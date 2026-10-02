@@ -209,15 +209,6 @@ func cacheTablePath(root string) string {
 	return filepath.Join(directory, "cohere", fmt.Sprintf("table-%x.gob", sum[:8]))
 }
 
-func cacheFilePath(prefix string, identity string) string {
-	directory, err := os.UserCacheDir()
-	if err != nil {
-		directory = os.TempDir()
-	}
-	sum := sha256.Sum256([]byte(identity))
-	return filepath.Join(directory, "cohere", fmt.Sprintf("%s-%x.json", prefix, sum[:8]))
-}
-
 // readFormatSection is the format record's section of this root's table, nil when there is none or the
 // table was discarded. The caller decides whether its key still holds.
 func readFormatSection(root string) *program.FormatSection {

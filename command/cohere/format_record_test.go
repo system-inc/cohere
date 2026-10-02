@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -16,16 +15,17 @@ import (
 // set it puts in scope, name by name. "Some files were in scope" is what a record that skips the wrong
 // ones also produces.
 
-// recordFixture is a project on disk with a declared submodule and an undeclared clone, an engine that
-// walks it for real, and the record kept in the test's own directory.
+// recordFixture is a project on disk with a declared submodule and an undeclared clone, and an engine
+// that walks it for real. The record lives in the real cache table, under a home of the test's own.
 type recordFixture struct {
-	root       string
-	recordPath string
-	engine     *fakeEngine
+	root   string
+	engine *fakeEngine
 }
 
 func newRecordFixture(t *testing.T) recordFixture {
 	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", "")
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{
 		"A.ts":         "export const a = 1;\n",
@@ -45,7 +45,7 @@ func newRecordFixture(t *testing.T) recordFixture {
 	engine.enumerate = func(directory string) (formatfiles.Enumeration, error) {
 		return formatfiles.Enumerate(directory, "", engine.Handles)
 	}
-	return recordFixture{root: root, recordPath: filepath.Join(t.TempDir(), "format.json"), engine: engine}
+	return recordFixture{root: root, engine: engine}
 }
 
 func (fixture recordFixture) path(name string) string {
@@ -56,7 +56,7 @@ func (fixture recordFixture) path(name string) string {
 // sorted, with the universe and the record it read.
 func (fixture recordFixture) scope(t *testing.T) ([]string, []string, *formatRecord, string) {
 	t.Helper()
-	record := loadFormatRecordAt(fixture.recordPath, fixture.root)
+	record := loadFormatRecord(fixture.root)
 	scope, universe := unformattedScope(fixture.engine, record, fixture.root, "")
 	return fixture.relative(t, scope.FileNames), universe, record, scope.Description
 }
@@ -78,7 +78,7 @@ func (fixture recordFixture) relative(t *testing.T, files []string) []string {
 // with a formatter that finds every file already formatted, and saves the record.
 func (fixture recordFixture) formatEverything(t *testing.T) {
 	t.Helper()
-	record := loadFormatRecordAt(fixture.recordPath, fixture.root)
+	record := loadFormatRecord(fixture.root)
 	scope, universe := unformattedScope(fixture.engine, record, fixture.root, "")
 	transform := record.observe(formatTransform(fixture.engine), fixture.engine.OptionsFingerprint)
 	for _, fileName := range scope.FileNames {
@@ -167,13 +167,9 @@ func TestADeletedFileLeavesTheScopeAndTheRecord(t *testing.T) {
 	if err := record.save(universe); err != nil {
 		t.Fatal(err)
 	}
-	contents, err := os.ReadFile(fixture.recordPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var stored formatRecordFile
-	if err := json.Unmarshal(contents, &stored); err != nil {
-		t.Fatal(err)
+	stored := readFormatSection(fixture.root)
+	if stored == nil {
+		t.Fatal("the record was not written to the cache table")
 	}
 	if _, kept := stored.Entries[fixture.path("B.ts")]; kept {
 		t.Fatal("the record kept an entry for a deleted file")
@@ -220,20 +216,9 @@ func TestARecordFromAnotherCohereSaysNothing(t *testing.T) {
 	fixture := newRecordFixture(t)
 	fixture.formatEverything(t)
 
-	contents, err := os.ReadFile(fixture.recordPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var stored formatRecordFile
-	if err := json.Unmarshal(contents, &stored); err != nil {
-		t.Fatal(err)
-	}
-	stored.Identity = "another cohere"
-	encoded, err := json.Marshal(stored)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(fixture.recordPath, encoded, 0o644); err != nil {
+	stored := readFormatSection(fixture.root)
+	stored.Key = "another cohere"
+	if err := writeFormatSection(fixture.root, stored); err != nil {
 		t.Fatal(err)
 	}
 
@@ -243,8 +228,8 @@ func TestARecordFromAnotherCohereSaysNothing(t *testing.T) {
 		t.Errorf("the scope line does not say why every file is in scope: %s", description)
 	}
 
-	// An unreadable record is the same answer, never an error.
-	if err := os.WriteFile(fixture.recordPath, []byte("{not json"), 0o644); err != nil {
+	// An unreadable table is the same answer, never an error.
+	if err := os.WriteFile(cacheTablePath(fixture.root), []byte("not a cache table"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	files, _, _, _ = fixture.scope(t)
@@ -266,7 +251,7 @@ func TestAVerifiedFileIsAnsweredByStatAndAnEditIsStillSeen(t *testing.T) {
 	if err := record.save(universe); err != nil {
 		t.Fatal(err)
 	}
-	reloaded := loadFormatRecordAt(fixture.recordPath, fixture.root)
+	reloaded := loadFormatRecord(fixture.root)
 	if entry := reloaded.entries[fixture.path("A.ts")]; entry.ModifiedNanoseconds == 0 {
 		t.Fatal("a file read and matched was given no signature, so every run reads it again")
 	}

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -41,9 +40,10 @@ import (
 //
 // # What makes the record say nothing
 //
-// The record is keyed by cohere's own identity (the binary, the project root, the platform), so a
-// rebuilt cohere, whose printers may print differently, starts with an empty record and formats every
-// file once. Each entry carries the options its file formats with, so a config edit sends exactly the
+// The record is a section of the project's cache table (see run_cache.go), keyed by cohere's own
+// identity (the binary, the project root, the platform), and the table itself is discarded whole by a
+// cohere built from another commit. So a rebuilt cohere, whose printers may print differently, starts
+// with an empty record and formats every file once. Each entry carries the options its file formats with, so a config edit sends exactly the
 // files it reaches back through the formatter. Any doubt, an unreadable record, a version it does not
 // know, is an empty record: the cost is one run that formats everything, never a file skipped on a
 // guess.
@@ -55,79 +55,42 @@ import (
 // makes, and it is stated in the same words there (see program.RunCache): a file whose bytes change
 // while its size and nanosecond modification time do not is invisible to it.
 
-// formatRecordVersion is bumped whenever an entry's meaning changes.
-const formatRecordVersion = 1
-
 type formatRecord struct {
-	path string
+	// root is the project root, whose cache table holds the record.
+	root string
 
-	// identity is cohere's own, empty when it could not be determined, in which case nothing is read or
-	// written and every file is in scope.
-	identity string
+	// key is cohere's own identity, the binary and the root, empty when it could not be determined, in
+	// which case nothing is read or written and every file is in scope. A section under another key
+	// says nothing about this cohere.
+	key string
 
 	// absent says why no earlier check is on record, and is empty when one was read.
 	absent string
 
 	mutex   sync.Mutex
-	entries map[string]formatRecordEntry
+	entries map[string]program.FormatEntry
 }
 
-type formatRecordEntry struct {
-	// Sum is the SHA-256 of a text the formatter left unchanged.
-	Sum string `json:"sum"`
-
-	// Options is the fingerprint of the options the text was formatted with.
-	Options string `json:"options"`
-
-	// Size and ModifiedNanoseconds are the file's signature when its bytes last matched Sum. Zero until
-	// a run has read them.
-	Size                int64 `json:"size,omitempty"`
-	ModifiedNanoseconds int64 `json:"modifiedNanoseconds,omitempty"`
-}
-
-type formatRecordFile struct {
-	Version  int                          `json:"version"`
-	Identity string                       `json:"identity"`
-	Entries  map[string]formatRecordEntry `json:"entries"`
-}
-
-// loadFormatRecord reads the record for a project root, from the user cache. It never fails: a record
-// that cannot be read is an empty one, and absent says why.
+// loadFormatRecord reads the record from the root's cache table. It never fails: a record that cannot
+// be read is an empty one, and absent says why.
 func loadFormatRecord(root string) *formatRecord {
-	return loadFormatRecordAt(cacheFilePath("format", root), root)
-}
-
-// loadFormatRecordAt is loadFormatRecord with the file named, so a test can keep it out of the user
-// cache.
-func loadFormatRecordAt(path string, root string) *formatRecord {
-	record := &formatRecord{path: path, entries: map[string]formatRecordEntry{}}
-	identity, err := program.RunCacheKey(nil, root, "format-record")
+	record := &formatRecord{root: root, entries: map[string]program.FormatEntry{}}
+	key, err := program.RunCacheKey(nil, root, "format-record")
 	if err != nil {
 		record.absent = fmt.Sprintf("cohere could not identify its own binary (%v)", firstLine(err.Error()))
 		return record
 	}
-	record.identity = identity
+	record.key = key
 
-	contents, err := os.ReadFile(record.path)
-	if errors.Is(err, os.ErrNotExist) {
+	// A table this cohere would discard, unreadable or written by another build, reads as no section.
+	section := readFormatSection(root)
+	switch {
+	case section == nil:
 		record.absent = "no earlier check is on record"
-		return record
-	}
-	if err != nil {
-		record.absent = fmt.Sprintf("the record could not be read (%v)", firstLine(err.Error()))
-		return record
-	}
-	var stored formatRecordFile
-	if err := json.Unmarshal(contents, &stored); err != nil {
-		record.absent = "the record could not be read"
-		return record
-	}
-	if stored.Version != formatRecordVersion || stored.Identity != identity {
+	case section.Key != key:
 		record.absent = "cohere changed since the last check, so its record says nothing about this one"
-		return record
-	}
-	if stored.Entries != nil {
-		record.entries = stored.Entries
+	case section.Entries != nil:
+		record.entries = section.Entries
 	}
 	return record
 }
@@ -136,7 +99,7 @@ func loadFormatRecordAt(path string, root string) *formatRecord {
 // they format with now, sorted.
 func (record *formatRecord) unformatted(files []string, optionsFor func(fileName string) (string, error)) []string {
 	confirmed := make([]bool, len(files))
-	if record.identity != "" {
+	if record.key != "" {
 		next := make(chan int, 256)
 		var workers sync.WaitGroup
 		for range min(runtime.NumCPU(), 8) {
@@ -210,7 +173,7 @@ func (record *formatRecord) formatted(fileName string, optionsFor func(fileName 
 // observe wraps a format transform so every text it returns is recorded as formatted. A nil record or
 // transform is handed back unchanged.
 func (record *formatRecord) observe(inner edit.Transform, optionsFor func(fileName string) (string, error)) edit.Transform {
-	if record == nil || inner == nil || record.identity == "" {
+	if record == nil || inner == nil || record.key == "" {
 		return inner
 	}
 	return func(fileName string, text string) (string, error) {
@@ -220,18 +183,19 @@ func (record *formatRecord) observe(inner edit.Transform, optionsFor func(fileNa
 		}
 		if options, optionsError := optionsFor(fileName); optionsError == nil {
 			record.mutex.Lock()
-			record.entries[fileName] = formatRecordEntry{Sum: formatRecordSum([]byte(formatted)), Options: options}
+			record.entries[fileName] = program.FormatEntry{Sum: formatRecordSum([]byte(formatted)), Options: options}
 			record.mutex.Unlock()
 		}
 		return formatted, nil
 	}
 }
 
-// save writes the record, atomically. universe, when not nil, is every file a default-scope run could
-// have formatted, and entries for anything outside it are dropped so the record does not keep files
-// that were deleted or are now ignored. A run with a narrower scope passes nil and drops nothing.
+// save writes the record into the root's cache table, leaving the table's other sections as they are.
+// universe, when not nil, is every file a default-scope run could have formatted, and entries for
+// anything outside it are dropped so the record does not keep files that were deleted or are now
+// ignored. A run with a narrower scope passes nil and drops nothing.
 func (record *formatRecord) save(universe []string) error {
-	if record == nil || record.identity == "" {
+	if record == nil || record.key == "" {
 		return nil
 	}
 	record.mutex.Lock()
@@ -241,7 +205,7 @@ func (record *formatRecord) save(universe []string) error {
 		for _, fileName := range universe {
 			inUniverse[fileName] = struct{}{}
 		}
-		kept := make(map[string]formatRecordEntry, len(entries))
+		kept := make(map[string]program.FormatEntry, len(entries))
 		for fileName, entry := range entries {
 			if _, present := inUniverse[fileName]; present {
 				kept[fileName] = entry
@@ -249,43 +213,14 @@ func (record *formatRecord) save(universe []string) error {
 		}
 		entries = kept
 	}
-	encoded, err := json.Marshal(formatRecordFile{Version: formatRecordVersion, Identity: record.identity, Entries: entries})
+	section := &program.FormatSection{Key: record.key, Entries: entries}
 	record.mutex.Unlock()
-	if err != nil {
-		return fmt.Errorf("encoding the format record: %w", err)
-	}
-	return writeFileAtomically(record.path, encoded)
+	return writeFormatSection(record.root, section)
 }
 
 func formatRecordSum(contents []byte) string {
 	sum := sha256.Sum256(contents)
 	return hex.EncodeToString(sum[:])
-}
-
-// writeFileAtomically writes through a temporary in the destination directory and a rename, so two runs
-// sharing a tree never read half of what the other wrote.
-func writeFileAtomically(path string, contents []byte) error {
-	directory := filepath.Dir(path)
-	if err := os.MkdirAll(directory, 0o755); err != nil {
-		return fmt.Errorf("creating %s: %w", directory, err)
-	}
-	temporary, err := os.CreateTemp(directory, "."+filepath.Base(path)+"-*")
-	if err != nil {
-		return fmt.Errorf("creating a temporary in %s: %w", directory, err)
-	}
-	temporaryName := temporary.Name()
-	defer os.Remove(temporaryName)
-	if _, err := temporary.Write(contents); err != nil {
-		temporary.Close()
-		return fmt.Errorf("writing %s: %w", temporaryName, err)
-	}
-	if err := temporary.Close(); err != nil {
-		return fmt.Errorf("closing %s: %w", temporaryName, err)
-	}
-	if err := os.Rename(temporaryName, path); err != nil {
-		return fmt.Errorf("renaming %s into place: %w", path, err)
-	}
-	return nil
 }
 
 // formatUniverse is every file the default format scope is drawn from: what the formatter handles
