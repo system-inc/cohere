@@ -1,10 +1,14 @@
 package registry
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/internal/types/program"
 )
 
 // crashShapes are source snippets whose optional nodes are absent.
@@ -44,7 +48,39 @@ var crashShapes = []string{
 	// optional node absent at once.
 	"",
 	"// nothing here\n",
+
+	// A node that is present and of a kind the rule did not expect, which is a different class from
+	// every shape above. A shared `case A, B:` arm reaching for one kind's accessor panics on the
+	// other, because `As*()` is an interface conversion rather than a cast: `AsCallExpression()` on a
+	// NewExpression crashed prefer-arrow-callback on 71 real files (#qa9nttp). Its neighbours are the
+	// other pairs a porter would put in one arm.
+	"declare class Foo { constructor(callback: () => void); }\nexport const made = new Foo(function () {});\n",
+	"declare class Foo { constructor(callback: () => void); }\nexport const made = new Foo(() => {});\n",
+	"declare function tag(strings: TemplateStringsArray): string;\nexport const tagged = tag`text`;\n",
+	"export class Base {}\nexport class Derived extends Base { constructor() { super(); } }\n",
 }
+
+// typedCorpusConfig is the corpus's tsconfig. The harness's own, plus what the shapes ask of it: JSX
+// for the .tsx paths, and imports written with their .ts extension.
+const typedCorpusConfig = `{
+	"compilerOptions": {
+		"strict": true,
+		"target": "ES2022",
+		"lib": ["ES2022"],
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"allowImportingTsExtensions": true,
+		"noEmit": true,
+		"jsx": "react-jsx",
+		"moduleDetection": "force",
+		"types": []
+	},
+	"include": ["**/*.ts", "**/*.tsx"]
+}`
+
+// networkServiceStub is what the shapes import as './NetworkService.ts'.
+const networkServiceStub = "export const networkService = {\n" +
+	"    useGraphQlQuery(...parameters: unknown[]): unknown { return parameters; },\n};\n"
 
 // No registered rule may crash on a shape whose optional nodes are absent.
 //
@@ -94,5 +130,72 @@ func TestNoRegisteredRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// No registered rule may crash on the corpus when it has types.
+//
+// The sweep above runs every rule through rule_testing.Run, which walks with no checker. 154 of the
+// registered rules then return early or skip every path that asks a type question, so the sweep
+// passed while their typed half never ran. prefer-arrow-callback's shared arm was the proof: its own
+// regression test panicked, all 111 upstream fixtures passed, and the sweep above passed, because the
+// arm sat behind a checker. Adding a shape could not fix that; the harness was the gap (#qa9nttp).
+//
+// So the corpus is also built into one typed program, every shape at every path, and one walk runs
+// every registered rule over it. One build rather than one per rule and shape is what makes the typed
+// half affordable. The walk contains a rule's panic to that rule and names it (cf5afb6), so this reads
+// the crashes the walk names rather than recovering on its own, and a run with several crashing
+// rules names every one.
+func TestNoRegisteredRuleCrashesOnTheCorpusWithTypes(t *testing.T) {
+	rules := All()
+	directory := t.TempDir()
+	files := map[string]string{"tsconfig.json": typedCorpusConfig}
+	for index, source := range crashShapes {
+		for _, folder := range []string{"source/api", "source/components", fmt.Sprintf("app/thing%d", index)} {
+			files[folder+"/NetworkService.ts"] = networkServiceStub
+		}
+		files[fmt.Sprintf("source/api/ThingRequest%d.ts", index)] = source
+		files[fmt.Sprintf("source/components/ThingRequest%d.tsx", index)] = source
+		files[fmt.Sprintf("app/thing%d/page.tsx", index)] = source
+	}
+	for name, contents := range files {
+		path := filepath.Join(directory, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory})
+	if err != nil {
+		t.Fatalf("building the corpus program: %v", err)
+	}
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
+	if err != nil {
+		t.Fatalf("walking the corpus: %v", err)
+	}
+
+	// Every type-aware rule must have been handed a file, or this proved nothing about it.
+	typed := 0
+	for _, subject := range rules {
+		if !subject.NeedsTypeChecker {
+			continue
+		}
+		typed++
+		if result.Coverage.RulesOffered[subject.Name] == 0 {
+			t.Errorf("type-aware rule %s was offered no file of the corpus, so its typed half went unswept", subject.Name)
+		}
+	}
+	if typed == 0 {
+		t.Fatal("no registered rule declares NeedsTypeChecker, so the typed sweep proved nothing")
+	}
+
+	for _, crash := range result.Coverage.RulesCrashed {
+		t.Errorf("rule %s crashed on %s with types: %v", crash.RuleName, filepath.Base(crash.FileName), crash.Cause)
+	}
+	for _, crash := range result.Coverage.FilesCrashed {
+		t.Errorf("%s crashed outside any rule with types: %v", filepath.Base(crash.FileName), crash.Cause)
 	}
 }
