@@ -56,6 +56,9 @@ var messageMultilineArrow = rule.Message{
 //
 // A React hook or addEventListener argument reports through its own message and must not be reported
 // twice, so the general case skips what the call-expression case already claimed.
+//
+// All three findings carry the original's fix, which rewrites the arrow in place as a function
+// expression; `arrowFunctionFix` holds the conversion and the places it declines.
 var ConsistencyNoMultilineArrowFunction = rule.Rule{
 	Name: "nexus/consistency-no-multiline-arrow-function",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
@@ -87,12 +90,12 @@ var ConsistencyNoMultilineArrowFunction = rule.Rule{
 
 				if isReactHookCallee(objectName, propertyName) && len(arguments) > 0 &&
 					arguments[0].Kind == ast.KindArrowFunction {
-					ctx.ReportNode(arguments[0], messageReactHookArrow(propertyName))
+					reportArrow(ctx, arguments[0], messageReactHookArrow(propertyName))
 					return
 				}
 				if propertyName == "addEventListener" && len(arguments) > 1 &&
 					arguments[1].Kind == ast.KindArrowFunction {
-					ctx.ReportNode(arguments[1], messageAddEventListenerArrow)
+					reportArrow(ctx, arguments[1], messageAddEventListenerArrow)
 				}
 			},
 
@@ -119,7 +122,7 @@ var ConsistencyNoMultilineArrowFunction = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(node, messageMultilineArrow)
+				reportArrow(ctx, node, messageMultilineArrow)
 			},
 		}
 	},
@@ -198,4 +201,167 @@ func isClaimedByCallExpressionCase(node *ast.Node) bool {
 	}
 	propertyName := access.Name().Text()
 	return isReactHookCallee(objectName, propertyName) || propertyName == "addEventListener"
+}
+
+// reportArrow reports an arrow with the conversion attached when the conversion keeps its meaning.
+func reportArrow(ctx rule.Context, arrow *ast.Node, message rule.Message) {
+	if fix, isSafe := arrowFunctionFix(ctx, arrow); isSafe {
+		ctx.ReportNodeWithFixes(arrow, message, fix)
+		return
+	}
+	ctx.ReportNode(arrow, message)
+}
+
+// arrowFunctionFix rewrites an arrow as a function expression, the TypeScript original's fix.
+//
+//	async <T>(value: T): Promise<T> => { ... }   ->   async function<T>(value: T): Promise<T> { ... }
+//	value => value * 2                           ->   function(value) { return value * 2; }
+//
+// The signature (type parameters, parameter list, return type) is copied from the source between
+// the arrow's start and its own `=>` token, which the parser hands over directly, so an arrow inside
+// a parameter's type cannot be mistaken for this one's. The type parameters come off the front by
+// their AST span rather than by counting angle brackets, for the original's reason: a default like
+// `<T extends Record<string, () => void>>` nests both. A bare single parameter gains parentheses,
+// and an expression body becomes a block that returns it.
+//
+// # Where this differs from the original, each time in the direction of not breaking code
+//
+// The original strips `async ` by text and slices the type parameters at an offset measured from the
+// node's start, which still counts the `async` it just removed. Both go wrong on shapes the parser
+// accepts: `async(value) => {}` keeps its `async(` and becomes `async function async(value)`, and
+// `async <T>(value: T) => {}` slices the parameter list mid-token. Here the signature starts after the
+// async modifier's own token, so both convert cleanly.
+//
+// The original converts whatever it reports, and the call-expression findings never asked whether
+// the arrow uses `this`, so `React.useCallback(() => { this.x })` became a function with its own
+// `this`. A function binds `this`, `arguments` and `new.target` where an arrow inherits them, and
+// `super` is not even legal in one, so an arrow reading any of the four, in its body or in a
+// parameter default, is still reported and is not rewritten.
+//
+// An expression body that the parser wraps in parentheses is returned without them, matching the
+// original's output: ESTree has no parenthesized node, so `getText(node.body)` never included them.
+func arrowFunctionFix(ctx rule.Context, node *ast.Node) (rule.Fix, bool) {
+	sourceFile := ctx.SourceFile
+	if sourceFile == nil || node == nil || node.Kind != ast.KindArrowFunction {
+		return rule.Fix{}, false
+	}
+	arrow := node.AsArrowFunction()
+	if arrow == nil || arrow.Body == nil || arrow.EqualsGreaterThanToken == nil {
+		return rule.Fix{}, false
+	}
+	if readsInheritedBinding(node) {
+		return rule.Fix{}, false
+	}
+
+	text := sourceFile.Text()
+	signatureStart := rule.TokenRange(sourceFile, node).Pos()
+	asyncKeyword := ""
+	if modifiers := node.Modifiers(); modifiers != nil {
+		for _, modifier := range modifiers.Nodes {
+			if modifier.Kind == ast.KindAsyncKeyword {
+				asyncKeyword = "async "
+				signatureStart = scanner.SkipTrivia(text, modifier.End())
+			}
+		}
+	}
+	arrowTokenStart := rule.TokenRange(sourceFile, arrow.EqualsGreaterThanToken).Pos()
+
+	generics := ""
+	parametersStart := signatureStart
+	if arrow.TypeParameters != nil {
+		// The list's end already includes a trailing comma, so `<T,>` lands here on the `>` too;
+		// the `.tsx` fix vector is what pins that.
+		closingAngle := scanner.SkipTrivia(text, arrow.TypeParameters.End())
+		if closingAngle >= arrowTokenStart || text[closingAngle] != '>' {
+			return rule.Fix{}, false
+		}
+		generics = strings.TrimSpace(text[signatureStart : closingAngle+1])
+		parametersStart = closingAngle + 1
+	}
+	if parametersStart > arrowTokenStart {
+		return rule.Fix{}, false
+	}
+
+	signature := strings.TrimSpace(text[parametersStart:arrowTokenStart])
+	if !strings.HasPrefix(signature, "(") {
+		signature = "(" + signature + ")"
+	}
+
+	body := arrow.Body
+	replacementBody := ""
+	if body.Kind == ast.KindBlock {
+		bodyRange := rule.TokenRange(sourceFile, body)
+		replacementBody = text[bodyRange.Pos():bodyRange.End()]
+	} else {
+		for body.Kind == ast.KindParenthesizedExpression {
+			body = body.AsParenthesizedExpression().Expression
+		}
+		bodyRange := rule.TokenRange(sourceFile, body)
+		replacementBody = "{ return " + text[bodyRange.Pos():bodyRange.End()] + "; }"
+	}
+
+	return ctx.ReplaceNode(node, asyncKeyword+"function"+generics+signature+" "+replacementBody), true
+}
+
+// readsInheritedBinding reports whether an arrow reads something it inherits and a function would
+// bind for itself: `this`, `arguments`, `new.target`, or `super`.
+//
+// Searched the way `usesThis` searches, through nested arrows (which inherit the same four) and not
+// into nested functions or methods (which bind their own), but over the parameters as well as the
+// body, since a default value is evaluated in the same scope. It does descend into a nested class,
+// whose field initializers and computed keys can read the outer `this`; that over-refuses a class
+// whose own members use `this`, which costs a fix and never a wrong one.
+func readsInheritedBinding(arrow *ast.Node) bool {
+	found := false
+	var walk func(current *ast.Node)
+	walk = func(current *ast.Node) {
+		if current == nil || found {
+			return
+		}
+		switch current.Kind {
+		case ast.KindThisKeyword, ast.KindSuperKeyword:
+			found = true
+			return
+		case ast.KindMetaProperty:
+			// `new.target` is bound per function; `import.meta` is the module's and survives.
+			if current.AsMetaProperty().KeywordToken == ast.KindNewKeyword {
+				found = true
+				return
+			}
+		case ast.KindIdentifier:
+			if current.Text() == "arguments" && !isPropertyNamePosition(current) {
+				found = true
+			}
+			return
+		case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindMethodDeclaration,
+			ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
+			return
+		}
+		current.ForEachChild(func(child *ast.Node) bool {
+			walk(child)
+			return found
+		})
+	}
+	arrow.ForEachChild(func(child *ast.Node) bool {
+		walk(child)
+		return found
+	})
+	return found
+}
+
+// isPropertyNamePosition reports an identifier that names a property rather than reading a binding:
+// the right half of `thing.arguments`, or a key in `{ arguments: 1 }`.
+func isPropertyNamePosition(identifier *ast.Node) bool {
+	parent := identifier.Parent
+	if parent == nil {
+		return false
+	}
+	switch parent.Kind {
+	case ast.KindPropertyAccessExpression:
+		return parent.AsPropertyAccessExpression().Name() == identifier
+	case ast.KindPropertyAssignment, ast.KindPropertyDeclaration, ast.KindPropertySignature,
+		ast.KindMethodDeclaration, ast.KindMethodSignature:
+		return parent.Name() == identifier
+	}
+	return false
 }
