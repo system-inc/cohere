@@ -122,11 +122,8 @@ var AwaitThenable = rule.Rule{
 	// All four listeners read ctx.TypeChecker unconditionally, so the checker is required.
 	NeedsTypeChecker: true,
 
-	// The aggregator arm asks whether a receiver is the default library's `PromiseConstructor`,
-	// which reads `program.IsSourceFileDefaultLibrary` per declaration. That depends on files this
-	// one does not name, so a findings cache keyed on this file's hash alone would serve a stale
-	// result.
-	ReadsProgram: true,
+	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {

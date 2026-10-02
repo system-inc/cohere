@@ -15,7 +15,6 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 )
@@ -76,7 +75,7 @@ type Diagnostic struct {
 // type-phase failure before any rule runs.
 type Context struct {
 	SourceFile  *ast.SourceFile
-	Program     *compiler.Program
+	Program     Program
 	TypeChecker *checker.Checker
 
 	// Report emits a finding. Prefer the helpers below, which spare a rule from restating how to
@@ -276,39 +275,21 @@ type Rule struct {
 	// or stay on name matching with the shadowing hazard written at their own site.
 	NeedsTypeChecker bool
 
-	// ReadsProgram declares that this rule reads something outside the file it was handed.
+	// ProgramReads declares what this rule reads through ctx.Program beyond the file it was handed.
+	// See ProgramRead for the kinds and what covers each.
 	//
-	// `ctx.Program` reaches every source file in the run, so a rule that touches it is not pure
-	// per-file even when it declares NeedsTypeChecker false. Eleven rules do this today, counted
-	// 2026-08-25 by grepping for the declaration rather than from memory: the two this note
-	// originally named (localization-no-untranslated-value reads the English translation table,
-	// boundary-no-project-theme-value scans every theme file), five tailwind rules that resolve
-	// classes against the design system, three typescript rules, and react/unsupported-syntax.
+	// The declaration exists for the findings cache, and the failure it prevents is the one this tool
+	// exists to catch. A cache keyed on one file serves a stale result when something the rule also
+	// read has changed and the key has not: zero findings, forever, indistinguishable from a clean
+	// tree. So it cannot live in a convention, and ctx.Program enforces it: a method outside the
+	// declaration panics with the rule's name, and the walk names the panic on every run.
 	//
-	// The count is recorded with its date because it drifts, and it drifted badly once already:
-	// this note read "two rules" long after the tailwind family landed. Trust the grep over the
-	// prose, and prefer reading the number off the declarations to citing it from here.
-	//
-	// The flag exists for the findings cache, and the failure it prevents is the one this tool
-	// exists to catch. A cache keyed on one file's hash serves a stale result when a file the rule
-	// also read has changed and the linted file has not: zero findings, forever, indistinguishable
-	// from a clean tree. Nothing else notices.
-	//
-	// So this cannot live in a convention. A future rule author reaching for ctx.Program has no
-	// reason to know they broke caching, exactly as NeedsTypeChecker exists because the analogous
-	// property could not live in discipline either. The failure is worse here: a nil checker is a
-	// loud crash, a stale cache is silence.
-	//
-	// The declaration is asymmetric on purpose, the same way NeedsTypeChecker is: under-declaring
-	// serves stale findings forever, over-declaring costs a cache miss. Those are not comparable, so
-	// anything that cannot see whether it reads the program declares true.
-	//
-	// That rule used to have a standing exception. The adapter at internal/rules/upstream handed
-	// ctx.Program to rules whose bodies it did not own, so it declared this true for all of them by
-	// assumption. The adapter is gone and the six rules it wrapped were absorbed, which made the
-	// question answerable per rule: two of them genuinely read the program and declare it, four do
-	// not and no longer claim to. Every rule in the tree now declares this from its own body.
-	ReadsProgram bool
+	// It replaced ReadsProgram, one flag for every kind, which kept 45 rules out of the cache although
+	// most read only compiler options, the default library, or their own file's module resolution,
+	// all of which the key already covers. Declaring more than a rule reads costs a cache miss;
+	// declaring less is refused at the read. A rule reading a helper's program methods declares what
+	// the helper reads.
+	ProgramReads ProgramRead
 
 	// ResolvesReactValueTypes declares that this rule identifies a React value by asking the checker
 	// for its TYPE, so a file where the hook call resolves to `any` costs it every finding it would

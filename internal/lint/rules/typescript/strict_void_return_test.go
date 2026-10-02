@@ -309,7 +309,7 @@ func TestStrictVoidReturnFiresOnUpstreamFailCases(t *testing.T) {
 	}
 }
 
-// TestStrictVoidReturnNeedsTheTypedHarness pins both declarations.
+// TestStrictVoidReturnNeedsTheTypedHarness pins the checker declaration.
 //
 // Under the plain harness the checker is nil and every listener returns immediately, so the clean
 // fixtures would pass having proven nothing.
@@ -318,9 +318,6 @@ func TestStrictVoidReturnNeedsTheTypedHarness(t *testing.T) {
 
 	if !StrictVoidReturn.NeedsTypeChecker {
 		t.Fatal("every finding comes from a contextual type, so the checker is required")
-	}
-	if !StrictVoidReturn.ReadsProgram {
-		t.Fatal("the contextual type comes from signatures in other modules, so the program is read")
 	}
 
 	rule_testing.ExpectClean(t, rule_testing.Run(t, StrictVoidReturn, strictVoidReturnFile,

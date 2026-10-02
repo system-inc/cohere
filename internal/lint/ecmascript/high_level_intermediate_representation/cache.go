@@ -57,9 +57,10 @@ import (
 //
 // It is not run-scoped state and it reaches nothing outside the file. A lowering is derived purely
 // from a function node in the file being linted plus that file's checker, and the cache is created
-// and discarded per file by the walk. So no rule using this acquires the `ReadsProgram` property,
-// and the hash-keyed findings cache stays correct: nothing here can make one file's result depend
-// on another file's contents, which is the failure `ReadsProgram` exists to declare.
+// and discarded per file by the walk. So no rule using this acquires a `ProgramReads` declaration,
+// and the findings cache stays correct: nothing here can make one file's result depend on another
+// file's contents beyond what the checker already answers, which is the failure `ProgramReads`
+// exists to declare.
 func ForFunction(ctx rule.Context, node *ast.Node) *Function {
 	if node == nil {
 		return nil

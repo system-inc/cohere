@@ -74,11 +74,8 @@ type NoConflictingClassesOptions struct {
 // picks for them.
 var NoConflictingClasses = rule.Rule{
 	Name: "better-tailwindcss/no-conflicting-classes",
-	// Declared because the rule reaches ctx.Program for the design system. The stylesheet graph
-	// reaches files the program does not contain, so a findings cache keyed on the linted file alone
-	// is stale whenever an `@utility` block changes what a class declares and the `.tsx` file does
-	// not.
-	ReadsProgram: true,
+	// The design system, whose stylesheets are read off the file system, outside the program.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

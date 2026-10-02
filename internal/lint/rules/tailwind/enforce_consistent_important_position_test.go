@@ -12,7 +12,7 @@ import (
 //
 // These fixtures use `rule_testing.Run` rather than the class-order suite's program harness, and that
 // is a claim about the rule rather than a shortcut: the marker's position is a property of the
-// string, so this rule asks nothing of the design system and declares no ReadsProgram. The proof it
+// string, so this rule asks nothing of the design system and declares no ProgramReads. The proof it
 // needs none is `unknown class carries the marker` below, which reports on a class no theme
 // defines.
 func runImportantPositionFixture(t *testing.T, source string) rule_testing.Result {

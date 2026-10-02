@@ -73,11 +73,6 @@ var NoUnnecessaryQualifier = rule.Rule{
 	// visible at this point, and are those the same symbol.
 	NeedsTypeChecker: true,
 
-	// The scope lookup resolves against the whole program rather than this file: a namespace can be
-	// declared in another file and merged, and an aliased namespace import resolves across a module
-	// boundary. A findings cache keyed on this file's hash alone would serve a stale verdict.
-	ReadsProgram: true,
-
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {

@@ -83,14 +83,6 @@ var PreferIncludes = rule.Rule{
 	Name:             "@typescript-eslint/prefer-includes",
 	NeedsTypeChecker: true,
 
-	// ReadsProgram is declared because the verdict for one file depends on the program that file was
-	// compiled in: whether `includes` exists on a type is answered from the default library and from
-	// declarations that may live in other files, so the same source can report or not depending on
-	// what the program contains. Undeclared, a findings cache keyed on this file's hash would keep
-	// serving an answer computed under a program that has since changed, which is silence rather
-	// than a crash.
-	ReadsProgram: true,
-
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

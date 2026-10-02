@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/checking"
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -914,22 +915,21 @@ func TestOnlyThrowErrorUndeclaredIdentifier(t *testing.T) {
 	rule_testing.ExpectClean(t, runOnlyThrowError(t, "throw notDeclaredAnywhere;", nil))
 }
 
-// TestOnlyThrowErrorReadsProgram pins the ReadsProgram declaration, and proves the claim behind it.
+// TestOnlyThrowErrorDependsOnAnotherFile pins what the rule reads, and proves the cross-file claim the
+// findings cache has to honor.
 //
-// The declaration is not bookkeeping. `internal/dispatch` keys a findings cache on a file's hash,
-// so a rule whose verdict depends on ANOTHER file must say so or the cache serves a stale answer.
-//
-// The assertion alone would be circular, so the cross-file case is measured: a class declared in a
-// second module extending the built-in `Error`, thrown from this one. `IsErrorLike` walks the base
-// types and asks the program whether each declaration's source file is a default library, which is
-// a question this file's bytes cannot answer. Flipping only the OTHER file, from `extends Error` to
-// no heritage, flips the verdict here while this file is untouched, which is exactly the staleness
-// the cache would produce.
-func TestOnlyThrowErrorReadsProgram(t *testing.T) {
+// The cross-file case is measured: a class declared in a second module extending the built-in
+// `Error`, thrown from this one. `IsErrorLike` walks the base types and asks whether each
+// declaration's source file is a default library, which this file's bytes cannot answer. Flipping
+// only the OTHER file, from `extends Error` to no heritage, flips the verdict here while this file is
+// untouched. The cache honors that through the type fingerprint, which covers other.ts as an import,
+// and the default library through the binary in its key; what the rule reads through ctx.Program is
+// the compiler options and the default library, and nothing else (#b8k3bp6).
+func TestOnlyThrowErrorDependsOnAnotherFile(t *testing.T) {
 	t.Parallel()
 
-	if !OnlyThrowError.ReadsProgram {
-		t.Fatal("OnlyThrowError must declare ReadsProgram: IsErrorLike and the allow specifiers both read ctx.Program")
+	if OnlyThrowError.ProgramReads != rule.ReadsCompilerOptions|rule.ReadsDefaultLibrary {
+		t.Fatalf("OnlyThrowError must declare what IsErrorLike and the allow specifiers read; declares %s", OnlyThrowError.ProgramReads)
 	}
 
 	subject := "import { Wrapped } from './other';\nthrow new Wrapped();"

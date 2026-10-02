@@ -11,8 +11,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
 type TypeOrValueSpecifierFrom uint8
@@ -58,9 +58,9 @@ func typeMatchesStringSpecifier(
 func typeDeclaredInFile(
 	relativePath string,
 	declarationFiles []*ast.SourceFile,
-	program *compiler.Program,
+	program rule.Program,
 ) bool {
-	cwd := program.Host().GetCurrentDirectory()
+	cwd := program.GetCurrentDirectory()
 	if relativePath == "" {
 		return Some(declarationFiles, func(f *ast.SourceFile) bool {
 			return strings.HasPrefix(f.FileName(), cwd)
@@ -74,7 +74,7 @@ func typeDeclaredInFile(
 
 func typeDeclaredInLib(
 	declarationFiles []*ast.SourceFile,
-	program *compiler.Program,
+	program rule.Program,
 ) bool {
 	// Assertion: The type is not an error type.
 
@@ -117,7 +117,7 @@ func typeDeclaredInDeclareModule(
 func typeDeclaredInDeclarationFile(
 	packageName string,
 	declarationFiles []*ast.SourceFile,
-	program *compiler.Program,
+	program rule.Program,
 ) bool {
 	// typesPackageName := ""
 	//  // Handle scoped packages: if the name starts with @, remove it and replace / with __
@@ -147,7 +147,7 @@ func typeDeclaredInPackageDeclarationFile(
 	packageName string,
 	declarations []*ast.Node,
 	declarationFiles []*ast.SourceFile,
-	program *compiler.Program,
+	program rule.Program,
 ) bool {
 	return typeDeclaredInDeclareModule(packageName, declarations) ||
 		typeDeclaredInDeclarationFile(packageName, declarationFiles, program)
@@ -156,7 +156,7 @@ func typeDeclaredInPackageDeclarationFile(
 func typeMatchesSpecifier(
 	t *checker.Type,
 	specifier TypeOrValueSpecifier,
-	program *compiler.Program,
+	program rule.Program,
 ) bool {
 	// A UNION matches only when EVERY member matches, and an INTERSECTION when ANY member does.
 	//
@@ -203,7 +203,7 @@ func typeMatchesSpecifier(
 func wholeTypeMatchesSpecifier(
 	t *checker.Type,
 	specifier TypeOrValueSpecifier,
-	program *compiler.Program,
+	program rule.Program,
 ) bool {
 	// The error type has a symbol whose name can incidentally match a specifier, so upstream
 	// declines it before any name comparison. `TypeMatchesSomeSpecifier` also skips it, but only
@@ -247,7 +247,7 @@ func TypeMatchesSomeSpecifier(
 	t *checker.Type,
 	specifiers []TypeOrValueSpecifier,
 	inlineSpecifiers []string,
-	program *compiler.Program,
+	program rule.Program,
 ) bool {
 	if Some(specifiers, func(s TypeOrValueSpecifier) bool {
 		return typeMatchesSpecifier(t, s, program)
@@ -327,7 +327,7 @@ func staticNameOfNode(node *ast.Node) (string, bool) {
 func valueMatchesSpecifier(
 	node *ast.Node,
 	specifier TypeOrValueSpecifier,
-	program *compiler.Program,
+	program rule.Program,
 	subject *checker.Type,
 ) bool {
 	staticName, named := staticNameOfNode(node)
@@ -377,7 +377,7 @@ func ValueMatchesSomeSpecifier(
 	node *ast.Node,
 	specifiers []TypeOrValueSpecifier,
 	inlineSpecifiers []string,
-	program *compiler.Program,
+	program rule.Program,
 	subject *checker.Type,
 ) bool {
 	staticName, named := staticNameOfNode(node)

@@ -199,13 +199,8 @@ var NoImpliedEval = rule.Rule{
 	// required rather than opportunistic.
 	NeedsTypeChecker: true,
 
-	// `isFunctionType` and the `Function` arm both call `type_checking.IsBuiltinSymbolLike(ctx.Program, ...)`,
-	// which walks the program's own default-library files to decide whether a type is the builtin
-	// `Function`. That is a read outside the file being linted, so the findings cache must not key on
-	// that file alone. While this rule was adapted, `upstream.Adapt` set this flag on every rule it
-	// wrapped without being able to see whether the rule read the program; here it is declared
-	// because the two call sites below are visible in this file.
-	ReadsProgram: true,
+	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		getCalleeName := func(node *ast.Expression) string {

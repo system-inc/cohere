@@ -50,7 +50,7 @@ type EnforceConsistentImportantPositionOptions struct {
 //
 // Unlike its siblings here it asks nothing of the theme: the marker's position is a property of the
 // string. `!unknown-class` reports, measured against upstream, which is the tell that membership is
-// not part of the question. So this rule does not declare ReadsProgram and does not pay for a
+// not part of the question. So this rule declares no ProgramReads and does not pay for a
 // design system it would not read.
 //
 // Variants are stripped before the marker is looked for, because `hover:!flex` carries its marker on

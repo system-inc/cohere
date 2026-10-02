@@ -213,9 +213,8 @@ var UnsupportedSyntax = rule.Rule{
 	// for a shadowing parameter, and nothing in the abstract syntax tree distinguishes them.
 	NeedsTypeChecker: true,
 
-	// `type_checking.IsSymbolFromDefaultLibrary` takes the compiled unit, so the handle is genuinely
-	// read here rather than only named in prose.
-	ReadsProgram: true,
+	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

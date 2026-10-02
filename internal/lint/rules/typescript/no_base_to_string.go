@@ -140,9 +140,8 @@ var NoBaseToString = rule.Rule{
 	// Every finding is decided by walking a type, so there is no syntactic subset of this rule.
 	NeedsTypeChecker: true,
 
-	// `isBuiltinSymbolToPrimitive` calls type_checking.IsSymbolFromDefaultLibrary, which walks the
-	// program's default-library files.
-	ReadsProgram: true,
+	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[NoBaseToStringOptions](options)

@@ -406,7 +406,7 @@ func proposalsForText(
 		currentRule := subject
 		context := rule.Context{
 			SourceFile: sourceFile,
-			Program:    graph.Program,
+			Program:    rule.ViewProgram(graph.Program, sourceFile, currentRule),
 			Report: func(diagnostic rule.Diagnostic) {
 				diagnostic.RuleName = currentRule.Name
 				if diagnostic.SourceFile == nil {

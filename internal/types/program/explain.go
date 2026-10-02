@@ -145,7 +145,7 @@ func (g *Graph) Explain(ctx context.Context, sourceFile *ast.SourceFile, rules [
 		start := time.Now()
 		listeners := subject.Run(rule.Context{
 			SourceFile:  sourceFile,
-			Program:     g.Program,
+			Program:     rule.ViewProgram(g.Program, sourceFile, subject),
 			TypeChecker: fileChecker,
 			FileCache:   fileCache,
 			Report:      report,

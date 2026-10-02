@@ -71,9 +71,8 @@ func messageIdenticalToSource(key string, locale string, value string) rule.Mess
 var LocalizationNoUntranslatedValue = rule.Rule{
 	Name: "nexus/localization-no-untranslated-value",
 
-	// Reads the English translation table out of the program, so a findings cache keyed on the
-	// linted file alone would go stale when en.ts changes and this file does not.
-	ReadsProgram: true,
+	// The English translation table, en.ts, which this file does not import.
+	ProgramReads: rule.ReadsOtherFiles,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

@@ -79,10 +79,8 @@ type EnforceConsistentVariantOrderOptions struct {
 // `better-tailwindcss/enforce-consistent-variant-order` line a project already has.
 var EnforceConsistentVariantOrder = rule.Rule{
 	Name: "better-tailwindcss/enforce-consistent-variant-order",
-	// Declared for the reason `enforce-consistent-class-order` declares it: the rule reaches
-	// ctx.Program for the design system, whose stylesheet graph reaches files the program does not
-	// contain, so a findings cache keyed on the linted file alone goes stale when theme.css changes.
-	ReadsProgram: true,
+	// The design system, whose stylesheets are read off the file system, outside the program.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

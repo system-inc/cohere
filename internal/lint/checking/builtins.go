@@ -9,19 +9,19 @@ package type_checking
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-func ComparePaths(a string, b string, program *compiler.Program) int {
+func ComparePaths(a string, b string, program rule.Program) int {
 	return tspath.ComparePaths(a, b, tspath.ComparePathsOptions{
-		CurrentDirectory:          program.Host().GetCurrentDirectory(),
-		UseCaseSensitiveFileNames: program.Host().FS().UseCaseSensitiveFileNames(),
+		CurrentDirectory:          program.GetCurrentDirectory(),
+		UseCaseSensitiveFileNames: program.UseCaseSensitiveFileNames(),
 	})
 }
 
-func IsSourceFileDefaultLibrary(program *compiler.Program, file *ast.SourceFile) bool {
+func IsSourceFileDefaultLibrary(program rule.Program, file *ast.SourceFile) bool {
 	if !file.IsDeclarationFile {
 		return false
 	}
@@ -40,12 +40,12 @@ func IsSourceFileDefaultLibrary(program *compiler.Program, file *ast.SourceFile)
 	var libs []string
 	if options.Lib == nil {
 		name := tsoptions.GetDefaultLibFileName(options)
-		libs = append(libs, tspath.CombinePaths(program.Host().DefaultLibraryPath(), name))
+		libs = append(libs, tspath.CombinePaths(program.DefaultLibraryPath(), name))
 	} else {
 		for _, lib := range options.Lib {
 			name, ok := tsoptions.GetLibFileName(lib)
 			if ok {
-				libs = append(libs, tspath.CombinePaths(program.Host().DefaultLibraryPath(), name))
+				libs = append(libs, tspath.CombinePaths(program.DefaultLibraryPath(), name))
 			}
 			// !!! error on unknown name
 		}
@@ -57,7 +57,7 @@ func IsSourceFileDefaultLibrary(program *compiler.Program, file *ast.SourceFile)
 }
 
 func IsSymbolFromDefaultLibrary(
-	program *compiler.Program,
+	program rule.Program,
 	symbol *ast.Symbol,
 ) bool {
 	if symbol == nil {
@@ -83,7 +83,7 @@ func IsSymbolFromDefaultLibrary(
  * ```
  */
 func IsPromiseLike(
-	program *compiler.Program,
+	program rule.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type) bool {
 	return IsBuiltinSymbolLike(program, typeChecker, t, "Promise")
@@ -98,7 +98,7 @@ func IsPromiseLike(
  * ```
  */
 func IsPromiseConstructorLike(
-	program *compiler.Program,
+	program rule.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type,
 ) bool {
@@ -114,7 +114,7 @@ func IsPromiseConstructorLike(
  * ```
  */
 func IsErrorLike(
-	program *compiler.Program,
+	program rule.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type) bool {
 	return IsBuiltinSymbolLike(program, typeChecker, t, "Error")
@@ -128,7 +128,7 @@ func IsErrorLike(
  * ```
  */
 func IsReadonlyErrorLike(
-	program *compiler.Program,
+	program rule.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type,
 ) bool {
@@ -148,7 +148,7 @@ func IsReadonlyErrorLike(
  * ```
  */
 func IsReadonlyTypeLike(
-	program *compiler.Program,
+	program rule.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type,
 	predicate func(subType *checker.Type) bool,
@@ -167,7 +167,7 @@ const (
 )
 
 func IsBuiltinTypeAliasLike(
-	program *compiler.Program,
+	program rule.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type,
 	predicate func(subType *checker.Type) bool,
@@ -187,7 +187,7 @@ func IsBuiltinTypeAliasLike(
 }
 
 func IsBuiltinSymbolLike(
-	program *compiler.Program,
+	program rule.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type,
 	symbolNames ...string,
@@ -209,7 +209,7 @@ func IsBuiltinSymbolLike(
 }
 
 func IsAnyBuiltinSymbolLike(
-	program *compiler.Program,
+	program rule.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type,
 ) bool {
@@ -228,7 +228,7 @@ func IsAnyBuiltinSymbolLike(
 }
 
 func IsBuiltinSymbolLikeRecurser(
-	program *compiler.Program,
+	program rule.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type,
 	predicate func(subType *checker.Type) builtinPredicateMatches,

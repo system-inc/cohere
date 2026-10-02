@@ -743,7 +743,11 @@ func dispatchFile(
 
 	containments := make([]*ruleContainment, 0, len(rules))
 
-	for _, subject := range rules {
+	// Each rule reads the program through a view of what it declared (rule.ProgramReads), built for
+	// the whole file in one allocation.
+	programViews := rule.ViewProgramForEach(graph.Program, sourceFile, rules)
+
+	for ruleIndex, subject := range rules {
 		ruleName := subject.Name
 
 		var timing *RuleTiming
@@ -753,7 +757,7 @@ func dispatchFile(
 
 		context := rule.Context{
 			SourceFile:  sourceFile,
-			Program:     graph.Program,
+			Program:     programViews[ruleIndex],
 			TypeChecker: fileChecker,
 			FileCache:   fileCache,
 			Report: func(diagnostic rule.Diagnostic) {

@@ -172,16 +172,15 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 // that matters here. Anything resting on a cross-package guard has to be scored by running that
 // package's suite directly.
 //
-// # NeedsTypeChecker and ReadsProgram
+// # NeedsTypeChecker, and no ProgramReads
 //
-// Both, and `ReadsProgram` is not optional: `GetTypeAtLocation` on a function whose return type is
-// an imported alias resolves across a module boundary, and `IsThenableType` walks to the `Promise`
-// declaration in the default library. A findings cache keyed on this file's hash alone would keep
-// serving an answer computed under a program that has since changed.
+// `GetTypeAtLocation` on a function whose return type is an imported alias resolves across a module
+// boundary, and `IsThenableType` walks to the `Promise` declaration in the default library. Both are
+// the checker's answers, not reads of ctx.Program, and the findings cache keys them on the type
+// fingerprint, which covers the import closure, and on the binary, which holds the default library.
 var ConsistentReturn = rule.Rule{
 	Name:             "@typescript-eslint/consistent-return",
 	NeedsTypeChecker: true,
-	ReadsProgram:     true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[ConsistentReturnSettings](options)
 		if !ok {

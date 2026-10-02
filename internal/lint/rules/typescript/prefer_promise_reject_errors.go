@@ -165,12 +165,8 @@ var PreferPromiseRejectErrors = rule.Rule{
 	// Every arm reads a type: the receiver's, the callee's, or the rejection reason's.
 	NeedsTypeChecker: true,
 
-	// `IsErrorLike` and the promise predicates walk base types asking whether a symbol comes from
-	// the default library, which reads `program.IsSourceFileDefaultLibrary` per declaration, and the
-	// `allow` specifiers compare a declaring file's path against the program's directory. Both
-	// depend on files this one does not name, so a findings cache keyed on this file's hash alone
-	// would serve a stale result.
-	ReadsProgram: true,
+	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[PreferPromiseRejectErrorsOptions](options)

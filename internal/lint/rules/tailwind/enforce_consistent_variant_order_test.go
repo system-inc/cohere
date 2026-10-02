@@ -14,7 +14,7 @@ import (
 // preserved as fixtures below because each one is a shape a reader would predict wrongly.
 //
 // The fixtures share the class-order suite's harness for the reason that file states at length: the
-// rule declares `ReadsProgram` and reaches for a real stylesheet, so a fixture running through
+// rule declares `ProgramReads` and reaches for a real stylesheet, so a fixture running through
 // `rule_testing.Run` would exercise the nil-Program decline path and pass while proving nothing.
 func runVariantOrderFixture(t *testing.T, fileName string, source string) rule_testing.Result {
 	t.Helper()

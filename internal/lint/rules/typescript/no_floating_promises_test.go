@@ -573,8 +573,8 @@ func TestNoFloatingPromisesRequiresTheTypedHarness(t *testing.T) {
 	if !NoFloatingPromises.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}
-	if !NoFloatingPromises.ReadsProgram {
-		t.Fatal("the rule stopped declaring ReadsProgram, and IsPromiseLike walks the program's default-library files")
+	if NoFloatingPromises.ProgramReads&rule.ReadsDefaultLibrary == 0 {
+		t.Fatal("the rule stopped declaring ReadsDefaultLibrary, and IsPromiseLike asks whether a declaration is the default library's")
 	}
 
 	source := "declare const p: Promise<number>;\np;\n"
@@ -640,10 +640,9 @@ func TestNoFloatingPromisesThenableNeedsTwoFunctionParameters(t *testing.T) {
 // tsgolint wins, because oxlint runs tsgolint and the differential harness compares against
 // oxlint, so reproducing the plugin's answer would be a difference the harness could see.
 //
-// The cross-file case is the reason this rule declares ReadsProgram rather than inheriting the
-// flag from an adapter. `type_checking.IsPromiseLike` walks the program's default-library files on the
-// core path of every promise test, and enum resolution reaches the declaring module. A findings
-// cache keyed on the linted file alone would be wrong for both.
+// The cross-file case is why this rule's findings are keyed on the type fingerprint rather than the
+// linted file alone. `type_checking.IsPromiseLike` asks about the default library on the core path of
+// every promise test, and enum resolution reaches the declaring module.
 func TestNoFloatingPromisesResolvesAStaticMemberName(t *testing.T) {
 	t.Parallel()
 

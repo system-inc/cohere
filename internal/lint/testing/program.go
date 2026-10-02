@@ -229,7 +229,7 @@ func runTypedFiles(
 	var diagnostics []rule.Diagnostic
 	ruleContext := rule.Context{
 		SourceFile:  sourceFile,
-		Program:     graph.Program,
+		Program:     rule.ViewProgram(graph.Program, sourceFile, subject),
 		TypeChecker: fileChecker,
 		FileCache:   rule.NewFileCache(),
 		Report: func(diagnostic rule.Diagnostic) {

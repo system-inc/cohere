@@ -16,7 +16,7 @@ import (
 //
 // Same reason `enforce_consistent_class_order_test.go` and `no_unknown_classes_test.go` give. The
 // rule now reads the live design system to split a class into root and value, so it declares
-// `ReadsProgram` and returns nil listeners when the Program is nil. `rule_testing.Run` hands it exactly
+// `ProgramReads` and returns nil listeners when the Program is nil. `rule_testing.Run` hands it exactly
 // that, so a fixture left on it would exercise the nil-Program branch: the reporting half fails
 // loudly and the silent half passes while proving nothing.
 //

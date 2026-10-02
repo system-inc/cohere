@@ -22,7 +22,7 @@ import (
 // after the format is fixed: it reports which ids are ambiguous and why. Whichever fix lands
 // (storing text, or refusing the dynamic ids), the numbers here are what that fix has to cover.
 //
-// The check is textual, like the ReadsProgram guard, and for the same reason: it covers every rule
+// The check is textual, like the ProgramReads guard, and for the same reason: it covers every rule
 // in the tree rather than only the ones a program happened to exercise.
 
 var (

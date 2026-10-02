@@ -242,13 +242,12 @@ func buildFloatingVoidMessage() rule.Message {
 // Every type question routes through `ctx.TypeChecker`, so the checker is required and the fixtures
 // use the typed harness.
 //
-// `ReadsProgram` is a measurement rather than an assumption, and it is declared because the body
-// genuinely reaches `ctx.Program` at three sites, one of them on the core path:
-// `type_checking.IsPromiseLike(ctx.Program, ...)` walks the program's default-library files to decide
-// whether a type is the builtin `Promise`, which happens for every promise test this rule makes.
-// The two `TypeMatchesSomeSpecifier` calls read the program too, and enum-key resolution reaches
-// the declaring module, which a fixture pins across two files. A findings cache keyed on the linted
-// file alone would be wrong for all of it.
+// `ProgramReads` is a measurement rather than an assumption: the body reaches `ctx.Program` at three
+// sites, one of them on the core path. `type_checking.IsPromiseLike(ctx.Program, ...)` asks whether a
+// declaration is the default library's `Promise`, which happens for every promise test this rule
+// makes, and the two `TypeMatchesSomeSpecifier` calls read the compiler options and the default
+// library too. Enum-key resolution reaches the declaring module through the checker, which a fixture
+// pins across two files; the type fingerprint is what keeps a cached finding honest about that.
 //
 // The nil guard is the one addition to the body and it could not be written before. While this rule
 // lived behind the tsgolint adapter the listener was upstream's and the adapter set
@@ -274,7 +273,8 @@ var NoFloatingPromises = rule.Rule{
 
 	NeedsTypeChecker: true,
 
-	ReadsProgram: true,
+	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		opts, ok := rule.OptionsAs[NoFloatingPromisesOptions](options)

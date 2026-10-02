@@ -10,9 +10,9 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
 type ConstraintTypeInfo struct {
@@ -472,7 +472,7 @@ const (
 func DiscriminateAnyType(
 	t *checker.Type,
 	typeChecker *checker.Checker,
-	program *compiler.Program,
+	program rule.Program,
 	node *ast.Node,
 ) DiscriminatedAnyType {
 	return discriminateAnyTypeWorker(t, typeChecker, program, node, NewSetFromItems[*checker.Type]())
@@ -481,7 +481,7 @@ func DiscriminateAnyType(
 func discriminateAnyTypeWorker(
 	t *checker.Type,
 	typeChecker *checker.Checker,
-	program *compiler.Program,
+	program rule.Program,
 	node *ast.Node,
 	// TODO(port): do we really need visited here?
 	visited *Set[*checker.Type],

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 	"github.com/system-inc/cohere/internal/types/program"
@@ -129,12 +130,17 @@ type designSystemProbe struct {
 	files   int
 }
 
+// designSystemProgram is a program as a rule calling DesignSystemForProgram sees it, declaring what the
+// design system reads.
+func designSystemProgram(program *compiler.Program) rule.Program {
+	return rule.ViewProgram(program, nil, rule.Rule{Name: "test/design-system", ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles})
+}
+
 func (probe *designSystemProbe) rule() rule.Rule {
 	return rule.Rule{
 		Name: "tailwind-design-system-probe",
-		// Declared because the body reaches ctx.Program. Under-declaring this serves stale findings
-		// forever once a findings cache exists, which is the failure ReadsProgram was added for.
-		ReadsProgram: true,
+		// What DesignSystemForProgram reads. ctx.Program refuses anything undeclared.
+		ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles,
 		Run: func(ctx rule.Context, _ any) rule.Listeners {
 			result := DesignSystemForProgram(ctx.Program)
 			probe.mutex.Lock()
@@ -671,7 +677,7 @@ func TestDesignSystemIsSafeUnderTheParallelWalk(t *testing.T) {
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
-			systems[index] = DesignSystemForProgram(graph.Program).System
+			systems[index] = DesignSystemForProgram(designSystemProgram(graph.Program)).System
 		}()
 	}
 	waitGroup.Wait()

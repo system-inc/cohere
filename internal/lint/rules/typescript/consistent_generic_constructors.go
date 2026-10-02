@@ -148,11 +148,8 @@ var ConsistentGenericConstructors = rule.Rule{
 	// declaration, which is a resolution question. Everything else is syntax.
 	NeedsTypeChecker: true,
 
-	// The rule reads compiler options off the program for IsolatedDeclarations, and asks whether a
-	// declaration lives in the default library, so its verdict for one file depends on the program
-	// the file was compiled in rather than on the file alone. A findings cache keyed on this file's
-	// hash would keep serving an answer computed under options that have since changed.
-	ReadsProgram: true,
+	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[ConsistentGenericConstructorsOptions](options)

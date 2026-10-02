@@ -115,7 +115,6 @@ var ClassLiteralPropertyStyle = rule.Rule{
 	// For classLiteralConversionBreaksAnOverride alone. The base class is usually in another file
 	// (StringSchema.ts against BaseSchema.ts), so the verdict reads the program as well.
 	NeedsTypeChecker: true,
-	ReadsProgram:     true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {

@@ -68,11 +68,8 @@ type NoUnknownClassesOptions struct {
 // in particular gets turned off the first time it flags a working class.
 var NoUnknownClasses = rule.Rule{
 	Name: "better-tailwindcss/no-unknown-classes",
-	// Declared because the rule reaches ctx.Program for the design system. The stylesheet graph
-	// reaches files the program does not contain, so a findings cache keyed on the linted file alone
-	// is stale whenever a `@utility` block is added and the `.tsx` file does not change: the new
-	// class reads as unknown forever, which is the shape of finding an author trusts least.
-	ReadsProgram: true,
+	// The design system, whose stylesheets are read off the file system, outside the program.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

@@ -60,7 +60,7 @@ func TestDesignSystemReadsAreRunCacheInputs(t *testing.T) {
 		t.Fatalf("building the program: %v", err)
 	}
 
-	result := DesignSystemForProgram(graph.Program)
+	result := DesignSystemForProgram(designSystemProgram(graph.Program))
 	if result.Err != nil {
 		t.Fatalf("the design system did not load, so this proves nothing: %v", result.Err)
 	}

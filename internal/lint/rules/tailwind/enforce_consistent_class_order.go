@@ -104,11 +104,8 @@ type EnforceConsistentClassOrderOptions struct {
 // they did not ask for. `reorderFixes` names the other two cases.
 var EnforceConsistentClassOrder = rule.Rule{
 	Name: "better-tailwindcss/enforce-consistent-class-order",
-	// Declared because the rule reaches ctx.Program to get the design system. The stylesheet graph
-	// reaches files the program does not contain at all, so a findings cache keyed on the linted
-	// file alone is stale whenever `theme.css` changes and the `.tsx` file does not: zero findings,
-	// forever, indistinguishable from a clean tree.
-	ReadsProgram: true,
+	// The design system, whose stylesheets are read off the file system, outside the program.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

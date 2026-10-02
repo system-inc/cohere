@@ -123,9 +123,8 @@ func concurrencyNoCheckThenWriteMessage(write string) rule.Message {
 var ConcurrencyNoCheckThenWrite = rule.Rule{
 	Name:             "nexus/concurrency-no-check-then-write",
 	NeedsTypeChecker: true,
-	// sharp's `toFile` is recognized by asking the program which file this file's `sharp` import
-	// resolved to, which reads past the file being linted.
-	ReadsProgram: true,
+	// Where this file's `sharp` import resolves.
+	ProgramReads: rule.ReadsModuleResolution,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {
@@ -450,8 +449,8 @@ func (analysis *concurrencyNoCheckThenWriteLoop) isSharpToFile(call *ast.Node) b
 			return files
 		}
 		for _, specifier := range analysis.ctx.SourceFile.Imports() {
-			resolved := analysis.ctx.Program.GetResolvedModuleFromModuleSpecifier(analysis.ctx.SourceFile, specifier)
-			if resolved.IsResolved() && resolved.IsExternalLibraryImport && resolved.PackageId.Name == "sharp" {
+			resolved := analysis.ctx.Program.ResolveModule(analysis.ctx.SourceFile, specifier)
+			if resolved.IsResolved() && resolved.IsExternalLibraryImport && resolved.PackageName == "sharp" {
 				files[resolved.ResolvedFileName] = true
 			}
 		}

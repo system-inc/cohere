@@ -12,7 +12,7 @@ import (
 // reports: a rule that reports the right set and rewrites it wrongly passes a set comparison.
 //
 // `rule_testing.Run` rather than the class-order program harness, because the question is entirely about
-// how a class is spelled and this rule declares no ReadsProgram.
+// how a class is spelled and this rule declares no ProgramReads.
 func runVariableSyntaxFixture(t *testing.T, source string) rule_testing.Result {
 	t.Helper()
 	return rule_testing.Run(t, EnforceConsistentVariableSyntax, "Component.tsx", source)

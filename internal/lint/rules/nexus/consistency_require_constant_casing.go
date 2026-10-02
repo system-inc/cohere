@@ -120,9 +120,9 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 	Name: "nexus/consistency-require-constant-casing",
 	// For the rename fix, which resolves references through the checker, and only at a finding.
 	NeedsTypeChecker: true,
-	// The drop-the-export advice reads every other file's imports, so a finding here changes when an
-	// importer does and this file does not.
-	ReadsProgram: true,
+	// Every other file's imports, for the drop-the-export advice: resolving another file's imports is
+	// a read of other files, which the view enforces, and a resolution, which the source guard sees.
+	ProgramReads: rule.ReadsModuleResolution | rule.ReadsOtherFiles,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		frameworkConstantNames := map[string]bool{}
 		if settings, hasSettings := rule.OptionsAs[ConsistencyRequireConstantCasingOptions](options); hasSettings {

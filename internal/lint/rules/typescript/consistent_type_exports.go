@@ -98,13 +98,6 @@ var ConsistentTypeExports = rule.Rule{
 	Name:             "@typescript-eslint/consistent-type-exports",
 	NeedsTypeChecker: true,
 
-	// ReadsProgram is declared because half this rule's judgment is about a DIFFERENT file: the star
-	// arm resolves a module specifier and reads what that module exports, and the named arm resolves
-	// an alias across the module boundary. A findings cache keyed on this file's hash would keep
-	// serving an answer computed against a version of the other file that has since changed, which
-	// is silence rather than a crash.
-	ReadsProgram: true,
-
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

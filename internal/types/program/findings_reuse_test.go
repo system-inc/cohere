@@ -25,7 +25,7 @@ func findingsReuseRules(t *testing.T) []rule.Rule {
 		if wanted[registered.Name] {
 			rules = append(rules, registered)
 		}
-		if typeAware == nil && registered.NeedsTypeChecker && !registered.ReadsProgram {
+		if typeAware == nil && registered.NeedsTypeChecker && registered.ProgramReads&rule.ReadsOtherFiles == 0 {
 			subject := registered
 			typeAware = &subject
 		}
@@ -216,7 +216,7 @@ func TestAFileWithNothingLeftToWalkKeepsItsCoverage(t *testing.T) {
 	}
 	var pure []rule.Rule
 	for _, subject := range findingsReuseRules(t) {
-		if !subject.NeedsTypeChecker && !subject.ReadsProgram {
+		if !subject.NeedsTypeChecker && subject.ProgramReads&(rule.ReadsModuleResolution|rule.ReadsOtherFiles) == 0 {
 			pure = append(pure, subject)
 		}
 	}
@@ -286,7 +286,7 @@ func typeAwareRule(t *testing.T) rule.Rule {
 	t.Helper()
 	for _, registered := range registry.All() {
 		if registered.Name == "@typescript-eslint/no-unsafe-unary-minus" {
-			if !registered.NeedsTypeChecker || registered.ReadsProgram {
+			if !registered.NeedsTypeChecker || registered.ProgramReads&rule.ReadsOtherFiles != 0 {
 				t.Fatalf("%s is not a cacheable type-aware rule any more, so this test proves nothing", registered.Name)
 			}
 			return registered
@@ -420,14 +420,20 @@ func TestAnEditToAGlobalDeclarationReachesEveryTypeAwareFinding(t *testing.T) {
 	}
 }
 
-// CacheClasses puts each rule in exactly one class, and a rule that reads the program is never cached
-// even when it also reads the checker.
+// CacheClasses puts each rule in exactly one class by what it reads (#b8k3bp6). Reading other files
+// keeps a rule out of the cache even when it also reads the checker. Reading this file's module
+// resolution makes a rule type-aware without a checker, since the type fingerprint is what covers it.
+// Compiler options and the default library leave a rule where its checker puts it, since the key
+// covers both.
 func TestCacheClassesSplitsThreeWays(t *testing.T) {
 	pure, typeAware, never := program.CacheClasses([]rule.Rule{
 		{Name: "pure"},
+		{Name: "options", ProgramReads: rule.ReadsCompilerOptions},
 		{Name: "typed", NeedsTypeChecker: true},
-		{Name: "program", ReadsProgram: true},
-		{Name: "both", ReadsProgram: true, NeedsTypeChecker: true},
+		{Name: "typed-library", NeedsTypeChecker: true, ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary},
+		{Name: "resolution", ProgramReads: rule.ReadsModuleResolution},
+		{Name: "program", ProgramReads: rule.ReadsOtherFiles},
+		{Name: "both", ProgramReads: rule.ReadsOtherFiles | rule.ReadsModuleResolution, NeedsTypeChecker: true},
 	})
 	names := func(rules []rule.Rule) string {
 		joined := ""
@@ -436,7 +442,7 @@ func TestCacheClassesSplitsThreeWays(t *testing.T) {
 		}
 		return joined
 	}
-	if names(pure) != "pure " || names(typeAware) != "typed " || names(never) != "program both " {
+	if names(pure) != "pure options " || names(typeAware) != "typed typed-library resolution " || names(never) != "program both " {
 		t.Errorf("pure [%s] typed [%s] never [%s]", names(pure), names(typeAware), names(never))
 	}
 }

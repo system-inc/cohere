@@ -418,8 +418,8 @@ func TestNoImpliedEvalDeclaresItNeedsTheTypeChecker(t *testing.T) {
 	if !NoImpliedEval.NeedsTypeChecker {
 		t.Error("NoImpliedEval must declare NeedsTypeChecker: every listener reads ctx.TypeChecker")
 	}
-	if !NoImpliedEval.ReadsProgram {
-		t.Error("NoImpliedEval must declare ReadsProgram: IsBuiltinSymbolLike reads ctx.Program")
+	if NoImpliedEval.ProgramReads != rule.ReadsCompilerOptions|rule.ReadsDefaultLibrary {
+		t.Errorf("NoImpliedEval must declare what IsBuiltinSymbolLike reads, the compiler options and the default library; declares %s", NoImpliedEval.ProgramReads)
 	}
 	if NoImpliedEval.Name != "@typescript-eslint/no-implied-eval" {
 		t.Errorf("registered name: want %q, got %q", "no-implied-eval", NoImpliedEval.Name)

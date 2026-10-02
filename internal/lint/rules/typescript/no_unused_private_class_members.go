@@ -98,10 +98,6 @@ var NoUnusedPrivateClassMembers = rule.Rule{
 	// question and is what replaces upstream's scope pass.
 	NeedsTypeChecker: true,
 
-	// The declaring member can be resolved across a module boundary when the class is imported, so
-	// the verdict depends on the program rather than on this file alone.
-	ReadsProgram: true,
-
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {
 			return rule.Listeners{}

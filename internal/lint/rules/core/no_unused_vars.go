@@ -61,7 +61,7 @@ func noUnusedVarsMessage(name string, assigned bool, underscoreSilences bool) ru
 // direction: the alternative is reporting a component's only export as dead because this file
 // happens not to call it. The program-wide claim is a real and different analysis and it already
 // exists here as `cohere --unused`, which is opt-in precisely so that reading every file in the
-// program does not poison the per-file findings cache. See `rule.ReadsProgram` for why that
+// program does not poison the per-file findings cache. See `rule.ProgramReads` for why that
 // separation is structural rather than stylistic: a rule reading beyond its own file, cached on
 // that file's hash, serves a stale answer forever and nothing notices.
 //

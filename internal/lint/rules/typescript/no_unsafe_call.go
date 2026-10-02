@@ -88,11 +88,8 @@ var NoUnsafeCall = rule.Rule{
 	// Every finding is a type question about the callee. The checker is required.
 	NeedsTypeChecker: true,
 
-	// The rule reads compiler options off the program (NoImplicitThis) and resolves the callee
-	// against the builtin Function symbol, so its verdict for one file depends on the program the
-	// file was compiled in rather than on the file alone. A findings cache keyed on this file's
-	// hash would keep serving an answer computed under options that have since changed.
-	ReadsProgram: true,
+	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// checkCall is upstream's single body, shared by all three anchors.

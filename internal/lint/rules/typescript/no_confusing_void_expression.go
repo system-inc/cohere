@@ -160,12 +160,6 @@ var NoConfusingVoidExpression = rule.Rule{
 	// Every judgment is a question about a type, so the checker is not optional here.
 	NeedsTypeChecker: true,
 
-	// The verdict depends on the program rather than on this file alone. `GetConstrainedTypeAtLocation`
-	// resolves a call's return type through whatever declaration it binds to, which may be in
-	// another file or in the standard library, and the contextual-type arm under
-	// `ignoreVoidReturningFunctions` asks a question that only the whole program answers.
-	ReadsProgram: true,
-
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoConfusingVoidExpressionSettings](options)
 		if !ok {

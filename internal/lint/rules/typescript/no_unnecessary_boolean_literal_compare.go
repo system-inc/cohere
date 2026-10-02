@@ -138,11 +138,8 @@ var NoUnnecessaryBooleanLiteralCompare = rule.Rule{
 	Name:             "@typescript-eslint/no-unnecessary-boolean-literal-compare",
 	NeedsTypeChecker: true,
 
-	// ReadsProgram is declared because the verdict depends on a compiler option rather than only on
-	// this file: with `strictNullChecks` off the rule reports a different thing entirely. A findings
-	// cache keyed on the file's hash would keep serving an answer computed under an option that has
-	// since changed, which is silence rather than a crash.
-	ReadsProgram: true,
+	// The compiler options.
+	ProgramReads: rule.ReadsCompilerOptions,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {

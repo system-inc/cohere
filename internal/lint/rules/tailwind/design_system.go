@@ -56,7 +56,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/system-inc/cohere/internal/lint/rule"
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
@@ -103,13 +103,13 @@ var ErrNoTailwindEntryPoint = errors.New("no Tailwind entry point found in this 
 // file comment above.
 var designSystemCache struct {
 	sync.Mutex
-	program *compiler.Program
+	program rule.ProgramIdentity
 	result  DesignSystemResult
 }
 
 // DesignSystemForProgram returns this run's design system, building it at most once.
 //
-// Every rule that calls this must declare `ReadsProgram: true`. The program reaches every file in
+// Every rule that calls this must declare `ReadsCompilerOptions | ReadsOtherFiles`. The program reaches every file in
 // the run and the stylesheet graph reaches files the program does not contain at all, so a findings
 // cache keyed on the linted file alone is stale whenever `theme.css` changes and the `.tsx` file
 // does not: zero findings, forever, indistinguishable from a clean tree.
@@ -125,7 +125,7 @@ var designSystemCache struct {
 // A nil program is a hard miss rather than a shared entry. The harnesses that build a Context by
 // hand leave Program nil, and letting them share one cache slot would mean two unrelated fixtures
 // reading each other's design system, which is the same bug the pointer key exists to prevent.
-func DesignSystemForProgram(program *compiler.Program) DesignSystemResult {
+func DesignSystemForProgram(program rule.Program) DesignSystemResult {
 	if program == nil {
 		return DesignSystemResult{Err: fmt.Errorf("no program: a design system cannot be located without one")}
 	}
@@ -133,12 +133,12 @@ func DesignSystemForProgram(program *compiler.Program) DesignSystemResult {
 	designSystemCache.Lock()
 	defer designSystemCache.Unlock()
 
-	if designSystemCache.program == program {
+	if designSystemCache.program == program.Identity() {
 		return designSystemCache.result
 	}
 
 	result := loadDesignSystemForProgram(program)
-	designSystemCache.program = program
+	designSystemCache.program = program.Identity()
 	designSystemCache.result = result
 	return result
 }
@@ -147,7 +147,7 @@ func DesignSystemForProgram(program *compiler.Program) DesignSystemResult {
 //
 // Call `DesignSystemForProgram` rather than this: an uncached call re-walks the `@import` graph, and
 // the rules that will read it run on every file in the tree.
-func loadDesignSystemForProgram(program *compiler.Program) DesignSystemResult {
+func loadDesignSystemForProgram(program rule.Program) DesignSystemResult {
 	projectRoot := projectRootOf(program)
 	if projectRoot == "" {
 		return DesignSystemResult{Err: fmt.Errorf("could not determine the project root from the program")}
@@ -159,7 +159,7 @@ func loadDesignSystemForProgram(program *compiler.Program) DesignSystemResult {
 	// theme imports replayed the old verdict (#ym4v8bc). Asked through it, each candidate entry point
 	// probed and missed is recorded absent, so creating one invalidates, and each probe of the
 	// package walk is recorded the same way.
-	fileSystem := program.Host().FS()
+	fileSystem := program.FS()
 	fileExists := fileSystem.FileExists
 
 	entryPoint := findTailwindEntryPoint(projectRoot, fileExists)
@@ -204,7 +204,7 @@ func loadDesignSystemForProgram(program *compiler.Program) DesignSystemResult {
 // was invoked from and the project root is where its config lives, and the two differ whenever
 // anyone runs the linter from a parent directory. Falls back to the current directory when the
 // program was built without a config file, which is what the in-memory test harnesses do.
-func projectRootOf(program *compiler.Program) string {
+func projectRootOf(program rule.Program) string {
 	if options := program.Options(); options != nil && options.ConfigFilePath != "" {
 		return filepath.Dir(options.ConfigFilePath)
 	}
@@ -299,7 +299,7 @@ func DesignSystemDeclineMessage(ruleName string, result DesignSystemResult) stri
 func resetDesignSystemCacheForTest() {
 	designSystemCache.Lock()
 	defer designSystemCache.Unlock()
-	designSystemCache.program = nil
+	designSystemCache.program = rule.ProgramIdentity{}
 	designSystemCache.result = DesignSystemResult{}
 }
 

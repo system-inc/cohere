@@ -64,7 +64,7 @@ type EnforceConsistentVariableSyntaxOptions struct {
 // `w-[calc(var(--x)*2)]` is silent: the outer brackets hold arithmetic, not a property reference.
 //
 // This rule asks nothing of the design system: the question is entirely about how the class is
-// spelled, so it declares no ReadsProgram.
+// spelled, so it declares no ProgramReads.
 //
 // Not fixable, for the reason its siblings are not: a class literal here wraps across lines with
 // indentation that carries intent, and a fixer would be the first thing to reflow it.

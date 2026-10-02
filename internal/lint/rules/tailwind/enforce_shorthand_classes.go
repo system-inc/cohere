@@ -183,9 +183,8 @@ var shorthandGroups = [][]shorthandRule{
 // state upstream's fix passes through rather than anything in the source a reader wrote.
 var EnforceShorthandClasses = rule.Rule{
 	Name: "better-tailwindcss/enforce-shorthand-classes",
-	// Declared because the rule reaches ctx.Program to ask the design system whether a shorthand
-	// exists, and a theme edit changes that answer without touching the linted file.
-	ReadsProgram: true,
+	// The design system, whose stylesheets are read off the file system, outside the program.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

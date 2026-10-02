@@ -67,10 +67,6 @@ var PreferObjectSpread = rule.Rule{
 	// Telling the global `Object` from a shadow is name resolution.
 	NeedsTypeChecker: true,
 
-	// The verdict depends on where `Object` is declared, which for the global is the standard
-	// library rather than this file. That is a whole-program question.
-	ReadsProgram: true,
-
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Whether anything in this file WRITES to `Object`. Upstream's ReferenceTracker refuses to
 		// follow a global that is reassigned, so a single `Object = {}` anywhere suppresses the

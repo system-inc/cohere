@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/module"
@@ -37,7 +36,7 @@ type importerIndex struct {
 // is a fact about the whole run. Built lazily, so a tree with no camelCase export pays nothing.
 var importerCache struct {
 	sync.Mutex
-	program *compiler.Program
+	program rule.ProgramIdentity
 	index   *importerIndex
 }
 
@@ -45,18 +44,18 @@ var importerCache struct {
 // caller treats as "cannot prove nobody imports it".
 //
 // It takes the program rather than the rule context so the one read of the context's program sits
-// in the rule's own file, beside the ReadsProgram declaration it obliges.
-func importerIndexFor(program *compiler.Program) *importerIndex {
+// in the rule's own file, beside the ProgramReads declaration it obliges.
+func importerIndexFor(program rule.Program) *importerIndex {
 	if program == nil {
 		return nil
 	}
 	importerCache.Lock()
 	defer importerCache.Unlock()
-	if importerCache.program == program && importerCache.index != nil {
+	if importerCache.program == program.Identity() && importerCache.index != nil {
 		return importerCache.index
 	}
 	index := buildImporterIndex(program)
-	importerCache.program = program
+	importerCache.program = program.Identity()
 	importerCache.index = index
 	return index
 }
@@ -66,7 +65,7 @@ func importerIndexFor(program *compiler.Program) *importerIndex {
 // `SourceFile.Imports()` is the binder's own list of every specifier a file names, static or
 // dynamic, so an import form nobody enumerated here still lands in the index, as "everything". The
 // specific forms below only narrow that to named imports where the syntax says exactly which names.
-func buildImporterIndex(program *compiler.Program) *importerIndex {
+func buildImporterIndex(program rule.Program) *importerIndex {
 	index := &importerIndex{byPath: map[tspath.Path]*importedNames{}}
 	var projectFiles []*ast.SourceFile
 	for _, importer := range program.SourceFiles() {
@@ -80,8 +79,8 @@ func buildImporterIndex(program *compiler.Program) *importerIndex {
 			if specifier == nil || !ast.IsStringLiteralLike(specifier) {
 				continue
 			}
-			resolved := program.GetResolvedModuleFromModuleSpecifier(importer, specifier)
-			if resolved == nil || resolved.ResolvedFileName == "" {
+			resolved := program.ResolveModule(importer, specifier)
+			if !resolved.IsResolved() {
 				continue
 			}
 			target := program.GetSourceFileForResolvedModule(resolved.ResolvedFileName)

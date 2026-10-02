@@ -63,12 +63,6 @@ var NoUnsafeArgument = rule.Rule{
 	// Every judgment is a comparison between an argument's type and a parameter's type.
 	NeedsTypeChecker: true,
 
-	// The resolved signature and the parameter types come from the program rather than from this
-	// file: an overload can be declared elsewhere, and a parameter's type can be a symbol resolved
-	// across a module boundary. A findings cache keyed on this file's hash alone would serve a
-	// verdict computed against a signature that has since changed.
-	ReadsProgram: true,
-
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

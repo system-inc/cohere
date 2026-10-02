@@ -112,16 +112,8 @@ var NoMisusedSpread = rule.Rule{
 	// Every arm asks the checker what the spread argument IS. None of it is answerable from syntax.
 	NeedsTypeChecker: true,
 
-	// Three of the predicates reach past the file they were handed. `IsPromiseLike` and the Map
-	// check both route through `IsBuiltinSymbolLike`, which asks whether a symbol comes from the
-	// default library, and the allow list's `TypeMatchesSomeSpecifier` resolves a specifier against
-	// declaring files. All three take the program.
-	//
-	// Declared because the failure it prevents is silent: a findings cache keyed on this file's hash
-	// would serve a stale verdict when a library or a declaring file changed and this file did not,
-	// which is indistinguishable from a clean tree. The registry guard is what caught the omission
-	// here rather than any fixture, since no fixture can observe a cache.
-	ReadsProgram: true,
+	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {

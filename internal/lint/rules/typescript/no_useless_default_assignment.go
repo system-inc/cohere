@@ -118,9 +118,8 @@ var NoUselessDefaultAssignment = rule.Rule{
 	// Every judgment is a question about whether a type admits undefined.
 	NeedsTypeChecker: true,
 
-	// The rule reads `strictNullChecks` off the program's compiler options, so its verdict for one
-	// file depends on how the program was configured rather than on the file alone.
-	ReadsProgram: true,
+	// The compiler options.
+	ProgramReads: rule.ReadsCompilerOptions,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[NoUselessDefaultAssignmentOptions](options)

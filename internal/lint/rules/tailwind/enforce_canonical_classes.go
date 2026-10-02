@@ -85,10 +85,8 @@ type EnforceCanonicalClassesOptions struct {
 // author to act on.
 var EnforceCanonicalClasses = rule.Rule{
 	Name: "better-tailwindcss/enforce-canonical-classes",
-	// Declared because the rule reaches ctx.Program for the design system. The stylesheet graph
-	// reaches files the program does not contain, so a findings cache keyed on the linted file alone
-	// is stale whenever a `@utility` block changes which roots exist and the `.tsx` file does not.
-	ReadsProgram: true,
+	// The design system, whose stylesheets are read off the file system, outside the program.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

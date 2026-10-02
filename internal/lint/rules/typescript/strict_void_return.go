@@ -96,22 +96,6 @@ var StrictVoidReturn = rule.Rule{
 	// The contextual type decides every finding.
 	NeedsTypeChecker: true,
 
-	// Declared true although this file never names `ctx.Program`, and that is the flag's own rule
-	// rather than an over-claim.
-	//
-	// What the flag protects is the findings cache, which is keyed on the linted file's hash. This
-	// rule's verdict depends on a CONTEXTUAL type, and that comes from the signature of whatever is
-	// being called or assigned to, which routinely lives in another module: change the declaration
-	// of `addEventListener` or of a local `type Cb = () => void` in a second file and this file's
-	// findings change while its own bytes do not. Undeclared, the cache would serve the old answer
-	// forever, which is silence rather than a crash.
-	//
-	// The field's own documentation makes the asymmetry explicit: under-declaring serves stale
-	// findings, over-declaring costs a cache miss, and anything that cannot see whether it reads
-	// the program declares true. A rule reading types across module boundaries is squarely inside
-	// that instruction.
-	ReadsProgram: true,
-
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[StrictVoidReturnOptions](options)
 		if !isSettings {

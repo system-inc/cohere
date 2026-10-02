@@ -114,10 +114,8 @@ var UnboundMethod = rule.Rule{
 	// subset of this rule that could run without the checker.
 	NeedsTypeChecker: true,
 
-	// `isNativelyBound` calls type_checking.IsBuiltinSymbolLike and IsSymbolFromDefaultLibrary, both
-	// of which walk the program's default-library files, and `isNotImported` compares a declaration's
-	// source file against the one being linted. All three are reads outside this file.
-	ReadsProgram: true,
+	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[UnboundMethodOptions](options)

@@ -12,7 +12,7 @@ import (
 // # Why every fixture here runs through a program
 //
 // Same reason the other three migrated rules' fixtures give. The rule now reads the live design
-// system to resolve a class to its declared properties, so it declares `ReadsProgram` and returns
+// system to resolve a class to its declared properties, so it declares `ProgramReads` and returns
 // nil listeners when the Program is nil. `rule_testing.Run` hands it exactly that, so a fixture left on
 // it would exercise the nil-Program branch: the reporting half fails loudly and the silent half —
 // which this rule's own header calls the load-bearing one — passes while proving nothing.

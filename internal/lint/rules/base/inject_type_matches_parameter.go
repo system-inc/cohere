@@ -58,10 +58,6 @@ var InjectTypeMatchesParameter = rule.Rule{
 	// Every judgment is an assignability question between two resolved types.
 	NeedsTypeChecker: true,
 
-	// The brand and the parameter's type routinely resolve across module boundaries, since the
-	// decorator factory and the injected service are rarely declared in the file using them.
-	ReadsProgram: true,
-
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {
 			return nil

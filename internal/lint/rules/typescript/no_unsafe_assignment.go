@@ -166,11 +166,8 @@ var NoUnsafeAssignment = rule.Rule{
 	// Every judgment compares a sender type against a receiver type.
 	NeedsTypeChecker: true,
 
-	// The rule reads `noImplicitThis` off the program's compiler options to choose between two
-	// message ids, and resolves contextual types that can be declared in another file. A findings
-	// cache keyed on this file's hash alone would serve a verdict computed under options or a
-	// signature that has since changed.
-	ReadsProgram: true,
+	// The compiler options.
+	ProgramReads: rule.ReadsCompilerOptions,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {

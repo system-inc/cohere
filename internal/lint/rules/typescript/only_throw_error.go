@@ -187,16 +187,8 @@ var OnlyThrowError = rule.Rule{
 	// Every arm reads the argument's type, so the checker is required.
 	NeedsTypeChecker: true,
 
-	// Two arms reach past the checker into the PROGRAM, so a findings cache keyed on this file's
-	// hash alone would serve a stale result when another file changes.
-	//
-	// `IsErrorLike` walks up base types asking `IsSymbolFromDefaultLibrary`, which calls
-	// `program.IsSourceFileDefaultLibrary` on each declaration's source file, and the `allow`
-	// specifiers compare a declaring file's absolute path or package against the program's current
-	// directory. Both answers depend on files this one does not name: a class here extending an
-	// Error declared in a sibling module changes verdict when that sibling changes, with this
-	// file's bytes untouched.
-	ReadsProgram: true,
+	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[OnlyThrowErrorOptions](options)

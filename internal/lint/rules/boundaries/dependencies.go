@@ -535,8 +535,9 @@ func (settings DependenciesOptions) messageFor(policyIndex int, from element, to
 // `require(` matches are `request.require(key)`, which upstream's `callee.name=require` skips too),
 // so the divergence reaches nothing there today.
 var Dependencies = rule.Rule{
-	Name:         "boundaries/dependencies",
-	ReadsProgram: true,
+	Name: "boundaries/dependencies",
+	// The project root, and where this file's imports resolve.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsModuleResolution,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil || ctx.Program == nil {
 			return nil
@@ -585,8 +586,8 @@ var Dependencies = rule.Rule{
 			if specifier == nil || specifier.Kind != ast.KindStringLiteral {
 				return
 			}
-			resolved := ctx.Program.GetResolvedModuleFromModuleSpecifier(ctx.SourceFile, specifier)
-			if resolved == nil || resolved.ResolvedFileName == "" || resolved.IsExternalLibraryImport {
+			resolved := ctx.Program.ResolveModule(ctx.SourceFile, specifier)
+			if !resolved.IsResolved() || resolved.IsExternalLibraryImport {
 				return
 			}
 			toPath, inside := relative(resolved.ResolvedFileName)

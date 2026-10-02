@@ -2918,9 +2918,9 @@ if (p) {
 	rule_testing.ExpectFindings(t, typed, "conditional")
 }
 
-// TestNoMisusedPromisesDoesNotReadTheProgram pins ReadsProgram as a per-rule measurement.
+// TestNoMisusedPromisesDoesNotReadTheProgram pins ProgramReads as a per-rule measurement.
 //
-// The wave this rule landed in replaced an adapter that declared ReadsProgram on every rule it
+// The wave this rule landed in replaced an adapter that declared a program read on every rule it
 // wrapped by assumption. Absorbing makes the question answerable, and the answer here is no: the body
 // never names ctx.Program. Under-declaring serves stale cached findings forever, which is the failure
 // the flag exists to prevent, so the claim is worth a guard rather than a comment.
@@ -2930,8 +2930,8 @@ if (p) {
 func TestNoMisusedPromisesDoesNotReadTheProgram(t *testing.T) {
 	t.Parallel()
 
-	if NoMisusedPromises.ReadsProgram {
-		t.Fatal("the rule body never names ctx.Program, so it must not declare ReadsProgram")
+	if NoMisusedPromises.ProgramReads != 0 {
+		t.Fatalf("the rule body never names ctx.Program, so it must declare no ProgramReads; declares %s", NoMisusedPromises.ProgramReads)
 	}
 }
 

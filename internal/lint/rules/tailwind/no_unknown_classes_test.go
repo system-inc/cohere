@@ -16,7 +16,7 @@ import (
 // # Why every fixture here runs through a program
 //
 // Same reason `enforce_consistent_class_order_test.go` gives, and the same trap. The rule now reads
-// the live design system, so it declares `ReadsProgram` and returns nil listeners when the Program
+// the live design system, so it declares `ProgramReads` and returns nil listeners when the Program
 // is nil. `rule_testing.Run` hands it exactly that. So every fixture in this file that kept using
 // `rule_testing.Run` after the swap would exercise the nil-Program branch: the reporting half would fail
 // loudly and the whole silent half would pass while proving nothing.

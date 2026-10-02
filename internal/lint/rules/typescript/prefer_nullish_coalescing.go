@@ -292,7 +292,8 @@ func preferNullishCoalescingSuggestion(replacement string) string {
 var PreferNullishCoalescing = rule.Rule{
 	Name:             "@typescript-eslint/prefer-nullish-coalescing",
 	NeedsTypeChecker: true,
-	ReadsProgram:     true,
+	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[PreferNullishCoalescingOptions](options)
 		if !ok {

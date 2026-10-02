@@ -373,29 +373,32 @@ func TestLintCacheStoreRecordsCleanFiles(t *testing.T) {
 
 // TestCacheableRulesExcludesImpureRules pins the split the cache's correctness rests on.
 //
-// A rule is cacheable only if its findings are a function of the linted file's bytes, because that
-// is what the content-hash key covers. Both declarations below describe a rule whose answer can
-// change while that hash does not, and replaying such a rule serves zero findings forever on a file
-// that now has one.
+// A rule is cacheable on content alone only if its findings are a function of the linted file's
+// bytes and of what the key already holds, which includes the tsconfig chain, so a rule reading only
+// the compiler options is. Every other declaration below describes a rule whose answer can change
+// while that hash does not, and replaying such a rule serves zero findings forever on a file that now
+// has one.
 func TestCacheableRulesExcludesImpureRules(t *testing.T) {
 	pure := rule.Rule{Name: "pure"}
-	readsProgram := rule.Rule{Name: "reads-program", ReadsProgram: true}
+	options := rule.Rule{Name: "options", ProgramReads: rule.ReadsCompilerOptions}
+	otherFiles := rule.Rule{Name: "other-files", ProgramReads: rule.ReadsOtherFiles}
+	resolution := rule.Rule{Name: "resolution", ProgramReads: rule.ReadsModuleResolution}
 	needsChecker := rule.Rule{Name: "needs-checker", NeedsTypeChecker: true}
-	both := rule.Rule{Name: "both", ReadsProgram: true, NeedsTypeChecker: true}
+	both := rule.Rule{Name: "both", ProgramReads: rule.ReadsOtherFiles, NeedsTypeChecker: true}
 
 	cacheable, uncacheable := program.CacheableRules(
-		[]rule.Rule{pure, readsProgram, needsChecker, both})
+		[]rule.Rule{pure, options, otherFiles, resolution, needsChecker, both})
 
-	if len(cacheable) != 1 || cacheable[0].Name != "pure" {
-		names := make([]string, 0, len(cacheable))
-		for _, subject := range cacheable {
-			names = append(names, subject.Name)
-		}
-		t.Errorf("cacheable = %v, want exactly [pure]: anything reading outside its own file can "+
-			"have its answer changed by an edit the content hash cannot see", names)
+	names := make([]string, 0, len(cacheable))
+	for _, subject := range cacheable {
+		names = append(names, subject.Name)
 	}
-	if len(uncacheable) != 3 {
-		t.Errorf("uncacheable = %d, want 3", len(uncacheable))
+	if strings.Join(names, ",") != "pure,options" {
+		t.Errorf("cacheable = %v, want exactly [pure options]: anything reading outside its own file "+
+			"and the key can have its answer changed by an edit the content hash cannot see", names)
+	}
+	if len(uncacheable) != 4 {
+		t.Errorf("uncacheable = %d, want 4", len(uncacheable))
 	}
 }
 
@@ -408,7 +411,8 @@ func TestCacheableRulesDefaultsToExcluding(t *testing.T) {
 	// A rule that declares an impurity and nothing else must still be turned away, so a future
 	// declaration added to rule.Rule cannot quietly become cacheable by omission here.
 	for _, subject := range []rule.Rule{
-		{Name: "reads-program", ReadsProgram: true},
+		{Name: "reads-other-files", ProgramReads: rule.ReadsOtherFiles},
+		{Name: "reads-module-resolution", ProgramReads: rule.ReadsModuleResolution},
 		{Name: "needs-checker", NeedsTypeChecker: true},
 	} {
 		cacheable, _ := program.CacheableRules([]rule.Rule{subject})

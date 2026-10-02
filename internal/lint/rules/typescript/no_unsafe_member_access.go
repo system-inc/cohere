@@ -80,10 +80,8 @@ var NoUnsafeMemberAccess = rule.Rule{
 	// Every judgment is a type question about an object or a computed key.
 	NeedsTypeChecker: true,
 
-	// The rule reads compiler options off the program for the `this` branch, so its verdict for one
-	// file depends on the program the file was compiled in. A findings cache keyed on this file's
-	// hash alone would keep serving an answer computed under options that have since changed.
-	ReadsProgram: true,
+	// The compiler options.
+	ProgramReads: rule.ReadsCompilerOptions,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoUnsafeMemberAccessOptions](options)

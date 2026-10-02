@@ -47,7 +47,7 @@ func LintFile(
 		currentRule := subject
 		context := rule.Context{
 			SourceFile:  sourceFile,
-			Program:     program,
+			Program:     rule.ViewProgram(program, sourceFile, currentRule),
 			TypeChecker: typeChecker,
 			Report: func(diagnostic rule.Diagnostic) {
 				diagnostic.RuleName = currentRule.Name

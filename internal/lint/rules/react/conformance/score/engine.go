@@ -340,7 +340,7 @@ func Analyze(subject RuleUnderTest, fixture react_conformance.Fixture, directory
 	var diagnostics []rule.Diagnostic
 	ruleContext := rule.Context{
 		SourceFile:  sourceFile,
-		Program:     graph.Program,
+		Program:     rule.ViewProgram(graph.Program, sourceFile, subject.Rule),
 		TypeChecker: fileChecker,
 		FileCache:   rule.NewFileCache(),
 		Report: func(diagnostic rule.Diagnostic) {
@@ -431,7 +431,7 @@ func collectMessageIds(subject RuleUnderTest, fixture react_conformance.Fixture,
 	var ids []string
 	ruleContext := rule.Context{
 		SourceFile:  sourceFile,
-		Program:     graph.Program,
+		Program:     rule.ViewProgram(graph.Program, sourceFile, subject.Rule),
 		TypeChecker: fileChecker,
 		FileCache:   rule.NewFileCache(),
 		Report: func(diagnostic rule.Diagnostic) {

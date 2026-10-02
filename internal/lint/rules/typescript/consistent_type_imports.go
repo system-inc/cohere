@@ -195,11 +195,8 @@ var ConsistentTypeImports = rule.Rule{
 	// resolves to.
 	NeedsTypeChecker: true,
 
-	// The decorator-metadata exemption reads `emitDecoratorMetadata` from the program's options and
-	// asks whether an import resolves to a class or an interface, which is decided in the file that
-	// declares it. Either can change without this file's bytes changing, so a findings cache keyed on
-	// this file's hash alone would serve a stale verdict.
-	ReadsProgram: true,
+	// The compiler options.
+	ProgramReads: rule.ReadsCompilerOptions,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[ConsistentTypeImportsOptions](options)

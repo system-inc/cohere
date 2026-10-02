@@ -38,10 +38,12 @@ import (
 //	walk, all 464 rules                     about 2.56s
 //	walk, the 45 ReadsProgram rules only    about 1.37s
 //
-// The second line is the ceiling for a fully cached run, since ReadsProgram rules always run. It was
-// first published here as 0.4s, measured on a graph whose earlier walks had already paid for type
-// checking: the checker computes types lazily and whichever walk asks first pays, so a later walk looks
-// cheap for a reason that has nothing to do with its rules. Every walk is now on a fresh graph. A real
+// The second line was the ceiling for a fully cached run, since those rules always ran. #b8k3bp6
+// split ReadsProgram into ProgramReads by kind, and only the 9 rules reading other files still always
+// run: about 0.23s on 2026-10-02, best of 3 on fresh graphs, against 1.35s for the 45 the same day.
+// The 1.37s was first published here as 0.4s, measured on a graph whose earlier walks had already
+// paid for type checking: the checker computes types lazily and whichever walk asks first pays, so a
+// later walk looks cheap for a reason that has nothing to do with its rules. Every walk is now on a fresh graph. A real
 // one-file-changed run on ahra saved about 1.1s of the fix phase, close to that ceiling.
 //
 // The node count is identical across rule sets, so the walk itself still cannot be skipped; what grew
@@ -123,7 +125,7 @@ type LintCacheEntry struct {
 // failure here that looks exactly like success.
 //
 // The text is stored rather than the 11 being refused because refusing them buys bytes with a
-// standing per-rule obligation, and this format already depends on `ReadsProgram` carrying one.
+// standing per-rule obligation, and this format already depends on `ProgramReads` carrying one.
 // The size scales the right way: the artifact grows with a dirty tree, which is the run where
 // this cache saves least, because changed files are recomputed anyway.
 //
@@ -289,9 +291,12 @@ func (c *LintCache) Store(entry LintCacheEntry) {
 // bytes, type-aware rules whose findings also depend on the types the file can see, and rules that may
 // never be cached.
 //
-// ReadsProgram is the one disqualification left. A rule touching ctx.Program reaches every source
-// file in the run, and what it read is not something a per-file key can name, so its answer can
-// change while every key it could have is unmoved.
+// ReadsOtherFiles is the one disqualification left. A rule reading the program's file list, a file by
+// name, another file's imports, or the file system reaches something a per-file key cannot name, so
+// its answer can change while every key it could have is unmoved. The program's other reads are in
+// the key already: compiler options through the tsconfig chain, the default library through the
+// binary, and this file's own module resolution through the type fingerprint, whose edges come from
+// it. So a rule reading module resolution is type-aware even with no checker (#b8k3bp6).
 //
 // NeedsTypeChecker used to disqualify too, on the reasoning that a type-aware rule's answer depends on
 // what the file imports. It does, and that is now in its key: Graph.TypeFingerprints hashes a file's
@@ -300,14 +305,14 @@ func (c *LintCache) Store(entry LintCacheEntry) {
 // excluded were excluded for the type checker alone.
 //
 // The asymmetry still holds. Including a rule wrongly serves stale findings silently and forever;
-// excluding one wrongly costs a cache miss. A rule that reads the program and the checker both is
-// excluded, since the program is the larger reach.
+// excluding one wrongly costs a cache miss. A rule that reads other files and the checker both is
+// excluded, since other files are the larger reach.
 func CacheClasses(rules []rule.Rule) (pure []rule.Rule, typeAware []rule.Rule, uncacheable []rule.Rule) {
 	for _, subject := range rules {
 		switch {
-		case subject.ReadsProgram:
+		case subject.ProgramReads&rule.ReadsOtherFiles != 0:
 			uncacheable = append(uncacheable, subject)
-		case subject.NeedsTypeChecker:
+		case subject.NeedsTypeChecker || subject.ProgramReads&rule.ReadsModuleResolution != 0:
 			typeAware = append(typeAware, subject)
 		default:
 			pure = append(pure, subject)

@@ -63,9 +63,8 @@ var NoDeprecated = rule.Rule{
 	// The rule cannot answer anything without resolving symbols across files.
 	NeedsTypeChecker: true,
 
-	// A use in this file is deprecated because of a tag in ANOTHER file, so the verdict is not a
-	// function of this file's text. The findings cache has to know that.
-	ReadsProgram: true,
+	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Every listener reads the checker unconditionally, so decline the file once here rather

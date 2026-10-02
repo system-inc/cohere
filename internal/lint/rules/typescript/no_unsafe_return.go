@@ -72,11 +72,8 @@ var NoUnsafeReturn = rule.Rule{
 	// Every judgment compares the returned value's type against the function's declared one.
 	NeedsTypeChecker: true,
 
-	// The rule reads compiler options off the program for the `this` branch, and resolves a
-	// function's contextual type, which can be declared in another file. A findings cache keyed on
-	// this file's hash alone would serve a verdict computed under options or a signature that has
-	// since changed.
-	ReadsProgram: true,
+	// The compiler options.
+	ProgramReads: rule.ReadsCompilerOptions,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

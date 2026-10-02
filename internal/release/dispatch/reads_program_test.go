@@ -6,42 +6,46 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
 
-// A rule that reads ctx.Program must declare ReadsProgram, and this is what makes that structural
+// A rule declares exactly what it reads through ctx.Program, and this is what makes that structural
 // rather than remembered.
 //
-// ctx.Program reaches every source file in the run, so a rule that touches it is not pure per-file.
-// The findings cache keys on the linted file's hash, so an undeclared cross-file rule serves a
-// stale result when the other file changes: zero findings, forever, indistinguishable from a clean
-// tree. Nothing downstream notices, which is why the check lives here instead of in a convention.
+// The findings cache decides from the declaration (rule.ProgramReads) whether a rule's findings can be
+// replayed and on what key: compiler options and the default library are in the key already, this
+// file's module resolution is in the type fingerprint, and anything else keeps the rule out of the
+// cache (#b8k3bp6). An undeclared read serves a stale result when what it read changes: zero findings,
+// forever, indistinguishable from a clean tree. An overdeclared read keeps a rule out of the cache it
+// could have joined. So both directions fail here.
 //
-// The check reads each rule file's syntax, not its text and not its behavior. Behavior would need a
-// program to run against and would cover only the rules it happened to exercise. Text was what this
-// checked until #ym4v8bc found two holes in it, both in the Tailwind rules:
+// ctx.Program refuses an undeclared read at runtime too, but only on the paths a run happens to take.
+// This reads each rule file's syntax, so it covers every path:
 //
-//   - A helper read the program for its callers. DesignSystemForProgram took a rule.Context, so five
-//     rules reached the program without writing ctx.Program, and they passed only because each also
-//     happened to check ctx.Program == nil somewhere. A file that reads the program through a
-//     rule.Context and defines no rule now fails here: its callers would read the program without
-//     naming it, and nothing would make them declare. Such a helper takes *compiler.Program instead,
-//     and every call site then names ctx.Program, which this sees.
-//   - A comment satisfied it. The helper's own file passed because its doc comment contained the
-//     text `ReadsProgram: true`. A declaration is now a ReadsProgram key set to true in a composite
-//     literal, and a mention of ctx.Program in a comment is not a read.
-func TestRulesReadingProgramDeclareIt(t *testing.T) {
+//   - every method a rule calls on its context's Program, through any chain (`state.ctx.Program`);
+//   - every function a rule hands its Program to, by what that function reads, followed through the
+//     helpers in the rule packages and in `checking` to a fixed point;
+//   - a Program handed to a function this cannot see is refused, since its reads cannot be counted.
+//
+// Text was what this checked until #ym4v8bc found two holes in it, both in the Tailwind rules. A
+// helper that reads the program through a rule.Context hides the read from its callers, so a file that
+// reads the program through a context and defines no rule still fails here: such a helper takes a
+// rule.Program, and every call site then names ctx.Program. And a declaration in a comment is not a
+// declaration: only a ProgramReads key in a composite literal counts.
+func TestRulesDeclareExactlyWhatTheyReadOfTheProgram(t *testing.T) {
 	ruleFiles := ruleSourceFiles(t)
 	if len(ruleFiles) == 0 {
 		// A check that found nothing to check passes for the wrong reason, which is the same shape
 		// as the defect it guards against.
 		t.Fatal("found no rule source files, so this test proved nothing")
 	}
+	helpers := programHelperReads(t, append(append([]string{}, ruleFiles...), checkingSourceFiles(t)...))
 
 	sawProgramReader := false
 	for _, path := range ruleFiles {
-		facts := readProgramFacts(t, path)
+		facts := readProgramFacts(t, path, helpers)
 		if !facts.readsProgram {
 			continue
 		}
@@ -49,15 +53,21 @@ func TestRulesReadingProgramDeclareIt(t *testing.T) {
 
 		if !facts.definesRule {
 			t.Errorf("%s reads the program through a rule.Context and defines no rule, so the rules "+
-				"calling it read the program without naming it and nothing makes them declare "+
-				"ReadsProgram. Take a *compiler.Program instead, so each call site names ctx.Program",
-				path)
+				"calling it read the program without naming it and nothing makes them declare it. "+
+				"Take a rule.Program instead, so each call site names ctx.Program", path)
 			continue
 		}
-		if !facts.declares {
-			t.Errorf("%s reads the program and does not declare ReadsProgram: true, so a findings cache "+
-				"keyed on one file's hash would serve a stale result when the other file changes",
-				path)
+		for _, unseen := range facts.unseenCallees {
+			t.Errorf("%s hands its Program to %s, which this cannot read, so its reads cannot be counted",
+				path, unseen)
+		}
+		if missing := facts.reads &^ facts.declared; missing != 0 {
+			t.Errorf("%s reads %s through ctx.Program and does not declare it (declares %s), so a findings "+
+				"cache would replay its findings after what it read had changed", path, missing, facts.declared)
+		}
+		if extra := facts.declared &^ facts.reads; extra != 0 {
+			t.Errorf("%s declares %s and reads none of it, which keeps it out of a cache it could join; "+
+				"declare %s", path, extra, facts.reads)
 		}
 	}
 
@@ -69,11 +79,12 @@ func TestRulesReadingProgramDeclareIt(t *testing.T) {
 	}
 }
 
-// The check sees code and not text, in both directions it was wrong in before.
+// The check sees code and not text, and counts reads by kind, in every direction it could be wrong.
 //
-// Each source is one this guard used to misjudge, written to a file and read the way the guard reads
-// the tree, so the guard is shown able to fail rather than only shown passing.
+// Each source is a shape this guard could misjudge, written to a file and read the way the guard
+// reads the tree, so the guard is shown able to fail rather than only shown passing.
 func TestReadProgramFactsSeesCodeNotComments(t *testing.T) {
+	helpers := map[string]programRead{"type_checking.IsPromiseLike": readsCompilerOptions | readsDefaultLibrary}
 	testCases := []struct {
 		name   string
 		source string
@@ -83,16 +94,15 @@ func TestReadProgramFactsSeesCodeNotComments(t *testing.T) {
 			// The shape DesignSystemForProgram had: a helper reading the program for its callers.
 			name: "a helper reading the program through a context",
 			source: `package probe
-func helper(ctx rule.Context) bool { return ctx.Program != nil }`,
-			want: programFacts{readsProgram: true},
+func helper(ctx rule.Context) bool { return ctx.Program.Options() != nil }`,
+			want: programFacts{readsProgram: true, reads: readsCompilerOptions},
 		},
 		{
-			// The shape the helper's own file had: the declaration's text in a comment.
 			name: "a declaration in a comment",
 			source: `package probe
-// Every caller must declare ` + "`ReadsProgram: true`" + `.
-var Probe = rule.Rule{Run: func(ctx rule.Context, options any) rule.Listeners { _ = ctx.Program; return nil }}`,
-			want: programFacts{readsProgram: true, definesRule: true},
+// Every caller must declare ` + "`ProgramReads: rule.ReadsOtherFiles`" + `.
+var Probe = rule.Rule{Run: func(ctx rule.Context, options any) rule.Listeners { _ = ctx.Program.SourceFiles(); return nil }}`,
+			want: programFacts{readsProgram: true, definesRule: true, reads: readsOtherFiles},
 		},
 		{
 			name: "a read in a comment only",
@@ -102,17 +112,24 @@ var Probe = rule.Rule{Run: func(ctx rule.Context, options any) rule.Listeners { 
 			want: programFacts{definesRule: true},
 		},
 		{
-			// A context under another name is still the context.
-			name: "a context parameter with a different name",
+			// A context under another name, and reached through a struct, is still the context.
+			name: "a context under another name, through a chain",
 			source: `package probe
-var Probe = rule.Rule{ReadsProgram: true, Run: func(c rule.Context, options any) rule.Listeners { _ = c.Program; return nil }}`,
-			want: programFacts{readsProgram: true, declares: true, definesRule: true},
+var Probe = rule.Rule{ProgramReads: rule.ReadsModuleResolution, Run: func(c rule.Context, options any) rule.Listeners { _ = state{c}.c.Program.ResolveModule(nil, nil); return nil }}`,
+			want: programFacts{readsProgram: true, definesRule: true, reads: readsModuleResolution, declared: readsModuleResolution},
 		},
 		{
-			name: "a declaration set to false",
+			// A read through a helper counts as the helper's reads.
+			name: "a read through a helper",
 			source: `package probe
-var Probe = rule.Rule{ReadsProgram: false, Run: func(ctx rule.Context, options any) rule.Listeners { _ = ctx.Program; return nil }}`,
-			want: programFacts{readsProgram: true, definesRule: true},
+var Probe = rule.Rule{ProgramReads: rule.ReadsCompilerOptions, Run: func(ctx rule.Context, options any) rule.Listeners { _ = type_checking.IsPromiseLike(ctx.Program, nil, nil); return nil }}`,
+			want: programFacts{readsProgram: true, definesRule: true, reads: readsCompilerOptions | readsDefaultLibrary, declared: readsCompilerOptions},
+		},
+		{
+			name: "a Program handed to a function this cannot see",
+			source: `package probe
+var Probe = rule.Rule{Run: func(ctx rule.Context, options any) rule.Listeners { somewhere.Else(ctx.Program); return nil }}`,
+			want: programFacts{readsProgram: true, definesRule: true, unseenCallees: []string{"somewhere.Else"}},
 		},
 	}
 	for _, testCase := range testCases {
@@ -121,28 +138,189 @@ var Probe = rule.Rule{ReadsProgram: false, Run: func(ctx rule.Context, options a
 			if err := os.WriteFile(path, []byte(testCase.source), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if got := readProgramFacts(t, path); got != testCase.want {
+			got := readProgramFacts(t, path, helpers)
+			if got.readsProgram != testCase.want.readsProgram || got.definesRule != testCase.want.definesRule ||
+				got.reads != testCase.want.reads || got.declared != testCase.want.declared ||
+				strings.Join(got.unseenCallees, ",") != strings.Join(testCase.want.unseenCallees, ",") {
 				t.Errorf("got %+v, want %+v", got, testCase.want)
 			}
 		})
 	}
 }
 
+// programRead mirrors rule.ProgramRead. This package reads rule sources as syntax and does not link
+// the rules, so it names the kinds the way the sources spell them.
+type programRead uint8
+
+const (
+	readsCompilerOptions programRead = 1 << iota
+	readsDefaultLibrary
+	readsModuleResolution
+	readsOtherFiles
+)
+
+func (reads programRead) String() string {
+	names := []string{}
+	for read, name := range map[programRead]string{
+		readsCompilerOptions:  "ReadsCompilerOptions",
+		readsDefaultLibrary:   "ReadsDefaultLibrary",
+		readsModuleResolution: "ReadsModuleResolution",
+		readsOtherFiles:       "ReadsOtherFiles",
+	} {
+		if reads&read != 0 {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	if len(names) == 0 {
+		return "nothing"
+	}
+	return strings.Join(names, " | ")
+}
+
+// programReadsByConstant is each declaration constant as a source spells it.
+var programReadsByConstant = map[string]programRead{
+	"ReadsCompilerOptions":  readsCompilerOptions,
+	"ReadsDefaultLibrary":   readsDefaultLibrary,
+	"ReadsModuleResolution": readsModuleResolution,
+	"ReadsOtherFiles":       readsOtherFiles,
+}
+
+// programReadsByMethod is what each rule.Program method reads. It must name every method the
+// interface has, which the build cannot check from here, so a method missing from this table is
+// refused as unseen rather than counted as reading nothing.
+var programReadsByMethod = map[string]programRead{
+	"Options":                        readsCompilerOptions,
+	"GetCurrentDirectory":            readsCompilerOptions,
+	"UseCaseSensitiveFileNames":      readsCompilerOptions,
+	"IsSourceFileDefaultLibrary":     readsDefaultLibrary,
+	"DefaultLibraryPath":             readsDefaultLibrary,
+	"ResolveModule":                  readsModuleResolution,
+	"GetSourceFileForResolvedModule": readsOtherFiles,
+	"SourceFiles":                    readsOtherFiles,
+	"GetSourceFile":                  readsOtherFiles,
+	"FS":                             readsOtherFiles,
+	"Identity":                       0,
+}
+
 // programFacts is what one rule file does with the program, read from its syntax.
 type programFacts struct {
-	// readsProgram is a `.Program` selector on a rule.Context parameter, under any name.
+	// readsProgram is a `.Program` selector on a rule.Context, under any name and through any chain.
 	readsProgram bool
-	// declares is a `ReadsProgram: true` key in a composite literal.
-	declares bool
 	// definesRule is a rule.Rule composite literal.
 	definesRule bool
+	// reads is what the file reads through its context's Program, directly and through helpers.
+	reads programRead
+	// declared is the file's ProgramReads key.
+	declared programRead
+	// unseenCallees are functions handed the Program whose reads this cannot count.
+	unseenCallees []string
+}
+
+// programUse is one place a Program value is used: a method called on it, or a function it is passed
+// to, named `package.Function` in the caller's terms.
+type programUse struct {
+	methods []string
+	callees []string
+}
+
+// usesOf collects how the Program values isProgram picks out are used inside node.
+func usesOf(node ast.Node, packageName string, isProgram func(ast.Expr) bool) programUse {
+	uses := programUse{}
+	ast.Inspect(node, func(inner ast.Node) bool {
+		call, isCall := inner.(*ast.CallExpr)
+		if !isCall {
+			return true
+		}
+		if selector, isSelector := call.Fun.(*ast.SelectorExpr); isSelector && isProgram(selector.X) {
+			uses.methods = append(uses.methods, selector.Sel.Name)
+		}
+		for _, argument := range call.Args {
+			if !isProgram(argument) {
+				continue
+			}
+			switch callee := call.Fun.(type) {
+			case *ast.Ident:
+				uses.callees = append(uses.callees, packageName+"."+callee.Name)
+			case *ast.SelectorExpr:
+				if qualifier, isIdentifier := callee.X.(*ast.Ident); isIdentifier {
+					uses.callees = append(uses.callees, qualifier.Name+"."+callee.Sel.Name)
+				} else {
+					uses.callees = append(uses.callees, "(method)."+callee.Sel.Name)
+				}
+			default:
+				uses.callees = append(uses.callees, "(an expression)")
+			}
+		}
+		return true
+	})
+	return uses
+}
+
+// programHelperReads is what every function taking a rule.Program reads of it, followed through the
+// functions it hands the Program on to, to a fixed point. Keyed `package.Function`.
+func programHelperReads(t *testing.T, paths []string) map[string]programRead {
+	t.Helper()
+	uses := map[string]programUse{}
+	for _, path := range paths {
+		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if err != nil {
+			t.Fatalf("parsing %s: %v", path, err)
+		}
+		for _, declaration := range file.Decls {
+			function, isFunction := declaration.(*ast.FuncDecl)
+			if !isFunction || function.Body == nil || function.Recv != nil {
+				continue
+			}
+			names := map[string]bool{}
+			for _, field := range function.Type.Params.List {
+				if isRuleSelector(field.Type, "Program") {
+					for _, name := range field.Names {
+						names[name.Name] = true
+					}
+				}
+			}
+			if len(names) == 0 {
+				continue
+			}
+			isProgram := func(expression ast.Expr) bool {
+				identifier, isIdentifier := expression.(*ast.Ident)
+				return isIdentifier && names[identifier.Name]
+			}
+			uses[file.Name.Name+"."+function.Name.Name] = usesOf(function.Body, file.Name.Name, isProgram)
+		}
+	}
+
+	reads := map[string]programRead{}
+	for changed := true; changed; {
+		changed = false
+		for name, use := range uses {
+			total := reads[name]
+			for _, method := range use.methods {
+				total |= programReadsByMethod[method]
+			}
+			for _, callee := range use.callees {
+				total |= reads[callee]
+			}
+			if total != reads[name] {
+				reads[name] = total
+				changed = true
+			}
+		}
+	}
+	for name := range uses {
+		if _, present := reads[name]; !present {
+			reads[name] = 0
+		}
+	}
+	return reads
 }
 
 // readProgramFacts parses one file and reports what it does with the program.
 //
 // Names of rule.Context parameters are collected first, since a rule may call its context anything;
 // ctx and context are added for the rare function literal whose parameter types are elided.
-func readProgramFacts(t *testing.T, path string) programFacts {
+func readProgramFacts(t *testing.T, path string, helpers map[string]programRead) programFacts {
 	t.Helper()
 
 	file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
@@ -164,19 +342,37 @@ func readProgramFacts(t *testing.T, path string) programFacts {
 		return true
 	})
 
+	// isContextProgram is `<context>.Program`, where the context is a name or the last link of a
+	// chain (`state.ctx.Program`).
+	isContextProgram := func(expression ast.Expr) bool {
+		selector, isSelector := expression.(*ast.SelectorExpr)
+		if !isSelector || selector.Sel.Name != "Program" {
+			return false
+		}
+		switch receiver := selector.X.(type) {
+		case *ast.Ident:
+			return contextNames[receiver.Name]
+		case *ast.SelectorExpr:
+			return contextNames[receiver.Sel.Name]
+		}
+		return false
+	}
+
 	facts := programFacts{}
 	ast.Inspect(file, func(node ast.Node) bool {
 		switch typed := node.(type) {
 		case *ast.SelectorExpr:
-			if receiver, isIdentifier := typed.X.(*ast.Ident); isIdentifier &&
-				typed.Sel.Name == "Program" && contextNames[receiver.Name] {
+			if isContextProgram(typed) {
 				facts.readsProgram = true
 			}
 		case *ast.KeyValueExpr:
-			key, keyIsIdentifier := typed.Key.(*ast.Ident)
-			value, valueIsIdentifier := typed.Value.(*ast.Ident)
-			if keyIsIdentifier && key.Name == "ReadsProgram" && valueIsIdentifier && value.Name == "true" {
-				facts.declares = true
+			if key, isIdentifier := typed.Key.(*ast.Ident); isIdentifier && key.Name == "ProgramReads" {
+				ast.Inspect(typed.Value, func(inner ast.Node) bool {
+					if selector, isSelector := inner.(*ast.SelectorExpr); isSelector {
+						facts.declared |= programReadsByConstant[selector.Sel.Name]
+					}
+					return true
+				})
 			}
 		case *ast.CompositeLit:
 			if isRuleSelector(typed.Type, "Rule") {
@@ -185,6 +381,24 @@ func readProgramFacts(t *testing.T, path string) programFacts {
 		}
 		return true
 	})
+
+	uses := usesOf(file, file.Name.Name, isContextProgram)
+	for _, method := range uses.methods {
+		read, known := programReadsByMethod[method]
+		if !known {
+			facts.unseenCallees = append(facts.unseenCallees, "Program."+method)
+			continue
+		}
+		facts.reads |= read
+	}
+	for _, callee := range uses.callees {
+		read, known := helpers[callee]
+		if !known {
+			facts.unseenCallees = append(facts.unseenCallees, callee)
+			continue
+		}
+		facts.reads |= read
+	}
 	return facts
 }
 
@@ -198,12 +412,24 @@ func isRuleSelector(expression ast.Expr, name string) bool {
 	return isIdentifier && packageName.Name == "rule" && selector.Sel.Name == name
 }
 
-// ruleSourceFiles lists the non-test Go files under internal/rules.
+// ruleSourceFiles lists the non-test Go files under internal/lint/rules.
 func ruleSourceFiles(t *testing.T) []string {
+	t.Helper()
+	return goSourceFilesUnder(t, "../../lint/rules")
+}
+
+// checkingSourceFiles lists the non-test Go files of the shared type-checking helpers, which take a
+// rule.Program from the rules that call them.
+func checkingSourceFiles(t *testing.T) []string {
+	t.Helper()
+	return goSourceFilesUnder(t, "../../lint/checking")
+}
+
+func goSourceFilesUnder(t *testing.T, root string) []string {
 	t.Helper()
 
 	var found []string
-	err := filepath.Walk("../../lint/rules", func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -214,7 +440,7 @@ func ruleSourceFiles(t *testing.T) []string {
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("walking rule packages: %v", err)
+		t.Fatalf("walking %s: %v", root, err)
 	}
 	return found
 }

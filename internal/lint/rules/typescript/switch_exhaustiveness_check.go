@@ -197,15 +197,6 @@ var SwitchExhaustivenessCheck = rule.Rule{
 	// switch it sees, with no cheap syntactic exit, so the checker is required.
 	NeedsTypeChecker: true,
 
-	// A switch over an enum imported from another module resolves its case types across that module
-	// boundary, so the answer this rule gives for one file depends on the contents of another. A
-	// findings cache keyed on the linted file alone would serve a stale verdict forever when the enum
-	// gains a member and the switch file does not change — silence rather than a crash, which is the
-	// direction this flag exists to prevent. While this rule was adapted, `upstream.Adapt` declared
-	// this on every rule it wrapped by assumption; here it is declared because a fixture in this
-	// package exercises exactly that cross-module resolution.
-	ReadsProgram: true,
-
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		opts, ok := rule.OptionsAs[SwitchExhaustivenessCheckOptions](options)
 		if !ok {

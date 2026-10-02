@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/module"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -94,9 +93,8 @@ const interfaceNameSuffix = "Interface"
 var BoundaryNoProjectThemeValue = rule.Rule{
 	Name: "structure/boundary-no-project-theme-value",
 
-	// Scans every theme file in the program, so a findings cache keyed on the linted file alone
-	// would go stale when a theme changes and this file does not.
-	ReadsProgram: true,
+	// Every theme file in the program.
+	ProgramReads: rule.ReadsOtherFiles,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName()).IsInLibrariesStructure {
 			return nil
@@ -208,7 +206,7 @@ func jsxElementNameOf(attribute *ast.Node) string {
 // under the parallel walk by construction rather than by discipline.
 var themeCache struct {
 	sync.Mutex
-	program *compiler.Program
+	program rule.ProgramIdentity
 	values  map[string]map[string][]string
 }
 
@@ -222,12 +220,12 @@ func themeValuesForProgram(ctx rule.Context) map[string]map[string][]string {
 	themeCache.Lock()
 	defer themeCache.Unlock()
 
-	if themeCache.program == ctx.Program && themeCache.values != nil {
+	if themeCache.program == ctx.Program.Identity() && themeCache.values != nil {
 		return themeCache.values
 	}
 
 	values := themeValuesFromProgram(ctx)
-	themeCache.program = ctx.Program
+	themeCache.program = ctx.Program.Identity()
 	themeCache.values = values
 	return values
 }

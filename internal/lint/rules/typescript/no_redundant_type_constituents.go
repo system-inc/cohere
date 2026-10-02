@@ -79,10 +79,6 @@ var NoRedundantTypeConstituents = rule.Rule{
 	// Every judgment is a type-flag question about a member the checker has already resolved.
 	NeedsTypeChecker: true,
 
-	// A member is routinely a type reference resolving across a module boundary, so the verdict for
-	// one file depends on the program rather than on the file alone.
-	ReadsProgram: true,
-
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// The declaration governs registration; the harness can still build a Context by hand, and
 		// a nil dereference here costs every rule its verdict on the whole file.

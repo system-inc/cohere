@@ -108,11 +108,11 @@ func consistentTypeImportsTypeErrors(t *testing.T, sources map[string]string) ma
 	probe := rule.Rule{
 		Name:             "test/type-check",
 		NeedsTypeChecker: true,
-		ReadsProgram:     true,
+		ProgramReads:     rule.ReadsOtherFiles,
 		Run: func(ctx rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					for _, sourceFile := range ctx.Program.GetSourceFiles() {
+					for _, sourceFile := range ctx.Program.SourceFiles() {
 						// The harness writes fixtures under a temporary root, so a file is matched to
 						// its fixture by the path the fixture named, as a suffix.
 						key := ""

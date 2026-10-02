@@ -15,7 +15,7 @@ import (
 //
 // # Why every fixture here runs through a program
 //
-// The rule reads the live design system, so it declares `ReadsProgram` and takes `ctx.Program` to
+// The rule reads the live design system, so it declares `ProgramReads` and takes `ctx.Program` to
 // find the repository's stylesheet. `rule_testing.Run` hands a rule a nil Program, and the rule's own
 // decline path returns nil listeners for that case rather than reporting. So every fixture in this
 // file that used `rule_testing.Run` after the swap would have exercised the nil-Program branch: the

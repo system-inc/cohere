@@ -231,7 +231,7 @@ var NoMisusedPromises = rule.Rule{
 	// Every listener consults the checker; see the note above on why the guard lives in Run.
 	NeedsTypeChecker: true,
 
-	// ReadsProgram is deliberately absent, and that is a measurement rather than an omission. The
+	// ProgramReads is deliberately absent, and that is a measurement rather than an omission. The
 	// program handle appears nowhere in this body: the rule asks the checker questions about nodes in
 	// the file it was handed, and the checker resolves across module boundaries on its own without the
 	// rule reaching past its own file. While this family was adapted, `upstream.Adapt` declared the

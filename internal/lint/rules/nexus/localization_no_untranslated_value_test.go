@@ -65,7 +65,7 @@ func runOnTranslations(t *testing.T, files map[string]string, subjectRelativePat
 	var diagnostics []rule.Diagnostic
 	context := rule.Context{
 		SourceFile: subject,
-		Program:    graph.Program,
+		Program:    rule.ViewProgram(graph.Program, subject, LocalizationNoUntranslatedValue),
 		Report: func(diagnostic rule.Diagnostic) {
 			diagnostic.RuleName = LocalizationNoUntranslatedValue.Name
 			diagnostics = append(diagnostics, diagnostic)

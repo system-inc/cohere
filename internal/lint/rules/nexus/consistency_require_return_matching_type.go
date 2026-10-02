@@ -116,11 +116,6 @@ var ConsistencyRequireReturnMatchingType = rule.Rule{
 	// checker can answer any of the three.
 	NeedsTypeChecker: true,
 
-	// A contextual or inferred return type resolves across module boundaries (an imported callback
-	// type, the `Promise` declaration in the default library), so a findings cache keyed on this
-	// file alone would serve an answer computed under a program that has since changed.
-	ReadsProgram: true,
-
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {
 			return nil

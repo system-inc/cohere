@@ -1622,9 +1622,6 @@ func TestSwitchExhaustivenessCheckDeclaresItNeedsTheChecker(t *testing.T) {
 	if !SwitchExhaustivenessCheck.NeedsTypeChecker {
 		t.Fatal("the rule must declare NeedsTypeChecker: without a checker it reports nothing rather than failing, so every clean fixture would pass vacuously")
 	}
-	if !SwitchExhaustivenessCheck.ReadsProgram {
-		t.Fatal("the rule must declare ReadsProgram: it resolves an imported enum across a module boundary, and a findings cache keyed on the linted file alone would serve a stale result forever")
-	}
 
 	// The guard the absorption made possible. Driving the listener with a checker-less Context must
 	// return before `getSwitchMetadata` reaches the checker, and this is the only path that reaches
