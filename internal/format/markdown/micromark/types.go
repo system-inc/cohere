@@ -68,8 +68,12 @@ type Token struct {
 	close                        bool
 	inactive                     bool
 	balanced                     bool
-	spread                       bool
 	gfmAutolinkLiteralWalkedInto bool
+
+	// Spread is upstream's _spread, read and written by mdast-util-from-markdown's prepareList.
+	Spread bool
+	// Align is upstream's _align on a GFM table token: "left", "right", "center" or "none" per column.
+	Align []string
 }
 
 // ended reports whether the token has been exited. Upstream tests `token.end` for undefined.
