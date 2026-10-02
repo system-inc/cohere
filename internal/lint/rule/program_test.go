@@ -47,6 +47,7 @@ func TestAProgramViewAdmitsExactlyTheDeclaredReads(t *testing.T) {
 		{"SourceFiles", ReadsOtherFiles, func(view Program) { view.SourceFiles() }},
 		{"GetSourceFile", ReadsOtherFiles, func(view Program) { view.GetSourceFile("other.ts") }},
 		{"FS", ReadsOtherFiles, func(view Program) { view.FS() }},
+		{"DesignSystemFS", ReadsDesignSystem, func(view Program) { view.DesignSystemFS() }},
 	}
 	program := new(compiler.Program)
 	for _, method := range methods {
@@ -55,7 +56,7 @@ func TestAProgramViewAdmitsExactlyTheDeclaredReads(t *testing.T) {
 			if !strings.Contains(refused, "rule probe called Program."+method.name) || !strings.Contains(refused, programReadNames[method.read]) {
 				t.Errorf("an undeclared %s was not refused by name and kind: %q", method.name, refused)
 			}
-			for _, other := range []ProgramRead{ReadsCompilerOptions, ReadsDefaultLibrary, ReadsModuleResolution, ReadsOtherFiles} {
+			for _, other := range []ProgramRead{ReadsCompilerOptions, ReadsDefaultLibrary, ReadsModuleResolution, ReadsOtherFiles, ReadsDesignSystem} {
 				refused := refusalOf(func() { method.call(ViewProgram(program, nil, Rule{Name: "probe", ProgramReads: other})) })
 				if admitted := refused == ""; admitted != (other == method.read) {
 					t.Errorf("%s under a declaration of %s: admitted %v, want %v", method.name, other, admitted, other == method.read)

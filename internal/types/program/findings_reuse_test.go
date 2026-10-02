@@ -433,6 +433,7 @@ func TestCacheClassesSplitsThreeWays(t *testing.T) {
 		{Name: "typed-library", NeedsTypeChecker: true, ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary},
 		{Name: "resolution", ProgramReads: rule.ReadsModuleResolution},
 		{Name: "program", ProgramReads: rule.ReadsOtherFiles},
+		{Name: "design-system", ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem},
 		{Name: "both", ProgramReads: rule.ReadsOtherFiles | rule.ReadsModuleResolution, NeedsTypeChecker: true},
 	})
 	names := func(rules []rule.Rule) string {
@@ -442,7 +443,7 @@ func TestCacheClassesSplitsThreeWays(t *testing.T) {
 		}
 		return joined
 	}
-	if names(pure) != "pure options " || names(typeAware) != "typed typed-library resolution " || names(never) != "program both " {
+	if names(pure) != "pure options " || names(typeAware) != "typed typed-library resolution " || names(never) != "program design-system both " {
 		t.Errorf("pure [%s] typed [%s] never [%s]", names(pure), names(typeAware), names(never))
 	}
 }

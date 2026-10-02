@@ -157,6 +157,7 @@ const (
 	readsDefaultLibrary
 	readsModuleResolution
 	readsOtherFiles
+	readsDesignSystem
 )
 
 func (reads programRead) String() string {
@@ -166,6 +167,7 @@ func (reads programRead) String() string {
 		readsDefaultLibrary:   "ReadsDefaultLibrary",
 		readsModuleResolution: "ReadsModuleResolution",
 		readsOtherFiles:       "ReadsOtherFiles",
+		readsDesignSystem:     "ReadsDesignSystem",
 	} {
 		if reads&read != 0 {
 			names = append(names, name)
@@ -184,6 +186,7 @@ var programReadsByConstant = map[string]programRead{
 	"ReadsDefaultLibrary":   readsDefaultLibrary,
 	"ReadsModuleResolution": readsModuleResolution,
 	"ReadsOtherFiles":       readsOtherFiles,
+	"ReadsDesignSystem":     readsDesignSystem,
 }
 
 // programReadsByMethod is what each rule.Program method reads. It must name every method the
@@ -200,6 +203,7 @@ var programReadsByMethod = map[string]programRead{
 	"SourceFiles":                    readsOtherFiles,
 	"GetSourceFile":                  readsOtherFiles,
 	"FS":                             readsOtherFiles,
+	"DesignSystemFS":                 readsDesignSystem,
 	"Identity":                       0,
 }
 

@@ -84,6 +84,12 @@ type DesignSystemResult struct {
 	Err error
 	// EntryPoint is the stylesheet the load was attempted from, empty when none was found.
 	EntryPoint string
+	// Reads is every path the load asked the file system about, present or absent: the entry point
+	// candidates, the package root's probes, and every stylesheet in the `@import` graph. It is the
+	// design system's whole read set, observed through rule.RecordingFS rather than listed, so a cache
+	// keyed on it re-runs the Tailwind rules when any of those files changes, appears, or disappears
+	// (#pyhm2t2). Set on every result, a failed load's included: a missing entry point is an input too.
+	Reads []rule.FileRead
 }
 
 // ErrNoTailwindEntryPoint is returned when a program's project holds no Tailwind stylesheet.
@@ -109,7 +115,7 @@ var designSystemCache struct {
 
 // DesignSystemForProgram returns this run's design system, building it at most once.
 //
-// Every rule that calls this must declare `ReadsCompilerOptions | ReadsOtherFiles`. The program reaches every file in
+// Every rule that calls this must declare `ReadsCompilerOptions | ReadsDesignSystem`. The program reaches every file in
 // the run and the stylesheet graph reaches files the program does not contain at all, so a findings
 // cache keyed on the linted file alone is stale whenever `theme.css` changes and the `.tsx` file
 // does not: zero findings, forever, indistinguishable from a clean tree.
@@ -148,6 +154,14 @@ func DesignSystemForProgram(program rule.Program) DesignSystemResult {
 // Call `DesignSystemForProgram` rather than this: an uncached call re-walks the `@import` graph, and
 // the rules that will read it run on every file in the tree.
 func loadDesignSystemForProgram(program rule.Program) DesignSystemResult {
+	fileSystem := program.DesignSystemFS()
+	result := loadDesignSystemThrough(program, fileSystem)
+	result.Reads = fileSystem.Reads()
+	return result
+}
+
+// loadDesignSystemThrough is the load itself, asking fileSystem every question about the disk.
+func loadDesignSystemThrough(program rule.Program, fileSystem *rule.RecordingFS) DesignSystemResult {
 	projectRoot := projectRootOf(program)
 	if projectRoot == "" {
 		return DesignSystemResult{Err: fmt.Errorf("could not determine the project root from the program")}
@@ -158,8 +172,8 @@ func loadDesignSystemForProgram(program rule.Program) DesignSystemResult {
 	// its back is an input the cache never signs, so editing an ignored or untracked stylesheet the
 	// theme imports replayed the old verdict (#ym4v8bc). Asked through it, each candidate entry point
 	// probed and missed is recorded absent, so creating one invalidates, and each probe of the
-	// package walk is recorded the same way.
-	fileSystem := program.FS()
+	// package walk is recorded the same way. It is reached through a rule.RecordingFS, which also keeps
+	// the read set the findings cache keys the Tailwind rules on.
 	fileExists := fileSystem.FileExists
 
 	entryPoint := findTailwindEntryPoint(projectRoot, fileExists)

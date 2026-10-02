@@ -133,14 +133,14 @@ type designSystemProbe struct {
 // designSystemProgram is a program as a rule calling DesignSystemForProgram sees it, declaring what the
 // design system reads.
 func designSystemProgram(program *compiler.Program) rule.Program {
-	return rule.ViewProgram(program, nil, rule.Rule{Name: "test/design-system", ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles})
+	return rule.ViewProgram(program, nil, rule.Rule{Name: "test/design-system", ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem})
 }
 
 func (probe *designSystemProbe) rule() rule.Rule {
 	return rule.Rule{
 		Name: "tailwind-design-system-probe",
 		// What DesignSystemForProgram reads. ctx.Program refuses anything undeclared.
-		ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles,
+		ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
 		Run: func(ctx rule.Context, _ any) rule.Listeners {
 			result := DesignSystemForProgram(ctx.Program)
 			probe.mutex.Lock()

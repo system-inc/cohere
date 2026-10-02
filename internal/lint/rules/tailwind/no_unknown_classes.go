@@ -68,8 +68,8 @@ type NoUnknownClassesOptions struct {
 // in particular gets turned off the first time it flags a working class.
 var NoUnknownClasses = rule.Rule{
 	Name: "better-tailwindcss/no-unknown-classes",
-	// The design system, whose stylesheets are read off the file system, outside the program.
-	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles,
+	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

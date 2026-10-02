@@ -28,6 +28,10 @@ import (
 //	ReadsOtherFiles        anything else: the program's file list, a file by name or by resolution,
 //	                       another file's imports, the file system. Nothing per file covers it, so a
 //	                       rule declaring it is never cached
+//	ReadsDesignSystem      the files the Tailwind design system is built from: its entry point, the
+//	                       stylesheets it imports, and the paths it probed and did not find. Read
+//	                       through DesignSystemFS, which records every one, so the set is observed
+//	                       rather than listed and can key a cache of its own (#pyhm2t2)
 //
 // A rule reads ctx.Program through a view that refuses every method outside its declaration, with a
 // panic naming the rule and the read. The walk contains that panic to the rule and names it, so a rule
@@ -40,6 +44,7 @@ const (
 	ReadsDefaultLibrary
 	ReadsModuleResolution
 	ReadsOtherFiles
+	ReadsDesignSystem
 )
 
 // programReadNames names each read in a refusal.
@@ -48,12 +53,13 @@ var programReadNames = map[ProgramRead]string{
 	ReadsDefaultLibrary:   "ReadsDefaultLibrary",
 	ReadsModuleResolution: "ReadsModuleResolution",
 	ReadsOtherFiles:       "ReadsOtherFiles",
+	ReadsDesignSystem:     "ReadsDesignSystem",
 }
 
 // String lists the reads a declaration holds, for refusals and tests.
 func (reads ProgramRead) String() string {
 	names := []string{}
-	for _, read := range []ProgramRead{ReadsCompilerOptions, ReadsDefaultLibrary, ReadsModuleResolution, ReadsOtherFiles} {
+	for _, read := range []ProgramRead{ReadsCompilerOptions, ReadsDefaultLibrary, ReadsModuleResolution, ReadsOtherFiles, ReadsDesignSystem} {
 		if reads&read != 0 {
 			names = append(names, programReadNames[read])
 		}
@@ -103,6 +109,9 @@ type Program interface {
 	SourceFiles() []*ast.SourceFile
 	GetSourceFile(fileName string) *ast.SourceFile
 	FS() vfs.FS
+
+	// ReadsDesignSystem: a file system that records every path it is asked about and refuses writes.
+	DesignSystemFS() *RecordingFS
 
 	// Identity reads nothing.
 	Identity() ProgramIdentity
@@ -209,6 +218,11 @@ func (view *programView) GetSourceFile(fileName string) *ast.SourceFile {
 func (view *programView) FS() vfs.FS {
 	view.require(ReadsOtherFiles, "FS")
 	return view.program.Host().FS()
+}
+
+func (view *programView) DesignSystemFS() *RecordingFS {
+	view.require(ReadsDesignSystem, "DesignSystemFS")
+	return NewRecordingFS(view.program.Host().FS())
 }
 
 func (view *programView) Identity() ProgramIdentity {

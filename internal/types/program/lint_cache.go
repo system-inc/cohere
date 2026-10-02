@@ -320,7 +320,9 @@ func (c *LintCache) Store(entry LintCacheEntry) {
 func CacheClasses(rules []rule.Rule) (pure []rule.Rule, typeAware []rule.Rule, uncacheable []rule.Rule) {
 	for _, subject := range rules {
 		switch {
-		case subject.ProgramReads&rule.ReadsOtherFiles != 0:
+		// ReadsDesignSystem is uncacheable until the table keys it on the design system's read set
+		// (#pyhm2t2); the declaration and its recorded reads land first so nothing changes meanwhile.
+		case subject.ProgramReads&(rule.ReadsOtherFiles|rule.ReadsDesignSystem) != 0:
 			uncacheable = append(uncacheable, subject)
 		case subject.NeedsTypeChecker || subject.ProgramReads&rule.ReadsModuleResolution != 0:
 			typeAware = append(typeAware, subject)

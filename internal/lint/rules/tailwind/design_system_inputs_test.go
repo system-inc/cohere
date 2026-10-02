@@ -88,4 +88,34 @@ func TestDesignSystemReadsAreRunCacheInputs(t *testing.T) {
 	if hasSuffix(present, "/app/_theme/styles/theme.css") {
 		t.Errorf("a candidate that does not exist is recorded present")
 	}
+
+	// The design system's own read set, which the findings cache keys the Tailwind rules on
+	// (#pyhm2t2), holds the same facts: the stylesheets present, the missed candidate absent. Every
+	// path in it is one the run cache's recorder also saw, so the two observations agree.
+	readPresent, readAbsent := []string{}, []string{}
+	for _, read := range result.Reads {
+		if read.Present {
+			readPresent = append(readPresent, read.Path)
+		} else {
+			readAbsent = append(readAbsent, read.Path)
+		}
+	}
+	for _, stylesheet := range []string{"/app/globals.css", "/app/extra.css"} {
+		if !hasSuffix(readPresent, stylesheet) {
+			t.Errorf("%s is missing from the design system's read set, so a cache keyed on it would replay "+
+				"the Tailwind rules after it changed", stylesheet)
+		}
+	}
+	if !hasSuffix(readAbsent, "/app/_theme/styles/theme.css") {
+		t.Errorf("the missed entry-point candidate is missing from the design system's read set as absent")
+	}
+	recorded := map[string]bool{}
+	for _, path := range append(present, absent...) {
+		recorded[path] = true
+	}
+	for _, read := range result.Reads {
+		if !recorded[read.Path] {
+			t.Errorf("the design system read %s and the run cache's recorder did not see it", read.Path)
+		}
+	}
 }
