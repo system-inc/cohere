@@ -1,0 +1,18 @@
+{
+    "name": "cohere",
+    "displayName": "cohere",
+    "description": "Formats on save with cohere: what `cohere --fix --format` writes, computed from the buffer, so the editor and the gate never disagree.",
+    "publisher": "system-inc",
+    "version": "0.0.1",
+    "private": true,
+    "license": "UNLICENSED",
+    "engines": {
+        "vscode": "^1.80.0"
+    },
+    "categories": ["Formatters"],
+    "activationEvents": ["onStartupFinished"],
+    "main": "./extension.js",
+    "scripts": {
+        "test": "node --test cohere-format.test.js"
+    }
+}
