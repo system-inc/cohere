@@ -17,7 +17,10 @@ import SwiftSyntax
  - Two extensions of another type stay beside the file's type, because moving them would cost what the
    ruling is for. Both were raised by @system_cohere_swift_ahraos_macos on real code:
    - A `private` or `fileprivate` extension. It is used only in this file, and moving it out would force
-     it to `internal`, widening access to satisfy a naming rule.
+     it to `internal`, widening access to satisfy a naming rule. This holds in a `Type+Purpose.swift` file
+     too (the Circle's second question, on `Terminal+AuthoritativeCheckpoint.swift`'s `VtColor` helper), as
+     long as the file has a visible face of its own: a declared type or a non-private extension it is
+     named for. A file of nothing but private extensions answers to the plain naming rule.
    - An extension whose every member names the file's type. `extension View { func delayWidthUntilIdle()
      }` beside `struct DelayWidthUntilIdle: ViewModifier` is the modifier's public face, and putting it in
      `View+Something.swift` separates the modifier from its only entry point, the opposite of findability.
@@ -48,13 +51,18 @@ public struct FileNamedForType: FileRule {
         }
 
         let declaredName = primary?.name
+        /* The file has a public face: a type it declares, or a visible extension it is named for. A file-private helper may sit beside either. */
+        let anchored = declaredName != nil || declarations.extensions.contains { other in
+            Self.isPurposeFile(stem: stem, for: other.name) && !(other.extensionDeclaration.map(Self.isFilePrivate) ?? false)
+        }
         for extended in declarations.extensions where extended.name != declaredName {
             if Self.isPurposeFile(stem: stem, for: extended.name) {
                 continue
             }
-            if let declaredName, let declaration = extended.extensionDeclaration,
-                Self.isFilePrivate(declaration) || Self.everyMemberNames(declaredName, in: declaration)
-            {
+            if let declaration = extended.extensionDeclaration, anchored, Self.isFilePrivate(declaration) {
+                continue
+            }
+            if let declaredName, let declaration = extended.extensionDeclaration, Self.everyMemberNames(declaredName, in: declaration) {
                 continue
             }
             let suggestion = "\(extended.name.split(separator: ".").first.map(String.init) ?? extended.name)+Purpose.swift"

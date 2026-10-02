@@ -61,6 +61,17 @@ struct FileShapeRuleTests {
         #expect(Self.messages(FileNamedForType(), "App.swift", source).isEmpty)
     }
 
+    @Test func aPrivateHelperExtensionStaysInAPurposeFile() {
+        let source = "extension Terminal.SeededVtState { func wireCheckpoint() {} }\nfileprivate extension VtColor { init(value: Int) {} }\n"
+        #expect(Self.messages(FileNamedForType(), "Terminal+AuthoritativeCheckpoint.swift", source).isEmpty)
+    }
+
+    /* The control: with no visible face, a private extension is just a misnamed file. */
+    @Test func aFileOfOnlyPrivateExtensionsIsStillNamedForWhatItExtends() {
+        let source = "private extension VtColor { init(value: Int) {} }\n"
+        #expect(Self.messages(FileNamedForType(), "Helpers.swift", source) == ["extensionOutsideItsFile"])
+    }
+
     /* The SwiftUI modifier idiom: the extension is the modifier's public face. */
     @Test func anExtensionExposingTheFilesTypeStaysBesideIt() {
         let source = "struct DelayWidthUntilIdle: ViewModifier {}\nextension View {\n    func delayWidthUntilIdle() -> some View { modifier(DelayWidthUntilIdle()) }\n}\n"
