@@ -166,3 +166,32 @@ func TestEnumerateRefusesNestedRepositories(t *testing.T) {
 		t.Errorf("offered %v, want just a.ts", enumeration.Files)
 	}
 }
+
+// TestAMissingStructureLayerIsNamed: a named layer that is not there must say so. Read as an empty
+// file, it removed nothing and the summary hid the zero, which is how the defaults moving in August
+// left every walk offering pnpm-lock.yaml until October.
+func TestAMissingStructureLayerIsNamed(t *testing.T) {
+	root := t.TempDir()
+	missing := StructureIgnorePath(root)
+	enumeration, err := Enumerate(root, missing, func(string) bool { return true })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(enumeration.MissingLayers) != 1 || enumeration.MissingLayers[0] != missing {
+		t.Fatalf("missing layers %v, want %s named", enumeration.MissingLayers, missing)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(missing), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(missing, []byte("pnpm-lock.yaml\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	enumeration, err = Enumerate(root, missing, func(string) bool { return true })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(enumeration.MissingLayers) != 0 {
+		t.Fatalf("a present layer was named missing: %v", enumeration.MissingLayers)
+	}
+}

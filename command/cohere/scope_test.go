@@ -1061,3 +1061,30 @@ func TestChangedFilesScopeDescendsIntoSubmodules(t *testing.T) {
 		t.Errorf("the submodule pointer itself was in scope: %v", scope.FileNames)
 	}
 }
+
+// A missing ignore layer is printed, because the zero it would otherwise contribute is hidden by
+// design and was hiding exactly this.
+func TestDescribeEnumerationNamesAMissingLayer(t *testing.T) {
+	description := describeEnumeration(prettier.Enumeration{
+		Root:          "/project",
+		MissingLayers: []string{"/project/libraries/structure/code-quality/prettier/PrettierIgnoreDefaults"},
+	}, 0)
+	if !strings.Contains(description, "ignore file missing at /project/libraries/structure/code-quality/prettier/PrettierIgnoreDefaults") {
+		t.Fatalf("the missing layer was not named: %s", description)
+	}
+}
+
+// A project without Structure names no Structure layer, so it is never reported missing; a project
+// with Structure names the one path.
+func TestStructureIgnorePathIsNamedOnlyWithStructure(t *testing.T) {
+	root := t.TempDir()
+	if path := resolveStructureIgnorePath(root); path != "" {
+		t.Fatalf("a project without Structure named %s", path)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "libraries", "structure"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if path := resolveStructureIgnorePath(root); path != prettier.StructureIgnorePath(root) {
+		t.Fatalf("a project with Structure named %q", path)
+	}
+}

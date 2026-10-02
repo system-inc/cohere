@@ -62,6 +62,10 @@ func TestCorpora(t *testing.T) {
 	}
 
 	pending := strings.Split(roots, ":")
+	named := map[string]bool{}
+	for _, root := range pending {
+		named[expandHome(strings.TrimSpace(root))] = true
+	}
 	seen := map[string]bool{}
 	for len(pending) > 0 {
 		root := expandHome(strings.TrimSpace(pending[0]))
@@ -71,10 +75,20 @@ func TestCorpora(t *testing.T) {
 		}
 		seen[root] = true
 
-		structureIgnore := filepath.Join(root, "libraries", "structure", "code-quality", "PrettierIgnoreDefaults.ts")
+		structureIgnore := prettier.StructureIgnorePath(root)
 		enumeration, err := enumerator.Enumerate(root, structureIgnore)
 		if err != nil {
 			t.Fatalf("enumerating %s: %v", root, err)
+		}
+		// A named corpus with Structure and no defaults file means the path went stale, and the run would
+		// measure files `s pnc` never formats: the harness did, for two months, with pnpm-lock.yaml in its
+		// yaml column. A nested repository pins its own Structure, which may predate the defaults, so there
+		// the gap is stated rather than refused.
+		if _, statError := os.Stat(filepath.Join(root, "libraries", "structure")); statError == nil && len(enumeration.MissingLayers) > 0 {
+			if named[root] {
+				t.Fatalf("refusing to measure %s: Structure's ignore defaults are missing at %v", root, enumeration.MissingLayers)
+			}
+			t.Logf("%s pins a Structure with no ignore defaults at %v", root, enumeration.MissingLayers)
 		}
 		for _, nested := range enumeration.NestedRepositories {
 			if !filepath.IsAbs(nested) {

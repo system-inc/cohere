@@ -658,6 +658,11 @@ func describeEnumeration(enumeration prettier.Enumeration, formattable int) stri
 		description += ", ignored " + strings.Join(layers, ", ")
 	}
 
+	// A layer that was named and is not there is the broken case a zero hides, so it is said aloud.
+	if len(enumeration.MissingLayers) > 0 {
+		description += ", ignore file missing at " + strings.Join(enumeration.MissingLayers, ", ")
+	}
+
 	// Nested repositories are named rather than counted. "We skipped a repo" is a fact somebody may
 	// want to argue with, and a number gives them nothing to argue with.
 	if len(enumeration.NestedRepositories) > 0 {
@@ -690,8 +695,10 @@ func describeEnumeration(enumeration prettier.Enumeration, formattable int) stri
 // It is one of three ignore layers the walk applies, and the one that is easiest to get wrong:
 // @system_cohere_format under-applied it all night and the omission showed up as a 28-file
 // discrepancy between two independently built corpora. So it is resolved from a path rather than
-// reconstructed from memory, and an absent file is not an error: a project without Structure simply
-// has two layers instead of three, and the enumeration reports what each layer removed.
+// reconstructed from memory. A project without Structure has two layers instead of three, so the
+// layer is named only when libraries/structure exists; a project with Structure and no defaults file
+// is the broken case, and the enumeration names it as missing rather than reporting a quiet zero.
+// That zero hid a stale path from August, when the file moved, until October.
 func resolveStructureIgnorePath(directory string) string {
 	root := directory
 	if root == "" {
@@ -699,7 +706,10 @@ func resolveStructureIgnorePath(directory string) string {
 			root = workingDirectory
 		}
 	}
-	return filepath.Join(root, "libraries", "structure", "code-quality", "PrettierIgnoreDefaults.ts")
+	if _, err := os.Stat(filepath.Join(root, "libraries", "structure")); err != nil {
+		return ""
+	}
+	return prettier.StructureIgnorePath(root)
 }
 
 // formatCandidates is the files the format phase should visit.

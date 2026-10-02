@@ -40,8 +40,20 @@ type Enumeration struct {
 	// than summed, because "we skipped 57 files" is not actionable and ".json 57" is.
 	DeclinedExtensions map[string]int
 
+	// MissingLayers names each ignore file the caller pointed at that was not there, by path. A layer
+	// that cannot be read removes nothing, and a zero reads like a layer with nothing to remove: Structure's
+	// defaults moved in August and every walk since offered pnpm-lock.yaml with no word said.
+	MissingLayers []string
+
 	// Files is what survived, absolute paths.
 	Files []string
+}
+
+// StructureIgnorePath is where a Structure-using project keeps the ignore defaults `s pnc` applies,
+// the second of the three layers Enumerate reads. One home, because six copies of the old path kept
+// pointing where the file used to be.
+func StructureIgnorePath(root string) string {
+	return filepath.Join(root, "libraries", "structure", "code-quality", "prettier", "PrettierIgnoreDefaults")
 }
 
 // ignoreLayer is one ignore file and the patterns it contributed.
@@ -148,6 +160,13 @@ func Enumerate(root string, structureIgnorePath string, handles func(fileName st
 	} {
 		if candidate.path == "" {
 			continue
+		}
+		// The repository's own ignore files are optional, so only the layer a caller named can be
+		// missing: naming it says the project has one.
+		if candidate.name == "PrettierIgnoreDefaults" {
+			if _, statError := os.Stat(candidate.path); os.IsNotExist(statError) {
+				enumeration.MissingLayers = append(enumeration.MissingLayers, candidate.path)
+			}
 		}
 		patterns, err := readIgnoreFile(candidate.path)
 		if err != nil {

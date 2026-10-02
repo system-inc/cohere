@@ -145,7 +145,7 @@ func nonASCIILines(t *testing.T, root string, seen map[string]bool) []string {
 	for len(pending) > 0 {
 		current := pending[0]
 		pending = pending[1:]
-		enumeration, err := engine.Enumerate(current, filepath.Join(current, "libraries", "structure", "code-quality", "PrettierIgnoreDefaults.ts"))
+		enumeration, err := engine.Enumerate(current, prettier.StructureIgnorePath(current))
 		if err != nil {
 			t.Fatalf("enumerating %s: %v", current, err)
 		}

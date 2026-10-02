@@ -75,7 +75,7 @@ func TestDumpDifferences(t *testing.T) {
 		}
 		seen[root] = true
 
-		structureIgnore := filepath.Join(root, "libraries", "structure", "code-quality", "PrettierIgnoreDefaults.ts")
+		structureIgnore := prettier.StructureIgnorePath(root)
 		enumeration, err := enumerator.Enumerate(root, structureIgnore)
 		if err != nil {
 			t.Fatalf("enumerating %s: %v", root, err)
