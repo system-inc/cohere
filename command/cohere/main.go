@@ -175,11 +175,7 @@ func run() error {
 		//
 		// It goes to stderr so the rule list on stdout stays diffable between two binaries.
 		if provenance := release.Current(); provenance.IsDevelopment() {
-			fmt.Fprintf(
-				os.Stderr,
-				"note: %d rules from a local build, so this is whatever was on disk when it was compiled, not necessarily what is committed\n",
-				len(names),
-			)
+			fmt.Fprintln(os.Stderr, rulesProvenanceNote(provenance, len(names)))
 		}
 		return nil
 	}

@@ -83,8 +83,10 @@ func TestRulesFlagDisclosesADevelopmentBuildBesideTheList(t *testing.T) {
 	if !strings.Contains(note, "local build") {
 		t.Fatalf("the note does not say the build is local: %q", note)
 	}
-	if !strings.Contains(note, "not necessarily what is committed") {
-		t.Fatalf("the note does not say the count may differ from the repository: %q", note)
+	// Built from the working tree, the binary is either dirty (the disclaimer) or a clean named
+	// commit (which reproduces it). Either way the note must say which, so one of the two must hold.
+	if !strings.Contains(note, "not necessarily what is committed") && !strings.Contains(note, "reproduces them") {
+		t.Fatalf("the note says neither that the count may differ from the repository nor which commit reproduces it: %q", note)
 	}
 
 	// The count has to appear in the note itself. A note that qualifies "the rules" in the abstract
