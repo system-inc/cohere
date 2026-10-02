@@ -1,7 +1,8 @@
 package css
 
 // src/language-css/print/comma-separated-value-group.js. The branches upstream gates on options.parser
-// being "scss" or "less" are left out, since the parser is always "css"; a comment marks each place.
+// being "scss" read the parser the format carries; the ones gated on "less" alone are left out, and a
+// comment marks each place.
 
 import (
 	"strings"
@@ -21,7 +22,7 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 		(declAncestorProp == "grid" ||
 			strings.HasPrefix(declAncestorProp, "grid-template"))
 	atRuleAncestorNode, _ := path.FindAncestor(func(node *estree.Node) bool { return node.Type() == "css-atrule" })
-	isControlDirective := atRuleAncestorNode != nil && isSCSSControlDirectiveNode(atRuleAncestorNode)
+	isControlDirective := atRuleAncestorNode != nil && isSCSSControlDirectiveNode(atRuleAncestorNode, options)
 	groups := node.List("groups")
 	hasInlineComment := someNode(groups, isInlineValueCommentNode)
 
@@ -100,7 +101,22 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 			continue
 		}
 
-		// The SCSS `if()` branch delimiter check is gated on options.parser === "scss".
+		// Don't print a space before the `;` branch delimiter in the SCSS `if()`
+		// function (i.e. `if(condition: value; else: value)`)
+		if parserOf(options) == "scss" &&
+			iNextNode.Type() == "value-word" &&
+			iNextNode.String("value") == ";" &&
+			path.Match(
+				nil,
+				func(node any, key any, _ int, _ bool) bool {
+					return key == "groups" && asNode(node).Type() == "value-paren_group"
+				},
+				func(node any, key any, _ int, _ bool) bool {
+					return key == "group" && asNode(node).Type() == "value-func" && asNode(node).String("value") == "if"
+				},
+			) {
+			continue
+		}
 
 		// We should keep spaces between words in a embedded JS expression
 		// examples:
@@ -242,7 +258,15 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 			continue
 		}
 
-		// The space before a unary minus followed by a function call is gated on options.parser === "scss".
+		// Space before unary minus followed by a function call.
+		if parserOf(options) == "scss" &&
+			isMathOperator &&
+			iNode.String("value") == "-" &&
+			iNextNode.Type() == "value-func" &&
+			locEnd(iNode) != locStart(iNextNode) {
+			appendToLast(doc.Text(" "))
+			continue
+		}
 
 		iNextNextNode := groupAt(i + 2)
 
@@ -279,8 +303,16 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 			continue
 		}
 
-		// No space before unary minus followed by an opening parenthesis `-(` is gated on the parser
-		// being "scss" or "less".
+		// No space before unary minus followed by an opening parenthesis `-(`
+		// (options.parser === "less" is not ported; only "scss" can be true here.)
+		if parserOf(options) == "scss" &&
+			isMathOperator &&
+			iNode.String("value") == "-" &&
+			isParenGroupNode(iNextNode) &&
+			locEnd(iNode) == locStart(iNextNode.Child("open")) &&
+			iNextNode.Child("open").String("value") == "(" {
+			continue
+		}
 
 		// Add `hardline` after inline comment (i.e. `// comment\n foo: bar;`)
 		if isInlineValueCommentNode(iNode) {

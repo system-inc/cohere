@@ -4,9 +4,9 @@ package css
 // nodes the glue grafts into them (postcss-media-query-parser, postcss-selector-parser,
 // postcss-values-parser). The printer object is postcssPrinter in format.go.
 //
-// The parser is always "css": the Less branches (mixins, functions, variables, extend) and the SCSS ones
-// are left out, each with a comment where upstream has it. options.__isHTMLStyleAttribute is an embed-only
-// option and false here.
+// The parser is "css" or "scss" (parserOf, format.go): the Less branches (mixins, functions, variables,
+// extend) are left out, each with a comment where upstream has it. options.__isHTMLStyleAttribute is an
+// embed-only option and false here.
 
 import (
 	"fmt"
@@ -374,8 +374,10 @@ func printDeclaration(path *astPath, options *printerOptions, print printing.Pri
 		isValueAllSpace ||
 		(!hasSpaceAfterColon &&
 			node.Truthy("isNested") &&
-			(isAtWordPlaceholderNode(node.Child("value").Child("group").Child("group")) ||
-				isAtWordPlaceholderNode(firstNode(node.Child("value").Child("group").Child("group").List("groups"))))) {
+			// node.value.group.group reads without optional chaining, a TypeError upstream where a
+			// link is missing (mustNode); only .groups?.[0] is guarded.
+			(isAtWordPlaceholderNode(mustNode(node.Child("value").Child("group")).Child("group")) ||
+				isAtWordPlaceholderNode(firstNode(mustNode(node.Child("value").Child("group").Child("group")).List("groups"))))) {
 		space = doc.Text("")
 	}
 
@@ -494,7 +496,7 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 	var printedValue doc.Doc = doc.Text("")
 	if estree.IsTruthy(node.Get("value")) {
 		var after doc.Doc = doc.Text("")
-		if isSCSSControlDirectiveNode(node) {
+		if isSCSSControlDirectiveNode(node, options) {
 			if hasParensAroundNode(node) {
 				after = doc.Text(" ")
 			} else {
@@ -510,7 +512,7 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 	if isPresent(node.Get("nodes")) {
 		var opening doc.Doc = doc.Text(" ")
 		_, selectorValueIsString := selector.Get("value").(string)
-		if isSCSSControlDirectiveNode(node) {
+		if isSCSSControlDirectiveNode(node, options) {
 			opening = doc.Text("")
 		} else if (selector != nil &&
 			!isPresent(selector.Get("nodes")) &&

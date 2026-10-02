@@ -4,6 +4,7 @@ package css
 
 import (
 	"regexp"
+	"strings"
 
 	"github.com/system-inc/cohere/internal/format/css/values"
 	"github.com/system-inc/cohere/internal/format/estree"
@@ -39,7 +40,17 @@ func parseValueNode(valueNode *estree.Node, walk valueRootWalk, options *parseOp
 	for i := 0; i < len(nodes); i++ {
 		node := nodes[i]
 
-		// The scss `50...` workaround (options.parser === "scss") is not ported.
+		if options.parser == "scss" &&
+			node.Is("number") &&
+			node.String("unit") == ".." &&
+			strings.HasSuffix(node.String("value"), ".") {
+			// Work around postcss bug parsing `50...` as `50.` with unit `..`
+			// Set the unit to `...` to "accidentally" have arbitrary arguments work in the same way that cases where the node already had a unit work.
+			// For example, 50px... is parsed as `50` with unit `px...` already by postcss-values-parser.
+			value := node.String("value")
+			node.Set("value", value[:len(value)-1])
+			node.Set("unit", "...")
+		}
 
 		if node.Is("func") && node.String("value") == "selector" {
 			group := node.Child("group")

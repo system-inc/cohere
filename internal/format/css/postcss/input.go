@@ -6,6 +6,9 @@
 // everything Prettier then does to the tree (type prefixes, parseNestedCSS, calculateLoc) is the glue's,
 // in internal/format/css. Parse here is only postcss.
 //
+// ParseSCSS is postcss-scss 4.0.9's parser over the same machinery (scss_parse.go, scss_parser.go,
+// scss_tokenize.go, nested_declaration.go), as Prettier's parseScss calls it.
+//
 // # Units
 //
 // postcss walks the text in UTF-16 code units, and the port does too: the tokenizer and parser run over

@@ -11,8 +11,8 @@ package css
 // here, which agrees with the byte offsets the sub-parsers report. The one place upstream turns a line
 // and column into an offset, lineColumnToIndex, converts the column from the library's UTF-16 units.
 //
-// replaceQuotesInInlineComments is postcss-less's workaround and is not reached by the css parser, so it
-// is not ported.
+// replaceQuotesInInlineComments is postcss-less's workaround and is reached by neither the css parser nor
+// the scss one, so it is not ported.
 
 import (
 	"strings"
@@ -63,7 +63,8 @@ func calculateLocEnd(node *estree.Node, text string) (int, bool) {
 	source := sourceOf(node)
 
 	if node.Type() == "css-comment" && node.Truthy("inline") {
-		// postcss's css parser never marks a comment inline; this is postcss-scss's and postcss-less's.
+		// Neither postcss nor postcss-scss marks node.inline (postcss-scss sets raws.inline, and its
+		// inline comment's source.end.offset below); this is postcss-less's.
 		startOffset, _ := numberIn(source, "startOffset")
 		end := printing.SkipEverythingButNewLine(text, startOffset, false)
 		return end, end >= 0

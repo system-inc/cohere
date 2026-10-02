@@ -1,7 +1,9 @@
 package javascript
 
 import (
+	"errors"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/doc"
@@ -28,7 +30,7 @@ type embedPrinter struct {
 
 // embedPrinters is upstream's printers list, in its order: the first whose test passes prints.
 var embedPrinters = []embedPrinter{
-	{test: isEmbedCss, print: printEmbedUnsupported("css")},
+	{test: isEmbedCss, print: printEmbedCss},
 	{test: isEmbedGraphQL, print: printEmbedGraphQL},
 	{test: isEmbedHtml, print: printEmbedUnsupported("html")},
 	{test: isAngularComponentTemplate, print: printEmbedUnsupported("angular")},
@@ -178,6 +180,78 @@ func isAsConstExpression(node Node) bool {
 	return node.Is("AsConstExpression") ||
 		node.Is("TSAsExpression") && annotation.Is("TSTypeReference") &&
 			annotation.Child("typeName").Is("Identifier") && annotation.Child("typeName").String("name") == "const"
+}
+
+// embed/css.js
+
+// printEmbedCss is upstream's printEmbedCss: the template with each expression replaced by a
+// placeholder, formatted as scss, and the expressions put back.
+func printEmbedCss(textToDoc printing.TextToDoc, print PrintFunc, path *Path, options *Options) (Doc, error) {
+	current := node(path)
+
+	// Get full template literal with expressions replaced by placeholders
+	var text strings.Builder
+	for index, quasi := range current.List("quasis") {
+		if index > 0 {
+			text.WriteString("@prettier-placeholder-" + strconv.Itoa(index-1) + "-id")
+		}
+		text.WriteString(templateElementRaw(quasi))
+	}
+	quasisDoc, err := textToDoc(text.String(), "scss")
+	if err != nil {
+		return nil, err
+	}
+	expressionDocs := printTemplateExpressions(path, options, print)
+	newDoc := replacePlaceholders(quasisDoc, expressionDocs)
+	if newDoc == nil {
+		return nil, errCouldNotInsertExpressions
+	}
+	return concat("`", indent(concat(hardline, newDoc)), softline, "`"), nil
+}
+
+var errCouldNotInsertExpressions = errors.New("Couldn't insert all the expressions")
+
+var placeholderPattern = regexp.MustCompile(`@prettier-placeholder-(\d+)-id`)
+
+// replacePlaceholders is upstream's replacePlaceholders: search all the placeholders in the quasisDoc
+// tree and replace them with the expression docs one by one. It returns nil when it could not replace
+// every expression.
+func replacePlaceholders(quasisDoc Doc, expressionDocs []Doc) Doc {
+	if len(expressionDocs) == 0 {
+		return quasisDoc
+	}
+	replaceCounter := 0
+	newDoc := doc.MapDoc(doc.CleanDoc(quasisDoc), func(current Doc) Doc {
+		text, isText := current.(doc.Text)
+		if !isText || !strings.Contains(string(text), "@prettier-placeholder") {
+			return current
+		}
+		// When we have multiple placeholders in one line, like:
+		// ${Child}${Child2}:not(:first-child)
+		//
+		// Upstream splits on the pattern with its capture group kept, so the pieces alternate between
+		// text (even indexes) and placeholder numbers (odd), which this rebuilds.
+		parts := []Doc{}
+		position := 0
+		for _, match := range placeholderPattern.FindAllStringSubmatchIndex(string(text), -1) {
+			parts = append(parts, replaceEndOfLine(string(text)[position:match[0]]))
+			number, _ := strconv.Atoi(string(text)[match[2]:match[3]])
+			replaceCounter++
+			if number < len(expressionDocs) {
+				parts = append(parts, expressionDocs[number])
+			} else {
+				// expressionDocs[component] is undefined upstream, and the doc printer throws on it.
+				parts = append(parts, nil)
+			}
+			position = match[1]
+		}
+		parts = append(parts, replaceEndOfLine(string(text)[position:]))
+		return doc.Concat(parts)
+	})
+	if len(expressionDocs) != replaceCounter {
+		return nil
+	}
+	return newDoc
 }
 
 // embed/css.js's tests.

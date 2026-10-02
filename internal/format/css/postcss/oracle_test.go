@@ -382,8 +382,13 @@ func TestParseAgreesWithPostcss(t *testing.T) {
 // dumpParse parses one text and renders it the way the oracle script does, through JSON, so both sides
 // compare as the same Go values: the tree, or a non-nil error dump.
 func dumpParse(text string) (any, any) {
+	return dumpParseWith(Parse, text)
+}
+
+// dumpParseWith is dumpParse with the parser named, Parse or ParseSCSS.
+func dumpParseWith(parse func(string) (*estree.Node, error), text string) (any, any) {
 	offsets := utf16OffsetsOf(stripByteOrderMark(text))
-	root, err := Parse(text)
+	root, err := parse(text)
 	if err != nil {
 		var syntaxError *CssSyntaxError
 		if !errors.As(err, &syntaxError) {

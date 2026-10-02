@@ -87,6 +87,57 @@ const onlyComments = gql` + "`" + `
 const blank = gql` + "`" + `   ` + "`" + `;
 `
 
+// cssTemplatesSource is unformatted CSS in styled-components and css templates, with expressions in
+// a selector, a value, a property name and a declaration of their own: what embed/css.js replaces with
+// @prettier-placeholder-N-id tokens before formatting the template as scss.
+const cssTemplatesSource = `import styled, { css } from 'styled-components';
+
+const Button = styled.button` + "`" + `
+color:red;background:${(properties) => properties.background};
+  ${Icon}:hover{opacity:.5}
+  &:hover , &:focus{ color : blue }
+  ${(properties) => properties.disabled && css` + "`" + `opacity:0.4;cursor:not-allowed` + "`" + `}
+  margin-${direction}:4px;
+  // an scss line comment
+  @media (max-width:${breakpoint}px){padding:0 ${spacing}px}
+` + "`" + `;
+
+const Title = styled(Heading).attrs({ level: 2 })` + "`" + `font-size:2EM;line-height:1.50;transition:opacity .2s ease-in-out,transform .2s ease-in-out,color .2s ease-in-out,background-color .2s ease-in-out` + "`" + `;
+
+const empty = css` + "`" + `  ` + "`" + `;
+`
+
+// TestCssTemplatesMatchTheFork is the css embed's acceptance fixture: styled-components and css
+// templates formatted through the native scss parser and CSS printer, against the fork, at two widths.
+// With the embed not recognizing styled templates, they print as written, and this fails.
+func TestCssTemplatesMatchTheFork(t *testing.T) {
+	for _, width := range []int{120, 80} {
+		options := prettier.DefaultOptions()
+		options.PrintWidth = width
+		oracle, err := prettier.New(options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expected, err := oracle.Format("Probe.tsx", cssTemplatesSource)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The fork really formatted the CSS.
+		for _, substring := range []string{"    color: red;\n", "font-size: 2em;", "const empty = css``;"} {
+			if !strings.Contains(expected, substring) {
+				t.Fatalf("printWidth %d: the fork's output lacks %q:\n%s", width, substring, expected)
+			}
+		}
+		actual, err := Formatter{Options: options}.Format("Probe.tsx", cssTemplatesSource)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if actual != expected {
+			t.Fatalf("printWidth %d:\n--- fork\n%s--- native\n%s", width, expected, actual)
+		}
+	}
+}
+
 // TestGraphqlTemplatesMatchTheFork is the embed's acceptance fixture: gql and graphql templates and a
 // /* GraphQL */ template, formatted through the native GraphQL printer, against the fork. With the
 // embed not recognizing these templates, they print as written, and this fails.

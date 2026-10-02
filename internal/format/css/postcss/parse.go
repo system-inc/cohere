@@ -31,7 +31,13 @@ import (
 //
 // A node's Range is [source.start.offset, source.end.offset] in bytes where postcss set both, and
 // [0, 0] where it set no end. Prettier's positions are loc.js's, which the glue computes from source.
-func Parse(text string) (root *estree.Node, err error) {
+func Parse(text string) (*estree.Node, error) {
+	return parseWith(text, newParser)
+}
+
+// parseWith runs a parser, postcss's or postcss-scss's, over the text: new Input(text), new Parser(input),
+// parser.parse(), parser.root.
+func parseWith(text string, construct func(in *input) *parser) (root *estree.Node, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			root = nil
@@ -41,6 +47,12 @@ func Parse(text string) (root *estree.Node, err error) {
 				err = printing.Syntax(syntaxError)
 				return
 			}
+			if typeError, isTypeError := recovered.(*TypeError); isTypeError {
+				// postcss-scss reaching past its tokens, a TypeError upstream that Prettier lets escape: the
+				// file does not parse, so it is marked the same way.
+				err = printing.Syntax(typeError)
+				return
+			}
 			// Anything else is a bug in the port, where upstream would have thrown a TypeError; it is
 			// reported, not marked as a syntax error, and never escapes as a panic.
 			err = errors.New(fmt.Sprint("postcss: ", recovered))
@@ -48,7 +60,7 @@ func Parse(text string) (root *estree.Node, err error) {
 	}()
 
 	in := newInput(text)
-	p := newParser(in)
+	p := construct(in)
 	p.parse()
 
 	return toEstree(p.root, in), nil
@@ -86,6 +98,8 @@ func toEstree(each *node, in *input) *estree.Node {
 			result.Set("value", each.value)
 		case "text":
 			result.Set("text", each.text)
+		case "isNested":
+			result.Set("isNested", each.isNested)
 		default:
 			panic("postcss: no field " + key)
 		}
@@ -97,7 +111,11 @@ func rawsToMap(raws map[string]any) map[string]any {
 	result := make(map[string]any, len(raws))
 	for key, value := range raws {
 		if raw, isRaw := value.(*rawValue); isRaw {
-			result[key] = map[string]any{"raw": raw.raw, "value": raw.value}
+			rawMap := map[string]any{"raw": raw.raw, "value": raw.value}
+			if raw.hasScss {
+				rawMap["scss"] = raw.scss
+			}
+			result[key] = rawMap
 			continue
 		}
 		result[key] = value

@@ -14,7 +14,7 @@ func hasComma(path *astPath, options *printerOptions) bool {
 	node := currentNode(path)
 	parent, _ := path.Parent()
 	return node.Truthy("source") &&
-		strings.HasSuffix(trimEnd(options.OriginalText[locStart(node):locStart(parent.Child("close"))]), ",")
+		strings.HasSuffix(trimEnd(sliceText(options.OriginalText, locStart(node), locStart(parent.Child("close")))), ",")
 }
 
 func printTrailingComma(path *astPath, options *printerOptions) doc.Doc {
@@ -28,7 +28,7 @@ func printTrailingComma(path *astPath, options *printerOptions) doc.Doc {
 		!(node.Type() == "value-comma_group" &&
 			everyNode(node.List("groups"), func(group *estree.Node) bool { return group.Type() == "value-comment" })) &&
 		shouldPrintTrailingComma(options) &&
-		printing.CallParent(path, func(path *astPath) bool { return isSCSSMapItemNode(path) }, 0) {
+		printing.CallParent(path, func(path *astPath) bool { return isSCSSMapItemNode(path, options) }, 0) {
 		return doc.NewIfBreak(doc.Text(","), nil, nil)
 	}
 
@@ -128,7 +128,7 @@ func printParenthesizedValueGroup(path *astPath, options *printerOptions, print 
 
 	isKey := isKeyInValuePairNode(node, parent)
 	isConfiguration := isConfigurationNode(node, parent)
-	isSCSSMapItem := isSCSSMapItemNode(path)
+	isSCSSMapItem := isSCSSMapItemNode(path, options)
 	shouldBreak := isConfiguration || (isSCSSMapItem && !isKey)
 	shouldDedent := isConfiguration || isKey
 

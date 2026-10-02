@@ -43,29 +43,53 @@ func copyTokens(tokens []token, from int, to int) []token {
 	return result
 }
 
+// parserMethods are the methods of Parser that postcss-scss's ScssParser overrides (scss_parser.go).
+// Go has no inheritance, so where upstream calls one of them on `this` the port calls it through
+// parser.this, which is the parser itself for css and the scssParser around it for scss; a subclass's
+// `super.method()` is a call on the embedded *parser. Every other method is called on the parser directly,
+// as no subclass the port carries replaces it.
+type parserMethods interface {
+	atrule(atToken token)
+	comment(commentToken token)
+	createTokenizer()
+	raw(each *node, prop string, tokens []token, customProperty bool)
+	rule(tokens []token)
+}
+
 type parser struct {
 	input *input
+
+	// this is upstream's `this` for the overridable methods.
+	this parserMethods
 
 	root      *node
 	current   *node
 	spaces    string
 	semicolon bool
 
-	tokenizer *tokenizer
+	tokenizer tokenStream
 }
 
 func newParser(in *input) *parser {
-	p := &parser{input: in}
+	p := &parser{}
+	p.this = p
+	p.construct(in)
+	return p
+}
+
+// construct is Parser's constructor, split from newParser so a subclass sets this first and its own
+// createTokenizer is the one the constructor calls.
+func (p *parser) construct(in *input) {
+	p.input = in
 
 	p.root = newRoot()
 	p.current = p.root
 	p.spaces = ""
 	p.semicolon = false
 
-	p.createTokenizer()
+	p.this.createTokenizer()
 	p.root.source = &source{start: &position{column: 1, line: 1, offset: 0}}
 	p.root.mark("source")
-	return p
 }
 
 func (p *parser) atrule(atToken token) {
@@ -145,7 +169,7 @@ func (p *parser) atrule(atToken token) {
 	node.raws["between"] = p.spacesAndCommentsFromEnd(&params)
 	if len(params) > 0 {
 		node.raws["afterName"] = p.spacesAndCommentsFromStart(&params)
-		p.raw(node, "params", params, false)
+		p.this.raw(node, "params", params, false)
 		if last {
 			each := params[len(params)-1]
 			node.source.end = p.getPosition(each.endOrStart())
@@ -372,7 +396,7 @@ func (p *parser) decl(tokens []token, customProperty bool) {
 	valueTokens := make([]token, 0, len(firstSpaces)+len(tokens))
 	valueTokens = append(valueTokens, firstSpaces...)
 	valueTokens = append(valueTokens, tokens...)
-	p.raw(node, "value", valueTokens, customProperty)
+	p.this.raw(node, "value", valueTokens, customProperty)
 
 	if strings.Contains(node.value, ":") && !customProperty {
 		p.checkMissedSemicolon(tokens)
@@ -499,7 +523,7 @@ func (p *parser) other(start token) {
 					break
 				}
 			} else if kind == "{" {
-				p.rule(tokens)
+				p.this.rule(tokens)
 				return
 			} else if kind == "}" {
 				p.tokenizer.back(tokens[len(tokens)-1])
@@ -558,10 +582,10 @@ func (p *parser) parse() {
 			p.end(each)
 
 		case "comment":
-			p.comment(each)
+			p.this.comment(each)
 
 		case "at-word":
-			p.atrule(each)
+			p.this.atrule(each)
 
 		case "{":
 			p.emptyRule(each)
@@ -619,7 +643,7 @@ func (p *parser) rule(tokens []token) {
 	p.init(node, tokens[0].start)
 
 	node.raws["between"] = p.spacesAndCommentsFromEnd(&tokens)
-	p.raw(node, "selector", tokens, false)
+	p.this.raw(node, "selector", tokens, false)
 	p.current = node
 }
 

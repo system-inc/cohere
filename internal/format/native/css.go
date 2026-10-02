@@ -8,9 +8,13 @@ import (
 )
 
 // The CSS printer: Prettier's language-css printer over postcss and its three sub-parsers, ported in
-// internal/format/css. Only the css parser: .scss and .less are not registered, and css templates in
-// TypeScript stay as written, because upstream formats those with the scss parser.
+// internal/format/css. The scss parser is registered for embedding only: upstream formats css and
+// styled templates in TypeScript as scss (language-js/embed/css.js). .scss and .less files are not
+// formatted.
 func init() {
+	RegisterDoc(".scss", func(_ string, text string, options prettier.Options, _ string, _ string, _ printing.TextToDoc) (doc.Doc, error) {
+		return css.PrintToDocSCSS(text, options)
+	})
 	Register(".css", func(_ string, text string, options prettier.Options) (string, error) {
 		return css.Format(text, options)
 	})

@@ -1,9 +1,11 @@
 package css
 
-// src/language-css/parser-postcss.js, the css parser: parseCss, parseWithParser and parseNestedCSS.
+// src/language-css/parser-postcss.js, the css and scss parsers: parseCss, parseScss, parseWithParser and
+// parseNestedCSS.
 //
-// The parser is always "css" here. Where upstream branches on options.parser === "scss" or "less" the
-// branch is left out with a note, except where keeping the test reads more like upstream.
+// The parser is "css" or "scss". Less is not ported: where upstream branches on options.parser === "less"
+// the branch is left out with a note, and parseLess (postcss-less, replaceQuotesInInlineComments) is not
+// here.
 
 import (
 	"errors"
@@ -19,7 +21,7 @@ import (
 
 // parseOptions is the part of Prettier's options object the parser reads and writes.
 type parseOptions struct {
-	// parser is options.parser, always "css".
+	// parser is options.parser, "css" or "scss".
 	parser string
 	// originalText is options.originalText, which parseWithParser sets.
 	originalText string
@@ -40,6 +42,20 @@ type javaScriptError struct {
 // upstream would have thrown (a TypeError on a custom property it cannot read, say) is a plain error.
 func parse(text string) (*estree.Node, error) {
 	return parseCss(text, &parseOptions{parser: "css"})
+}
+
+// parseSCSS is the scss parser's parse, the same as parse but through postcss-scss
+// (postcss.ParseSCSS), with options.parser "scss" for the glue's scss branches.
+func parseSCSS(text string) (*estree.Node, error) {
+	return parseScss(text, &parseOptions{parser: "scss"})
+}
+
+// parseWithParserName is the parse of the parser named: "css" or "scss".
+func parseWithParserName(text string, parser string) (*estree.Node, error) {
+	if parser == "scss" {
+		return parseSCSS(text)
+	}
+	return parse(text)
 }
 
 // replaceNonLineBreaksWithSpace is src/utilities/replace-non-line-breaks-with-space.js in bytes: every
@@ -170,9 +186,13 @@ func parseNestedCSS(node *estree.Node, options *parseOptions) *estree.Node {
 				nodeText := strings.Repeat("a", len(prop)) +
 					sliceJavaScript(options.originalText, startOffset+len(prop), endOffset)
 				fakeContent := replaceNonLineBreaksWithSpace(textBefore) + nodeText
-				// The scss and less parsers are not ported; the css parser parses itself again.
+				// The less parser (options.parser === "less") is not ported.
+				parse := parseCss
+				if options.parser == "scss" {
+					parse = parseScss
+				}
 				nestedOptions := *options
-				ast, err := parseCss(fakeContent, &nestedOptions)
+				ast, err := parse(fakeContent, &nestedOptions)
 				if err != nil {
 					// noop
 					ast = nil
@@ -396,14 +416,15 @@ func scssOrRaw(raw map[string]any) string {
 	return text
 }
 
-func parseWithParser(text string, options *parseOptions) (*estree.Node, error) {
+func parseWithParser(parse func(string) (*estree.Node, error), text string, options *parseOptions) (*estree.Node, error) {
 	frontMatter, textToParse := parseFrontMatter(text)
 
 	// Prevent file access https://github.com/postcss/postcss/blob/4f4e2932fc97e2c117e1a4b15f0272ed551ed59d/lib/previous-map.js#L18
-	result, err := postcss.Parse(textToParse)
+	result, err := parse(textToParse)
 	if err != nil {
 		// Upstream rethrows a CssSyntaxError as createError(`${name}: ${reason}`, {loc}); postcss.Parse
-		// has already marked it printing.Syntax, with its name, reason, line and column.
+		// and postcss.ParseSCSS have already marked it printing.Syntax, with its name, reason, line and
+		// column.
 		return nil, err
 	}
 
@@ -420,9 +441,21 @@ func parseWithParser(text string, options *parseOptions) (*estree.Node, error) {
 	return result, nil
 }
 
-// parseCss is upstream's parseCss, the one place a throw upstream would let through comes back as an
-// error.
-func parseCss(text string, options *parseOptions) (root *estree.Node, err error) {
+// parseCss is upstream's parseCss: parseWithParser over postcss's parse.
+func parseCss(text string, options *parseOptions) (*estree.Node, error) {
+	return parseCatching(postcss.Parse, text, options)
+}
+
+// The less parser (parseLess, postcss-less behind replaceQuotesInInlineComments) is not ported.
+
+// parseScss is upstream's parseScss: parseWithParser over postcss-scss's parse.
+func parseScss(text string, options *parseOptions) (*estree.Node, error) {
+	return parseCatching(postcss.ParseSCSS, text, options)
+}
+
+// parseCatching is parseWithParser, and the one place a throw upstream would let through comes back as
+// an error.
+func parseCatching(parse func(string) (*estree.Node, error), text string, options *parseOptions) (root *estree.Node, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			root = nil
@@ -434,7 +467,7 @@ func parseCss(text string, options *parseOptions) (root *estree.Node, err error)
 		}
 	}()
 
-	root, err = parseWithParser(text, options)
+	root, err = parseWithParser(parse, text, options)
 	if err != nil {
 		return nil, err
 	}

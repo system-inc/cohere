@@ -15,8 +15,6 @@ var (
 	scssNestedPropertyInlineComment = regexp.MustCompile(`//[^\n\r\x{2028}\x{2029}]*\n`)
 )
 
-// isScssNestedPropertyNode is always false for the css parser; it is kept so parser.go reads like
-// upstream.
 func isScssNestedPropertyNode(node *estree.Node, options *parseOptions) bool {
 	if options.parser != "scss" {
 		return false

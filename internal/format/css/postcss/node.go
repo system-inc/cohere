@@ -32,6 +32,8 @@ type node struct {
 	important bool
 	// Comment.
 	text string
+	// postcss-scss's NestedDeclaration (nested_declaration.go), a decl with nodes.
+	isNested bool
 }
 
 // source is node.source without input: { start, end }, end unset until the parser finds it.
@@ -48,9 +50,15 @@ type position struct {
 }
 
 // rawValue is what Parser.raw stores in raws[prop] when the clean value differs from the source text.
+//
+// scss is the field postcss-scss's raw adds, the text with `//` comments as written, where its raw
+// (the same comments rewritten as /* */) differs; hasScss says it is set.
 type rawValue struct {
 	raw   string
 	value string
+
+	scss    string
+	hasScss bool
 }
 
 // mark records that the field exists, the first time it is assigned.

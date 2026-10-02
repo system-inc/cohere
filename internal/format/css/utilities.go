@@ -1,8 +1,8 @@
 package css
 
 // src/language-css/utilities/index.js: the predicates the printer and its print/ helpers ask of nodes and
-// paths. The parser is always "css" here (SCSS and Less are out of scope), so the helpers upstream gates on
-// options.parser === "scss" answer false, and say so.
+// paths. The two upstream gates on options.parser === "scss" read the parser the format carries
+// (parserOf, format.go).
 
 import (
 	"regexp"
@@ -184,9 +184,10 @@ func isRelationalOperatorNode(node *estree.Node) bool {
 	return node.Type() == "value-word" && slices.Contains([]string{"<", ">", "<=", ">="}, node.String("value"))
 }
 
-// isSCSSControlDirectiveNode is gated upstream on options.parser === "scss", which is never true here.
-func isSCSSControlDirectiveNode(*estree.Node) bool {
-	return false
+func isSCSSControlDirectiveNode(node *estree.Node, options *printerOptions) bool {
+	return parserOf(options) == "scss" &&
+		node.Type() == "css-atrule" &&
+		slices.Contains([]string{"if", "else", "for", "each", "while"}, node.String("name"))
 }
 
 var detachedRulesetCallPattern = regexp.MustCompile(`^\(` + javaScriptWhitespaceClass + `*\)$`)
@@ -219,7 +220,7 @@ func hasComposesNode(node *estree.Node) bool {
 }
 
 // hasParensAroundNode compares open and close with null, as upstream does, so an absent one (undefined)
-// counts as present. Its only caller is SCSS-only, but the port keeps the comparison.
+// counts as present.
 func hasParensAroundNode(node *estree.Node) bool {
 	group := node.Child("value").Child("group").Child("group")
 	return group.Type() == "value-paren_group" &&
@@ -242,10 +243,90 @@ func isKeyValuePairInParenGroupNode(node *estree.Node) bool {
 	return node.Type() == "value-paren_group" && len(groups) > 0 && groups[0] != nil && isKeyValuePairNode(groups[0])
 }
 
-// isSCSSMapItemNode is gated upstream on options.parser !== "scss" returning false first, which it
-// always does here.
-func isSCSSMapItemNode(*astPath) bool {
+func isSCSSMapItemNode(path *astPath, options *printerOptions) bool {
+	if parserOf(options) != "scss" {
+		return false
+	}
+
+	node := currentNode(path)
+	groupCount := arrayLength(node.Get("groups"))
+
+	// Ignore empty item (i.e. `$key: ()`)
+	if groupCount == 0 {
+		return false
+	}
+
+	// A parenthesized scalar (i.e. `$key: (value)`) isn't a single-item list.
+	if node.Type() == "value-paren_group" &&
+		node.Child("open") != nil &&
+		node.Child("close") != nil &&
+		groupCount == 1 &&
+		firstNode(node.List("groups")).Type() != "value-comma_group" {
+		return false
+	}
+
+	parentNode, _ := path.Parent()
+
+	// Don't treat SCSS if function arguments as maps (`if(sass(condition): value; else: value)`)
+	// https://sass-lang.com/documentation/breaking-changes/if-function/
+	if parentNode != nil &&
+		parentNode.Type() == "value-func" &&
+		parentNode.String("value") == "if" {
+		return false
+	}
+
+	parentParentNode, _ := path.Grandparent()
+
+	// Check open parens contain key/value pair (i.e. `(key: value)` and `(key: (value, other-value)`)
+	if !isKeyValuePairInParenGroupNode(node) &&
+		!(parentParentNode != nil && isKeyValuePairInParenGroupNode(parentParentNode)) {
+		return false
+	}
+
+	declNode, _ := path.FindAncestor(func(node *estree.Node) bool { return node.Type() == "css-decl" })
+
+	// SCSS map declaration (i.e. `$map: (key: value, other-key: other-value)`)
+	if strings.HasPrefix(declNode.String("prop"), "$") {
+		return true
+	}
+
+	// List as value of key inside SCSS map (i.e. `$map: (key: (value other-value other-other-value))`)
+	// Upstream reads parentParentNode.type without optional chaining, a TypeError when there is none.
+	if isKeyValuePairInParenGroupNode(mustNode(parentParentNode)) {
+		// If there is any operator in the value, it is not a map item
+		if someNode(mustGroups(parentNode), isMathOperatorNode) {
+			return false
+		}
+
+		return true
+	}
+
+	// SCSS Map is argument of function (i.e. `func((key: value, other-key: other-value))`)
+	if parentParentNode.Type() == "value-func" {
+		return true
+	}
+
 	return false
+}
+
+// arrayLength is value.length for a groups or nodes array, whichever element type it holds (a url()
+// argument the value parser cannot handle leaves a string among the groups), and 0 for anything else.
+func arrayLength(value any) int {
+	switch typed := value.(type) {
+	case []*estree.Node:
+		return len(typed)
+	case []any:
+		return len(typed)
+	}
+	return 0
+}
+
+// mustGroups is node.groups read without optional chaining: an absent array is a TypeError upstream.
+func mustGroups(node *estree.Node) []*estree.Node {
+	if !mustNode(node).Has("groups") {
+		panic("TypeError: Cannot read properties of undefined (reading 'some')")
+	}
+	return node.List("groups")
 }
 
 func isInlineValueCommentNode(node *estree.Node) bool {

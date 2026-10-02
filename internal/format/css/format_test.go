@@ -434,3 +434,259 @@ func firstDifference(expected string, actual string) string {
 	}
 	return "(no differing line)"
 }
+
+// scssFormatCases are the scss snippets: each goes through FormatSCSS and through the fork as a .scss
+// file, under every option set (printWidth 120 and 80 among them), and the outputs must be equal. As
+// with formatCases, contains spells out what each case is about in the fork's output.
+var scssFormatCases = []formatCase{
+	{
+		name:     "// comments: top level, inline after declarations, inside rules, last",
+		source:   "// top\n// second\na{// first\ncolor:red; // trailing\n// between\nbackground:blue}\n$x:1px;// after variable\n// last",
+		contains: []string{"// top\n// second\na {", "color: red; // trailing", "// last\n"},
+	},
+	{
+		name: "$variables with !default and !global, and math with them",
+		source: "$a:1px;$b : 2px!default;$c:red !global;$d: 3px   !default  !global;\n" +
+			"a{$e:1 !default;width:$a+$b;height:$a*2;margin:-$a;padding:$a/2 $b}",
+		contains: []string{"$b: 2px !default;", "$c: red !global;", "$e: 1 !default;"},
+	},
+	{
+		name: "maps: flat, nested, lists, map functions, a long map that breaks",
+		source: "$map:(key1:value1,key2:value2,key3:value3);\n$nested:(a:(b:1,c:2),d:(e:3));\n$list:(1,2,3);\n" +
+			"$breakpoints:(small:576px,medium:768px,large:992px,xlarge:1200px,xxlarge:1400px,xxxlarge:1600px,huge:1920px);\n" +
+			"a{width:map-get($map,key1);height:map.get($nested,a,b)}",
+		contains: []string{"$map: (\n", "key1: value1,\n", "map-get($map, key1)"},
+	},
+	{
+		name:     "nested properties: a property block, and a value with a block",
+		source:   "a{font:{family:serif;size:12PX;weight:bold}margin:0 {top:1px;bottom:2px}}",
+		contains: []string{"font: {\n", "family: serif;"},
+	},
+	{
+		name: "#{} interpolation in selectors, property names, values and strings",
+		source: "#{$sel} .a-#{$x}{#{$prop}-top:#{$v}px;width:calc(100% - #{$w});content:\"#{$a} b\";" +
+			"--#{$name}:#{$value}}\n@media #{$query} and (min-width:#{$w}){a{x:y}}\n.b-#{$i}:hover{x:y}",
+		contains: []string{"#{$sel} .a-#{$x} {", "#{$prop}-top: #{$v}px;", "calc(100% - #{$w})"},
+	},
+	{
+		name: "@mixin and @include with arguments, defaults, keyword arguments, rest arguments and content blocks",
+		source: "@mixin m($a,$b:10px,$args...){width:$a;height:$b}\n@mixin bare{x:y}\n" +
+			"a{@include m(1px,$b:2px);@include bare;@include m(1px, $list...);@include breakpoint(md){color:red}}\n" +
+			"@mixin rtl($property,$ltr-value,$rtl-value){#{$property}:$ltr-value;[dir=rtl] &{#{$property}:$rtl-value}}",
+		contains: []string{"@mixin m($a, $b: 10px, $args...) {", "@include m(1px, $b: 2px);", "@include breakpoint(md) {"},
+	},
+	{
+		name: "@if, @else if and @else, at the top and in a rule, with comparison and boolean operators",
+		source: "@if $a==1{a{x:y}}@else if $a>2 and $b!=3{b{x:y}}@else{c{x:y}}\n" +
+			"a{@if not $flag{color:red}@else{color:blue}}\n@if ($a == 1) {d{x:y}}",
+		contains: []string{"@if $a==1 {", "} @else if $a>2 and $b!=3 {", "} @else {"},
+	},
+	{
+		name: "@each, @for and @while",
+		source: "@each $name,$glyph in $icons{.icon-#{$name}:before{content:$glyph}}\n" +
+			"@each $key,$value in (a:1,b:2){.x-#{$key}{x:$value}}\n" +
+			"@for $i from 1 through 3{.m-#{$i}{margin:$i*4px}}\n$i:6;@while $i>0{.w-#{$i}{width:10px*$i}$i:$i - 2}",
+		contains: []string{"@each $name, $glyph in $icons {", "@for $i from 1 through 3 {", "@while $i>0 {"},
+	},
+	{
+		name:     "a custom property holding a block, which the scss parser parses again",
+		source:   ":root{\n--x:{\n// note\ncolor:RED;\nwidth:$w * 2;\n};\n--y:{a:b};\n}",
+		contains: []string{"        // note\n        color: RED;", "width: $w * 2;"},
+	},
+	{
+		name:     "%placeholders and @extend",
+		source:   "%message{border:1px solid #CCC;padding:10px}\n.a{@extend %message;color:red}\n.b{@extend .a !optional}",
+		contains: []string{"%message {", "@extend %message;", "#ccc"},
+	},
+	{
+		name:     "& with suffixes, pseudo-classes, combinators and as a suffix",
+		source:   ".block{&-element{x:y}&--mod{x:y}&:hover{x:y}& + &{x:y}.parent &{x:y}&.is-active{x:y}>&__child{x:y}}",
+		contains: []string{"&-element {", "&--mod {", "& + & {", ".parent & {"},
+	},
+	{
+		name: "@use, @forward, @function and @return",
+		source: "@use 'sass:math';@use \"config\" as cfg with ($primary:blue,$secondary:red);\n" +
+			"@forward 'src/list' hide list-reset,$horizontal-list-gap;\n@forward 'lib' as lib-*;\n" +
+			"@function double($n){@return $n*2}\n@function sum($numbers...){$sum:0;@each $n in $numbers{$sum:$sum+$n}@return $sum}",
+		contains: []string{"@use 'sass:math';", "@function double($n) {", "@return $n * 2;"},
+	},
+	{
+		name:     "unary minus before a function and a parenthesis, if() branches, and rest numbers",
+		source:   "a{margin:- fn(1);b:-fn(1);c:-($a + $b);d:if(sass($a): 1; else: 2)}\n@include foo(50...);\n@include bar(1px...);",
+		contains: []string{"c: -($a + $b);"},
+	},
+	{
+		name: "control directives, maps and long arguments break at the print width",
+		source: "@include very-long-mixin-name($first-argument-value,$second-argument-value,$third-argument-value,$fourth-argument-value);\n" +
+			"$theme-colors:(\"primary\":$blue,\"secondary\":$gray-600,\"success\":$green,\"info\":$cyan,\"warning\":$yellow);\n" +
+			"@if $condition-number-one == true and $condition-number-two == false or $condition-number-three != null{a{x:y}}",
+		contains: []string{"$theme-colors: (\n"},
+	},
+}
+
+func TestFormatSCSSMatchesTheFork(t *testing.T) {
+	for optionsName, options := range formatOptionSets() {
+		oracle, err := prettier.New(options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, testCase := range scssFormatCases {
+			expected, err := oracle.Format("Probe.scss", testCase.source)
+			if err != nil {
+				t.Fatalf("%s (%s): the oracle failed: %v", testCase.name, optionsName, err)
+			}
+			if expected == testCase.source {
+				t.Fatalf("%s (%s): the oracle left the snippet unchanged, so an identity printer would pass", testCase.name, optionsName)
+			}
+			if optionsName == "defaults" {
+				for _, substring := range testCase.contains {
+					if !strings.Contains(expected, substring) {
+						t.Errorf("%s (%s): the fork's output lacks %q:\n%s", testCase.name, optionsName, substring, expected)
+					}
+				}
+			}
+			actual, err := FormatSCSS(testCase.source, options)
+			if err != nil {
+				t.Errorf("%s (%s): %v", testCase.name, optionsName, err)
+				continue
+			}
+			if actual != expected {
+				t.Errorf("%s (%s):\n--- fork\n%s--- native\n%s", testCase.name, optionsName, expected, actual)
+			}
+		}
+	}
+}
+
+// The scss parser is not the css one: the same text formats differently under each, so FormatSCSS is
+// not Format under another name. Each of these is printed differently by the fork as .css and as .scss.
+func TestFormatSCSSIsNotFormat(t *testing.T) {
+	oracle, err := prettier.New(prettier.DefaultOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, source := range []string{
+		"a{\n// comment\ncolor:red;\n}",
+		"$map:(key1:value1,key2:value2);",
+		"@if $a==1{a{x:y}}@else{b{x:y}}",
+	} {
+		asCSS, cssErr := oracle.Format("Probe.css", source)
+		asSCSS, scssErr := oracle.Format("Probe.scss", source)
+		if scssErr != nil {
+			t.Fatalf("%q: the oracle refused it as scss: %v", source, scssErr)
+		}
+		if cssErr == nil && asCSS == asSCSS {
+			t.Fatalf("%q: the oracle prints it the same as css and as scss, so it tells the parsers apart for nothing", source)
+		}
+		actualSCSS, err := FormatSCSS(source, prettier.DefaultOptions())
+		if err != nil || actualSCSS != asSCSS {
+			t.Errorf("%q as scss:\n--- fork\n%s--- native (%v)\n%s", source, asSCSS, err, actualSCSS)
+		}
+		actualCSS, err := Format(source, prettier.DefaultOptions())
+		if (err == nil) != (cssErr == nil) || actualCSS != asCSS {
+			t.Errorf("%q as css:\n--- fork (%v)\n%s--- native (%v)\n%s", source, cssErr, asCSS, err, actualCSS)
+		}
+	}
+}
+
+// PrintToDocSCSS is FormatSCSS's doc without its trailing hardline.
+func TestPrintToDocSCSSIsFormatSCSSWithoutTheTrailingHardline(t *testing.T) {
+	options := prettier.DefaultOptions()
+	for _, testCase := range scssFormatCases {
+		formatted, err := FormatSCSS(testCase.source, options)
+		if err != nil {
+			t.Fatalf("%s: %v", testCase.name, err)
+		}
+		document, err := PrintToDocSCSS(testCase.source, options)
+		if err != nil {
+			t.Fatalf("%s: %v", testCase.name, err)
+		}
+		printed := doc.Print(document, doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs})
+		if printed != strings.TrimSuffix(formatted, "\n") {
+			t.Errorf("%s:\n--- FormatSCSS\n%s--- PrintToDocSCSS\n%s", testCase.name, formatted, printed)
+		}
+	}
+}
+
+// Prettier's own SCSS fixtures, tests/format/scss in the fork: 90 files written for the scss parser and
+// printer. Found as the CSS fixtures are (COHERE_PRETTIER_FORK or ~/Projects/system/prettier), skipped
+// when absent. Every file the fork formats must match byte for byte, and a file the fork refuses must be
+// refused here too. The one kind set aside is yaml front matter, which FormatSCSS refuses as Format does.
+func TestPrettierSCSSFixturesMatchTheFork(t *testing.T) {
+	root := os.Getenv("COHERE_PRETTIER_FORK")
+	if root == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			t.Skip("no home directory to find the Prettier fork in")
+		}
+		root = filepath.Join(home, "Projects", "system", "prettier")
+	}
+	fixtures := filepath.Join(root, "tests", "format", "scss")
+	if _, err := os.Stat(fixtures); err != nil {
+		t.Skipf("the Prettier fork's SCSS fixtures are not at %s; set COHERE_PRETTIER_FORK", fixtures)
+	}
+	var files []string
+	_ = filepath.WalkDir(fixtures, func(path string, entry os.DirEntry, err error) error {
+		if err == nil && !entry.IsDir() && strings.HasSuffix(path, ".scss") {
+			files = append(files, path)
+		}
+		return nil
+	})
+
+	for optionsName, options := range formatOptionSets() {
+		oracle, err := prettier.New(options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		compared, matched, rewritten, refusedByBoth, skipped := 0, 0, 0, 0, 0
+		for _, file := range files {
+			source, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// The shared layer normalizes line endings before any printer runs, as Prettier's core does.
+			text := strings.ReplaceAll(string(source), "\r\n", "\n")
+			actual, nativeErr := FormatSCSS(text, options)
+
+			// yaml front matter is formatted by the yaml printer, which FormatSCSS cannot reach, so it refuses.
+			if strings.HasPrefix(text, "---") && strings.Contains(text[3:], "\n---") {
+				if frontMatterRoot, parseErr := parseSCSS(text); parseErr == nil &&
+					frontMatterRoot.Child("frontMatter").String("language") == "yaml" &&
+					strings.TrimSpace(frontMatterRoot.Child("frontMatter").String("value")) != "" {
+					if nativeErr == nil {
+						t.Errorf("%s (%s): yaml front matter was printed instead of refused", file, optionsName)
+					}
+					skipped++
+					continue
+				}
+			}
+
+			expected, oracleErr := oracle.Format("Probe.scss", text)
+			switch {
+			case oracleErr != nil && nativeErr != nil:
+				refusedByBoth++
+			case oracleErr != nil:
+				t.Errorf("%s (%s): the fork refused it (%v) and FormatSCSS printed it", file, optionsName, oracleErr)
+			case nativeErr != nil:
+				t.Errorf("%s (%s): %v", file, optionsName, nativeErr)
+			default:
+				compared++
+				if expected != text {
+					rewritten++
+				}
+				if actual == expected {
+					matched++
+				} else {
+					t.Errorf("%s (%s): differs from the fork\n%s", file, optionsName, firstDifference(expected, actual))
+				}
+			}
+		}
+		// The refusal threshold: an oracle or a printer that refuses everything cannot read as agreement,
+		// and fixtures the oracle leaves as written would let an identity printer through.
+		if compared < 80 || rewritten < 60 {
+			t.Errorf("%s: only %d fixtures were compared, %d rewritten by the fork (%d refused by both, %d set aside)",
+				optionsName, compared, rewritten, refusedByBoth, skipped)
+		}
+		t.Logf("%s: %d of %d fixtures compared match the fork, %d of them rewritten (%d refused by both, %d set aside for yaml front matter)",
+			optionsName, matched, compared, rewritten, refusedByBoth, skipped)
+	}
+}
