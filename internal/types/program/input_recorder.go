@@ -126,11 +126,6 @@ func (f *recordingFS) Stat(path string) vfs.FileInfo {
 	return information
 }
 
-func (f *recordingFS) WalkDir(root string, walkFn vfs.WalkDirFunc) error {
-	f.noteAnswer(root, f.FS.DirectoryExists(root))
-	return f.FS.WalkDir(root, walkFn)
-}
-
 func (f *recordingFS) Realpath(path string) string {
 	resolved := f.FS.Realpath(path)
 	// Realpath answers for a missing path too, by returning it unchanged, so existence is asked

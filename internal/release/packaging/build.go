@@ -116,10 +116,6 @@ func Build(options Options) (Result, error) {
 		return Result{}, err
 	}
 
-	if err := requireCompilerPatches(options.ModuleDirectory); err != nil {
-		return Result{}, err
-	}
-
 	result := Result{}
 
 	for _, target := range targets {
@@ -182,37 +178,6 @@ func requireAncestor(moduleDirectory string, minimum string, reason string) erro
 		"could not tell whether this release contains %s, so it is refused rather than assumed: %w\n%s\nA shallow clone is the usual cause; fetch full history and release again",
 		ShortCommit(minimum), err, strings.TrimSpace(string(output)),
 	)
-}
-
-// requireCompilerPatches refuses a release whose vendored compiler is missing a patch cohere carries.
-//
-// A build that skips `go run ./command/cohere-patches` compiles the stock checker, and a release
-// that also skips `go test ./patches/` would ship it: every binary would build, sign and publish,
-// and the only sign would be `MISSING` in a `--version` nobody runs until a bug report arrives.
-//
-// It runs the patch tool's own `-check` rather than `patches.Verify`, because Verify measures the
-// checker linked into the process calling it, and here that is this release tool rather than the
-// binaries being shipped, several of which cannot run on the machine building them. `-check`
-// reads the submodule source every target compiles from, so one check covers all of them. It is
-// the tool's implementation rather than a copy of it, so there is one place that decides what
-// "applied" means, and its exit contract is pinned by the tool's own tests.
-//
-// Runs before any target is cross-compiled, so a missing patch costs seconds rather than six
-// builds. A patch upstream has already merged passes, because that compiler is correct; the tool
-// prints UPSTREAM as the cue to delete the patch, and the output is passed through so that cue
-// lands in the release log instead of disappearing.
-func requireCompilerPatches(moduleDirectory string) error {
-	command := exec.Command("go", "run", "./command/cohere-patches", "-check")
-	command.Dir = moduleDirectory
-	output, err := command.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf(
-			"the vendored compiler is missing a patch cohere carries, so this release would ship the stock checker: %w\n%s\nRun `go run ./command/cohere-patches` in %s, then release again",
-			err, strings.TrimSpace(string(output)), moduleDirectory,
-		)
-	}
-	os.Stderr.Write(output)
-	return nil
 }
 
 // buildPlatformPackage cross-compiles one target and writes its package around the binary.

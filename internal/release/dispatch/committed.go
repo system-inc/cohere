@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 	"time"
 
@@ -30,24 +29,18 @@ import (
 // inside the toolchain that enforces it.
 //
 // So a gate run builds from a snapshot of HEAD: this repository extracted with `git archive`, and the
-// vendored compiler extracted at the commit HEAD pins it to, with HEAD's own patches applied. Nothing
-// in either comes from a working tree, the compiler submodule's included. Testing uncommitted work is
-// still possible, and it is explicit: `--dev` builds the working tree and says so on every run.
+// vendored compiler extracted at the commit HEAD pins it to. Nothing in either comes from a working
+// tree, the compiler submodule's included. Testing uncommitted work is still possible, and it is
+// explicit: `--dev` builds the working tree and says so on every run.
 
 // snapshotTag is mixed into the binary hash so a committed-tree build can never share a name with a
 // binary built any other way. Both kinds land in the same directory.
 const snapshotTag = "committed-tree"
 
 // compilerSubdirectory is the part of the vendored compiler the build reads. `go.work` uses only
-// `./TypeScript/tsc`, and every patch touches a path under it, so the rest of the submodule (another
-// few hundred files of tooling) is left out of the snapshot.
+// `./TypeScript/tsc`, so the rest of the submodule (another few hundred files of tooling) is left out of
+// the snapshot.
 const compilerSubdirectory = "tsc"
-
-// PatchPresentMarker is the state `cohere --version` prints for a compiler patch whose probe measured
-// the patched behaviour in that binary. It is written out here rather than imported, because the
-// package that prints it links the whole compiler, and the launcher's job is one stat and one exec.
-// A test in `patches` pins the two together.
-const PatchPresentMarker = "present (measured in this binary)"
 
 // committedBuild is what one committed-tree build is made from.
 type committedBuild struct {
@@ -65,8 +58,8 @@ type committedBuild struct {
 
 // hash names the binary this build produces.
 //
-// The commit decides everything committed: the rules, the shims, the pinned compiler commit and the
-// patch files are all in its tree. What it does not decide is the toolchain and the flags, so those
+// The commit decides everything committed: the rules, the shims and the pinned compiler commit are
+// all in its tree. What it does not decide is the toolchain and the flags, so those
 // are framed in beside it.
 func (build committedBuild) hash() string {
 	digest := sha256.New()
@@ -85,11 +78,11 @@ func (paths Paths) SnapshotDirectory() string {
 	return filepath.Join(paths.CacheDirectory, "snapshot")
 }
 
-// CompilerDirectory holds patched compiler extractions, one per pinned commit and patch set.
+// CompilerDirectory holds compiler extractions, one per pinned commit.
 //
 // These are kept, because the compiler is 66,000 files and takes about seven seconds to extract,
-// while the pin and the patches change rarely. Two commits of this repository that pin the same
-// compiler with the same patches build against the same directory.
+// while the pin changes rarely. Two commits of this repository that pin the same compiler build
+// against the same directory.
 func (paths Paths) CompilerDirectory() string {
 	return filepath.Join(paths.CacheDirectory, "compiler")
 }
@@ -186,17 +179,12 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 		return fmt.Errorf("extracting commit %s: %w", release.ShortCommit(build.Commit), err)
 	}
 
-	patchFiles, err := committedPatchFiles(snapshot)
+	compiler, err := ensureCompiler(paths, build.CompilerCommit)
 	if err != nil {
 		return err
 	}
 
-	compiler, err := ensureCompiler(paths, build.CompilerCommit, patchFiles)
-	if err != nil {
-		return err
-	}
-
-	// `git archive` writes the submodule as an empty directory. The patched compiler goes in its place
+	// `git archive` writes the submodule as an empty directory. The compiler goes in its place
 	// as a link, which Go follows for a workspace module, and which keeps the snapshot to this
 	// repository's own few thousand files.
 	submodulePath := filepath.Join(snapshot, "TypeScript")
@@ -204,7 +192,7 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 		return fmt.Errorf("clearing the submodule placeholder in the snapshot: %w", err)
 	}
 	if err := os.Symlink(compiler, submodulePath); err != nil {
-		return fmt.Errorf("linking the patched compiler into the snapshot: %w", err)
+		return fmt.Errorf("linking the compiler into the snapshot: %w", err)
 	}
 
 	// Built to a temporary name and renamed only once proven, so a concurrent run never finds, and
@@ -215,7 +203,7 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 	if err := goBuildSnapshot(paths, snapshot, packagePath, build, temporary); err != nil {
 		return err
 	}
-	if err := proveCommittedBinary(temporary, snapshot, build, len(patchFiles)); err != nil {
+	if err := proveCommittedBinary(temporary, snapshot, build); err != nil {
 		return err
 	}
 	if err := os.Rename(temporary, binaryPath); err != nil {
@@ -260,43 +248,19 @@ func pruneAfterBuild(paths Paths, keep string, currentCompiler string) {
 	}
 }
 
-// committedPatchFiles lists the compiler patches as the snapshot holds them, in the order they apply.
+// ensureCompiler returns an extraction of the compiler at compilerCommit, creating it once.
 //
-// Read from the snapshot rather than from this binary's embedded copy, because the patches are part
-// of the commit being built. The files are numbered, so name order is application order, which is
-// also the order `patches.All` lists them in.
-func committedPatchFiles(snapshot string) ([]string, error) {
-	files, err := filepath.Glob(filepath.Join(snapshot, "patches", "*.patch"))
-	if err != nil {
-		return nil, fmt.Errorf("listing the committed compiler patches: %w", err)
-	}
-	sort.Strings(files)
-	return files, nil
-}
-
-// ensureCompiler returns a patched extraction of the compiler at compilerCommit, creating it once.
-//
-// It is keyed by the commit and by the patch contents together, so a changed patch can never reuse a
-// compiler patched by its previous version.
-func ensureCompiler(paths Paths, compilerCommit string, patchFiles []string) (string, error) {
-	digest := sha256.New()
-	for _, path := range patchFiles {
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			return "", fmt.Errorf("reading committed patch %s: %w", filepath.Base(path), err)
-		}
-		fmt.Fprintf(digest, "patch\x00%s\x00%d\x00", filepath.Base(path), len(contents))
-		digest.Write(contents)
-	}
-	key := release.ShortCommit(compilerCommit) + "-" + hex.EncodeToString(digest.Sum(nil))[:hashLength]
+// It is keyed by the full commit, so a moved pin can never reuse an extraction of the previous one.
+func ensureCompiler(paths Paths, compilerCommit string) (string, error) {
+	key := compilerCommit
 	compiler := filepath.Join(paths.CompilerDirectory(), key)
 
 	if _, err := os.Stat(compiler); err == nil {
 		return compiler, nil
 	}
 
-	fmt.Fprintf(os.Stderr, "cohere: extracting the compiler at %s with %d patch(es), once per pin (about seven seconds)\n",
-		release.ShortCommit(compilerCommit), len(patchFiles))
+	fmt.Fprintf(os.Stderr, "cohere: extracting the compiler at %s, once per pin (about seven seconds)\n",
+		release.ShortCommit(compilerCommit))
 
 	partial, err := os.MkdirTemp(paths.CompilerDirectory(), key+".partial-*")
 	if err != nil {
@@ -308,13 +272,7 @@ func ensureCompiler(paths Paths, compilerCommit string, patchFiles []string) (st
 	submodule := filepath.Join(paths.ModuleDirectory, "TypeScript")
 	if err := extractGitArchive(submodule, compilerCommit, compilerSubdirectory, partial); err != nil {
 		return "", fmt.Errorf("extracting the compiler at %s (if the commit is missing, the submodule has not fetched it: "+
-			"run `git submodule update --init` in %s): %w", release.ShortCommit(compilerCommit), paths.ModuleDirectory, err)
-	}
-
-	for _, patchFile := range patchFiles {
-		if err := applyPatch(partial, patchFile); err != nil {
-			return "", err
-		}
+			"run `git submodule sync && git submodule update --init` in %s): %w", release.ShortCommit(compilerCommit), paths.ModuleDirectory, err)
 	}
 
 	if err := os.Rename(partial, compiler); err != nil {
@@ -323,42 +281,9 @@ func ensureCompiler(paths Paths, compilerCommit string, patchFiles []string) (st
 		if _, statErr := os.Stat(compiler); statErr == nil {
 			return compiler, nil
 		}
-		return "", fmt.Errorf("moving the patched compiler into the cache: %w", err)
+		return "", fmt.Errorf("moving the compiler into the cache: %w", err)
 	}
 	return compiler, nil
-}
-
-// applyPatch applies one committed patch to an extracted compiler, refusing if it does not apply.
-//
-// The extraction is not a repository, so `git apply` patches files the way `patch` would. The
-// directory does sit inside this checkout's ignored cache, and git would otherwise search upward and
-// find the checkout; the ceiling stops that search at the extraction. Measured 2026-10-02: in an
-// ignored directory the apply landed correctly even without the ceiling. It is set so that the result
-// cannot depend on the state of an enclosing repository at all. The real guard is downstream: the
-// built binary's probe measures whether each patch is present, and a build where one is not is refused.
-func applyPatch(compiler string, patchFile string) error {
-	name := filepath.Base(patchFile)
-
-	command := exec.Command("git", "apply", patchFile)
-	command.Dir = compiler
-	command.Env = append(os.Environ(), "GIT_CEILING_DIRECTORIES="+filepath.Dir(compiler))
-	var standardError bytes.Buffer
-	command.Stderr = &standardError
-	if err := command.Run(); err != nil {
-		// A patch that upstream has since merged applies in reverse. That build would still be correct,
-		// but the patch is now dead weight, and nothing else would ever say so.
-		reverse := exec.Command("git", "apply", "--reverse", "--check", patchFile)
-		reverse.Dir = compiler
-		reverse.Env = command.Env
-		if reverse.Run() == nil {
-			fmt.Fprintf(os.Stderr, "cohere: %s is already in the pinned compiler; delete it and its entry in patches/patches.go\n", name)
-			return nil
-		}
-		return fmt.Errorf("compiler patch %s does not apply to the pinned compiler, so no binary was built "+
-			"(building the stock compiler under a binary that lists the patch would be the defect patches exist to prevent): %v\n%s",
-			name, err, strings.TrimSpace(standardError.String()))
-	}
-	return nil
 }
 
 // goBuildSnapshot compiles the snapshot.
@@ -410,11 +335,9 @@ func goBuildSnapshot(paths Paths, snapshot string, packagePath string, build com
 // proveCommittedBinary asks the built binary what it is, and refuses it unless the answer matches the
 // build.
 //
-// Go's exit code says the compile succeeded. It does not say the stamps took, or that the compiler
-// patches are in the checker this binary links. The binary's own `--version` measures both, the
-// patches by running each probe against its own checker, so the proof is read off the artifact
-// rather than off the steps that made it.
-func proveCommittedBinary(binaryPath string, workingDirectory string, build committedBuild, patchCount int) error {
+// Go's exit code says the compile succeeded. It does not say the stamps took. The binary's own
+// `--version` does, so the proof is read off the artifact rather than off the steps that made it.
+func proveCommittedBinary(binaryPath string, workingDirectory string, build committedBuild) error {
 	command := exec.Command(binaryPath, "--version")
 	command.Dir = workingDirectory
 	output, err := command.CombinedOutput()
@@ -422,21 +345,17 @@ func proveCommittedBinary(binaryPath string, workingDirectory string, build comm
 		return fmt.Errorf("the binary built from %s failed its own --version (%w), so it was not cached:\n%s",
 			release.ShortCommit(build.Commit), err, output)
 	}
-	return checkCommittedVersion(string(output), build.Commit, patchCount)
+	return checkCommittedVersion(string(output), build.Commit)
 }
 
 // checkCommittedVersion is the judgement proveCommittedBinary makes, separate so it can be tested
 // against the text a real binary prints without building one.
-func checkCommittedVersion(version string, commit string, patchCount int) error {
+func checkCommittedVersion(version string, commit string) error {
 	commitNamed := false
-	present := 0
 	for line := range strings.SplitSeq(version, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) == 2 && fields[0] == "commit:" && fields[1] == release.ShortCommit(commit) {
 			commitNamed = true
-		}
-		if strings.Contains(line, PatchPresentMarker) {
-			present++
 		}
 	}
 
@@ -447,10 +366,6 @@ func checkCommittedVersion(version string, commit string, patchCount int) error 
 	if strings.Contains(version, "uncommitted changes") {
 		return fmt.Errorf("the binary built from %s reports uncommitted changes, which a committed-tree build cannot have, "+
 			"so it was not cached:\n%s", release.ShortCommit(commit), version)
-	}
-	if present != patchCount {
-		return fmt.Errorf("commit %s carries %d compiler patch(es) and the binary measured %d present, so it was not cached:\n%s",
-			release.ShortCommit(commit), patchCount, present, version)
 	}
 	return nil
 }

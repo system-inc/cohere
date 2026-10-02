@@ -67,12 +67,6 @@ jobs:
                   go-version-file: go.mod
                   cache: true
 
-            - name: Apply the patches cohere carries on its vendored compiler
-              # A fresh checkout has the stock compiler, and building it ships the stock checker.
-              # `cohere-release` refuses a tree where any patch is missing, so skipping this step
-              # fails the release loudly rather than publishing the wrong compiler.
-              run: go run ./command/cohere-patches
-
             - name: Check the module before building anything
               # A release is not the place to discover a formatting or vet failure. These are the
               # same checks the repository is gated by, run first so a bad tree never reaches the

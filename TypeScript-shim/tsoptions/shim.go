@@ -10,7 +10,6 @@ import "github.com/microsoft/TypeScript/tsc/internal/core"
 import "github.com/microsoft/TypeScript/tsc/internal/diagnostics"
 import "github.com/microsoft/TypeScript/tsc/internal/tsoptions"
 import "github.com/microsoft/TypeScript/tsc/internal/tspath"
-import "reflect"
 import _ "unsafe"
 
 type AlternateModeDiagnostics = tsoptions.AlternateModeDiagnostics
@@ -49,8 +48,8 @@ func CreateDiagnosticForNodeInSourceFileOrCompilerDiagnostic(sourceFile *ast.Sou
 type DidYouMeanOptionsDiagnostics = tsoptions.DidYouMeanOptionsDiagnostics
 type ExtendedConfigCache = tsoptions.ExtendedConfigCache
 type ExtendedConfigCacheEntry = tsoptions.ExtendedConfigCacheEntry
-//go:linkname ForEachCompilerOptionValue github.com/microsoft/TypeScript/tsc/internal/tsoptions.ForEachCompilerOptionValue
-func ForEachCompilerOptionValue(options *core.CompilerOptions, declFilter func(*tsoptions.CommandLineOption) bool, fn func(option *tsoptions.CommandLineOption, value reflect.Value, i int) bool) bool
+//go:linkname ForEachCompilerOptionAffectingBuildInfo github.com/microsoft/TypeScript/tsc/internal/tsoptions.ForEachCompilerOptionAffectingBuildInfo
+func ForEachCompilerOptionAffectingBuildInfo(options *core.CompilerOptions, fn func(option *tsoptions.CommandLineOption, value any))
 //go:linkname GetCallbackForFindingPropertyAssignmentByValue github.com/microsoft/TypeScript/tsc/internal/tsoptions.GetCallbackForFindingPropertyAssignmentByValue
 func GetCallbackForFindingPropertyAssignmentByValue(value string) func(property *ast.PropertyAssignment) *ast.Node
 //go:linkname GetContentMapperOptionDiagnosticLocation github.com/microsoft/TypeScript/tsc/internal/tsoptions.GetContentMapperOptionDiagnosticLocation
@@ -81,16 +80,15 @@ func NewParsedCommandLine(compilerOptions *core.CompilerOptions, rootFileNames [
 func NewTsconfigSourceFileFromFilePath(configFileName string, configPath tspath.Path, configSourceText string) *tsoptions.TsConfigSourceFile
 var OptionsDeclarations = tsoptions.OptionsDeclarations
 var OptionsForBuild = tsoptions.OptionsForBuild
-var OptionsForWatch = tsoptions.OptionsForWatch
 //go:linkname ParseBuildCommandLine github.com/microsoft/TypeScript/tsc/internal/tsoptions.ParseBuildCommandLine
 func ParseBuildCommandLine(commandLine []string, host tsoptions.ParseConfigHost) *tsoptions.ParsedBuildCommandLine
 //go:linkname ParseBuildOptions github.com/microsoft/TypeScript/tsc/internal/tsoptions.ParseBuildOptions
-func ParseBuildOptions(key string, value any, allOptions *core.BuildOptions) []*ast.Diagnostic
+func ParseBuildOptions(key string, value any, allOptions *core.BuildOptions)
 //go:linkname ParseCommandLine github.com/microsoft/TypeScript/tsc/internal/tsoptions.ParseCommandLine
 func ParseCommandLine(commandLine []string, host tsoptions.ParseConfigHost) *tsoptions.ParsedCommandLine
 type ParseCommandLineWorkerDiagnostics = tsoptions.ParseCommandLineWorkerDiagnostics
 //go:linkname ParseCompilerOptions github.com/microsoft/TypeScript/tsc/internal/tsoptions.ParseCompilerOptions
-func ParseCompilerOptions(key string, value any, allOptions *core.CompilerOptions) []*ast.Diagnostic
+func ParseCompilerOptions(key string, value any, allOptions *core.CompilerOptions)
 //go:linkname ParseConfigFileTextToJson github.com/microsoft/TypeScript/tsc/internal/tsoptions.ParseConfigFileTextToJson
 func ParseConfigFileTextToJson(fileName string, path tspath.Path, jsonText string) (any, []*ast.Diagnostic)
 type ParseConfigHost = tsoptions.ParseConfigHost
@@ -105,9 +103,7 @@ func ParseStringArray(value any) []string
 //go:linkname ParseTristate github.com/microsoft/TypeScript/tsc/internal/tsoptions.ParseTristate
 func ParseTristate(value any) core.Tristate
 //go:linkname ParseTypeAcquisition github.com/microsoft/TypeScript/tsc/internal/tsoptions.ParseTypeAcquisition
-func ParseTypeAcquisition(key string, value any, allOptions *core.TypeAcquisition) []*ast.Diagnostic
-//go:linkname ParseWatchOptions github.com/microsoft/TypeScript/tsc/internal/tsoptions.ParseWatchOptions
-func ParseWatchOptions(key string, value any, allOptions *core.WatchOptions) []*ast.Diagnostic
+func ParseTypeAcquisition(key string, value any, allOptions *core.TypeAcquisition)
 type ParsedBuildCommandLine = tsoptions.ParsedBuildCommandLine
 type ParsedCommandLine = tsoptions.ParsedCommandLine
 type ParsedOptions = tsoptions.ParsedOptions
@@ -117,4 +113,3 @@ type TSConfig = tsoptions.TSConfig
 func TargetToLibMap() map[core.ScriptTarget]string
 type TsConfigSourceFile = tsoptions.TsConfigSourceFile
 var TscBuildOption = tsoptions.TscBuildOption
-var WatchNameMap = tsoptions.WatchNameMap

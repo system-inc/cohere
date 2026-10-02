@@ -170,10 +170,9 @@ after it is a stat and an exec.
 **It builds from the committed tree, never the working tree.** The checkout is shared, and a gate
 that built from disk ran whatever any member had half-written: on 2026-10-02 one member's
 uncommitted rule work turned 22 findings on in ahra before it was classified. So a build extracts
-HEAD with `git archive`, extracts the compiler at the commit HEAD pins, applies HEAD's
-`patches/*.patch` to it, and builds that. The patched compiler is kept under
-`.cache/cohere/compiler/`, one per pin and patch set, because it is 66,000 files. Before a binary is
-cached, its own `--version` must name the commit and measure every patch present, or it is refused.
+HEAD with `git archive`, extracts the compiler at the commit HEAD pins, and builds that. The
+compiler is kept under `.cache/cohere/compiler/`, one per pin, because it is 66,000 files. Before a
+binary is cached, its own `--version` must name the commit, or it is refused.
 
 ```sh
 cohere                    # build HEAD's committed tree if it has no binary yet, then exec
@@ -258,7 +257,6 @@ installs correctly and is never found, which on the machine is indistinguishable
 never shipped.
 
 ```sh
-go run ./command/cohere-patches
 go run ./command/cohere-release --version 0.1.0 --output dist
 ```
 
@@ -266,11 +264,6 @@ One command builds all six from one machine, in about two minutes, and it stages
 publishes. It refuses a release it cannot complete: a target that fails to build fails the whole
 run, because a version missing one platform resolves to nothing there and gets reported as a bug
 against a release that looked fine everywhere else.
-
-The first line applies the patches cohere carries on its vendored compiler, which a fresh clone and
-every submodule bump leave unapplied. The release checks them with `cohere-patches -check` before
-building anything and refuses if one is missing, because skipping the step still compiles cleanly
-and ships the stock checker.
 
 The launcher is Node rather than Go, which is the one surprising choice. A Go dispatcher would have
 to be cross-compiled per platform, making it a seventh platform package and defeating the point of

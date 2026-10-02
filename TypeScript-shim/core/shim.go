@@ -108,12 +108,7 @@ var NodeCoreModules = core.NodeCoreModules
 func NonRelativeModuleNameForTypingCache(moduleName string) string
 type PagedLinkStore[V any] = core.PagedLinkStore[V]
 type Pattern = core.Pattern
-type PollingKind = core.PollingKind
-const PollingKindDynamicPriority = core.PollingKindDynamicPriority
-const PollingKindFixedChunkSize = core.PollingKindFixedChunkSize
-const PollingKindFixedInterval = core.PollingKindFixedInterval
-const PollingKindNone = core.PollingKindNone
-const PollingKindPriorityInterval = core.PollingKindPriorityInterval
+type PluginImport = core.PluginImport
 //go:linkname PositionToLineAndByteOffset github.com/microsoft/TypeScript/tsc/internal/core.PositionToLineAndByteOffset
 func PositionToLineAndByteOffset(position int, lineStarts []core.TextPos) (line int, byteOffset int)
 type ProjectReference = core.ProjectReference
@@ -144,6 +139,7 @@ const ScriptTargetES2022 = core.ScriptTargetES2022
 const ScriptTargetES2023 = core.ScriptTargetES2023
 const ScriptTargetES2024 = core.ScriptTargetES2024
 const ScriptTargetES2025 = core.ScriptTargetES2025
+const ScriptTargetES2026 = core.ScriptTargetES2026
 const ScriptTargetES5 = core.ScriptTargetES5
 const ScriptTargetESNext = core.ScriptTargetESNext
 const ScriptTargetJSON = core.ScriptTargetJSON
@@ -178,21 +174,6 @@ var UnprefixedNodeCoreModules = core.UnprefixedNodeCoreModules
 func Version() string
 //go:linkname VersionMajorMinor github.com/microsoft/TypeScript/tsc/internal/core.VersionMajorMinor
 func VersionMajorMinor() string
-type WatchDirectoryKind = core.WatchDirectoryKind
-const WatchDirectoryKindDynamicPriorityPolling = core.WatchDirectoryKindDynamicPriorityPolling
-const WatchDirectoryKindFixedChunkSizePolling = core.WatchDirectoryKindFixedChunkSizePolling
-const WatchDirectoryKindFixedPollingInterval = core.WatchDirectoryKindFixedPollingInterval
-const WatchDirectoryKindNone = core.WatchDirectoryKindNone
-const WatchDirectoryKindUseFsEvents = core.WatchDirectoryKindUseFsEvents
-type WatchFileKind = core.WatchFileKind
-const WatchFileKindDynamicPriorityPolling = core.WatchFileKindDynamicPriorityPolling
-const WatchFileKindFixedChunkSizePolling = core.WatchFileKindFixedChunkSizePolling
-const WatchFileKindFixedPollingInterval = core.WatchFileKindFixedPollingInterval
-const WatchFileKindNone = core.WatchFileKindNone
-const WatchFileKindPriorityPollingInterval = core.WatchFileKindPriorityPollingInterval
-const WatchFileKindUseFsEvents = core.WatchFileKindUseFsEvents
-const WatchFileKindUseFsEventsOnParentDirectory = core.WatchFileKindUseFsEventsOnParentDirectory
-type WatchOptions = core.WatchOptions
 //go:linkname WithCheckerLifetime github.com/microsoft/TypeScript/tsc/internal/core.WithCheckerLifetime
 func WithCheckerLifetime(ctx context.Context, lifetime core.CheckerLifetime) context.Context
 //go:linkname WithRequestID github.com/microsoft/TypeScript/tsc/internal/core.WithRequestID

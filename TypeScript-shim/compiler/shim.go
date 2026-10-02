@@ -47,6 +47,9 @@ func NewCompilerHost(currentDirectory string, fs vfs.FS, defaultLibraryPath stri
 //go:linkname NewProgram github.com/microsoft/TypeScript/tsc/internal/compiler.NewProgram
 func NewProgram(opts compiler.ProgramOptions) *compiler.Program
 type Program = compiler.Program
+type ProgramConfig = compiler.ProgramConfig
+type ProgramFactories = compiler.ProgramFactories
+type ProgramHosts = compiler.ProgramHosts
 type ProgramLike = compiler.ProgramLike
 type ProgramOptions = compiler.ProgramOptions
 //go:linkname SortAndDeduplicateDiagnostics github.com/microsoft/TypeScript/tsc/internal/compiler.SortAndDeduplicateDiagnostics

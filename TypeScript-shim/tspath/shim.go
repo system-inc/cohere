@@ -31,7 +31,36 @@ func ContainsIgnoredPath(path string) bool
 func ContainsPath(parent string, child string, options tspath.ComparePathsOptions) bool
 //go:linkname ConvertToRelativePath github.com/microsoft/TypeScript/tsc/internal/tspath.ConvertToRelativePath
 func ConvertToRelativePath(absoluteOrRelativePath string, options tspath.ComparePathsOptions) string
+//go:linkname DecodeDynamicURINoPath github.com/microsoft/TypeScript/tsc/internal/tspath.DecodeDynamicURINoPath
+func DecodeDynamicURINoPath(path string) (string, bool)
+//go:linkname DecodeDynamicURIPath github.com/microsoft/TypeScript/tsc/internal/tspath.DecodeDynamicURIPath
+func DecodeDynamicURIPath(path string) string
+//go:linkname DecodeDynamicURIPathForDisk github.com/microsoft/TypeScript/tsc/internal/tspath.DecodeDynamicURIPathForDisk
+func DecodeDynamicURIPathForDisk(path string) (string, bool)
+//go:linkname DecodeDynamicURIPathSegment github.com/microsoft/TypeScript/tsc/internal/tspath.DecodeDynamicURIPathSegment
+func DecodeDynamicURIPathSegment(segment string) string
 const DirectorySeparator = tspath.DirectorySeparator
+const DynamicURIFileNamePrefix = tspath.DynamicURIFileNamePrefix
+//go:linkname DynamicURIPathToModuleSpecifier github.com/microsoft/TypeScript/tsc/internal/tspath.DynamicURIPathToModuleSpecifier
+func DynamicURIPathToModuleSpecifier(path string) string
+//go:linkname EncodeDynamicDirectorySpecifier github.com/microsoft/TypeScript/tsc/internal/tspath.EncodeDynamicDirectorySpecifier
+func EncodeDynamicDirectorySpecifier(specifier string) string
+//go:linkname EncodeDynamicLogicalModuleSpecifier github.com/microsoft/TypeScript/tsc/internal/tspath.EncodeDynamicLogicalModuleSpecifier
+func EncodeDynamicLogicalModuleSpecifier(specifier string) string
+//go:linkname EncodeDynamicModuleSpecifier github.com/microsoft/TypeScript/tsc/internal/tspath.EncodeDynamicModuleSpecifier
+func EncodeDynamicModuleSpecifier(specifier string) string
+//go:linkname EncodeDynamicRelativeURIDirectoryPath github.com/microsoft/TypeScript/tsc/internal/tspath.EncodeDynamicRelativeURIDirectoryPath
+func EncodeDynamicRelativeURIDirectoryPath(path string) string
+//go:linkname EncodeDynamicRelativeURIPath github.com/microsoft/TypeScript/tsc/internal/tspath.EncodeDynamicRelativeURIPath
+func EncodeDynamicRelativeURIPath(path string) string
+//go:linkname EncodeDynamicURIDirectoryPath github.com/microsoft/TypeScript/tsc/internal/tspath.EncodeDynamicURIDirectoryPath
+func EncodeDynamicURIDirectoryPath(path string) string
+//go:linkname EncodeDynamicURINoPath github.com/microsoft/TypeScript/tsc/internal/tspath.EncodeDynamicURINoPath
+func EncodeDynamicURINoPath(suffix string) string
+//go:linkname EncodeDynamicURIPath github.com/microsoft/TypeScript/tsc/internal/tspath.EncodeDynamicURIPath
+func EncodeDynamicURIPath(path string) string
+//go:linkname EncodeDynamicURIPathWithSuffix github.com/microsoft/TypeScript/tsc/internal/tspath.EncodeDynamicURIPathWithSuffix
+func EncodeDynamicURIPathWithSuffix(path string, suffix string) string
 //go:linkname EnsurePathIsNonModuleName github.com/microsoft/TypeScript/tsc/internal/tspath.EnsurePathIsNonModuleName
 func EnsurePathIsNonModuleName(path string) string
 //go:linkname EnsureTrailingDirectorySeparator github.com/microsoft/TypeScript/tsc/internal/tspath.EnsureTrailingDirectorySeparator
@@ -58,6 +87,8 @@ var ExtensionsNotSupportingExtensionlessResolution = tspath.ExtensionsNotSupport
 func FileExtensionIs(path string, extension string) bool
 //go:linkname FileExtensionIsOneOf github.com/microsoft/TypeScript/tsc/internal/tspath.FileExtensionIsOneOf
 func FileExtensionIsOneOf(path string, extensions []string) bool
+//go:linkname ForceEncodeDynamicURIPathSegment github.com/microsoft/TypeScript/tsc/internal/tspath.ForceEncodeDynamicURIPathSegment
+func ForceEncodeDynamicURIPathSegment(segment string, preserveExtension bool) string
 //go:linkname GetAnyExtensionFromPath github.com/microsoft/TypeScript/tsc/internal/tspath.GetAnyExtensionFromPath
 func GetAnyExtensionFromPath(path string, extensions []string, ignoreCase bool) string
 //go:linkname GetBaseFileName github.com/microsoft/TypeScript/tsc/internal/tspath.GetBaseFileName
@@ -116,6 +147,8 @@ func IsDeclarationFileName(fileName string) bool
 func IsDiskPathRoot(path string) bool
 //go:linkname IsDynamicFileName github.com/microsoft/TypeScript/tsc/internal/tspath.IsDynamicFileName
 func IsDynamicFileName(fileName string) bool
+//go:linkname IsEncodedDynamicFileName github.com/microsoft/TypeScript/tsc/internal/tspath.IsEncodedDynamicFileName
+func IsEncodedDynamicFileName(path string) bool
 //go:linkname IsExternalModuleNameRelative github.com/microsoft/TypeScript/tsc/internal/tspath.IsExternalModuleNameRelative
 func IsExternalModuleNameRelative(moduleName string) bool
 //go:linkname IsRootedDiskPath github.com/microsoft/TypeScript/tsc/internal/tspath.IsRootedDiskPath
@@ -165,6 +198,10 @@ func ToFileNameLowerCase(fileName string) string
 func ToPath(fileName string, basePath string, useCaseSensitiveFileNames bool) tspath.Path
 //go:linkname TrimFilePathPrefix github.com/microsoft/TypeScript/tsc/internal/tspath.TrimFilePathPrefix
 func TrimFilePathPrefix(path string, prefix string, useCaseSensitiveFileNames bool) (string, bool)
+//go:linkname TryDecodeDynamicURIPath github.com/microsoft/TypeScript/tsc/internal/tspath.TryDecodeDynamicURIPath
+func TryDecodeDynamicURIPath(path string) (string, bool)
+//go:linkname TryDecodeDynamicURIPathSegment github.com/microsoft/TypeScript/tsc/internal/tspath.TryDecodeDynamicURIPathSegment
+func TryDecodeDynamicURIPathSegment(segment string) (string, bool)
 //go:linkname TryExtractTSExtension github.com/microsoft/TypeScript/tsc/internal/tspath.TryExtractTSExtension
 func TryExtractTSExtension(fileName string) string
 //go:linkname TryGetExtensionFromPath github.com/microsoft/TypeScript/tsc/internal/tspath.TryGetExtensionFromPath

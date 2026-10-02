@@ -463,6 +463,8 @@ func GetSemanticJsxChildren(children []*ast.JsxChild) []*ast.JsxChild
 func GetSourceFileOfModule(module *ast.Symbol) *ast.SourceFile
 //go:linkname GetSourceFileOfNode github.com/microsoft/TypeScript/tsc/internal/ast.GetSourceFileOfNode
 func GetSourceFileOfNode(node *ast.Node) *ast.SourceFile
+//go:linkname GetSourceFileOfSymbol github.com/microsoft/TypeScript/tsc/internal/ast.GetSourceFileOfSymbol
+func GetSourceFileOfSymbol(symbol *ast.Symbol) *ast.SourceFile
 //go:linkname GetSuperContainer github.com/microsoft/TypeScript/tsc/internal/ast.GetSuperContainer
 func GetSuperContainer(node *ast.Node, stopOnFunctions bool) *ast.Node
 //go:linkname GetSymbolId github.com/microsoft/TypeScript/tsc/internal/ast.GetSymbolId
