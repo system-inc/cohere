@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/formatfiles"
@@ -250,15 +251,45 @@ func gitChangedFiles(workingDirectory string, since string) ([]string, []string,
 	// because every submodule is asked directly below, and the parent's own opinion of one adds
 	// nothing but a failure mode: a submodule git cannot open fails the parent's call outright, which
 	// would name the whole repository as unreadable rather than the one directory that was.
-	output, err := gitOutput(workingDirectory,
-		"status", "--porcelain=v1", "--no-renames", "--untracked-files=all", "--ignore-submodules=all", "--", ".")
-	if err != nil {
-		return nil, nil, fmt.Errorf("asking git what changed: %w", err)
+	//
+	// The questions this level asks do not depend on each other, so they are asked at once. On ahra the
+	// scope made about fourteen git calls in a row across three repositories and was most of a cached
+	// run. Errors are read back in the order the calls used to be made, so a failure names the same
+	// question it always did, and any failure is still an error rather than an empty answer.
+	var (
+		output, prefixOutput, head                   string
+		statusError, prefixError, headError, listErr error
+		submodules                                   map[string]struct{}
+		questions                                    sync.WaitGroup
+	)
+	questions.Add(3)
+	go func() {
+		defer questions.Done()
+		output, statusError = gitOutput(workingDirectory,
+			"status", "--porcelain=v1", "--no-renames", "--untracked-files=all", "--ignore-submodules=all", "--", ".")
+	}()
+	go func() {
+		defer questions.Done()
+		prefixOutput, prefixError = gitOutput(workingDirectory, "rev-parse", "--show-prefix")
+	}()
+	go func() {
+		defer questions.Done()
+		submodules, listErr = gitSubmodulePaths(workingDirectory)
+	}()
+	if since != "" {
+		questions.Add(1)
+		go func() {
+			defer questions.Done()
+			head, headError = gitOutput(workingDirectory, "rev-parse", "HEAD")
+		}()
 	}
+	questions.Wait()
 
-	prefixOutput, err := gitOutput(workingDirectory, "rev-parse", "--show-prefix")
-	if err != nil {
-		return nil, nil, fmt.Errorf("asking git where %s sits in its repository: %w", workingDirectory, err)
+	if statusError != nil {
+		return nil, nil, fmt.Errorf("asking git what changed: %w", statusError)
+	}
+	if prefixError != nil {
+		return nil, nil, fmt.Errorf("asking git where %s sits in its repository: %w", workingDirectory, prefixError)
 	}
 	prefix := strings.TrimSpace(prefixOutput)
 
@@ -273,9 +304,8 @@ func gitChangedFiles(workingDirectory string, since string) ([]string, []string,
 	// So the files that differ between the recorded commit and the working tree are added. Deleted
 	// files are filtered for the same reason parsePorcelain drops them: there is nothing to read.
 	if since != "" {
-		head, err := gitOutput(workingDirectory, "rev-parse", "HEAD")
-		if err != nil {
-			return nil, nil, fmt.Errorf("asking git which commit is checked out: %w", err)
+		if headError != nil {
+			return nil, nil, fmt.Errorf("asking git which commit is checked out: %w", headError)
 		}
 		if strings.TrimSpace(head) != since {
 			moved, err := gitOutput(workingDirectory, "diff", "--name-only", "--no-renames", "--diff-filter=d", since, "--", ".")
@@ -321,9 +351,8 @@ func gitChangedFiles(workingDirectory string, since string) ([]string, []string,
 	// Asked of git rather than answered by stat: a stat call would also reject a path deleted
 	// between the status call and the check, which is a different thing and belongs to the caller
 	// that reads it.
-	submodules, err := gitSubmodulePaths(workingDirectory)
-	if err != nil {
-		return nil, nil, err
+	if listErr != nil {
+		return nil, nil, listErr
 	}
 	if len(submodules) == 0 {
 		return changed, nil, nil
@@ -363,32 +392,55 @@ func gitChangedFiles(workingDirectory string, since string) ([]string, []string,
 	// file it could not process, which is a true statement about a path that was never a file. The
 	// same drop has to happen at every level, which is what calling back into this function does.
 	// Each level prefixes only its own segment, so the paths compose rather than doubling.
-	unreadable := []string{}
+	//
+	// The submodules are asked concurrently. Each answer lands in its own slot and the slots are read
+	// back in sorted order, so a gather can drop neither a file nor an error: a lost error would make an
+	// incomplete change set look complete, and lost files would make a real edit invisible.
+	type submoduleAnswer struct {
+		files      []string
+		unreadable []string
+	}
+	names := make([]string, 0, len(submodules))
 	for submodule := range submodules {
-		directory := filepath.Join(workingDirectory, submodule)
-		if _, err := os.Stat(filepath.Join(directory, ".git")); err != nil {
-			continue
-		}
+		names = append(names, submodule)
+	}
+	sort.Strings(names)
+	answers := make([]submoduleAnswer, len(names))
+	var asking sync.WaitGroup
+	for index, submodule := range names {
+		asking.Add(1)
+		go func() {
+			defer asking.Done()
+			directory := filepath.Join(workingDirectory, submodule)
+			if _, err := os.Stat(filepath.Join(directory, ".git")); err != nil {
+				return
+			}
+			recorded, err := gitRecordedCommit(workingDirectory, submodule, directory)
+			if err != nil {
+				answers[index].unreadable = []string{fmt.Sprintf("%s (%v)", submodule, err)}
+				return
+			}
+			inside, insideUnreadable, err := gitChangedFiles(directory, recorded)
+			if err != nil {
+				answers[index].unreadable = []string{fmt.Sprintf("%s (%v)", submodule, err)}
+				return
+			}
+			for _, name := range inside {
+				answers[index].files = append(answers[index].files, filepath.Join(submodule, name))
+			}
+			for _, description := range insideUnreadable {
+				// Concatenated rather than joined: the description carries git's error text, and Join
+				// would clean the paths inside it.
+				answers[index].unreadable = append(answers[index].unreadable, submodule+string(filepath.Separator)+description)
+			}
+		}()
+	}
+	asking.Wait()
 
-		recorded, err := gitRecordedCommit(workingDirectory, submodule, directory)
-		if err != nil {
-			unreadable = append(unreadable, fmt.Sprintf("%s (%v)", submodule, err))
-			continue
-		}
-
-		inside, insideUnreadable, err := gitChangedFiles(directory, recorded)
-		if err != nil {
-			unreadable = append(unreadable, fmt.Sprintf("%s (%v)", submodule, err))
-			continue
-		}
-		for _, name := range inside {
-			kept = append(kept, filepath.Join(submodule, name))
-		}
-		for _, description := range insideUnreadable {
-			// Concatenated rather than joined: the description carries git's error text, and Join
-			// would clean the paths inside it.
-			unreadable = append(unreadable, submodule+string(filepath.Separator)+description)
-		}
+	unreadable := []string{}
+	for _, answer := range answers {
+		kept = append(kept, answer.files...)
+		unreadable = append(unreadable, answer.unreadable...)
 	}
 	sort.Strings(unreadable)
 

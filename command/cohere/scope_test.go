@@ -1088,3 +1088,80 @@ func TestStructureIgnorePathIsNamedOnlyWithStructure(t *testing.T) {
 		t.Fatalf("a project with Structure named %q", path)
 	}
 }
+
+// A broken submodule beside a healthy one loses neither: the broken one is named, the healthy one's
+// edit is still in scope.
+//
+// That a lone broken submodule is named and refuses the check is TestAnUnreadableSubmoduleIsNamedAndFailsTheCheck.
+// This is the case the concurrent gather adds: the submodules are asked at once and merged by slot, so a
+// merge that dropped one answer's error would make the change set look complete, and one that dropped
+// the other's files would make a real edit invisible. Each half has been shown failing against a gather
+// mutated to drop it.
+func TestABrokenSubmoduleBesideAHealthyOneLosesNeither(t *testing.T) {
+	git := func(directory string, arguments ...string) {
+		t.Helper()
+		command := exec.Command("git", arguments...)
+		command.Dir = directory
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Skipf("git is unavailable or refused (%v): %s", err, output)
+		}
+	}
+	makeRepository := func(directory string, file string) {
+		t.Helper()
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		git(directory, "init", "--quiet")
+		git(directory, "config", "user.email", "fixture@example.com")
+		git(directory, "config", "user.name", "fixture")
+		if err := os.WriteFile(filepath.Join(directory, file), []byte("export const value = 1;\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		git(directory, "add", file)
+		git(directory, "commit", "--quiet", "-m", "initial")
+	}
+
+	healthy := filepath.Join(t.TempDir(), "healthy")
+	makeRepository(healthy, "Healthy.ts")
+	broken := filepath.Join(t.TempDir(), "broken")
+	makeRepository(broken, "Broken.ts")
+
+	root := t.TempDir()
+	makeRepository(root, "Root.ts")
+	git(root, "-c", "protocol.file.allow=always", "submodule", "--quiet", "add", healthy, "healthy")
+	git(root, "-c", "protocol.file.allow=always", "submodule", "--quiet", "add", broken, "broken")
+	git(root, "commit", "--quiet", "-m", "add the submodules")
+
+	// The control: both submodules readable, the healthy edit found, nothing unreadable. Without it a
+	// resolver that always reported an unreadable submodule would pass the assertions below.
+	if err := os.WriteFile(filepath.Join(root, "healthy", "Healthy.ts"), []byte("export const value = 2;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before, err := changedFilesScope(root)
+	if err != nil {
+		t.Fatalf("unexpected error with both submodules readable: %v", err)
+	}
+	if len(before.UnreadableSubmodules) != 0 {
+		t.Fatalf("a readable tree reported unreadable submodules: %v", before.UnreadableSubmodules)
+	}
+	if !before.includes(filepath.Join(root, "healthy", "Healthy.ts")) {
+		t.Fatalf("the control did not find the healthy edit: %v", before.FileNames)
+	}
+
+	// Break one: its .git file still exists, so it is asked, but it points at nothing.
+	if err := os.WriteFile(filepath.Join(root, "broken", ".git"), []byte("gitdir: /nonexistent/cohere-fixture\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	scope, err := changedFilesScope(root)
+	if err != nil {
+		t.Fatalf("one unreadable submodule failed the whole call, rather than being named: %v", err)
+	}
+	if !scope.includes(filepath.Join(root, "healthy", "Healthy.ts")) {
+		t.Errorf("the healthy submodule's edit was lost beside the broken one: %v", scope.FileNames)
+	}
+	if len(scope.UnreadableSubmodules) != 1 || !strings.HasPrefix(scope.UnreadableSubmodules[0], "broken") {
+		t.Errorf("the broken submodule was not named exactly once: %v", scope.UnreadableSubmodules)
+	}
+
+}
