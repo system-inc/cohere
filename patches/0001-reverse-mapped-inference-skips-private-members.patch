@@ -1,0 +1,22 @@
+diff --git a/tsc/internal/checker/inference.go b/tsc/internal/checker/inference.go
+index 4bb9d2923d..6aa6206382 100644
+--- a/tsc/internal/checker/inference.go
++++ b/tsc/internal/checker/inference.go
+@@ -1109,6 +1109,17 @@ func (c *Checker) resolveReverseMappedTypeMembers(t *Type) {
+ 	members := make(ast.SymbolTable)
+ 	limitedConstraint := c.getLimitedConstraint(t)
+ 	for _, prop := range c.getPropertiesOfType(r.source) {
++		// A reverse mapping recovers the source of a homomorphic mapped type, whose keys come from
++		// keyof, and keyof never produces a private or protected member (getLiteralTypeFromProperty
++		// returns never for one). So a non-public source property has no key to map from. Copying it
++		// anyway creates an inferred property with the member's declarations but no accessibility,
++		// which then reads as public: inferring T for Readonly<C & T> from a class C with a private
++		// member yields a T that redeclares that member as public. Since #63932 made intersection
++		// properties take the most permissive accessibility, that public copy wins over C's private
++		// declaration, and C becomes incomparable to Readonly<C & T> (TS2352 on `f<T>() as C`).
++		if getDeclarationModifierFlagsFromSymbol(prop)&ast.ModifierFlagsNonPublicAccessibilityModifier != 0 {
++			continue
++		}
+ 		// In case of a reverse mapped type with an intersection constraint, if we were able to
+ 		// extract the filtering type literals we skip those properties that are not assignable to them,
+ 		// because the extra properties wouldn't get through the application of the mapped type anyway

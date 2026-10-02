@@ -25,6 +25,7 @@ import (
 	"github.com/system-inc/cohere/internal/release/packaging"
 	"github.com/system-inc/cohere/internal/types/program"
 	"github.com/system-inc/cohere/internal/unused_exports"
+	"github.com/system-inc/cohere/patches"
 )
 
 // processStart is stamped before anything else runs, so the phase line can say how much of the run
@@ -262,6 +263,11 @@ func run() error {
 		// what ran: the pinned typescript-go commit is most of the code in this binary and moves
 		// independently of the version. A bug report that names all of it is reproducible.
 		fmt.Println(release.Current())
+		// Measured, not recited: each patch's probe runs against the checker this binary links, so a
+		// binary built without applying the patches says MISSING instead of listing them as present.
+		for _, line := range patches.Describe(patches.Verify(context.Background(), os.TempDir())) {
+			fmt.Println(line)
+		}
 		return nil
 	}
 
