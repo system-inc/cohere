@@ -5,6 +5,8 @@ import (
 	"sync"
 
 	"github.com/dop251/goja"
+
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 )
 
 // formatScript calls into the loaded bundles.
@@ -16,7 +18,7 @@ import (
 // the printer against this engine; until then the oracle disagreed with the tree on those files.
 //
 // The options are passed explicitly rather than resolved inside the runtime, because this runtime has
-// no filesystem: the config is the caller's to supply, through ResolveOptions in config.go, and
+// no filesystem: the config is the caller's to supply, through formatoptions.Resolve, and
 // hardcoding it here would silently ignore a project that configured something else.
 const formatScript = `
 	(function () {
@@ -38,41 +40,6 @@ const formatScript = `
 	})()
 `
 
-// Options are the Prettier settings the engine formats with.
-//
-// The last five are the options a config in our repositories names beyond ahra's five. Four of them are
-// Prettier 3's defaults, so setting them changes nothing, and they are carried anyway so a resolved
-// config is passed whole rather than filtered by someone's belief about which keys matter.
-// BracketSameLine is the one that is not a default, and leaving it out is what made api-phi-health's JSX
-// measure against the wrong formatter.
-type Options struct {
-	TabWidth    int
-	UseTabs     bool
-	Semi        bool
-	SingleQuote bool
-	PrintWidth  int
-
-	TrailingComma   string
-	BracketSpacing  bool
-	BracketSameLine bool
-	ArrowParens     string
-	EndOfLine       string
-}
-
-// DefaultOptions mirrors the prettier block in the ahra package.json, over Prettier's own defaults.
-//
-// A caller formatting a repository it can locate should use ResolveOptions instead. This exists for
-// tests and for callers with no directory to resolve from.
-func DefaultOptions() Options {
-	options := PrettierDefaults()
-	options.TabWidth = 4
-	options.UseTabs = false
-	options.Semi = true
-	options.SingleQuote = true
-	options.PrintWidth = 120
-	return options
-}
-
 // Engine formats source by running our Prettier fork inside goja.
 //
 // A goja.Runtime cannot be used by two goroutines at once and its values cannot cross runtimes, so
@@ -80,7 +47,7 @@ func DefaultOptions() Options {
 // set is changed files, typically one to a dozen, where a pool's construction cost -- roughly 100ms
 // of bundle evaluation per runtime -- would exceed what it saves.
 type Engine struct {
-	options Options
+	options formatoptions.Options
 
 	mutex   sync.Mutex
 	runtime *goja.Runtime
@@ -90,7 +57,7 @@ type Engine struct {
 //
 // Evaluation happens once, here, rather than per format. It costs about 100ms, and paying it per
 // file would dominate the formatting itself.
-func New(options Options) (*Engine, error) {
+func New(options formatoptions.Options) (*Engine, error) {
 	sources, err := loadBundles()
 	if err != nil {
 		return nil, err

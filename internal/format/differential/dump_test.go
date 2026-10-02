@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
@@ -59,7 +61,7 @@ func TestDumpDifferences(t *testing.T) {
 		}
 		directory = filepath.Join(base, "cohere", "prettier-oracle")
 	}
-	enumerator, err := prettier.New(prettier.DefaultOptions())
+	enumerator, err := prettier.New(formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +76,7 @@ func TestDumpDifferences(t *testing.T) {
 		}
 		seen[root] = true
 
-		structureIgnore := prettier.StructureIgnorePath(root)
+		structureIgnore := formatfiles.StructureIgnorePath(root)
 		enumeration, err := enumerator.Enumerate(root, structureIgnore)
 		if err != nil {
 			t.Fatalf("enumerating %s: %v", root, err)
@@ -95,7 +97,7 @@ func TestDumpDifferences(t *testing.T) {
 			}
 		}
 
-		resolution, err := prettier.ResolveOptions(root)
+		resolution, err := formatoptions.Resolve(root)
 		if err != nil {
 			t.Fatalf("resolving the Prettier config for %s: %v", root, err)
 		}

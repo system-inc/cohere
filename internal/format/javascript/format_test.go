@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -100,16 +101,16 @@ var formatCases = []formatCase{
 }
 
 // formatFor is the native entry point a file name reaches through internal/format/native.
-func formatFor(fileName string) func(string, string, prettier.Options) (string, error) {
+func formatFor(fileName string) func(string, string, formatoptions.Options) (string, error) {
 	switch {
 	case strings.HasSuffix(fileName, ".json"):
 		return FormatJSON
 	case strings.HasSuffix(fileName, ".js"):
-		return func(fileName string, text string, options prettier.Options) (string, error) {
+		return func(fileName string, text string, options formatoptions.Options) (string, error) {
 			return FormatJavaScript(fileName, text, options, nil)
 		}
 	}
-	return func(fileName string, text string, options prettier.Options) (string, error) {
+	return func(fileName string, text string, options formatoptions.Options) (string, error) {
 		return Format(fileName, text, options, nil)
 	}
 }
@@ -117,18 +118,18 @@ func formatFor(fileName string) func(string, string, prettier.Options) (string, 
 // TestJavaScriptRefusesWhatTypeScriptReadsDifferently: `a < b > (c)` is two comparisons to babel and a
 // generic call to TypeScript, so printing the TSX parse would rewrite the program's meaning.
 func TestJavaScriptRefusesWhatTypeScriptReadsDifferently(t *testing.T) {
-	if _, err := FormatJavaScript("Probe.js", "const result = a < b > (c);\n", prettier.DefaultOptions(), nil); err == nil {
+	if _, err := FormatJavaScript("Probe.js", "const result = a < b > (c);\n", formatoptions.Default(), nil); err == nil {
 		t.Fatal("a JavaScript file that parses as a TypeScript generic call was printed instead of refused")
 	}
-	if _, err := FormatJavaScript("Probe.js", "const result = a < b;\n", prettier.DefaultOptions(), nil); err != nil {
+	if _, err := FormatJavaScript("Probe.js", "const result = a < b;\n", formatoptions.Default(), nil); err != nil {
 		t.Fatalf("plain JavaScript was refused: %v", err)
 	}
 }
 
 func TestFormatMatchesTheFork(t *testing.T) {
-	sameLine := prettier.DefaultOptions()
+	sameLine := formatoptions.Default()
 	sameLine.BracketSameLine = true
-	for _, options := range []prettier.Options{prettier.DefaultOptions(), sameLine} {
+	for _, options := range []formatoptions.Options{formatoptions.Default(), sameLine} {
 		oracle, err := prettier.New(options)
 		if err != nil {
 			t.Fatal(err)

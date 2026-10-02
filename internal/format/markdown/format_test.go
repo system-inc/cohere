@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/format/differential"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -64,13 +65,13 @@ var formatFixtures = []string{
 	"", "\n", "a", "a\n", "\n\na\n\n",
 }
 
-var formatVariants = func() []prettier.Options {
-	defaults := prettier.DefaultOptions()
-	narrow := prettier.DefaultOptions()
+var formatVariants = func() []formatoptions.Options {
+	defaults := formatoptions.Default()
+	narrow := formatoptions.Default()
 	narrow.PrintWidth, narrow.TabWidth = 40, 2
-	tabs := prettier.DefaultOptions()
+	tabs := formatoptions.Default()
 	tabs.UseTabs, tabs.SingleQuote = true, false
-	return []prettier.Options{defaults, narrow, tabs}
+	return []formatoptions.Options{defaults, narrow, tabs}
 }()
 
 // compareFormat formats every input both ways and reports each difference; it returns how many differ.
@@ -112,7 +113,7 @@ func TestFormatFixturesMatchOracle(t *testing.T) {
 // TestFormatOracleCanFail proves the comparison sees a difference: the port's output for one input
 // compared against the oracle's for another must differ.
 func TestFormatOracleCanFail(t *testing.T) {
-	engine, err := prettier.New(prettier.DefaultOptions())
+	engine, err := prettier.New(formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +121,7 @@ func TestFormatOracleCanFail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	actual, err := Format("1. a", prettier.DefaultOptions(), nil)
+	actual, err := Format("1. a", formatoptions.Default(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +153,7 @@ func TestExhaustiveDelimitersMatchOracle(t *testing.T) {
 	}
 	extend("", 0)
 
-	engine, err := prettier.New(prettier.DefaultOptions())
+	engine, err := prettier.New(formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +163,7 @@ func TestExhaustiveDelimitersMatchOracle(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		actual, err := Format(input, prettier.DefaultOptions(), nil)
+		actual, err := Format(input, formatoptions.Default(), nil)
 		if err != nil || actual != expected {
 			failures++
 			if failures <= 20 {

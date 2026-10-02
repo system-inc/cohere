@@ -90,7 +90,7 @@ type Options[N Node[N]] struct {
 	Printer      *Printer[N]
 	OriginalText string
 
-	// Settings is the language's own options (prettier.Options for every printer today), carried as a
+	// Settings is the language's own options (formatoptions.Options for every printer today), carried as a
 	// value the language type-asserts, so this package does not import the oracle engine's package.
 	Settings any
 

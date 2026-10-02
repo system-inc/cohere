@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/formatfiles"
 )
 
 // A scoped transform must format what is in scope and skip what is not, and the skip must carry the
@@ -621,8 +621,8 @@ func TestAnEmptyScopeNamesWhereItLookedThroughTheWholePath(t *testing.T) {
 }
 
 // enumerationOf builds an Enumeration the way the real walk would report one.
-func enumerationOf(root string, files []string, walked int, declined map[string]int, nested []string, ignored map[string]int) prettier.Enumeration {
-	return prettier.Enumeration{
+func enumerationOf(root string, files []string, walked int, declined map[string]int, nested []string, ignored map[string]int) formatfiles.Enumeration {
+	return formatfiles.Enumeration{
 		Root:               root,
 		Walked:             walked,
 		Files:              files,
@@ -1065,7 +1065,7 @@ func TestChangedFilesScopeDescendsIntoSubmodules(t *testing.T) {
 // A missing ignore layer is printed, because the zero it would otherwise contribute is hidden by
 // design and was hiding exactly this.
 func TestDescribeEnumerationNamesAMissingLayer(t *testing.T) {
-	description := describeEnumeration(prettier.Enumeration{
+	description := describeEnumeration(formatfiles.Enumeration{
 		Root:          "/project",
 		MissingLayers: []string{"/project/libraries/structure/code-quality/prettier/PrettierIgnoreDefaults"},
 	}, 0)
@@ -1084,7 +1084,7 @@ func TestStructureIgnorePathIsNamedOnlyWithStructure(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "libraries", "structure"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if path := resolveStructureIgnorePath(root); path != prettier.StructureIgnorePath(root) {
+	if path := resolveStructureIgnorePath(root); path != formatfiles.StructureIgnorePath(root) {
 		t.Fatalf("a project with Structure named %q", path)
 	}
 }

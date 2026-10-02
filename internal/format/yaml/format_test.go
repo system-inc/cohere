@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/format/differential"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
@@ -113,20 +114,20 @@ var formatFixtures = []string{
 // formatVariants are the option sets every fixture runs under: our defaults (tabWidth 4, single quotes,
 // printWidth 120), narrow (printWidth 40, tabWidth 2, double quotes), tabs, and the less common
 // settings the printer reads (no bracket spacing, no trailing comma, CRLF).
-var formatVariants = func() []prettier.Options {
-	defaults := prettier.DefaultOptions()
-	narrow := prettier.DefaultOptions()
+var formatVariants = func() []formatoptions.Options {
+	defaults := formatoptions.Default()
+	narrow := formatoptions.Default()
 	narrow.PrintWidth, narrow.TabWidth, narrow.SingleQuote = 40, 2, false
-	tabs := prettier.DefaultOptions()
+	tabs := formatoptions.Default()
 	tabs.UseTabs, tabs.SingleQuote, tabs.PrintWidth, tabs.EndOfLine = true, false, 40, "cr"
-	other := prettier.DefaultOptions()
+	other := formatoptions.Default()
 	other.PrintWidth, other.BracketSpacing, other.TrailingComma, other.EndOfLine = 40, false, "none", "crlf"
-	return []prettier.Options{defaults, narrow, tabs, other}
+	return []formatoptions.Options{defaults, narrow, tabs, other}
 }()
 
 // formatParsed prints a parsed input the way Prettier's core wraps the printer: the byte order mark comes
 // back on the output.
-func formatParsed(fileName string, tree parsed, text string, hasByteOrderMark bool, options prettier.Options, proseWrap string, textToDoc printing.TextToDoc) (string, error) {
+func formatParsed(fileName string, tree parsed, text string, hasByteOrderMark bool, options formatoptions.Options, proseWrap string, textToDoc printing.TextToDoc) (string, error) {
 	if tree.err != "" {
 		return "", fmt.Errorf("the parser failed: %s", tree.err)
 	}
@@ -142,7 +143,7 @@ func formatParsed(fileName string, tree parsed, text string, hasByteOrderMark bo
 
 // formatFullStack is Format as native.Formatter calls it: the byte order mark removed and line endings
 // normalized before, the mark restored after.
-func formatFullStack(fileName string, input string, options prettier.Options, proseWrap string, textToDoc printing.TextToDoc) (string, error) {
+func formatFullStack(fileName string, input string, options formatoptions.Options, proseWrap string, textToDoc printing.TextToDoc) (string, error) {
 	text, hasByteOrderMark := normalizeInput(input)
 	formatted, err := formatWithProseWrap(fileName, text, options, proseWrap, textToDoc)
 	if err != nil {
@@ -226,7 +227,7 @@ func TestFormatFixturesMatchOracle(t *testing.T) {
 // TestFormatOracleCanFail proves the comparison sees a difference: the port's output for one input
 // against the oracle's for another.
 func TestFormatOracleCanFail(t *testing.T) {
-	engine, err := prettier.New(prettier.DefaultOptions())
+	engine, err := prettier.New(formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +239,7 @@ func TestFormatOracleCanFail(t *testing.T) {
 	if byteOrderMarks[0] {
 		t.Fatal("the fixture has no byte order mark")
 	}
-	actual, err := Print(trees[0].root, texts[0], prettier.DefaultOptions(), nil)
+	actual, err := Print(trees[0].root, texts[0], formatoptions.Default(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +252,7 @@ func TestFormatOracleCanFail(t *testing.T) {
 // hardline that upstream's textToDoc strips, and the caller strips it.
 func TestPrintDocLeavesTheTrailingHardline(t *testing.T) {
 	texts, _, trees := parseInputs(t, []string{"a: b\n"})
-	document, err := PrintDoc(trees[0].root, texts[0], prettier.DefaultOptions(), nil)
+	document, err := PrintDoc(trees[0].root, texts[0], formatoptions.Default(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

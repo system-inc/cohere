@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/printing"
 	"github.com/system-inc/cohere/internal/format/yaml/unist"
 )
@@ -97,31 +97,31 @@ var yamlPrinter = &printing.Printer[*unist.Node]{
 //
 // No file name is given, so the .prettierrc embed never applies, as upstream's without
 // options.filepath. PrintFile takes one.
-func Print(root *unist.Node, text string, options prettier.Options, textToDoc printing.TextToDoc) (string, error) {
+func Print(root *unist.Node, text string, options formatoptions.Options, textToDoc printing.TextToDoc) (string, error) {
 	return PrintFile("", root, text, options, textToDoc)
 }
 
 // PrintDoc is Print's doc, before layout: what markdown's front matter embeds. The trailing hardline is
 // still there; upstream's textToDoc strips it with stripTrailingHardline (doc.StripTrailingHardline),
 // and the caller is expected to do the same.
-func PrintDoc(root *unist.Node, text string, options prettier.Options, textToDoc printing.TextToDoc) (doc.Doc, error) {
+func PrintDoc(root *unist.Node, text string, options formatoptions.Options, textToDoc printing.TextToDoc) (doc.Doc, error) {
 	return PrintDocFile("", root, text, options, textToDoc)
 }
 
 // PrintFile is Print for a named file. The name is upstream's options.filepath: a .prettierrc,
 // .stylelintrc or .lintstagedrc is printed as JSON when textToDoc can format it as JSON.
-func PrintFile(fileName string, root *unist.Node, text string, options prettier.Options, textToDoc printing.TextToDoc) (string, error) {
+func PrintFile(fileName string, root *unist.Node, text string, options formatoptions.Options, textToDoc printing.TextToDoc) (string, error) {
 	return printFile(fileName, root, text, options, "preserve", textToDoc)
 }
 
 // PrintDocFile is PrintDoc for a named file.
-func PrintDocFile(fileName string, root *unist.Node, text string, options prettier.Options, textToDoc printing.TextToDoc) (doc.Doc, error) {
+func PrintDocFile(fileName string, root *unist.Node, text string, options formatoptions.Options, textToDoc printing.TextToDoc) (doc.Doc, error) {
 	return printDocFile(fileName, root, text, options, "preserve", textToDoc)
 }
 
-// printFile is PrintFile with proseWrap given. None of our repositories sets it, and prettier.Options
+// printFile is PrintFile with proseWrap given. None of our repositories sets it, and formatoptions.Options
 // does not carry it, so only the tests reach always and never.
-func printFile(fileName string, root *unist.Node, text string, prettierOptions prettier.Options, proseWrap string, textToDoc printing.TextToDoc) (string, error) {
+func printFile(fileName string, root *unist.Node, text string, prettierOptions formatoptions.Options, proseWrap string, textToDoc printing.TextToDoc) (string, error) {
 	// src/main/core.js, coreFormat: a file that is empty or only whitespace formats to "" without being
 	// printed. The doc entry has no such check, as upstream's textToDoc has none.
 	if trim(text) == "" {
@@ -147,7 +147,7 @@ func printFile(fileName string, root *unist.Node, text string, prettierOptions p
 	return formatted, nil
 }
 
-func printDocFile(fileName string, root *unist.Node, text string, prettierOptions prettier.Options, proseWrap string, textToDoc printing.TextToDoc) (document doc.Doc, err error) {
+func printDocFile(fileName string, root *unist.Node, text string, prettierOptions formatoptions.Options, proseWrap string, textToDoc printing.TextToDoc) (document doc.Doc, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			document, err = nil, fmt.Errorf("yaml: %v", recovered)

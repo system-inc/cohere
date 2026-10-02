@@ -8,7 +8,7 @@ import (
 	"errors"
 
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/printing"
 	"github.com/system-inc/cohere/internal/format/yaml/unist"
 )
@@ -19,13 +19,13 @@ import (
 // reads to print a .prettierrc as JSON through textToDoc; textToDoc may be nil.
 //
 // A file that does not parse fails with an error printing.IsSyntax recognizes.
-func Format(fileName string, text string, options prettier.Options, textToDoc printing.TextToDoc) (string, error) {
+func Format(fileName string, text string, options formatoptions.Options, textToDoc printing.TextToDoc) (string, error) {
 	return formatWithProseWrap(fileName, text, options, "preserve", textToDoc)
 }
 
-// formatWithProseWrap is Format with proseWrap given. prettier.Options does not carry it and none of our
+// formatWithProseWrap is Format with proseWrap given. formatoptions.Options does not carry it and none of our
 // repositories sets it, so only the tests reach always and never.
-func formatWithProseWrap(fileName string, text string, options prettier.Options, proseWrap string, textToDoc printing.TextToDoc) (string, error) {
+func formatWithProseWrap(fileName string, text string, options formatoptions.Options, proseWrap string, textToDoc printing.TextToDoc) (string, error) {
 	// coreFormat: `if (!originalText || originalText.trim().length === 0)`, before parsing.
 	if trim(text) == "" {
 		return "", nil
@@ -42,7 +42,7 @@ func formatWithProseWrap(fileName string, text string, options prettier.Options,
 // as it is, with no byte order mark or line ending normalization, as textToDoc takes it. The doc still
 // ends in its trailing hardline, which the caller strips (doc.StripTrailingHardline) as upstream's
 // textToDoc does. A text that does not parse fails with an error printing.IsSyntax recognizes.
-func FormatDoc(text string, options prettier.Options, textToDoc printing.TextToDoc) (doc.Doc, error) {
+func FormatDoc(text string, options formatoptions.Options, textToDoc printing.TextToDoc) (doc.Doc, error) {
 	root, err := parse(text)
 	if err != nil {
 		return nil, err

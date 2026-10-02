@@ -3,6 +3,8 @@ package prettier
 import (
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 )
 
 /*
@@ -28,7 +30,7 @@ import (
 func TestOverrideReachesTheLoader(t *testing.T) {
 	t.Setenv(ForkPathVariable, "/nonexistent/elsewhere")
 
-	if _, err := New(DefaultOptions()); err == nil {
+	if _, err := New(formatoptions.Default()); err == nil {
 		t.Fatalf("New succeeded with %s pointed at a nonexistent path, so the loader is not reading it", ForkPathVariable)
 	} else if !strings.Contains(err.Error(), "/nonexistent/elsewhere") {
 		t.Fatalf("the failure does not name the overridden path, so something else failed: %v", err)
@@ -66,7 +68,7 @@ func TestOverrideIsTheOnlyKnobThatMoves(t *testing.T) {
 func TestEmbeddedBundlesNeedNoFork(t *testing.T) {
 	t.Setenv(ForkPathVariable, "")
 
-	if _, err := New(DefaultOptions()); err != nil {
+	if _, err := New(formatoptions.Default()); err != nil {
 		t.Fatalf("building an engine from the embedded bundles: %v", err)
 	}
 }

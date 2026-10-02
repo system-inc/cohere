@@ -17,7 +17,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
-	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -92,15 +92,15 @@ func embed(path *astPath, _ *printerOptions) func(printing.TextToDoc, printing.P
 }
 
 // printSettings is what a format carries in options.Settings: the resolved Prettier options, and
-// options.parser, which prettier.Options does not hold since the file's language decides it.
+// options.parser, which formatoptions.Options does not hold since the file's language decides it.
 type printSettings struct {
-	prettier.Options
+	formatoptions.Options
 	// parser is options.parser: "css" or "scss".
 	parser string
 }
 
 // settingsOf is the resolved Prettier options a format carries in options.Settings.
-func settingsOf(options *printerOptions) prettier.Options {
+func settingsOf(options *printerOptions) formatoptions.Options {
 	return options.Settings.(printSettings).Options
 }
 
@@ -111,17 +111,17 @@ func parserOf(options *printerOptions) string {
 
 // Format is Prettier's format for a CSS file: parse, print to a doc, lay it out. Byte order marks and
 // line endings are normalized by the shared layer, not here.
-func Format(text string, prettierOptions prettier.Options) (string, error) {
+func Format(text string, prettierOptions formatoptions.Options) (string, error) {
 	return formatWithParser(text, prettierOptions, "css")
 }
 
 // FormatSCSS is Prettier's format for an SCSS file, the parser "scss".
-func FormatSCSS(text string, prettierOptions prettier.Options) (string, error) {
+func FormatSCSS(text string, prettierOptions formatoptions.Options) (string, error) {
 	return formatWithParser(text, prettierOptions, "scss")
 }
 
 // formatWithParser is Format under the parser named, "css" or "scss".
-func formatWithParser(text string, prettierOptions prettier.Options, parser string) (formatted string, err error) {
+func formatWithParser(text string, prettierOptions formatoptions.Options, parser string) (formatted string, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			formatted, err = "", fmt.Errorf("%s: %v", parser, recovered)
@@ -141,17 +141,17 @@ func formatWithParser(text string, prettierOptions prettier.Options, parser stri
 
 // PrintToDoc is upstream's textToDoc for CSS embedded in another language: the printed doc with its
 // trailing hardline stripped.
-func PrintToDoc(text string, prettierOptions prettier.Options) (doc.Doc, error) {
+func PrintToDoc(text string, prettierOptions formatoptions.Options) (doc.Doc, error) {
 	return printToDocWithParser(text, prettierOptions, "css")
 }
 
 // PrintToDocSCSS is PrintToDoc for SCSS, the parser "scss".
-func PrintToDocSCSS(text string, prettierOptions prettier.Options) (doc.Doc, error) {
+func PrintToDocSCSS(text string, prettierOptions formatoptions.Options) (doc.Doc, error) {
 	return printToDocWithParser(text, prettierOptions, "scss")
 }
 
 // printToDocWithParser is PrintToDoc under the parser named, "css" or "scss".
-func printToDocWithParser(text string, prettierOptions prettier.Options, parser string) (document doc.Doc, err error) {
+func printToDocWithParser(text string, prettierOptions formatoptions.Options, parser string) (document doc.Doc, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			document, err = nil, fmt.Errorf("%s: %v", parser, recovered)
@@ -167,7 +167,7 @@ func printToDocWithParser(text string, prettierOptions prettier.Options, parser 
 
 // printToDoc is parser-postcss.js's parseCss (or parseScss) followed by printAstToDoc
 // (src/main/ast-to-doc.js).
-func printToDoc(text string, prettierOptions prettier.Options, parser string) (doc.Doc, error) {
+func printToDoc(text string, prettierOptions formatoptions.Options, parser string) (doc.Doc, error) {
 	root, err := parseWithParserName(text, parser)
 	if err != nil {
 		if !printing.IsSyntax(err) {

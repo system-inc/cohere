@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/markdown/mdast"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
@@ -218,7 +220,7 @@ func TestCorpusParseMatchesUpstream(t *testing.T) {
 	if roots == "" {
 		t.Skip("set COHERE_YAML_CORPUS to measure; this is a measuring run, not a unit test")
 	}
-	enumerator, err := prettier.New(prettier.DefaultOptions())
+	enumerator, err := prettier.New(formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +239,7 @@ func TestCorpusParseMatchesUpstream(t *testing.T) {
 			continue
 		}
 		seen[root] = true
-		enumeration, err := enumerator.Enumerate(root, prettier.StructureIgnorePath(root))
+		enumeration, err := enumerator.Enumerate(root, formatfiles.StructureIgnorePath(root))
 		if err != nil {
 			t.Fatalf("enumerating %s: %v", root, err)
 		}

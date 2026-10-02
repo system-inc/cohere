@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
@@ -55,7 +57,7 @@ func TestCorpora(t *testing.T) {
 	}
 	t.Logf("oracle cache %s, bundles %s from %s", directory, digest[:12], bundles.Origin)
 
-	enumerator, err := prettier.New(prettier.DefaultOptions())
+	enumerator, err := prettier.New(formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +76,7 @@ func TestCorpora(t *testing.T) {
 		}
 		seen[root] = true
 
-		structureIgnore := prettier.StructureIgnorePath(root)
+		structureIgnore := formatfiles.StructureIgnorePath(root)
 		enumeration, err := enumerator.Enumerate(root, structureIgnore)
 		if err != nil {
 			t.Fatalf("enumerating %s: %v", root, err)
@@ -99,7 +101,7 @@ func TestCorpora(t *testing.T) {
 		// Each corpus formats with its own resolved config, the way Prettier resolves it for that
 		// tree. One set of options for every repository is how api-phi-health's bracketSameLine went
 		// unmeasured on the first run.
-		resolution, err := prettier.ResolveOptions(root)
+		resolution, err := formatoptions.Resolve(root)
 		if err != nil {
 			t.Fatalf("resolving the Prettier config for %s: %v", root, err)
 		}
@@ -124,7 +126,7 @@ func TestCorpora(t *testing.T) {
 	}
 }
 
-func candidateFor(t *testing.T, name string, newOracle NewFormatter, options prettier.Options) NewFormatter {
+func candidateFor(t *testing.T, name string, newOracle NewFormatter, options formatoptions.Options) NewFormatter {
 	switch name {
 	case "native":
 		// The printers that replace Prettier. A file type with no printer yet is refused, so this reads
@@ -147,7 +149,7 @@ func candidateFor(t *testing.T, name string, newOracle NewFormatter, options pre
 //
 // %+v names every field, so a field added to Options later joins the identity without anyone
 // remembering to add it here.
-func describeOptions(options prettier.Options) string {
+func describeOptions(options formatoptions.Options) string {
 	return fmt.Sprintf("%+v", options)
 }
 

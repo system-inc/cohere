@@ -11,6 +11,8 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/doc"
+	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
@@ -26,14 +28,14 @@ import (
 
 // markdownCandidate formats .md files with the port and refuses the rest.
 type markdownCandidate struct {
-	options   prettier.Options
+	options   formatoptions.Options
 	textToDoc printing.TextToDoc
 }
 
 // oracleTextToDoc formats embedded code with the embedded Prettier, standing in for native printers
 // that do not exist yet, so the embed plumbing (fences, front matter) is measured on its own. Set
 // COHERE_MARKDOWN_EMBED_ORACLE to use it.
-func oracleTextToDoc(t *testing.T, options prettier.Options) printing.TextToDoc {
+func oracleTextToDoc(t *testing.T, options formatoptions.Options) printing.TextToDoc {
 	if os.Getenv("COHERE_MARKDOWN_EMBED_ORACLE") == "" {
 		return nil
 	}
@@ -78,14 +80,14 @@ func dependsOnEmbed(text string) bool { return len(EmbeddedParsers(text)) > 0 }
 type markdownCorpus struct {
 	root    string
 	files   []string
-	options prettier.Options
+	options formatoptions.Options
 }
 
 // markdownCorpora enumerates the .md files of each root the way TestCorpora does: through the
 // engine's ignore layers, and into each nested repository as a corpus of its own, with its own config.
 func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 	t.Helper()
-	enumerator, err := prettier.New(prettier.DefaultOptions())
+	enumerator, err := prettier.New(formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +106,7 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 		}
 		seen[root] = true
 
-		structureIgnore := prettier.StructureIgnorePath(root)
+		structureIgnore := formatfiles.StructureIgnorePath(root)
 		enumeration, err := enumerator.Enumerate(root, structureIgnore)
 		if err != nil {
 			t.Fatalf("enumerating %s: %v", root, err)
@@ -125,7 +127,7 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 			}
 		}
 
-		resolution, err := prettier.ResolveOptions(root)
+		resolution, err := formatoptions.Resolve(root)
 		if err != nil {
 			t.Fatalf("resolving the Prettier config for %s: %v", root, err)
 		}

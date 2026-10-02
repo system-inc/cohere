@@ -8,11 +8,12 @@ import (
 	"github.com/dop251/goja"
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/doc"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
-// The oracle for what prettier.Engine cannot be asked: proseWrap, which prettier.Options does not carry
+// The oracle for what prettier.Engine cannot be asked: proseWrap, which formatoptions.Options does not carry
 // and every corpus leaves at "preserve", and a file path the engine does not route (.prettierrc). These
 // run the same embedded bundles in their own runtime, with the option given.
 
@@ -33,7 +34,7 @@ func newOptionsOracle(t *testing.T) *optionsOracle {
 	return &optionsOracle{runtime: runtime}
 }
 
-func (oracle *optionsOracle) format(text string, filePath string, parser string, options prettier.Options, proseWrap string) (string, error) {
+func (oracle *optionsOracle) format(text string, filePath string, parser string, options formatoptions.Options, proseWrap string) (string, error) {
 	oracle.runtime.Set("__source", text)
 	oracle.runtime.Set("__filePath", filePath)
 	oracle.runtime.Set("__parser", parser)
@@ -127,7 +128,7 @@ func TestProseWrapMatchesOracle(t *testing.T) {
 
 // jsonTextToDoc stands in for the native JSON printer: the oracle formats the JSON, and the text comes
 // back as a doc with its trailing newline stripped, as textToDoc strips the trailing hardline.
-func jsonTextToDoc(t *testing.T, oracle *optionsOracle, options prettier.Options) printing.TextToDoc {
+func jsonTextToDoc(t *testing.T, oracle *optionsOracle, options formatoptions.Options) printing.TextToDoc {
 	return func(text string, parser string) (doc.Doc, error) {
 		if parser != "json" {
 			t.Errorf("the YAML printer asked for parser %q", parser)
@@ -186,7 +187,7 @@ func TestPrettierRcEmbedsJSON(t *testing.T) {
 // file as YAML, as upstream does when the JSON format throws.
 func TestPrettierRcWithoutTextToDocPrintsYAML(t *testing.T) {
 	texts, _, trees := parseInputs(t, []string{`{"a":1}`})
-	actual, err := PrintFile(".prettierrc", trees[0].root, texts[0], prettier.DefaultOptions(), nil)
+	actual, err := PrintFile(".prettierrc", trees[0].root, texts[0], formatoptions.Default(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

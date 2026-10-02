@@ -7,11 +7,12 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/system-inc/cohere/internal/format/differential"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
 // The proseWrap oracle. Every corpus prints with proseWrap "preserve", where a line break returns before
-// whitespace.js reaches its CJK and Korean rules, and prettier.Options does not carry the option. So
+// whitespace.js reaches its CJK and Korean rules, and formatoptions.Options does not carry the option. So
 // these fixtures run the same bundles in their own runtime with proseWrap "always" and "never", against
 // the port with the same setting.
 
@@ -33,7 +34,7 @@ func newProseWrapOracle(t *testing.T) *proseWrapOracle {
 	return &proseWrapOracle{runtime: runtime}
 }
 
-func (oracle *proseWrapOracle) format(text string, options prettier.Options, proseWrap string) (string, error) {
+func (oracle *proseWrapOracle) format(text string, options formatoptions.Options, proseWrap string) (string, error) {
 	oracle.runtime.Set("__source", text)
 	oracle.runtime.Set("__proseWrap", proseWrap)
 	oracle.runtime.Set("__printWidth", options.PrintWidth)

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/format/doc"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -158,16 +159,16 @@ var formatCases = []formatCase{
 
 // formatOptionSets are the options every case runs under: ahra's defaults (printWidth 120, tabWidth 4,
 // singleQuote), printWidth 80 with Prettier's tabWidth 2, double quotes, and tabs.
-func formatOptionSets() map[string]prettier.Options {
-	narrow := prettier.DefaultOptions()
+func formatOptionSets() map[string]formatoptions.Options {
+	narrow := formatoptions.Default()
 	narrow.PrintWidth = 80
 	narrow.TabWidth = 2
-	doubleQuotes := prettier.DefaultOptions()
+	doubleQuotes := formatoptions.Default()
 	doubleQuotes.SingleQuote = false
-	tabs := prettier.DefaultOptions()
+	tabs := formatoptions.Default()
 	tabs.UseTabs = true
-	return map[string]prettier.Options{
-		"defaults":          prettier.DefaultOptions(),
+	return map[string]formatoptions.Options{
+		"defaults":          formatoptions.Default(),
 		"printWidth 80":     narrow,
 		"singleQuote false": doubleQuotes,
 		"useTabs":           tabs,
@@ -215,7 +216,7 @@ func TestOptionSetsChangeTheOutput(t *testing.T) {
 		}
 		changed := false
 		for _, testCase := range formatCases {
-			withDefaults, defaultsErr := Format(testCase.source, prettier.DefaultOptions())
+			withDefaults, defaultsErr := Format(testCase.source, formatoptions.Default())
 			withOptions, optionsErr := Format(testCase.source, options)
 			if defaultsErr == nil && optionsErr == nil && withDefaults != withOptions {
 				changed = true
@@ -230,7 +231,7 @@ func TestOptionSetsChangeTheOutput(t *testing.T) {
 
 // What the fork refuses, Format refuses, as a syntax error.
 func TestFormatRefusesWhatTheForkRefuses(t *testing.T) {
-	oracle, err := prettier.New(prettier.DefaultOptions())
+	oracle, err := prettier.New(formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +239,7 @@ func TestFormatRefusesWhatTheForkRefuses(t *testing.T) {
 		if _, err := oracle.Format("Probe.css", source); err == nil {
 			t.Fatalf("the oracle accepted %q", source)
 		}
-		if formatted, err := Format(source, prettier.DefaultOptions()); err == nil {
+		if formatted, err := Format(source, formatoptions.Default()); err == nil {
 			t.Errorf("%q was printed instead of refused:\n%s", source, formatted)
 		}
 	}
@@ -246,7 +247,7 @@ func TestFormatRefusesWhatTheForkRefuses(t *testing.T) {
 
 // PrintToDoc is the same doc without its trailing hardline, which an embedding printer lays out.
 func TestPrintToDocIsFormatWithoutTheTrailingHardline(t *testing.T) {
-	options := prettier.DefaultOptions()
+	options := formatoptions.Default()
 	for _, testCase := range formatCases {
 		formatted, err := Format(testCase.source, options)
 		if err != nil {
@@ -560,7 +561,7 @@ func TestFormatSCSSMatchesTheFork(t *testing.T) {
 // The scss parser is not the css one: the same text formats differently under each, so FormatSCSS is
 // not Format under another name. Each of these is printed differently by the fork as .css and as .scss.
 func TestFormatSCSSIsNotFormat(t *testing.T) {
-	oracle, err := prettier.New(prettier.DefaultOptions())
+	oracle, err := prettier.New(formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -577,11 +578,11 @@ func TestFormatSCSSIsNotFormat(t *testing.T) {
 		if cssErr == nil && asCSS == asSCSS {
 			t.Fatalf("%q: the oracle prints it the same as css and as scss, so it tells the parsers apart for nothing", source)
 		}
-		actualSCSS, err := FormatSCSS(source, prettier.DefaultOptions())
+		actualSCSS, err := FormatSCSS(source, formatoptions.Default())
 		if err != nil || actualSCSS != asSCSS {
 			t.Errorf("%q as scss:\n--- fork\n%s--- native (%v)\n%s", source, asSCSS, err, actualSCSS)
 		}
-		actualCSS, err := Format(source, prettier.DefaultOptions())
+		actualCSS, err := Format(source, formatoptions.Default())
 		if (err == nil) != (cssErr == nil) || actualCSS != asCSS {
 			t.Errorf("%q as css:\n--- fork (%v)\n%s--- native (%v)\n%s", source, cssErr, asCSS, err, actualCSS)
 		}
@@ -590,7 +591,7 @@ func TestFormatSCSSIsNotFormat(t *testing.T) {
 
 // PrintToDocSCSS is FormatSCSS's doc without its trailing hardline.
 func TestPrintToDocSCSSIsFormatSCSSWithoutTheTrailingHardline(t *testing.T) {
-	options := prettier.DefaultOptions()
+	options := formatoptions.Default()
 	for _, testCase := range scssFormatCases {
 		formatted, err := FormatSCSS(testCase.source, options)
 		if err != nil {

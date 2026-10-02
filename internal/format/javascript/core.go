@@ -22,7 +22,7 @@ package javascript
 import (
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
-	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -44,7 +44,7 @@ type Doc = doc.Doc
 // settings is what upstream reads off `options` beyond the core's fields: the resolved Prettier
 // options, the file path, and the caches upstream keeps in WeakMaps keyed on nodes.
 type settings struct {
-	prettier.Options
+	formatoptions.Options
 	FilePath string
 
 	// Parser is upstream's options.parser: "typescript", "babel" for JavaScript, or "json" or

@@ -11,6 +11,8 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -136,7 +138,7 @@ process.stdin.on("end", () => process.stdout.write(JSON.stringify(JSON.parse(dat
 // be measuring different strings, which is exactly the comparison that looks clean and proves nothing.
 func nonASCIILines(t *testing.T, root string, seen map[string]bool) []string {
 	t.Helper()
-	engine, err := prettier.New(prettier.DefaultOptions())
+	engine, err := prettier.New(formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +147,7 @@ func nonASCIILines(t *testing.T, root string, seen map[string]bool) []string {
 	for len(pending) > 0 {
 		current := pending[0]
 		pending = pending[1:]
-		enumeration, err := engine.Enumerate(current, prettier.StructureIgnorePath(current))
+		enumeration, err := engine.Enumerate(current, formatfiles.StructureIgnorePath(current))
 		if err != nil {
 			t.Fatalf("enumerating %s: %v", current, err)
 		}

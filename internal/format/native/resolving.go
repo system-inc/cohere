@@ -2,10 +2,10 @@ package native
 
 import (
 	"fmt"
+	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"path/filepath"
 	"sync"
-
-	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
 // Resolving formats each file with the options its own directory resolves to, the way
@@ -16,13 +16,13 @@ import (
 // cached, one per directory.
 type Resolving struct {
 	mutex       sync.Mutex
-	byDirectory map[string]prettier.Resolution
+	byDirectory map[string]formatoptions.Resolution
 }
 
 // NewResolving resolves startDirectory's options eagerly, so a config cohere refuses stops the run
 // before any phase does work rather than on the first file after fixes have begun.
 func NewResolving(startDirectory string) (*Resolving, error) {
-	resolving := &Resolving{byDirectory: map[string]prettier.Resolution{}}
+	resolving := &Resolving{byDirectory: map[string]formatoptions.Resolution{}}
 	if _, err := resolving.resolve(startDirectory); err != nil {
 		return nil, err
 	}
@@ -36,8 +36,8 @@ func (resolving *Resolving) Handles(fileName string) bool {
 }
 
 // Enumerate walks a tree for the files a native printer handles.
-func (resolving *Resolving) Enumerate(root string, structureIgnorePath string) (prettier.Enumeration, error) {
-	return prettier.Enumerate(root, structureIgnorePath, resolving.Handles)
+func (resolving *Resolving) Enumerate(root string, structureIgnorePath string) (formatfiles.Enumeration, error) {
+	return formatfiles.Enumerate(root, structureIgnorePath, resolving.Handles)
 }
 
 // Format formats one file with the options its own directory resolves to.
@@ -49,10 +49,10 @@ func (resolving *Resolving) Format(fileName string, text string) (string, error)
 	return Formatter{Options: resolution.Options}.Format(fileName, text)
 }
 
-func (resolving *Resolving) resolve(directory string) (prettier.Resolution, error) {
+func (resolving *Resolving) resolve(directory string) (formatoptions.Resolution, error) {
 	absolute, err := filepath.Abs(directory)
 	if err != nil {
-		return prettier.Resolution{}, err
+		return formatoptions.Resolution{}, err
 	}
 	resolving.mutex.Lock()
 	cached, present := resolving.byDirectory[absolute]
@@ -61,9 +61,9 @@ func (resolving *Resolving) resolve(directory string) (prettier.Resolution, erro
 		return cached, nil
 	}
 
-	resolution, err := prettier.ResolveOptions(absolute)
+	resolution, err := formatoptions.Resolve(absolute)
 	if err != nil {
-		return prettier.Resolution{}, err
+		return formatoptions.Resolution{}, err
 	}
 	resolving.mutex.Lock()
 	resolving.byDirectory[absolute] = resolution

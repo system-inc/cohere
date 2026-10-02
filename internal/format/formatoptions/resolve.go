@@ -1,4 +1,4 @@
-package prettier
+package formatoptions
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ import (
  * Which Prettier options a directory is formatted with.
  *
  * The engine takes its options from the caller and says so, because resolving a config is Node's job
- * and goja has no filesystem. Until this file every caller passed DefaultOptions, which is ahra's
+ * and goja has no filesystem. Until this file every caller passed Default, which is ahra's
  * block, to every repository. That was measured wrong on the first differential run: api-phi-health
  * sets `bracketSameLine: true`, the oracle did not, and its JSX numbers described a formatter that
  * repository does not use.
@@ -69,7 +69,7 @@ type Resolution struct {
 
 // PrettierDefaults are Prettier 3's own defaults, what a directory with no config formats with.
 //
-// Not DefaultOptions: those are ahra's choices, and a repository that configures nothing gets tab
+// Not Default: those are ahra's choices, and a repository that configures nothing gets tab
 // width 2, print width 80 and double quotes, not ahra's 4, 120 and single.
 func PrettierDefaults() Options {
 	return Options{
@@ -86,8 +86,8 @@ func PrettierDefaults() Options {
 	}
 }
 
-// ResolveOptions finds the config governing directory and applies it over Prettier's defaults.
-func ResolveOptions(directory string) (Resolution, error) {
+// Resolve finds the config governing directory and applies it over Prettier's defaults.
+func Resolve(directory string) (Resolution, error) {
 	absolute, err := filepath.Abs(directory)
 	if err != nil {
 		return Resolution{}, err

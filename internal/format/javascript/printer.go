@@ -6,7 +6,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
-	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -41,20 +41,20 @@ var estreePrinter = &printing.Printer[*estree.Node]{
 // Format is Prettier's format for a TypeScript file: parse, attach comments, print to a doc, and lay the
 // doc out. fileName decides JSX and is what upstream's options.filepath carries. textToDoc formats the
 // languages a file embeds (GraphQL in a gql template), or is nil.
-func Format(fileName string, text string, options prettier.Options, textToDoc printing.TextToDoc) (string, error) {
+func Format(fileName string, text string, options formatoptions.Options, textToDoc printing.TextToDoc) (string, error) {
 	return format(fileName, text, options, "typescript", textToDoc)
 }
 
 // FormatJavaScript is Prettier's format for a .js, .mjs, .cjs or .jsx file, which upstream parses with
 // babel. The parser name matters to the printer only in print/key.js: under babel a numeric string
 // key unquotes (`{ "1": a }` prints `{ 1: a }`), which TypeScript forbids.
-func FormatJavaScript(fileName string, text string, options prettier.Options, textToDoc printing.TextToDoc) (string, error) {
+func FormatJavaScript(fileName string, text string, options formatoptions.Options, textToDoc printing.TextToDoc) (string, error) {
 	return format(fileName, text, options, "babel", textToDoc)
 }
 
 // FormatJSON is Prettier's format for a JSON file, with the parser JSONParser picks. JSON embeds
 // nothing.
-func FormatJSON(fileName string, text string, options prettier.Options) (string, error) {
+func FormatJSON(fileName string, text string, options formatoptions.Options) (string, error) {
 	return format(fileName, text, options, JSONParser(fileName), nil)
 }
 
@@ -71,7 +71,7 @@ func JSONParser(fileName string) string {
 
 // format parses, prints and lays out one file. Byte order marks and line endings, main/core.js's part,
 // are normalized by the caller, native.Formatter, once for every printer.
-func format(fileName string, text string, options prettier.Options, parser string, textToDoc printing.TextToDoc) (string, error) {
+func format(fileName string, text string, options formatoptions.Options, parser string, textToDoc printing.TextToDoc) (string, error) {
 	document, err := printToDoc(fileName, text, options, parser, "", textToDoc)
 	if err != nil {
 		return "", err
@@ -83,7 +83,7 @@ func format(fileName string, text string, options prettier.Options, parser strin
 // for text embedded in another language's file, with its trailing hardline stripped, for the outer
 // printer to lay out at its own indentation. parser is "typescript", "babel", "json" or
 // "json-stringify"; parentParser is the outer file's parser, which upstream sets on every embed.
-func PrintToDoc(fileName string, text string, options prettier.Options, parser string, parentParser string,
+func PrintToDoc(fileName string, text string, options formatoptions.Options, parser string, parentParser string,
 	textToDoc printing.TextToDoc) (doc.Doc, error) {
 	document, err := printToDoc(fileName, text, options, parser, parentParser, textToDoc)
 	if err != nil {
@@ -93,7 +93,7 @@ func PrintToDoc(fileName string, text string, options prettier.Options, parser s
 }
 
 // printToDoc parses with the parser and prints the tree to a doc.
-func printToDoc(fileName string, text string, options prettier.Options, parser string, parentParser string,
+func printToDoc(fileName string, text string, options formatoptions.Options, parser string, parentParser string,
 	textToDoc printing.TextToDoc) (document doc.Doc, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {

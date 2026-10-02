@@ -9,7 +9,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
-	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -37,13 +37,13 @@ var graphqlPrinter = &printing.Printer[*estree.Node]{
 
 // settingsOf is the resolved Prettier options a format carries in options.Settings. The printer reads
 // one of them, bracketSpacing (options.js).
-func settingsOf(options *printerOptions) prettier.Options {
-	return options.Settings.(prettier.Options)
+func settingsOf(options *printerOptions) formatoptions.Options {
+	return options.Settings.(formatoptions.Options)
 }
 
 // Format is Prettier's format for a GraphQL file: parse, attach comments, print to a doc, lay it out.
 // Byte order marks and line endings are normalized by the caller, native.Formatter, for every printer.
-func Format(text string, prettierOptions prettier.Options) (formatted string, err error) {
+func Format(text string, prettierOptions formatoptions.Options) (formatted string, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			formatted, err = "", fmt.Errorf("graphql: %v", recovered)
@@ -63,7 +63,7 @@ func Format(text string, prettierOptions prettier.Options) (formatted string, er
 
 // PrintToDoc is upstream's textToDoc for GraphQL embedded in another language: the printed doc with its
 // trailing hardline stripped.
-func PrintToDoc(text string, prettierOptions prettier.Options) (document doc.Doc, err error) {
+func PrintToDoc(text string, prettierOptions formatoptions.Options) (document doc.Doc, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			document, err = nil, fmt.Errorf("graphql: %v", recovered)
@@ -78,7 +78,7 @@ func PrintToDoc(text string, prettierOptions prettier.Options) (document doc.Doc
 }
 
 // printToDoc is parser-graphql.js's parse followed by printAstToDoc (src/main/ast-to-doc.js).
-func printToDoc(text string, prettierOptions prettier.Options) (doc.Doc, error) {
+func printToDoc(text string, prettierOptions formatoptions.Options) (doc.Doc, error) {
 	document, comments, err := Parse(text)
 	if err != nil {
 		return nil, err

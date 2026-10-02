@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -20,7 +21,7 @@ func TestEmbeddedCodeMatchesTheFork(t *testing.T) {
 		"```ts\nfunction identity<T,>(value: T) { return value }\n```\n\n" +
 		"```json\n{ \"a\": 1, b: [1,2,], }\n```\n\n" +
 		"- item\n\n  ```tsx\n  <Nested prop={1} />\n  ```\n"
-	options := prettier.DefaultOptions()
+	options := formatoptions.Default()
 	oracle, err := prettier.New(options)
 	if err != nil {
 		t.Fatal(err)
@@ -112,7 +113,7 @@ const empty = css` + "`" + `  ` + "`" + `;
 // With the embed not recognizing styled templates, they print as written, and this fails.
 func TestCssTemplatesMatchTheFork(t *testing.T) {
 	for _, width := range []int{120, 80} {
-		options := prettier.DefaultOptions()
+		options := formatoptions.Default()
 		options.PrintWidth = width
 		oracle, err := prettier.New(options)
 		if err != nil {
@@ -143,7 +144,7 @@ func TestCssTemplatesMatchTheFork(t *testing.T) {
 // embed not recognizing these templates, they print as written, and this fails.
 func TestGraphqlTemplatesMatchTheFork(t *testing.T) {
 	for _, width := range []int{120, 80} {
-		options := prettier.DefaultOptions()
+		options := formatoptions.Default()
 		options.PrintWidth = width
 		oracle, err := prettier.New(options)
 		if err != nil {

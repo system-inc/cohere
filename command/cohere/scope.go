@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/formatfiles"
 )
 
 // formatScope is which files the format phase considers, and how that set was decided.
@@ -569,7 +569,7 @@ func scopedTransform(inner edit.Transform, scope formatScope) edit.Transform {
 // before and after the engine's filter, and every declined extension by name. A file the engine
 // cannot handle has to be a named zero rather than an absence, which is the one place in this
 // pipeline where a file could previously be silently missing.
-func (s formatScope) narrowToEnumeration(enumeration prettier.Enumeration) formatScope {
+func (s formatScope) narrowToEnumeration(enumeration formatfiles.Enumeration) formatScope {
 	if s.Everything {
 		// A whole-tree scope becomes the enumeration itself: every file the walk found and the engine
 		// handles, rather than every file in the type graph.
@@ -633,7 +633,7 @@ func (s formatScope) narrowToEnumeration(enumeration prettier.Enumeration) forma
 // accident. When the universe changes, this string has to be rewritten deliberately, so it names the
 // root, the ignore layers that removed anything, the nested repositories it refused, and the
 // declined extensions.
-func describeEnumeration(enumeration prettier.Enumeration, formattable int) string {
+func describeEnumeration(enumeration formatfiles.Enumeration, formattable int) string {
 	// One format string rather than two. An earlier version branched between a form that named the
 	// formattable count and one that did not, and the branch made the root unobservable: a mutation
 	// deleting the root from one string left the other correct, so no fixture could see it. Two
@@ -708,7 +708,7 @@ func resolveStructureIgnorePath(directory string) string {
 	if _, err := os.Stat(filepath.Join(root, "libraries", "structure")); err != nil {
 		return ""
 	}
-	return prettier.StructureIgnorePath(root)
+	return formatfiles.StructureIgnorePath(root)
 }
 
 // formatCandidates is the files the format phase should visit.

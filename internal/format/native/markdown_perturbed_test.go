@@ -13,6 +13,8 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/doc"
+	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/markdown"
 	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
@@ -79,14 +81,14 @@ func perturbMarkdown(text string) string {
 type markdownCorpus struct {
 	root    string
 	files   []string
-	options prettier.Options
+	options formatoptions.Options
 }
 
 // markdownCorpora enumerates the .md files of each root the way TestCorpora does: through the engine's
 // ignore layers, and into each nested repository as a corpus of its own, with its own config.
 func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 	t.Helper()
-	enumerator, err := prettier.New(prettier.DefaultOptions())
+	enumerator, err := prettier.New(formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +107,7 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 		}
 		seen[root] = true
 
-		structureIgnore := prettier.StructureIgnorePath(root)
+		structureIgnore := formatfiles.StructureIgnorePath(root)
 		enumeration, err := enumerator.Enumerate(root, structureIgnore)
 		if err != nil {
 			t.Fatalf("enumerating %s: %v", root, err)
@@ -125,7 +127,7 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 				files = append(files, file)
 			}
 		}
-		resolution, err := prettier.ResolveOptions(root)
+		resolution, err := formatoptions.Resolve(root)
 		if err != nil {
 			t.Fatalf("resolving the Prettier config for %s: %v", root, err)
 		}
@@ -139,7 +141,7 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 // markdown then matches, the miss belongs to those languages' missing printers. A native printer is kept
 // rather than replaced because it knows its host, as the oracle run standalone does not (a lone JSX
 // element in a tsx fence keeps no semicolon only when the printer knows its parent is markdown).
-func standInEmbeds(options prettier.Options, engine *prettier.Engine, fellBack map[string]bool) printing.TextToDoc {
+func standInEmbeds(options formatoptions.Options, engine *prettier.Engine, fellBack map[string]bool) printing.TextToDoc {
 	native := TextToDoc(options, "markdown")
 	return func(text string, parserOrFile string) (doc.Doc, error) {
 		if printed, err := native(text, parserOrFile); err == nil {
@@ -169,7 +171,7 @@ func TestPerturbedMarkdownCorpus(t *testing.T) {
 
 	type job struct {
 		path    string
-		options prettier.Options
+		options formatoptions.Options
 	}
 	type outcome struct {
 		job
@@ -183,7 +185,7 @@ func TestPerturbedMarkdownCorpus(t *testing.T) {
 		narrow.PrintWidth, narrow.TabWidth = 40, 2
 		tabs := corpus.options
 		tabs.UseTabs, tabs.SingleQuote = true, !tabs.SingleQuote
-		for _, options := range []prettier.Options{corpus.options, narrow, tabs} {
+		for _, options := range []formatoptions.Options{corpus.options, narrow, tabs} {
 			for _, path := range corpus.files {
 				jobs = append(jobs, job{path: path, options: options})
 			}
@@ -197,7 +199,7 @@ func TestPerturbedMarkdownCorpus(t *testing.T) {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
-			engines := map[prettier.Options]*prettier.Engine{}
+			engines := map[formatoptions.Options]*prettier.Engine{}
 			for job := range queue {
 				engine := engines[job.options]
 				if engine == nil {

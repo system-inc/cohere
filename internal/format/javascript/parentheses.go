@@ -479,7 +479,7 @@ func needsParentheses(path *Path, options *Options) bool {
 
 		case "ConditionalExpression":
 			// TODO remove this case entirely once we've removed this flag.
-			// options.experimentalTernaries is always false here: prettier.Options does not carry it.
+			// options.experimentalTernaries is always false here: formatoptions.Options does not carry it.
 			return key == "test"
 
 		case "MemberExpression", "OptionalMemberExpression":

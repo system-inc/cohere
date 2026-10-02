@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/format/doc"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -123,16 +124,16 @@ var formatCases = []formatCase{
 
 // formatOptionSets are the options every case runs under: ahra's defaults (printWidth 120, tabWidth 4),
 // printWidth 80 with Prettier's tabWidth 2, bracketSpacing false, and tabs.
-func formatOptionSets() map[string]prettier.Options {
-	narrow := prettier.DefaultOptions()
+func formatOptionSets() map[string]formatoptions.Options {
+	narrow := formatoptions.Default()
 	narrow.PrintWidth = 80
 	narrow.TabWidth = 2
-	noBracketSpacing := prettier.DefaultOptions()
+	noBracketSpacing := formatoptions.Default()
 	noBracketSpacing.BracketSpacing = false
-	tabs := prettier.DefaultOptions()
+	tabs := formatoptions.Default()
 	tabs.UseTabs = true
-	return map[string]prettier.Options{
-		"defaults":             prettier.DefaultOptions(),
+	return map[string]formatoptions.Options{
+		"defaults":             formatoptions.Default(),
 		"printWidth 80":        narrow,
 		"bracketSpacing false": noBracketSpacing,
 		"useTabs":              tabs,
@@ -172,7 +173,7 @@ func TestFormatMatchesTheFork(t *testing.T) {
 
 // The option sets have to change the output somewhere, or running under them proves nothing.
 func TestOptionSetsChangeTheOutput(t *testing.T) {
-	defaults, err := Format(formatCases[2].source, prettier.DefaultOptions())
+	defaults, err := Format(formatCases[2].source, formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +183,7 @@ func TestOptionSetsChangeTheOutput(t *testing.T) {
 		}
 		changed := false
 		for _, testCase := range formatCases {
-			withDefaults, defaultsErr := Format(testCase.source, prettier.DefaultOptions())
+			withDefaults, defaultsErr := Format(testCase.source, formatoptions.Default())
 			withOptions, optionsErr := Format(testCase.source, options)
 			if defaultsErr == nil && optionsErr == nil && withDefaults != withOptions {
 				changed = true
@@ -201,7 +202,7 @@ func TestOptionSetsChangeTheOutput(t *testing.T) {
 // What graphql-js refuses, both refuse: an empty selection set, an empty argument list, and a description
 // on a shorthand query.
 func TestFormatRefusesWhatTheForkRefuses(t *testing.T) {
-	oracle, err := prettier.New(prettier.DefaultOptions())
+	oracle, err := prettier.New(formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +210,7 @@ func TestFormatRefusesWhatTheForkRefuses(t *testing.T) {
 		if _, err := oracle.Format("Probe.graphql", source); err == nil {
 			t.Fatalf("the oracle accepted %q", source)
 		}
-		if formatted, err := Format(source, prettier.DefaultOptions()); err == nil {
+		if formatted, err := Format(source, formatoptions.Default()); err == nil {
 			t.Errorf("%q was printed instead of refused:\n%s", source, formatted)
 		}
 	}
@@ -217,7 +218,7 @@ func TestFormatRefusesWhatTheForkRefuses(t *testing.T) {
 
 // PrintToDoc is the same doc without its trailing hardline, which is what the TypeScript embed lays out.
 func TestPrintToDocIsFormatWithoutTheTrailingHardline(t *testing.T) {
-	options := prettier.DefaultOptions()
+	options := formatoptions.Default()
 	for _, testCase := range formatCases {
 		formatted, err := Format(testCase.source, options)
 		if err != nil {

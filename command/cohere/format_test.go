@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/formatfiles"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -19,7 +19,7 @@ import (
 type fakeEngine struct {
 	handled              []string
 	format               func(fileName string, text string) (string, error)
-	enumerate            func(root string) (prettier.Enumeration, error)
+	enumerate            func(root string) (formatfiles.Enumeration, error)
 	askedFor             []string
 	enumeratedRoot       string
 	enumeratedIgnorePath string
@@ -39,13 +39,13 @@ func (e *fakeEngine) Handles(fileName string) bool {
 //
 // It returns whatever the fixture set, including the account of what the walk removed, because the
 // numbers in that account are the thing under test rather than the walk itself.
-func (e *fakeEngine) Enumerate(root string, structureIgnorePath string) (prettier.Enumeration, error) {
+func (e *fakeEngine) Enumerate(root string, structureIgnorePath string) (formatfiles.Enumeration, error) {
 	e.enumeratedRoot = root
 	e.enumeratedIgnorePath = structureIgnorePath
 	if e.enumerate != nil {
 		return e.enumerate(root)
 	}
-	return prettier.Enumeration{Root: root}, nil
+	return formatfiles.Enumeration{Root: root}, nil
 }
 
 func (e *fakeEngine) Format(fileName string, text string) (string, error) {

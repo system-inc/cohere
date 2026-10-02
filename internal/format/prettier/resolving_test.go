@@ -1,10 +1,21 @@
 package prettier
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func writeFile(t *testing.T, path string, contents string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
 
 // TestResolvingFormatsEachFileWithItsOwnConfig is the defect the format phase had, run through the
 // replacement: one formatter, two repositories, two configs, and each file gets its own.

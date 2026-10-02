@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/edit"
+	"github.com/system-inc/cohere/internal/format/formatfiles"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
@@ -55,7 +56,7 @@ type formatEngine interface {
 	// It belongs on the engine rather than in the pipeline because it is extension and ignore-file
 	// knowledge, the same knowledge Handles already encodes. The pipeline decides which of those
 	// files are in scope; the engine decides which files are formattable at all.
-	Enumerate(root string, structureIgnorePath string) (prettier.Enumeration, error)
+	Enumerate(root string, structureIgnorePath string) (formatfiles.Enumeration, error)
 }
 
 // formatTransform adapts a format engine to the edit engine's whole-text transform.

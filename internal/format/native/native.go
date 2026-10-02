@@ -21,7 +21,7 @@ import (
 	"sync"
 
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -29,13 +29,13 @@ import (
 //
 // fileName is passed because a printer may need it: Prettier picks json-stringify for package.json by
 // name, not by extension.
-type Print func(fileName string, text string, options prettier.Options) (string, error)
+type Print func(fileName string, text string, options formatoptions.Options) (string, error)
 
 // PrintDoc is a printer's textToDoc (src/main/multiparser.js): the doc for text embedded in another
 // language's file, with the trailing hardline stripped, for the outer printer to lay out at its own
 // indentation. parser is the one the embedding asked for (a fence's language can pick json for a file
 // named anything), parentParser is the outer file's, and textToDoc formats what this text embeds in turn.
-type PrintDoc func(fileName string, text string, options prettier.Options, parser string, parentParser string,
+type PrintDoc func(fileName string, text string, options formatoptions.Options, parser string, parentParser string,
 	textToDoc printing.TextToDoc) (doc.Doc, error)
 
 var (
@@ -92,7 +92,7 @@ var embeddedParsers = map[string]string{
 // own indentation, as upstream does. One with only a Print returns its formatted text as a single
 // text doc, which is laid out at the full width even when nested: that differs from upstream only on
 // a line within the nesting's indentation of the limit.
-func TextToDoc(options prettier.Options, parentParser string) printing.TextToDoc {
+func TextToDoc(options formatoptions.Options, parentParser string) printing.TextToDoc {
 	return func(text string, parserOrFile string) (doc.Doc, error) {
 		fileName, parser := parserOrFile, parserOrFile
 		if strings.Contains(parserOrFile, ".") {
@@ -143,7 +143,7 @@ func Extensions() []string {
 
 // Formatter formats with the registered printers and one set of options.
 type Formatter struct {
-	Options prettier.Options
+	Options formatoptions.Options
 }
 
 // Handles reports whether a printer is registered for the file's type.
@@ -161,7 +161,7 @@ func (formatter Formatter) Format(fileName string, text string) (string, error) 
 
 	// main/core.js's formatWithCursor, once for every language as upstream does it: the byte order mark
 	// comes off before parsing and goes back on after, and carriage returns become newlines. endOfLine
-	// is always "lf" (prettier.ResolveOptions refuses anything else), so nothing converts them back.
+	// is always "lf" (formatoptions.Resolve refuses anything else), so nothing converts them back.
 	hasByteOrderMark := strings.HasPrefix(text, byteOrderMark)
 	text = strings.TrimPrefix(text, byteOrderMark)
 	if strings.Contains(text, "\r") {

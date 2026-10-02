@@ -1,4 +1,4 @@
-package prettier
+package formatfiles
 
 import (
 	"os"
@@ -28,7 +28,6 @@ func writeTree(t *testing.T, files map[string]string) string {
 // This is the whole point of the change. The pipeline's universe was the type graph, so a .css in a
 // TypeScript project was not declined, it was absent, and absence and agreement print the same.
 func TestEnumerateOffersEveryLanguage(t *testing.T) {
-	engine := newTestEngine(t)
 	root := writeTree(t, map[string]string{
 		"a.ts":      "export const a = 1;\n",
 		"b.tsx":     "export const b = <div />;\n",
@@ -38,7 +37,7 @@ func TestEnumerateOffersEveryLanguage(t *testing.T) {
 		"f.graphql": "type F { g: Int }\n",
 	})
 
-	enumeration, err := engine.Enumerate(root, "")
+	enumeration, err := Enumerate(root, "", handlesEveryLanguage)
 	if err != nil {
 		t.Fatalf("enumerate: %v", err)
 	}
@@ -65,7 +64,6 @@ func TestEnumerateOffersEveryLanguage(t *testing.T) {
 // enumeration and a vacuous one look identical from the outside, so the report has to say what it
 // refused and why, or the coverage line inherits the same blindness it was built to destroy.
 func TestEnumerateNamesWhatItDeclined(t *testing.T) {
-	engine := newTestEngine(t)
 	root := writeTree(t, map[string]string{
 		"a.ts":      "export const a = 1;\n",
 		"tool.go":   "package tool\n",
@@ -73,7 +71,7 @@ func TestEnumerateNamesWhatItDeclined(t *testing.T) {
 		"README":    "no extension\n",
 	})
 
-	enumeration, err := engine.Enumerate(root, "")
+	enumeration, err := Enumerate(root, "", handlesEveryLanguage)
 	if err != nil {
 		t.Fatalf("enumerate: %v", err)
 	}
@@ -102,7 +100,6 @@ func TestEnumerateNamesWhatItDeclined(t *testing.T) {
 // Counted separately because a layer that silently fails to load removes nothing, and a slightly
 // smaller total is not a detectable signal. A zero next to a layer name is.
 func TestEnumerateAppliesEveryIgnoreLayer(t *testing.T) {
-	engine := newTestEngine(t)
 	root := writeTree(t, map[string]string{
 		".gitignore":      "built.ts\n",
 		".prettierignore": "archived/\n",
@@ -116,7 +113,7 @@ func TestEnumerateAppliesEveryIgnoreLayer(t *testing.T) {
 		t.Fatalf("write structure ignore: %v", err)
 	}
 
-	enumeration, err := engine.Enumerate(root, structureIgnore)
+	enumeration, err := Enumerate(root, structureIgnore, handlesEveryLanguage)
 	if err != nil {
 		t.Fatalf("enumerate: %v", err)
 	}
@@ -142,7 +139,6 @@ func TestEnumerateAppliesEveryIgnoreLayer(t *testing.T) {
 // a line into a submodule; the change was correct and still unrequested, which is the worst shape
 // for a surprise because it survives review.
 func TestEnumerateRefusesNestedRepositories(t *testing.T) {
-	engine := newTestEngine(t)
 	root := writeTree(t, map[string]string{
 		"a.ts":             "export const a = 1;\n",
 		"vendor/.git/HEAD": "ref: refs/heads/main\n",
@@ -150,7 +146,7 @@ func TestEnumerateRefusesNestedRepositories(t *testing.T) {
 		"vendor/deep/x.md": "# x\n",
 	})
 
-	enumeration, err := engine.Enumerate(root, "")
+	enumeration, err := Enumerate(root, "", handlesEveryLanguage)
 	if err != nil {
 		t.Fatalf("enumerate: %v", err)
 	}
@@ -194,4 +190,14 @@ func TestAMissingStructureLayerIsNamed(t *testing.T) {
 	if len(enumeration.MissingLayers) != 0 {
 		t.Fatalf("a present layer was named missing: %v", enumeration.MissingLayers)
 	}
+}
+
+// handlesEveryLanguage stands in for a formatter's Handles: the walk takes any file-type predicate, so
+// its tests need the languages a formatter speaks, not a formatter.
+func handlesEveryLanguage(path string) bool {
+	switch filepath.Ext(path) {
+	case ".ts", ".tsx", ".js", ".json", ".css", ".md", ".graphql", ".yaml":
+		return true
+	}
+	return false
 }

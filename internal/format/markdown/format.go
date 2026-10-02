@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/system-inc/cohere/internal/format/doc"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/markdown/mdast"
-	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -41,14 +41,14 @@ var mdastPrinter = &printing.Printer[*Node]{
 // them as written, which is also what upstream does when that formatting fails. The core's own steps
 // around the printer are here too: a byte order mark is removed and restored, and line endings are
 // normalized to \n before parsing, as src/main/core.js does.
-func Format(text string, prettierOptions prettier.Options, textToDoc printing.TextToDoc) (string, error) {
-	// None of our repositories sets proseWrap, and prettier.Options does not carry it.
+func Format(text string, prettierOptions formatoptions.Options, textToDoc printing.TextToDoc) (string, error) {
+	// None of our repositories sets proseWrap, and formatoptions.Options does not carry it.
 	return formatWithProseWrap(text, prettierOptions, "preserve", textToDoc)
 }
 
 // formatWithProseWrap is Format with proseWrap given, so the tests can reach the always and never
 // branches the corpora never take.
-func formatWithProseWrap(text string, prettierOptions prettier.Options, proseWrap string, textToDoc printing.TextToDoc) (formatted string, err error) {
+func formatWithProseWrap(text string, prettierOptions formatoptions.Options, proseWrap string, textToDoc printing.TextToDoc) (formatted string, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			formatted, err = "", fmt.Errorf("markdown: %v", recovered)

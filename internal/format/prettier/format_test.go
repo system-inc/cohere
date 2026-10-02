@@ -3,6 +3,8 @@ package prettier
 import (
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 )
 
 // newTestEngine builds an engine, and no longer skips when a fork is absent.
@@ -31,7 +33,7 @@ import (
 func newTestEngine(t *testing.T) *Engine {
 	t.Helper()
 	t.Setenv(ForkPathVariable, "")
-	engine, err := New(DefaultOptions())
+	engine, err := New(formatoptions.Default())
 	if err != nil {
 		t.Fatalf("building the engine from the embedded bundles: %v", err)
 	}
