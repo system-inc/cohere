@@ -84,6 +84,7 @@ var PreferFind = rule.Rule{
 	// The receiver's type decides whether a `filter` call is Array.prototype.filter, and the index
 	// constant is read as a literal type.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// isArrayish answers upstream's `isArrayish`: a possibly-nullable array or tuple, or a

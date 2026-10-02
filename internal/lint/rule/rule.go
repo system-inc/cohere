@@ -172,6 +172,18 @@ func Cached[Value any](cache *FileCache, key string, compute func() Value) Value
 // design exists to refuse.
 type Listeners map[ast.Kind]func(node *ast.Node)
 
+// TypeReach is what a type-aware rule can see of imported files. See Rule.TypeReach.
+type TypeReach string
+
+const (
+	// TypeReachContents keys a type-aware rule's findings on the bytes of its file's whole import closure.
+	TypeReachContents TypeReach = ""
+
+	// TypeReachShapes keys them on the closure's shapes, for a rule that never reads into an imported
+	// function's body.
+	TypeReachShapes TypeReach = "Shapes"
+)
+
 // NoListenerKind is why a rule may register no listener on a file it was offered and still have done
 // its job there.
 //
@@ -290,6 +302,19 @@ type Rule struct {
 	// declaring less is refused at the read. A rule reading a helper's program methods declares what
 	// the helper reads.
 	ProgramReads ProgramRead
+
+	// TypeReach declares what a type-aware rule can see of the files its file imports, and so what its
+	// cached findings are keyed on. Contents, the default, keys them on the bytes of every file in the
+	// import closure. Shapes keys them on each imported file's shape: its declaration output and its text
+	// with function bodies cut out (program.SignatureEntry), so an edit inside a body of a file imported
+	// by half the tree re-runs this rule on that one file rather than on half the tree.
+	//
+	// Shapes is a claim that the rule never reads into an imported function's body, which a shape does
+	// not cover. The claim is checked rather than trusted: a scan of every rule and the helpers it
+	// reaches refuses Shapes on any rule that can reach both an imported declaration and a body
+	// (TestRulesClaimShapesOnlyWhereTheScanAllowsIt). Claiming wrongly replays a stale finding; not
+	// claiming costs a re-run.
+	TypeReach TypeReach
 
 	// ResolvesReactValueTypes declares that this rule identifies a React value by asking the checker
 	// for its TYPE, so a file where the hook call resolves to `any` costs it every finding it would

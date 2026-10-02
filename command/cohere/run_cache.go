@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/release/packaging"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -68,6 +70,10 @@ type runCacheSession struct {
 	// findings is the findings cache this run consults and records, the run cache's second layer. Nil
 	// when the graph never reached a walk.
 	findings *program.FindingsReuse
+
+	// shapes is every project file's shape this run, recorded so the next computes only what changed. Nil
+	// when no rule is keyed on shapes, since then nothing reads them and computing them would be waste.
+	shapes map[string]program.SignatureEntry
 
 	stdout, stderr teeStream
 }
@@ -345,7 +351,7 @@ func (session *runCacheSession) record(exitCode int) *program.RunCache {
 // bytes, so a file the fix phase rewrote left an entry for bytes that no longer exist, which can never
 // match.
 func (session *runCacheSession) write(recorded *program.RunCache) {
-	if recorded == nil && session.findings == nil {
+	if recorded == nil && session.findings == nil && session.shapes == nil {
 		return
 	}
 	identity := cacheTableIdentity()
@@ -355,6 +361,9 @@ func (session *runCacheSession) write(recorded *program.RunCache) {
 	}
 	if session.findings != nil {
 		table.Findings = session.findings.Recorded()
+	}
+	if session.shapes != nil {
+		table.Signatures = session.shapes
 	}
 	if err := program.WriteCacheTable(session.tablePath, table, identity); err != nil {
 		fmt.Fprintf(os.Stderr, "note: the cache table could not be written: %v\n", firstLine(err.Error()))
@@ -472,7 +481,26 @@ func attachFindingsCache(graph *program.Graph, location projectLocation) {
 		return
 	}
 	session.findings = program.NewFindingsReuse(key, session.table.Findings)
+
+	// Shapes cost a declaration emit for each file whose bytes changed, so they are computed only when some
+	// rule is keyed on them. They start from the table's, then from the compiler's own buildinfo, so only
+	// what changed since either is computed.
+	if anyRuleKeyedOnShapes(registry.All()) {
+		shapes, _ := graph.Signatures(context.Background(), graph.SeedSignatures(session.table.Signatures))
+		graph.Shapes = shapes
+		session.shapes = shapes
+	}
 	graph.FindingsReuse = session.findings
+}
+
+// anyRuleKeyedOnShapes reports whether any rule declares rule.TypeReachShapes.
+func anyRuleKeyedOnShapes(rules []rule.Rule) bool {
+	for _, subject := range rules {
+		if subject.TypeReach == rule.TypeReachShapes {
+			return true
+		}
+	}
+	return false
 }
 
 // findingsCacheKey covers everything a cacheable rule's answer depends on beyond a file's own bytes:

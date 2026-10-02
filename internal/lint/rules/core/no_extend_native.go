@@ -148,6 +148,7 @@ var NoExtendNative = rule.Rule{
 	// See the doc above: half the clean cases are a local binding shadowing a builtin name, and
 	// nothing structural separates those from the real global.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// A rule configured as a bare `"error"` is handed NIL rather than a decoded struct, because

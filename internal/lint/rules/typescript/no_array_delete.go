@@ -156,6 +156,7 @@ var NoArrayDelete = rule.Rule{
 
 	// The listener resolves the receiver's type on every `delete x[y]`, so the checker is required.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		isUnderlyingTypeArray := func(t *checker.Type) bool {

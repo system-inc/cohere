@@ -110,6 +110,7 @@ var correctnessNoIdenticalBranchesMessage = rule.Message{
 var CorrectnessNoIdenticalBranches = rule.Rule{
 	Name:             "nexus/correctness-no-identical-branches",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {

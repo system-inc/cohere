@@ -113,6 +113,7 @@ var UnboundMethod = rule.Rule{
 	// Every finding is decided by resolving a property to its declaration, so there is no syntactic
 	// subset of this rule that could run without the checker.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,

@@ -87,6 +87,7 @@ var NoUnsafeCall = rule.Rule{
 
 	// Every finding is a type question about the callee. The checker is required.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,

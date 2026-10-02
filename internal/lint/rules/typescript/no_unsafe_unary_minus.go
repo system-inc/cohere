@@ -143,6 +143,7 @@ var NoUnsafeUnaryMinus = rule.Rule{
 	// The listener reads ctx.TypeChecker on every `-` operand, so the checker is required rather
 	// than opportunistic.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

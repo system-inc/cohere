@@ -97,6 +97,7 @@ type noUselessReturnEvent struct {
 var NoUselessReturn = rule.Rule{
 	Name:             "no-useless-return",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {

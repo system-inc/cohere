@@ -121,6 +121,7 @@ var AwaitThenable = rule.Rule{
 
 	// All four listeners read ctx.TypeChecker unconditionally, so the checker is required.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,

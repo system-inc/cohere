@@ -68,6 +68,7 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 	// Both halves are type questions: what the parameter's generic resolves to, and what the
 	// method's call signature returns.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

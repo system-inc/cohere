@@ -232,6 +232,7 @@ var ForbidElements = rule.Rule{
 	// whether `createElement` binds to a `react` import. Upstream's corpus depends on that
 	// distinction directly: `createElement("button")` with no import is one of its clean cases.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[ForbidElementsOptions](options)

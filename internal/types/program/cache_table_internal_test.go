@@ -53,7 +53,7 @@ func TestCacheTableRefusesAnotherFormat(t *testing.T) {
 // TestCacheTableRefusesAListIndexPastItsTable pins the one check gob cannot make for us. The rule lists
 // are interned by hand, and an index trusted past its table would hand an entry another file's rules.
 func TestCacheTableRefusesAListIndexPastItsTable(t *testing.T) {
-	for _, field := range []string{"Rules", "TypedRules", "Listening"} {
+	for _, field := range []string{"Rules", "TypedRules", "Listening", "ShapedRules"} {
 		t.Run(field, func(t *testing.T) {
 			entry := lintCacheWireEntry{Path: "/a.ts"}
 			reflect.ValueOf(&entry).Elem().FieldByName(field).SetInt(1)
@@ -95,6 +95,7 @@ func TestCacheTableDropsAFindingsSectionOfAnotherMeaning(t *testing.T) {
 // and pinning the new shape under it, and this test says so when it is forgotten.
 var pinnedCacheTableShapes = map[int]string{
 	1: "3db631dcfd27db51bf5c9e29a4a0ac41a7ba30dc90aeb8712037e057a516effb",
+	2: "30d879299d079a880679687f46936674d9ecd124a5916a1ea76ff210d6e67873",
 }
 
 func TestCacheTableShapeIsPinnedToItsVersion(t *testing.T) {

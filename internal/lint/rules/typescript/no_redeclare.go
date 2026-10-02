@@ -176,6 +176,7 @@ var NoRedeclare = rule.Rule{
 
 	// See the doc above: the scope partition comes from the binder, which the program builds.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoRedeclareOptions](options)

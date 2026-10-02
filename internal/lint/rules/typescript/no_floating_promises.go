@@ -273,6 +273,8 @@ var NoFloatingPromises = rule.Rule{
 
 	NeedsTypeChecker: true,
 
+	TypeReach: rule.TypeReachShapes,
+
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 

@@ -117,6 +117,7 @@ var reactHookAnyTypeMessageId = "reactHookAnyType"
 var ReactHookAnyType = rule.Rule{
 	Name:             "structure/react-hook-any-type",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// The typed-rule guard. A rule that reads a nil checker here would decline every file
 		// vacuously, which is precisely the silence this rule exists to make loud.

@@ -226,6 +226,7 @@ var IdDenylist = rule.Rule{
 	// Telling a global reference from a name the source declared is name resolution. See the
 	// exemption section above for the four resolution outcomes and how each was measured.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings := idDenylistSettingsFrom(options)

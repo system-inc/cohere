@@ -81,6 +81,7 @@ var NoUnsafeTypeAssertion = rule.Rule{
 
 	// Every step is a type question, and two of them are assignability queries.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		checkAssertion := func(node *ast.Node, expression *ast.Node, assertedTypeNode *ast.Node) {

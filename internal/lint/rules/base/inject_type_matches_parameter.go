@@ -57,6 +57,7 @@ var InjectTypeMatchesParameter = rule.Rule{
 
 	// Every judgment is an assignability question between two resolved types.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {

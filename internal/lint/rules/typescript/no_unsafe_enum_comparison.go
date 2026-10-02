@@ -88,6 +88,7 @@ var (
 var NoUnsafeEnumComparison = rule.Rule{
 	Name:             "@typescript-eslint/no-unsafe-enum-comparison",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Declared AND guarded. `NeedsTypeChecker` governs the registration path; the harness can
 		// still build a `rule.Context` by hand, and `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes`

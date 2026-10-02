@@ -117,6 +117,7 @@ var NoUselessDefaultAssignment = rule.Rule{
 
 	// Every judgment is a question about whether a type admits undefined.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,

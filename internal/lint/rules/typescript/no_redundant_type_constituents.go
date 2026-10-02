@@ -78,6 +78,7 @@ var NoRedundantTypeConstituents = rule.Rule{
 
 	// Every judgment is a type-flag question about a member the checker has already resolved.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// The declaration governs registration; the harness can still build a Context by hand, and

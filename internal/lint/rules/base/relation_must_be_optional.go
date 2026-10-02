@@ -61,6 +61,7 @@ var RelationMustBeOptional = rule.Rule{
 	// The finding is decided by whether the property's type admits undefined, so there is no
 	// syntactic subset of this rule.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

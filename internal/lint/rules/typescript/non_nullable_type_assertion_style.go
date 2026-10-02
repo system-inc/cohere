@@ -89,6 +89,7 @@ var NonNullableTypeAssertionStyle = rule.Rule{
 	// Every finding is decided by comparing two types by identity, so there is no syntactic subset of
 	// this rule that could run without the checker.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// report is shared by the two assertion spellings, which differ only in where the expression

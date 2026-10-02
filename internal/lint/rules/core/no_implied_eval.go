@@ -97,6 +97,7 @@ var NoImpliedEval = rule.Rule{
 	// and nothing structural answers that: the shadow can be a parameter, an import, a function
 	// declaration, or a `var` in any enclosing scope.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Declared as well as needed. NeedsTypeChecker governs the registration path, so a

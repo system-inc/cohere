@@ -118,6 +118,7 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 	// Every verdict comes from the checker: whether the receiver is thenable, and whether the
 	// handler's first parameter is intrinsic `unknown`. Neither is answerable from syntax.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Declines the file once rather than per node. Unreachable through registration, since

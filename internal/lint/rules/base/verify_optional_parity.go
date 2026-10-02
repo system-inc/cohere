@@ -79,6 +79,7 @@ var VerifyOptionalParity = rule.Rule{
 	// written `name?: string` and one written `name: string | undefined` are the same question, and
 	// only the checker collapses them.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

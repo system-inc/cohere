@@ -203,6 +203,7 @@ func DecodeButtonHasTypeOptions(raw []byte) (any, error) {
 var ButtonHasType = rule.Rule{
 	Name:             "react/button-has-type",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[ButtonHasTypeOptions](options)
 		if !ok {

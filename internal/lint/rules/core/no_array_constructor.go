@@ -135,6 +135,7 @@ var NoArrayConstructor = rule.Rule{
 	// See the doc above: a local binding named `Array` makes the reported shapes correct code, and
 	// two of upstream's clean cases are exactly that. Nothing structural answers it.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {

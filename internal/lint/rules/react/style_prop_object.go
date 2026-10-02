@@ -172,6 +172,7 @@ var StylePropObject = rule.Rule{
 	// `GetSymbolAtLocation`, and `isPragmaCreateElementCall` asks the checker whether a bare
 	// `createElement` binds to a react import.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[StylePropObjectOptions](options)

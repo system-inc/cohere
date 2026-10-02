@@ -104,6 +104,7 @@ var messageUnsafeDeclarationMerging = rule.Message{
 var NoUnsafeDeclarationMerging = rule.Rule{
 	Name:             "@typescript-eslint/no-unsafe-declaration-merging",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node, opposite ast.Kind) {
 			// The nil-checker guard, kept even though it is inert on today's shim, and the

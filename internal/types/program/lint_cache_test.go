@@ -20,8 +20,12 @@ func sampleLintCache() *program.LintCache {
 				TypedRules:  []string{"await-thenable"},
 				// Not zero, so an encoder that dropped it could not match the zero a decode defaults to.
 				TypeFingerprint: program.HashContent("the types debugger; can see"),
-				Listening:       []string{"no-debugger", "no-empty", "await-thenable"},
-				VisitedNodes:    5,
+				ShapedRules:     []string{"no-floating-promises"},
+				// Not zero and not the type fingerprint, so an encoder that dropped it or swapped the two
+				// could not match.
+				ShapeFingerprint: program.HashContent("the shapes debugger; can see"),
+				Listening:        []string{"no-debugger", "no-empty", "await-thenable", "no-floating-promises"},
+				VisitedNodes:     5,
 				Findings: []program.LintCacheFinding{
 					{
 						RuleName: "no-debugger", Start: 0, End: 9,
@@ -114,6 +118,12 @@ func TestLintCacheRoundTripsEveryField(t *testing.T) {
 		}
 		if got.TypeFingerprint != want.TypeFingerprint {
 			t.Errorf("entry %d TypeFingerprint: %x against %x", index, got.TypeFingerprint, want.TypeFingerprint)
+		}
+		if strings.Join(got.ShapedRules, ",") != strings.Join(want.ShapedRules, ",") {
+			t.Errorf("entry %d ShapedRules: %v against %v", index, got.ShapedRules, want.ShapedRules)
+		}
+		if got.ShapeFingerprint != want.ShapeFingerprint {
+			t.Errorf("entry %d ShapeFingerprint: %x against %x", index, got.ShapeFingerprint, want.ShapeFingerprint)
 		}
 		if strings.Join(got.Listening, ",") != strings.Join(want.Listening, ",") {
 			t.Errorf("entry %d Listening: %v against %v", index, got.Listening, want.Listening)
@@ -297,7 +307,7 @@ func TestLintCacheFindingHasNoUncheckedFields(t *testing.T) {
 func TestLintCacheEntryHasNoUncheckedFields(t *testing.T) {
 	compared := map[string]struct{}{
 		"Path": {}, "ContentHash": {}, "Rules": {}, "TypedRules": {}, "TypeFingerprint": {}, "Listening": {},
-		"VisitedNodes": {}, "Findings": {},
+		"VisitedNodes": {}, "Findings": {}, "ShapedRules": {}, "ShapeFingerprint": {},
 	}
 	entryType := reflect.TypeOf(program.LintCacheEntry{})
 	for index := range entryType.NumField() {

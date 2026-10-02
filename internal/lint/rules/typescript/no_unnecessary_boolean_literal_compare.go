@@ -137,6 +137,7 @@ func messageNoUnnecessaryBooleanLiteralCompareNoStrictNullCheck() rule.Message {
 var NoUnnecessaryBooleanLiteralCompare = rule.Rule{
 	Name:             "@typescript-eslint/no-unnecessary-boolean-literal-compare",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,

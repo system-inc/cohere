@@ -52,6 +52,7 @@ var messageNoLabelVar = rule.Message{
 var NoLabelVar = rule.Rule{
 	Name:             "no-label-var",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindLabeledStatement: func(node *ast.Node) {

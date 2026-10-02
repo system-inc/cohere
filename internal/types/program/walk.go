@@ -149,6 +149,12 @@ type Result struct {
 	// with every rule. Zero without a cache. The lint line reports it, so a reader can tell a walked
 	// verdict from a remembered one.
 	FilesReplayed int
+
+	// TypeAwareRerun and ShapeKeyedRerun are how many of the replayed files ran their content-keyed and
+	// their shape-keyed type-aware rules again, because something they import changed. The difference
+	// between the two is what shapes saved.
+	TypeAwareRerun  int
+	ShapeKeyedRerun int
 }
 
 // Walk visits every file in the given set once, dispatching every rule's listeners as it goes.
@@ -176,13 +182,19 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 	var mutex sync.Mutex
 	diagnostics := []rule.Diagnostic{}
-	filesReplayed := 0
+	filesReplayed, typeAwareRerun, shapeKeyedRerun := 0, 0, 0
 
 	// Computed once per walk, before any worker runs, and only when the findings cache is in use: about
-	// 47ms on ahra, the one cost type-aware caching adds over the walk.
-	var fingerprints map[tspath.Path][sha256.Size]byte
+	// 47ms on ahra, the one cost type-aware caching adds over the walk. Shape fingerprints need this run's
+	// shapes, which the caller computes; without them the shape-keyed rules are keyed on the type
+	// fingerprint instead, which can only re-run them more often.
+	var fingerprints, shapeFingerprints map[tspath.Path][sha256.Size]byte
 	if g.FindingsReuse != nil && !g.CollectTimings {
 		fingerprints = g.TypeFingerprints()
+		shapeFingerprints = fingerprints
+		if g.Shapes != nil {
+			shapeFingerprints = g.SignatureFingerprints(g.Shapes)
+		}
 	}
 	listeningCounts := make(map[string]int, len(rules))
 	reportingCounts := make(map[string]int, len(rules))
@@ -217,7 +229,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			defer waitGroup.Done()
 
 			localDiagnostics := []rule.Diagnostic{}
-			localReplayed := 0
+			localReplayed, localTypeAwareRerun, localShapeKeyedRerun := 0, 0, 0
 			localListening := make(map[string]int, len(rules))
 			localReporting := make(map[string]int, len(rules))
 			localOffered := make(map[string]int, len(rules))
@@ -268,27 +280,57 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					reuse = nil
 				}
 				//
-				// Type-aware rules replay only while the file's type fingerprint is unchanged too, so an
-				// importer of an edited file replays its pure rules and runs its type-aware ones again.
+				// Type-aware rules replay only while their fingerprint is unchanged too, so an importer of an
+				// edited file replays its pure rules and runs its type-aware ones again. Shape-keyed rules are
+				// keyed on the shape fingerprint, which an edit inside an imported body does not move.
 				walkRules := applicable
 				var replayed *LintCacheEntry
-				typedReplayed := false
-				var pureNames, typedNames []string
-				var contentHash, fingerprint [sha256.Size]byte
+				typedReplayed, shapedReplayed := false, false
+				var keys cacheKeys
 				if reuse != nil {
-					pureHere, typedHere, neverHere := CacheClasses(applicable)
-					pureNames, typedNames = ruleNames(pureHere), ruleNames(typedHere)
-					contentHash = HashContent(sourceFile.Text())
-					fingerprint = fingerprints[sourceFile.Path()]
-					if entry, pureHit, typedHit := reuse.lookup(sourceFile.FileName(), contentHash, pureNames, typedNames, fingerprint); pureHit {
+					pureHere, typeAwareHere, _ := CacheClasses(applicable)
+					shapedHere, typedHere := ShapeClasses(typeAwareHere)
+					keys = cacheKeys{
+						contentHash:      HashContent(sourceFile.Text()),
+						pure:             ruleNames(pureHere),
+						typed:            ruleNames(typedHere),
+						typeFingerprint:  fingerprints[sourceFile.Path()],
+						shaped:           ruleNames(shapedHere),
+						shapeFingerprint: shapeFingerprints[sourceFile.Path()],
+					}
+					if entry, pureHit, typedHit, shapedHit := reuse.lookup(sourceFile.FileName(), keys); pureHit {
 						replayed = &entry
-						typedReplayed = typedHit
-						walkRules = neverHere
-						if !typedHit {
-							walkRules = append(append([]rule.Rule{}, typedHere...), neverHere...)
+						typedReplayed, shapedReplayed = typedHit, shapedHit
+						replays := make(map[string]bool, len(applicable))
+						for _, name := range keys.pure {
+							replays[name] = true
+						}
+						if typedHit {
+							for _, name := range keys.typed {
+								replays[name] = true
+							}
+						}
+						if shapedHit {
+							for _, name := range keys.shaped {
+								replays[name] = true
+							}
+						}
+						// The rules still to walk, in the order they were configured: the order rules run in
+						// can decide which findings exist (HashRuleSet).
+						walkRules = nil
+						for _, subject := range applicable {
+							if !replays[subject.Name] {
+								walkRules = append(walkRules, subject)
+							}
 						}
 						localReplayed++
-						replayEntry(entry, typedHit, sourceFile, &localDiagnostics, localReporting, localOffered, localListening)
+						if !typedHit && len(keys.typed) > 0 {
+							localTypeAwareRerun++
+						}
+						if !shapedHit && len(keys.shaped) > 0 {
+							localShapeKeyedRerun++
+						}
+						replayEntry(entry, typedHit, shapedHit, sourceFile, &localDiagnostics, localReporting, localOffered, localListening)
 						if len(walkRules) == 0 {
 							localNodes += entry.VisitedNodes
 							continue
@@ -342,7 +384,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				// A file being recorded counts its listening and offered rules into maps of its own, so
 				// the entry can say which cacheable rules listened on this file; they are merged into the
 				// worker's totals at once, before the crash check, exactly as passing the totals in did.
-				recording := reuse != nil && (replayed == nil || !typedReplayed)
+				recording := reuse != nil && (replayed == nil || !typedReplayed || !shapedReplayed)
 				listeningTarget, offeredTarget := localListening, localOffered
 				var fileListening, fileOffered map[string]int
 				if recording {
@@ -401,13 +443,13 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				localSuppressed.add(silenced)
 
 				if recording && replayed == nil {
-					if entry, eligible := recordableEntry(sourceFile, contentHash, pureNames, typedNames, fingerprint,
+					if entry, eligible := recordableEntry(sourceFile, keys,
 						localDiagnostics[diagnosticsBefore:], fileListening, visited, silenced); eligible {
 						reuse.keep(entry)
 					}
 				}
 				if recording && replayed != nil {
-					if entry, eligible := refreshTyped(*replayed, typedNames, fingerprint,
+					if entry, eligible := refreshTyped(*replayed, keys, !typedReplayed, !shapedReplayed,
 						localDiagnostics[diagnosticsBefore:], fileListening); eligible {
 						reuse.keep(entry)
 					}
@@ -441,6 +483,8 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			ruleCrashesAll = append(ruleCrashesAll, localRuleCrashes...)
 			timings.merge(localTimings)
 			filesReplayed += localReplayed
+			typeAwareRerun += localTypeAwareRerun
+			shapeKeyedRerun += localShapeKeyedRerun
 			mutex.Unlock()
 		}()
 	}
@@ -455,9 +499,11 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	}
 
 	return Result{
-		Diagnostics:   diagnostics,
-		Timings:       timings,
-		FilesReplayed: filesReplayed,
+		Diagnostics:     diagnostics,
+		Timings:         timings,
+		FilesReplayed:   filesReplayed,
+		TypeAwareRerun:  typeAwareRerun,
+		ShapeKeyedRerun: shapeKeyedRerun,
 		Coverage: Coverage{
 			FilesInProgram: len(g.Program.GetSourceFiles()),
 			FilesWalked:    len(files),

@@ -588,10 +588,16 @@ func writeCoverageNotes(out io.Writer, summary coverageSummary, details bool) {
 }
 
 // replayedFromCache says how much of a verdict was remembered rather than walked, so a reader can always
-// tell the two apart. Empty when nothing was replayed.
+// tell the two apart, and how many replayed files ran type-aware rules again because something they import
+// changed: content-keyed rules on every importer of a changed file, shape-keyed ones only where a shape
+// changed. Empty when nothing was replayed.
 func replayedFromCache(result program.Result) string {
 	if result.FilesReplayed == 0 {
 		return ""
 	}
-	return fmt.Sprintf("; %d of %d files replayed from cache", result.FilesReplayed, result.Coverage.FilesWalked)
+	replayed := fmt.Sprintf("; %d of %d files replayed from cache", result.FilesReplayed, result.Coverage.FilesWalked)
+	if result.TypeAwareRerun > 0 || result.ShapeKeyedRerun > 0 {
+		replayed += fmt.Sprintf(" (type-aware rules ran again on %d of them, shape-keyed on %d)", result.TypeAwareRerun, result.ShapeKeyedRerun)
+	}
+	return replayed
 }

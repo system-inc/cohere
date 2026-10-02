@@ -71,6 +71,7 @@ var PreferRestParams = rule.Rule{
 	// See the doc above: telling the implicit binding from a declared one is name resolution, and
 	// the probe that established it is recorded there.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

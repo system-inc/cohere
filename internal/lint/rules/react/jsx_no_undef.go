@@ -75,6 +75,7 @@ var messageJsxIdentifierNotDefined = rule.Message{
 var JsxNoUndef = rule.Rule{
 	Name:             "react/jsx-no-undef",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		check := func(node *ast.Node) {
 			tagName, _ := jsx.ElementParts(node)

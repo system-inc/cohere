@@ -82,6 +82,7 @@ var NoObjCalls = rule.Rule{
 	// See the doc above: eighteen of the clean cases are a local shadowing a global, and nothing
 	// structural tells a shadow from the global it hides.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// check reports one call or new expression if its callee names a non-callable global.

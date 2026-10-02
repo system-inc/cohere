@@ -62,6 +62,7 @@ var NoUnsafeArgument = rule.Rule{
 
 	// Every judgment is a comparison between an argument's type and a parameter's type.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

@@ -198,6 +198,7 @@ var NoImpliedEval = rule.Rule{
 	// Both listeners reach the checker for any call whose callee name matches, so the checker is
 	// required rather than opportunistic.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,

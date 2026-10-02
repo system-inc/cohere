@@ -79,6 +79,7 @@ var NoUnsafeMemberAccess = rule.Rule{
 
 	// Every judgment is a type question about an object or a computed key.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,

@@ -94,6 +94,14 @@ type LintCacheEntry struct {
 	// TypeFingerprint is the file's type fingerprint when TypedRules' findings were produced.
 	TypeFingerprint [sha256.Size]byte
 
+	// ShapedRules is the type-aware rules applied to this file that declare rule.TypeReachShapes. Their
+	// findings replay while ShapeFingerprint matches, which an edit inside an imported function's body does
+	// not move. See Graph.SignatureFingerprints.
+	ShapedRules []string
+
+	// ShapeFingerprint is the file's shape fingerprint when ShapedRules' findings were produced.
+	ShapeFingerprint [sha256.Size]byte
+
 	// Listening is the subset of Rules and TypedRules that registered a listener on this file. A replay
 	// counts them as listening, which is what keeps the coverage line identical to a walked run's.
 	Listening []string
@@ -192,6 +200,8 @@ func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 
 // lintCacheVersion is bumped whenever the format's meaning changes.
 //
+// 6: entries carry shape-keyed type-aware rules and the shape fingerprint they were produced under.
+//
 // 5: entries carry type-aware rules and the type fingerprint they were produced under.
 //
 // 4: rule lists are stored once and referenced by index, and hashes are hex. Version 3 wrote each
@@ -203,7 +213,7 @@ func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 // The encoding itself is no longer this version's business. The cache is the findings section of the
 // cache table (cache_table.go), encoded with gob behind the table's header, so a change to the encoded
 // shape moves cacheTableVersion. This one moves when what an entry means changes.
-const lintCacheVersion = 5
+const lintCacheVersion = 6
 
 // Lookup returns a file's cached entry, and whether the cache had a usable answer.
 //

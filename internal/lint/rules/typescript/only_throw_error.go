@@ -186,6 +186,7 @@ var OnlyThrowError = rule.Rule{
 
 	// Every arm reads the argument's type, so the checker is required.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,

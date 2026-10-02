@@ -91,6 +91,7 @@ var GraphQlNullableParity = rule.Rule{
 
 	// One side of every comparison is a TypeScript type.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// checkNullability is the shared comparison: report when the declared flag and the type

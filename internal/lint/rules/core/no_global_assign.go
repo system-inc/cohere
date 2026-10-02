@@ -109,6 +109,7 @@ var NoGlobalAssign = rule.Rule{
 	// See the doc above: `Object = 1` and `function f(Object) { Object = 1; }` are textually
 	// identical at the write and differ only in what the name resolves to.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// An absent or malformed option block means no exceptions, which is upstream's default

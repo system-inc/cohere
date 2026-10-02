@@ -154,6 +154,7 @@ var NoRequireImports = rule.Rule{
 	// See the doc above: telling the CommonJS `require` from a local binding of that name is name
 	// resolution, and the four-way probe that established it is recorded there.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[NoRequireImportsOptions](options)

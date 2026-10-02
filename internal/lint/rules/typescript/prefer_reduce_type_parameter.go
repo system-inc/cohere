@@ -103,6 +103,7 @@ var PreferReduceTypeParameter = rule.Rule{
 	// Both halves of the judgment are type questions: whether the receiver is an array, and whether
 	// the assertion is doing work. The checker is required.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// isArrayOrTupleThroughout answers upstream's `isArrayType`: every union constituent, and

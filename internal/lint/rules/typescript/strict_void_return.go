@@ -95,6 +95,7 @@ var StrictVoidReturn = rule.Rule{
 
 	// The contextual type decides every finding.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[StrictVoidReturnOptions](options)

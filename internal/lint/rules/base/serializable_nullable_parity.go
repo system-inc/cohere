@@ -62,6 +62,7 @@ var SerializableNullableParity = rule.Rule{
 
 	// The property's type decides every finding.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

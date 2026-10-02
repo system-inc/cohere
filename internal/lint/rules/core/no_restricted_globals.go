@@ -231,6 +231,7 @@ var NoRestrictedGlobals = rule.Rule{
 	// Telling a global from a local shadow is name resolution. See the predicate section above for
 	// the four resolution outcomes and how each was measured.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoRestrictedGlobalsSettings](options)

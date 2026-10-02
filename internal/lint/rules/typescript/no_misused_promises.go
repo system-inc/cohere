@@ -230,6 +230,7 @@ var NoMisusedPromises = rule.Rule{
 
 	// Every listener consults the checker; see the note above on why the guard lives in Run.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	// ProgramReads is deliberately absent, and that is a measurement rather than an omission. The
 	// program handle appears nowhere in this body: the rule asks the checker questions about nodes in

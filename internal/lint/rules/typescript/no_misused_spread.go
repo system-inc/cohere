@@ -111,6 +111,7 @@ var NoMisusedSpread = rule.Rule{
 
 	// Every arm asks the checker what the spread argument IS. None of it is answerable from syntax.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,

@@ -102,6 +102,7 @@ var Radix = rule.Rule{
 
 	// The shadow question is which file declares the name, which only resolution can answer.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

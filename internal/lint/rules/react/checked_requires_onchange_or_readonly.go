@@ -145,6 +145,7 @@ var checkedRequiresTargetProperties = map[string]bool{
 var CheckedRequiresOnChangeOrReadOnly = rule.Rule{
 	Name:             "react/checked-requires-onchange-or-readonly",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[CheckedRequiresOnChangeOrReadOnlyOptions](options)
 

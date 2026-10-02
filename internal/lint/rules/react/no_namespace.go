@@ -112,6 +112,7 @@ var NoNamespace = rule.Rule{
 	// Declared for the bare-call branch of `isPragmaCreateElementCall`, which asks the checker
 	// which binding `createElement` resolves to. The JSX arm needs nothing from it.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		reportElement := func(node *ast.Node) {
 			// `jsx.ElementParts` rather than a switch over the two kinds. A first draft wrote the

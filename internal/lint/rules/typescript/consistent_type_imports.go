@@ -194,6 +194,7 @@ var ConsistentTypeImports = rule.Rule{
 	// failing cases are textually near-identical to passing ones and differ only in what a name
 	// resolves to.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,

@@ -85,6 +85,10 @@ type Graph struct {
 	// FindingsReuse, when set, lets Walk serve unchanged files' cacheable findings from the last run
 	// and records this run's for the next. Nil walks everything, exactly as before it existed.
 	FindingsReuse *FindingsReuse
+
+	// Shapes is every project file's shape for this run (Graph.Signatures), when the caller computed them.
+	// Walk keys shape-keyed rules on them; without them it keys those rules on the type fingerprint.
+	Shapes map[string]SignatureEntry
 }
 
 // configHost adapts a filesystem and a working directory to what tsconfig parsing wants.

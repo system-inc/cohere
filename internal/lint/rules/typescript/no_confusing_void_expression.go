@@ -159,6 +159,7 @@ var NoConfusingVoidExpression = rule.Rule{
 
 	// Every judgment is a question about a type, so the checker is not optional here.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoConfusingVoidExpressionSettings](options)

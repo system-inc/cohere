@@ -81,6 +81,7 @@ var messageNoThrowLiteralUndef = rule.Message{
 var NoThrowLiteral = rule.Rule{
 	Name:             "no-throw-literal",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindThrowStatement: func(node *ast.Node) {

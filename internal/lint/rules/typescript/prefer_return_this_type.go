@@ -141,6 +141,7 @@ var PreferReturnThisType = rule.Rule{
 	// Every discrimination this rule makes is a type question. Name matching alone reports the
 	// supertype case upstream is silent on and misses the aliased-local case it reports.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// checkFunction is upstream's `checkFunction`: the class must have a name, the function must

@@ -58,6 +58,7 @@ var messageSymbolDescription = rule.Message{
 var SymbolDescription = rule.Rule{
 	Name:             "symbol-description",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

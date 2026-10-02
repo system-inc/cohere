@@ -144,6 +144,7 @@ var messagePreferFragmentPragma = rule.Message{
 var JsxFragments = rule.Rule{
 	Name:             "react/jsx-fragments",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

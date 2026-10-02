@@ -196,6 +196,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 	// The listener consults the checker for the discriminant and for every case expression on every
 	// switch it sees, with no cheap syntactic exit, so the checker is required.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		opts, ok := rule.OptionsAs[SwitchExhaustivenessCheckOptions](options)

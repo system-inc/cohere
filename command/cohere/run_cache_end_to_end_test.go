@@ -109,7 +109,7 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	durations := regexp.MustCompile(`\d+(\.\d+)?(ms|s|µs)\b`)
 	// The findings cache's clause says how much of the verdict was remembered; a cold run never has it,
 	// so it comes off before a comparison and is required or forbidden separately per scenario.
-	layerTwoClause := regexp.MustCompile(`; \d+ of \d+ files replayed from cache`)
+	layerTwoClause := regexp.MustCompile(`; \d+ of \d+ files replayed from cache( \(type-aware rules ran again on \d+ of them, shape-keyed on \d+\))?`)
 	normalized := func(output string) string {
 		return layerTwoClause.ReplaceAllString(durations.ReplaceAllString(output, "T"), "")
 	}

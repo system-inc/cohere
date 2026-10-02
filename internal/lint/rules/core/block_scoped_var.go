@@ -49,6 +49,7 @@ import (
 var BlockScopedVar = rule.Rule{
 	Name:             "block-scoped-var",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(file *ast.Node) {

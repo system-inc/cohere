@@ -148,6 +148,7 @@ var NoMixedEnums = rule.Rule{
 	// The classification of a non-literal initializer is a type question, and so is finding the
 	// merged declaration list.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

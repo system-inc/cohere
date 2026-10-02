@@ -57,6 +57,10 @@ type CacheTable struct {
 	// Findings is the per-file findings cache, nil until a run has walked.
 	Findings *LintCache
 
+	// Signatures is each project file's shape, recorded so the next run computes only the files whose
+	// bytes changed. Nil until a run has needed shapes.
+	Signatures map[string]SignatureEntry
+
 	// Formatted is the format record: which bytes cohere has already seen formatted, so a run formats
 	// what changed since cohere last looked. Nil until a run has formatted. Its meaning is the format
 	// phase's (command/cohere/format_record.go); this file only keeps it.
@@ -93,7 +97,9 @@ type CacheTableIdentity struct {
 // cacheTableVersion is the format, and it moves whenever the encoded shape or its meaning does. The shape
 // half is enforced by TestCacheTableShapeIsPinnedToItsVersion; the meaning half is the reason each
 // section also keeps its own version.
-const cacheTableVersion = 1
+//
+// 2: findings entries carry shape-keyed rules and their fingerprint, and the table holds Signatures.
+const cacheTableVersion = 2
 
 // cacheTableMagic opens every table, so a file that is not one is refused on its first field.
 const cacheTableMagic = "cohere cache table"
@@ -115,9 +121,10 @@ type cacheTableHeader struct {
 
 // cacheTableBody is what follows the header.
 type cacheTableBody struct {
-	Runs      map[string]*RunCache
-	Findings  *lintCacheWire
-	Formatted *FormatSection
+	Runs       map[string]*RunCache
+	Findings   *lintCacheWire
+	Signatures map[string]SignatureEntry
+	Formatted  *FormatSection
 }
 
 // lintCacheWire is the findings section as encoded. Rule lists are stored once and referenced by index:
@@ -139,6 +146,9 @@ type lintCacheWireEntry struct {
 	Listening       int
 	VisitedNodes    int
 	Findings        []LintCacheFinding
+
+	ShapedRules      int
+	ShapeFingerprint [sha256.Size]byte
 }
 
 // NewCacheTable is an empty table, what a first run and every discard start from.
@@ -158,7 +168,7 @@ func EncodeCacheTable(table *CacheTable, identity CacheTableIdentity) ([]byte, e
 	if err := encoder.Encode(cacheTableHeader{Magic: cacheTableMagic, Version: cacheTableVersion, Identity: identity}); err != nil {
 		return nil, fmt.Errorf("encoding the cache table's header: %w", err)
 	}
-	body := cacheTableBody{Runs: table.Runs, Formatted: table.Formatted}
+	body := cacheTableBody{Runs: table.Runs, Signatures: table.Signatures, Formatted: table.Formatted}
 	if table.Findings != nil {
 		body.Findings = table.Findings.wire()
 	}
@@ -211,7 +221,7 @@ func DecodeCacheTable(buffer []byte, identity CacheTableIdentity) (*CacheTable, 
 			ErrCacheTablePartlyKept, orUnknown(header.Identity.SelfCommit), orUnknown(identity.SelfCommit))
 	}
 
-	table := &CacheTable{Runs: body.Runs, Formatted: body.Formatted}
+	table := &CacheTable{Runs: body.Runs, Signatures: body.Signatures, Formatted: body.Formatted}
 	if table.Runs == nil {
 		table.Runs = map[string]*RunCache{}
 	}
@@ -261,6 +271,9 @@ func (c *LintCache) wire() *lintCacheWire {
 			Listening:       intern(entry.Listening),
 			VisitedNodes:    entry.VisitedNodes,
 			Findings:        entry.Findings,
+
+			ShapedRules:      intern(entry.ShapedRules),
+			ShapeFingerprint: entry.ShapeFingerprint,
 		})
 	}
 	return wire
@@ -289,6 +302,8 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 			TypeFingerprint: stored.TypeFingerprint,
 			VisitedNodes:    stored.VisitedNodes,
 			Findings:        stored.Findings,
+
+			ShapeFingerprint: stored.ShapeFingerprint,
 		}
 		var err error
 		if entry.Rules, err = list(stored.Rules); err != nil {
@@ -299,6 +314,9 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 		}
 		if entry.Listening, err = list(stored.Listening); err != nil {
 			return nil, fmt.Errorf("entry %d listening: %v", position, err)
+		}
+		if entry.ShapedRules, err = list(stored.ShapedRules); err != nil {
+			return nil, fmt.Errorf("entry %d shaped rules: %v", position, err)
 		}
 		cache.Entries = append(cache.Entries, entry)
 	}
@@ -397,6 +415,8 @@ func DumpCacheTable(out io.Writer, path string, table *CacheTable, identity Cach
 			len(run.Inputs), files, directories, absent, len(run.Output), len(run.Errors))
 	}
 
+	fmt.Fprintf(out, "signatures: %d files\n", len(table.Signatures))
+
 	if table.Formatted == nil {
 		fmt.Fprintln(out, "formatted: none")
 	} else {
@@ -413,9 +433,9 @@ func DumpCacheTable(out io.Writer, path string, table *CacheTable, identity Cach
 	}
 	fmt.Fprintf(out, "findings: %d files, %d findings, key %x\n", len(table.Findings.Entries), findingCount, table.Findings.Key[:6])
 	for _, entry := range table.Findings.Entries {
-		fmt.Fprintf(out, "  %s  content %x  types %x  %d pure + %d type-aware rules, %d listening, %d nodes, %d findings\n",
-			entry.Path, entry.ContentHash[:6], entry.TypeFingerprint[:6], len(entry.Rules), len(entry.TypedRules),
-			len(entry.Listening), entry.VisitedNodes, len(entry.Findings))
+		fmt.Fprintf(out, "  %s  content %x  types %x  shapes %x  %d pure + %d type-aware + %d shape-keyed rules, %d listening, %d nodes, %d findings\n",
+			entry.Path, entry.ContentHash[:6], entry.TypeFingerprint[:6], entry.ShapeFingerprint[:6], len(entry.Rules),
+			len(entry.TypedRules), len(entry.ShapedRules), len(entry.Listening), entry.VisitedNodes, len(entry.Findings))
 		for _, finding := range entry.Findings {
 			fmt.Fprintf(out, "    %d-%d %s/%s: %s\n", finding.Start, finding.End, finding.RuleName, finding.MessageId, finding.MessageDescription)
 		}

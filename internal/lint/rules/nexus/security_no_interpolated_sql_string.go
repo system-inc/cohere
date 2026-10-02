@@ -142,6 +142,7 @@ var securityNoInterpolatedSqlStringMessage = rule.Message{
 var SecurityNoInterpolatedSqlString = rule.Rule{
 	Name:             "nexus/security-no-interpolated-sql-string",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {

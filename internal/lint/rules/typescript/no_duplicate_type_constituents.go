@@ -138,6 +138,7 @@ var NoDuplicateTypeConstituents = rule.Rule{
 
 	// Every constituent's type is resolved to compare identities.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[NoDuplicateTypeConstituentsOptions](options)

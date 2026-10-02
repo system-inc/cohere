@@ -82,6 +82,7 @@ var NoNewWrappers = rule.Rule{
 	// See the doc above: four of seven upstream valid cases are shadowing, and nothing structural
 	// separates the global from a local of the same name.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

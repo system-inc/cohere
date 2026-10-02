@@ -215,6 +215,7 @@ func messageStaticPropertyPlacement(
 var StaticPropertyPlacement = rule.Rule{
 	Name:             "react/static-property-placement",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

@@ -102,6 +102,7 @@ var messageDefaultPropsNotSorted = rule.Message{
 var SortDefaultProps = rule.Rule{
 	Name:             "react/sort-default-props",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

@@ -230,6 +230,7 @@ var IframeMissingSandbox = rule.Rule{
 	// whether `createElement` binds to a `react` import. The namespaced `React.createElement`
 	// branch is purely syntactic and needs nothing.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// validateSandboxValue splits a sandbox attribute's text and reports each rejected token,

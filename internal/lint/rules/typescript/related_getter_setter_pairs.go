@@ -184,6 +184,7 @@ var messageRelatedGetterSetterPairs = rule.Message{
 var RelatedGetterSetterPairs = rule.Rule{
 	Name:             "@typescript-eslint/related-getter-setter-pairs",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// A typed rule handed a nil checker goes silent rather than crashing, which is the more
 		// dangerous of the two failure modes because a whole StaysSilent suite passes vacuously

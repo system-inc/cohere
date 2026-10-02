@@ -165,6 +165,7 @@ var NoUnsafeAssignment = rule.Rule{
 
 	// Every judgment compares a sender type against a receiver type.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,

@@ -139,6 +139,7 @@ var NoBaseToString = rule.Rule{
 
 	// Every finding is decided by walking a type, so there is no syntactic subset of this rule.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,

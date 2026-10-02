@@ -261,6 +261,7 @@ var IdMatch = rule.Rule{
 
 	// Telling a global reference from a name the source declared is name resolution.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings := idMatchSettingsFrom(options)

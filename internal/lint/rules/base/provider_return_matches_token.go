@@ -69,6 +69,7 @@ var ProviderReturnMatchesToken = rule.Rule{
 	// Every judgment in this rule is a question for the checker: what type the decorator has, what
 	// its brand carries, and whether one type is assignable to another.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

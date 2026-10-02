@@ -84,6 +84,7 @@ var NoNewFunc = rule.Rule{
 	// See the doc above: the whole discrimination is whether `Function` is the global or a local
 	// shadowing it, and nothing structural answers that.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		reportIfFunctionConstructor := func(node *ast.Node) {

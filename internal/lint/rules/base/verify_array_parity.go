@@ -129,6 +129,7 @@ var VerifyArrayParity = rule.Rule{
 	// Whether the property is array-typed is a question only the checker can answer, since the
 	// annotation may be an alias, a generic, or a union.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

@@ -147,6 +147,7 @@ var NoForInArray = rule.Rule{
 	// The listener resolves the subject's type on every for-in statement, so the checker is required
 	// rather than opportunistic.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		hasArrayishLength := func(t *checker.Type) bool {

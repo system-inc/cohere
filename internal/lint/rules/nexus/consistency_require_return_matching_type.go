@@ -115,6 +115,7 @@ var ConsistencyRequireReturnMatchingType = rule.Rule{
 	// The verdict is the function's return type, declared, contextual or inferred, and only the
 	// checker can answer any of the three.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {

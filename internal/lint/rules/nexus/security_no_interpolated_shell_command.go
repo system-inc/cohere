@@ -120,6 +120,7 @@ var securityNoInterpolatedShellCommandMessage = rule.Message{
 var SecurityNoInterpolatedShellCommand = rule.Rule{
 	Name:             "nexus/security-no-interpolated-shell-command",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {

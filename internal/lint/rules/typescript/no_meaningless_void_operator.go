@@ -109,6 +109,7 @@ var NoMeaninglessVoidOperator = rule.Rule{
 
 	// The argument's type decides every finding, so the checker is required.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[NoMeaninglessVoidOperatorOptions](options)

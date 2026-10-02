@@ -81,6 +81,7 @@ var noAlertProhibited = map[string]bool{
 var NoAlert = rule.Rule{
 	Name:             "no-alert",
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

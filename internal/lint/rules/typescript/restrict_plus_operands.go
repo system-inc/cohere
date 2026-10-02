@@ -193,6 +193,7 @@ var RestrictPlusOperands = rule.Rule{
 
 	// Every operand is judged by its type. Nothing here is answerable from syntax.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {
