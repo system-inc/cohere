@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -207,6 +209,16 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 				// name, so the local spelling reaches no one.
 				exportedNames := exportedNamesOf(ctx, statement, name)
 				exported := len(exportedNames) > 0
+
+				// Next.js reads this export off the route file by name, so its spelling and its
+				// `export` are both the framework's. Every clause below would otherwise advise a
+				// change Next silently ignores: PascalCase for `revalidate`, camelCase for an arrow
+				// `POST`, or dropping the export from a `metadata` nothing imports. Checked before
+				// the clauses rather than beside the consumer's list, because that list is optional
+				// and this floor is not.
+				if exported && nextjs.IsRouteContractExport(imports.NormalizedFileName(ctx.SourceFile), declaredName) {
+					return
+				}
 
 				// A function is named for what it does, not for how far it reaches, so like an
 				// instance it takes camelCase whatever its reach. Five shapes reach this: an inline

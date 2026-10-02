@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/binding"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -364,6 +365,7 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 		fileName := imports.NormalizedFileName(ctx.SourceFile)
 		isFrameworkParameterFile := matchesAnyFilePattern(fileName, settings.FrameworkParameterFilePatterns)
 		isFrameworkConstantFile := matchesAnyFilePattern(fileName, settings.FrameworkConstantFilePatterns)
+		routeContract := nextjs.RouteContractExports(fileName)
 
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
@@ -403,6 +405,20 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 				}
 
 				if allowedAbbreviatedNames[name] {
+					return
+				}
+
+				// A name Next.js reads off this route file by name is the framework's spelling,
+				// not ours, and the options above cannot be trusted to list it: `maxDuration`
+				// passes the `max[A-Z]` gate and no consumer named it, so this rule told route
+				// authors to write `maximumDuration`, which Next then silently ignores. That is the
+				// shape of the rename that cost five phi web routes their prerendering, so the
+				// floor comes from `nextjs.IsRouteContractExport` whatever the consumer passes.
+				//
+				// Every occurrence of the spelling is exempt, the export and its references alike,
+				// except a nested binding that shadows it: a `const config` inside a function is
+				// this file's own name again and is judged on its merits.
+				if routeContract[name] && !declaresNestedBinding(node) {
 					return
 				}
 
@@ -952,6 +968,34 @@ func isTypeMemberKey(node *ast.Node) bool {
 	case ast.KindMethodSignature:
 		signature := parent.AsMethodSignatureDeclaration()
 		return signature != nil && signature.Name() == node
+	}
+	return false
+}
+
+// declaresNestedBinding reports whether an identifier is the name of a binding declared below module
+// scope: a parameter, a destructured element, or a variable, function or class inside a function or
+// block.
+//
+// A Next.js contract export is a module-scope name. A nested binding with the same spelling is a
+// different variable that only shares the letters, so it gets no contract exemption.
+func declaresNestedBinding(node *ast.Node) bool {
+	parent := node.Parent
+	if parent == nil || parent.Name() != node {
+		return false
+	}
+	switch parent.Kind {
+	case ast.KindParameter, ast.KindBindingElement:
+		return true
+	case ast.KindFunctionDeclaration, ast.KindClassDeclaration:
+		return parent.Parent == nil || parent.Parent.Kind != ast.KindSourceFile
+	case ast.KindVariableDeclaration:
+		// Declaration, then its list, then the statement holding the list.
+		list := parent.Parent
+		if list == nil || list.Parent == nil {
+			return true
+		}
+		statement := list.Parent
+		return statement.Parent == nil || statement.Parent.Kind != ast.KindSourceFile
 	}
 	return false
 }

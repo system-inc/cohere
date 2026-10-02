@@ -568,3 +568,51 @@ func TestConsistencyNoAbbreviatedIdentifierStillSkipsTheRestOfTheForeignFamily(t
 		})
 	}
 }
+
+// TestConsistencyNoAbbreviatedIdentifierLeavesNextRouteContractsAlone covers the floor
+// `nextjs.IsRouteContractExport` sets with no options at all.
+//
+// `maxDuration` is the case no consumer list carried: it passes the `max[A-Z]` gate, and the rule
+// told route authors to write `maximumDuration`, which Next then silently ignores. Each silent case is
+// paired with the same text in a file Next does not read, which must still report, so the exemption
+// is shown to come from the route file rather than from the name.
+func TestConsistencyNoAbbreviatedIdentifierLeavesNextRouteContractsAlone(t *testing.T) {
+	t.Parallel()
+
+	const routeFile = "/repository/app/api/report/route.ts"
+	const pageFile = "/repository/app/blog/[slug]/page.tsx"
+	cases := []struct {
+		name       string
+		fileName   string
+		sourceText string
+		wantIds    []string
+	}{
+		{"maxDuration in a route", routeFile, "export const maxDuration = 60;", nil},
+		{"maxDuration outside a route", abbreviatedFile, "export const maxDuration = 60;", []string{"noMax"}},
+		{"generateStaticParams in a page", pageFile, "export async function generateStaticParams() { return []; }", nil},
+		{"generateStaticParams outside a route", abbreviatedFile, "export async function generateStaticParams() { return []; }", []string{"noParamsSuffix"}},
+		{"dynamicParams in a page", pageFile, "export const dynamicParams = false;", nil},
+		{"config in a page", pageFile, "export const config = {};", nil},
+		{"a reference to the export is the export", pageFile, "export const maxDuration = 60;\nconsole.log(maxDuration);", nil},
+		// A nested binding sharing the spelling is a different variable, judged on its merits. Its
+		// declaration reports and its reference does not: references are exempt by spelling, since
+		// telling a shadow from the export needs scope resolution this rule does not do. One finding,
+		// on the declaration, is enough for the author to rename both.
+		{"a nested config shadows the contract", pageFile, "export function load() {\n    const config = 1;\n    return config;\n}", []string{"noConfig"}},
+		{"a parameter named for the contract", pageFile, "export function load(maxDuration: number) {\n    return 1;\n}", []string{"noMax"}},
+		// Contracts differ by file: a page has no http methods and a route has no metadata, and
+		// `params` is no contract export anywhere, so it keeps its own options-driven handling.
+		{"a page is not a route handler", routeFile, "export const generateViewport = () => ({});", nil},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, testCase.fileName, testCase.sourceText)
+			if len(testCase.wantIds) == 0 {
+				rule_testing.ExpectClean(t, result)
+				return
+			}
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		})
+	}
+}

@@ -724,3 +724,44 @@ func TestConsistencyRequireConstantCasingChecksTheExportedNameForImporters(t *te
 	}, "source/Thing.ts")
 	rule_testing.ExpectFindings(t, result, "requirePascalCaseExported")
 }
+
+// TestConsistencyRequireConstantCasingLeavesNextRouteContractsAlone covers the floor
+// `nextjs.IsRouteContractExport` sets with no options at all.
+//
+// Every clause of this rule would advise on a contract export: PascalCase for `revalidate`, camelCase
+// for an arrow-function `POST`, and dropping the export from a `metadata` nothing imports. Each silent
+// case is paired with the same text where Next does not read it.
+func TestConsistencyRequireConstantCasingLeavesNextRouteContractsAlone(t *testing.T) {
+	t.Parallel()
+
+	const routeFile = "/repository/app/api/report/route.ts"
+	const pageFile = "/repository/app/blog/[slug]/page.tsx"
+	cases := []struct {
+		name       string
+		fileName   string
+		sourceText string
+		wantIds    []string
+	}{
+		{"revalidate in a page", pageFile, "export const revalidate = 60;", nil},
+		{"revalidate outside a route", constantCasingFile, "export const revalidate = 60;", []string{"requirePascalCaseExported"}},
+		{"an arrow POST in a route", routeFile, "export const POST = async () => new Response('');", nil},
+		{"an arrow POST outside a route", constantCasingFile, "export const POST = async () => new Response('');", []string{"requireCamelCaseFunction"}},
+		{"unstable_instant in a page", pageFile, "export const unstable_instant = false;", nil},
+		// Contracts differ by file: a route reads no metadata, so the export there is ours to judge.
+		{"metadata in a route is not a contract", routeFile, "export const metadata = { title: 'Title' };", []string{"requirePascalCaseExported"}},
+		// Only the export is the contract; a file-local constant with the spelling is judged as one.
+		{"an unexported POST is not read by Next", routeFile, "const POST = async () => new Response('');\nconsole.log(POST);", []string{"requireCamelCaseFunction"}},
+		{"a local PascalCase is still judged", pageFile, "const Revalidate = 60;\nconsole.log(Revalidate);", []string{"requireCamelCaseLocal"}},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.Run(t, ConsistencyRequireConstantCasing, testCase.fileName, testCase.sourceText)
+			if len(testCase.wantIds) == 0 {
+				rule_testing.ExpectClean(t, result)
+				return
+			}
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		})
+	}
+}
