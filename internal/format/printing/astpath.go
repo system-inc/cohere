@@ -82,6 +82,10 @@ func (path *AstPath[N]) Index() (int, bool) {
 	return index, isIndex
 }
 
+// Stack is upstream's path.stack, for the printers that read it directly (the YAML printer's
+// isLastDescendantNode walks it). The slice is the path's own: read it, never modify it.
+func (path *AstPath[N]) Stack() []any { return path.stack }
+
 // Value is upstream's path.node and getValue(): the current value, typed as the stack holds it.
 func (path *AstPath[N]) Value() any { return path.at(-1) }
 
