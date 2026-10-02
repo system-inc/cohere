@@ -10,9 +10,9 @@ const NodePath = require('node:path');
 
 const cohereBinaryFileName = process.platform === 'win32' ? 'cohere.exe' : 'cohere';
 
-// The arguments a save runs with. The engine is named until cohere's default becomes the native
-// printers; after that it is the default and the flag goes.
-const saveArguments = ['--fix', '--format', '--format-engine', 'native'];
+// The arguments a save runs with: the gate's own, with no engine named, so a save formats with whatever
+// cohere's default is.
+const saveArguments = ['--fix', '--format'];
 
 /*
  * Finds the cohere binary for a project, or returns undefined having found nothing.
