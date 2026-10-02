@@ -62,7 +62,15 @@ struct TypesPhase {
                 failedBuilds.append(result)
             }
             let directories = try buildDirectories(under: build.scratchPath)
+            /*
+             A build that failed and left nothing failed before the compiler ran (dependency resolution, the
+             manifest), which is a different fault from a build that succeeded into a layout we cannot read.
+             Measured: `--no-fix` on a copy of ahraos-macos without its gitignored Package.resolved.
+             */
             guard !directories.isEmpty else {
+                if !result.succeeded {
+                    throw TypesFailure(description: "swift build of \(build.root.path) failed before compiling anything, so the compiler never ran: \(Self.tail(of: result))")
+                }
                 throw TypesFailure(description: "the build of \(build.root.path) left no target directories under \(intermediates(of: build.scratchPath).path), so this engine does not recognise the build system's layout and cannot read what the compiler said\n\(Self.tail(of: result))")
             }
             targetDirectories.append(contentsOf: directories)
