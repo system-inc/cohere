@@ -792,8 +792,8 @@ func TestClassOrderLeavesTemplateRunsThePluginLeaves(t *testing.T) {
 			source: "const element = <div className={`flex items-center ${x} block gap-2`} />;",
 		},
 		{
-			// The plugin removes the repeat and sorts; no rule here removes repeats from a template's
-			// runs, so ordering around one would leave a list the author still cannot make clean.
+			// The repeat is no-duplicate-classes' finding and fix; the order lands the pass after, as
+			// TestTailwindFixersComposeInOnePass shows for a template whose runs hold repeats.
 			name:   "a run holding a repeat",
 			source: "const element = <div className={`items-center flex flex ${x}`} />;",
 		},

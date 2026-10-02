@@ -45,6 +45,13 @@ func TestTailwindFixersComposeInOnePass(t *testing.T) {
 			want:   "export const element = <div className={`flex items-center ${open ? 'm-2 p-4' : ''} block gap-2`} />;",
 		},
 		{
+			// Repeats inside both runs of a template: removed in the first pass, the runs ordered in
+			// the second. The plugin wrote exactly this for the same input.
+			name:   "a template whose runs hold repeats",
+			source: "export const element = <div className={`items-center flex  flex ${size} gap-2 block gap-2`} />;",
+			want:   "export const element = <div className={`flex items-center ${size} block gap-2`} />;",
+		},
+		{
 			// A deprecated class that has to move: the rename lands first and the order after it.
 			name:   "a deprecated class that moves, beside a repeat and padding",
 			source: `export const element = <div className=" items-center flex-grow  flex flex" />;`,

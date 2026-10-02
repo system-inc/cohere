@@ -126,7 +126,7 @@ var EnforceConsistentClassOrder = rule.Rule{
 		// read is the loud case, and it is reported once per file rather than swallowed, because a
 		// rule reporting zero findings over unreadable CSS is indistinguishable from a clean tree
 		// and that is the one failure cohere exists to remove.
-		designSystem := DesignSystemForProgram(ctx)
+		designSystem := DesignSystemForProgram(ctx.Program)
 		if designSystem.Err != nil {
 			if errors.Is(designSystem.Err, ErrNoTailwindEntryPoint) || ctx.Program == nil {
 				return nil
@@ -295,9 +295,10 @@ func reorderFixes(sourceText string, literal ClassLiteral, classes []string, ord
 //	`${x}items-center flex block`              ->  `${x}items-center block flex`
 //
 // Only the slots whose class changes are rewritten, so the whitespace rule's edits in the same runs
-// land in the same pass. A run holding a repeat is left unordered: the plugin removes repeats in
-// templates and `no-duplicate-classes` does not read a template's runs, so ordering around one
-// would report a list the author still cannot make clean.
+// land in the same pass. A run holding a repeat is ordered on the pass after `no-duplicate-classes`
+// removes it, the plugin's own order of operations: it dedupes a run, then sorts it. The repeat is
+// that rule's finding meanwhile, so the run is never left unordered in silence. A repeat split
+// across a hole is no repeat within either run and does not hold the ordering back.
 func reportTemplateClassOrder(ctx rule.Context, segments []ClassSegment, designSystem DesignSystemResult) {
 	sourceText := ctx.SourceFile.Text()
 	for index, segment := range segments {

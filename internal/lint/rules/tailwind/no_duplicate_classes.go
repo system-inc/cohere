@@ -85,6 +85,9 @@ var NoDuplicateClasses = rule.Rule{
 			for _, literal := range reader.ClassLiteralsIn(node) {
 				reportDuplicates(ctx, literal)
 			}
+			for _, segments := range reader.ClassTemplateSegmentsIn(node) {
+				reportTemplateDuplicates(ctx, segments)
+			}
 		}
 
 		listeners := rule.Listeners{}
@@ -157,6 +160,108 @@ func reportDuplicates(ctx rule.Context, literal ClassLiteral) {
 		ctx.Report(rule.Diagnostic{
 			Range:      literal.Range,
 			Message:    message,
+			SourceFile: ctx.SourceFile,
+			Fixes:      fixes,
+		})
+	}
+}
+
+// reportTemplateDuplicates finds repeats in the runs of a template with holes.
+//
+// A repeat inside one run is fixed exactly as in a literal, which is what Prettier's Tailwind plugin
+// does to the same run before sorting it: `flex flex ${size}` becomes `flex ${size}`. A repeat split
+// across a hole, `flex ${size} flex`, is reported and not fixed. Both classes apply whatever the hole
+// holds, so it is a real repeat, but the plugin dedupes each run on its own and leaves this one as
+// written, and a fix here would be the one rewrite of a class string the plugin never makes.
+//
+// A class glued to a hole is not a class: `px-` in `px-${size}` is half of one the hole completes,
+// so it is neither counted nor compared, matching the runs `enforce-consistent-class-order` leaves
+// in place. Until this read templates, a repeat in a template run was invisible to every rule here,
+// and the order rule, which leaves a run holding a repeat unordered, left it unordered in silence.
+func reportTemplateDuplicates(ctx rule.Context, segments []ClassSegment) {
+	sourceText := ""
+	if ctx.SourceFile != nil {
+		sourceText = ctx.SourceFile.Text()
+	}
+
+	type repeat struct {
+		segment  ClassSegment
+		fixes    []rule.Fix
+		fixable  bool
+		reported bool
+	}
+	repeats := map[string]*repeat{}
+	order := []string{}
+	seenInTemplate := map[string]bool{}
+
+	for index, segment := range segments {
+		if strings.Contains(segment.Text, "${") {
+			continue
+		}
+		tokens, tokenized := classTokensIn(sourceText, segment.Range, segment.Text)
+		if !tokenized {
+			tokens = classTokensOf(segment.Text, 0)
+		}
+		if len(tokens) == 0 {
+			continue
+		}
+
+		// The glued classes at either end, by the same test the plugin's ignoreFirst and ignoreLast
+		// make.
+		first, last := 0, len(tokens)
+		if index > 0 && !tokens[0].Separator {
+			first = 1
+		}
+		if index < len(segments)-1 && !tokens[len(tokens)-1].Separator {
+			last = len(tokens) - 1
+		}
+
+		seenInRun := map[string]bool{}
+		for tokenIndex := first; tokenIndex < last; tokenIndex++ {
+			token := tokens[tokenIndex]
+			if token.Separator {
+				continue
+			}
+			className := token.Text
+			if !seenInRun[className] && !seenInTemplate[className] {
+				seenInRun[className] = true
+				seenInTemplate[className] = true
+				continue
+			}
+
+			found, exists := repeats[className]
+			if !exists {
+				found = &repeat{segment: segment, fixable: true}
+				repeats[className] = found
+				order = append(order, className)
+			}
+			if !seenInRun[className] || !tokenized {
+				// Across a hole, or a run whose source is not its value: reported, not fixed.
+				found.fixable = false
+				seenInRun[className] = true
+				continue
+			}
+			separator := tokens[tokenIndex-1].Range
+			if separator.End() == separator.Pos()+1 {
+				found.fixes = append(found.fixes, rule.ReplaceRange(core.NewTextRange(separator.Pos(), token.Range.End()), ""))
+			} else {
+				found.fixes = append(found.fixes,
+					rule.ReplaceRange(core.NewTextRange(separator.Pos(), separator.Pos()+1), ""),
+					rule.ReplaceRange(token.Range, ""),
+				)
+			}
+		}
+	}
+
+	for _, className := range order {
+		found := repeats[className]
+		var fixes []rule.Fix
+		if found.fixable {
+			fixes = found.fixes
+		}
+		ctx.Report(rule.Diagnostic{
+			Range:      found.segment.Range,
+			Message:    messageDuplicateClass(className),
 			SourceFile: ctx.SourceFile,
 			Fixes:      fixes,
 		})

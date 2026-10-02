@@ -316,3 +316,60 @@ func TestAttributeOnlyReadingLosesFindings(t *testing.T) {
 			len(sourcesOnlyNonAttributeSurfacesCatch), lost)
 	}
 }
+
+// A repeat inside a template's run is read, and fixed the way Prettier's Tailwind plugin fixes it.
+//
+// Until this, no-duplicate-classes read only string literals, so a repeat in a template run was
+// invisible, and the order rule, which leaves a run holding a repeat unordered, left it unordered
+// in silence. Each fixed case is quoted from what the plugin wrote for the same input. A glued
+// fragment such as `px-` is half a class the hole completes, and is never compared.
+func TestNoDuplicateClassesReadsTemplateRuns(t *testing.T) {
+	for _, testCase := range []struct {
+		name, source, want string
+	}{
+		{
+			name:   "a repeat before a hole",
+			source: "const merged = mergeClassNames(`flex flex ${size}`);",
+			want:   "const merged = mergeClassNames(`flex ${size}`);",
+		},
+		{
+			name:   "a repeat in a run that ends glued to a hole",
+			source: "const merged = mergeClassNames(`items-center flex flex px-${size} block`);",
+			want:   "const merged = mergeClassNames(`items-center flex px-${size} block`);",
+		},
+		{
+			name:   "a repeat after a hole",
+			source: "const element = <div className={`${size} gap-2 block gap-2`} />;",
+			want:   "const element = <div className={`${size} gap-2 block`} />;",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", testCase.source)
+			rule_testing.ExpectFixedSource(t, result, testCase.want)
+		})
+	}
+}
+
+// A repeat split across a hole is reported and not fixed.
+//
+// Both classes apply whatever the hole holds, so it is a real repeat. The plugin dedupes each run on
+// its own and leaves `flex ${size} flex` as written, so a fix would be the one rewrite of a class
+// string the plugin never makes. The finding is what keeps it from sitting there silently.
+func TestNoDuplicateClassesReportsARepeatAcrossAHoleWithoutAFix(t *testing.T) {
+	result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", "const merged = mergeClassNames(`flex ${size} flex`);")
+	rule_testing.ExpectFindings(t, result, "duplicateClass")
+	if len(result.Diagnostics[0].Fixes) != 0 {
+		t.Fatalf("a repeat across a hole must not be fixed, got %+v", result.Diagnostics[0].Fixes)
+	}
+}
+
+// The template runs that hold no repeat, including glued fragments that look like one.
+func TestNoDuplicateClassesTemplateRunsStaySilent(t *testing.T) {
+	for _, source := range []string{
+		"const merged = mergeClassNames(`flex ${size} block`);",
+		"const merged = mergeClassNames(`px-${a} px-${b}`);",
+		"const merged = mergeClassNames(`flex px-${a} flex-${b} block`);",
+	} {
+		rule_testing.ExpectClean(t, rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", source))
+	}
+}

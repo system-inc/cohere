@@ -45,7 +45,13 @@ func classTokensIn(sourceText string, textRange core.TextRange, value string) ([
 	if start < 0 || end > len(sourceText) || start > end || sourceText[start:end] != value {
 		return nil, false
 	}
+	return classTokensOf(value, start), true
+}
 
+// classTokensOf splits a run of class text into its classes and separators, with ranges offset by
+// start. A caller that has no trustworthy source offset passes the text alone and uses only the
+// tokens' text, never their ranges.
+func classTokensOf(value string, start int) []classToken {
 	tokens := []classToken{}
 	index := 0
 	for index < len(value) {
@@ -60,7 +66,7 @@ func classTokensIn(sourceText string, textRange core.TextRange, value string) ([
 			Separator: separator,
 		})
 	}
-	return tokens, true
+	return tokens
 }
 
 // classesOf is the class tokens alone, in source order.
