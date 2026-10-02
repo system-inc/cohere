@@ -248,9 +248,9 @@ func TestRequireDescriptionCoversWhatCohereHonors(t *testing.T) {
 		{sourceText: "// eslint-enable"},
 		{sourceText: "/*\n * eslint-disable\n */", wantSpans: []string{"/*\n * eslint-disable\n */"}},
 		{sourceText: "/* eslint-disable-line\n */", wantSpans: []string{"/* eslint-disable-line\n */"}},
-		// The suppression parser reads a scope suffix with no word boundary after it, so this is a
-		// next-line directive naming `foo` to cohere and not a directive at all to ESLint.
-		{sourceText: "/* eslint-disable-next-line, foo */", wantSpans: []string{"/* eslint-disable-next-line, foo */"}},
+		// A scope word must end at whitespace or the end of the comment, as in ESLint, so this is not a
+		// directive to either engine.
+		{sourceText: "/* eslint-disable-next-line, foo */"},
 		{sourceText: "// eslint-disable -- generated", options: ``},
 		{sourceText: "// eslint-disable", options: `{"ignore":["eslint-disable"]}`},
 	})

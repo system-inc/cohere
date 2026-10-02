@@ -189,10 +189,10 @@ func splitDirective(body string) (rest string, found bool) {
 func splitScope(rest string) (scope Scope, remainder string, valid bool) {
 	switch {
 	case strings.HasPrefix(rest, "-next-line"):
-		return ScopeNextLine, rest[len("-next-line"):], true
+		return ScopeNextLine, rest[len("-next-line"):], endsWord(rest[len("-next-line"):])
 	case strings.HasPrefix(rest, "-line"):
-		return ScopeSameLine, rest[len("-line"):], true
-	case rest == "" || rest[0] == ' ' || rest[0] == '\t':
+		return ScopeSameLine, rest[len("-line"):], endsWord(rest[len("-line"):])
+	case endsWord(rest):
 		// The bare, file-level form.
 		return ScopeFile, rest, true
 	}
@@ -200,6 +200,17 @@ func splitScope(rest string) (scope Scope, remainder string, valid bool) {
 	// The directive is a prefix of a longer word — `eslint-disable-nonsense`, or `eslint-disabled`.
 	// Prose that merely contains a directive word must not silence a rule.
 	return ScopeFile, "", false
+}
+
+// endsWord reports whether the scope word just read is a whole word: the comment ends, or a space
+// or tab follows.
+//
+// Every scope needs it, not only the bare form. ESLint 10.8.1 reads none of these as a directive,
+// measured: `eslint-disable-next-line, no-console`, `eslint-disable-next-lineno-console`, and
+// `eslint-disable-lines no-console`. Without the check the first named `no-console` and the last
+// named a rule `s no-console`, each suppressing what ESLint reports.
+func endsWord(rest string) bool {
+	return rest == "" || rest[0] == ' ' || rest[0] == '\t'
 }
 
 // splitReason separates the rule list from the ` -- reason` that may follow it.

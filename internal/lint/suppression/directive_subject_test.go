@@ -85,6 +85,11 @@ func TestRecognizeAgreesWithBuild(t *testing.T) {
 		// A file-scope disable and an enable are block-comment forms only, ESLint's grammar.
 		{"// oxlint-disable", ""},
 		{"// eslint-enable foo", ""},
+		// A scope word ends at whitespace or the end of the comment, as in ESLint.
+		{"// eslint-disable-next-line, no-console", ""},
+		{"// eslint-disable-next-lineno-console", ""},
+		{"// eslint-disable-lines no-console", ""},
+		{"// eslint-disable-line\tno-console", directives.ScopeWordDisableLine},
 		{"/*\n * cohere-disable foo\n */", directives.ScopeWordDisable},
 		{"// cohere-disabled", ""},
 		{"// cohere-enabled", ""},
