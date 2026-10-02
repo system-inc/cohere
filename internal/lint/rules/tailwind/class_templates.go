@@ -119,7 +119,7 @@ func templateExpressionOf(node *ast.Node) *ast.Node {
 		return templateExpressionOf(expression.Expression)
 
 	// Same omission as the string reader had: parentheses are real nodes here, so `{(`px-${s}`)}`
-	// is invisible to a reader that only knows the kinds it expects. See stringLiteralOf for why
+	// is invisible to a reader that only knows the kinds it expects. See collectClassLiterals for why
 	// stripping is safe for these rules specifically and not a pattern to copy.
 	case ast.KindParenthesizedExpression:
 		parenthesized := node.AsParenthesizedExpression()

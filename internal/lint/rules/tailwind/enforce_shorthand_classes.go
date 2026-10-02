@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 // messageShorthandClasses names the longhands and the class that replaces them.
@@ -154,15 +155,21 @@ var shorthandGroups = [][]shorthandRule{
 // The rebuilt class carries the variants, the sign and the marker of the group it replaces, so
 // `hover:ps-4 hover:pe-4` becomes `hover:px-4` and `-mt-2 -mb-2` becomes `-my-2`.
 //
-// # Membership is not checked, which is a deliberate divergence
+// # Membership is checked, as upstream checks it
 //
 // Upstream asks the design system whether the shorthand it is about to suggest exists, and declines
-// when it does not. That guard exists for a repository that removed a utility from its theme. This
-// rule does not ask, and the reason is proportion: the table names 48 collapses over framework
-// utilities, a theme that removed one of them is a shape neither repository in this corpus has, and
-// asking would make this the fourth rule in the package to build a design system. If a repository
-// ever hits it, the finding names a class that does not compile and `no-unknown-classes` reports it
-// on the next line.
+// when it does not. This rule skipped that on the reasoning that a missing shorthand needs a theme
+// that removed a framework utility, a shape neither corpus repository has, and that
+// `no-unknown-classes` would catch the suggestion if one ever appeared.
+//
+// The table is patterns, and a pattern can build a class Tailwind never had. `w-screen h-screen`
+// matches `w-(.*) h-(.*)` and suggests `size-screen`, which does not exist: `w-screen` is `100vw`
+// and `h-screen` is `100vh`, so no one class sets both. Found when nested literals reached two of
+// them in ahra (#1hmzh0z), and the author following the finding would have deleted a working pair
+// for a class that does nothing. `no-unknown-classes` did catch it, one edit too late.
+//
+// So the design system is asked when there is one. Without a program (a syntactic fixture) or
+// without a Tailwind entry point there is nothing to ask, and the rule reports as it did.
 //
 // Not fixable, for the reason its siblings are not: a class literal here wraps across lines with
 // indentation that carries intent, and a fixer would be the first thing to reflow it.
@@ -176,9 +183,20 @@ var shorthandGroups = [][]shorthandRule{
 // state upstream's fix passes through rather than anything in the source a reader wrote.
 var EnforceShorthandClasses = rule.Rule{
 	Name: "better-tailwindcss/enforce-shorthand-classes",
+	// Declared because the rule reaches ctx.Program to ask the design system whether a shorthand
+	// exists, and a theme edit changes that answer without touching the linted file.
+	ReadsProgram: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil
+		}
+
+		// nil when there is no design system to ask, and classExistsIn answers true for nil.
+		var system *tailwindengine.LoadedDesignSystem
+		if ctx.Program != nil {
+			if designSystem := DesignSystemForProgram(ctx); designSystem.Err == nil {
+				system = designSystem.System
+			}
 		}
 
 		settings := DefaultClassLiteralSettings()
@@ -199,6 +217,9 @@ var EnforceShorthandClasses = rule.Rule{
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
 				for _, collapse := range shorthandCollapses(SplitClasses(literal.Text)) {
+					if !shorthandsExistIn(collapse.shorthands, system) {
+						continue
+					}
 					ctx.ReportRange(literal.Range, messageShorthandClasses(
 						strings.Join(collapse.longhands, " "),
 						strings.Join(collapse.shorthands, " "),
@@ -213,6 +234,16 @@ var EnforceShorthandClasses = rule.Rule{
 		}
 		return listeners
 	},
+}
+
+// shorthandsExistIn reports whether every class a collapse would suggest is one the design system has.
+func shorthandsExistIn(shorthands []string, system *tailwindengine.LoadedDesignSystem) bool {
+	for _, shorthand := range shorthands {
+		if !classExistsIn(shorthand, system) {
+			return false
+		}
+	}
+	return true
 }
 
 // shorthandCollapse is one reportable pair: the classes written and the class that replaces them.

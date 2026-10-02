@@ -39,20 +39,23 @@ func (r *ClassLiteralReader) ClassSegmentsIn(node *ast.Node) []ClassSegment {
 		return nil
 	}
 
-	// A plain string literal is one segment with no holes on either side.
+	// A plain string literal is one segment with no holes on either side, unless it sits inside a
+	// template's hole, where both of its edges touch the template's text once substituted and its
+	// edge whitespace is a separator (see ClassLiteral.InsideTemplateHole).
 	var segments []ClassSegment
 	for _, literal := range r.ClassLiteralsIn(node) {
 		segments = append(segments, ClassSegment{
-			Text:   literal.Text,
-			Range:  literal.Range,
-			Origin: literal.Origin,
+			Text:         literal.Text,
+			Range:        literal.Range,
+			LeadingHole:  literal.InsideTemplateHole,
+			TrailingHole: literal.InsideTemplateHole,
+			Origin:       literal.Origin,
 		})
 	}
-	if len(segments) > 0 {
-		return segments
-	}
 
-	// Otherwise a template, broken into its static runs.
+	// And a template, broken into its static runs, whether or not literals were found. They used to
+	// be alternatives, and once ClassLiteralsIn read the strings inside a template's holes, the
+	// template's own text would have been skipped whenever one of its holes held a string.
 	//
 	// Deliberately not routed through ClassTemplatesIn. That reader answers "where does static text
 	// meet an interpolation without whitespace", so it returns nothing for a template whose seams

@@ -30,6 +30,14 @@ type ClassLiteral struct {
 	// Origin says which reading rule found this literal, so a report can explain itself and a test
 	// can assert that all three surfaces are covered rather than only the obvious one.
 	Origin ClassLiteralOrigin
+	// InsideTemplateHole is set for a literal written inside a template's `${}`, at any depth.
+	//
+	// Its edge whitespace is load-bearing there: in `flex${open ? ' hidden' : ''}` the leading
+	// space is all that keeps `hidden` from fusing with `flex` once the value is substituted. A rule
+	// that trims a literal's edges must not trim these, which is the same thing
+	// `ClassSegment.LeadingHole` says about a template's own static text, and what the plugin's
+	// `canCollapseWhitespaceIn` decides from the same position.
+	InsideTemplateHole bool
 }
 
 // ClassLiteralOrigin is where a class string was written.
@@ -127,9 +135,22 @@ func ListenerKinds() []ast.Kind {
 
 // ClassLiteralsIn returns the class strings a node carries, or nothing.
 //
-// Only genuine string literals are returned. A template with a hole in it is knowable only in part,
-// and a class assembled at runtime is `no-concatenated-classes`'s finding rather than this reader's
-// problem.
+// Every string that can become the class value is returned, each as its own literal: the surface's
+// own string, and the strings in the branches of a conditional, the operands of `&&`, `||` and `??`
+// that can be the result, the elements of an array, and the expressions inside a template's holes.
+// Prettier's Tailwind plugin sorted every one of these, and until #vf1hd6j measured it this reader
+// returned only the first: 364 nested literals in ahra and 299 in www-phi-health that no rule here
+// had ever read.
+//
+// Value positions only, which is narrower than the plugin. Its `sortInside` visits every string
+// under the braces, so in `size === 'sm' ? 'p-2' : 'p-4'` it also reads `'sm'`. Sorting a single
+// word is a no-op, so the plugin loses nothing by it; reporting `'primary-large'` from a comparison
+// as an unknown class would be a false positive. A condition is not a class list.
+//
+// Each literal stands alone, so a rule comparing classes within one literal never compares the two
+// branches of a conditional, which are never applied together. The static text of a template with
+// holes is not a literal here: a class assembled at runtime is `no-concatenated-classes`'s finding,
+// and `ClassSegmentsIn` reads that text for the rules that edit it.
 func (r *ClassLiteralReader) ClassLiteralsIn(node *ast.Node) []ClassLiteral {
 	if node == nil {
 		return nil
@@ -160,11 +181,7 @@ func (r *ClassLiteralReader) attributeLiterals(node *ast.Node) []ClassLiteral {
 		return nil
 	}
 
-	literal := stringLiteralOf(attribute.Initializer)
-	if literal == nil {
-		return nil
-	}
-	return []ClassLiteral{classLiteralFrom(literal, ClassLiteralOriginAttribute)}
+	return classLiteralsUnder(attribute.Initializer, ClassLiteralOriginAttribute)
 }
 
 func (r *ClassLiteralReader) calleeLiterals(node *ast.Node) []ClassLiteral {
@@ -188,9 +205,7 @@ func (r *ClassLiteralReader) calleeLiterals(node *ast.Node) []ClassLiteral {
 		return nil
 	}
 	for _, argument := range call.Arguments.Nodes {
-		if literal := stringLiteralOf(argument); literal != nil {
-			literals = append(literals, classLiteralFrom(literal, ClassLiteralOriginCallee))
-		}
+		literals = append(literals, classLiteralsUnder(argument, ClassLiteralOriginCallee)...)
 	}
 	return literals
 }
@@ -217,34 +232,38 @@ func (r *ClassLiteralReader) variableLiterals(node *ast.Node) []ClassLiteral {
 		return nil
 	}
 
-	literal := stringLiteralOf(declaration.Initializer)
-	if literal == nil {
-		return nil
-	}
-	return []ClassLiteral{classLiteralFrom(literal, ClassLiteralOriginVariable)}
+	return classLiteralsUnder(declaration.Initializer, ClassLiteralOriginVariable)
 }
 
-// stringLiteralOf unwraps the shapes a class string can arrive in.
+// classLiteralsUnder collects every string literal in a value position under an expression.
+func classLiteralsUnder(node *ast.Node, origin ClassLiteralOrigin) []ClassLiteral {
+	literals := []ClassLiteral{}
+	collectClassLiterals(node, origin, false, &literals)
+	return literals
+}
+
+// collectClassLiterals walks the shapes a class value can arrive through, keeping the strings.
 //
-// A JSX attribute may hold the literal directly (`className="a b"`) or inside an expression
-// container (`className={"a b"}`), and both are equally static. A template literal with no
-// substitutions is also fully known, but is deliberately excluded: its raw text can contain escapes
-// whose decoded length differs from the source, which would make an offset-based fix wrong.
-func stringLiteralOf(node *ast.Node) *ast.Node {
+// `&&` contributes only its right side, because its left side is the result only when it is falsy,
+// and a class string is never falsy unless it is empty. `||` and `??` contribute both, since either
+// side can be the result. Anything else, a call, a member access, a comparison, is not a class list
+// and is not entered: in `cn(getSize('sm px-2'))` the string is an argument to a function nobody
+// named as a class callee.
+func collectClassLiterals(node *ast.Node, origin ClassLiteralOrigin, insideTemplateHole bool, literals *[]ClassLiteral) {
 	if node == nil {
-		return nil
+		return
 	}
 
 	switch node.Kind {
-	case ast.KindStringLiteral:
-		return node
+	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
+		literal := classLiteralFrom(node, origin)
+		literal.InsideTemplateHole = insideTemplateHole
+		*literals = append(*literals, literal)
 
 	case ast.KindJsxExpression:
-		expression := node.AsJsxExpression()
-		if expression == nil {
-			return nil
+		if expression := node.AsJsxExpression(); expression != nil {
+			collectClassLiterals(expression.Expression, origin, insideTemplateHole, literals)
 		}
-		return stringLiteralOf(expression.Expression)
 
 	// `className={('flex flex')}` is legal and means exactly what the unparenthesized form means.
 	//
@@ -258,14 +277,52 @@ func stringLiteralOf(node *ast.Node) *ast.Node {
 	// parentheses cannot change them; it is not correct everywhere, and a rule whose verdict
 	// depends on the parse shape must not copy this.
 	case ast.KindParenthesizedExpression:
-		parenthesized := node.AsParenthesizedExpression()
-		if parenthesized == nil {
-			return nil
+		if parenthesized := node.AsParenthesizedExpression(); parenthesized != nil {
+			collectClassLiterals(parenthesized.Expression, origin, insideTemplateHole, literals)
 		}
-		return stringLiteralOf(parenthesized.Expression)
-	}
 
-	return nil
+	case ast.KindAsExpression:
+		collectClassLiterals(node.AsAsExpression().Expression, origin, insideTemplateHole, literals)
+
+	case ast.KindSatisfiesExpression:
+		collectClassLiterals(node.AsSatisfiesExpression().Expression, origin, insideTemplateHole, literals)
+
+	case ast.KindConditionalExpression:
+		conditional := node.AsConditionalExpression()
+		collectClassLiterals(conditional.WhenTrue, origin, insideTemplateHole, literals)
+		collectClassLiterals(conditional.WhenFalse, origin, insideTemplateHole, literals)
+
+	case ast.KindBinaryExpression:
+		binary := node.AsBinaryExpression()
+		if binary.OperatorToken == nil {
+			return
+		}
+		switch binary.OperatorToken.Kind {
+		case ast.KindAmpersandAmpersandToken:
+			collectClassLiterals(binary.Right, origin, insideTemplateHole, literals)
+		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
+			collectClassLiterals(binary.Left, origin, insideTemplateHole, literals)
+			collectClassLiterals(binary.Right, origin, insideTemplateHole, literals)
+		}
+
+	case ast.KindArrayLiteralExpression:
+		if elements := node.AsArrayLiteralExpression().Elements; elements != nil {
+			for _, element := range elements.Nodes {
+				collectClassLiterals(element, origin, insideTemplateHole, literals)
+			}
+		}
+
+	case ast.KindTemplateExpression:
+		template := node.AsTemplateExpression()
+		if template.TemplateSpans == nil {
+			return
+		}
+		for _, spanNode := range template.TemplateSpans.Nodes {
+			if span := spanNode.AsTemplateSpan(); span != nil {
+				collectClassLiterals(span.Expression, origin, true, literals)
+			}
+		}
+	}
 }
 
 // classLiteralFrom records the literal and the span of its contents.

@@ -172,8 +172,7 @@ func reportDeprecations(ctx rule.Context, literal ClassLiteral) {
 		return
 	}
 
-	// The class tokens line up with `classes` one for one, or the per-class fix is not available and
-	// the whole-literal rewrite stands in for it.
+	// The class tokens line up with `classes` one for one, or there is no fix to offer.
 	var tokens []classToken
 	tokenized := false
 	if ctx.SourceFile != nil {
@@ -191,31 +190,16 @@ func reportDeprecations(ctx rule.Context, literal ClassLiteral) {
 		tokenized = false
 	}
 
-	rewritten := make([]string, 0, len(classes))
 	type finding struct {
 		className   string
 		replacement string
 		index       int
 	}
 	var findings []finding
-	anyRewritten := false
-
 	for index, className := range classes {
-		replacement, isDeprecated := deprecationFor(className)
-		if !isDeprecated {
-			rewritten = append(rewritten, className)
-			continue
+		if replacement, isDeprecated := deprecationFor(className); isDeprecated {
+			findings = append(findings, finding{className: className, replacement: replacement, index: index})
 		}
-
-		findings = append(findings, finding{className: className, replacement: replacement, index: index})
-		if replacement == "" {
-			// Removed outright: keep the class as written, because this rule has no rewrite to offer
-			// and dropping it would change what renders.
-			rewritten = append(rewritten, className)
-			continue
-		}
-		rewritten = append(rewritten, replacement)
-		anyRewritten = true
 	}
 
 	if len(findings) == 0 {
@@ -223,11 +207,13 @@ func reportDeprecations(ctx rule.Context, literal ClassLiteral) {
 	}
 
 	// A literal holding a template hole is only partly known, so its classes can be reported but its
-	// text must not be rebuilt from the fragments the reader could see.
-	canFix := anyRewritten && !strings.Contains(literal.Text, "${")
+	// text must not be rewritten from the fragments the reader could see.
+	canFix := !strings.Contains(literal.Text, "${")
 
 	for _, found := range findings {
 		if found.replacement == "" {
+			// Removed outright: reported and left as written, because this rule has no rewrite to offer
+			// and dropping the class would change what renders.
 			ctx.ReportRange(literal.Range, messageDeprecatedClassIrreplaceable(found.className))
 			continue
 		}
@@ -238,12 +224,11 @@ func reportDeprecations(ctx rule.Context, literal ClassLiteral) {
 			continue
 		}
 
-		fixes := []rule.Fix{rule.ReplaceRange(literal.Range, strings.Join(rewritten, " "))}
-		if tokenized {
-			fixes = nil
-			if !containsString(classes[:found.index], found.className) {
-				fixes = []rule.Fix{rule.ReplaceRange(classTokens[found.index].Range, found.replacement)}
-			}
+		// Without tokens the literal's source is not its decoded value, and it is reported without a
+		// fix for the reason no-unnecessary-whitespace gives.
+		var fixes []rule.Fix
+		if tokenized && !containsString(classes[:found.index], found.className) {
+			fixes = []rule.Fix{rule.ReplaceRange(classTokens[found.index].Range, found.replacement)}
 		}
 
 		ctx.Report(rule.Diagnostic{

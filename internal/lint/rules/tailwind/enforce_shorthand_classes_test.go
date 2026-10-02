@@ -1,6 +1,8 @@
 package tailwind
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -175,4 +177,34 @@ func TestEnforceShorthandClassesReportsEachFamilySeparately(t *testing.T) {
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("expected two findings, got %d", len(result.Diagnostics))
 	}
+}
+
+// The suggested shorthand has to exist, which only a design system can say.
+//
+// `w-screen h-screen` matches the `w-(.*) h-(.*)` pattern and would suggest `size-screen`, a class
+// Tailwind never had: the two set `100vw` and `100vh`. The pair stays, and `w-auto h-auto` beside it
+// is the control that the rule still fires through the same harness. Before the check, both
+// reported, and nested literals put two `w-screen h-screen` findings on ahra.
+func TestEnforceShorthandClassesSuggestsOnlyClassesThatExist(t *testing.T) {
+	packageRoot := classOrderFixturePackageRoot()
+	if packageRoot == "" {
+		t.Skip("no installed tailwindcss on this machine, so there is no design system to ask")
+	}
+	run := func(source string) rule_testing.Result {
+		return rule_testing.RunTypedFilesWithSetup(t, EnforceShorthandClasses, map[string]string{
+			"Component.tsx":                 source,
+			classOrderFixtureStylesheetPath: classOrderFixtureStylesheet,
+		}, "Component.tsx", func(root string) {
+			modules := filepath.Join(root, "node_modules")
+			if err := os.MkdirAll(modules, 0o755); err != nil {
+				t.Fatalf("creating the fixture node_modules: %v", err)
+			}
+			if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
+				t.Fatalf("linking the installed tailwindcss into the fixture: %v", err)
+			}
+		})
+	}
+
+	rule_testing.ExpectClean(t, run(`const element = <div className="h-screen w-screen" />;`))
+	rule_testing.ExpectFindings(t, run(`const element = <div className="h-auto w-auto" />;`), "shorthandClasses")
 }

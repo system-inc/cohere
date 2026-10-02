@@ -72,14 +72,17 @@ var NoUnnecessaryWhitespace = rule.Rule{
 
 		report := func(node *ast.Node) {
 			for _, segment := range reader.ClassSegmentsIn(node) {
-				tidied, needsTidying := tidyWhitespace(segment)
+				_, needsTidying := tidyWhitespace(segment)
 				if !needsTidying {
 					continue
 				}
 
+				// A segment whose source is not its decoded value is reported without a fix. Writing the
+				// decoded text back over the source would turn an escaped quote or backtick into a
+				// bare one, the file would stop parsing, and the engine would refuse every fix in it.
 				fixes, scoped := whitespaceDeletions(ctx.SourceFile.Text(), segment)
 				if !scoped {
-					fixes = []rule.Fix{rule.ReplaceRange(segment.Range, tidied)}
+					fixes = nil
 				}
 
 				ctx.Report(rule.Diagnostic{
@@ -162,7 +165,7 @@ func tidyWhitespace(segment ClassSegment) (string, bool) {
 //
 // Applied together the deletions produce exactly `tidyWhitespace`'s text: a run at an outer edge with
 // no hole beside it goes entirely, and any other run keeps its first character. False when the
-// segment's source is not its decoded value, and the caller falls back to rewriting the segment.
+// segment's source is not its decoded value, and the caller reports without a fix.
 func whitespaceDeletions(sourceText string, segment ClassSegment) ([]rule.Fix, bool) {
 	tokens, tokenized := classTokensIn(sourceText, segment.Range, segment.Text)
 	if !tokenized {

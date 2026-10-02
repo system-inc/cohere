@@ -146,7 +146,10 @@ func reportDuplicates(ctx rule.Context, literal ClassLiteral) {
 		// whole-literal rewrite this replaced was attached to every duplicated class's diagnostic,
 		// so a literal with two duplicated classes proposed the same edit twice and the engine
 		// refused the second as an overlap.
-		fixes := []rule.Fix{deduplicateFix(literal)}
+		// A literal whose source is not its decoded value is reported without a fix, for the reason
+		// no-unnecessary-whitespace gives: decoded text written over an escape can stop the file
+		// parsing, and then nothing in it is fixed.
+		var fixes []rule.Fix
 		if tokenized {
 			fixes = repeatDeletions(tokens, className)
 		}
@@ -193,24 +196,6 @@ func repeatDeletions(tokens []classToken, className string) []rule.Fix {
 		)
 	}
 	return fixes
-}
-
-// deduplicateFix rewrites the literal's contents with every repeat removed, for a literal whose
-// source is not its decoded value and so cannot be tokenized at source offsets.
-func deduplicateFix(literal ClassLiteral) rule.Fix {
-	classes := strings.Fields(literal.Text)
-	seen := make(map[string]bool, len(classes))
-	kept := make([]string, 0, len(classes))
-
-	for _, className := range classes {
-		if seen[className] {
-			continue
-		}
-		seen[className] = true
-		kept = append(kept, className)
-	}
-
-	return rule.ReplaceRange(literal.Range, strings.Join(kept, " "))
 }
 
 func containsString(values []string, want string) bool {
