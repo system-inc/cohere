@@ -10,6 +10,14 @@ import SwiftSyntax
 
  Only the discarded form is matched. Of the 1,428 `try?` the design doc counted, most use their value,
  and those are not the rule's business.
+
+ A `try?` that is the only statement of a body is often that body's value, not a discard, and syntax says
+ so in most places: a function or getter with a return type, a computed property, an `if` or `switch` used
+ as an expression. Those are skipped. A closure's sole `try?` is skipped too, because syntax cannot tell
+ `compactMap { try? fit($0) }` (a value) from `Task { try? await Task.sleep(for: delay) }` (a discard):
+ `Task.detached { try? read() }.value` shows even the callee does not decide. The Void case is a known
+ miss until the typed tier can read the closure's type. Raised by @system_cohere_swift_ahraos_presence,
+ measured at about 30 of Presence's 515 findings.
  */
 public struct NoDiscardedTryOptional: FileRule {
     public let name = "cohere-swift/no-discarded-try-optional"
@@ -43,9 +51,49 @@ public struct NoDiscardedTryOptional: FileRule {
             return .visitChildren
         }
 
-        /* `try? work()` on its own line: the expression is the whole code-block item. */
+        /* `try? work()` on its own line: the expression is the whole code-block item, and not the value of its body. */
         static func isStatement(_ node: TryExprSyntax) -> Bool {
-            node.parent?.is(CodeBlockItemSyntax.self) == true
+            guard let item = node.parent?.as(CodeBlockItemSyntax.self) else { return false }
+            return !isImplicitValue(item)
+        }
+
+        /* Whether the item is the sole statement of a body that returns it: the implicit-return positions. */
+        static func isImplicitValue(_ item: CodeBlockItemSyntax) -> Bool {
+            guard let list = item.parent?.as(CodeBlockItemListSyntax.self), list.count == 1, let owner = list.parent else { return false }
+            if owner.is(ClosureExprSyntax.self) || owner.is(AccessorBlockSyntax.self) {
+                return true
+            }
+            if let switchCase = owner.as(SwitchCaseSyntax.self) {
+                return switchCase.parent?.parent.map(isUsedAsValue) ?? false
+            }
+            guard let block = owner.as(CodeBlockSyntax.self), let body = block.parent else { return false }
+            if let function = body.as(FunctionDeclSyntax.self) {
+                return function.signature.returnClause.map { !isVoid($0.type) } ?? false
+            }
+            if let accessor = body.as(AccessorDeclSyntax.self) {
+                return accessor.accessorSpecifier.tokenKind == .keyword(.get)
+            }
+            if body.is(IfExprSyntax.self) {
+                return isUsedAsValue(body)
+            }
+            return false
+        }
+
+        /* An `if` or `switch` is a value unless it stands as a statement; an `else if` answers for its whole chain. */
+        static func isUsedAsValue(_ expression: Syntax) -> Bool {
+            var top = expression
+            while let parent = top.parent, parent.is(IfExprSyntax.self) {
+                top = parent
+            }
+            guard let parent = top.parent else { return false }
+            return !(parent.is(CodeBlockItemSyntax.self) || parent.is(ExpressionStmtSyntax.self))
+        }
+
+        static func isVoid(_ type: TypeSyntax) -> Bool {
+            if let tuple = type.as(TupleTypeSyntax.self) {
+                return tuple.elements.isEmpty
+            }
+            return type.as(IdentifierTypeSyntax.self)?.name.text == "Void"
         }
 
         /* `_ = try? work()`, which the unfolded tree spells as the sequence `_`, `=`, `try? work()`. */

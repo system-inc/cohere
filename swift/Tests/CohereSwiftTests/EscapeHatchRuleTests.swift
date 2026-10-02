@@ -63,6 +63,39 @@ struct EscapeHatchRuleTests {
         #expect(Self.lines(NoDiscardedTryOptional(), source) == [2, 3])
     }
 
+    /* A sole `try?` is its body's value wherever the body returns one (the shapes @system_cohere_swift_ahraos_presence found on Presence), and a discard wherever it does not. */
+    @Test func aSoleTryOptionalThatIsItsBodysValueIsNotADiscard() {
+        let values = """
+            let looks = data.flatMap { try? decoder.decode([Look].self, from: $0) } ?? []
+            let ledges = candidates.compactMap { try? self.fit(ledge: $0) }
+            func latency() -> Double? { try? OutputLatency.read() }
+            var duration: Double? { try? asset.duration() }
+            var cached: Data? {
+                get { try? Data(contentsOf: url) }
+            }
+            let chosen = if fast { try? quick() } else { try? slow() }
+            let picked = switch mode {
+            case .fast: try? quick()
+            default: nil
+            }
+            """
+        #expect(Self.lines(NoDiscardedTryOptional(), values).isEmpty)
+        let discards = """
+            func cleanUp() { try? FileManager.default.removeItem(at: url) }
+            func reset() -> Void { try? store.clear() }
+            if stale { try? cache.purge() }
+            switch mode {
+            case .fast: try? quick()
+            default: break
+            }
+            let runs = items.map { item in
+                try? item.write()
+                return item
+            }
+            """
+        #expect(Self.lines(NoDiscardedTryOptional(), discards) == [1, 2, 3, 5, 9])
+    }
+
     @Test func failuresWithoutMessagesAreFound() {
         let source = """
             fatalError()
