@@ -41,13 +41,14 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 		return 1, err
 	}
 
-	binaryPath, err := resolveSwiftEngineBinary(location)
+	binaryPath, sourceCommit, err := resolveSwiftEngineBinary(location, release.Current())
 	if err != nil {
 		return 1, err
 	}
 
 	run := newSwiftRun(os.Stdout, mode, location.rootNote(), processStart)
 	run.details = given["coverage"] && flagValue("coverage") == "true"
+	run.engineSourceCommit = sourceCommit
 	return runEngineBinary(binaryPath, arguments, run, os.Stderr)
 }
 
@@ -57,26 +58,44 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 // builds for every gate, gets an engine built from that same commit. Any other cohere, a `--dev` build
 // from a dirty tree included, gets one built from the working tree, so a development run checks
 // development rules in both engines and says so through both provenance records.
-func resolveSwiftEngineBinary(location projectLocation) (string, error) {
+//
+// The second value is the commit whose Swift sources the engine is guaranteed to match, or empty when
+// nothing guarantees it: an engine named by the override, or one built from the working tree. The
+// provenance is this cohere's, passed in rather than read here so a test can state a clean named commit,
+// which a test binary never has, and prove the override still vouches for none.
+func resolveSwiftEngineBinary(location projectLocation, provenance release.Provenance) (string, string, error) {
 	if named := os.Getenv(dispatch.SwiftEngineOverrideVariable); named != "" {
 		if !isRegularFile(named) {
-			return "", fmt.Errorf("%s names %s, which is not a file, so nothing was checked", dispatch.SwiftEngineOverrideVariable, named)
+			return "", "", fmt.Errorf("%s names %s, which is not a file, so nothing was checked", dispatch.SwiftEngineOverrideVariable, named)
 		}
 		fmt.Fprintf(os.Stderr, "cohere: running the Swift engine %s named by %s, not one built from the sources on disk\n",
 			named, dispatch.SwiftEngineOverrideVariable)
-		return named, nil
+		return named, "", nil
 	}
 
 	moduleDirectory, err := dispatch.FindModuleDirectory()
 	if err != nil {
-		return "", fmt.Errorf("%s is a Swift package, and the Swift engine is built from a cohere checkout: %w", location.Root, err)
+		return "", "", fmt.Errorf("%s is a Swift package, and the Swift engine is built from a cohere checkout: %w", location.Root, err)
 	}
-	commit := ""
-	if provenance := release.Current(); provenance.SelfCommit != "" && !provenance.SourceTreeModified {
-		commit = provenance.SelfCommit
-	}
+	commit := committedSwiftSource(provenance)
 	binaryPath, _, err := dispatch.ResolveSwiftEngine(dispatch.DefaultPaths(moduleDirectory), commit, swiftContractVersion)
-	return binaryPath, err
+	if err != nil {
+		return "", "", err
+	}
+	return binaryPath, commit, nil
+}
+
+// committedSwiftSource is the commit the Swift engine is built from, or empty for the working tree.
+//
+// Only a cohere that names its commit and was built from a tree with nothing uncommitted in it has a
+// commit to offer: anything else could not be reproduced from one, so neither could an engine built to
+// match it. That empty answer is also what keeps `cohere --version` from claiming a commit for an engine
+// nothing vouches for.
+func committedSwiftSource(provenance release.Provenance) string {
+	if provenance.SelfCommit != "" && !provenance.SourceTreeModified {
+		return provenance.SelfCommit
+	}
+	return ""
 }
 
 // flagValue reads a parsed flag's value by name.

@@ -117,11 +117,11 @@ func committedSwiftEngineHash(moduleDirectory string, commit string, toolchain s
 	if err != nil {
 		// rev-parse with several arguments stops at the first it cannot resolve, so the message names
 		// what was asked rather than guessing which one was missing.
-		return "", fmt.Errorf("reading the Swift engine's inputs at %s (%s): %w", shortCommit(commit), strings.Join(swiftEngineInputs, ", "), err)
+		return "", fmt.Errorf("reading the Swift engine's inputs at %s (%s): %w", ShortCommit(commit), strings.Join(swiftEngineInputs, ", "), err)
 	}
 	objects := strings.Fields(output)
 	if len(objects) != len(swiftEngineInputs) {
-		return "", fmt.Errorf("asked git for %d Swift engine inputs at %s and got %d answers", len(swiftEngineInputs), shortCommit(commit), len(objects))
+		return "", fmt.Errorf("asked git for %d Swift engine inputs at %s and got %d answers", len(swiftEngineInputs), ShortCommit(commit), len(objects))
 	}
 
 	digest := sha256.New()
@@ -149,7 +149,7 @@ func checkOutWorktree(moduleDirectory string, worktree string, commit string) er
 		return err
 	}
 	if _, err := gitOutput(worktree, "checkout", "--quiet", "--detach", commit); err != nil {
-		return fmt.Errorf("moving the Swift engine's worktree to %s: %w", shortCommit(commit), err)
+		return fmt.Errorf("moving the Swift engine's worktree to %s: %w", ShortCommit(commit), err)
 	}
 	return requireWorktreeAt(worktree, commit)
 }
@@ -175,7 +175,7 @@ func requireWorktreeAt(worktree string, commit string) error {
 		return fmt.Errorf("reading the Swift engine's worktree: %w", err)
 	}
 	if strings.TrimSpace(head) != commit {
-		return fmt.Errorf("the Swift engine's worktree is at %s after checking out %s", shortCommit(strings.TrimSpace(head)), shortCommit(commit))
+		return fmt.Errorf("the Swift engine's worktree is at %s after checking out %s", ShortCommit(strings.TrimSpace(head)), ShortCommit(commit))
 	}
 	return requireCleanWorktree(worktree)
 }
@@ -193,7 +193,7 @@ func proveCommittedSwiftEngine(binaryPath string, commit string, contract int) e
 	output, err := command.Output()
 	if err != nil {
 		return fmt.Errorf("the Swift engine built from %s failed its own --version (%w), so it was not cached: %s",
-			shortCommit(commit), err, strings.TrimSpace(standardError.String()))
+			ShortCommit(commit), err, strings.TrimSpace(standardError.String()))
 	}
 
 	scanner := bufio.NewScanner(bytes.NewReader(output))
@@ -206,13 +206,13 @@ func proveCommittedSwiftEngine(binaryPath string, commit string, contract int) e
 			continue
 		}
 		if record.SourceTreeModified == nil {
-			return fmt.Errorf("the Swift engine built from %s reported provenance without sourceTreeModified, so it was not cached", shortCommit(commit))
+			return fmt.Errorf("the Swift engine built from %s reported provenance without sourceTreeModified, so it was not cached", ShortCommit(commit))
 		}
 		if *record.SourceTreeModified {
 			return fmt.Errorf("the Swift engine built from %s reports a modified source tree, which a build from a clean worktree at that commit cannot have, so it was not cached",
-				shortCommit(commit))
+				ShortCommit(commit))
 		}
 		return nil
 	}
-	return fmt.Errorf("the Swift engine built from %s printed no provenance record for --version, so it was not cached:\n%s", shortCommit(commit), output)
+	return fmt.Errorf("the Swift engine built from %s printed no provenance record for --version, so it was not cached:\n%s", ShortCommit(commit), output)
 }

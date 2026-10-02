@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/edit"
+	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
@@ -154,6 +155,14 @@ type swiftRun struct {
 	// details is `--coverage`: name every rule once under its coverage fact rather than only counting.
 	// A front-door flag, never forwarded: the engine's records already carry what it names.
 	details bool
+
+	// engineSourceCommit is the commit whose Swift sources the engine is guaranteed to be built from,
+	// or empty when nothing vouches for it. Set only when the engine came through the launcher's
+	// committed path, whose cache key is the object ids of that commit's Swift inputs. The engine itself
+	// says `commit dev` and must: one cached engine serves every commit with identical Swift inputs, so a
+	// commit baked into it would name whichever commit built it first, true of the build and false of
+	// the run. The front door knows the run.
+	engineSourceCommit string
 
 	provenance *swiftProvenanceRecord
 	project    *swiftProjectRecord
@@ -634,6 +643,10 @@ func (r *swiftRun) finish(engineExit int, ended string) (int, error) {
 			r.provenance.Toolchain, r.provenance.SwiftSyntax, r.provenance.SwiftFormat)
 		if r.provenance.SourceTreeModified {
 			fmt.Fprintln(r.out, "  the Swift engine was built from a modified tree, so no commit reproduces it")
+		}
+		if r.engineSourceCommit != "" {
+			fmt.Fprintf(r.out, "  the Swift engine was built from Swift sources identical to commit %s, as the launcher's cache key requires\n",
+				dispatch.ShortCommit(r.engineSourceCommit))
 		}
 		return 0, nil
 
