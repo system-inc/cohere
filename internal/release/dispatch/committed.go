@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 )
 
 // The launcher builds the cohere every project's gate runs from the checkout's committed tree, never
@@ -218,7 +219,43 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 	if err := os.Rename(temporary, binaryPath); err != nil {
 		return fmt.Errorf("moving the built binary into the cache: %w", err)
 	}
+
+	pruneAfterBuild(paths, binaryPath, compiler)
 	return nil
+}
+
+// pruneAfterBuild trims the binary cache once a new binary is in it, which is when the cache grows.
+//
+// It never fails the build: the binary is built and proven, and a prune that could not finish leaves
+// the cache as large as it was, which is the state it started in. It says so instead. Every outcome
+// goes to the prune log, a prune that removed nothing included, and stderr hears only when something
+// was removed, so an ordinary build stays quiet.
+func pruneAfterBuild(paths Paths, keep string, currentCompiler string) {
+	now := time.Now()
+	plan, err := PlanPrune(paths, []string{keep}, currentCompiler, now)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cohere: the cache was not pruned: %v\n", err)
+		return
+	}
+	removed, applyErr := ApplyPrune(paths, plan)
+	if err := RecordPrune(paths, plan, removed, now); err != nil {
+		fmt.Fprintf(os.Stderr, "cohere: the prune log was not written: %v\n", err)
+	}
+	if len(removed) > 0 {
+		bytes := int64(0)
+		for _, file := range removed {
+			bytes += file.Bytes
+		}
+		fmt.Fprintf(os.Stderr, "cohere: pruned %d cached binaries (%.1f GB) unused for over an hour; names in %s\n",
+			len(removed), float64(bytes)/1e9, paths.PruneLogPath())
+	}
+	if applyErr != nil {
+		fmt.Fprintf(os.Stderr, "cohere: the prune stopped part way: %v\n", applyErr)
+	}
+	if len(plan.StaleCompilers) > 0 {
+		fmt.Fprintf(os.Stderr, "cohere: %d compiler extraction(s) under %s are no longer in use and were kept; each is 66,000 files, so removing one is a call for whoever moved the pin\n",
+			len(plan.StaleCompilers), paths.CompilerDirectory())
+	}
 }
 
 // committedPatchFiles lists the compiler patches as the snapshot holds them, in the order they apply.
