@@ -18,8 +18,8 @@ func TestRuleReferencesNameEveryRuleEveryDirectiveWrote(t *testing.T) {
 		"/* eslint-enable no-such-rule */",
 		"// eslint-disable-next-line",
 		"const text = '// eslint-disable-next-line inside-a-string';",
-		// Prose to ESLint, which reads a file-scope disable or an enable only in a block comment, so
-		// it can never report these names. The phi web sentence is verbatim.
+		// Not directives: a file-scope disable or an enable counts only as a block comment, ESLint's
+		// grammar (directives.isLineComment). The phi web sentence is verbatim.
 		"// eslint-disable + generated banner keep the linter and future readers out.",
 		"// eslint-enable no-such-rule",
 	}

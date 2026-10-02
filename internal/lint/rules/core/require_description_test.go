@@ -241,10 +241,11 @@ func TestRequireDescriptionCoversWhatCohereHonors(t *testing.T) {
 		{sourceText: "// cohere-disable-next-line foo", options: `{"ignore":["eslint-disable-next-line"]}`},
 		{sourceText: "/* cohere-enable */", options: `{"ignore":["eslint-enable"]}`},
 		{sourceText: "/* cohere-disable */", options: `{"ignore":["eslint-disable-line"]}`, wantSpans: []string{"/* cohere-disable */"}},
-		// eslint spellings ESLint ignores and cohere honors.
-		{sourceText: "// eslint-disable", wantSpans: []string{"// eslint-disable"}},
-		{sourceText: "// eslint-disable eqeqeq", wantSpans: []string{"// eslint-disable eqeqeq"}},
-		{sourceText: "// eslint-enable", wantSpans: []string{"// eslint-enable"}},
+		// A file-scope disable and an enable written as `//` are prose to ESLint, and since Kirk's
+		// ruling of 2026-10-01 to cohere too, so there is no directive to describe.
+		{sourceText: "// eslint-disable"},
+		{sourceText: "// eslint-disable eqeqeq"},
+		{sourceText: "// eslint-enable"},
 		{sourceText: "/*\n * eslint-disable\n */", wantSpans: []string{"/*\n * eslint-disable\n */"}},
 		{sourceText: "/* eslint-disable-line\n */", wantSpans: []string{"/* eslint-disable-line\n */"}},
 		// The suppression parser reads a scope suffix with no word boundary after it, so this is a

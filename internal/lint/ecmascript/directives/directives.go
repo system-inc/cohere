@@ -94,6 +94,9 @@ func ParseDisable(commentText string) (Disable, bool) {
 	if !valid {
 		return Disable{}, false
 	}
+	if scope == ScopeFile && isLineComment(commentText) {
+		return Disable{}, false
+	}
 
 	rules, reason := splitReason(rest)
 
@@ -107,6 +110,9 @@ func ParseDisable(commentText string) (Disable, bool) {
 // ParseEnable reads one comment's full source text as an enable directive, returning the rule names
 // it closes. No names closes every open block.
 func ParseEnable(commentText string) (rules []string, found bool) {
+	if isLineComment(commentText) {
+		return nil, false
+	}
 	body := strings.TrimSpace(stripCommentMarkers(commentText))
 
 	for _, directive := range enableDirectives {
@@ -225,6 +231,22 @@ func parseRuleNames(list string) []string {
 		}
 	}
 	return names
+}
+
+// isLineComment reports whether a comment is the `//` form.
+//
+// A file-scope disable and an enable are directives only in a block comment. That is ESLint's
+// grammar, measured on 10.8.1: `// eslint-disable no-console` neither silences `no-console` nor is
+// read as a directive, and `// eslint-enable` closes nothing, while the same text in `/* */` does
+// both. Only `-line` and `-next-line` work as line comments.
+//
+// cohere honored the `//` form until Kirk's ruling of 2026-10-01, and the cost was prose becoming a
+// directive: phi web's build scripts carry `// eslint-disable + generated banner keep the linter and
+// future readers out.`, a sentence about a generated file, which cohere read as a file-wide disable.
+// A sentence that silently disables a whole file is the gap cohere exists to close, and the parity
+// doctrine is never worse than ESLint.
+func isLineComment(commentText string) bool {
+	return strings.HasPrefix(commentText, "//")
 }
 
 // stripCommentMarkers removes `//`, `/*`, `*/`, and any `*` continuation markers.

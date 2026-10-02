@@ -452,3 +452,42 @@ func TestEveryHonoredSpellingClosesItsBlock(t *testing.T) {
 		})
 	}
 }
+
+// TestALineCommentFileDisableSuppressesNothing is Kirk's ruling of 2026-10-01: a file-scope disable
+// and an enable are directives only as block comments, which is ESLint's grammar (measured on
+// 10.8.1). As `//` they are prose, and phi web's build scripts hold exactly that prose, which
+// previously disabled every rule for the rest of the file.
+//
+// Each case pairs the line form, which must change nothing, with the block form, which must still
+// work, so the test cannot pass by breaking file scope altogether.
+func TestALineCommentFileDisableSuppressesNothing(t *testing.T) {
+	prose := strings.Join([]string{
+		"// eslint-disable + generated banner keep the linter and future readers out.",
+		"enum Reported {}",
+		"// eslint-disable nexus/consistency-no-enum",
+		"enum AlsoReported {}",
+	}, "\n")
+	index := Build(prose)
+	if len(index.Directives()) != 0 {
+		t.Fatalf("a `//` file-scope disable was read as %d directive(s)", len(index.Directives()))
+	}
+	for _, line := range []int{1, 3} {
+		if index.Suppresses("nexus/consistency-no-enum", offsetOfLine(prose, line)) {
+			t.Fatalf("line %d was suppressed by a `//` file-scope disable", line)
+		}
+	}
+
+	block := strings.Join([]string{
+		"/* eslint-disable nexus/consistency-no-enum */",
+		"enum Suppressed {}",
+		"// eslint-enable nexus/consistency-no-enum",
+		"enum StillSuppressed {}",
+	}, "\n")
+	blockIndex := Build(block)
+	if !blockIndex.Suppresses("nexus/consistency-no-enum", offsetOfLine(block, 1)) {
+		t.Fatal("control: the block form stopped suppressing")
+	}
+	if !blockIndex.Suppresses("nexus/consistency-no-enum", offsetOfLine(block, 3)) {
+		t.Fatal("a `//` enable closed a block, which ESLint does not do")
+	}
+}

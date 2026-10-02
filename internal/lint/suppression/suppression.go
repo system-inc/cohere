@@ -152,28 +152,17 @@ func Build(sourceText string) *Index {
 
 	for _, comment := range scanComments(sourceText) {
 		commentText := sourceText[comment.pos:comment.end]
-
-		// ESLint reads a file-scope disable and an enable only in a block comment; as `//` they are
-		// prose to it (measured on 10.8.1: neither suppresses nor is reported). cohere honors them
-		// anyway, a recorded divergence (require_description_test.go). Their names are left out of
-		// the unknown-rule check, because a name ESLint never reads as a rule is one it can never
-		// report, and phi web's build scripts carry exactly such prose: `// eslint-disable +
-		// generated banner keep the linter and future readers out.`
-		eslintReadsAsDirective := !strings.HasPrefix(commentText, "//")
-
 		parsed := parseDirective(commentText)
 		if parsed == nil {
-			if names, isEnable := directives.ParseEnable(commentText); isEnable && eslintReadsAsDirective {
+			if names, isEnable := directives.ParseEnable(commentText); isEnable {
 				for _, name := range names {
 					references = append(references, RuleReference{Name: name, Pos: comment.pos, End: comment.end})
 				}
 			}
 			continue
 		}
-		if parsed.Kind != KindFile || eslintReadsAsDirective {
-			for _, name := range parsed.Rules {
-				references = append(references, RuleReference{Name: name, Pos: comment.pos, End: comment.end})
-			}
+		for _, name := range parsed.Rules {
+			references = append(references, RuleReference{Name: name, Pos: comment.pos, End: comment.end})
 		}
 
 		parsed.Pos = comment.pos
