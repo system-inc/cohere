@@ -11,8 +11,8 @@ import SwiftSyntax
  so a symbol a file refers to is placed in the module that declares it.
 
  An import counts as used when a reference in the file:
-   - resolves to a declaration of that module, or of a module it re-exports (a system module re-exports what
-     it imports, as a superset; a module of ours re-exports what its files `@_exported import`);
+   - resolves to a declaration of that module, or of a module it might re-export (`ModuleReexports`, read
+     with `Reach.assumed`: a system module is taken to re-export everything it imports);
    - or names that module anywhere in its signature. The index does not record every member reference: on
      Presence, `$0.rawValue` on a MediaPipe `BlendShape` reached through a closure parameter has no occurrence
      at all, yet the file needs MediaPipe's import for it. The closure's type is in the signature of the
@@ -23,17 +23,24 @@ import SwiftSyntax
  Zero false positives is the bar, so a file is left unchecked, and counted, when the index cannot vouch for
  it: no unit newer than the file, a reference no module claims, or any `#if` in it, since the index describes
  the configuration the build compiled and an inactive branch may be the only user of an import.
- `@_exported` imports are API and never reported. Measured before it shipped: every finding on both proving
- grounds was removed on a `git archive` copy, and `swift build --build-tests` stayed clean (83 on ahraos-macos,
- 376 on Presence, 459 of 459).
+ `@_exported` imports are API and never reported.
 
- Not yet never-worse than SwiftLint's analyzer `unused_import`. On ahraos-macos SwiftLint 0.65.1 reports 123 to
- this rule's 83, 81 of them the same; of its 42 others, at least 24 are real (the compiler builds without them)
- and at least 10 are SwiftLint's false positives. The real ones are pairs such as `import AppKit` beside `import
- SwiftUI` in a file that uses `CGFloat`: each import's closure covers the reference, so both are credited, though
- either alone would do. Closing it needs the real re-export graph (each `.swiftinterface`'s `@_exported` lines,
- each Clang module map's exports) in place of the system superset above, and then a joint check that removes
- imports one at a time while the rest still cover every reference, keeping the most specific.
+ Crediting alone keeps both halves of a pair such as `import AppKit` beside `import SwiftUI` in a file that
+ uses `CGFloat`, since each import's closure covers the reference though either alone would do. `redundant`
+ then removes what the others already bring, so the rule reports a used import too when the file can do
+ without it.
+
+ Measured before it shipped, every finding was removed on a `git archive` copy and `swift build --build-tests`
+ stayed clean: 143 of 143 on ahraos-macos, 828 of 828 on Presence. Against SwiftLint 0.65.1's analyzer
+ `unused_import` on ahraos-macos, 123 to this rule's 143: 112 the same and 31 this rule's alone. Of SwiftLint's
+ other 11, ten break the build once removed with this rule's. Five are SwiftLint flagging every import that
+ brings a module the file needs (KingdomFeedLog, KingdomFeedLogLine, RowRegistration and the two SidebarDrag
+ geometries, where this rule removes the others and keeps one); five are imports the file needs outright
+ (Pane, LocalPtyByteSource, ScrollHoldAssert, ServicesClientByteSource, AhraOsShellHelper). The eleventh is
+ real and missed: `import Darwin` in AhraOsServices/main.swift, beside `import AppKit`, for `SIG_IGN`. That is
+ the Darwin overlay's, and an overlay's top-level declarations become visible through re-exported parts of
+ its Clang module in some cases (Darwin's, through ObjectiveC or Dispatch) and not in others (CoreGraphics's,
+ through Foundation), so nothing here believes it.
  */
 struct UnusedImports {
     static let ruleName = "cohere-swift/unused-import"
@@ -95,31 +102,34 @@ struct UnusedImports {
 
         let referenced = Set(checked.flatMap { $0.references.map(\.symbol) })
         let resolver = ModuleResolver(units: units, referenced: referenced, demangler: demangler)
-        let reexports = Self.reexports(units: units.map(\.unit), files: files)
+        let reexports = ModuleReexports(units: units.map(\.unit), files: files)
 
         for entry in checked {
             let imports = Self.imports(in: entry.file.tree)
             let imported = Set(imports.map(\.module))
             var used: Set<String> = []
+            /* What each reference needs, the standard library left out: what the file's imports must keep in reach. */
+            var needs: [Need] = []
             var unresolved = 0
             for reference in entry.references {
-                guard var modules = resolver.declaringModules(of: reference) else {
+                guard let declaring = resolver.declaringModules(of: reference) else {
                     unresolved += 1
                     continue
                 }
-                modules.formUnion(resolver.modulesNamed(inSignatureOf: reference.symbol))
-                let direct = modules.intersection(imported)
-                if !direct.isEmpty {
-                    used.formUnion(direct)
-                    continue
-                }
+                let modules = declaring.union(resolver.modulesNamed(inSignatureOf: reference.symbol))
                 /*
                  The standard library is every file's without an import, and every system module imports it, so
                  a reference into it credits no import through a re-export. Found by the fixture: `Int` kept
                  `import Foundation` alive in a file that used nothing of Foundation's.
                  */
                 let reexported = modules.subtracting(Self.implicitModules)
-                for module in imported where !reexported.isDisjoint(with: reexports.closure(of: module)) {
+                needs.append(Need(modules: reexported, declaring: declaring, headers: resolver.declaringHeaders(of: reference)))
+                let direct = modules.intersection(imported)
+                if !direct.isEmpty {
+                    used.formUnion(direct)
+                    continue
+                }
+                for module in imported where !reexported.isDisjoint(with: reexports.closure(of: module, reach: .assumed)) {
                     used.insert(module)
                 }
             }
@@ -128,13 +138,17 @@ struct UnusedImports {
                 continue
             }
             result.filesChecked += 1
+            var judged: [ImportDeclaration] = []
             for declaration in imports where !Self.implicitModules.contains(declaration.module) {
                 if declaration.isExported {
                     result.importsExported += 1
                     continue
                 }
                 result.importsChecked += 1
-                guard !used.contains(declaration.module) else { continue }
+                judged.append(declaration)
+            }
+            let unused = judged.filter { !used.contains($0.module) }
+            for declaration in unused {
                 let finding = entry.file.finding(
                     at: declaration.node,
                     rule: Self.ruleName,
@@ -144,8 +158,32 @@ struct UnusedImports {
                 )
                 result.findings.append((finding, declaration.node.trimmedDescription))
             }
+            let kept = imported.subtracting(unused.map(\.module))
+            for redundant in Self.redundant(judged.filter { used.contains($0.module) }, kept: kept, needs: needs, reexports: reexports) {
+                let others = redundant.coveredBy.map { "`import \($0)`" }.joined(separator: ", ")
+                let verb = redundant.coveredBy.count == 1 ? "re-exports" : "re-export"
+                let finding = entry.file.finding(
+                    at: redundant.declaration.node,
+                    rule: Self.ruleName,
+                    messageId: "redundantImport",
+                    message: "Everything this file uses through \(redundant.declaration.module) also comes through \(others), which \(verb) it. Remove the import.",
+                    suggestions: [FindingRecord.Suggestion(message: "Remove `import \(redundant.declaration.module)`", fixes: [Self.removal(of: redundant.declaration.node, in: entry.file)])]
+                )
+                result.findings.append((finding, redundant.declaration.node.trimmedDescription))
+            }
         }
         return result
+    }
+
+    /*
+     What one reference needs from the file's imports: every module it names, the declaring ones among them, and
+     the headers that declare it when it is a Clang declaration. A declaring module is in reach when the module is
+     visible or, for a Clang declaration, when one of its headers is.
+     */
+    struct Need {
+        var modules: Set<String>
+        var declaring: Set<String>
+        var headers: Set<String>
     }
 
     struct ImportDeclaration {
@@ -196,38 +234,65 @@ struct UnusedImports {
     }
 
     /*
-     What each module makes visible beyond itself. A system module is taken to re-export everything it imports,
-     a superset, so an import is never reported for lack of an edge the interface would have shown. A module of
-     ours re-exports exactly what its files `@_exported import`.
+     Imports the file can do without because its other imports already bring everything it needs from them:
+     `import AppKit` beside `import SwiftUI` in a file that uses `CGFloat` and `NSView`, where SwiftUI re-exports
+     AppKit. An import can go only when every module it might have brought to a reference (`Reach.bounded`) is
+     still reached through what stays, by edges read from interfaces and module maps alone (`Reach.known`). A
+     module a reference needs counts whether it declares the reference or only appears in its signature, since
+     the signature stands in for member references the index leaves out. Imports are tried least specific
+     first, the widest known reach first and then the last written, so the narrower import that names what the
+     file uses stays. Each removal is judged against the imports that remain after the ones before it, so the
+     set reported is safe to remove together.
      */
-    struct Reexports {
-        var edges: [String: Set<String>]
-
-        func closure(of module: String) -> Set<String> {
-            var seen: Set<String> = []
-            var pending = [module]
-            while let current = pending.popLast() {
-                for next in edges[current, default: []] where seen.insert(next).inserted {
-                    pending.append(next)
+    static func redundant(
+        _ candidates: [ImportDeclaration],
+        kept: Set<String>,
+        needs: [Need],
+        reexports: ModuleReexports
+    ) -> [(declaration: ImportDeclaration, coveredBy: [String])] {
+        var kept = kept
+        let ordered = candidates.enumerated().sorted { first, second in
+            let firstReach = reexports.reach(of: first.element.module, reach: .known).count
+            let secondReach = reexports.reach(of: second.element.module, reach: .known).count
+            return firstReach != secondReach ? firstReach > secondReach : first.offset > second.offset
+        }.map(\.element)
+        var removed: [(declaration: ImportDeclaration, provided: Set<String>, headers: Set<String>)] = []
+        for candidate in ordered where kept.contains(candidate.module) {
+            let reach = reexports.reach(of: candidate.module, reach: .bounded)
+            let remaining = kept.subtracting([candidate.module])
+            let stillReached = remaining.reduce(into: implicitModules) { reached, module in
+                reached.formUnion(reexports.reach(of: module, reach: .known))
+            }
+            var provided: Set<String> = []
+            var headers: Set<String> = []
+            /* An import another one re-exports whole brings nothing that one does not, whatever the file needs. */
+            if !stillReached.contains(candidate.module) {
+                let visible = reexports.visibleHeaders(through: stillReached)
+                let covered = needs.allSatisfy { need in
+                    need.modules.intersection(reach).allSatisfy { module in
+                        provided.insert(module)
+                        if stillReached.contains(module) {
+                            return true
+                        }
+                        guard need.declaring.contains(module), !need.headers.isDisjoint(with: visible) else { return false }
+                        headers.formUnion(need.headers)
+                        return true
+                    }
                 }
+                guard covered else { continue }
             }
-            return seen
+            kept = remaining
+            removed.append((candidate, provided, headers))
         }
-    }
-
-    static func reexports(units: [IndexStore.Unit], files: [ParsedFile]) -> Reexports {
-        var edges: [String: Set<String>] = [:]
-        for unit in units where unit.isSystem {
-            edges[unit.module, default: []].formUnion(unit.importedModules)
+        /* Named after every removal, so the imports a message points to are ones the file keeps. */
+        return removed.map { entry in
+            let coveredBy = kept.filter { module in
+                let reached = reexports.reach(of: module, reach: .known)
+                return reached.contains(entry.declaration.module) || !reached.isDisjoint(with: entry.provided)
+                    || !reexports.visibleHeaders(through: reached).isDisjoint(with: entry.headers)
+            }.sorted()
+            return (entry.declaration, coveredBy.isEmpty ? kept.sorted() : coveredBy)
         }
-        let moduleOfFile = Dictionary(units.filter { !$0.isSystem }.map { ($0.mainFile, $0.module) }, uniquingKeysWith: { first, _ in first })
-        for file in files {
-            guard let module = moduleOfFile[file.url.resolvingSymlinksInPath().path] else { continue }
-            for declaration in imports(in: file.tree) where declaration.isExported {
-                edges[module, default: []].insert(declaration.module)
-            }
-        }
-        return Reexports(edges: edges)
     }
 
     /*
@@ -238,6 +303,9 @@ struct UnusedImports {
         private var declaring: [String: Set<String>] = [:]
         /* Top-level names Clang modules declare, for symbols Swift spells by name (`s:So11sockaddr_unV`, `s:SC7AF_UNIX`). */
         private var clangNames: [String: Set<String>] = [:]
+        /* The headers that declare a Clang symbol or name, for coverage finer than a module (`ModuleReexports.visibleHeaders`). */
+        private var declaringHeaders: [String: Set<String>] = [:]
+        private var clangNameHeaders: [String: Set<String>] = [:]
         private let knownModules: Set<String>
         private let demangler: SwiftDemangler?
 
@@ -262,22 +330,29 @@ struct UnusedImports {
              credited to every module whose unit names it. Crediting only the first unit read put Accelerate's
              vDSP in another module on Presence, and `import Accelerate` read as unused where every call needs it.
              */
-            var modulesOfRecord: [String: (store: IndexStore, modules: Set<String>)] = [:]
+            var modulesOfRecord: [String: (store: IndexStore, modules: Set<String>, file: String)] = [:]
             for source in units {
                 for record in source.unit.allRecords {
                     if modulesOfRecord[record] == nil {
-                        modulesOfRecord[record] = (source.store, [])
+                        modulesOfRecord[record] = (source.store, [], source.unit.recordFiles[record] ?? "")
                     }
                     modulesOfRecord[record]?.modules.insert(source.unit.module)
                 }
             }
             for (record, holder) in modulesOfRecord {
+                let header = holder.file.hasSuffix(".h") ? holder.file : nil
                 for occurrence in holder.store.occurrences(inRecord: record) ?? [] where occurrence.isDeclaration {
                     if wanted.contains(occurrence.symbol) {
                         declaring[occurrence.symbol, default: []].formUnion(holder.modules)
+                        if let header, occurrence.symbol.hasPrefix("c:") {
+                            declaringHeaders[occurrence.symbol, default: []].insert(header)
+                        }
                     }
                     if occurrence.symbol.hasPrefix("c:"), wantedClangNames.contains(occurrence.name) {
                         clangNames[occurrence.name, default: []].formUnion(holder.modules)
+                        if let header {
+                            clangNameHeaders[occurrence.name, default: []].insert(header)
+                        }
                     }
                 }
             }
@@ -308,6 +383,36 @@ struct UnusedImports {
                 return modules
             }
             return nil
+        }
+
+        /*
+         The headers that declare what a Clang occurrence refers to, followed the way `declaringModules` follows it,
+         or empty when it is no Clang declaration a header holds (a Swift one, a category member).
+         */
+        func declaringHeaders(of occurrence: IndexStore.RecordOccurrence) -> Set<String> {
+            let symbol = occurrence.symbol
+            if declaring[symbol] != nil {
+                return declaringHeaders[symbol] ?? []
+            }
+            if let base = Self.accessorBase(symbol), declaring[base] != nil {
+                return declaringHeaders[base] ?? []
+            }
+            if Self.categoryModule(symbol) != nil {
+                return []
+            }
+            if let container = Self.objectiveCContainer(symbol), declaring[container] != nil {
+                return declaringHeaders[container] ?? []
+            }
+            if FileSymbols.Occurrence(line: 0, column: 0, symbol: symbol, name: occurrence.name, isReference: true).declaringModule != nil {
+                return []
+            }
+            if symbol.hasPrefix("s:s") || (symbol.hasPrefix("s:S") && !symbol.hasPrefix("s:So") && !symbol.hasPrefix("s:SC")) {
+                return []
+            }
+            if let name = Self.clangImportedName(symbol), clangNames[name] != nil {
+                return clangNameHeaders[name] ?? []
+            }
+            return []
         }
 
         /* Every module of the build the declaration's demangled signature names, `CoreFoundation.CGFloat` and the like. */

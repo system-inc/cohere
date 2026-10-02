@@ -24,6 +24,8 @@ final class IndexStore {
     private static let unitDependency: Int32 = 1
     /* `INDEXSTORE_UNIT_DEPENDENCY_RECORD`: the dependency that names the record of the unit's own file. */
     private static let recordDependency: Int32 = 2
+    /* `INDEXSTORE_UNIT_DEPENDENCY_FILE`: a file the compile read, such as a Clang module's headers and the module maps it consulted. */
+    private static let fileDependency: Int32 = 3
     /* `INDEXSTORE_SYMBOL_ROLE_DECLARATION` and `INDEXSTORE_SYMBOL_ROLE_DEFINITION`. */
     static let declarationRoles: UInt64 = 1 << 0 | 1 << 1
     /* `INDEXSTORE_SYMBOL_ROLE_REFERENCE`. */
@@ -40,9 +42,11 @@ final class IndexStore {
      */
     struct Unit: Sendable {
         var name: String
-        /* The compiled file, resolved, or the module's interface for a system unit. */
+        /* The compiled file, resolved. Empty for a module the build imported. */
         var mainFile: String
         var module: String
+        /* What the compile wrote, as the compiler names it: for a Swift module the build imported, the `.swiftinterface` it read; for a Clang module, its `.pcm`. */
+        var outputFile: String
         var isSystem: Bool
         var written: Date
         var importedModules: [String]
@@ -50,6 +54,10 @@ final class IndexStore {
         var ownRecords: [String]
         /* Every record the unit names: for a system module, the records declaring what it exports. */
         var allRecords: [String]
+        /* The file each record describes: for a Clang module, the header that declares what the record holds. */
+        var recordFiles: [String: String]
+        /* The files the compile read without recording them: for a Clang module, its headers and the module maps it consulted. */
+        var files: [String]
     }
 
     /* One occurrence as the record holds it, roles and kind kept whole for questions `FileSymbols` does not ask. */
@@ -73,6 +81,7 @@ final class IndexStore {
     private let unitReaderDispose: CohereIndexUnitReaderDispose
     private let unitMainFile: CohereIndexUnitReaderGetMainFile
     private let unitModuleName: CohereIndexUnitReaderGetModuleName
+    private let unitOutputFile: CohereIndexUnitReaderGetOutputFile
     private let unitIsSystem: CohereIndexUnitReaderIsSystemUnit
     private let dependenciesApply: CohereIndexUnitReaderDependenciesApply
     private let dependencyKind: CohereIndexUnitDependencyGetKind
@@ -110,6 +119,7 @@ final class IndexStore {
         unitReaderDispose = try symbol("indexstore_unit_reader_dispose", as: CohereIndexUnitReaderDispose.self)
         unitMainFile = try symbol("indexstore_unit_reader_get_main_file", as: CohereIndexUnitReaderGetMainFile.self)
         unitModuleName = try symbol("indexstore_unit_reader_get_module_name", as: CohereIndexUnitReaderGetModuleName.self)
+        unitOutputFile = try symbol("indexstore_unit_reader_get_output_file", as: CohereIndexUnitReaderGetOutputFile.self)
         unitIsSystem = try symbol("indexstore_unit_reader_is_system_unit", as: CohereIndexUnitReaderIsSystemUnit.self)
         dependenciesApply = try symbol("indexstore_unit_reader_dependencies_apply_f", as: CohereIndexUnitReaderDependenciesApply.self)
         dependencyKind = try symbol("indexstore_unit_dependency_get_kind", as: CohereIndexUnitDependencyGetKind.self)
@@ -194,6 +204,23 @@ final class IndexStore {
         return byFile
     }
 
+    /*
+     One spelling for a path under an SDK. The index names the same header through `MacOSX.sdk` and through the
+     versioned SDK it links to, so each SDK root is resolved once and every path under it is written through that.
+     */
+    final class SDKRoots {
+        private var resolved: [String: String] = [:]
+
+        func canonical(_ path: String) -> String {
+            guard let range = path.range(of: ".sdk/") else { return path }
+            let root = String(path[..<range.upperBound])
+            if resolved[root] == nil {
+                resolved[root] = URL(fileURLWithPath: root).resolvingSymlinksInPath().path + "/"
+            }
+            return (resolved[root] ?? root) + path[range.upperBound...]
+        }
+    }
+
     /* Every unit in the store, read once. Measured on Presence: 2,531 units, listed in 9ms. */
     func units() -> [Unit] {
         if let cachedUnits {
@@ -210,6 +237,7 @@ final class IndexStore {
         }
         let unitsDirectory = storePath.appendingPathComponent("v5/units", isDirectory: true)
         var units: [Unit] = []
+        let sdkRoots = SDKRoots()
         for name in names.values {
             guard let reader = unitReaderCreate(store, name, nil) else { continue }
             defer { unitReaderDispose(reader) }
@@ -218,15 +246,19 @@ final class IndexStore {
             final class Dependencies {
                 let store: IndexStore
                 let mainFile: String
+                let sdkRoots: SDKRoots
                 var imported: [String] = []
                 var own: [String] = []
                 var all: [String] = []
-                init(store: IndexStore, mainFile: String) {
+                var recordFiles: [String: String] = [:]
+                var files: [String] = []
+                init(store: IndexStore, mainFile: String, sdkRoots: SDKRoots) {
                     self.store = store
                     self.mainFile = mainFile
+                    self.sdkRoots = sdkRoots
                 }
             }
-            let dependencies = Dependencies(store: self, mainFile: mainFile)
+            let dependencies = Dependencies(store: self, mainFile: mainFile, sdkRoots: sdkRoots)
             _ = dependenciesApply(reader, Unmanaged.passUnretained(dependencies).toOpaque()) { context, dependency in
                 guard let context, let dependency else { return true }
                 let dependencies = Unmanaged<Dependencies>.fromOpaque(context).takeUnretainedValue()
@@ -239,11 +271,15 @@ final class IndexStore {
                     }
                 case IndexStore.recordDependency:
                     let record = IndexStore.text(store.dependencyName(dependency))
+                    let file = IndexStore.text(store.dependencyFilePath(dependency))
                     dependencies.all.append(record)
+                    dependencies.recordFiles[record] = dependencies.sdkRoots.canonical(file)
                     /* The record of the unit's own file, matched by path: a unit's other records belong to files it only read. */
-                    if IndexStore.text(store.dependencyFilePath(dependency)) == dependencies.mainFile {
+                    if file == dependencies.mainFile {
                         dependencies.own.append(record)
                     }
+                case IndexStore.fileDependency:
+                    dependencies.files.append(dependencies.sdkRoots.canonical(IndexStore.text(store.dependencyFilePath(dependency))))
                 default:
                     break
                 }
@@ -253,11 +289,14 @@ final class IndexStore {
                 name: name,
                 mainFile: mainFile.isEmpty ? "" : URL(fileURLWithPath: mainFile).resolvingSymlinksInPath().path,
                 module: Self.text(unitModuleName(reader)),
+                outputFile: Self.text(unitOutputFile(reader)),
                 isSystem: unitIsSystem(reader),
                 written: written,
                 importedModules: dependencies.imported,
                 ownRecords: dependencies.own,
-                allRecords: dependencies.all
+                allRecords: dependencies.all,
+                recordFiles: dependencies.recordFiles,
+                files: dependencies.files
             ))
         }
         cachedUnits = units

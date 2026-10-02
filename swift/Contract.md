@@ -202,10 +202,16 @@ lines are left out when nothing was found.
 `unused-import` reads the build's index store. An import is used when something written in the file
 resolves into its module, or into a module it re-exports, or when a declaration the file refers to
 names that module in its signature (the index leaves out some member references, so a value of the
-module's type reached through a closure parameter is caught by the signature that hands it over). A
-file the index cannot vouch for is not checked: one the build has not compiled as it stands, one with
-`#if` (the index describes the configuration the build compiled), one with a reference no module
-claims. `@_exported` imports are API and never reported.
+module's type reached through a closure parameter is caught by the signature that hands it over). An
+import that is used is still reported, with `messageId` `redundantImport`, when the file's other imports
+already bring everything it brought: `import AppKit` beside `import SwiftUI`, which re-exports AppKit
+whole. That check believes only re-exports read from each module's own text: a `.swiftinterface`'s
+`@_exported import` lines, and for a Clang module the headers its map re-exports and what they import on
+lines the build certainly compiled, a whole module or one header at a time. It tries the widest import
+first so the narrower one stays, and judges each removal against what the ones before it left, so every
+import reported can go together. A file the index cannot vouch for is not checked: one the build has
+not compiled as it stands, one with `#if` (the index describes the configuration the build compiled),
+one with a reference no module claims. `@_exported` imports are API and never reported.
 
 ### `fix`, the fix and format phase's summary
 

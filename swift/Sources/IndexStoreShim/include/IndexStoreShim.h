@@ -35,6 +35,7 @@ typedef CohereIndexUnitReader (*CohereIndexUnitReaderCreate)(CohereIndexStore st
 typedef void (*CohereIndexUnitReaderDispose)(CohereIndexUnitReader reader);
 typedef CohereIndexString (*CohereIndexUnitReaderGetMainFile)(CohereIndexUnitReader reader);
 typedef CohereIndexString (*CohereIndexUnitReaderGetModuleName)(CohereIndexUnitReader reader);
+typedef CohereIndexString (*CohereIndexUnitReaderGetOutputFile)(CohereIndexUnitReader reader);
 typedef bool (*CohereIndexUnitReaderIsSystemUnit)(CohereIndexUnitReader reader);
 typedef bool (*CohereIndexUnitReaderDependenciesApply)(CohereIndexUnitReader reader, void *context, bool (*applier)(void *context, CohereIndexUnitDependency dependency));
 typedef int (*CohereIndexUnitDependencyGetKind)(CohereIndexUnitDependency dependency);
