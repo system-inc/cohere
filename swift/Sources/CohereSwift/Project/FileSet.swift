@@ -18,8 +18,11 @@ public struct FileSet: Equatable, Sendable {
         public var url: URL
         public var targetName: String
         public var targetKind: String
+        /* The root of the package whose target compiles it. */
+        public var packageRoot: URL?
 
-        public init(url: URL, targetName: String, targetKind: String) {
+        public init(url: URL, targetName: String, targetKind: String, packageRoot: URL? = nil) {
+            self.packageRoot = packageRoot
             self.url = url
             self.targetName = targetName
             self.targetKind = targetKind
@@ -68,7 +71,7 @@ public struct FileSet: Equatable, Sendable {
                         excluded.append(.init(file: source.path, reason: "marked @generated"))
                         continue
                     }
-                    owned.append(OwnedFile(url: source, targetName: target.name, targetKind: kind))
+                    owned.append(OwnedFile(url: source, targetName: target.name, targetKind: kind, packageRoot: member.root))
                 }
             }
         }

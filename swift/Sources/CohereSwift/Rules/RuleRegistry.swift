@@ -31,6 +31,9 @@ public enum RuleRegistry {
         UnusedOptionalBinding(),
         UnusedClosureParameter(),
         LegacyConstructors(),
+        NoAmbiguousIdentifier(),
+        NoStutteringName(),
+        NoUtilsFolder(),
         SwiftFormatRule.requireLowerCamelCase,
         SwiftFormatRule.noLeadingUnderscores,
     ] }

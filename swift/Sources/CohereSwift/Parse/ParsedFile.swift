@@ -17,8 +17,11 @@ public struct ParsedFile: Sendable {
     public var locations: SourceLocationConverter
     /* Every node in the tree, counted once at parse time for the coverage line's `nodes visited`. */
     public var nodeCount: Int
+    /* The root of the package whose target compiles this file (a local package's own root, not the checked root's); nil where nothing set it, such as a test fixture. */
+    public var packageRoot: URL?
 
-    public init(url: URL, targetName: String, targetKind: String, source: String, tree: SourceFileSyntax, nodeCount: Int) {
+    public init(url: URL, targetName: String, targetKind: String, source: String, tree: SourceFileSyntax, nodeCount: Int, packageRoot: URL? = nil) {
+        self.packageRoot = packageRoot
         self.url = url
         self.targetName = targetName
         self.targetKind = targetKind

@@ -67,7 +67,8 @@ public struct SourceParser: Sendable {
             targetKind: owned.targetKind,
             source: source,
             tree: tree,
-            nodeCount: counter.count
+            nodeCount: counter.count,
+            packageRoot: owned.packageRoot
         )
         guard tree.hasError else {
             return .parsed(file, [])

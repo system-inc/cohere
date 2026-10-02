@@ -218,7 +218,7 @@ public struct Pipeline {
                 /* One write per file, of the fixed and formatted text, and only when it differs from what was read. */
                 if options.mutate, final != originals[file.url.path] {
                     try final.write(to: file.url, atomically: true, encoding: .utf8)
-                    rewritten.append(FileSet.OwnedFile(url: file.url, targetName: file.targetName, targetKind: file.targetKind))
+                    rewritten.append(FileSet.OwnedFile(url: file.url, targetName: file.targetName, targetKind: file.targetKind, packageRoot: file.packageRoot))
                 }
             }
             /* Rewritten files are parsed again, so lint reads the text that is on disk now rather than the text that was. */
@@ -378,7 +378,7 @@ public struct Pipeline {
     /* Each owned package's manifest, parsed, so package rules can point at the line that would fix them. A manifest that cannot be read is absent, and its findings point at line 1. */
     private func manifests(of package: PackageModel) async -> [String: ParsedFile] {
         let owned = package.allPackages.filter { $0.root == package.root || !package.isVendored($0) }
-        let files = owned.map { FileSet.OwnedFile(url: $0.root.appendingPathComponent("Package.swift"), targetName: $0.root.path, targetKind: "manifest") }
+        let files = owned.map { FileSet.OwnedFile(url: $0.root.appendingPathComponent("Package.swift"), targetName: $0.root.path, targetKind: "manifest", packageRoot: $0.root) }
         let result = await SourceParser().parse(files)
         return Dictionary(result.files.map { ($0.targetName, $0) }, uniquingKeysWith: { first, _ in first })
     }

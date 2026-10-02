@@ -65,7 +65,8 @@ struct FileFixer {
                 targetKind: current.targetKind,
                 source: result.text,
                 tree: tree,
-                nodeCount: counter.count
+                nodeCount: counter.count,
+                packageRoot: current.packageRoot
             )
             applied += result.applied
             /* The text moved past what this pass found; only a later pass over it can stand for lint. */

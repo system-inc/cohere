@@ -34,8 +34,8 @@ struct TopLevelDeclarations {
 
     init(_ tree: SourceFileSyntax) {
         var seenTypes = Set<String>()
-        for item in tree.statements {
-            collect(item.item, seenTypes: &seenTypes)
+        for statement in tree.statements {
+            collect(statement.item, seenTypes: &seenTypes)
         }
     }
 
