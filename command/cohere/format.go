@@ -6,7 +6,15 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/edit"
+	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/printing"
+)
+
+// The formatters --format-engine chooses between.
+const (
+	formatEnginePrettier = "prettier"
+	formatEngineNative   = "native"
 )
 
 // formatEngine formats one file's text, or says it could not.
@@ -103,6 +111,10 @@ func formatTransform(engine formatEngine) edit.Transform {
 // A false negative here costs a refusal where a skip was meant, which is the safe direction: it is
 // reported and counted rather than hidden.
 func isUnparseable(err error) bool {
+	// The native printers mark their parse failures, so their wording never has to be guessed.
+	if printing.IsSyntax(err) {
+		return true
+	}
 	message := strings.ToLower(err.Error())
 	for _, marker := range []string{"does not parse", "parse error", "syntaxerror", "unexpected token"} {
 		if strings.Contains(message, marker) {
@@ -142,7 +154,10 @@ func extensionOf(fileName string) string {
 // The engine has landed, so this now returns it, and the `enabled` flag is what stays off. Wiring
 // and enabling are separate acts: the seam is proven, and whether a bare `cohere` should rewrite
 // files is a question about corpus agreement rather than about plumbing.
-func configuredFormatter(enabled bool) (formatEngine, error) {
+//
+// engineName picks the goja Prettier fork or the native printers that replace it. Both resolve each
+// file's options from its own directory, so choosing one changes the printers and nothing else.
+func configuredFormatter(enabled bool, engineName string) (formatEngine, error) {
 	if !enabled {
 		return nil, nil
 	}
@@ -154,6 +169,19 @@ func configuredFormatter(enabled bool) (formatEngine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("finding where to resolve the Prettier config from: %w", err)
 	}
+
+	switch engineName {
+	case formatEngineNative:
+		engine, err := native.NewResolving(workingDirectory)
+		if err != nil {
+			return nil, fmt.Errorf("loading the native formatter: %w", err)
+		}
+		return engine, nil
+	case formatEnginePrettier:
+	default:
+		return nil, fmt.Errorf("--format-engine %q is not a formatter: use %s or %s", engineName, formatEnginePrettier, formatEngineNative)
+	}
+
 	engine, err := prettier.NewResolving(workingDirectory)
 	if err != nil {
 		// Not a nil engine. Nil already means "nobody asked for a formatter", and the coverage line

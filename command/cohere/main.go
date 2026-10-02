@@ -90,6 +90,11 @@ func run() error {
 	// corpus. Reformatting the tree away from what the gate produces is worse than not formatting,
 	// so enabling is a separate decision from wiring.
 	format := flag.Bool("format", false, "run the formatter over the candidate files")
+	// Which formatter runs, so the native printers can be measured through this pipeline before they
+	// replace Prettier: the zero diff on a clean checkout and the whole-tree time are the switch's
+	// acceptance, and both are properties of the phase rather than of the printers alone.
+	formatEngine := flag.String("format-engine", formatEnginePrettier,
+		"the formatter --format runs: "+formatEnginePrettier+" (the goja Prettier fork) or "+formatEngineNative+" (cohere's own printers)")
 	maxFixPasses := flag.Int("fix-passes", edit.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
 	showTiming := flag.Bool("timing", false, "report what each rule cost, most expensive first")
 	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run")
@@ -569,7 +574,7 @@ func run() error {
 		// Built before the fix phase rather than inside it, so a formatter that cannot load its
 		// bundles stops the run here with a reason rather than degrading into the nil that means
 		// nobody asked for one.
-		formatter, err := configuredFormatter(*format)
+		formatter, err := configuredFormatter(*format, *formatEngine)
 		if err != nil {
 			return err
 		}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/printing"
 )
 
 // fakeEngine stands in for the real formatter so the seam can be tested before the engine exists.
@@ -315,5 +316,53 @@ func TestTheEnginesRealParseErrorsAreRecognized(t *testing.T) {
 		if !isUnparseable(errors.New(message)) {
 			t.Fatalf("a real parse failure was not recognized, so it would be reported as a broken formatter: %q", message)
 		}
+	}
+}
+
+// The native printers' parse failures must be recognized too, for the reason the goja ones above
+// are pinned: the matcher has to know the errors the engine actually emits, and switching engines
+// changes who emits them. Measured by formatting malformed source, never written by hand.
+func TestTheNativeEnginesParseErrorsAreRecognized(t *testing.T) {
+	engine, err := configuredFormatter(true, formatEngineNative)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for fileName, malformed := range map[string]string{
+		"a.ts":  "const a = ;\n",
+		"a.tsx": "const a = <span>;\n",
+		"a.js":  "function (\n",
+	} {
+		_, formatError := engine.Format(fileName, malformed)
+		if formatError == nil {
+			t.Errorf("%s: the native engine formatted malformed source without complaint", fileName)
+			continue
+		}
+		if !isUnparseable(formatError) {
+			t.Errorf("%s: a parse failure would be reported as a broken formatter: %v", fileName, formatError)
+		}
+	}
+}
+
+// --format-engine refuses a name it does not know rather than falling back to either engine, since a
+// typo that quietly ran Prettier would measure the wrong formatter and report it as the native one.
+func TestAnUnknownFormatEngineIsRefused(t *testing.T) {
+	if _, err := configuredFormatter(true, "nativ"); err == nil {
+		t.Fatal("an unknown engine name was accepted")
+	}
+	engine, err := configuredFormatter(false, "nativ")
+	if err != nil || engine != nil {
+		t.Fatalf("with formatting off, the engine name should not matter: %v, %v", engine, err)
+	}
+}
+
+// A parse failure a native printer marks is a skip whatever its wording, and marking is the only way
+// an unfamiliar message gets there: the same words unmarked are still a broken formatter.
+func TestAMarkedSyntaxErrorIsUnparseableWhateverItSays(t *testing.T) {
+	plain := errors.New("json: line 1: a wording no matcher has seen")
+	if isUnparseable(plain) {
+		t.Fatal("an unmarked, unfamiliar message was read as a parse failure, so the marker proves nothing")
+	}
+	if !isUnparseable(fmt.Errorf("formatting a.json: %w", printing.Syntax(plain))) {
+		t.Fatal("a marked parse failure, wrapped once more, was not recognized")
 	}
 }
