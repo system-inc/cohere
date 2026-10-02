@@ -135,28 +135,18 @@ func extensionOf(fileName string) string {
 	return fileName[lastDot:]
 }
 
-// configuredFormatter returns the formatter the pipeline runs, or nil when none is available.
-//
-// It is nil today, deliberately and visibly. The engine is @system_cohere_format's goja Prettier
-// fork, which is not in this module yet; when it lands, this function returns it and nothing else
-// in the pipeline changes.
-//
-// Returning nil rather than quietly wiring the native formatter is the whole point. `formatdiff`
-// exists in-tree and would compile, and it is the wrong engine: FormatCodeSettings has no
-// printWidth, so it has no line-breaking engine at all, and 21.8% of tracked files diverge from our
-// Prettier after every settings-reachable fix. A bare `cohere` running it would reformat about a
-// fifth of the tree away from what the existing gate produces, which is worse than not formatting.
+// configuredFormatter returns the formatter the pipeline runs, or nil when formatting was not asked
+// for.
 //
 // A nil engine skips with "no formatter is configured" and that reaches the coverage line, so a run
 // with no formatter reports as a run with no formatter rather than as a perfectly formatted tree.
-// The absence is stated on every run instead of being discovered later.
 //
-// The engine has landed, so this now returns it, and the `enabled` flag is what stays off. Wiring
-// and enabling are separate acts: the seam is proven, and whether a bare `cohere` should rewrite
-// files is a question about corpus agreement rather than about plumbing.
-//
-// engineName picks the goja Prettier fork or the native printers that replace it. Both resolve each
-// file's options from its own directory, so choosing one changes the printers and nothing else.
+// engineName picks cohere's native printers, the default, or the goja Prettier fork they replace,
+// which stays only as the differential's oracle until it leaves the binary. The native printers were
+// made the default when they matched the fork on every file of ahra, www-phi-health and
+// api-phi-health, and when a whole-tree run of each engine over the same ahra snapshot wrote the
+// same bytes. Both resolve each file's options from its own directory, so choosing one changes the
+// printers and nothing else.
 func configuredFormatter(enabled bool, engineName string) (formatEngine, error) {
 	if !enabled {
 		return nil, nil

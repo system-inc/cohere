@@ -93,8 +93,8 @@ func run() error {
 	// Which formatter runs, so the native printers can be measured through this pipeline before they
 	// replace Prettier: the zero diff on a clean checkout and the whole-tree time are the switch's
 	// acceptance, and both are properties of the phase rather than of the printers alone.
-	formatEngine := flag.String("format-engine", formatEnginePrettier,
-		"the formatter --format runs: "+formatEnginePrettier+" (the goja Prettier fork) or "+formatEngineNative+" (cohere's own printers)")
+	formatEngine := flag.String("format-engine", formatEngineNative,
+		"the formatter --format runs: "+formatEngineNative+" (cohere's own printers) or "+formatEnginePrettier+" (the goja Prettier fork they replace, kept as the differential's oracle)")
 	maxFixPasses := flag.Int("fix-passes", edit.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
 	showTiming := flag.Bool("timing", false, "report what each rule cost, most expensive first")
 	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run")
@@ -526,11 +526,10 @@ func run() error {
 		// Formatting is scoped to changed files by default, and the scope is resolved before the phase
 		// runs so its description can be reported whether or not anything was formatted.
 		//
-		// Measured: the formatter is 83 to 100ms per file with no warm-up, so the whole tree is 4.7 to
-		// 5.7 minutes against a lint phase of 392ms. That is not a tuning problem, it is a different
-		// tool, and a gate nobody waits for is a gate that does not exist. Real churn here is one file
-		// per commit and 35 across five, so changed-files puts the common case in the tens of
-		// milliseconds.
+		// Measured on ahra's 3,084 formattable files: the native printers format the whole tree in
+		// about 10 seconds, where the goja fork took 11 minutes. Real churn here is one file per commit
+		// and 35 across five, so changed-files still puts the common case in milliseconds, and a whole
+		// tree stays the thing a caller asks for by name.
 		scope := wholeTreeScope()
 		switch {
 		case !writeScope.Everything:

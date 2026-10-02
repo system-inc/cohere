@@ -16,12 +16,11 @@ import (
 
 // formatScope is which files the format phase considers, and how that set was decided.
 //
-// Formatting the whole tree is not a tuning problem, it is a different tool. Measured: the goja
-// formatter runs 83 to 100ms per file with no warm-up, so 3,407 files is 4.7 to 5.7 minutes against
-// a lint phase that finishes in 392ms. That is roughly 700 times the rest of the run, and a gate
-// nobody will wait for is a gate that does not exist. Actual churn on this tree is one file per
-// commit and 35 across five, so scoping to changed files puts the common case in the tens of
-// milliseconds.
+// The scope began as a necessity: the goja formatter ran 83 to 100ms per file, so ahra's whole tree
+// was minutes against a lint phase of 392ms. The native printers format that tree in about 10
+// seconds, so the scope is now about relevance rather than survival. Actual churn on this tree is
+// one file per commit and 35 across five, so scoping to changed files puts the common case in
+// milliseconds and formats only what the caller touched.
 //
 // The set is named as well as computed, because working-tree modifications, staged changes, and a
 // diff against a base branch are three different answers to "what changed" and a reader cannot tell
