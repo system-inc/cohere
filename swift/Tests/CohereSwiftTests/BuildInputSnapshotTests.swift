@@ -106,6 +106,23 @@ struct BuildInputSnapshotTests {
         #expect(!after.build.contains(Self.reusedWords))
     }
 
+    /* A record libclang cannot read must not end the run; it is dropped, and the build that follows writes a good one. */
+    @Test func anUnreadableRecordIsRebuiltNotFatal() async throws {
+        let package = try Package()
+        let first = try await package.run()
+        let scratch = Pipeline.scratchPath(for: package.root)
+        let records = FileManager.default.enumerator(at: scratch, includingPropertiesForKeys: nil)?
+            .compactMap { $0 as? URL }
+            .filter { $0.pathExtension == "dia" && $0.lastPathComponent.hasPrefix("Control") } ?? []
+        #expect(!records.isEmpty, "found no record to corrupt, so this test would prove nothing")
+        for record in records {
+            try Data("not a serialized diagnostics file".utf8).write(to: record)
+        }
+        let after = try await package.run()
+        #expect(!after.build.contains(Self.reusedWords), "a corrupt record was reused")
+        #expect(after.compilerFindings == first.compilerFindings)
+    }
+
     @Test func theSnapshotSeesSizeAndTime() throws {
         let package = try Package()
         let take = { BuildInputSnapshot.take(roots: [package.root], resolved: package.root.appendingPathComponent("Package.resolved"), toolchain: "t", arguments: ["a"]) }

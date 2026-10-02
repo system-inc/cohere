@@ -150,8 +150,26 @@ struct TypesPhase {
                 let modified = try record.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate ?? .distantPast
                 /* Keyed by target as well as name: two targets may each hold a `Utilities.swift`, and one must not vouch for the other. */
                 let key = "\(targetName)/\(record.deletingPathExtension().lastPathComponent)"
+                /*
+                 A record libclang cannot read (seen once on Presence, a `.dia` left half-written by a build that
+                 was interrupted) vouches for nothing: its file is left without a record, which marks the run
+                 incomplete and makes a reused build rebuild, rather than one bad file ending the whole run. The
+                 record is removed, since it sits in the engine's own scratch: SwiftPM recompiles a file whose
+                 output is missing, so the build that follows writes a good one.
+                 */
+                let diagnostics: [SerializedDiagnosticsReader.Diagnostic]
+                do {
+                    diagnostics = try reader.read(record)
+                } catch {
+                    do {
+                        try FileManager.default.removeItem(at: record)
+                    } catch {
+                        /* Left in place, the file stays without a record and the run says so; only the repair is lost. */
+                    }
+                    continue
+                }
                 recordFor[key] = max(recordFor[key] ?? .distantPast, modified)
-                for diagnostic in try reader.read(record) {
+                for diagnostic in diagnostics {
                     guard let severity = diagnostic.severity else { continue }
                     let file = URL(fileURLWithPath: diagnostic.file).resolvingSymlinksInPath().path
                     guard ours[file] != nil else { continue }
