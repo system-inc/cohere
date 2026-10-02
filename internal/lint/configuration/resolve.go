@@ -121,8 +121,7 @@ func (r Resolved) settingFor(ruleName string) (RuleSetting, bool) {
 	found := false
 	ambiguous := false
 	for configuredName, setting := range r.Rules {
-		prefix := strings.TrimSuffix(configuredName, ruleName)
-		if prefix == configuredName || !strings.HasSuffix(prefix, "/") {
+		if configuredName == ruleName || !KeyReachesRule(configuredName, ruleName) {
 			continue
 		}
 		if found {
@@ -140,6 +139,19 @@ func (r Resolved) settingFor(ruleName string) (RuleSetting, bool) {
 		return RuleSetting{}, false
 	}
 	return matched, found
+}
+
+// KeyReachesRule reports whether a config key configures a registered rule: the key is the rule's
+// name, or the rule's name qualified with a plugin prefix on a `/` boundary.
+//
+// One direction only. `nexus/consistency-no-enum` reaches a rule registered as
+// `consistency-no-enum`, but a bare `no-unused-vars` does not reach a rule registered as
+// `@typescript-eslint/no-unused-vars`. It is exported so the orphaned-key report asks the same
+// question: that report once tested the reverse direction, so after the 2026-10-02 rename it called
+// phi api's bare keys resolving while this function left all three rules unconfigured, and 152
+// findings disappeared with no warning.
+func KeyReachesRule(key string, ruleName string) bool {
+	return key == ruleName || strings.HasSuffix(key, "/"+ruleName)
 }
 
 // Resolve computes the effective configuration for one file path.
