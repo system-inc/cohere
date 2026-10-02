@@ -295,6 +295,40 @@ func FixAndTransformFile(fileName string, propose Propose, transform Transform, 
 		return FileResult{FileName: fileName}, err
 	}
 
+	result, err := FixAndTransformText(fileName, text, propose, transform, maxPasses)
+	if err != nil {
+		return result, err
+	}
+
+	// Changed alone is the right condition here, and it is deliberately not joined by Converged.
+	//
+	// A run that exhausted the pass budget has already cleared Changed and reverted Text upstream, in
+	// FixText, so a non-converged file cannot reach this line with anything to write. Re-checking
+	// Converged would be a second gate on a decision already made, and two gates on one property is
+	// how they drift apart. Said here because reading this function alone makes the guard look
+	// absent: two readers concluded exactly that from this line, and the guard is one branch above.
+	if !result.Changed {
+		return result, nil
+	}
+
+	if err := writeAtomically(fileName, result.Text); err != nil {
+		// The file on disk is untouched: the rename is the only step that changes it, and a failure
+		// before it leaves the original intact. Report the fixes as not-applied rather than applied,
+		// so the count matches what a reader would find in the tree.
+		result.Changed = false
+		return result, fmt.Errorf("writing %s: %w", fileName, err)
+	}
+
+	return result, nil
+}
+
+// FixAndTransformText is FixAndTransformFile on text in hand, writing nothing: the fixpoint, then the
+// transform behind the same parse guard, with the result in FileResult.Text.
+//
+// An editor formatting a buffer before it saves needs exactly what a run would write for that file,
+// computed from text that is not on disk yet. Splitting the write off rather than copying the rest is
+// what keeps the two answers the same answer.
+func FixAndTransformText(fileName string, text string, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
 	result, err := FixText(fileName, text, propose, maxPasses)
 	if err != nil {
 		return result, err
@@ -339,25 +373,6 @@ func FixAndTransformFile(fileName string, propose Propose, transform Transform, 
 				result.Changed = true
 			}
 		}
-	}
-
-	// Changed alone is the right condition here, and it is deliberately not joined by Converged.
-	//
-	// A run that exhausted the pass budget has already cleared Changed and reverted Text upstream, in
-	// FixText, so a non-converged file cannot reach this line with anything to write. Re-checking
-	// Converged would be a second gate on a decision already made, and two gates on one property is
-	// how they drift apart. Said here because reading this function alone makes the guard look
-	// absent: two readers concluded exactly that from this line, and the guard is one branch above.
-	if !result.Changed {
-		return result, nil
-	}
-
-	if err := writeAtomically(fileName, result.Text); err != nil {
-		// The file on disk is untouched: the rename is the only step that changes it, and a failure
-		// before it leaves the original intact. Report the fixes as not-applied rather than applied,
-		// so the count matches what a reader would find in the tree.
-		result.Changed = false
-		return result, fmt.Errorf("writing %s: %w", fileName, err)
 	}
 
 	return result, nil

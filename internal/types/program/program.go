@@ -124,6 +124,11 @@ type Options struct {
 	// measurement needs to be reproducible, or when a caller wants types from different files to be
 	// comparable (types from two checkers cannot be mixed).
 	SingleThreaded bool
+
+	// Overlay is file contents that stand in for the disk's, by absolute path: an editor's unsaved
+	// buffer, so the graph describes the text about to be saved rather than the text being replaced.
+	// Nil reads everything from disk.
+	Overlay map[string]string
 }
 
 // Build resolves a tsconfig and constructs the program and its checkers.
@@ -156,7 +161,10 @@ func Build(options Options) (*Graph, error) {
 	// resolves without anything being installed. cachedvfs memoizes stat and readdir: config
 	// resolution and module resolution ask the same directories about the same files repeatedly, and
 	// on a 9,530-file program that repetition is most of the syscall traffic.
-	fileSystem := cachedvfs.From(bundled.WrapFS(osvfs.FS()))
+	var fileSystem vfs.FS = cachedvfs.From(bundled.WrapFS(osvfs.FS()))
+	if len(options.Overlay) > 0 {
+		fileSystem = newOverlayFS(fileSystem, options.Overlay)
+	}
 
 	host := &configHost{fs: fileSystem, currentDirectory: currentDirectory}
 

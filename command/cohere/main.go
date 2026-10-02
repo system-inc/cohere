@@ -108,6 +108,10 @@ func run() error {
 	changedOnly := flag.Bool("changed", false,
 		"check only the files git reports as changed, plus everything that imports them")
 	showVersion := flag.Bool("version", false, "print the version and exit")
+	// The editor's save: the buffer arrives on stdin and what --fix (and --format) would write for this
+	// path leaves on stdout, with nothing written to disk. See stdin.go.
+	stdinFilePath := flag.String("stdin-filepath", "",
+		"with --fix, read one file's text from stdin and print what --fix would write for the file at this path, writing nothing to disk")
 	flag.Parse()
 
 	// Where the project is, decided once, before anything reads a path.
@@ -304,6 +308,24 @@ func run() error {
 		return locateError
 	}
 
+	if given["stdin-filepath"] {
+		// One file, from stdin, to stdout: no other phase runs and no report is printed, because stdout
+		// is the file's text. --fix is required rather than implied, so the command line says what the
+		// output means.
+		if !*fixOnly || *noFix || *typesOnly || *lintOnly || len(flag.Args()) > 0 {
+			return errStdinNeedsFix
+		}
+		return runStdin(ctx, stdinRequest{
+			Location:         location,
+			WorkingDirectory: workingDirectory,
+			FilePath:         *stdinFilePath,
+			Format:           *format,
+			FormatEngine:     *formatEngine,
+			MaxPasses:        *maxFixPasses,
+			SingleThreaded:   *singleThreaded,
+		}, os.Stdin, os.Stdout)
+	}
+
 	// `--changed` asks git before the graph is built, because the most common answer needs no graph.
 	//
 	// A clean tree used to exit 1 with "nothing to walk: the file set is empty", after paying for the
@@ -488,32 +510,11 @@ func run() error {
 	var reusableWalk *program.Result
 
 	if runFix || runLint {
-		// A config that cannot be read is a hard failure and never a permissive default. Linting
-		// everything with nothing configured produces output indistinguishable from a clean run, and
-		// that exact confusion is what this tool exists to make impossible.
-		loaded, err := configuration.Load(location.LintConfigFileName)
+		loaded, err := configureLint(graph, location)
 		if err != nil {
-			return fmt.Errorf("loading the lint config: %w", err)
+			return err
 		}
 		lintConfig = loaded
-		// Validated against the whole program rather than against a narrowed scope. The question
-		// this check asks is whether a config override reaches any file at all, which is a property
-		// of the tree and not of one run: scoping to a single file legitimately leaves `modules/**`
-		// matching nothing, and failing there would make every scoped run report a broken config.
-		//
-		// Measured while building the scope: `--lint OneFile.ts` refused to run, naming three
-		// overrides as vacuous, because the validator was handed the one file in scope.
-		wholeProgramFiles := graph.ProjectFiles()
-		projectFileNames := make([]string, 0, len(wholeProgramFiles))
-		for _, projectFile := range wholeProgramFiles {
-			projectFileNames = append(projectFileNames, projectFile.FileName())
-		}
-		if err := lintConfig.ValidateSelectors(projectFileNames); err != nil {
-			return fmt.Errorf("validating the lint config: %w", err)
-		}
-		graph.LintConfig = lintConfig
-		graph.RuleOptions = registry.OptionsAt(optionsBase(lintConfig, location.Root))
-		graph.RegisteredRuleNames = registry.Names()
 	}
 
 	switch {
@@ -687,7 +688,10 @@ func run() error {
 		// When nothing changed, the graph is provably the same object the walk ran against, so the
 		// result is exactly what a second walk would produce. Measured on the ahra tree: a run costs
 		// about 0.9s fixed plus 1.1s per walk, so this removes roughly a third of a default run.
-		if fixSummary.FilesChanged == 0 {
+		//
+		// With no program file in scope the fix phase did not walk at all, and its empty result is not a
+		// walk to reuse: lint walks for itself and refuses the empty set, as it always has.
+		if fixSummary.FilesChanged == 0 && len(projectFiles) > 0 {
 			reusableWalk = &fixWalk
 		}
 	}
@@ -930,6 +934,39 @@ func rebuildGraph(
 // Built at both places a graph receives its options, so the graph rebuilt after fixing anchors the
 // same way the first one did. A rebuilt graph that decoded with no base would refuse a relative root
 // the first graph accepted, and fail the run halfway through for a reason the config never changed.
+// configureLint loads the lint config and hands it to the graph, which is what fixing and linting
+// both need before either runs: which rules apply to which files, with their options. One function
+// because the gate and the editor's save (stdin.go) must configure rules the same way, or a save would
+// write what the gate does not.
+func configureLint(graph *program.Graph, location projectLocation) (*configuration.Config, error) {
+	// A config that cannot be read is a hard failure and never a permissive default. Linting
+	// everything with nothing configured produces output indistinguishable from a clean run, and
+	// that exact confusion is what this tool exists to make impossible.
+	lintConfig, err := configuration.Load(location.LintConfigFileName)
+	if err != nil {
+		return nil, fmt.Errorf("loading the lint config: %w", err)
+	}
+	// Validated against the whole program rather than against a narrowed scope. The question
+	// this check asks is whether a config override reaches any file at all, which is a property
+	// of the tree and not of one run: scoping to a single file legitimately leaves `modules/**`
+	// matching nothing, and failing there would make every scoped run report a broken config.
+	//
+	// Measured while building the scope: `--lint OneFile.ts` refused to run, naming three
+	// overrides as vacuous, because the validator was handed the one file in scope.
+	wholeProgramFiles := graph.ProjectFiles()
+	projectFileNames := make([]string, 0, len(wholeProgramFiles))
+	for _, projectFile := range wholeProgramFiles {
+		projectFileNames = append(projectFileNames, projectFile.FileName())
+	}
+	if err := lintConfig.ValidateSelectors(projectFileNames); err != nil {
+		return nil, fmt.Errorf("validating the lint config: %w", err)
+	}
+	graph.LintConfig = lintConfig
+	graph.RuleOptions = registry.OptionsAt(optionsBase(lintConfig, location.Root))
+	graph.RegisteredRuleNames = registry.Names()
+	return lintConfig, nil
+}
+
 func optionsBase(lintConfig *configuration.Config, projectRoot string) rule.OptionsBase {
 	base := rule.OptionsBase{ProjectRoot: projectRoot}
 	if lintConfig != nil {

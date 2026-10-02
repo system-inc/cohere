@@ -52,9 +52,19 @@ func applyProposedFixes(
 	// the caller's and not this function's, because only the caller knows whether anything was
 	// rewritten afterward: a file rewritten here makes these diagnostics describe bytes that no
 	// longer exist.
-	result, err := graph.Walk(ctx, projectFiles, rules)
-	if err != nil {
-		return edit.Summary{}, program.Result{}, fmt.Errorf("collecting proposals: %w", err)
+	//
+	// No program file in scope is a run about files the program does not hold, such as
+	// `cohere --fix --format notes.md`, and there are no rules to ask. Walking anyway refused the empty
+	// set ("nothing to walk"), which bailed the phase before the format candidates below were ever
+	// formatted, so naming a .md, .css, .json or .graphql formatted nothing. The empty result is not
+	// handed on as a walk: the caller reuses it only when projectFiles is non-empty.
+	var result program.Result
+	if len(projectFiles) > 0 {
+		walked, err := graph.Walk(ctx, projectFiles, rules)
+		if err != nil {
+			return edit.Summary{}, program.Result{}, fmt.Errorf("collecting proposals: %w", err)
+		}
+		result = walked
 	}
 
 	// Group proposals by the file they belong to. A diagnostic carries its source file, so the
