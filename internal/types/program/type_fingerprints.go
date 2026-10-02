@@ -34,6 +34,14 @@ import (
 // them: compared raw, on a case-insensitive volume, they produced a graph with almost no edges, which
 // reads as valid rather than as broken.
 func (g *Graph) TypeFingerprints() map[tspath.Path][sha256.Size]byte {
+	global, edges, contents := g.typeGraph()
+	return fingerprintComponents(g.ProjectFiles(), edges, contents, global)
+}
+
+// typeGraph is what every fingerprint is built over: the global component, hashing every file that can
+// change other files' types without being imported, the import edges between project files, and every
+// file's content hash, computed once for all three.
+func (g *Graph) typeGraph() ([sha256.Size]byte, map[tspath.Path][]tspath.Path, map[tspath.Path][sha256.Size]byte) {
 	allFiles := g.Program.GetSourceFiles()
 	projectFiles := g.ProjectFiles()
 
@@ -76,8 +84,7 @@ func (g *Graph) TypeFingerprints() map[tspath.Path][sha256.Size]byte {
 			}
 		}
 	}
-
-	return fingerprintComponents(projectFiles, edges, contents, globalSum)
+	return globalSum, edges, contents
 }
 
 // reachesBeyondItsImports reports whether a project file can change other files' types without being
