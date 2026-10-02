@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -125,7 +126,7 @@ func TestBothPathsAgreeOnEveryPluginDefault(t *testing.T) {
 	// into `Rules`, so a rule arriving only through the declaration is indistinguishable there from
 	// one named by hand -- which is exactly the distinction this test exists to measure. Reading the
 	// merged map made this guard pass on a config with three lines deliberately removed.
-	namedInFile, err := ruleNamesInFile(liveConfigPath)
+	namedInFile, err := ruleNamesInChain(liveConfigPath)
 	if err != nil {
 		t.Fatalf("reading the rules block: %v", err)
 	}
@@ -169,17 +170,35 @@ func TestBothPathsAgreeOnEveryPluginDefault(t *testing.T) {
 	}
 }
 
-// ruleNamesInFile returns the rules the config's own rules block names, before any plugin default is
-// merged in.
+// ruleNamesInChain returns the rules named by hand anywhere in the config's extends chain, before any
+// plugin default is merged in, the project's own file winning over the tiers it extends.
 //
 // Separate from `Load` on purpose. `Load` returns the resolved result, which is the right answer for
 // every consumer and the wrong one for a test asking which of two paths a rule arrived by.
-func ruleNamesInFile(path string) (map[string]RuleSetting, error) {
-	contents, err := os.ReadFile(path)
+//
+// The whole chain rather than the one file, since ahra's config became an overlay on the Structure and
+// Nexus tiers (#rkm5a31): the forty lines moved into Nexus's tier, so reading ahra's file alone
+// reported all forty dropped to warn while every one still ran at error.
+func ruleNamesInChain(path string) (map[string]RuleSetting, error) {
+	sources, err := SourcesOf(path)
 	if err != nil {
 		return nil, err
 	}
-	return ruleNamesInContents(contents)
+	named := map[string]RuleSetting{}
+	for index := len(sources) - 1; index >= 0; index-- {
+		contents, err := os.ReadFile(sources[index])
+		if err != nil {
+			return nil, err
+		}
+		layer, err := ruleNamesInContents(contents)
+		if err != nil {
+			return nil, fmt.Errorf("reading the rules block of %s: %w", sources[index], err)
+		}
+		for name, setting := range layer {
+			named[name] = setting
+		}
+	}
+	return named, nil
 }
 
 // ruleNamesInContents is the same read, over bytes rather than a path.
@@ -235,14 +254,9 @@ func TestTheGuardCatchesARemovedLine(t *testing.T) {
 	if _, err := os.Stat(liveConfigPath); err != nil {
 		t.Skipf("the live config is not present at %s", liveConfigPath)
 	}
-	contents, err := os.ReadFile(liveConfigPath)
+	intact, err := ruleNamesInChain(liveConfigPath)
 	if err != nil {
-		t.Fatalf("reading the live config: %v", err)
-	}
-
-	intact, err := ruleNamesInContents(contents)
-	if err != nil {
-		t.Fatalf("reading the rules block: %v", err)
+		t.Fatalf("reading the rules blocks: %v", err)
 	}
 	unnamed := func(named map[string]RuleSetting) int {
 		missing := 0
