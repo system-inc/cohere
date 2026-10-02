@@ -26,17 +26,21 @@
 // never derived from offsets.
 package estree
 
+import "github.com/system-inc/cohere/internal/format/printing"
+
 // Node is one ESTree node, or one comment: comments are {type: "Line" | "Block", value} objects in
 // Prettier and travel through the same paths, so they are Nodes too.
 //
-// Comment bookkeeping (node.comments, comment.leading, comment.printed) does not live here: the shared
-// print core in internal/format/printing keeps it in a side table keyed on node identity, so every
-// language's nodes stay free of it. That is also why a Node is always used through a pointer.
+// Comment bookkeeping (node.comments, comment.leading, comment.printed) is the shared print core's
+// CommentFields, embedded so the core reads and writes it the same way for every language. The core
+// keys its caches on node identity, which is why a Node is always used through a pointer.
 type Node struct {
 	nodeType string
 	Range    [2]int
 
 	properties []property
+
+	printing.CommentFields[*Node]
 
 	// Parenthesized is Prettier's node.extra.parenthesized, set when the parser saw redundant parentheses.
 	Parenthesized bool
@@ -110,8 +114,20 @@ func (node *Node) Get(key string) any {
 	return nil
 }
 
-// Field is Get under the name the shared print core's Node interface uses.
-func (node *Node) Field(name string) any { return node.Get(name) }
+// Field is node[name] for the shared print core. "comments" is the attached comments, which live in
+// CommentFields rather than among the properties.
+func (node *Node) Field(name string) any {
+	if name == "comments" {
+		if node == nil || len(node.Comments) == 0 {
+			return nil
+		}
+		return node.Comments
+	}
+	return node.Get(name)
+}
+
+// CommentData is the shared print core's access to the comment bookkeeping.
+func (node *Node) CommentData() *printing.CommentFields[*Node] { return &node.CommentFields }
 
 // Has is `key in node`: whether the property exists, even with a nil value.
 func (node *Node) Has(key string) bool {
