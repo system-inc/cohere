@@ -616,15 +616,27 @@ func cohereVersionOf(ctx context.Context, command GateCommand) string {
 // commits apart rendered identically while producing different results.
 //
 // The commit is what identifies which rules are compiled in, so the line naming it is what is kept.
+//
+// That is the `commit:` line, which names the binary's own commit. The `compiler:` line's fallback,
+// "unknown (built from cohere <sha>)", named it too, but only on a build that did not stamp its
+// compiler, and reading it was reading the right number off the wrong line. The launcher's
+// committed-tree builds stamp the compiler, so that fallback disappeared and every global binary
+// rendered as "cohere dev" (measured 2026-10-02 on 7b434bb4105b). It is still read when there is no
+// `commit:` line, for binaries that predate it.
 func versionLineFrom(output string) string {
 	lines := strings.Split(output, "\n")
 
 	commit := ""
+	compilerFallback := ""
 	note := ""
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if commit == "" && strings.Contains(trimmed, "built from") {
+		if commit == "" && strings.HasPrefix(trimmed, "commit:") {
 			commit = trimmed
+			continue
+		}
+		if compilerFallback == "" && strings.Contains(trimmed, "built from") {
+			compilerFallback = trimmed
 			continue
 		}
 		// A local build says so, in a `note:` line stating that its rules are whatever was on disk
@@ -641,6 +653,9 @@ func versionLineFrom(output string) string {
 		}
 	}
 
+	if commit == "" {
+		commit = compilerFallback
+	}
 	if commit != "" {
 		if note != "" {
 			return commit + " — " + note
