@@ -49,3 +49,71 @@ func TestEmbeddedCodeMatchesTheFork(t *testing.T) {
 		t.Fatalf("--- fork\n%s--- native\n%s", expected, actual)
 	}
 }
+
+// graphqlTemplatesSource is unformatted GraphQL in TypeScript templates, the input the corpus cannot
+// supply: its gql templates are all already formatted, so they read the same whether the embed works
+// or prints them as written.
+const graphqlTemplatesSource = `import gql from 'graphql-tag';
+
+const fragment = gql` + "`" + `fragment   UserFields on User{id name  email profile{avatar(size:LARGE) bio}}` + "`" + `;
+
+export const Query = gql` + "`" + `
+  # leading comment
+  query UserQuery($id: ID!, $first: Int = 10, $after: String, $includeArchivedItemsInTheResultSet: Boolean = false) @cached(ttl: 60) {
+    user(id: $id) { ...UserFields
+      posts(first: $first, after: $after, includeArchived: $includeArchivedItemsInTheResultSet, orderBy: {field: CREATED_AT, direction: DESC}) {
+        edges { node { id title  # trailing comment
+          tags } }
+        pageInfo{hasNextPage endCursor}
+      }
+    }
+  }
+
+  ${fragment}
+` + "`" + `;
+
+const mutation = graphql` + "`" + `mutation($input:CreatePostInput!){createPost(input:$input){post{id}errors{field message}}}` + "`" + `;
+
+const marked = /* GraphQL */ ` + "`" + `
+  query { viewer { login } }
+` + "`" + `;
+
+const onlyComments = gql` + "`" + `
+  # nothing but a comment
+
+  # and another
+` + "`" + `;
+
+const blank = gql` + "`" + `   ` + "`" + `;
+`
+
+// TestGraphqlTemplatesMatchTheFork is the embed's acceptance fixture: gql and graphql templates and a
+// /* GraphQL */ template, formatted through the native GraphQL printer, against the fork. With the
+// embed not recognizing these templates, they print as written, and this fails.
+func TestGraphqlTemplatesMatchTheFork(t *testing.T) {
+	for _, width := range []int{120, 80} {
+		options := prettier.DefaultOptions()
+		options.PrintWidth = width
+		oracle, err := prettier.New(options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expected, err := oracle.Format("Probe.ts", graphqlTemplatesSource)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The fork really formatted the GraphQL: the cramped fragment is broken out.
+		for _, substring := range []string{"fragment UserFields on User {\n", "mutation ($input: CreatePostInput!) {", "const blank = gql``;"} {
+			if !strings.Contains(expected, substring) {
+				t.Fatalf("printWidth %d: the fork's output lacks %q:\n%s", width, substring, expected)
+			}
+		}
+		actual, err := Formatter{Options: options}.Format("Probe.ts", graphqlTemplatesSource)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if actual != expected {
+			t.Fatalf("printWidth %d:\n--- fork\n%s--- native\n%s", width, expected, actual)
+		}
+	}
+}

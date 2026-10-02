@@ -30,6 +30,7 @@ var estreePrinter = &printing.Printer[*estree.Node]{
 		Remaining: handleRemainingComment,
 	},
 	AvoidAstMutation: true,
+	Embed:            embed,
 	TemplateQuasis: func(node Node) ([]Node, bool) {
 		if !node.Is("TemplateLiteral") {
 			return nil, false
