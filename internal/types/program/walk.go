@@ -354,7 +354,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				visited, silenced, ruleCrashes, crashed := dispatchFileSafely(sourceFile, func(diagnostic rule.Diagnostic) {
 					localDiagnostics = append(localDiagnostics, diagnostic)
 					localReporting[diagnostic.RuleName]++
-				}, walkRules, g, fileChecker, listeningTarget, offeredTarget, ruleOptions, localTimings, catalog)
+				}, walkRules, g, fileChecker, listeningTarget, offeredTarget, ruleOptions, localTimings, catalog, resolution)
 
 				release()
 
@@ -682,6 +682,7 @@ func dispatchFileSafely(
 	ruleOptions map[string]any,
 	timings *Timings,
 	catalog *ruleNameCatalog,
+	resolution configuration.Resolved,
 ) (visited int, silenced suppressionTally, ruleCrashes []RuleCrash, crashed error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -695,7 +696,7 @@ func dispatchFileSafely(
 	}()
 
 	visited, silenced, ruleCrashes = dispatchFile(sourceFile, report, applicable, g, fileChecker,
-		listeningCounts, offeredCounts, ruleOptions, timings, catalog)
+		listeningCounts, offeredCounts, ruleOptions, timings, catalog, resolution)
 	return visited, silenced, ruleCrashes, nil
 }
 
@@ -717,6 +718,7 @@ func dispatchFile(
 	ruleOptions map[string]any,
 	timings *Timings,
 	catalog *ruleNameCatalog,
+	resolution configuration.Resolved,
 ) (visitedNodes int, silenced suppressionTally, ruleCrashes []RuleCrash) {
 	// A kind may have listeners from several rules, so the merged table maps a kind to a slice rather
 	// than to one function.
@@ -848,7 +850,7 @@ func dispatchFile(
 		}
 	}
 
-	return visitedNodes, tally(directives, ranRule), ruleCrashes
+	return visitedNodes, tally(directives, ranRule, resolution), ruleCrashes
 }
 
 // suppressionTally is what one file's directives did, summed across the run.
@@ -891,6 +893,27 @@ func namesOnlyUnrunRules(directive *suppression.Directive, ranRule map[string]bo
 	return true
 }
 
+// namesOnlyOffRules reports whether the config turns off, for this file, every rule a directive named.
+//
+// Such a directive silences nothing whether or not cohere ports the rules, because a rule that is off
+// cannot report, so it is dead rather than waiting on a port. The excuse is for a rule the config
+// would run if this binary had it. ESLint flagged 13 `no-await-in-loop` directives in ahra as unused
+// and was right, while cohere excused them as unported (#ezhwsbc). One named rule the config would run
+// keeps the excuse, because the directive may be load-bearing for that one.
+//
+// Looked up by the name the directive wrote, which is the name the config is keyed by.
+func namesOnlyOffRules(directive *suppression.Directive, resolution configuration.Resolved) bool {
+	if len(directive.Rules) == 0 {
+		return false
+	}
+	for _, named := range directive.Rules {
+		if status, _ := resolution.StatusOf(named); status != configuration.StatusScopedOff {
+			return false
+		}
+	}
+	return true
+}
+
 // bareRuleName drops a plugin prefix, so `structure/no-x` and `no-x` compare equal.
 //
 // Directives are written against the gate's names, which carry the plugin that owns the rule, while
@@ -908,13 +931,13 @@ func bareRuleName(name string) string {
 // The reasonless count is per withheld finding rather than per directive, because that is the
 // number that answers the question being asked: how much of what cohere chose not to tell you was
 // silenced by someone who did not say why.
-func tally(directives *suppression.Index, ranRule map[string]bool) suppressionTally {
+func tally(directives *suppression.Index, ranRule map[string]bool, resolution configuration.Resolved) suppressionTally {
 	counted := suppressionTally{}
 	for index, directive := range directives.Directives() {
 		applied := directives.AppliedCount(index)
 		if applied == 0 {
 			counted.unusedDirectives++
-			if namesOnlyUnrunRules(directive, ranRule) {
+			if namesOnlyUnrunRules(directive, ranRule) && !namesOnlyOffRules(directive, resolution) {
 				counted.unusedForUnrunRule++
 			}
 			continue
