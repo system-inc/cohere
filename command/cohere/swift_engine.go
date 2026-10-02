@@ -171,7 +171,7 @@ func runEngineBinaryUntil(
 ) (int, error) {
 	command := exec.Command(binaryPath, arguments...)
 	command.Stderr = standardError
-	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	startInOwnProcessGroup(command)
 	command.WaitDelay = engineWaitDelay
 	standardOutput, err := command.StdoutPipe()
 	if err != nil {
@@ -189,9 +189,7 @@ func runEngineBinaryUntil(
 		for {
 			select {
 			case received := <-interrupts:
-				if forwarded, isSignal := received.(syscall.Signal); isSignal {
-					_ = syscall.Kill(-engineGroup, forwarded)
-				}
+				signalProcessGroup(engineGroup, received)
 			case <-runEnded:
 				return
 			}
@@ -234,7 +232,7 @@ func runEngineBinaryUntil(
 // engine is reaped and its pipes are closed. Signalling it again is safe, because a process id is never
 // reused while a process group of that id still has members.
 func killEngineGroup(engineGroup int, command *exec.Cmd) {
-	_ = syscall.Kill(-engineGroup, syscall.SIGKILL)
+	killProcessGroup(engineGroup)
 	waited := make(chan struct{})
 	go func() {
 		_ = command.Wait()
@@ -245,7 +243,7 @@ func killEngineGroup(engineGroup int, command *exec.Cmd) {
 		case <-waited:
 			return
 		case <-time.After(20 * time.Millisecond):
-			_ = syscall.Kill(-engineGroup, syscall.SIGKILL)
+			killProcessGroup(engineGroup)
 		}
 	}
 }

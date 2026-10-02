@@ -1,3 +1,8 @@
+//go:build unix
+
+// The stand-in engines here are /bin/sh scripts, and the process-group behavior they prove exists only
+// on Unix, so the file builds there.
+
 package main
 
 import (
