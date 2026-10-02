@@ -80,6 +80,14 @@ func IsForeignName(node *ast.Node) bool {
 		assignment := parent.AsPropertyAssignment()
 		return assignment != nil && assignment.Name() == node
 
+	case ast.KindBindingElement:
+		// The key half of `{ params: parameters }` in a destructuring pattern: the object's spelling,
+		// renamed away on the spot, and the same ESTree `Property` key the originals skip. A
+		// shorthand `{ params }` has no property name and declares a binding, so it is still judged.
+		// Found on api's MappedJoins.test.ts and FileStorageVideoDerivativeService.ts (#dx1vrfm).
+		element := parent.AsBindingElement()
+		return element != nil && element.PropertyName == node
+
 	case ast.KindImportSpecifier, ast.KindExportSpecifier, ast.KindNamespaceImport,
 		ast.KindImportClause:
 		// An imported name is external surface this file cannot rename, in all four spellings:

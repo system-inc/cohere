@@ -106,11 +106,11 @@ func messageNoWordSegment(name string, word string, suggestion string) rule.Mess
 // travels in the message instead, where a reader applies it with the scope in front of them. Four
 // other ported rules made the same call for the same reason.
 //
-// One consequence worth stating plainly: without the scope walk, a reference to an imported
-// abbreviated name is still reported here where the original stayed silent. That is a message a
-// reader can dismiss, not a rename that breaks a file, which is the trade the missing fix makes
-// affordable. The import specifier itself is still exempt, so the finding lands on the use rather
-// than on the declaration.
+// The original's scope walk also kept it silent on every reference to an imported name, and this
+// port reported those until api-phi-health's parity sweep counted six (#dx1vrfm). It now skips a
+// reference to a name an import binds and nothing else in the file declares, which agrees with the
+// scope walk everywhere but a file that shadows an import; there it keeps reporting, erring toward a
+// finding. The rule judges names the code declares, never names it reads from elsewhere.
 var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 	Name: "nexus/consistency-no-abbreviated-identifier",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
@@ -120,6 +120,8 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 		isFrameworkParameterFile := matchesAnyFilePattern(fileName, settings.FrameworkParameterFilePatterns)
 		isFrameworkConstantFile := matchesAnyFilePattern(fileName, settings.FrameworkConstantFilePatterns)
 		routeContract := nextjs.RouteContractExports(fileName)
+		// Built on the first candidate identifier, so a file with no abbreviated name never walks.
+		var importedNames map[string]bool
 
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
@@ -155,6 +157,19 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 				// `maxAgentsBytes` and `maxBootBytes`. The original reports all five and this port
 				// reported none, which was the whole of that rule's parity gap.
 				if binding.IsForeignName(node) && !isTypeMemberKey(node) {
+					return
+				}
+
+				// A reference to an imported name is the other module's spelling, as the import
+				// specifier is: `loadConfig(directory)` and drizzle's `char(name)` read names this
+				// file does not own (#dx1vrfm). The original skips them through a scope walk; this
+				// port has none, so a name counts as imported when an import binds it and nothing
+				// else in the file declares it. A file that shadows an import keeps reporting the
+				// name everywhere, which errs toward a finding rather than away from one.
+				if importedNames == nil {
+					importedNames = importedNamesNeverRedeclared(ctx.SourceFile)
+				}
+				if importedNames[name] {
 					return
 				}
 
@@ -507,4 +522,36 @@ func declaresNestedBinding(node *ast.Node) bool {
 		return statement.Parent == nil || statement.Parent.Kind != ast.KindSourceFile
 	}
 	return false
+}
+
+// importedNamesNeverRedeclared returns the names an import in this file binds, less any name the
+// file also declares somewhere: a variable, a parameter, a destructured element, a function, a class
+// or any other named declaration. Such a name may be shadowed, and without scope analysis a reference
+// cannot be told apart, so it is left to be judged.
+func importedNamesNeverRedeclared(sourceFile *ast.SourceFile) map[string]bool {
+	imported := map[string]bool{}
+	declared := map[string]bool{}
+	var visit func(node *ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindIdentifier && node.Parent != nil && node.Parent.Name() == node {
+			switch node.Parent.Kind {
+			case ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportSpecifier, ast.KindImportEqualsDeclaration:
+				imported[node.Text()] = true
+			case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment, ast.KindPropertyAccessExpression,
+				ast.KindPropertySignature, ast.KindPropertyDeclaration, ast.KindMethodDeclaration,
+				ast.KindMethodSignature, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindExportSpecifier,
+				ast.KindEnumMember, ast.KindJsxAttribute:
+				// Members and keys bind no name in scope.
+			default:
+				declared[node.Text()] = true
+			}
+		}
+		node.ForEachChild(visit)
+		return false
+	}
+	sourceFile.AsNode().ForEachChild(visit)
+	for name := range declared {
+		delete(imported, name)
+	}
+	return imported
 }

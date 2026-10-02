@@ -569,6 +569,51 @@ func TestConsistencyNoAbbreviatedIdentifierStillSkipsTheRestOfTheForeignFamily(t
 	}
 }
 
+// TestConsistencyNoAbbreviatedIdentifierSkipsNamesTheCodeOnlyReads holds the principle from
+// api-phi-health's parity sweep (#dx1vrfm): the rule judges names the code declares, never names it
+// reads from elsewhere or renames away from. Each silent row is one of the six reported sites in
+// shape; each reporting row is the nearest shape the rule must still catch.
+func TestConsistencyNoAbbreviatedIdentifierSkipsNamesTheCodeOnlyReads(t *testing.T) {
+	t.Parallel()
+
+	silent := []struct{ name, sourceText string }{
+		// ModuleTestDiscovery.ts: tsconfig-paths' loadConfig, read in a type query and a call.
+		{"a reference to an imported name", "import { loadConfig } from 'tsconfig-paths';\nlet configuration: ReturnType<typeof loadConfig> | undefined;\nconfiguration = loadConfig('.');\nexport { configuration };\n"},
+		// OrmSchemaBuilderDrizzleMySql.ts: drizzle's char, called.
+		{"a call of an imported function", "import { char } from 'drizzle-orm/mysql-core';\nexport const column = char('name', { length: 36 });\n"},
+		{"a reference to a default import", "import loadConfig from 'config-loader';\nexport const configuration = loadConfig();\n"},
+		// MappedJoins.test.ts: drizzle's params key, renamed on destructure.
+		{"a destructuring key renamed away", "declare const query: { toSQL(): Record<string, unknown> };\nconst { sql: statement, params: parameters } = query.toSQL();\nexport { statement, parameters };\n"},
+		// FileStorageVideoDerivativeService.ts: an external maxBitrate key, renamed on destructure.
+		{"an external key renamed away", "declare const entry: Record<string, unknown>;\nconst { maxBitrate: maximumBitrate } = entry;\nexport { maximumBitrate };\n"},
+	}
+	for _, testCase := range silent {
+		t.Run(testCase.name, func(t *testing.T) {
+			rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText))
+		})
+	}
+
+	fires := []struct{ name, sourceText, id string }{
+		// A shorthand destructure declares the abbreviated name in this file.
+		{"a shorthand destructure", "declare const query: { params: unknown[] };\nconst { params } = query;\nexport { params };\n", "noParams"},
+		// The local half of a rename is this file's name.
+		{"a rename onto an abbreviation", "declare const entry: { maximumBitrate: number };\nconst { maximumBitrate: maxBitrate } = entry;\nexport { maxBitrate };\n", "noMax"},
+		// A file that shadows an import declares that name too, so it is judged rather than guessed.
+		{"a local that shadows an import", "import { char } from 'drizzle-orm/mysql-core';\nexport function build() {\n    const char = 1;\n    return char;\n}\nexport { char as column };\n", "noChar"},
+	}
+	for _, testCase := range fires {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
+			if len(result.Diagnostics) == 0 {
+				t.Fatalf("expected a finding, got none")
+			}
+			if result.Diagnostics[0].Message.Id != testCase.id {
+				t.Fatalf("expected %s first, got %v", testCase.id, result.MessageIds())
+			}
+		})
+	}
+}
+
 // TestConsistencyNoAbbreviatedIdentifierLeavesNextRouteContractsAlone covers the floor
 // `nextjs.IsRouteContractExport` sets with no options at all.
 //
