@@ -2325,3 +2325,122 @@ func TestLogicalAssignmentOperatorsWrapsWhereUpstreamWraps(t *testing.T) {
 		})
 	}
 }
+
+// TestLogicalAssignmentOperatorsIsSilentInsideReactCompiledFunctions covers the `reactCompiler`
+// option, which is ours rather than upstream's.
+//
+// React Compiler refuses all three shorthands (`Handle ||= operators in AssignmentExpression`,
+// measured on babel-plugin-react-compiler 1.0.0 by @system_cohere), in a hook body and in an effect
+// callback alike, so suggesting one inside a compiled function costs that function its compilation.
+// The three real sites, each modelled here in its original long form, are a callback inside a
+// component (UsersRolesPage.tsx:121), a component body (RestEndpointNodeContent.tsx:335), and an
+// effect callback inside a provider component (WebSocketViaSharedWorkerProviderInternal.tsx:309).
+//
+// Every row runs twice, with the compiler on and off, so a silent row is shown to be the gate rather
+// than a shape the rule never reported. Which functions count as compiled is the react shelf's
+// `IsInsideComponentOrHook`, the same predicate eight react rules use, so a component-named function
+// that neither writes JSX nor calls a hook is not compiled and keeps reporting.
+func TestLogicalAssignmentOperatorsIsSilentInsideReactCompiledFunctions(t *testing.T) {
+	t.Parallel()
+
+	decode := func(raw string) LogicalAssignmentOperatorsOptions {
+		decoded, err := DecodeLogicalAssignmentOperatorsOptions(json.RawMessage(raw))
+		if err != nil {
+			t.Fatalf("decoding %s: %v", raw, err)
+		}
+		return decoded.(LogicalAssignmentOperatorsOptions)
+	}
+	compilerOn := decode(`["always", {"enforceForIfStatements": true}]`)
+	compilerOff := decode(`["always", {"enforceForIfStatements": true, "reactCompiler": false}]`)
+
+	cases := []struct {
+		name       string
+		sourceText string
+		compiled   bool
+	}{
+		{"a callback inside a component, as UsersRolesPage", `
+export function UsersRolesPage(properties: { assignments: { type?: string }[] }) {
+    const grouped = properties.assignments.reduce(function (groups: Record<string, unknown[]>, assignment) {
+        const type = assignment.type;
+        if(type) {
+            if(!groups[type]) groups[type] = [];
+            groups[type].push(assignment);
+        }
+        return groups;
+    }, {});
+    return <div>{Object.keys(grouped).length}</div>;
+}`, true},
+		{"a component body, as RestEndpointNodeContent", `
+export function RestEndpointNodeContent(properties: { stored: unknown }) {
+    let apiKey = typeof properties.stored === 'string' ? properties.stored : null;
+    if(apiKey) apiKey = apiKey.trim();
+    return <div>{apiKey}</div>;
+}`, true},
+		{"an effect callback inside a provider, as WebSocketViaSharedWorkerProviderInternal", `
+import React from 'react';
+declare function createMonitor(): object;
+export function WebSocketProviderInternal(properties: { children: React.ReactNode }) {
+    const monitorReference = React.useRef<object | null>(null);
+    React.useEffect(function () {
+        if(!monitorReference.current) monitorReference.current = createMonitor();
+    }, []);
+    return <>{properties.children}</>;
+}`, true},
+		{"a hook body", `
+import React from 'react';
+export function useCount(initial: number | null) {
+    const [count] = React.useState(0);
+    let start = initial;
+    start = start ?? count;
+    return start;
+}`, true},
+		{"the assignment shape in a component", `
+export function Badge(properties: { label?: string }) {
+    let label = properties.label;
+    label = label || 'none';
+    return <span>{label}</span>;
+}`, true},
+		{"a helper outside any component", `
+export function normalizeKey(stored: unknown) {
+    let apiKey = typeof stored === 'string' ? stored : null;
+    if(apiKey) apiKey = apiKey.trim();
+    return apiKey;
+}`, false},
+		// The name alone does not compile a function: React compiles a component that writes JSX or
+		// calls a hook, and this one does neither.
+		{"a component-named function with no JSX and no hooks", `
+export function Defaults(properties: { label?: string }) {
+    let label = properties.label;
+    label = label || 'none';
+    return label;
+}`, false},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			off := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "Compiled.tsx", testCase.sourceText, compilerOff)
+			if len(off.Diagnostics) == 0 {
+				t.Fatalf("with the compiler off the rule must report here, or the row proves nothing")
+			}
+			on := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "Compiled.tsx", testCase.sourceText, compilerOn)
+			if testCase.compiled {
+				rule_testing.ExpectClean(t, on)
+				return
+			}
+			if len(on.Diagnostics) != len(off.Diagnostics) {
+				t.Errorf("outside a compiled function the setting must change nothing: %d findings on, %d off",
+					len(on.Diagnostics), len(off.Diagnostics))
+			}
+		})
+	}
+
+	// `never` reports the shorthand and expands it to the long form the compiler accepts, so it is
+	// not gated: inside a component it is the rule doing the compiler's work for it.
+	never := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "Compiled.tsx", `
+export function Badge(properties: { label?: string }) {
+    let label = properties.label;
+    label ||= 'none';
+    return <span>{label}</span>;
+}`, logicalAssignmentNeverOptions())
+	rule_testing.ExpectFindings(t, never, "unexpected")
+}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -315,7 +316,7 @@ var Globals = rule.Rule{
 // function, so a silence here is a silence about the write rather than the function bailing out.
 // See the table on the rule for the full result set.
 func isGlobalStoreTarget(identifier *ast.Node) bool {
-	parent := skipParenthesesUpward(identifier)
+	parent := utilsreact.SkipParenthesesUpward(identifier)
 	if parent == nil {
 		return false
 	}
@@ -421,7 +422,7 @@ func globalStoreReportNode(identifier *ast.Node) *ast.Node {
 		return identifier.Parent
 	}
 
-	if parent := skipParenthesesUpward(identifier); parent != nil &&
+	if parent := utilsreact.SkipParenthesesUpward(identifier); parent != nil &&
 		parent.Kind == ast.KindBinaryExpression &&
 		parent.AsBinaryExpression().OperatorToken.Kind != ast.KindEqualsToken {
 		// A compound assignment reports the whole expression, parentheses on the target included:
@@ -461,8 +462,8 @@ func isInsideDestructuringTarget(node *ast.Node) bool {
 // enclosingCompilationRoot returns the function React Compiler would compile that contains a node,
 // or nil when the node sits outside every one.
 //
-// The gate itself is `isInsideComponentOrHook`, shared with `unsupported-syntax` in this package and
-// measured there over seventeen probe rounds. This returns the root node rather than a boolean,
+// The gate itself is the react shelf's `IsInsideComponentOrHook`, written for `unsupported-syntax`
+// and measured there over seventeen probe rounds. This returns the root node rather than a boolean,
 // because this rule needs to ask two further questions about the node's position *relative to* the
 // root: whether a nested function sits between them, and whether the declaration it writes to lives
 // inside it.
@@ -470,7 +471,7 @@ func isInsideDestructuringTarget(node *ast.Node) bool {
 // The innermost qualifying ancestor wins, which matches the gate's own walk.
 func enclosingCompilationRoot(node *ast.Node) *ast.Node {
 	for current := node.Parent; current != nil; current = current.Parent {
-		if isComponentOrHookLike(current) && isReachableRootPosition(current) {
+		if utilsreact.IsComponentOrHookLike(current) && utilsreact.IsReachableRootPosition(current) {
 			return current
 		}
 	}

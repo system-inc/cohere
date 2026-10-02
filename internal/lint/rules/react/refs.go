@@ -137,8 +137,8 @@ import (
 //
 // # The component gate is NOT used here, and that is a deliberate difference from its neighbours
 //
-// `static_components.go`, `globals.go` and `set_state_in_render.go` all gate on
-// `isComponentOrHookLike`, and three of them reuse the predicate whole. This rule does not, and the
+// `static_components.go`, `globals.go` and `set_state_in_render.go` all gate on the shelf's
+// `IsComponentOrHookLike`, and three of them reuse the predicate whole. This rule does not, and the
 // reason is that upstream's own gate for this validator is different. Measured on the executable: a
 // lowercase `function helper(props) { return props.ref.current; }` is CLEAN, so a gate is real; but
 // the gate that decides it is compilation admission, which for this validator already excludes a

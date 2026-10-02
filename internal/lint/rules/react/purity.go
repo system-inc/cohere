@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
+	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -159,9 +160,10 @@ var purityGlobalContainers = map[string]bool{"globalThis": true, "global": true}
 //
 // # The gate, taken whole and not re-derived
 //
-// `isComponentOrHookLike` comes from `unsupported_syntax.go`. Two porters paid seventeen probe
-// rounds and seven false positives for it and a second copy here would be a second thing to keep in
-// agreement with React. It is the right gate rather than a convenient one, verified on this rule's
+// `IsComponentOrHookLike` comes from the react shelf, written for `unsupported-syntax`. Two porters
+// paid seventeen probe rounds and seven false positives for it, and a second copy here would be a
+// second thing to keep in agreement with React. It is the right gate rather than a convenient one,
+// verified on this rule's
 // own diagnostics: `function helper() { return Math.random(); }` is silent, `function Component() {
 // return Math.random(); }` is ALSO silent because it creates no JSX and calls no hook, and a class
 // `render()` is silent. All three measured on React.
@@ -257,7 +259,7 @@ func purityAnalyzeSubject(ctx rule.Context, function *high_level_intermediate_re
 	if function == nil {
 		return
 	}
-	if function.Node == nil || !isComponentOrHookLike(function.Node) {
+	if function.Node == nil || !utilsreact.IsComponentOrHookLike(function.Node) {
 		for _, nested := range function.Functions {
 			purityAnalyzeSubject(ctx, nested)
 		}
@@ -761,7 +763,7 @@ func (unit *purityUnit) callbackArguments(
 	calleeName string,
 	report func(purityFinding),
 ) {
-	if calleeName != "useMemo" && isReactHookName(calleeName) {
+	if calleeName != "useMemo" && utilsreact.IsCompilerHookName(calleeName) {
 		return
 	}
 	for _, argument := range args {

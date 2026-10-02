@@ -3,6 +3,7 @@ package react
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
+	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -414,8 +415,8 @@ func incompatibleLibraryCallMessage(
 
 // incompatibleLibraryEnclosingRoot returns the component or hook a call sits inside, if any.
 //
-// This is the component gate, and it reuses `isComponentOrHookLike` and `isReachableRootPosition`
-// from `unsupported_syntax.go` whole rather than restating them. Those two were derived over
+// This is the component gate, and it reuses the react shelf's `IsComponentOrHookLike` and
+// `IsReachableRootPosition` whole rather than restating them. Those two were derived over
 // seventeen probe rounds against React's own rule and are already shared by three other rules here;
 // a fourth private copy would be the divergence this tree's shelf rule exists to prevent.
 //
@@ -423,7 +424,7 @@ func incompatibleLibraryCallMessage(
 // one-finding-per-function bookkeeping on.
 func incompatibleLibraryEnclosingRoot(node *ast.Node) *ast.Node {
 	for current := node.Parent; current != nil; current = current.Parent {
-		if isComponentOrHookLike(current) && isReachableRootPosition(current) {
+		if utilsreact.IsComponentOrHookLike(current) && utilsreact.IsReachableRootPosition(current) {
 			return current
 		}
 	}

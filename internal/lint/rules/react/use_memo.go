@@ -2,6 +2,7 @@ package react
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -235,12 +236,13 @@ var messageUseMemoCallbackReassignsOuterVariable = rule.Message{
 // silent, `function useThing` reports, module scope is silent, `function Component(...props)` is
 // silent, `function Component(props, other)` is silent, `function Component(props, ref)` reports.
 //
-// That gate is exactly `unsupported-syntax`'s `isInsideComponentOrHook`, already in this package and
-// measured there over seventeen probe rounds, so it is reused rather than rewritten. One difference
-// from `error-boundaries` was measured rather than inherited: a `Component` declared **inside**
+// That gate is exactly the react shelf's `IsInsideComponentOrHook`, written for
+// `unsupported-syntax` and measured there over seventeen probe rounds, so it is reused rather than
+// rewritten. One difference from `error-boundaries` was measured rather than inherited: a
+// `Component` declared **inside**
 // another function **does** report here, where `error-boundaries` measured its equivalent silent.
-// `isInsideComponentOrHook` already answers that correctly, since a nested function reachable through
-// a component-or-hook-named ancestor stays a root candidate.
+// `IsInsideComponentOrHook` already answers that correctly, since a nested function reachable
+// through a component-or-hook-named ancestor stays a root candidate.
 //
 // # Two readings that were wrong, recorded because the next reader will make them
 //
@@ -304,7 +306,7 @@ var UseMemo = rule.Rule{
 				if !isManualMemo {
 					return
 				}
-				if !isInsideComponentOrHook(node) {
+				if !utilsreact.IsInsideComponentOrHook(node) {
 					return
 				}
 
@@ -703,7 +705,7 @@ func checkInlineCallback(ctx rule.Context, kind manualMemoKindValue, callback *a
 		return
 	}
 
-	parameters := functionParameters(callback)
+	parameters := utilsreact.FunctionParameters(callback)
 	if len(parameters) > 0 {
 		// Points at the first parameter, whatever its shape. Measured over an identifier, an object
 		// pattern and a default: the span is the whole parameter node in each case.
@@ -771,7 +773,7 @@ func hasModifierKind(node *ast.Node, kind ast.Kind) bool {
 // variable from a function declared inside the callback is silent, because that write closes over
 // the callback's scope rather than the component's from the callback's own point of view.
 func reportOuterReassignments(ctx rule.Context, callback *ast.Node) {
-	body := functionBody(callback)
+	body := utilsreact.FunctionBody(callback)
 	if body == nil {
 		return
 	}

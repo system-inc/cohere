@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 )
 
 // The shape predicates for consistency-require-constant-casing.
@@ -74,26 +75,12 @@ func isFunctionNode(node *ast.Node) bool {
 	return node != nil && (node.Kind == ast.KindArrowFunction || node.Kind == ast.KindFunctionExpression)
 }
 
-// functionBody returns the block body of a function literal, or nil when it has none.
-func functionBody(node *ast.Node) *ast.Node {
-	switch {
-	case node == nil:
-		return nil
-	case node.Kind == ast.KindArrowFunction:
-		return node.AsArrowFunction().Body
-	case node.Kind == ast.KindFunctionExpression:
-		return node.AsFunctionExpression().Body
-	default:
-		return nil
-	}
-}
-
 // returnsAFunction reports whether a function literal hands back a function.
 //
 // Both bodies are read: a concise arrow body is the returned expression itself, and a block body
 // needs its return statements found.
 func returnsAFunction(node *ast.Node) bool {
-	body := functionBody(node)
+	body := react.FunctionBody(node)
 	if body == nil {
 		return false
 	}

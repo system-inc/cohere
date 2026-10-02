@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
+	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -225,7 +226,7 @@ func immutabilityIsCompilationUnit(function *high_level_intermediate_representat
 	if function == nil || node == nil {
 		return false
 	}
-	return isComponentOrHookLike(node)
+	return utilsreact.IsComponentOrHookLike(node)
 }
 
 // immutabilityInstructionAt returns one instruction by id, or nil when the id is out of range.

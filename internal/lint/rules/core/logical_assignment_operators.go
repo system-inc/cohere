@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -117,16 +118,23 @@ const (
 //
 // EnforceForIfStatements defaults to FALSE, so it is a plain bool: the zero value is already the
 // upstream default and nothing is lost by an absent key.
+//
+// ReactCompiler is ours, not upstream's, and defaults to TRUE: React Compiler refuses all three
+// shorthands, so under `always` the rule is silent inside the functions the compiler compiles. A
+// project that does not run the compiler sets it false to have those findings back. The default is
+// the safe side because the fixer applies `||=` to a bare identifier unattended, and in a compiled
+// component that rewrite costs the component its compilation. See the rule's doc comment.
 type LogicalAssignmentOperatorsOptions struct {
 	Require                *LogicalAssignmentSetting
 	EnforceForIfStatements bool
+	ReactCompiler          bool
 }
 
 // DefaultLogicalAssignmentOperatorsSettings is upstream's `["always"]` with the if-statement check
-// off.
+// off, and the React Compiler assumed on.
 func DefaultLogicalAssignmentOperatorsSettings() LogicalAssignmentOperatorsOptions {
 	always := LogicalAssignmentAlways
-	return LogicalAssignmentOperatorsOptions{Require: &always}
+	return LogicalAssignmentOperatorsOptions{Require: &always, ReactCompiler: true}
 }
 
 // DecodeLogicalAssignmentOperatorsOptions turns upstream's option list into options.
@@ -179,6 +187,7 @@ func DecodeLogicalAssignmentOperatorsOptions(list []byte) (any, error) {
 	decoder.DisallowUnknownFields()
 	var extra struct {
 		EnforceForIfStatements *bool `json:"enforceForIfStatements"`
+		ReactCompiler          *bool `json:"reactCompiler"`
 	}
 	if err := decoder.Decode(&extra); err != nil {
 		return DefaultLogicalAssignmentOperatorsSettings(),
@@ -186,6 +195,9 @@ func DecodeLogicalAssignmentOperatorsOptions(list []byte) (any, error) {
 	}
 	if extra.EnforceForIfStatements != nil {
 		settings.EnforceForIfStatements = *extra.EnforceForIfStatements
+	}
+	if extra.ReactCompiler != nil {
+		settings.ReactCompiler = *extra.ReactCompiler
 	}
 	return settings, nil
 }
@@ -266,6 +278,21 @@ var logicalAssignmentLongForm = map[ast.Kind]string{
 // Strictness is what turns the guard off, because `with` is illegal in strict code. Upstream asks
 // its scope analysis; here the question is whether the file is a module or carries a "use strict"
 // prologue, which is what logicalAssignmentIsStrict answers.
+//
+// # Silent inside React Compiler's functions, where ESLint is not
+//
+// React Compiler refuses all three shorthands, `Handle ||= operators in AssignmentExpression` on
+// babel-plugin-react-compiler 1.0.0, in a hook body and inside an effect callback alike, while the
+// same rewrite in a plain helper compiles. So under `always` the rule says nothing inside a function
+// the compiler compiles, decided by the react shelf's `IsInsideComponentOrHook`, the predicate the
+// react rules already share rather than a second component detector. ESLint reports there; those
+// are its false positives, and three ahra sites carried them (UsersRolesPage.tsx:121,
+// RestEndpointNodeContent.tsx:335, WebSocketViaSharedWorkerProviderInternal.tsx:309).
+//
+// cohere's configuration does not say whether the compiler is on, since it lives in a Next config as
+// a JavaScript value, so the rule takes it as its own `reactCompiler` option, on by default. Every
+// tree we lint runs the compiler, and the fixer applies `||=` to a bare identifier unattended, so
+// the default is the side where an unattended rewrite cannot cost a component its compilation.
 var LogicalAssignmentOperators = rule.Rule{
 	Name: "logical-assignment-operators",
 	// Two judgments resolve a name: whether `undefined` is the global rather than a local shadowing
@@ -286,6 +313,9 @@ var LogicalAssignmentOperators = rule.Rule{
 		state := &logicalAssignmentState{
 			ctx:      ctx,
 			isStrict: logicalAssignmentIsStrict(ctx.SourceFile),
+			// Only under `always`: `never` reports the shorthand and expands it, which is the
+			// rewrite the compiler wants rather than the one it refuses.
+			skipCompiledFunctions: *settings.Require == LogicalAssignmentAlways && settings.ReactCompiler,
 		}
 
 		if *settings.Require == LogicalAssignmentNever {
@@ -313,6 +343,8 @@ type logicalAssignmentState struct {
 	// isStrict is the file-level answer to upstream's `sourceCode.getScope(ast).isStrict`, which is
 	// consulted only to decide whether a `with` block can be in play.
 	isStrict bool
+	// skipCompiledFunctions silences every finding inside a function React Compiler compiles.
+	skipCompiledFunctions bool
 }
 
 // logicalAssignmentIsStrict answers upstream's global-scope `isStrict`.
@@ -780,6 +812,11 @@ func (state *logicalAssignmentState) report(
 	fixes []rule.Fix,
 	shouldBeFixed bool,
 ) {
+	// Asked here, at a finding, rather than on every node: the ancestor walk is paid only where the
+	// rule already has something to say, which is the cheap test first and the expensive one after.
+	if state.skipCompiledFunctions && react.IsInsideComponentOrHook(node) {
+		return
+	}
 	if len(fixes) == 0 {
 		state.ctx.ReportNode(node, message)
 		return

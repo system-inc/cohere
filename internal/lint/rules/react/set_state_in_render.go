@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
+	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -184,7 +185,7 @@ var SetStateInRender = rule.Rule{
 
 // analyzeSetStateSubject runs the validator over the functions React would have compiled.
 //
-// The gate is `isComponentOrHookLike`, taken whole from `unsupported_syntax.go` rather than written
+// The gate is the react shelf's `IsComponentOrHookLike`, taken whole rather than written
 // again. Two porters have paid for that gate already, seventeen probe rounds and seven false
 // positives, and a second copy of it in this package would be a second thing to keep in agreement
 // with React for no benefit. It is the right gate here rather than a convenient one:
@@ -198,7 +199,7 @@ func analyzeSetStateSubject(ctx rule.Context, function *high_level_intermediate_
 	if function == nil {
 		return
 	}
-	if function.Node == nil || !isComponentOrHookLike(function.Node) {
+	if function.Node == nil || !utilsreact.IsComponentOrHookLike(function.Node) {
 		for _, nested := range function.Functions {
 			analyzeSetStateSubject(ctx, nested)
 		}
