@@ -5,6 +5,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/lint/checking"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -427,13 +428,8 @@ func correctnessNoIdenticalBranchesArguments(node *ast.Node) []*ast.Node {
 // correctnessNoIdenticalBranchesIsIntrinsicJsx says whether a JSX element names a host element
 // (`<p>`, `<my-element>`, `<svg:rect>`) rather than a component, the way the checker decides it.
 func correctnessNoIdenticalBranchesIsIntrinsicJsx(node *ast.Node) bool {
-	var tagName *ast.Node
-	switch node.Kind {
-	case ast.KindJsxOpeningElement:
-		tagName = node.AsJsxOpeningElement().TagName
-	case ast.KindJsxSelfClosingElement:
-		tagName = node.AsJsxSelfClosingElement().TagName
-	default:
+	tagName, _ := jsx.ElementParts(node)
+	if tagName == nil {
 		return false
 	}
 	return tagName.Kind == ast.KindJsxNamespacedName ||
