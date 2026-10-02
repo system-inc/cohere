@@ -72,8 +72,8 @@ func TestAnUncommittedEditDoesNotReachTheBuiltBinaryAndCommittingItDoes(t *testi
 
 	// The binary names the commit that reproduces it.
 	version := run(t, second, "--version")
-	if !strings.Contains(version, "commit:         "+ShortCommit(secondCommit)) {
-		t.Fatalf("--version does not name commit %s:\n%s", ShortCommit(secondCommit), version)
+	if !strings.Contains(version, "commit:         "+release.ShortCommit(secondCommit)) {
+		t.Fatalf("--version does not name commit %s:\n%s", release.ShortCommit(secondCommit), version)
 	}
 
 	// Nothing is left behind but the binaries and the shared compiler.
@@ -117,7 +117,7 @@ func TestCheckCommittedVersionReadsWhatARealBinaryPrints(t *testing.T) {
 	}
 
 	cases := map[string]string{
-		"another commit": strings.Replace(clean, ShortCommit(commit), "000000000000", 1),
+		"another commit": strings.Replace(clean, release.ShortCommit(commit), "000000000000", 1),
 		"a dirty tree": func() string {
 			dirty := provenance
 			dirty.SourceTreeModified = true

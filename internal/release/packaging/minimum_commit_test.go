@@ -98,7 +98,7 @@ func TestBuildRefusesBeforeTheMinimum(t *testing.T) {
 	if err == nil {
 		t.Fatal("Build released from a repository that never contained the minimum commit")
 	}
-	if !strings.Contains(err.Error(), shortCommit(MinimumReleaseCommit)) {
+	if !strings.Contains(err.Error(), ShortCommit(MinimumReleaseCommit)) {
 		t.Fatalf("Build failed, but not on the minimum commit: %v", err)
 	}
 }

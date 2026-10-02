@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
@@ -646,7 +645,7 @@ func (r *swiftRun) finish(engineExit int, ended string) (int, error) {
 		}
 		if r.engineSourceCommit != "" {
 			fmt.Fprintf(r.out, "  the Swift engine was built from Swift sources identical to commit %s, as the launcher's cache key requires\n",
-				dispatch.ShortCommit(r.engineSourceCommit))
+				release.ShortCommit(r.engineSourceCommit))
 		}
 		return 0, nil
 

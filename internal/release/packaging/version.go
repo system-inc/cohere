@@ -139,7 +139,7 @@ func (provenance Provenance) String() string {
 	// Printed whenever the build carried a stamp, including a release, because a published version
 	// still does not say which commit produced it and a bug report quoting both is easier to chase.
 	if provenance.SelfCommit != "" {
-		lines = append(lines, "  commit:         "+shortCommit(provenance.SelfCommit))
+		lines = append(lines, "  commit:         "+ShortCommit(provenance.SelfCommit))
 	}
 	// Printed only when true, because "built from a clean tree" is the ordinary case and a line
 	// asserting it on every release would be noise that hides the one time it matters.
@@ -206,7 +206,7 @@ func resolveCompilerCommit() string {
 			// Named for what it actually is. Reporting this repository's commit under the
 			// compiler's label would be a true fact wearing a wrong name, which is worse than
 			// the honest "unknown" because a reader would act on it.
-			return fmt.Sprintf("unknown (built from cohere %s)", shortCommit(setting.Value))
+			return fmt.Sprintf("unknown (built from cohere %s)", ShortCommit(setting.Value))
 		}
 	}
 	return "unknown"
@@ -254,8 +254,12 @@ func resolveSourceTreeModified() bool {
 	return false
 }
 
-// shortCommit trims a full hash to the length people actually read.
-func shortCommit(commit string) string {
+// ShortCommit trims a full hash to the length people actually read, the one home for that length.
+//
+// Exported because the launcher checks a freshly built binary by finding its own commit, shortened
+// this way, on the `commit:` line this package prints. Two copies of the length would have to agree
+// by coincidence, and the day they did not, every committed build would be refused.
+func ShortCommit(commit string) string {
 	const shortLength = 12
 	if len(commit) <= shortLength {
 		return commit

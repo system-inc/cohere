@@ -175,12 +175,12 @@ func requireAncestor(moduleDirectory string, minimum string, reason string) erro
 	if errors.As(err, &exitError) && exitError.ExitCode() == 1 {
 		return fmt.Errorf(
 			"this release would be built from a commit that does not contain %s, and %s. Release from a checkout that includes it",
-			shortCommit(minimum), reason,
+			ShortCommit(minimum), reason,
 		)
 	}
 	return fmt.Errorf(
 		"could not tell whether this release contains %s, so it is refused rather than assumed: %w\n%s\nA shallow clone is the usual cause; fetch full history and release again",
-		shortCommit(minimum), err, strings.TrimSpace(string(output)),
+		ShortCommit(minimum), err, strings.TrimSpace(string(output)),
 	)
 }
 

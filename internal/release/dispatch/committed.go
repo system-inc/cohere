@@ -15,6 +15,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
 // The launcher builds the cohere every project's gate runs from the checkout's committed tree, never
@@ -142,14 +144,14 @@ func readCommittedBuild(moduleDirectory string) (committedBuild, error) {
 func pinnedCompilerCommit(moduleDirectory string, commit string) (string, error) {
 	output, err := gitOutput(moduleDirectory, "ls-tree", commit, "TypeScript")
 	if err != nil {
-		return "", fmt.Errorf("reading the compiler pin from %s: %w", ShortCommit(commit), err)
+		return "", fmt.Errorf("reading the compiler pin from %s: %w", release.ShortCommit(commit), err)
 	}
 	// "160000 commit <sha>\tTypeScript" for a submodule. Anything else means the commit does not pin
 	// a compiler at all, and building would pick one up from somewhere unnamed.
 	fields := strings.Fields(output)
 	if len(fields) < 3 || fields[0] != "160000" || fields[1] != "commit" {
 		return "", fmt.Errorf("commit %s does not pin the vendored compiler as a submodule at TypeScript (ls-tree printed %q)",
-			ShortCommit(commit), strings.TrimSpace(output))
+			release.ShortCommit(commit), strings.TrimSpace(output))
 	}
 	return fields[2], nil
 }
@@ -162,10 +164,10 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "cohere: building from commit %s, its committed tree only\n", ShortCommit(build.Commit))
+	fmt.Fprintf(os.Stderr, "cohere: building from commit %s, its committed tree only\n", release.ShortCommit(build.Commit))
 
 	// A directory of its own, so two runs building at once never extract over each other.
-	created, err := os.MkdirTemp(paths.SnapshotDirectory(), ShortCommit(build.Commit)+"-*")
+	created, err := os.MkdirTemp(paths.SnapshotDirectory(), release.ShortCommit(build.Commit)+"-*")
 	if err != nil {
 		return fmt.Errorf("creating a snapshot directory: %w", err)
 	}
@@ -181,7 +183,7 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 	}
 
 	if err := extractGitArchive(paths.ModuleDirectory, build.Commit, "", snapshot); err != nil {
-		return fmt.Errorf("extracting commit %s: %w", ShortCommit(build.Commit), err)
+		return fmt.Errorf("extracting commit %s: %w", release.ShortCommit(build.Commit), err)
 	}
 
 	patchFiles, err := committedPatchFiles(snapshot)
@@ -286,7 +288,7 @@ func ensureCompiler(paths Paths, compilerCommit string, patchFiles []string) (st
 		fmt.Fprintf(digest, "patch\x00%s\x00%d\x00", filepath.Base(path), len(contents))
 		digest.Write(contents)
 	}
-	key := ShortCommit(compilerCommit) + "-" + hex.EncodeToString(digest.Sum(nil))[:hashLength]
+	key := release.ShortCommit(compilerCommit) + "-" + hex.EncodeToString(digest.Sum(nil))[:hashLength]
 	compiler := filepath.Join(paths.CompilerDirectory(), key)
 
 	if _, err := os.Stat(compiler); err == nil {
@@ -294,7 +296,7 @@ func ensureCompiler(paths Paths, compilerCommit string, patchFiles []string) (st
 	}
 
 	fmt.Fprintf(os.Stderr, "cohere: extracting the compiler at %s with %d patch(es), once per pin (about seven seconds)\n",
-		ShortCommit(compilerCommit), len(patchFiles))
+		release.ShortCommit(compilerCommit), len(patchFiles))
 
 	partial, err := os.MkdirTemp(paths.CompilerDirectory(), key+".partial-*")
 	if err != nil {
@@ -306,7 +308,7 @@ func ensureCompiler(paths Paths, compilerCommit string, patchFiles []string) (st
 	submodule := filepath.Join(paths.ModuleDirectory, "TypeScript")
 	if err := extractGitArchive(submodule, compilerCommit, compilerSubdirectory, partial); err != nil {
 		return "", fmt.Errorf("extracting the compiler at %s (if the commit is missing, the submodule has not fetched it: "+
-			"run `git submodule update --init` in %s): %w", ShortCommit(compilerCommit), paths.ModuleDirectory, err)
+			"run `git submodule update --init` in %s): %w", release.ShortCommit(compilerCommit), paths.ModuleDirectory, err)
 	}
 
 	for _, patchFile := range patchFiles {
@@ -397,7 +399,7 @@ func goBuildSnapshot(paths Paths, snapshot string, packagePath string, build com
 	command.Stderr = os.Stderr
 
 	if err := command.Run(); err != nil {
-		return fmt.Errorf("building cohere from commit %s: %w", ShortCommit(build.Commit), err)
+		return fmt.Errorf("building cohere from commit %s: %w", release.ShortCommit(build.Commit), err)
 	}
 	if _, err := os.Stat(outputPath); err != nil {
 		return fmt.Errorf("go build reported success but produced no binary at %s: %w", outputPath, err)
@@ -418,7 +420,7 @@ func proveCommittedBinary(binaryPath string, workingDirectory string, build comm
 	output, err := command.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("the binary built from %s failed its own --version (%w), so it was not cached:\n%s",
-			ShortCommit(build.Commit), err, output)
+			release.ShortCommit(build.Commit), err, output)
 	}
 	return checkCommittedVersion(string(output), build.Commit, patchCount)
 }
@@ -430,7 +432,7 @@ func checkCommittedVersion(version string, commit string, patchCount int) error 
 	present := 0
 	for line := range strings.SplitSeq(version, "\n") {
 		fields := strings.Fields(line)
-		if len(fields) == 2 && fields[0] == "commit:" && fields[1] == ShortCommit(commit) {
+		if len(fields) == 2 && fields[0] == "commit:" && fields[1] == release.ShortCommit(commit) {
 			commitNamed = true
 		}
 		if strings.Contains(line, PatchPresentMarker) {
@@ -440,15 +442,15 @@ func checkCommittedVersion(version string, commit string, patchCount int) error 
 
 	if !commitNamed {
 		return fmt.Errorf("the binary built from %s does not name that commit in --version, so it cannot be traced back to it "+
-			"and was not cached:\n%s", ShortCommit(commit), version)
+			"and was not cached:\n%s", release.ShortCommit(commit), version)
 	}
 	if strings.Contains(version, "uncommitted changes") {
 		return fmt.Errorf("the binary built from %s reports uncommitted changes, which a committed-tree build cannot have, "+
-			"so it was not cached:\n%s", ShortCommit(commit), version)
+			"so it was not cached:\n%s", release.ShortCommit(commit), version)
 	}
 	if present != patchCount {
 		return fmt.Errorf("commit %s carries %d compiler patch(es) and the binary measured %d present, so it was not cached:\n%s",
-			ShortCommit(commit), patchCount, present, version)
+			release.ShortCommit(commit), patchCount, present, version)
 	}
 	return nil
 }
@@ -488,7 +490,7 @@ func extractGitArchive(repository string, commit string, subdirectory string, de
 	if written == 0 {
 		// An empty extraction builds into nothing that runs, or worse, into something that runs and
 		// checks nothing. A commit always has files, so zero is a failure that has to say so.
-		return fmt.Errorf("git archive of %s wrote no files, which cannot be right", ShortCommit(commit))
+		return fmt.Errorf("git archive of %s wrote no files, which cannot be right", release.ShortCommit(commit))
 	}
 	return nil
 }
@@ -558,16 +560,6 @@ func gitOutput(directory string, arguments ...string) (string, error) {
 		return "", fmt.Errorf("git %s: %w: %s", strings.Join(arguments, " "), err, strings.TrimSpace(standardError.String()))
 	}
 	return string(output), nil
-}
-
-// ShortCommit trims a commit to the twelve characters `cohere --version` prints. Exported so the front
-// door shortens a commit the same way the launcher does.
-func ShortCommit(commit string) string {
-	const shortLength = 12
-	if len(commit) <= shortLength {
-		return commit
-	}
-	return commit[:shortLength]
 }
 
 // platformBinaryPrefix is how every hash-named cohere binary for this platform begins.
