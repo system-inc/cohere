@@ -120,12 +120,20 @@ func matchesIgnore(relative string, pattern string) bool {
 }
 
 // Enumerate walks a project root and returns the files this engine would format.
+func (engine *Engine) Enumerate(root string, structureIgnorePath string) (Enumeration, error) {
+	return Enumerate(root, structureIgnorePath, engine.Handles)
+}
+
+// Enumerate walks a project root and returns the files handles accepts.
+//
+// The walk is a function of the ignore layers and a file-type predicate, not of any engine, so the
+// native formatter enumerates without building a goja runtime it would never run.
 //
 // The layers are applied in the order `s pnc` applies them, and each is counted separately so a
 // misconfigured layer shows as a suspicious zero rather than as a slightly smaller total. That
 // ordering is not cosmetic: it is the difference between a corpus that measures the tree and one
 // that measures a smaller subject while looking complete.
-func (engine *Engine) Enumerate(root string, structureIgnorePath string) (Enumeration, error) {
+func Enumerate(root string, structureIgnorePath string, handles func(fileName string) bool) (Enumeration, error) {
 	enumeration := Enumeration{
 		Root:               root,
 		IgnoredByLayer:     map[string]int{},
@@ -200,7 +208,7 @@ func (engine *Engine) Enumerate(root string, structureIgnorePath string) (Enumer
 			}
 		}
 
-		if !engine.Handles(path) {
+		if !handles(path) {
 			enumeration.Unhandled++
 			extension := strings.ToLower(filepath.Ext(path))
 			if extension == "" {
