@@ -2,6 +2,7 @@ package javascript
 
 import (
 	"regexp"
+	"strconv"
 	"unicode"
 
 	"github.com/system-inc/cohere/internal/format/printing"
@@ -175,7 +176,7 @@ func printProperty(path *Path, options *Options, print PrintFunc) Doc {
 	return printAssignment(path, options, print, printKey(path, options, print), ":", "value")
 }
 
-// print/key.js. Our parsers are "typescript" and the JSON ones, and quoteProps is always "as-needed".
+// print/key.js. Our parsers are "typescript", "babel" and the JSON ones, and quoteProps is always "as-needed".
 
 func isTsEnumMember(node Node) bool { return node.Is("TSEnumMember") }
 
@@ -217,8 +218,8 @@ func isKeySafeToQuote(node Node, options *Options) bool {
 	return javaScriptNumberString(key.Get("value").(float64)) == printedNumber && isSimpleNumber(printedNumber)
 }
 
-// isKeySafeToUnquote is upstream's isKeySafeToUnquote. Of its parsers, ours are "typescript" and the
-// JSON ones, so the unquote-as-number branch (the JavaScript parsers only) never applies.
+// isKeySafeToUnquote is upstream's isKeySafeToUnquote. Of its parsers, ours are "typescript", "babel"
+// and the JSON ones.
 func isKeySafeToUnquote(node Node, options *Options) bool {
 	switch settingsOf(options).Parser {
 	case "json", "jsonc":
@@ -240,7 +241,13 @@ func isKeySafeToUnquote(node Node, options *Options) bool {
 	if !(isTypeScript(options) && node.Is("PropertyDefinition")) && isEs5IdentifierName(value) {
 		return true
 	}
-	// Unquoting as a number is only for the JavaScript parsers.
+	// Safe to unquote as number
+	// Note: It's also not safe for TypeScript as mentioned above
+	// https://github.com/prettier/prettier/pull/8508
+	if settingsOf(options).Parser == "babel" && !node.Is("ImportAttribute") && isSimpleNumber(value) {
+		number, _ := strconv.ParseFloat(value, 64)
+		return javaScriptNumberString(number) == value
+	}
 	return false
 }
 

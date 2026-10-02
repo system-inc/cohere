@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -42,17 +44,61 @@ type Converter struct {
 	allowPattern bool
 	scan         *scanner.Scanner
 	unsupported  error
+
+	// typeCastCommentEnds are the ends of the file's type cast comments, in order, when converting
+	// for the babel parser (ConvertForBabel). Nil converts for typescript.
+	typeCastCommentEnds []int
 }
+
+// ConvertForBabel is Convert for a file Prettier would parse with babel (see ParseJavaScript). The
+// one difference in the tree is postprocess's: Babel keeps a parenthesized expression as a node
+// when a type cast comment, `/** @type {T} */ (value)`, comes right before it.
+func ConvertForBabel(sourceFile *ast.SourceFile) (*Node, []*Node, error) {
+	// postprocess merges nestled JSDoc comments before it looks for casts, so this does too.
+	ends := []int{}
+	for _, comment := range mergeNestledJsdocComments(collectComments(sourceFile)) {
+		if IsTypeCastComment(comment) {
+			ends = append(ends, LocEnd(comment))
+		}
+	}
+	return convert(sourceFile, ends)
+}
+
+// followsTypeCastComment is postprocess's test for keeping a ParenthesizedExpression: the last type
+// cast comment that ends at or before start is separated from it by whitespace alone.
+func (converter *Converter) followsTypeCastComment(start int) bool {
+	ends := converter.typeCastCommentEnds
+	index := sort.SearchInts(ends, start+1) - 1
+	return index >= 0 && TrimJavaScript(converter.text[ends[index]:start]) == ""
+}
+
+// IsTypeCastComment is upstream's isTypeCastComment, utilities/is-type-cast-comment.js. Upstream
+// memoizes it per comment; the answer reads only the comment's value, so computing it each time is
+// the same.
+func IsTypeCastComment(comment *Node) bool {
+	return comment.Is("Block", "CommentBlock", "MultiLine") &&
+		strings.HasPrefix(comment.String("value"), "*") &&
+		// TypeScript expects the type to be enclosed in curly brackets, however
+		// Closure Compiler accepts types in parens and even without any delimiters at all.
+		// That's why we just search for "@type" and "@satisfies".
+		typeCastCommentPattern.MatchString(comment.String("value"))
+}
+
+var typeCastCommentPattern = regexp.MustCompile(`@(?:type|satisfies)\b`)
 
 // Convert parses nothing: it converts a parsed source file, and returns the Program with its comments.
 //
 // The file must have parsed without diagnostics. Upstream throws the first parse diagnostic before
 // converting, and so does this.
 func Convert(sourceFile *ast.SourceFile) (program *Node, comments []*Node, err error) {
+	return convert(sourceFile, nil)
+}
+
+func convert(sourceFile *ast.SourceFile, typeCastCommentEnds []int) (program *Node, comments []*Node, err error) {
 	if diagnostics := sourceFile.Diagnostics(); len(diagnostics) > 0 {
 		return nil, nil, fmt.Errorf("parse error at %d: %s", diagnostics[0].Pos(), diagnostics[0].String())
 	}
-	converter := &Converter{sourceFile: sourceFile, text: sourceFile.Text()}
+	converter := &Converter{sourceFile: sourceFile, text: sourceFile.Text(), typeCastCommentEnds: typeCastCommentEnds}
 	converter.scan = scanner.NewScanner()
 	converter.scan.SetText(converter.text)
 
@@ -1415,6 +1461,12 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 			"typeAnnotation", typeAnnotation)
 
 	case ast.KindParenthesizedExpression:
+		// Under babel, Prettier keeps Babel's ParenthesizedExpression after a Closure-style type cast
+		// comment (parse/postprocess/index.js); typescript-estree never makes one.
+		if start := converter.getStart(node); converter.followsTypeCastComment(start) {
+			return createNodeWithRange("ParenthesizedExpression", converter.getRange(node),
+				"expression", converter.convertChild(node.Expression(), parent))
+		}
 		return converter.convertChild(node.Expression(), parent)
 
 	case ast.KindTypeAliasDeclaration:

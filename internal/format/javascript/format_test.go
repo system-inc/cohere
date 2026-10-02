@@ -84,6 +84,13 @@ var formatCases = []formatCase{
 		contains: []string{"\xef\xbb\xbfconst a = { b: 1 };\n// comment\n", "`line\nline`"},
 	},
 	{
+		name:     "javascript: JSDoc types stay comments, numeric keys unquote under babel, JSX parses",
+		fileName: "Probe.js",
+		source: "/**\n * @typedef {{ a: number }} Shape\n * @param {string} name\n * @returns {Shape}\n */\nexport function make (name) { return /** @type {Shape} */ ({ 'a': 1, '2': name, 'b-c': 3 }) }\n" +
+			"const view = <div className='x'>{make('y')}</div>\n",
+		contains: []string{"export function make(name) {", "/** @type {Shape} */ ({ a: 1, 2: name, 'b-c': 3 })", "<div className=\"x\">"},
+	},
+	{
 		name:     "json: comments, trailing commas, quoting and numbers through the JavaScript printer",
 		fileName: "settings.json",
 		source: "// leading\n{ unquoted: 1, 'single': 'it\\'s', \"nested\": { \"array\": [1.50, -2, +3, 0x1F, 1e3,], /* inside */ \"empty\": {} },\n" +
@@ -100,10 +107,24 @@ var formatCases = []formatCase{
 
 // formatFor is the native entry point a file name reaches through internal/format/native.
 func formatFor(fileName string) func(string, string, prettier.Options) (string, error) {
-	if strings.HasSuffix(fileName, ".json") {
+	switch {
+	case strings.HasSuffix(fileName, ".json"):
 		return FormatJSON
+	case strings.HasSuffix(fileName, ".js"):
+		return FormatJavaScript
 	}
 	return Format
+}
+
+// TestJavaScriptRefusesWhatTypeScriptReadsDifferently: `a < b > (c)` is two comparisons to babel and a
+// generic call to TypeScript, so printing the TSX parse would rewrite the program's meaning.
+func TestJavaScriptRefusesWhatTypeScriptReadsDifferently(t *testing.T) {
+	if _, err := FormatJavaScript("Probe.js", "const result = a < b > (c);\n", prettier.DefaultOptions()); err == nil {
+		t.Fatal("a JavaScript file that parses as a TypeScript generic call was printed instead of refused")
+	}
+	if _, err := FormatJavaScript("Probe.js", "const result = a < b;\n", prettier.DefaultOptions()); err != nil {
+		t.Fatalf("plain JavaScript was refused: %v", err)
+	}
 }
 
 func TestFormatMatchesTheFork(t *testing.T) {

@@ -118,7 +118,7 @@ func getCommentChildNodes(_ Node, _ *Options) ([]Node, bool) {
 // handleClosureTypeCastComments is upstream's handleClosureTypeCastComments.
 func handleClosureTypeCastComments(context *commentContext) bool {
 	comment, followingNode := context.Comment, context.Following
-	if followingNode != nil && isTypeCastComment(comment) {
+	if followingNode != nil && estree.IsTypeCastComment(comment) {
 		printing.AddLeadingComment(followingNode, comment)
 		return true
 	}

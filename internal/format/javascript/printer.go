@@ -44,6 +44,13 @@ func Format(fileName string, text string, options prettier.Options) (string, err
 	return format(fileName, text, options, "typescript", estreePrinter)
 }
 
+// FormatJavaScript is Prettier's format for a .js, .mjs, .cjs or .jsx file, which upstream parses with
+// babel. The parser name matters to the printer only in print/key.js: under babel a numeric string
+// key unquotes (`{ "1": a }` prints `{ 1: a }`), which TypeScript forbids.
+func FormatJavaScript(fileName string, text string, options prettier.Options) (string, error) {
+	return format(fileName, text, options, "babel", estreePrinter)
+}
+
 // format is main/core.js's formatWithCursor for one printer: the byte order mark comes off before
 // parsing and goes back on after, and carriage returns become newlines. endOfLine is always "lf" (the
 // config resolver refuses anything else), so nothing converts them back.
@@ -67,6 +74,8 @@ func format(fileName string, text string, options prettier.Options, parser strin
 	switch parser {
 	case "typescript":
 		root, comments, err = estree.ParseTypeScript(fileName, text)
+	case "babel":
+		root, comments, err = estree.ParseJavaScript(fileName, text)
 	case "json":
 		root, comments, err = estree.ParseJSON(text, true)
 	case "json-stringify":

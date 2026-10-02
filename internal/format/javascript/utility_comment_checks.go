@@ -1,13 +1,11 @@
 package javascript
 
-import (
-	"regexp"
-	"strings"
-)
+import "github.com/system-inc/cohere/internal/format/estree"
 
 // utilities/has-leading-own-line-comment.js, utilities/return-statement-has-leading-comment.js,
 // utilities/needs-hardline-after-dangling-comment.js,
-// utilities/should-expression-statement-print-own-comments.js, utilities/is-type-cast-comment.js.
+// utilities/should-expression-statement-print-own-comments.js. utilities/is-type-cast-comment.js is
+// estree.IsTypeCastComment, because the babel parse reads it too.
 
 // hasLeadingOwnLineComment is upstream's hasLeadingOwnLineComment.
 func hasLeadingOwnLineComment(text string, node Node) bool {
@@ -79,22 +77,9 @@ func shouldExpressionStatementPrintOwnComments(path *Path, options *Options) boo
 	// `;/* normal comment */ ([]).forEach(foo)`
 	// We may want consider remove the `isTypeCastComment` check
 	comments := getComments(node(path), commentLeading, nil)
-	if len(comments) > 0 && isTypeCastComment(comments[len(comments)-1]) {
+	if len(comments) > 0 && estree.IsTypeCastComment(comments[len(comments)-1]) {
 		return true
 	}
 
 	return false
-}
-
-var typeCastCommentPattern = regexp.MustCompile(`@(?:type|satisfies)\b`)
-
-// isTypeCastComment is upstream's isTypeCastComment. Upstream memoizes it per comment; the answer
-// reads only the comment's value, so computing it each time is the same.
-func isTypeCastComment(comment Node) bool {
-	return isBlockComment(comment) &&
-		strings.HasPrefix(comment.String("value"), "*") &&
-		// TypeScript expects the type to be enclosed in curly brackets, however
-		// Closure Compiler accepts types in parens and even without any delimiters at all.
-		// That's why we just search for "@type" and "@satisfies".
-		typeCastCommentPattern.MatchString(comment.String("value"))
 }

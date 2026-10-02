@@ -103,6 +103,14 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 		return printExpressionStatement(path, options, print)
 	case "ChainExpression":
 		return print("expression", nil)
+	// Babel non-standard node. Used for Closure-style type casts. See postprocess.js.
+	case "ParenthesizedExpression":
+		expression := current.Child("expression")
+		shouldHug := !hasAnyComment(expression) && (isObjectExpression(expression) || isArrayExpression(expression))
+		if shouldHug {
+			return concat("(", print("expression", nil), ")")
+		}
+		return group(concat("(", indent(concat(softline, print("expression", nil))), softline, ")"))
 	case "AssignmentExpression":
 		return printAssignmentExpression(path, options, print)
 	case "VariableDeclarator":
