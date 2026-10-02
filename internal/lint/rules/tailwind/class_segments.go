@@ -41,16 +41,16 @@ func (r *ClassLiteralReader) ClassSegmentsIn(node *ast.Node) []ClassSegment {
 	}
 
 	// A plain string literal is one segment with no holes on either side, unless it sits inside a
-	// template's hole, where both of its edges touch the template's text once substituted and its
-	// edge whitespace is a separator (see ClassLiteral.InsideTemplateHole).
+	// template's hole, where an edge that touches the template's text once substituted keeps its
+	// whitespace as a separator (see holeEdges).
 	values := r.classValuesIn(node)
 	var segments []ClassSegment
 	for _, literal := range values.literals {
 		segments = append(segments, ClassSegment{
 			Text:         literal.Text,
 			Range:        literal.Range,
-			LeadingHole:  literal.InsideTemplateHole,
-			TrailingHole: literal.InsideTemplateHole,
+			LeadingHole:  literal.Edges.Leading,
+			TrailingHole: literal.Edges.Trailing,
 			Origin:       literal.Origin,
 		})
 	}
@@ -121,7 +121,7 @@ func segmentsOfTemplate(value classTemplateValue) []ClassSegment {
 	segments = append(segments, ClassSegment{
 		Text:         template.Head.Text(),
 		Range:        trimDelimiters(rule.TokenRange(sourceFile, template.Head), 1, 2),
-		LeadingHole:  value.insideTemplateHole,
+		LeadingHole:  value.edges.Leading,
 		TrailingHole: true,
 		Origin:       origin,
 	})
@@ -144,7 +144,7 @@ func segmentsOfTemplate(value classTemplateValue) []ClassSegment {
 			Text:         span.Literal.Text(),
 			Range:        trimDelimiters(rule.TokenRange(sourceFile, span.Literal), 1, trailing),
 			LeadingHole:  true,
-			TrailingHole: index < len(spans)-1 || value.insideTemplateHole,
+			TrailingHole: index < len(spans)-1 || value.edges.Trailing,
 			Origin:       origin,
 		})
 	}

@@ -30,14 +30,10 @@ type ClassLiteral struct {
 	// Origin says which reading rule found this literal, so a report can explain itself and a test
 	// can assert that all three surfaces are covered rather than only the obvious one.
 	Origin ClassLiteralOrigin
-	// InsideTemplateHole is set for a literal written inside a template's `${}`, at any depth.
-	//
-	// Its edge whitespace is load-bearing there: in `flex${open ? ' hidden' : ''}` the leading
-	// space is all that keeps `hidden` from fusing with `flex` once the value is substituted. A rule
-	// that trims a literal's edges must not trim these, which is the same thing
-	// `ClassSegment.LeadingHole` says about a template's own static text, and what the plugin's
-	// `canCollapseWhitespaceIn` decides from the same position.
-	InsideTemplateHole bool
+	// Edges says which of the literal's ends will touch class text once it is substituted into a
+	// template's hole, so that the whitespace at that end is all that separates two classes. See
+	// holeEdges.
+	Edges classValueEdges
 }
 
 // ClassLiteralOrigin is where a class string was written.
@@ -166,9 +162,9 @@ type classValues struct {
 type classTemplateValue struct {
 	node   *ast.Node
 	origin ClassLiteralOrigin
-	// insideTemplateHole is set when the template is itself inside another template's hole, which
-	// makes its outer edges touch that template's text once substituted.
-	insideTemplateHole bool
+	// edges says which of the template's outer ends touch class text, when it is itself inside
+	// another template's hole.
+	edges classValueEdges
 }
 
 // classValuesIn dispatches on the three class surfaces.
@@ -223,7 +219,7 @@ func (r *ClassLiteralReader) calleeValues(node *ast.Node) classValues {
 
 	values := classValues{}
 	for _, argument := range call.Arguments.Nodes {
-		collectClassValues(argument, ClassLiteralOriginCallee, false, &values)
+		collectClassValues(argument, ClassLiteralOriginCallee, classValueEdges{}, &values)
 	}
 	return values
 }
@@ -257,7 +253,7 @@ func (r *ClassLiteralReader) variableValues(node *ast.Node) classValues {
 // expression.
 func classValuesUnder(node *ast.Node, origin ClassLiteralOrigin) classValues {
 	values := classValues{}
-	collectClassValues(node, origin, false, &values)
+	collectClassValues(node, origin, classValueEdges{}, &values)
 	return values
 }
 
@@ -269,7 +265,7 @@ func classValuesUnder(node *ast.Node, origin ClassLiteralOrigin) classValues {
 // side can be the result. Anything else, a call, a member access, a comparison, is not a class list
 // and is not entered: in `cn(getSize('sm px-2'))` the string is an argument to a function nobody
 // named as a class callee.
-func collectClassValues(node *ast.Node, origin ClassLiteralOrigin, insideTemplateHole bool, values *classValues) {
+func collectClassValues(node *ast.Node, origin ClassLiteralOrigin, edges classValueEdges, values *classValues) {
 	if node == nil {
 		return
 	}
@@ -277,12 +273,12 @@ func collectClassValues(node *ast.Node, origin ClassLiteralOrigin, insideTemplat
 	switch node.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
 		literal := classLiteralFrom(node, origin)
-		literal.InsideTemplateHole = insideTemplateHole
+		literal.Edges = edges
 		values.literals = append(values.literals, literal)
 
 	case ast.KindJsxExpression:
 		if expression := node.AsJsxExpression(); expression != nil {
-			collectClassValues(expression.Expression, origin, insideTemplateHole, values)
+			collectClassValues(expression.Expression, origin, edges, values)
 		}
 
 	// `className={('flex flex')}` is legal and means exactly what the unparenthesized form means.
@@ -298,19 +294,19 @@ func collectClassValues(node *ast.Node, origin ClassLiteralOrigin, insideTemplat
 	// depends on the parse shape must not copy this.
 	case ast.KindParenthesizedExpression:
 		if parenthesized := node.AsParenthesizedExpression(); parenthesized != nil {
-			collectClassValues(parenthesized.Expression, origin, insideTemplateHole, values)
+			collectClassValues(parenthesized.Expression, origin, edges, values)
 		}
 
 	case ast.KindAsExpression:
-		collectClassValues(node.AsAsExpression().Expression, origin, insideTemplateHole, values)
+		collectClassValues(node.AsAsExpression().Expression, origin, edges, values)
 
 	case ast.KindSatisfiesExpression:
-		collectClassValues(node.AsSatisfiesExpression().Expression, origin, insideTemplateHole, values)
+		collectClassValues(node.AsSatisfiesExpression().Expression, origin, edges, values)
 
 	case ast.KindConditionalExpression:
 		conditional := node.AsConditionalExpression()
-		collectClassValues(conditional.WhenTrue, origin, insideTemplateHole, values)
-		collectClassValues(conditional.WhenFalse, origin, insideTemplateHole, values)
+		collectClassValues(conditional.WhenTrue, origin, edges, values)
+		collectClassValues(conditional.WhenFalse, origin, edges, values)
 
 	case ast.KindBinaryExpression:
 		binary := node.AsBinaryExpression()
@@ -319,33 +315,86 @@ func collectClassValues(node *ast.Node, origin ClassLiteralOrigin, insideTemplat
 		}
 		switch binary.OperatorToken.Kind {
 		case ast.KindAmpersandAmpersandToken:
-			collectClassValues(binary.Right, origin, insideTemplateHole, values)
+			collectClassValues(binary.Right, origin, edges, values)
 		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-			collectClassValues(binary.Left, origin, insideTemplateHole, values)
-			collectClassValues(binary.Right, origin, insideTemplateHole, values)
+			collectClassValues(binary.Left, origin, edges, values)
+			collectClassValues(binary.Right, origin, edges, values)
 		}
 
 	case ast.KindArrayLiteralExpression:
 		if elements := node.AsArrayLiteralExpression().Elements; elements != nil {
 			for _, element := range elements.Nodes {
-				collectClassValues(element, origin, insideTemplateHole, values)
+				collectClassValues(element, origin, edges, values)
 			}
 		}
 
 	case ast.KindTemplateExpression:
-		values.templates = append(values.templates, classTemplateValue{
-			node: node, origin: origin, insideTemplateHole: insideTemplateHole,
-		})
+		values.templates = append(values.templates, classTemplateValue{node: node, origin: origin, edges: edges})
 		template := node.AsTemplateExpression()
-		if template.TemplateSpans == nil {
+		if template.Head == nil || template.TemplateSpans == nil {
 			return
 		}
-		for _, spanNode := range template.TemplateSpans.Nodes {
-			if span := spanNode.AsTemplateSpan(); span != nil {
-				collectClassValues(span.Expression, origin, true, values)
+		spans := template.TemplateSpans.Nodes
+		before := template.Head.Text()
+		for index, spanNode := range spans {
+			span := spanNode.AsTemplateSpan()
+			if span == nil || span.Literal == nil {
+				continue
 			}
+			after := span.Literal.Text()
+			collectClassValues(span.Expression, origin, holeEdges(before, after, index == 0, index == len(spans)-1, edges), values)
+			before = after
 		}
 	}
+}
+
+// classValueEdges says which ends of a value touch class text once it is substituted, so that the
+// whitespace at that end is the only thing between two classes and must not be trimmed away.
+//
+// A value on a surface touches nothing at either end. A value inside a template's hole touches the
+// text on each side of the hole unless that text supplies whitespace of its own.
+type classValueEdges struct {
+	Leading  bool
+	Trailing bool
+}
+
+// holeEdges is which ends of a hole's value touch class text, from the template text either side.
+//
+// In `flex ${open ? ' hidden ' : ”}` the text before the hole ends with a space, so the value's
+// leading space separates nothing and can go, and nothing follows the hole, so its trailing space
+// can go too: the result is `'hidden'`, which is what Prettier's Tailwind plugin writes. In
+// `flex${open ? ' hidden' : ”}` the leading space is the only thing keeping `hidden` from fusing
+// with `flex`, so it stays.
+//
+// The plugin trims there too, and that is a defect in it rather than a convention to copy: its
+// `canCollapseWhitespaceIn` tests whether the quasi before a hole starts with whitespace where the
+// question is whether it ends with it, so it rewrites `flex${c ? '  block  ' : ”}` to
+// `flex${c ? 'block' : ”}` and the two classes become `flexblock`. Measured 2026-10-02 against
+// 0.8.1. This matches it everywhere the trim is safe, which is every hole string the gate found, and
+// declines only the rewrites that change what renders.
+//
+// An empty run between two holes touches the neighbouring hole's value, which nothing here can
+// read, so it counts as touching. An empty run at a template's own end inherits that template's
+// edges, which is what makes a template nested inside another template's hole come out right.
+func holeEdges(before string, after string, firstHole bool, lastHole bool, template classValueEdges) classValueEdges {
+	edges := classValueEdges{}
+	switch {
+	case before == "" && firstHole:
+		edges.Leading = template.Leading
+	case before == "":
+		edges.Leading = true
+	default:
+		edges.Leading = !isSpace(rune(before[len(before)-1]))
+	}
+	switch {
+	case after == "" && lastHole:
+		edges.Trailing = template.Trailing
+	case after == "":
+		edges.Trailing = true
+	default:
+		edges.Trailing = !isSpace(rune(after[0]))
+	}
+	return edges
 }
 
 // classLiteralFrom records the literal and the span of its contents.

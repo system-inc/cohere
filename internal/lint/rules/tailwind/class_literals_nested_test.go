@@ -182,3 +182,61 @@ func TestTemplateRunsAfterTriviaAreFixed(t *testing.T) {
 		})
 	}
 }
+
+// A string in a template's hole loses its edge whitespace exactly where the template text beside the
+// hole already supplies some, and keeps one character where it does not.
+//
+// The trimmed cases are quoted from Prettier's Tailwind plugin on 2026-10-02. The kept cases are
+// where the plugin is wrong: it trims them too, so `flex${c ? '  block  ' : ”}` became
+// `flex${c ? 'block' : ”}` and two classes fused into `flexblock`. See holeEdges.
+func TestHoleStringEdgesTrimOnlyWhereTheTemplateSeparates(t *testing.T) {
+	for _, testCase := range []struct {
+		name, source, want string
+	}{
+		{
+			name:   "the gate's shape: text before ends with a space, nothing after",
+			source: "const element = <i className={`size-2.5 transition-transform ${open ? ' rotate-90 ' : ''}`} />;",
+			want:   "const element = <i className={`size-2.5 transition-transform ${open ? 'rotate-90' : ''}`} />;",
+		},
+		{
+			name:   "spaces on both sides of the hole",
+			source: "const element = <i className={`flex ${c ? '  block  ' : ''} grid`} />;",
+			want:   "const element = <i className={`flex ${c ? 'block' : ''} grid`} />;",
+		},
+		{
+			name:   "a hole at the template's start",
+			source: "const element = <i className={`${c ? '  block  ' : ''} flex`} />;",
+			want:   "const element = <i className={`${c ? 'block' : ''} flex`} />;",
+		},
+		{
+			name:   "a template nested in a hole",
+			source: "const element = <i className={`flex ${c ? `  block  ${d}` : ''}`} />;",
+			want:   "const element = <i className={`flex ${c ? `block ${d}` : ''}`} />;",
+		},
+		{
+			// The plugin writes `flex${c ? 'block' : ''}grid` here, which is `flexblockgrid`.
+			name:   "glued on both sides, one character survives each edge",
+			source: "const element = <i className={`flex${c ? '  block  ' : ''}grid`} />;",
+			want:   "const element = <i className={`flex${c ? ' block ' : ''}grid`} />;",
+		},
+		{
+			name:   "glued before, spaced after",
+			source: "const element = <i className={`flex${c ? '  block  ' : ''} grid`} />;",
+			want:   "const element = <i className={`flex${c ? ' block' : ''} grid`} />;",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", testCase.source)
+			rule_testing.ExpectFixedSource(t, result, testCase.want)
+		})
+	}
+
+	// And the already-right shapes stay silent, glued single spaces included.
+	for _, source := range []string{
+		"const element = <i className={`flex ${c ? 'block' : ''}`} />;",
+		"const element = <i className={`flex${c ? ' block' : ''}`} />;",
+		"const element = <i className={`${c ? 'block ' : ''}flex`} />;",
+	} {
+		rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", source))
+	}
+}
