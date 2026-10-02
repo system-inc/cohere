@@ -320,7 +320,7 @@ public struct Pipeline {
      Where SwiftPM writes when the engine runs it: outside the project, keyed by the package's path, so a run
      never takes the developer's `.build` lock and `--no-fix` writes nothing into the project.
      */
-    static func scratchPath(for root: URL) -> URL {
+    public static func scratchPath(for root: URL) -> URL {
         let digest = SHA256.hash(data: Data(root.resolvingSymlinksInPath().path.utf8))
         let key = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
         return FileManager.default.homeDirectoryForCurrentUser

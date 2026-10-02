@@ -61,7 +61,13 @@ struct PipelineControlTests {
         try manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
         try configuration.write(to: root.appendingPathComponent(".swift-format"), atomically: true, encoding: .utf8)
         try source.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
-        defer { try? FileManager.default.removeItem(at: root) }
+        defer {
+            do {
+                try FileManager.default.removeItem(at: root)
+            } catch {
+                /* Ignored on purpose: a leftover fixture in the temporary directory costs nothing, and failing a test that already answered would hide its answer. */
+            }
+        }
 
         let options = try CommandOptions.parse(["--contract", "1", "--root", root.path, "--no-fix"], workingDirectory: root)
         var lines = Data()

@@ -32,6 +32,7 @@ let package = Package(
     ],
     products: [
         .executable(name: "cohere-swift", targets: ["CohereSwiftCommand"]),
+        .executable(name: "cohere-swift-parity", targets: ["CohereSwiftParity"]),
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-syntax.git", exact: "604.0.0"),
@@ -62,6 +63,14 @@ let package = Package(
         ),
         .executableTarget(
             name: "CohereSwiftCommand",
+            dependencies: ["CohereSwift"]
+        ),
+        /*
+         The parity harness: the engine beside SwiftLint and swift-format's linter, rule by rule. A separate
+         product, so the front door's `--product cohere-swift` build never compiles it.
+         */
+        .executableTarget(
+            name: "CohereSwiftParity",
             dependencies: ["CohereSwift"]
         ),
         .testTarget(
