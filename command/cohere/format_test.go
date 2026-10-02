@@ -8,6 +8,8 @@ import (
 
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -365,5 +367,105 @@ func TestAMarkedSyntaxErrorIsUnparseableWhateverItSays(t *testing.T) {
 	}
 	if !isUnparseable(fmt.Errorf("formatting a.json: %w", printing.Syntax(plain))) {
 		t.Fatal("a marked parse failure, wrapped once more, was not recognized")
+	}
+}
+
+// nonIdempotentUnifiChain is real input: modules/unifi/UnifiFleetCommandLineInterface.ts as it stood
+// before ahra 7872fceb, cut to the expression that does not settle. One pass of Prettier breaks the
+// `(…).filter(…).map(…)` chain across lines, and a second pass joins it again; the native printer
+// matches both passes. Formatted once, it fails the `--no-fix` check on the text the write produced.
+const nonIdempotentUnifiChain = `export function report(networkResults: PromiseSettledResult<Read>[], networkConsoles: Console[]): string {
+    return JSON.stringify(
+        {
+            networks: networkResults.map((result, index) =>
+                result.status === 'fulfilled'
+                    ? {
+                          console: networkConsoles[index]?.name,
+                          blockedPorts: result.value.snapshot.devices.flatMap((device) =>
+                              (device.port_table ?? []).filter(unifiIsPortBlocked).map((port) => ({ device: unifiDeviceName(device), port: port.port_idx, state: port.stp_state })),
+                          ),
+                      }
+                    : { console: networkConsoles[index]?.name, error: String(result.reason) },
+            ),
+        },
+        null,
+        4,
+    );
+}
+`
+
+// The transform formats to a fixpoint, so what it writes is what the next run would leave alone.
+func TestTheTransformFormatsARealNonIdempotentInputToItsFixpoint(t *testing.T) {
+	// ahra's options, named rather than resolved: resolving from this test's directory finds no
+	// config and prints at Prettier's default width, where this input settles in one pass.
+	printer := native.Formatter{Options: formatoptions.Default()}
+	engine := &fakeEngine{handled: []string{".ts"}, format: printer.Format}
+
+	// The premise: one pass really does not settle this input. Without it the case below would pass
+	// on a printer that happened to be idempotent here and prove nothing about the loop.
+	once, err := engine.Format("Report.ts", nonIdempotentUnifiChain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	twice, err := engine.Format("Report.ts", once)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if once == twice {
+		t.Fatal("one pass settled the Unifi chain, so this fixture no longer reproduces a non-idempotent input")
+	}
+
+	formatted, err := formatTransform(engine)("Report.ts", nonIdempotentUnifiChain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if formatted != twice {
+		t.Fatalf("the transform stopped short of the fixpoint:\n--- transform\n%s--- two passes\n%s", formatted, twice)
+	}
+	if again, _ := formatTransform(engine)("Report.ts", formatted); again != formatted {
+		t.Fatalf("the transform's own output is rewritten by the next run:\n%s", again)
+	}
+}
+
+// The bound: a file still changing on the last pass is a failure naming it, never a skip and never
+// the last pass written as though it were formatted. The stability check: a file that settles on the
+// second pass comes back settled, and an already formatted one costs a single pass.
+func TestTheFormatFixpointIsBoundedAndStopsWhenStable(t *testing.T) {
+	growing := &fakeEngine{
+		handled: []string{".ts"},
+		format:  func(_ string, text string) (string, error) { return text + "x", nil },
+	}
+	_, err := formatTransform(growing)("Drifting.ts", "const a = 1;\n")
+	if err == nil || errors.Is(err, edit.ErrSkipped) {
+		t.Fatalf("a file still changing at the bound was not a failure: %v", err)
+	}
+	if !strings.Contains(err.Error(), "Drifting.ts") || !strings.Contains(err.Error(), "not idempotent") {
+		t.Fatalf("the failure does not name the file and why: %v", err)
+	}
+	if len(growing.askedFor) != formatPassLimit {
+		t.Fatalf("formatted %d times, want the bound of %d", len(growing.askedFor), formatPassLimit)
+	}
+
+	settling := &fakeEngine{
+		handled: []string{".ts"},
+		format: func(_ string, text string) (string, error) {
+			switch text {
+			case "a\n":
+				return "b\n", nil
+			default:
+				return "c\n", nil
+			}
+		},
+	}
+	if formatted, err := formatTransform(settling)("Settling.ts", "a\n"); err != nil || formatted != "c\n" {
+		t.Fatalf("a file that settles on the second pass came back %q, %v; want \"c\\n\"", formatted, err)
+	}
+
+	stable := prettierLike()
+	if _, err := formatTransform(stable)("Formatted.ts", "const a = 1;\n"); err != nil {
+		t.Fatal(err)
+	}
+	if len(stable.askedFor) != 1 {
+		t.Fatalf("an already formatted file was formatted %d times, want 1", len(stable.askedFor))
 	}
 }

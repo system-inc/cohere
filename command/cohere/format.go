@@ -79,25 +79,47 @@ func formatTransform(engine formatEngine) edit.Transform {
 			return "", fmt.Errorf("%w: %s is not a file type the formatter handles", edit.ErrSkipped, extensionOf(fileName))
 		}
 
-		formatted, err := engine.Format(fileName, text)
-		if err != nil {
-			// A failure is reported as a failure rather than downgraded to a skip. The edit engine
-			// keeps the fixes that already converged, so a formatter falling over on one file does not
-			// cost the tree its correctness fixes, and the refusal is counted rather than swallowed.
-			//
-			// The exception is a file that does not parse, which the engine may report as an error and
-			// which is genuinely a skip: the edit engine already refuses to fix a file in that state,
-			// and the types phase reports it in a form a reader can act on. A second complaint from the
-			// formatter adds noise rather than information.
-			if isUnparseable(err) {
-				return "", fmt.Errorf("%w: the file does not parse, so there is nothing to format", edit.ErrSkipped)
+		// Formatted until the text stops changing, not once. Prettier is not idempotent on every input,
+		// and the native printers match it pass for pass, so one pass can leave a file a second pass
+		// still rewrites. A writing run that formats once then fails its own `--no-fix` check on the
+		// file it just wrote: 7872fceb did exactly that to two of ahra's files. An already formatted
+		// file is the common case and still costs one pass, because its first pass changes nothing.
+		current := text
+		for pass := 1; pass <= formatPassLimit; pass++ {
+			formatted, err := engine.Format(fileName, current)
+			if err != nil {
+				// A failure is reported as a failure rather than downgraded to a skip. The edit engine
+				// keeps the fixes that already converged, so a formatter falling over on one file does
+				// not cost the tree its correctness fixes, and the refusal is counted rather than
+				// swallowed.
+				//
+				// The exception is a file that does not parse, which the engine may report as an error
+				// and which is genuinely a skip: the edit engine already refuses to fix a file in that
+				// state, and the types phase reports it in a form a reader can act on. A second
+				// complaint from the formatter adds noise rather than information. Only on the first
+				// pass, though: the formatter's own output failing to parse is the formatter breaking.
+				if pass == 1 && isUnparseable(err) {
+					return "", fmt.Errorf("%w: the file does not parse, so there is nothing to format", edit.ErrSkipped)
+				}
+				return "", err
 			}
-			return "", err
+			if formatted == current {
+				return current, nil
+			}
+			current = formatted
 		}
 
-		return formatted, nil
+		// Still changing at the bound. Writing the last pass would call a file formatted that the next
+		// run rewrites again, so it is a failure naming the file, and the edit engine keeps the fixes
+		// and leaves the formatting undone.
+		return "", fmt.Errorf("%s is not idempotent under the formatter: pass %d still changed it", fileName, formatPassLimit)
 	}
 }
+
+// formatPassLimit bounds how many times one file is formatted while its text keeps changing. Every
+// non-idempotent input measured on ahra settled on the second pass, so a third that still changes
+// something is a printer defect to report, not a file to keep formatting.
+const formatPassLimit = 3
 
 // isUnparseable reports whether a format error was caused by source that does not parse.
 //
