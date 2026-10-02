@@ -248,6 +248,10 @@ type ParseContext struct {
 	Constructs *FullConstructs
 	Defined    []string
 	Lazy       map[int]bool
+
+	// GfmFootnotes is upstream's parser.gfmFootnotes, which micromark-extension-gfm-footnote hangs on the
+	// parser: the identifiers of the footnote definitions seen so far.
+	GfmFootnotes []string
 }
 
 // Content types, upstream's constants.contentType*.
