@@ -740,7 +740,7 @@ func (r *swiftRun) acceptSummary(record *swiftSummaryRecord) error {
 	// that says it fell short is believed, even where no record shows the gap.
 	//
 	// A run with nothing to check skipped every phase because there was nothing for any of them to
-	// look at, which recordNothingToCheck treats as a clean answer over zero files and so does this.
+	// look at, which the phase report treats as a clean answer over zero files, and so does this.
 	namedGaps := r.filesWithoutRecord > 0 || r.crashes > 0 || len(r.unreadable) > 0
 	gapInRecords := (record.NothingToCheck == "" && !r.report.checkedEverything()) || namedGaps
 	if gapInRecords && *record.Complete {

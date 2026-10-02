@@ -20,7 +20,7 @@ import (
 // gives them, forwarded only when the caller typed them. The rest are refused by name, by the engine
 // or below, because a flag accepted and ignored reads as a run that did what was asked.
 var swiftPassThroughSwitches = []string{
-	"no-fix", "fix", "types", "lint", "format", "format-all", "changed", "single-threaded",
+	"no-fix", "fix", "types", "lint", "format", "format-all", "single-threaded",
 	"rules", "rules-enabled", "version", "unused", "unused-all", "unused-deep", "timing",
 }
 

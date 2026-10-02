@@ -2,10 +2,12 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/format/formatfiles"
 )
 
 // programExtensions are the extensions a tsconfig can put into a program at all. Anything else, a
@@ -27,12 +29,9 @@ func errNamedPathsOutsideProgram(location projectLocation, names []string) error
 // The walk refuses an empty file set, which is right, and used to say only "nothing to walk: the
 // file set is empty". Measured on ahra: `cohere --lint modules/tasks/data/attachments/pt64fq7/score.mjs`
 // printed exactly that, with nothing saying the file is left out by the tsconfig's `exclude` and
-// ignored by git besides, so a reader could not tell a scratch file from a broken invocation. The
-// refusal stays; it now carries the reason.
-//
-// Git is asked rather than the ignore files parsed, because git is what decides: `check-ignore -v`
-// names the file, the line and the pattern that matched, which is what a reader needs to change it.
-// A path git cannot answer about, outside any repository, simply gets no git clause.
+// ignored by .gitignore besides, so a reader could not tell a scratch file from a broken invocation.
+// The refusal stays; it now carries the reason, with the ignore line that matched when one does,
+// which is what a reader needs to change it. See ignoreSource.
 func explainNamedPathsOutsideProgram(location projectLocation, names []string) string {
 	sentences := make([]string, 0, len(names))
 	configName := location.ConfigFileName
@@ -60,8 +59,8 @@ func explainNamedPathsOutsideProgram(location projectLocation, names []string) s
 				" leaves it out with its `include` and `exclude` lists"
 		}
 
-		if ignoredBy := gitIgnoreSource(location.Root, path); ignoredBy != "" {
-			sentence += ", and git ignores it too (" + ignoredBy + ")"
+		if ignoredBy := ignoreSource(location.Root, path); ignoredBy != "" {
+			sentence += ", and the root's .gitignore leaves it out too (" + ignoredBy + ")"
 		}
 		sentences = append(sentences, sentence+".")
 	}
@@ -69,34 +68,21 @@ func explainNamedPathsOutsideProgram(location projectLocation, names []string) s
 	return "nothing to check: none of the named paths is in the program. " + strings.Join(sentences, " ")
 }
 
-// gitIgnoreSource names the ignore rule that matches a path, as the ignore file and line followed by
-// the pattern in backticks, or answers empty when git does not ignore it or cannot say.
+// ignoreSource names the line of the project root's `.gitignore` that covers a path, with the pattern
+// in backticks, or answers empty when none does or the file cannot be read.
 //
-// `git check-ignore` exits 1 for a path it does not ignore and 128 outside a repository; both are
-// "no clause" rather than a failure, because the explanation is complete without one.
-func gitIgnoreSource(root string, path string) string {
-	command := exec.Command("git", "check-ignore", "--verbose", "--", path)
-	command.Dir = root
-	output, err := command.Output()
-	if err != nil {
-		// Not ignored, outside a repository, or no git at all: the sentence stands without it.
+// Read natively, from the root's `.gitignore`, with the matcher the format walk uses. Git used to be
+// asked (`check-ignore --verbose`), which also saw nested ignore files and global excludes; this clause
+// is part of an explanation and decides nothing, so the narrower answer costs a reader at most a
+// missing clause, and cohere runs no git.
+func ignoreSource(root string, path string) string {
+	relative, err := filepath.Rel(root, path)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 		return ""
 	}
-
-	// The verbose form is `<source>:<line>:<pattern>\t<path>`. The source and line never contain a
-	// tab, and a pattern cannot either, so the tab is the one safe split.
-	line := strings.TrimSpace(string(output))
-	match, _, found := strings.Cut(line, "\t")
-	if !found {
+	line, pattern, err := formatfiles.IgnoringLine(filepath.Join(root, ".gitignore"), relative)
+	if err != nil || line == 0 {
 		return ""
 	}
-	source, rest, found := strings.Cut(match, ":")
-	if !found {
-		return ""
-	}
-	lineNumber, pattern, found := strings.Cut(rest, ":")
-	if !found {
-		return ""
-	}
-	return source + ":" + lineNumber + " `" + pattern + "`"
+	return fmt.Sprintf("line %d, `%s`", line, pattern)
 }

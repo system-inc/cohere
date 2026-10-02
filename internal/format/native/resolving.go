@@ -50,6 +50,16 @@ func (resolving *Resolving) Format(fileName string, text string) (string, error)
 	return Formatter{Options: resolution.Options}.Format(fileName, text)
 }
 
+// OptionsFingerprint names the options a file formats with: every field, by name, so two resolutions
+// that differ anywhere print differently.
+func (resolving *Resolving) OptionsFingerprint(fileName string) (string, error) {
+	resolution, err := resolving.resolve(filepath.Dir(fileName))
+	if err != nil {
+		return "", fmt.Errorf("resolving the format options for %s: %w", fileName, err)
+	}
+	return fmt.Sprintf("%+v", resolution.Options), nil
+}
+
 func (resolving *Resolving) resolve(directory string) (formatoptions.Resolution, error) {
 	absolute, err := filepath.Abs(directory)
 	if err != nil {

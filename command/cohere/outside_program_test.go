@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 )
@@ -12,8 +11,9 @@ import (
 //
 // Before it existed the refusal was the walk's "nothing to walk: the file set is empty (the program
 // holds N files)", measured on ahra for `--lint modules/tasks/data/attachments/pt64fq7/score.mjs`,
-// a file the tsconfig excludes and git ignores. Nothing said which. Each row is one of the three
-// reasons, and the gitignore row asserts git's own file, line and pattern come through.
+// a file the tsconfig excludes and .gitignore leaves out. Nothing said which. Each row is one of the
+// three reasons, and the gitignore rows assert the line and pattern come through, with no git
+// repository at all: the clause is read from the file.
 func TestExplainNamedPathsOutsideProgramSaysWhy(t *testing.T) {
 	t.Parallel()
 
@@ -34,12 +34,6 @@ func TestExplainNamedPathsOutsideProgramSaysWhy(t *testing.T) {
 	write("scripts/Excluded.ts", "export const excluded = 1;\n")
 	write("NOTES.md", "# notes\n")
 
-	initialize := exec.Command("git", "init", "--quiet")
-	initialize.Dir = root
-	if output, err := initialize.CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v: %s", err, output)
-	}
-
 	location := projectLocation{
 		Root:           root,
 		ConfigFileName: filepath.Join(root, "tsconfig.json"),
@@ -51,10 +45,10 @@ func TestExplainNamedPathsOutsideProgramSaysWhy(t *testing.T) {
 		path string
 		want string
 	}{
-		{"excluded by the tsconfig and ignored by git", "modules/tasks/data/score.mjs",
+		{"excluded by the tsconfig and by .gitignore", "modules/tasks/data/score.mjs",
 			"nothing to check: none of the named paths is in the program. modules/tasks/data/score.mjs is not one " +
 				"of the program's files, because the tsconfig at tsconfig.json leaves it out with its `include` " +
-				"and `exclude` lists, and git ignores it too (.gitignore:2 `modules/*/data/`)."},
+				"and `exclude` lists, and the root's .gitignore leaves it out too (line 2, `modules/*/data/`)."},
 		{"excluded by the tsconfig alone", "scripts/Excluded.ts",
 			"nothing to check: none of the named paths is in the program. scripts/Excluded.ts is not one of the " +
 				"program's files, because the tsconfig at tsconfig.json leaves it out with its `include` and " +
@@ -65,8 +59,8 @@ func TestExplainNamedPathsOutsideProgramSaysWhy(t *testing.T) {
 		{"a directory", "modules/tasks/data",
 			"nothing to check: none of the named paths is in the program. modules/tasks/data is a directory " +
 				"holding no file the program contains, because the tsconfig at tsconfig.json leaves every file " +
-				"in it out with its `include` and `exclude` lists, and git ignores it too (.gitignore:2 " +
-				"`modules/*/data/`)."},
+				"in it out with its `include` and `exclude` lists, and the root's .gitignore leaves it out " +
+				"too (line 2, `modules/*/data/`)."},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			if got := explainNamedPathsOutsideProgram(location, []string{testCase.path}); got != testCase.want {

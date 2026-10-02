@@ -134,31 +134,6 @@ func TestAFixRunWritesOnlyWhatWasNamed(t *testing.T) {
 		assertWroteOnlyNamed(t, root, before, "Producer.ts", output)
 	})
 
-	// `--changed` is the other scope a caller states, and the same boundary holds: the changed file
-	// is written, a committed consumer that imports it is checked and left alone.
-	t.Run("--changed writes only the changed file", func(t *testing.T) {
-		root := t.TempDir()
-		makeFixtureRepository(t, root)
-		fixScopeProject(t, root, nil)
-		clean := "export function value(): number {\n    return 1;\n}\n"
-		writeTree(t, root, map[string]string{"Producer.ts": clean})
-		gitIn(t, root, "add", ".")
-		gitIn(t, root, "commit", "--quiet", "-m", "fixture")
-
-		writeTree(t, root, map[string]string{"Producer.ts": "export function value(): number {\n    debugger;\n    return 1;\n}\n"})
-		before := map[string]string{
-			"Producer.ts": readForTest(t, filepath.Join(root, "Producer.ts")),
-			"Consumer.ts": readForTest(t, filepath.Join(root, "Consumer.ts")),
-			"Sibling.ts":  readForTest(t, filepath.Join(root, "Sibling.ts")),
-		}
-
-		output, code := runCohere(t, binary, root, "--fix", "--changed")
-		if code != 0 {
-			t.Fatalf("exit %d:\n%s", code, output)
-		}
-		assertWroteOnlyNamed(t, root, before, "Producer.ts", output)
-	})
-
 	// The control on the boundary: with nothing named, the whole project is the caller's, and every
 	// file with a repair is written as it always was.
 	t.Run("with nothing named, every repair lands", func(t *testing.T) {
@@ -193,7 +168,7 @@ func TestAFixRunDoesNotWriteIntoANestedRepository(t *testing.T) {
 		name  string
 		plant func(t *testing.T, nested string)
 	}{
-		{"a clone", func(t *testing.T, nested string) { gitIn(t, nested, "init", "--quiet") }},
+		{"a clone", plantClone},
 		{"a submodule's gitlink", func(t *testing.T, nested string) {
 			writeTree(t, nested, map[string]string{".git": "gitdir: ../.git/modules/nested\n"})
 		}},
@@ -225,7 +200,7 @@ func TestAFixRunDoesNotWriteIntoANestedRepository(t *testing.T) {
 	t.Run("naming a path inside it writes it", func(t *testing.T) {
 		root := t.TempDir()
 		fixScopeProject(t, root, map[string]string{"nested/Inside.ts": nestedViolation})
-		gitIn(t, filepath.Join(root, "nested"), "init", "--quiet")
+		plantClone(t, filepath.Join(root, "nested"))
 
 		output, code := runCohere(t, binary, root, "--fix", "nested/Inside.ts")
 		if code != 0 {
@@ -238,4 +213,11 @@ func TestAFixRunDoesNotWriteIntoANestedRepository(t *testing.T) {
 			t.Errorf("a named file was reported as withheld:\n%s", output)
 		}
 	})
+}
+
+// plantClone makes a directory look like a clone the way cohere looks: a `.git` directory, which is all
+// formatfiles.HasOwnRepository asks. No git runs, so the fixture holds where git is absent.
+func plantClone(t *testing.T, directory string) {
+	t.Helper()
+	writeTree(t, directory, map[string]string{".git/HEAD": "ref: refs/heads/main\n"})
 }

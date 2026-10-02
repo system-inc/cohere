@@ -50,6 +50,11 @@ type formatEngine interface {
 	// knowledge, the same knowledge Handles already encodes. The pipeline decides which of those
 	// files are in scope; the engine decides which files are formattable at all.
 	Enumerate(root string, structureIgnorePath string) (formatfiles.Enumeration, error)
+
+	// OptionsFingerprint names the options a file formats with, so the format record can tell bytes
+	// formatted under one config from the same bytes under another. A config edit changes the
+	// fingerprint of every file it reaches, and each of those files is formatted again.
+	OptionsFingerprint(fileName string) (string, error)
 }
 
 // formatTransform adapts a format engine to the edit engine's whole-text transform.

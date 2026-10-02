@@ -72,10 +72,10 @@ func runCohere(t *testing.T, binary string, directory string, arguments ...strin
 	return string(output), exitError.ExitCode()
 }
 
-// TestCohereRunsFromAnywhere holds the three behaviors of the command a caller sees from a shell:
-// where it finds the project, whether `--no-fix` writes, and what `--changed` says over nothing.
+// TestCohereRunsFromAnywhere holds the behaviors of the command a caller sees from a shell:
+// where it finds the project and whether `--no-fix` writes.
 //
-// One binary for all three, because each subtest asserts a property of the live command rather than
+// One binary for all of them, because each subtest asserts a property of the live command rather than
 // of a helper. The helpers have their own fixtures; these are the composition, which is where the
 // lint config's path, the type phase's write, and the empty change set each went wrong before.
 func TestCohereRunsFromAnywhere(t *testing.T) {
@@ -167,64 +167,6 @@ func TestCohereRunsFromAnywhere(t *testing.T) {
 		}
 		if information, err := os.Stat(buildInfo); err != nil || !information.ModTime().Equal(modified) {
 			t.Errorf("a --no-fix run touched the build info: mtime %v, was %v (stat: %v)", information.ModTime(), modified, err)
-		}
-	})
-
-	t.Run("--changed on a clean tree is a clean answer", func(t *testing.T) {
-		root := fixtureProject(t)
-		makeFixtureRepository(t, root)
-		gitIn(t, root, "add", ".")
-		gitIn(t, root, "commit", "--quiet", "-m", "baseline")
-
-		output, code := runCohere(t, binary, root, "--no-fix", "--changed")
-		if code != 0 {
-			t.Fatalf("a clean tree under --changed exited %d:\n%s", code, output)
-		}
-		for _, want := range []string{"nothing changed against HEAD", "0 files checked"} {
-			if !strings.Contains(output, want) {
-				t.Errorf("want %q in:\n%s", want, output)
-			}
-		}
-		// No graph was needed, so none may be reported as built.
-		if strings.Contains(output, "graph built") {
-			t.Errorf("a clean tree still built the graph:\n%s", output)
-		}
-
-		// A change outside the program is the same kind of answer, reached after the graph.
-		writeTree(t, root, map[string]string{"README.md": "notes\n"})
-		output, code = runCohere(t, binary, root, "--no-fix", "--changed")
-		if code != 0 {
-			t.Fatalf("a change outside the program exited %d:\n%s", code, output)
-		}
-		if !strings.Contains(output, "none of the 1 changed files are in the program: 0 files checked") {
-			t.Errorf("the run did not say why it checked nothing:\n%s", output)
-		}
-
-		// The control that keeps the two answers above honest: a real change in the program is still
-		// checked, and a real error in it still fails the run. Without this, a --changed that had
-		// stopped looking at all would pass both assertions above.
-		writeTree(t, root, map[string]string{"sub/deeper/Thing.ts": "export const thing: number = \"not a number\";\n"})
-		output, code = runCohere(t, binary, root, "--no-fix", "--changed")
-		if code == 0 {
-			t.Fatalf("a type error in a changed file passed under --changed:\n%s", output)
-		}
-		if !strings.Contains(output, "Thing.ts") || !strings.Contains(output, "TS2322") {
-			t.Errorf("the planted error was not the reported one:\n%s", output)
-		}
-	})
-
-	// The other direction of the honesty doctrine: an unknown change set is never green.
-	t.Run("--changed where git cannot answer is a loud failure", func(t *testing.T) {
-		root := fixtureProject(t)
-		output, code := runCohere(t, binary, root, "--no-fix", "--changed")
-		if code == 0 {
-			t.Fatalf("--changed outside a repository exited 0:\n%s", output)
-		}
-		if !strings.Contains(output, "asking what changed") {
-			t.Errorf("the failure does not say what could not be determined:\n%s", output)
-		}
-		if strings.Contains(output, "nothing changed") {
-			t.Errorf("a failed git call was described as nothing changing:\n%s", output)
 		}
 	})
 }

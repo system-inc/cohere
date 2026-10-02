@@ -133,6 +133,48 @@ func matchesIgnore(relative string, pattern string) bool {
 	return strings.HasPrefix(relative, pattern+"/") || strings.Contains(relative, "/"+pattern+"/")
 }
 
+// IgnoringLine names the first pattern in an ignore file that covers a path, given relative to the
+// file's directory, with the pattern's line number. It answers 0 when no pattern does or the file does
+// not exist.
+//
+// It applies the walk's own subset of gitignore semantics, the file itself and every directory above
+// it, so it says what the walk would skip. That is not always what git would say: a negation is read
+// as a pattern of its own rather than as an exception.
+func IgnoringLine(ignoreFile string, relative string) (int, string, error) {
+	contents, err := os.ReadFile(ignoreFile)
+	if os.IsNotExist(err) {
+		return 0, "", nil
+	}
+	if err != nil {
+		return 0, "", fmt.Errorf("reading ignore file %s: %w", ignoreFile, err)
+	}
+	relative = filepath.ToSlash(relative)
+	for index, line := range strings.Split(string(contents), "\n") {
+		pattern := strings.TrimSpace(line)
+		if pattern == "" || strings.HasPrefix(pattern, "#") {
+			continue
+		}
+		if matchesIgnore(relative, pattern) {
+			return index + 1, pattern, nil
+		}
+		for directory := pathDirectory(relative); directory != ""; directory = pathDirectory(directory) {
+			if matchesIgnore(directory, pattern) || matchesIgnore(directory+"/", pattern) {
+				return index + 1, pattern, nil
+			}
+		}
+	}
+	return 0, "", nil
+}
+
+// pathDirectory is a slash path's parent, or "" at the top.
+func pathDirectory(path string) string {
+	slash := strings.LastIndexByte(path, '/')
+	if slash < 0 {
+		return ""
+	}
+	return path[:slash]
+}
+
 // Enumerate walks a project root and returns the files handles accepts.
 //
 // The walk is a function of the ignore layers and a file-type predicate, not of any engine, so the

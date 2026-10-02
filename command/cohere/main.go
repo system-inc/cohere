@@ -112,8 +112,6 @@ func run() error {
 	// across everything that was alive only through it. Keeping both means the two numbers can be
 	// read against each other before the bigger one is trusted.
 	unusedDeep := flag.Bool("unused-deep", false, "with --unused, also compute the transitive closure and group the dead code into islands")
-	changedOnly := flag.Bool("changed", false,
-		"check only the files git reports as changed, plus everything that imports them")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	// The editor's save: the buffer arrives on stdin and what --fix (and --format) would write for this
 	// path leaves on stdout, with nothing written to disk. See stdin.go.
@@ -332,34 +330,6 @@ func run() error {
 		}, os.Stdin, os.Stdout)
 	}
 
-	// `--changed` asks git before the graph is built, because the most common answer needs no graph.
-	//
-	// A clean tree used to exit 1 with "nothing to walk: the file set is empty", after paying for the
-	// graph and a type pass over zero files (about 390ms on ahra for the types alone). That is a red
-	// run over a correct answer. Git ran, git answered, and the answer was that nothing differs from
-	// HEAD, so there is nothing this run could find, and saying so and exiting 0 is the verdict.
-	//
-	// What keeps that honest is that only an answer counts. Git failing, the directory not being a
-	// repository, or a submodule that could not be read all mean the change set is unknown rather
-	// than empty, and every one of them is still an error here: see changedScopeForCheck. A named
-	// path wins over `--changed`, as it does in the switch below, so this only runs when it will be
-	// used.
-	var changedScope formatScope
-	askingWhatChanged := *changedOnly && len(flag.Args()) == 0
-	if askingWhatChanged {
-		changedScope, err = changedScopeForCheck(location.Root)
-		if err != nil {
-			return fmt.Errorf("asking what changed: %w", err)
-		}
-		if len(changedScope.FileNames) == 0 {
-			fmt.Printf("nothing changed against HEAD in %s (working tree, staged, and untracked)\n", location.Root)
-			nothingChanged := &pipelineReport{processStart: processStart, rootNote: location.rootNote(), graphNotBuilt: true}
-			nothingChanged.recordNothingToCheck("nothing changed against HEAD", unusedRequest)
-			nothingChanged.Write(os.Stdout)
-			return nil
-		}
-	}
-
 	// The run cache: a bare run whose every input is unchanged replays its recorded report here and
 	// exits, before the graph is built. Otherwise this starts recording. See run_cache.go.
 	runCacheInputs := beginRunCache(location)
@@ -405,55 +375,13 @@ func run() error {
 	// named. A caller who names paths has said which files the run is about, and a fixable finding
 	// outside them is reported, not repaired. With nothing named the whole project is the caller's.
 	writeScope := formatScope{Everything: true}
-	switch {
-	case len(flag.Args()) > 0 && !*listRules && !*listRulesEnabled:
+	if len(flag.Args()) > 0 && !*listRules && !*listRulesEnabled {
 		scope, err := namedPathsScope(location.ArgumentBase, location.Root, flag.Args())
 		if err != nil {
 			return err
 		}
 		writeScope = scope
 		lintScope, projectFiles = narrowToClosure(graph, scope, projectFiles)
-
-	case askingWhatChanged:
-		// Opt-in, and it has to stay that way. Measured on this tree with nothing edited: the changed
-		// set is three files, and linting them reports 6 findings against a real 5,201 in 93ms and
-		// exits green. As a default that is the silent-green failure this binary exists to have
-		// stopped making, wearing the costume of a speed improvement.
-		//
-		// As a flag it is a statement: the caller has said they want the answer about what they
-		// touched, and the coverage line says how many files that was.
-		//
-		// The scope itself was resolved before the graph was built; see changedScope above.
-		scope := changedScope
-
-		// Written is what changed, whatever the check widens to below: the closure's importers and the
-		// whole tree a changed config demands are checked, never rewritten.
-		writeScope = scope
-
-		// A changed rule config changes what every file means, and no import edge carries that.
-		//
-		// Measured: turning `eqeqeq` off and asking `--changed` checked 3 files and said nothing
-		// about the 68 findings that had just stopped existing. The closure cannot help, because the
-		// relationship is not an import; the config reaches every file at once.
-		//
-		// So the config is the one changed file that widens the scope instead of narrowing it. The
-		// whole tree is the only answer that is not a guess about which rules moved.
-		// Measured twice, once per kind. Turning `eqeqeq` off and asking `--changed` checked 3 files
-		// and said nothing about the 68 findings that had just stopped existing. Changing `target` in
-		// the tsconfig did the same: 3 files, no note, while every file in the program was now being
-		// checked against different compiler options.
-		//
-		// Resolved against the graph's directory rather than the flag's, which defaults to empty and
-		// would leave a relative path that never matches an absolute scope entry. That is the same
-		// defect `namedPathsScope` hit and the same one its fixture asserts against, arriving here
-		// through a different door.
-		if changedConfig := changedConfiguration(scope, graph, location.LintConfigFileName); changedConfig != "" {
-			fmt.Fprintf(os.Stderr,
-				"note: %s changed, which changes what every file means, so the whole tree is checked\n",
-				filepath.Base(changedConfig))
-		} else {
-			lintScope, projectFiles = narrowToClosure(graph, scope, projectFiles)
-		}
 	}
 
 	if lintScope.Everything {
@@ -496,20 +424,6 @@ func run() error {
 		rootNote:       location.rootNote(),
 	}
 
-	// The other clean answer over zero files: git reported changes and none of them is in the program,
-	// such as a README edit, or a file under a directory the tsconfig excludes. The change set was
-	// determined and the program was built, so there is a real answer, and it is that this program has
-	// nothing to check. Before this, every phase was handed an empty slice and the walk refused it,
-	// which reported a red run for an edit to a markdown file.
-	if askingWhatChanged && !lintScope.Everything && len(projectFiles) == 0 {
-		report.recordNothingToCheck(
-			fmt.Sprintf("none of the %d changed files are in the program", len(changedScope.FileNames)),
-			unusedRequest,
-		)
-		report.Write(os.Stdout)
-		return nil
-	}
-
 	// Phase 2: fix and format. Mutation runs before anything reports, so every phase downstream sees
 	// the repaired tree rather than findings a fixer would have silently repaired.
 	//
@@ -542,57 +456,10 @@ func run() error {
 		// formatter included, and only the write is withheld: see applyProposedFixes. It used to skip
 		// the phase, and a tree with an unformatted file printed `lint: 0 findings` over it on every
 		// clean run, with `fix skipped (--no-fix)` the only word on the phase that would have seen it.
-		// Formatting is scoped to changed files by default, and the scope is resolved before the phase
-		// runs so its description can be reported whether or not anything was formatted.
 		//
-		// Measured on ahra's 3,084 formattable files: the native printers format the whole tree in
-		// about 10 seconds, where the goja fork took 11 minutes. Real churn here is one file per commit
-		// and 35 across five, so changed-files still puts the common case in milliseconds, and a whole
-		// tree stays the thing a caller asks for by name.
-		scope := wholeTreeScope()
-		switch {
-		case !writeScope.Everything:
-			// A caller who named paths, or asked for what changed, has already said which files this
-			// run is about, and asking git what changed answers a different question at the cost of a
-			// subprocess.
-			//
-			// Measured: `git status --porcelain --untracked-files=all` is about 70ms on this tree, and
-			// it was most of the 116ms a scoped run spent outside any phase. On a run whose phases
-			// total 343ms that is not a rounding error.
-			//
-			// The stated scope is the right answer rather than merely the cheap one. Formatting files
-			// the caller did not name would be a surprise in the one mode where they were explicit.
-			//
-			// It reads the write scope and not the check scope. The check scope becomes the whole tree
-			// past the closure limit, and keying on it sent a named run down to the changed-files
-			// default below, formatting every changed file in every submodule. It also comes before
-			// `--format-all`: that flag widens what is formatted from changed files to all of them, and
-			// with paths stated, all of them is all of the stated paths.
-			scope = writeScope
-
-		case *formatAll:
-			// Asked for by name, so it keeps the whole tree.
-
-		default:
-			resolved, scopeError := runCacheScope(location.Root)
-			if scopeError != nil {
-				// Falling back to the whole tree would turn a failed subprocess into a five-minute
-				// surprise, so the scope becomes empty and says why. Fixing still runs; only formatting
-				// is withheld, and the reason reaches the coverage line.
-				resolved = formatScope{Description: fmt.Sprintf("nothing (could not determine what changed: %v)", scopeError)}
-			}
-			// Formatting proceeds without a submodule it could not read, which withholds no finding,
-			// but it says so: a file left unformatted with no word is the shape this scope exists to
-			// prevent.
-			for _, unreadable := range resolved.UnreadableSubmodules {
-				fmt.Fprintf(os.Stderr, "note: could not read what changed in %s, so nothing in it is formatted\n", unreadable)
-			}
-			scope = resolved
-		}
-
-		// Built before the fix phase rather than inside it, so a formatter that cannot load its
-		// bundles stops the run here with a reason rather than degrading into the nil that means
-		// nobody asked for one.
+		// Built before the scope rather than after it, so a formatter that cannot load its bundles stops
+		// the run here with a reason rather than degrading into the nil that means nobody asked for one,
+		// and so the scope can know whether there is anything to format at all.
 		//
 		// `--format-all` asks for formatting by naming its scope, so it turns the formatter on. Alone it
 		// used to configure none: `cohere --format-all` formatted nothing, and `cohere --no-fix
@@ -602,58 +469,95 @@ func run() error {
 			return err
 		}
 
+		// The format record: which bytes cohere has already seen formatted. Every formatting run adds to
+		// it, and the default scope is read from it. See format_record.go.
+		var record *formatRecord
+		if formatter != nil {
+			record = loadFormatRecord(location.Root)
+		}
+		// Every file the default scope was drawn from, so the record can drop entries outside it. Nil for a
+		// narrower scope, which says nothing about the files it did not look at.
+		var recordUniverse []string
+
 		// The format phase gets its own universe, and this is where the two narrowings part.
 		//
 		// A proposed fix comes from a rule that ran over the program, so its candidate must be in the
 		// program. A format candidate comes from the disk, and intersecting it with the type graph is
 		// what made css, markdown, json and yaml invisible: a tsconfig enumerates TypeScript by
 		// construction. Formatting is the only phase whose subject is not the program.
-		//
-		// The walk is lazy, and the reason is not cost. An enumeration on a run with nothing changed
-		// produces a true number whose only effect is to make a no-op run look like work, which is the
-		// same shape as a count claiming files were reformatted that nobody touched.
+		var scope formatScope
 		switch {
+		case formatter == nil && writeScope.Everything:
+			// Nothing will be formatted, so there is nothing to find. This used to ask git what changed on
+			// every bare run, which was about half of a cached replay, and every file it found then reported
+			// as not formatted because nobody asked: a cost and a count that were both about nothing.
+			scope = formatScope{index: map[string]struct{}{}, Description: "nothing, since formatting was not requested"}
+
 		case formatter == nil:
-			// No formatter means nothing to enumerate for. The scope keeps its type-graph narrowing so
-			// the fix phase's own reporting is unchanged.
+			// No formatter, and paths were named. The scope keeps its type-graph narrowing so the fix
+			// phase's own reporting is unchanged.
 			//
-			// Narrowed against the whole program rather than against a named scope, for the reason
-			// the block above states: the format phase has its own universe. A run scoped to one file
-			// still reports honestly how many changed files the program contains, and reporting the
-			// intersection with the scope instead made `7 changed files, 0 of them in the program` on
-			// a tree where three of them were.
+			// Narrowed against the whole program rather than against the named scope, because the format
+			// phase has its own universe: reporting the intersection with the scope instead made `7 changed
+			// files, 0 of them in the program` on a tree where three of them were.
 			wholeProgram := graph.ProjectFiles()
 			inProgram := make(map[string]struct{}, len(wholeProgram))
 			for _, sourceFile := range wholeProgram {
 				inProgram[sourceFile.FileName()] = struct{}{}
 			}
-			scope = scope.narrowTo(inProgram)
+			scope = writeScope.narrowTo(inProgram)
 
-		case !scope.Everything && len(scope.FileNames) == 0:
-			// Nothing changed, so the walk cannot affect the outcome. The scope already names where it
-			// looked, which is the honest thing to print here.
+		case !writeScope.Everything && len(writeScope.FileNames) == 0:
+			// Named paths that hold no file, so the walk cannot affect the outcome. The scope already names
+			// where it looked, which is the honest thing to print here.
+			scope = writeScope
 
-		default:
-			// The enumeration walks the whole tree through ignore layers, which are inputs the run cache
-			// does not observe. Declining here costs a miss in this configuration and never a stale hit.
+		case !writeScope.Everything || *formatAll:
+			// A caller who named paths has already said which files this run is about, and formatting
+			// files they did not name would be a surprise in the one mode where they were explicit. It reads
+			// the write scope and not the check scope: the check scope becomes the whole tree past the
+			// closure limit, and keying on it sent a named run down to the default below, formatting every
+			// changed file in every submodule. It also comes before `--format-all`, because with paths
+			// stated, all of them is all of the stated paths.
+			//
+			// `--format-all` alone is the whole walk, asked for by name.
+			//
+			// The enumeration walks the tree through ignore layers, which are inputs the run cache does not
+			// observe. Declining here costs a miss in this configuration and never a stale hit.
+			scope = wholeTreeScope()
+			if !writeScope.Everything {
+				scope = writeScope
+			}
 			declineRunCache("a formatter enumerated the tree")
 			enumeration, enumerateError := formatter.Enumerate(
 				graph.Config.GetCurrentDirectory(),
 				resolveStructureIgnorePath(location.Root),
 			)
 			if enumerateError != nil {
-				// A failed walk withholds formatting and says why, rather than falling back to a
-				// universe that would format the wrong set. Fixing still runs.
+				// A failed walk withholds formatting and says why, rather than falling back to a universe
+				// that would format the wrong set. Fixing still runs.
 				scope = formatScope{Description: fmt.Sprintf("nothing (could not enumerate the tree: %v)", enumerateError)}
 			} else {
 				scope = scope.narrowToEnumeration(enumeration)
 			}
+
+		default:
+			// What changed since cohere last looked: every file the formatter handles, here and in each
+			// declared submodule, whose bytes are not on record as formatted. Measured on ahra's 3,084
+			// formattable files, the native printers format the whole tree in about 10 seconds, which the
+			// first run with no record pays once; every run after formats what was edited.
+			declineRunCache("a formatter enumerated the tree")
+			scope, recordUniverse = unformattedScope(
+				formatter, record,
+				graph.Config.GetCurrentDirectory(),
+				resolveStructureIgnorePath(location.Root),
+			)
 		}
 
 		fixStart := time.Now()
 		fixSummary, fixWalk, err := applyProposedFixes(
 			ctx, graph, projectFiles, registry.All(),
-			scopedTransform(formatTransform(formatter), scope),
+			scopedTransform(record.observe(formatTransform(formatter), optionsFingerprintOf(formatter)), scope),
 			scope.formatCandidates(),
 			writeScope,
 			*maxFixPasses,
@@ -672,6 +576,12 @@ func run() error {
 		// True of the tree and actionable, so a replay keeps it, but it says which run produced it.
 		fmt.Fprintln(provenanceOutput(os.Stdout), fixSummary)
 
+		// Not writing the record costs the next run a format of files already formatted, never a skip,
+		// so it is a note rather than a failure.
+		if err := record.save(recordUniverse); err != nil {
+			fmt.Fprintf(os.Stderr, "note: the format record could not be written: %v\n", firstLine(err.Error()))
+		}
+
 		// A run that rewrote files must not be replayed. The run cache stats inputs when it records, which
 		// is after the rewrite, so the manifest would match the fixed tree and the next run would replay
 		// "files rewritten" over a tree it never touched.
@@ -679,9 +589,9 @@ func run() error {
 			declineRunCache("the fix phase rewrote files")
 		}
 
-		// The scope is stated on every run rather than inferred from a file count. Working-tree
-		// changes, staged changes, and a base-branch diff are three different answers to "what
-		// changed", and a reader cannot tell which one they got from a number alone.
+		// The scope is stated on every run rather than inferred from a file count. Named paths, the whole
+		// tree, and what is not on record as formatted are three different answers to "what was
+		// formatted", and a reader cannot tell which one they got from a number alone.
 		fmt.Printf("format scope: %s\n", scope.Description)
 		if mutate {
 			report.record(phaseFix, outcomeRan, fixDuration, "")
@@ -815,7 +725,7 @@ func run() error {
 			// Named paths that reached no program file are refused with the reason rather than with
 			// the walk's bare "the file set is empty", which could not say that the file was left out
 			// by the tsconfig or ignored by git. See explainNamedPathsOutsideProgram.
-			if len(projectFiles) == 0 && !lintScope.Everything && len(flag.Args()) > 0 && !askingWhatChanged {
+			if len(projectFiles) == 0 && !lintScope.Everything && len(flag.Args()) > 0 {
 				return errNamedPathsOutsideProgram(location, flag.Args())
 			}
 			walked, err := graph.Walk(ctx, projectFiles, rules)

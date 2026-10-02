@@ -137,10 +137,9 @@ type pipelineReport struct {
 	// Empty otherwise. See projectLocation.rootNote.
 	rootNote string
 
-	// nothingToCheck is set when `--changed` asked git, git answered, and the answer held nothing the
-	// program contains. It is the reason, in words, and it replaces the coverage warning rather than
-	// sitting beside it: every phase was skipped, and "did not check everything" would call a clean
-	// answer a gap.
+	// nothingToCheck is set when the Swift engine reports that its run had nothing to look at. It is the
+	// reason, in words, and it replaces the coverage warning rather than sitting beside it: every phase
+	// was skipped, and "did not check everything" would call a clean answer a gap.
 	nothingToCheck string
 
 	// graphNotBuilt is set when the run ended before the graph was needed, so the accounting line
@@ -162,26 +161,6 @@ type pipelineReport struct {
 	// not read. Empty when nothing like that happened. The phase line cannot express it, so the
 	// coverage warning names it instead of pointing at phases that all say they ran.
 	incompleteBeyondPhases string
-}
-
-// recordNothingToCheck marks every phase skipped for one reason, and the run as a clean answer
-// over zero files.
-//
-// Skipped rather than not reached, because nothing failed upstream: there was nothing for any phase
-// to look at. The opt-in phase keeps its own wording when nobody asked for it, for the reason
-// markRemainingNotReachedFor states.
-func (r *pipelineReport) recordNothingToCheck(reason string, requested requestedPhases) {
-	r.nothingToCheck = reason
-	for _, name := range phaseOrder {
-		if r.has(name) {
-			continue
-		}
-		if optInPhases[name] && !requested[name] {
-			r.record(name, outcomeSkipped, 0, "not requested — this is a report, ask for it with --unused")
-			continue
-		}
-		r.record(name, outcomeSkipped, 0, reason)
-	}
 }
 
 // record notes what a phase did. Called once per phase, in order.

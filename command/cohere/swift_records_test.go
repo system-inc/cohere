@@ -393,18 +393,18 @@ func TestSwiftEngineArguments(t *testing.T) {
 		LintConfigFileName: "/work/macos/sub/Local.json",
 		ArgumentBase:       "/work/macos/sub",
 	}
-	values := map[string]string{"no-fix": "true", "changed": "false", "fix-passes": "4", "rules": "true"}
+	values := map[string]string{"no-fix": "true", "single-threaded": "false", "fix-passes": "4", "rules": "true"}
 	value := func(name string) string { return values[name] }
 
 	arguments, mode, err := swiftEngineArguments(location,
-		map[string]bool{"no-fix": true, "changed": true, "fix-passes": true, "lint-config": true},
+		map[string]bool{"no-fix": true, "single-threaded": true, "fix-passes": true, "lint-config": true},
 		value, []string{"Thing.swift", "/abs/Other.swift"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := "--contract 2 --root /work/macos --no-fix --lint-config /work/macos/sub/Local.json --fix-passes 4 /work/macos/sub/Thing.swift /abs/Other.swift"
 	if strings.Join(arguments, " ") != want || mode != swiftModeCheck {
-		// `--changed=false` was typed and is false, so it is not forwarded as a switch.
+		// `--single-threaded=false` was typed and is false, so it is not forwarded as a switch.
 		t.Errorf("arguments %q mode %s, want %q", strings.Join(arguments, " "), mode, want)
 	}
 

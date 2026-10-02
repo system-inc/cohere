@@ -22,6 +22,7 @@ type fakeEngine struct {
 	handled              []string
 	format               func(fileName string, text string) (string, error)
 	enumerate            func(root string) (formatfiles.Enumeration, error)
+	options              func(fileName string) (string, error)
 	askedFor             []string
 	enumeratedRoot       string
 	enumeratedIgnorePath string
@@ -48,6 +49,14 @@ func (e *fakeEngine) Enumerate(root string, structureIgnorePath string) (formatf
 		return e.enumerate(root)
 	}
 	return formatfiles.Enumeration{Root: root}, nil
+}
+
+// OptionsFingerprint is one fixed configuration, unless the fixture says otherwise.
+func (e *fakeEngine) OptionsFingerprint(fileName string) (string, error) {
+	if e.options != nil {
+		return e.options(fileName)
+	}
+	return "fake options", nil
 }
 
 func (e *fakeEngine) Format(fileName string, text string) (string, error) {
