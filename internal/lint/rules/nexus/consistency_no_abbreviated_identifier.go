@@ -40,43 +40,6 @@ type ConsistencyNoAbbreviatedIdentifierOptions struct {
 	FrameworkParameterScopeSuffixes []string
 }
 
-// abbreviationCandidatePattern is every spelling any branch below could possibly match, in one test.
-//
-// **This is no longer the runtime gate.** `isAbbreviationCandidate` in abbreviation_gate.go answers
-// the same question with lookups, 76 times faster, and this pattern is now the specification it is
-// tested against: `abbreviation_gate_test.go` asserts the gate admits every name this matches, over
-// 82,367 identifiers from the ahra tree. Keeping the pattern is what makes that test meaningful, so
-// a branch gaining a new abbreviation still updates this first and the differential test then fails
-// until the gate follows.
-//
-// This exists purely to decide whether a name is worth spending the rest of the rule on, and it is
-// the reason the guards are ordered the way they are. In the TypeScript original the expensive step
-// was a scope walk that cost the tree roughly two and a half seconds, more than every other house
-// rule combined, and the overwhelming majority of that work was spent proving that names like
-// `renderNodeOrComponent` are not imports, which no branch would have asked about anyway. Measured:
-// 2,580ms of a 3,700ms run became 152ms once this gate ran first, with findings byte-identical.
-//
-// The port has no scope walk, so the saving here is smaller in absolute terms, but the shape is the
-// same and it still matters: this listener fires on every identifier in the tree, and the walk
-// through parent kinds plus roughly forty string comparisons per name is real work that 99.7% of
-// identifiers do not need to do. A rule that declines cheaply is the whole speed story.
-//
-// The alternation is deliberately a superset of the branches, never a subset. It over-matches
-// slightly (a name that passes here may still fall through every branch and report nothing), which
-// is the safe direction: a false positive here costs one cheap traversal, while a false negative
-// would silently stop the rule firing, and a rule that stops firing looks exactly like a clean run.
-//
-// If a branch below gains a new abbreviation, it must be added here too, or the rule will go quiet
-// for it. The four groups map one-to-one onto the branch families: whole-word names, `abbrev[A-Z]`
-// prefixes, `Abbrev` suffixes and the `Ms` special case, and mid-name word segments.
-var abbreviationCandidatePattern = regexp.MustCompile(
-	`^(prop|props|param|params|ref|config|idx|arg|args|acc|char|fn|str|val|arr|obj|num|res|err|req|msg|min|max|prev|cur|pct|opts|ctx|db|tx|queryFn|mutationFn)$` +
-		`|^(ctx|db|tx|opts|cur|pct|prev|idx|config|prop|props|param|params|ref|arg|args|char|fn|str|val|arr|obj|num|res|err|req|msg|min|max)[A-Z]` +
-		`|(Prop|Props|Param|Params|Ref|Config|Idx|Arg|Args|Char|Fn|Str|Val|Arr|Obj|Num|Res|Err|Req|Msg|Min|Max)$` +
-		`|[a-z]Ms($|[A-Z])` +
-		`|(Cwd|Dir|Env|Cli|Len|Seq|Db|Tx|Vars|Var)($|[A-Z0-9])`,
-)
-
 // millisecondSegmentPattern matches a millisecond unit written as a camelCase word.
 //
 // Go's regexp has no lookahead, so where the TypeScript wrote `[a-z]Ms(?=$|[A-Z])` this captures the
@@ -85,144 +48,6 @@ var abbreviationCandidatePattern = regexp.MustCompile(
 // word after.
 var millisecondSegmentPattern = regexp.MustCompile(`([a-z])Ms($|[A-Z])`)
 
-// allowedAbbreviatedNames would otherwise be flagged and are not ours to rename.
-var allowedAbbreviatedNames = map[string]bool{
-	"URLSearchParams": true, // Web API
-}
-
-// allowedAbbreviationSegments are words that merely contain an abbreviation's letters.
-//
-// `InnoDb` is MySQL's storage engine and a proper noun, so the `Db` inside it is not standing in for
-// anything: renaming it to `InnoDatabase` names a thing that does not exist. Matched as a segment
-// rather than as a whole identifier, because it appears inside longer names like
-// `InnoDbMaximumIndexKeyBytes`.
-var allowedAbbreviationSegments = []string{"InnoDb"}
-
-func containsAllowedAbbreviationSegment(name string) bool {
-	for _, segment := range allowedAbbreviationSegments {
-		if strings.Contains(name, segment) {
-			return true
-		}
-	}
-	return false
-}
-
-// exactAbbreviation is a whole-word abbreviation and the word it stands in for.
-type exactAbbreviation struct {
-	name      string
-	full      string
-	messageId string
-}
-
-// suffixAbbreviation is an abbreviation appearing at the end of a name.
-//
-// lowerWord and upperWord are the already-spelled-out forms that must not re-fire: `Value` ends with
-// neither `Val` nor... it does end with `Val`'s letters is exactly the trap, so `parsedValue` is
-// excluded by ending with `Value`.
-type suffixAbbreviation struct {
-	suffix      string
-	replacement string
-	lowerWord   string
-	upperWord   string
-	messageId   string
-}
-
-// prefixAbbreviation is an abbreviation appearing at the start of a camelCase name.
-type prefixAbbreviation struct {
-	prefix      string
-	replacement string
-	fullWord    string
-	messageId   string
-}
-
-// wordSegmentAbbreviation is an abbreviation that is a camelCase word wherever it sits.
-type wordSegmentAbbreviation struct {
-	word        string
-	replacement string
-}
-
-var exactAbbreviations = []exactAbbreviation{
-	{"val", "value", "noVal"},
-	{"arr", "array", "noArr"},
-	{"obj", "object", "noObj"},
-	{"num", "number", "noNum"},
-	{"res", "response", "noRes"},
-	{"err", "error", "noErr"},
-	{"req", "request", "noReq"},
-	{"msg", "message", "noMsg"},
-	{"min", "minimum", "noMin"},
-	{"max", "maximum", "noMax"},
-}
-
-var suffixAbbreviations = []suffixAbbreviation{
-	{"Val", "Value", "value", "Value", "noValSuffix"},
-	{"Arr", "Array", "array", "Array", "noArrSuffix"},
-	{"Obj", "Object", "object", "Object", "noObjSuffix"},
-	{"Num", "Number", "number", "Number", "noNumSuffix"},
-	{"Res", "Response", "response", "Response", "noResSuffix"},
-	{"Err", "Error", "error", "Error", "noErrSuffix"},
-	{"Req", "Request", "request", "Request", "noReqSuffix"},
-	{"Msg", "Message", "message", "Message", "noMsgSuffix"},
-	{"Min", "Minimum", "minimum", "Minimum", "noMinSuffix"},
-	{"Max", "Maximum", "maximum", "Maximum", "noMaxSuffix"},
-}
-
-var prefixAbbreviations = []prefixAbbreviation{
-	{"val", "value", "value", "noVal"},
-	{"arr", "array", "array", "noArr"},
-	{"obj", "object", "object", "noObj"},
-	{"num", "number", "number", "noNum"},
-	{"res", "response", "response", "noRes"},
-	{"err", "error", "error", "noErr"},
-	{"req", "request", "request", "noReq"},
-	{"msg", "message", "message", "noMsg"},
-	{"min", "minimum", "minimum", "noMin"},
-	{"max", "maximum", "maximum", "noMax"},
-}
-
-// wordSegmentAbbreviations are matched wherever they sit rather than only at an anchor.
-//
-// The branches above anchor: `^max[A-Z]` catches `maximumAge` and misses `DatabaseMaxPageSize`, and
-// a suffix check catches `userWorkingDirectory` and misses `originalInitCwd`. Both spellings are the
-// same abbreviation and a reader meets them the same way, so the position it happens to occupy
-// should not decide whether the rule speaks.
-//
-// A segment is matched when the characters before it are not lowercase letters continuing a longer
-// word, and what follows is either the end of the name or the start of the next word. That is what
-// keeps `Direction` from reading as `Dir`, `Environment` from reading as `Env`, and `SMS` from
-// reading as anything.
-//
-// `Vars` precedes `Var` so the longer word wins.
-var wordSegmentAbbreviations = []wordSegmentAbbreviation{
-	{"Cwd", "WorkingDirectory"},
-	{"Dir", "Directory"},
-	{"Env", "Environment"},
-	{"Cli", "CommandLineInterface"},
-	{"Len", "Length"},
-	{"Seq", "Sequence"},
-	{"Db", "Database"},
-	{"Tx", "Transaction"},
-	{"Vars", "Variables"},
-	{"Var", "Variable"},
-}
-
-// prefixContinuationPattern is `^<prefix>[A-Z]`, built once per abbreviation rather than per name.
-var prefixContinuationPatterns = buildPrefixContinuationPatterns()
-
-func buildPrefixContinuationPatterns() map[string]*regexp.Regexp {
-	patterns := map[string]*regexp.Regexp{}
-	for _, prefix := range []string{
-		"ctx", "db", "tx", "opts", "cur", "pct", "prev", "idx", "config", "prop", "props",
-		"param", "params", "ref", "arg", "args", "char", "fn", "str",
-	} {
-		patterns[prefix] = regexp.MustCompile(`^` + prefix + `[A-Z]`)
-	}
-	for _, entry := range prefixAbbreviations {
-		patterns[entry.prefix] = regexp.MustCompile(`^` + entry.prefix + `[A-Z]`)
-	}
-	return patterns
-}
-
 // wordSegmentPatterns are the two shapes a mid-name segment can take, plus the replacement form.
 type wordSegmentPatterns struct {
 	boundary *regexp.Regexp
@@ -230,81 +55,10 @@ type wordSegmentPatterns struct {
 	replace  *regexp.Regexp
 }
 
-var compiledWordSegmentPatterns = buildWordSegmentPatterns()
-
-func buildWordSegmentPatterns() map[string]wordSegmentPatterns {
-	patterns := map[string]wordSegmentPatterns{}
-	for _, entry := range wordSegmentAbbreviations {
-		patterns[entry.word] = wordSegmentPatterns{
-			boundary: regexp.MustCompile(`(^|[^a-zA-Z])` + entry.word + `($|[A-Z0-9])`),
-			camel:    regexp.MustCompile(`[a-z0-9]` + entry.word + `($|[A-Z0-9])`),
-			replace:  regexp.MustCompile(entry.word + `($|[A-Z0-9])`),
-		}
-	}
-	return patterns
-}
-
-// messageAbbreviation is the shape every finding takes: name the abbreviation, name the replacement.
-//
-// Every message states the reasoning rather than just the verdict, because a rule that only says
-// what is wrong gets disabled the first time it is inconvenient.
-func messageAbbreviation(messageId string, description string) rule.Message {
-	return rule.Message{Id: messageId, Description: description}
-}
-
-func messageExactAbbreviation(messageId string, name string, suggestion string) rule.Message {
-	return messageAbbreviation(messageId, `Identifier "`+name+`" should not be abbreviated. Use "`+
-		suggestion+`" or a more descriptive name. `+abbreviationReasoning)
-}
-
-func messageSuggestedRename(messageId string, name string, suggestion string) rule.Message {
-	return messageAbbreviation(messageId, `Identifier "`+name+`" should not be abbreviated. Use "`+
-		suggestion+`". `+abbreviationReasoning)
-}
-
-func messageSuffixRename(messageId string, name string, suffix string, suggestion string) rule.Message {
-	return messageAbbreviation(messageId, `Identifier "`+name+`" should not end with "`+suffix+
-		`". Use "`+suggestion+`". `+abbreviationReasoning)
-}
-
 // abbreviationReasoning is written once and shared, because it is the same argument every time.
 const abbreviationReasoning = "A name is written once and read everywhere, so the letters saved at " +
 	"the declaration are paid back at every call site by a reader who has to expand the abbreviation " +
 	"themselves and hope they expanded it the way the author meant."
-
-var messageNoAcc = rule.Message{
-	Id: "noAcc",
-	Description: `Identifier "acc" should not be abbreviated. Pick a name that describes what is ` +
-		`being accumulated, "total", "sum", "groupedItems", or whatever fits the reduce. ` +
-		abbreviationReasoning,
-}
-
-var messageNoArg = rule.Message{
-	Id: "noArg",
-	Description: `Identifier "arg" should not be abbreviated. Use "argument", "commandArgument", or ` +
-		`a more descriptive name. ` + abbreviationReasoning,
-}
-
-var messageNoArgs = rule.Message{
-	Id: "noArgs",
-	Description: `Identifier "args" should not be abbreviated. Use "arguments", "commandArguments", ` +
-		`"commandLineArguments", or a more descriptive name. ` + abbreviationReasoning,
-}
-
-var messageNoFn = rule.Message{
-	Id: "noFn",
-	Description: `Identifier "fn" should not be abbreviated. Use "callback", "handler", "factory", ` +
-		`or a more descriptive name. ` + abbreviationReasoning,
-}
-
-func messageNoFnSuffix(name string) rule.Message {
-	return rule.Message{
-		Id: "noFnSuffix",
-		Description: `Identifier "` + name + `" should not end with "Fn". Use a more descriptive ` +
-			`name, drop the "Fn" suffix or rename to a role like "Handler", "Callback", "Factory". ` +
-			abbreviationReasoning,
-	}
-}
 
 func messageNoMsSuffix(name string, suggestion string) rule.Message {
 	return rule.Message{
@@ -373,7 +127,7 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 
 				// Cheapest question first: could this name match any branch at all? Everything below
 				// is a skip or a report keyed on the same spellings, so a name no branch could match
-				// reports nothing whichever order the guards run in. See the pattern's own comment.
+				// reports nothing whichever order the guards run in. See abbreviation_gate.go.
 				if !isAbbreviationCandidate(name) {
 					return
 				}
@@ -404,10 +158,6 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 					return
 				}
 
-				if allowedAbbreviatedNames[name] {
-					return
-				}
-
 				// A name Next.js reads off this route file by name is the framework's spelling,
 				// not ours, and the options above cannot be trusted to list it: `maxDuration`
 				// passes the `max[A-Z]` gate and no consumer named it, so this rule told route
@@ -430,6 +180,44 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 					return
 				}
 
+				// The vocabulary says what the word is; abbreviations.json holds it, and Swift reads
+				// the same file. What follows is policy, which stays here.
+				finding, found := vocabulary.find(name)
+				if !found {
+					return
+				}
+
+				// Spellings a framework or a convention mandates, each silencing exactly the finding
+				// it names. Each was a `return` at that branch when the vocabulary was code, so
+				// matching on the finding's form and word is the same decision in the same place.
+				switch finding.form + " " + finding.entry.Abbreviation {
+				case "whole params", "suffix params":
+					// Next.js requires `params` and `searchParams` verbatim in page, layout, and
+					// route files, and inside the functions it reads by name.
+					if isFrameworkParameterFile || isInsideFrameworkScope(node, settings) {
+						return
+					}
+				case "whole ref":
+					// React 19 made `ref` a regular property on function components. The canonical
+					// name is load-bearing: interface keys, destructured shorthand, and
+					// forward-into-child JSX attribute values all have to read as `ref` for consumers
+					// to wire refs up correctly.
+					if isReactReferencePropertyContext(node) {
+						return
+					}
+				case "whole config":
+					// Next.js middleware requires `export const config` by that exact name.
+					if isFrameworkConstantFile {
+						return
+					}
+				case "whole args":
+					// A rest parameter in a variadic or framework function keeps the conventional
+					// spelling: `...args` is the shape everyone reads.
+					if isRestElement(node) {
+						return
+					}
+				}
+
 				// The identifier's own text, not its leading trivia.
 				//
 				// `node.Loc.Pos()` sits before the trivia, so a binding preceded by a comment
@@ -437,286 +225,7 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 				// it cannot cover, since the directive matches the line after itself: `params` in
 				// McpApi.ts reported at line 240 while its suppression sat on 241 covering 242, so a
 				// correctly-suppressed identifier still produced a finding nothing could silence.
-				identifierRange := rule.TokenRange(ctx.SourceFile, node)
-				report := func(message rule.Message) {
-					ctx.ReportRange(identifierRange, message)
-				}
-
-				switch name {
-				case "prop":
-					report(messageExactAbbreviation("noProp", name, "property"))
-					return
-				case "props":
-					report(messageExactAbbreviation("noProps", name, "properties"))
-					return
-				case "param":
-					report(messageExactAbbreviation("noParam", name, "parameter"))
-					return
-				case "params":
-					// Next.js requires this spelling in page, layout, and route files, and inside
-					// the functions it reads by name.
-					if isFrameworkParameterFile || isInsideFrameworkScope(node, settings) {
-						return
-					}
-					report(messageExactAbbreviation("noParams", name, "parameters"))
-					return
-				case "ref":
-					// React 19 made `ref` a regular property on function components. The canonical
-					// name is load-bearing: interface keys, destructured shorthand, and
-					// forward-into-child JSX attribute values all have to read as `ref` for
-					// consumers to wire refs up correctly.
-					if isReactReferencePropertyContext(node) {
-						return
-					}
-					report(messageExactAbbreviation("noRef", name, "reference"))
-					return
-				case "config":
-					// Next.js middleware requires `export const config` by that exact name.
-					if isFrameworkConstantFile {
-						return
-					}
-					report(messageExactAbbreviation("noConfig", name, "configuration"))
-					return
-				case "idx":
-					report(messageExactAbbreviation("noIdx", name, "index"))
-					return
-				case "arg":
-					report(messageNoArg)
-					return
-				case "args":
-					// A rest parameter in a variadic or framework function keeps the conventional
-					// spelling: `...args` is the shape everyone reads.
-					if isRestElement(node) {
-						return
-					}
-					report(messageNoArgs)
-					return
-				case "acc":
-					report(messageNoAcc)
-					return
-				case "char":
-					report(messageExactAbbreviation("noChar", name, "character"))
-					return
-				case "fn":
-					report(messageNoFn)
-					return
-				case "str":
-					report(messageExactAbbreviation("noStr", name, "string"))
-					return
-				}
-
-				// Abbreviations that expand identically whether alone or as a camelCase prefix. The
-				// already-spelled guard is a prefix of the full word rather than the two letters,
-				// because `dbCode` and `database` both begin `d`,`b` and only the second is already
-				// spelled out.
-				for _, entry := range []struct {
-					abbreviation   string
-					replacement    string
-					alreadySpelled string
-					messageId      string
-				}{
-					{"ctx", "context", "context", "noCtx"},
-					{"db", "database", "database", "noDb"},
-					{"tx", "transaction", "transaction", "noTx"},
-					{"opts", "options", "options", "noOpts"},
-					{"cur", "current", "current", "noCur"},
-					{"pct", "percent", "percent", "noPct"},
-					{"prev", "previous", "previous", "noPrev"},
-				} {
-					// `InnoDb` is a proper noun; the `Db` in it stands in for nothing.
-					if entry.abbreviation == "db" && containsAllowedAbbreviationSegment(name) {
-						continue
-					}
-					if name == entry.abbreviation {
-						report(messageSuggestedRename(entry.messageId, name, entry.replacement))
-						return
-					}
-					if prefixContinuationPatterns[entry.abbreviation].MatchString(name) &&
-						!strings.HasPrefix(name, entry.alreadySpelled) {
-						suggestion := entry.replacement + strings.TrimPrefix(name, entry.abbreviation)
-						report(messageSuggestedRename(entry.messageId, name, suggestion))
-						return
-					}
-				}
-
-				// The rest of the whole-word family, all deterministic expansions.
-				for _, entry := range exactAbbreviations {
-					if name == entry.name {
-						report(messageExactAbbreviation(entry.messageId, name, entry.full))
-						return
-					}
-				}
-
-				// Suffix checks. `Properties` already ends with `Props`'s letters, which is why the
-				// guard tests the spelled-out word rather than the abbreviation.
-				if strings.HasSuffix(name, "Prop") && !strings.HasSuffix(name, "Properties") {
-					report(messageSuffixRename("noPropSuffix", name, "Prop",
-						strings.TrimSuffix(name, "Prop")+"Property"))
-					return
-				}
-				if strings.HasSuffix(name, "Props") && !strings.HasSuffix(name, "Properties") {
-					report(messageSuffixRename("noPropsSuffix", name, "Props",
-						strings.TrimSuffix(name, "Props")+"Properties"))
-					return
-				}
-				if strings.HasSuffix(name, "Param") {
-					report(messageSuffixRename("noParamSuffix", name, "Param",
-						strings.TrimSuffix(name, "Param")+"Parameter"))
-					return
-				}
-				if strings.HasSuffix(name, "Params") {
-					// `searchParams` is required verbatim by Next.js in the same files and scopes.
-					if isFrameworkParameterFile || isInsideFrameworkScope(node, settings) {
-						return
-					}
-					report(messageSuffixRename("noParamsSuffix", name, "Params",
-						strings.TrimSuffix(name, "Params")+"Parameters"))
-					return
-				}
-
-				// A millisecond suffix, read as a camelCase word rather than as two letters. It
-				// requires a lowercase letter before it and either the end of the name or the start
-				// of the next word after, so the unit is matched wherever it sits: `maximumAgeMs` and
-				// `maximumAgeMsHalf` both count, while `SMS`, `LLMs`, and `CountryCodeMS` are words
-				// that merely contain the letters, and `msgText` and `someMsgHandler` fail because
-				// `Msg` continues in lowercase.
-				//
-				// Anchoring only to the end would have missed the middle, which is how
-				// `maximumAgeMsHalf` sat unreported while every one of its siblings was caught.
-				//
-				// Foreign names like Node's `mtimeMs` on `Stats` still match, and a consumer cannot
-				// rename those, so they take a stated suppression at their single site the way every
-				// other foreign spelling does.
-				if millisecondSegmentPattern.MatchString(name) {
-					suggestion := replaceFirst(millisecondSegmentPattern, name, "${1}InMilliseconds${2}")
-					report(messageNoMsSuffix(name, suggestion))
-					return
-				}
-
-				if strings.HasSuffix(name, "Ref") {
-					report(messageSuffixRename("noRefSuffix", name, "Ref",
-						strings.TrimSuffix(name, "Ref")+"Reference"))
-					return
-				}
-				if strings.HasSuffix(name, "Config") {
-					report(messageSuffixRename("noConfigSuffix", name, "Config",
-						strings.TrimSuffix(name, "Config")+"Configuration"))
-					return
-				}
-				if strings.HasSuffix(name, "Idx") {
-					report(messageSuffixRename("noIdxSuffix", name, "Idx",
-						strings.TrimSuffix(name, "Idx")+"Index"))
-					return
-				}
-				if strings.HasSuffix(name, "Arg") && !strings.HasSuffix(name, "argument") &&
-					!strings.HasSuffix(name, "Argument") {
-					report(messageSuffixRename("noArgSuffix", name, "Arg",
-						strings.TrimSuffix(name, "Arg")+"Argument"))
-					return
-				}
-				if strings.HasSuffix(name, "Args") && !strings.HasSuffix(name, "arguments") &&
-					!strings.HasSuffix(name, "Arguments") {
-					report(messageSuffixRename("noArgsSuffix", name, "Args",
-						strings.TrimSuffix(name, "Args")+"Arguments"))
-					return
-				}
-				if strings.HasSuffix(name, "Char") && !strings.HasSuffix(name, "character") &&
-					!strings.HasSuffix(name, "Character") {
-					report(messageSuffixRename("noCharSuffix", name, "Char",
-						strings.TrimSuffix(name, "Char")+"Character"))
-					return
-				}
-				if strings.HasSuffix(name, "Fn") && !strings.HasSuffix(name, "function") &&
-					!strings.HasSuffix(name, "Function") {
-					report(messageNoFnSuffix(name))
-					return
-				}
-				if strings.HasSuffix(name, "Str") && !strings.HasSuffix(name, "string") &&
-					!strings.HasSuffix(name, "String") {
-					report(messageSuffixRename("noStrSuffix", name, "Str",
-						strings.TrimSuffix(name, "Str")+"String"))
-					return
-				}
-				for _, entry := range suffixAbbreviations {
-					if strings.HasSuffix(name, entry.suffix) &&
-						!strings.HasSuffix(name, entry.lowerWord) &&
-						!strings.HasSuffix(name, entry.upperWord) {
-						report(messageSuffixRename(entry.messageId, name, entry.suffix,
-							strings.TrimSuffix(name, entry.suffix)+entry.replacement))
-						return
-					}
-				}
-
-				// Prefix checks, camelCase continuation: `paramsText`, `configValue`, `idxStart`.
-				for _, entry := range []struct {
-					prefix         string
-					replacement    string
-					alreadySpelled string
-					messageId      string
-				}{
-					// `idx` has no already-spelled guard in the original: `index` does not start
-					// with `idx`, so there is nothing to re-fire on.
-					{"idx", "index", "", "noIdx"},
-					{"config", "configuration", "configuration", "noConfig"},
-					{"prop", "property", "propert", "noProp"},
-					{"props", "properties", "propert", "noProps"},
-					{"param", "parameter", "parameter", "noParam"},
-					{"params", "parameters", "parameter", "noParams"},
-					{"ref", "reference", "reference", "noRef"},
-					{"char", "character", "character", "noChar"},
-					{"str", "string", "string", "noStr"},
-				} {
-					if !prefixContinuationPatterns[entry.prefix].MatchString(name) {
-						continue
-					}
-					if entry.alreadySpelled != "" && strings.HasPrefix(name, entry.alreadySpelled) {
-						continue
-					}
-					suggestion := entry.replacement + strings.TrimPrefix(name, entry.prefix)
-					report(messageSuggestedRename(entry.messageId, name, suggestion))
-					return
-				}
-
-				// `arg`, `args`, and `fn` prefixes report without naming a replacement, because
-				// `arguments` is a reserved binding and `fn` needs a role rather than an expansion.
-				if prefixContinuationPatterns["arg"].MatchString(name) && !strings.HasPrefix(name, "argument") {
-					report(messageNoArg)
-					return
-				}
-				if prefixContinuationPatterns["args"].MatchString(name) && !strings.HasPrefix(name, "arguments") {
-					report(messageNoArgs)
-					return
-				}
-				if prefixContinuationPatterns["fn"].MatchString(name) && !strings.HasPrefix(name, "function") {
-					report(messageNoFn)
-					return
-				}
-
-				for _, entry := range prefixAbbreviations {
-					if prefixContinuationPatterns[entry.prefix].MatchString(name) &&
-						!strings.HasPrefix(name, entry.fullWord) {
-						suggestion := entry.replacement + strings.TrimPrefix(name, entry.prefix)
-						report(messageSuggestedRename(entry.messageId, name, suggestion))
-						return
-					}
-				}
-
-				if containsAllowedAbbreviationSegment(name) {
-					return
-				}
-
-				for _, entry := range wordSegmentAbbreviations {
-					patterns := compiledWordSegmentPatterns[entry.word]
-					if !patterns.boundary.MatchString(name) && !patterns.camel.MatchString(name) {
-						continue
-					}
-					suggestion := replaceFirst(patterns.replace, name, entry.replacement+"${1}")
-					if suggestion == name {
-						continue
-					}
-					report(messageNoWordSegment(name, entry.word, suggestion))
-					return
-				}
+				ctx.ReportRange(rule.TokenRange(ctx.SourceFile, node), finding.message)
 			},
 		}
 	},

@@ -1,0 +1,275 @@
+{
+    "about": "The abbreviation vocabulary for nexus/consistency-no-abbreviated-identifier, read by the Go rule through go:embed and by the Swift engine directly. Each entry is one abbreviated word: `expansion` is the word it stands in for, and each form says where in a name the word is judged. A suffix or segment form matches the word capitalized, and suggests the expansion capitalized. ORDER IS OBSERVABLE: within each form the rule reports the first entry that matches, so `ms` sits between `params` and `ref`, the early prefixes run `ctx` through `prev` in this order, and `vars` precedes `var`. Framework exemptions (`params` in route files, `ref` in React property positions, `config` in middleware, a `...args` rest, TanStack's `queryFn`) are policy rather than vocabulary and stay in the Go rule.",
+    "abbreviations": [
+        {
+            "abbreviation": "prop",
+            "expansion": "property",
+            "whole": { "messageId": "noProp", "style": "orDescriptive" },
+            "prefix": { "messageId": "noProp", "phase": "late" },
+            "suffix": { "messageId": "noPropSuffix" }
+        },
+        {
+            "abbreviation": "props",
+            "expansion": "properties",
+            "whole": { "messageId": "noProps", "style": "orDescriptive" },
+            "prefix": { "messageId": "noProps", "phase": "late" },
+            "suffix": { "messageId": "noPropsSuffix" }
+        },
+        {
+            "abbreviation": "param",
+            "expansion": "parameter",
+            "whole": { "messageId": "noParam", "style": "orDescriptive" },
+            "prefix": { "messageId": "noParam", "phase": "late" },
+            "suffix": { "messageId": "noParamSuffix" }
+        },
+        {
+            "abbreviation": "params",
+            "expansion": "parameters",
+            "whole": { "messageId": "noParams", "style": "orDescriptive" },
+            "prefix": { "messageId": "noParams", "phase": "late" },
+            "suffix": { "messageId": "noParamsSuffix" }
+        },
+        {
+            "abbreviation": "ms",
+            "expansion": "milliseconds",
+            "reason": "A millisecond unit read as a camelCase word: a lowercase letter before it, and the end of the name or the next word after, so `maximumAgeMsHalf` counts while `SMS`, `LLMs` and `msgText` do not. The tree spells the unit `InMilliseconds`, more than two to one over `Ms` for the identical value.",
+            "suffix": { "messageId": "noMsSuffix", "matcher": "millisecondWord", "replacement": "InMilliseconds" }
+        },
+        {
+            "abbreviation": "ref",
+            "expansion": "reference",
+            "whole": { "messageId": "noRef", "style": "orDescriptive" },
+            "prefix": { "messageId": "noRef", "phase": "late" },
+            "suffix": { "messageId": "noRefSuffix" }
+        },
+        {
+            "abbreviation": "config",
+            "expansion": "configuration",
+            "whole": { "messageId": "noConfig", "style": "orDescriptive" },
+            "prefix": { "messageId": "noConfig", "phase": "late" },
+            "suffix": { "messageId": "noConfigSuffix" }
+        },
+        {
+            "abbreviation": "idx",
+            "expansion": "index",
+            "whole": { "messageId": "noIdx", "style": "orDescriptive" },
+            "prefix": { "messageId": "noIdx", "phase": "late" },
+            "suffix": { "messageId": "noIdxSuffix" }
+        },
+        {
+            "abbreviation": "arg",
+            "expansion": "argument",
+            "advice": "Use \"argument\", \"commandArgument\", or a more descriptive name.",
+            "reason": "The whole word and the prefix give advice rather than one rename, because the right name depends on what the argument is.",
+            "whole": { "messageId": "noArg", "style": "advice" },
+            "prefix": { "messageId": "noArg", "phase": "late", "style": "advice" },
+            "suffix": { "messageId": "noArgSuffix" }
+        },
+        {
+            "abbreviation": "args",
+            "expansion": "arguments",
+            "advice": "Use \"arguments\", \"commandArguments\", \"commandLineArguments\", or a more descriptive name.",
+            "reason": "`arguments` is a reserved binding, so the whole word and the prefix give advice rather than the bare expansion.",
+            "whole": { "messageId": "noArgs", "style": "advice" },
+            "prefix": { "messageId": "noArgs", "phase": "late", "style": "advice" },
+            "suffix": { "messageId": "noArgsSuffix" }
+        },
+        {
+            "abbreviation": "acc",
+            "advice": "Pick a name that describes what is being accumulated, \"total\", \"sum\", \"groupedItems\", or whatever fits the reduce.",
+            "reason": "A reduce accumulator has no single expansion: the right name is whatever it accumulates.",
+            "whole": { "messageId": "noAcc", "style": "advice" }
+        },
+        {
+            "abbreviation": "char",
+            "expansion": "character",
+            "whole": { "messageId": "noChar", "style": "orDescriptive" },
+            "prefix": { "messageId": "noChar", "phase": "late" },
+            "suffix": { "messageId": "noCharSuffix" }
+        },
+        {
+            "abbreviation": "fn",
+            "advice": "Use \"callback\", \"handler\", \"factory\", or a more descriptive name.",
+            "reason": "A function wants a role rather than an expansion: `function` names the kind, not the job.",
+            "whole": { "messageId": "noFn", "style": "advice" },
+            "prefix": { "messageId": "noFn", "phase": "late", "style": "advice" },
+            "suffix": {
+                "messageId": "noFnSuffix",
+                "advice": "Use a more descriptive name, drop the \"Fn\" suffix or rename to a role like \"Handler\", \"Callback\", \"Factory\"."
+            }
+        },
+        {
+            "abbreviation": "str",
+            "expansion": "string",
+            "whole": { "messageId": "noStr", "style": "orDescriptive" },
+            "prefix": { "messageId": "noStr", "phase": "late" },
+            "suffix": { "messageId": "noStrSuffix" }
+        },
+        {
+            "abbreviation": "val",
+            "expansion": "value",
+            "whole": { "messageId": "noVal", "style": "orDescriptive" },
+            "prefix": { "messageId": "noVal", "phase": "late" },
+            "suffix": { "messageId": "noValSuffix" }
+        },
+        {
+            "abbreviation": "arr",
+            "expansion": "array",
+            "whole": { "messageId": "noArr", "style": "orDescriptive" },
+            "prefix": { "messageId": "noArr", "phase": "late" },
+            "suffix": { "messageId": "noArrSuffix" }
+        },
+        {
+            "abbreviation": "obj",
+            "expansion": "object",
+            "whole": { "messageId": "noObj", "style": "orDescriptive" },
+            "prefix": { "messageId": "noObj", "phase": "late" },
+            "suffix": { "messageId": "noObjSuffix" }
+        },
+        {
+            "abbreviation": "num",
+            "expansion": "number",
+            "whole": { "messageId": "noNum", "style": "orDescriptive" },
+            "prefix": { "messageId": "noNum", "phase": "late" },
+            "suffix": { "messageId": "noNumSuffix" }
+        },
+        {
+            "abbreviation": "res",
+            "expansion": "response",
+            "whole": { "messageId": "noRes", "style": "orDescriptive" },
+            "prefix": { "messageId": "noRes", "phase": "late" },
+            "suffix": { "messageId": "noResSuffix" }
+        },
+        {
+            "abbreviation": "err",
+            "expansion": "error",
+            "whole": { "messageId": "noErr", "style": "orDescriptive" },
+            "prefix": { "messageId": "noErr", "phase": "late" },
+            "suffix": { "messageId": "noErrSuffix" }
+        },
+        {
+            "abbreviation": "req",
+            "expansion": "request",
+            "whole": { "messageId": "noReq", "style": "orDescriptive" },
+            "prefix": { "messageId": "noReq", "phase": "late" },
+            "suffix": { "messageId": "noReqSuffix" }
+        },
+        {
+            "abbreviation": "msg",
+            "expansion": "message",
+            "whole": { "messageId": "noMsg", "style": "orDescriptive" },
+            "prefix": { "messageId": "noMsg", "phase": "late" },
+            "suffix": { "messageId": "noMsgSuffix" }
+        },
+        {
+            "abbreviation": "min",
+            "expansion": "minimum",
+            "whole": { "messageId": "noMin", "style": "orDescriptive" },
+            "prefix": { "messageId": "noMin", "phase": "late" },
+            "suffix": { "messageId": "noMinSuffix" }
+        },
+        {
+            "abbreviation": "max",
+            "expansion": "maximum",
+            "whole": { "messageId": "noMax", "style": "orDescriptive" },
+            "prefix": { "messageId": "noMax", "phase": "late" },
+            "suffix": { "messageId": "noMaxSuffix" }
+        },
+        {
+            "abbreviation": "ctx",
+            "expansion": "context",
+            "reason": "An early prefix: judged before any suffix, so a name starting with it reports the prefix even when it also ends with an abbreviation.",
+            "whole": { "messageId": "noCtx", "style": "plain" },
+            "prefix": { "messageId": "noCtx", "phase": "early" }
+        },
+        {
+            "abbreviation": "cwd",
+            "expansion": "workingDirectory",
+            "segment": {}
+        },
+        {
+            "abbreviation": "dir",
+            "expansion": "directory",
+            "reason": "A segment ends at the end of the name or the start of the next word, which is what keeps `Direction` from reading as `Dir`.",
+            "segment": {}
+        },
+        {
+            "abbreviation": "env",
+            "expansion": "environment",
+            "segment": {}
+        },
+        {
+            "abbreviation": "cli",
+            "expansion": "commandLineInterface",
+            "segment": {}
+        },
+        {
+            "abbreviation": "len",
+            "expansion": "length",
+            "segment": {}
+        },
+        {
+            "abbreviation": "seq",
+            "expansion": "sequence",
+            "segment": {}
+        },
+        {
+            "abbreviation": "db",
+            "expansion": "database",
+            "whole": { "messageId": "noDb", "style": "plain" },
+            "prefix": { "messageId": "noDb", "phase": "early" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "tx",
+            "expansion": "transaction",
+            "whole": { "messageId": "noTx", "style": "plain" },
+            "prefix": { "messageId": "noTx", "phase": "early" },
+            "segment": {}
+        },
+        {
+            "abbreviation": "opts",
+            "expansion": "options",
+            "whole": { "messageId": "noOpts", "style": "plain" },
+            "prefix": { "messageId": "noOpts", "phase": "early" }
+        },
+        {
+            "abbreviation": "cur",
+            "expansion": "current",
+            "whole": { "messageId": "noCur", "style": "plain" },
+            "prefix": { "messageId": "noCur", "phase": "early" }
+        },
+        {
+            "abbreviation": "pct",
+            "expansion": "percent",
+            "whole": { "messageId": "noPct", "style": "plain" },
+            "prefix": { "messageId": "noPct", "phase": "early" }
+        },
+        {
+            "abbreviation": "prev",
+            "expansion": "previous",
+            "whole": { "messageId": "noPrev", "style": "plain" },
+            "prefix": { "messageId": "noPrev", "phase": "early" }
+        },
+        {
+            "abbreviation": "vars",
+            "expansion": "variables",
+            "reason": "Before `var`, so the longer word wins.",
+            "segment": {}
+        },
+        {
+            "abbreviation": "var",
+            "expansion": "variable",
+            "segment": {}
+        }
+    ],
+    "allowedNames": [
+        { "name": "URLSearchParams", "reason": "A Web API, and not ours to rename." }
+    ],
+    "allowedSegments": [
+        {
+            "segment": "InnoDb",
+            "reason": "MySQL's storage engine, a proper noun. The `Db` in it stands in for nothing, and `InnoDatabase` names a thing that does not exist. Matched as a segment because it appears inside longer names like `InnoDbMaximumIndexKeyBytes`."
+        }
+    ]
+}

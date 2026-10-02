@@ -6,7 +6,12 @@ import (
 	"testing"
 )
 
-// The gate must be a superset of the regex it replaces, and this is the only thing that proves it.
+// The gate must be a superset of what the vocabulary reports, and this is the only thing that proves
+// it.
+//
+// It runs the vocabulary itself with no gate in front of it, which is stronger than the regular
+// expression this used to compare against: that pattern was a hand-written description of the
+// branches, and the vocabulary is the branches.
 //
 // The asymmetry is the whole point and it is stated in the rule's own comment: a false positive here
 // costs one cheap traversal, while a false negative silently stops the rule firing, and a rule that
@@ -26,7 +31,7 @@ func TestAbbreviationGateHasNoFalseNegatives(t *testing.T) {
 
 	falseNegatives := []string{}
 	for _, name := range corpus {
-		if abbreviationCandidatePattern.MatchString(name) && !isAbbreviationCandidate(name) {
+		if _, reported := vocabulary.find(name); reported && !isAbbreviationCandidate(name) {
 			falseNegatives = append(falseNegatives, name)
 		}
 	}
@@ -36,7 +41,7 @@ func TestAbbreviationGateHasNoFalseNegatives(t *testing.T) {
 		if len(shown) > 20 {
 			shown = shown[:20]
 		}
-		t.Fatalf("gate misses %d names the pattern matches, which would silence the rule for each: %v",
+		t.Fatalf("gate misses %d names the vocabulary reports, which would silence the rule for each: %v",
 			len(falseNegatives), shown)
 	}
 }
@@ -52,29 +57,29 @@ func TestAbbreviationGateStaysSelective(t *testing.T) {
 	corpus := loadIdentifierCorpus(t)
 
 	admitted := 0
-	matched := 0
+	reported := 0
 	for _, name := range corpus {
 		if isAbbreviationCandidate(name) {
 			admitted++
 		}
-		if abbreviationCandidatePattern.MatchString(name) {
-			matched++
+		if _, found := vocabulary.find(name); found {
+			reported++
 		}
 	}
 
-	// The regex admits a small fraction of real identifiers. The gate may admit more, but not by a
-	// margin that would put the expensive work back.
+	// The vocabulary reports a small fraction of real identifiers. The gate may admit more, but not
+	// by a margin that would put the expensive work back.
 	const maximumAdmittedFraction = 0.10
 	if float64(admitted) > float64(len(corpus))*maximumAdmittedFraction {
 		t.Fatalf("gate admits %d of %d names (%.1f%%), which is too coarse to be worth having",
 			admitted, len(corpus), 100*float64(admitted)/float64(len(corpus)))
 	}
-	t.Logf("corpus %d, pattern matches %d, gate admits %d", len(corpus), matched, admitted)
+	t.Logf("corpus %d, vocabulary reports %d, gate admits %d", len(corpus), reported, admitted)
 }
 
 // The arms the two failed attempts lost, pinned by name so a regression names itself.
 //
-// Every one of these is a real spelling from the tree that the regex matches. They are here in
+// Every one of these is a real spelling from the tree that the vocabulary reports. They are here in
 // addition to the corpus test, not instead of it: the corpus proves the gate today, and these say
 // which shapes were historically easy to drop.
 func TestAbbreviationGateCoversTheArmsThatWereLost(t *testing.T) {
@@ -95,11 +100,11 @@ func TestAbbreviationGateCoversTheArmsThatWereLost(t *testing.T) {
 	}
 	for _, name := range cases {
 		t.Run(name, func(t *testing.T) {
-			if !abbreviationCandidatePattern.MatchString(name) {
-				t.Fatalf("fixture %q does not match the pattern, so it proves nothing", name)
+			if _, reported := vocabulary.find(name); !reported {
+				t.Fatalf("the vocabulary does not report %q, so it proves nothing", name)
 			}
 			if !isAbbreviationCandidate(name) {
-				t.Fatalf("gate misses %q, which the pattern matches", name)
+				t.Fatalf("gate misses %q, which the vocabulary reports", name)
 			}
 		})
 	}

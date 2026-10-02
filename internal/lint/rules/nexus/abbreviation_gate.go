@@ -12,64 +12,69 @@ package nexus
 // V8. **A regex that is cheap in JavaScript is not automatically cheap in Go**, and a per-node gate
 // is where that difference gets multiplied by two million. Nothing about the rule's logic changed.
 //
-// Every alternative in the pattern is a literal word, or a literal word plus a case boundary, so
-// there is no backtracking behavior to preserve and a map lookup answers the same question.
+// Every alternative in that pattern was a literal word, or a literal word plus a case boundary, so
+// there was no backtracking behavior to preserve and a map lookup answers the same question. The
+// pattern itself is gone: it was kept as the specification this gate was tested against, and once
+// the vocabulary moved into abbreviations.json a pattern derived from the same file would only have
+// compared the file to itself.
 //
-// The direction of error is the whole discipline here, and it is inherited from the pattern's own
-// comment: this must be a **superset** of what the branches match. A false positive costs one cheap
-// traversal that reports nothing. A false negative silences the rule for that spelling, and a rule
-// that stops firing looks exactly like a clean run. `abbreviation_gate_test.go` asserts the superset
-// property over 82,367 distinct identifiers from the ahra tree, which is the only thing that proves
-// it: two earlier attempts at this gate both lost `elapsedMs`, and a hand-written list does not
-// contain the case its author misread.
+// The direction of error is the whole discipline here: this must be a **superset** of what the
+// vocabulary reports. A false positive costs one cheap traversal that reports nothing. A false
+// negative silences the rule for that spelling, and a rule that stops firing looks exactly like a
+// clean run. `abbreviation_gate_test.go` asserts the superset property by running the vocabulary
+// itself, with no gate in front of it, over 82,367 distinct identifiers from the ahra tree, and
+// requiring the gate to admit every name it reports. Two earlier attempts at this gate both lost
+// `elapsedMs`, and a hand-written list does not contain the case its author misread.
 
-// gateWholeWordNames are names that are an abbreviation entire.
+// abbreviationGate is the vocabulary turned into the lookups below, one set per form.
 //
-// From the pattern's first arm, which anchors both ends.
-var gateWholeWordNames = map[string]bool{
-	"prop": true, "props": true, "param": true, "params": true, "ref": true, "config": true,
-	"idx": true, "arg": true, "args": true, "acc": true, "char": true, "fn": true, "str": true,
-	"val": true, "arr": true, "obj": true, "num": true, "res": true, "err": true, "req": true,
-	"msg": true, "min": true, "max": true, "prev": true, "cur": true, "pct": true, "opts": true,
-	"ctx": true, "db": true, "tx": true, "queryFn": true, "mutationFn": true,
+// Derived from abbreviations.json rather than written out, so a word added to the file is admitted
+// by the gate in the same edit. When these were four hand-written maps beside a hand-written list,
+// the two could disagree, and a word the gate did not admit was a word the rule never judged.
+type abbreviationGate struct {
+	wholeWords map[string]bool
+	prefixes   map[string]bool
+	suffixes   map[string]bool
+	segments   map[string]bool
+	// millisecond is whether any entry uses the millisecond matcher, which has its own arm.
+	millisecond bool
+	// The longest word in each form bounds that form's scan, so a long name does not cost work
+	// proportional to its length times the table size.
+	longestPrefix  int
+	longestSuffix  int
+	longestSegment int
 }
 
-// gatePrefixNames begin a camelCase name, so the next character is uppercase.
-//
-// From the pattern's second arm. Deliberately not the same set as the whole-word arm: `acc` and the
-// two TanStack names appear only as whole words in the pattern, and widening here would be a change
-// in behavior rather than a change in representation.
-var gatePrefixNames = map[string]bool{
-	"ctx": true, "db": true, "tx": true, "opts": true, "cur": true, "pct": true, "prev": true,
-	"idx": true, "config": true, "prop": true, "props": true, "param": true, "params": true,
-	"ref": true, "arg": true, "args": true, "char": true, "fn": true, "str": true, "val": true,
-	"arr": true, "obj": true, "num": true, "res": true, "err": true, "req": true, "msg": true,
-	"min": true, "max": true,
-}
+var gate = buildAbbreviationGate(vocabulary)
 
-// gateSuffixNames end a camelCase name, so they are capitalized and reach the end.
-//
-// From the pattern's third arm.
-var gateSuffixNames = map[string]bool{
-	"Prop": true, "Props": true, "Param": true, "Params": true, "Ref": true, "Config": true,
-	"Idx": true, "Arg": true, "Args": true, "Char": true, "Fn": true, "Str": true, "Val": true,
-	"Arr": true, "Obj": true, "Num": true, "Res": true, "Err": true, "Req": true, "Msg": true,
-	"Min": true, "Max": true,
+func buildAbbreviationGate(vocabulary *abbreviationVocabulary) abbreviationGate {
+	built := abbreviationGate{
+		wholeWords: map[string]bool{},
+		prefixes:   map[string]bool{},
+		suffixes:   map[string]bool{},
+		segments:   map[string]bool{},
+	}
+	for name := range vocabulary.wholeByName {
+		built.wholeWords[name] = true
+	}
+	for _, entry := range append(append([]*abbreviationEntry{}, vocabulary.earlyPrefixes...), vocabulary.latePrefixes...) {
+		built.prefixes[entry.Abbreviation] = true
+		built.longestPrefix = max(built.longestPrefix, len(entry.Abbreviation))
+	}
+	for _, entry := range vocabulary.suffixes {
+		if entry.Suffix.Matcher == "millisecondWord" {
+			built.millisecond = true
+			continue
+		}
+		built.suffixes[capitalizeAbbreviation(entry.Abbreviation)] = true
+		built.longestSuffix = max(built.longestSuffix, len(entry.Abbreviation))
+	}
+	for _, entry := range vocabulary.segments {
+		built.segments[capitalizeAbbreviation(entry.Abbreviation)] = true
+		built.longestSegment = max(built.longestSegment, len(entry.Abbreviation))
+	}
+	return built
 }
-
-// gateSegmentNames appear as a camelCase word anywhere in a name, followed by the end, another
-// word, or a digit.
-//
-// From the pattern's fifth arm. `Ms` is handled separately because its arm tests the character
-// *before* it as well.
-var gateSegmentNames = map[string]bool{
-	"Cwd": true, "Dir": true, "Env": true, "Cli": true, "Len": true, "Seq": true,
-	"Db": true, "Tx": true, "Vars": true, "Var": true,
-}
-
-// longestAbbreviationLength bounds the substring scans below, so a long name does not cost work
-// proportional to its length times the table size.
-const longestAbbreviationLength = 10
 
 // isAbbreviationCandidate reports whether a name could match any branch of the rule.
 //
@@ -81,7 +86,7 @@ func isAbbreviationCandidate(name string) bool {
 	}
 
 	// First arm: the whole name is an abbreviation.
-	if gateWholeWordNames[name] {
+	if gate.wholeWords[name] {
 		return true
 	}
 
@@ -89,9 +94,9 @@ func isAbbreviationCandidate(name string) bool {
 	//
 	// Scanning to the first uppercase letter finds the only split the arm can match, since the
 	// prefix in the pattern is anchored at the start and is entirely lowercase.
-	for index := 1; index < len(name) && index <= longestAbbreviationLength; index++ {
+	for index := 1; index < len(name) && index <= gate.longestPrefix; index++ {
 		if isUppercaseAsciiLetter(name[index]) {
-			if gatePrefixNames[name[:index]] {
+			if gate.prefixes[name[:index]] {
 				return true
 			}
 			break
@@ -103,8 +108,8 @@ func isAbbreviationCandidate(name string) bool {
 	// Lengths run from two, not three: `Fn` is the shortest entry in the table, and starting at
 	// three silently loses every name ending in it. The corpus caught that, on `accessorFn`,
 	// `LanguageFn`, `noFn`, and a bare `Fn`.
-	for length := 2; length <= 6 && length <= len(name); length++ {
-		if gateSuffixNames[name[len(name)-length:]] {
+	for length := 2; length <= gate.longestSuffix && length <= len(name); length++ {
+		if gate.suffixes[name[len(name)-length:]] {
 			return true
 		}
 	}
@@ -115,7 +120,7 @@ func isAbbreviationCandidate(name string) bool {
 	// checking the words: that split puts `Ms` in its own word and discards the lowercase letter
 	// before it, which is precisely the boundary being tested. Two independent attempts lost
 	// `elapsedMs` exactly here.
-	for index := 1; index+2 <= len(name); index++ {
+	for index := 1; gate.millisecond && index+2 <= len(name); index++ {
 		if name[index] != 'M' || name[index+1] != 's' {
 			continue
 		}
@@ -137,8 +142,8 @@ func isAbbreviationCandidate(name string) bool {
 		if !isUppercaseAsciiLetter(name[index]) {
 			continue
 		}
-		for length := 2; length <= 4 && index+length <= len(name); length++ {
-			if !gateSegmentNames[name[index:index+length]] {
+		for length := 2; length <= gate.longestSegment && index+length <= len(name); length++ {
+			if !gate.segments[name[index:index+length]] {
 				continue
 			}
 			after := index + length

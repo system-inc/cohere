@@ -411,7 +411,7 @@ func TestConsistencyNoAbbreviatedIdentifierCandidateGateCoversEveryBranch(t *tes
 		"eventSeq", "primaryDbHost", "pendingTxHash", "themeVars", "themeVarName",
 	}
 	for _, name := range reportable {
-		if !abbreviationCandidatePattern.MatchString(name) {
+		if !isAbbreviationCandidate(name) {
 			t.Errorf("the gate rejects %q, which a branch below would have reported", name)
 		}
 	}
@@ -420,7 +420,7 @@ func TestConsistencyNoAbbreviatedIdentifierCandidateGateCoversEveryBranch(t *tes
 	for _, name := range []string{
 		"renderNodeOrComponent", "identifier", "sourceFile", "handleSubmit", "useMediaQuery",
 	} {
-		if abbreviationCandidatePattern.MatchString(name) {
+		if isAbbreviationCandidate(name) {
 			t.Errorf("the gate accepts %q, which no branch would report", name)
 		}
 	}
