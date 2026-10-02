@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -205,6 +205,12 @@ func decodeDependenciesOptions(raw []byte, base rule.OptionsBase) (any, error) {
 		if len(descriptor.Pattern) == 0 {
 			return nil, fmt.Errorf("boundaries/dependencies: element %q has no pattern", descriptor.Type)
 		}
+		for _, pattern := range descriptor.Pattern {
+			if strings.ContainsAny(pattern, "{}()") {
+				return nil, fmt.Errorf("boundaries/dependencies: element %q has pattern %q, and this port matches "+
+					"`*`, `?`, `[...]` and `**` but not micromatch's brace or extglob syntax", descriptor.Type, pattern)
+			}
+		}
 		if descriptor.Mode != "" && descriptor.Mode != "folder" {
 			return nil, fmt.Errorf("boundaries/dependencies: element %q has mode %q, and this port implements "+
 				"only the default folder mode", descriptor.Type, descriptor.Mode)
@@ -336,38 +342,41 @@ func elementPath(pattern string, suffix []string, segments []string) string {
 
 // globMatches is micromatch's answer for a slash-separated path, with its default handling of dots.
 //
-// configuration.Match is the shelf's glob and is right for config files, which ESLint matches with
-// `dot: true`. Element patterns go through micromatch with its defaults, where neither `*` nor `**`
-// matches a segment that begins with a dot unless the pattern spells the dot. Reusing the shelf
-// would put `workers/api/.wrangler/state.ts` inside the `workers/*` element, a membership upstream
-// does not grant.
+// Element patterns go through micromatch with its defaults, where neither `*` nor `**` matches a
+// segment that begins with a dot unless the pattern spells the dot. cohere's config glob matches dot
+// segments (config files are matched with `dot: true`), so reusing it would put
+// `workers/api/.wrangler/state.ts` inside the `workers/*` element, a membership upstream does not
+// grant. It is also not imported for a second reason: a rule package stays a leaf of the build graph
+// (`TestRulePackagesStayLeaves`), and the config package is not one.
 func globMatches(pattern string, path []string) bool {
 	return matchGlobSegments(strings.Split(strings.Trim(pattern, "/"), "/"), path)
 }
 
-func matchGlobSegments(pattern []string, path []string) bool {
+func matchGlobSegments(pattern []string, segments []string) bool {
 	if len(pattern) == 0 {
-		return len(path) == 0
+		return len(segments) == 0
 	}
 	if pattern[0] == "**" {
-		if matchGlobSegments(pattern[1:], path) {
+		if matchGlobSegments(pattern[1:], segments) {
 			return true
 		}
-		if len(path) == 0 || strings.HasPrefix(path[0], ".") {
+		if len(segments) == 0 || strings.HasPrefix(segments[0], ".") {
 			return false
 		}
-		return matchGlobSegments(pattern, path[1:])
+		return matchGlobSegments(pattern, segments[1:])
 	}
-	if len(path) == 0 {
+	if len(segments) == 0 {
 		return false
 	}
-	if strings.HasPrefix(path[0], ".") && !strings.HasPrefix(pattern[0], ".") {
+	if strings.HasPrefix(segments[0], ".") && !strings.HasPrefix(pattern[0], ".") {
 		return false
 	}
-	if !configuration.Match(pattern[0], path[0]) {
+	// One segment, so `*` and `?` cannot cross a slash. Brace and extglob syntax, which path.Match
+	// does not read, is refused when the options are decoded.
+	if matched, err := path.Match(pattern[0], segments[0]); err != nil || !matched {
 		return false
 	}
-	return matchGlobSegments(pattern[1:], path[1:])
+	return matchGlobSegments(pattern[1:], segments[1:])
 }
 
 // matches reports whether one element satisfies an element selector.

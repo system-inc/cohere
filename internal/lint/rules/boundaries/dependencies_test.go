@@ -388,6 +388,7 @@ func TestDependenciesRefusesWhatItDoesNotPort(t *testing.T) {
 		{"the legacy rules key", `{"rules": [], ` + elements + `}`, "rules"},
 		{"checkInternals true", `{"checkInternals": true, ` + elements + `}`, "checkInternals"},
 		{"file mode", `{"elements": [{"type": "api", "pattern": "api/**", "mode": "file"}]}`, "folder mode"},
+		{"a brace pattern", `{"elements": [{"type": "api", "pattern": "{api,client}/**"}]}`, "brace or extglob"},
 		{"a basePattern", `{"elements": [{"type": "api", "pattern": "api/**", "basePattern": "x"}]}`, "basePattern"},
 		{"a dependency selector", `{"policies": [{"dependency": {"kind": "type"}, "allow": {"to": {"element": {"type": "api"}}}}], ` + elements + `}`, "dependency"},
 		{"a policy that decides nothing", `{"policies": [{"from": {"element": {"type": "api"}}}], ` + elements + `}`, "neither allow nor disallow"},
