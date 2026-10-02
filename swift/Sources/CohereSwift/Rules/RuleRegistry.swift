@@ -48,6 +48,9 @@ public enum RuleRegistry {
         LastWhere(),
         IsDisjoint(),
         ReduceInto(),
+        NoDefaultForOwnedEnum(),
+        NoUnhandledThrowingTask(),
+        RedundantTypeAnnotation(),
     ]
 
     public static let packageRules: [any PackageRule] = [

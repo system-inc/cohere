@@ -67,6 +67,8 @@ struct RuleMapping: Sendable {
         RuleMapping(incumbent: .swiftLint, incumbentRule: "last_where", rules: ["cohere-swift/last-where"]),
         RuleMapping(incumbent: .swiftLint, incumbentRule: "is_disjoint", rules: ["cohere-swift/is-disjoint"]),
         RuleMapping(incumbent: .swiftLint, incumbentRule: "reduce_into", rules: ["cohere-swift/reduce-into"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "unhandled_throwing_task", rules: ["cohere-swift/no-unhandled-throwing-task"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "redundant_type_annotation", rules: ["cohere-swift/redundant-type-annotation"]),
     ]
 
     static func incumbentRules(of incumbent: Incumbent) -> [String] {
