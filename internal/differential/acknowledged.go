@@ -79,6 +79,16 @@ var KnownGateDefects = []AcknowledgedDifference{
 			"TestNoUnnecessaryTypeParametersRecognizesTheExactEqualityIdiom",
 	},
 	{
+		File: "libraries/structure/libraries/nexus/source/types/ObjectTypes.ts",
+		Line: 93,
+		Rule: "no-unnecessary-type-parameters",
+		Side: SideGate,
+		Reason: "`typeOnly<Shape>(): Shape` takes no value and uses `Shape` only in its return type, so it is a " +
+			"phantom-type witness rather than a disguised cast (nothing is handed in to cast from); the type-witness " +
+			"principle keeps it silent; typescript/no_unnecessary_type_parameters.md, " +
+			"TestNoUnnecessaryTypeParametersTypeWitnesses",
+	},
+	{
 		File: "libraries/structure/libraries/nexus/source/security/random/Random.test.ts",
 		Line: 6,
 		Rule: "no-confusing-void-expression",
@@ -161,6 +171,84 @@ var KnownGateDefects = []AcknowledgedDifference{
 		Reason: "the loop awaits and `stopped` is set by teardown, reached through a SIGINT handler registered " +
 			"before it; core/no_unmodified_loop_condition.md, " +
 			"TestNoUnmodifiedLoopConditionSeesAWriterThatRunsWhileTheLoopIsSuspended",
+	},
+	{
+		File: "libraries/structure/libraries/nexus/source/text/Shouting.ts",
+		Line: 569,
+		Rule: "consistency-no-shouting",
+		Side: SideGate,
+		Reason: "the `NOT` sits inside a double-quoted phrase the block comment wrapped onto the next line, and a " +
+			"quoted all-caps phrase is a literal by ruling; the gate's double-quote mask stops at a newline; " +
+			"nexus/consistency_no_shouting.md, TestConsistencyNoShoutingMasksADoubleQuoteThatWraps",
+	},
+	{
+		File: "libraries/structure/libraries/nexus/source/geography/Countries.ts",
+		Line: 13,
+		Rule: "no-misused-spread",
+		Side: SideGate,
+		Reason: "a string spread walks code points, which is what mapping ISO letters to regional indicators wants; " +
+			"cohere drops upstream's string branch by ruling, since its only repair is Array.from, the same iteration; " +
+			"typescript/no_misused_spread.md, TestNoMisusedSpreadLeavesStringSpreadAlone",
+	},
+	{
+		File: "modules/openai/PngTextMetadata.ts",
+		Line: 64,
+		Rule: "no-misused-spread",
+		Side: SideGate,
+		Reason: "a Latin-1 filter that wants code points; typescript/no_misused_spread.md, " +
+			"TestNoMisusedSpreadLeavesStringSpreadAlone",
+	},
+	{
+		File: "modules/pensieve/PensieveDailies.ts",
+		Line: 288,
+		Rule: "no-misused-spread",
+		Side: SideGate,
+		Reason: "quote-mark scanning by code point; typescript/no_misused_spread.md, " +
+			"TestNoMisusedSpreadLeavesStringSpreadAlone",
+	},
+	{
+		File: "modules/pensieve/PensieveDailies.ts",
+		Line: 326,
+		Rule: "no-misused-spread",
+		Side: SideGate,
+		Reason: "ignored characters filtered by code point; typescript/no_misused_spread.md, " +
+			"TestNoMisusedSpreadLeavesStringSpreadAlone",
+	},
+	{
+		File: "libraries/structure/source/components/maps/MapProjection.ts",
+		Line: 5,
+		Rule: "consistency-require-constant-casing",
+		Side: SideGate,
+		Reason: "`DegreesToRadians` leaves the file through `export { DegreesToRadians }` and Map.tsx imports it, so " +
+			"PascalCase is right; the gate's rule sees only an `export` modifier and calls it file-local; " +
+			"TestConsistencyRequireConstantCasingCountsALocalExportClause",
+	},
+	{
+		File: "modules/ollama/OllamaApi.ts",
+		Line: 51,
+		Rule: "consistency-require-constant-casing",
+		Side: SideGate,
+		Reason: "`OllamaEnvironment` is exported through `export { OllamaEnvironment }`, which the gate's rule does " +
+			"not read; TestConsistencyRequireConstantCasingCountsALocalExportClause",
+	},
+	{
+		File: "app/(os-layout)/_components/row/TaskList.tsx",
+		Line: 61,
+		Rule: "consistency-require-constant-casing",
+		Side: SideGate,
+		Reason: "`PriorityOrder` leaves the file through `export { PriorityOrder }` and TaskDetailFields.tsx imports " +
+			"it, so PascalCase is right; the gate's rule sees only an `export` modifier and calls it file-local; " +
+			"TestConsistencyRequireConstantCasingCountsALocalExportClause",
+	},
+	{
+		File: "modules/google/ads/GoogleAdsClient.ts",
+		Line: 57,
+		Rule: "consistency-require-constant-casing",
+		Side: SideGate,
+		Reason: "`GoogleAdsCredentials` leaves the file through `export { GoogleAdsCredentials }` and " +
+			"seven Google Ads API files import it, so PascalCase is right; the gate's rule " +
+			"sees only an `export` modifier and calls it file-local; " +
+			"TestConsistencyRequireConstantCasingCountsALocalExportClause",
 	},
 }
 
