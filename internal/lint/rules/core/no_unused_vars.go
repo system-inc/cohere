@@ -1515,18 +1515,11 @@ func isStructurallyRequiredParameter(parameter *ast.Node) bool {
 		return true
 	}
 
-	// An `override` method's signature is fixed by the base class it overrides, so an unused
-	// parameter there is required by the contract rather than left behind. Upstream reaches this
-	// through the same `is_allowed_param_because_of_method` family.
-	if owner.Kind == ast.KindMethodDeclaration {
-		if modifiers := owner.Modifiers(); modifiers != nil {
-			for _, modifier := range modifiers.Nodes {
-				if modifier.Kind == ast.KindOverrideKeyword {
-					return true
-				}
-			}
-		}
-	}
+	// An `override` method is deliberately not a third shape. oxc exempts its parameters (its
+	// `is_allowed_param_because_of_method` family), and this port once did too; typescript-eslint does
+	// not, and TypeScript lets an override declare fewer parameters than the method it overrides, so an
+	// unused trailing one can simply go. The arm cost api-phi-health three findings ESLint reports
+	// (#c6jhg93), each fixed upstream by deleting the parameter.
 
 	if owner.Kind == ast.KindConstructor {
 		if modifiers := parameter.Modifiers(); modifiers != nil {
@@ -1698,6 +1691,14 @@ func isParameterBeforeAUsedOne(
 		// Without it, `constructor(baz: string, private logger: Logger)` reports `baz`, which is a
 		// parameter that genuinely cannot be deleted without breaking the property behind it.
 		if isStructurallyRequiredParameter(other.declaration) {
+			return true
+		}
+		// A later parameter with a default value shields the ones before it, as upstream's
+		// `isAfterLastUsedArg` does: it asks whether a later parameter has any reference, and a default
+		// is a write reference. So `(a, b, c = {})` with only `a` read reports `c`, as assigned and
+		// never used, and not `b`. Measured with lintText on the installed typescript-eslint, and
+		// the shape of api-phi-health's FakeStripePaymentProcessor.ts:122 (#c6jhg93).
+		if other.declaration.Kind == ast.KindParameter && other.declaration.AsParameterDeclaration().Initializer != nil {
 			return true
 		}
 		if symbol := ctx.TypeChecker.GetSymbolAtLocation(other.name); symbol != nil && reads[symbol] {

@@ -593,3 +593,40 @@ func TestNoUnusedVarsReportsAValueUsedOnlyAsAType(t *testing.T) {
 		})
 	}
 }
+
+// TestNoUnusedVarsJudgesOverrideParametersAsTypeScriptEslintDoes holds #c6jhg93: an override method's
+// unused trailing parameter reports, and a later defaulted parameter shields the ones before it.
+// Each row's expected names were measured with lintText on the installed typescript-eslint.
+func TestNoUnusedVarsJudgesOverrideParametersAsTypeScriptEslintDoes(t *testing.T) {
+	t.Parallel()
+
+	base := "export class Base {\n    shouldRun(previous: number | null): boolean { return previous === null; }\n" +
+		"    create(items: string[], discounts: number[], options: object = {}): number { return items.length + discounts.length + Object.keys(options).length; }\n}\n"
+	cases := []struct {
+		name   string
+		source string
+		want   []string
+	}{
+		// DailyMetricsScheduledExecutable.ts:47 and SystemLogReportScheduledExecutable.ts:74.
+		{"an override's unused only parameter", base + "export class Child extends Base {\n    override shouldRun(_previousRun: number | null): boolean { return true; }\n}\n", []string{"_previousRun"}},
+		// FakeStripePaymentProcessor.ts:122: the defaulted _options reports and shields _appliedDiscount.
+		{"an override's trailing defaulted parameter", base + "export class Child extends Base {\n    override create(items: string[], _appliedDiscount: number[], _options: object = {}): number { return items.length; }\n}\n", []string{"_options"}},
+		// oxc's clean case, withheld from the corpus because typescript-eslint reports it.
+		{"oxc's override case", "class Foo {\n    public method(a: number, b: number): number { return a + b; }\n}\nclass Bar extends Foo {\n    public override method(a: number, b: number): number { return a; }\n}\nnew Bar();\n", []string{"b"}},
+		// The shield, both ways: a default after b shields b; without the default, both report.
+		{"a defaulted parameter shields the one before it", "export function run(a: number, b: string, c: object = {}): number { return a; }\n", []string{"c"}},
+		{"without the default, both trailing parameters report", "export function run(a: number, b: string, c: object): number { return a; }\n", []string{"b", "c"}},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
+			var got []string
+			for _, diagnostic := range result.Diagnostics {
+				got = append(got, testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()])
+			}
+			if strings.Join(got, ",") != strings.Join(testCase.want, ",") {
+				t.Fatalf("reported %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}

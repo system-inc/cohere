@@ -261,7 +261,10 @@ var noUnusedVarsUpstreamClean = []string{
 	"\n        class Foo { }\n        class Bar extends Foo {}\n        console.log(new Bar());\n        ",
 	"\n        export abstract class Foo {\n            public abstract bar(a: number): string;\n        }\n        ",
 	"var Foo = class Foo {}; new Foo();",
-	"\n        class Foo {\n            public method(a: number, b: number): number {\n                return a + b;\n            }\n        }\n        class Bar extends Foo {\n            public override method(a: number, b: number): number {\n                return a;\n            }\n        }\n        new Bar();\n        ",
+	// oxc's clean case of an override method leaving `b` unused is withheld here: oxc exempts an
+	// override's parameters and typescript-eslint does not, measured with lintText on the installed
+	// typescript-eslint, and ESLint is the gate (#c6jhg93). It is pinned in no_unused_vars_test.go as
+	// reporting instead.
 	"let a = 0; class A { c = a++ } new A()",
 	"let a = 0; class A { c = a } new A()",
 	"let a = 0; class A { c = a + 1 } new A()",
@@ -743,10 +746,11 @@ var noUnusedVarsUpstreamReports = []string{
 }
 
 // TestNoUnusedVarsStaysSilentOnUpstreamCleanCases asserts every clean case upstream ships stays
-// clean here. All 407 pass, which is the half of the corpus that catches a rule reporting too much.
+// clean here. All 406 pass, which is the half of the corpus that catches a rule reporting too much.
 //
 // oxc ships 409. Two of them are clean only under oxc's leading-underscore default, which this rule
 // no longer has, and they moved to noUnusedVarsReportedOnlyWithoutTheUnderscoreDefault below.
+// A third, an override method's unused parameter, is withheld above because typescript-eslint reports it.
 func TestNoUnusedVarsStaysSilentOnUpstreamCleanCases(t *testing.T) {
 	t.Parallel()
 
