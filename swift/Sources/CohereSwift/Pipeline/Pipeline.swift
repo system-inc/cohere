@@ -109,6 +109,9 @@ public struct Pipeline {
             try writer.write(UnreadableRecord(file: crash.file, error: crash.error))
         }
         let filesThatDoNotParse = Set(parsed.parseErrors.map(\.file)).count
+        /* What the fixer's last walk found in each file whose final text is the text it walked, by path, so lint need not walk it again. */
+        var reusableFindings: [String: [String: [FindingRecord]]] = [:]
+        var nothingRewritten = false
 
         if !options.runFix {
             try writer.write(PhaseRecord(name: .fix, outcome: .skipped, detail: "not requested"))
@@ -134,12 +137,16 @@ public struct Pipeline {
             var fixesApplied = 0
             var refusals: [String: Int] = [:]
             var toFormat = parsed.files
+            var fixerFindings: [String: [String: [FindingRecord]]] = [:]
             if options.mutate {
                 let fixer = FileFixer(configuration: configuration, rules: fileRules, maximumPasses: options.fixPasses)
                 toFormat = parsed.files.map { file in
                     let result = fixer.fix(file)
                     fixesApplied += result.applied
                     refusals.merge(result.refusalsByReason, uniquingKeysWith: +)
+                    if let found = result.findingsOfFinalText {
+                        fixerFindings[file.url.path] = found
+                    }
                     return result.file
                 }
             }
@@ -177,6 +184,10 @@ public struct Pipeline {
                     notFormatted["the formatter failed: \(reason)", default: 0] += 1
                     complete = false
                 }
+                /* The fixer walked exactly this text when the formatter left it as the fixer did, so its findings are lint's. */
+                if final == file.source, let found = fixerFindings[file.url.path] {
+                    reusableFindings[file.url.path] = found
+                }
                 /* One write per file, of the fixed and formatted text, and only when it differs from what was read. */
                 if options.mutate, final != originals[file.url.path] {
                     try final.write(to: file.url, atomically: true, encoding: .utf8)
@@ -189,6 +200,7 @@ public struct Pipeline {
                 let replacements = Dictionary(reparsed.files.map { ($0.url.path, $0) }, uniquingKeysWith: { first, _ in first })
                 parsed.files = parsed.files.map { replacements[$0.url.path] ?? $0 }
             }
+            nothingRewritten = rewritten.isEmpty
             try writer.write(fixRecord(
                 scope: scope,
                 considered: parsed.files.count,
@@ -242,14 +254,24 @@ public struct Pipeline {
             try writer.write(PhaseRecord(name: .lint, outcome: .skipped, detail: "not requested"))
         } else {
             let lintStart = Date()
-            let lint = Linter(configuration: configuration, fileRules: fileRules).run(package: package, manifests: await manifests(of: package), files: parsed.files)
+            let lint = Linter(configuration: configuration, fileRules: fileRules)
+                .run(package: package, manifests: await manifests(of: package), files: parsed.files, reusable: reusableFindings)
             for finding in lint.findings {
                 try writer.write(finding)
             }
+            /*
+             Reported as reused only when every file's findings came from the fix phase and nothing was rewritten,
+             because that is what the front door's line says. A run that reused some files and walked others
+             still saves the walk, and says it ran.
+             */
+            let reusedEverything = nothingRewritten && !parsed.files.isEmpty && parsed.files.allSatisfy { reusableFindings[$0.url.path] != nil }
             var record = lint.record
             record.elapsedMilliseconds = Self.milliseconds(since: lintStart)
+            record.reusedFrom = reusedEverything ? "fix" : ""
             try writer.write(record)
-            try writer.write(PhaseRecord(name: .lint, outcome: .ran, elapsedMilliseconds: record.elapsedMilliseconds))
+            try writer.write(reusedEverything
+                ? PhaseRecord(name: .lint, outcome: .reused, elapsedMilliseconds: record.elapsedMilliseconds, detail: "the fix phase's walk (nothing was rewritten)")
+                : PhaseRecord(name: .lint, outcome: .ran, elapsedMilliseconds: record.elapsedMilliseconds))
             if !record.crashes.isEmpty {
                 complete = false
             }

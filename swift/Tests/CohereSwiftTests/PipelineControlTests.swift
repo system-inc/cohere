@@ -54,7 +54,7 @@ struct PipelineControlTests {
     }
 
     /* A fresh package per run, because the engine's build cache is keyed by the package's path. */
-    static func run(source: String, manifest: String = manifest, otherFiles: [String: Data] = [:], arguments: [String] = [], sink: ((Data) -> Void)? = nil) async throws -> Run {
+    static func run(source: String, manifest: String = manifest, otherFiles: [String: Data] = [:], arguments: [String] = [], mutating: Bool = false, sink: ((Data) -> Void)? = nil) async throws -> Run {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-control-\(UUID().uuidString)", isDirectory: true)
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
@@ -72,7 +72,7 @@ struct PipelineControlTests {
             }
         }
 
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"] + arguments, workingDirectory: root)
+        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path] + (mutating ? [] : ["--no-fix"]) + arguments, workingDirectory: root)
         var lines = Data()
         let writer = ContractWriter { data in
             lines.append(data)
@@ -82,7 +82,9 @@ struct PipelineControlTests {
         let records = try lines.split(separator: UInt8(ascii: "\n")).map { line in
             try #require(try JSONSerialization.jsonObject(with: Data(line)) as? [String: Any])
         }
-        #expect(String(decoding: try Data(contentsOf: sources.appendingPathComponent("Control.swift")), as: UTF8.self) == source, "a --no-fix run wrote to the package")
+        if !mutating {
+            #expect(String(decoding: try Data(contentsOf: sources.appendingPathComponent("Control.swift")), as: UTF8.self) == source, "a --no-fix run wrote to the package")
+        }
         return Run(records: records)
     }
 
@@ -106,6 +108,21 @@ struct PipelineControlTests {
         let run = try await Self.run(source: source)
         #expect(run.findings == ["cohere-swift/no-force-unwrap:5"])
         #expect(run.phase("types") == "ran")
+    }
+
+    /*
+     When the fix phase rewrote nothing, lint reuses its last walk instead of walking again, and must find exactly
+     what a fresh walk finds. The --no-fix run has no fixer, so its lint walks; the two are compared.
+     */
+    @Test func lintReusesTheFixWalkAndFindsTheSame() async throws {
+        let source = Self.cleanSource.replacingOccurrences(of: "        value * 2", with: "        Int(\"2\")! * value")
+        let reused = try await Self.run(source: source, mutating: true)
+        let walked = try await Self.run(source: source)
+        #expect(reused.phase("lint") == "reused")
+        #expect(reused.of("lint").first?["reusedFrom"] as? String == "fix")
+        #expect(walked.phase("lint") == "ran")
+        #expect(reused.findings == walked.findings)
+        #expect(reused.findings == ["cohere-swift/no-force-unwrap:5"])
     }
 
     @Test func typesCatchesATypeErrorAndStopsLint() async throws {

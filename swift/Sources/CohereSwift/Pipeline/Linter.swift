@@ -16,7 +16,8 @@ struct Linter {
     let fileRules: [any FileRule]
 
     /* `manifests` holds each owned package's parsed `Package.swift`, keyed by the package root's path; vendored packages are absent and never checked. */
-    func run(package: PackageModel, manifests: [String: ParsedFile], files: [ParsedFile]) -> Result {
+    /* `reusable` holds, by path, what the fix phase's last walk found per rule in exactly the text being linted; those files are not walked again. */
+    func run(package: PackageModel, manifests: [String: ParsedFile], files: [ParsedFile], reusable: [String: [String: [FindingRecord]]] = [:]) -> Result {
         let ownedPackages = package.allPackages.filter { $0.root == package.root || !package.isVendored($0) }
         var findings: [FindingRecord] = []
         var listening: [String: Int] = [:]
@@ -48,7 +49,7 @@ struct Linter {
             rulesRun += 1
             for file in files where rule.applies(to: file) {
                 listening[rule.name, default: 0] += 1
-                let found = rule.findings(in: file).map { Self.applying(severity, to: $0) }
+                let found = (reusable[file.url.path]?[rule.name] ?? rule.findings(in: file)).map { Self.applying(severity, to: $0) }
                 reporting[rule.name, default: 0] += found.count
                 findings.append(contentsOf: found)
             }

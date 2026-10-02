@@ -9,6 +9,11 @@ import SwiftParser
  A file that still has fixes at the limit is not hidden: its remaining findings surface in lint like any
  other finding.
 
+ Every pass runs every enabled rule, so the last pass already holds what lint would find in the text
+ the fixer ends on. That is returned (`findingsOfFinalText`), and lint reuses it for a file the formatter
+ then leaves alone, rather than walking the same text twice. Only the last pass's findings qualify, and
+ only when no fix landed after them: a pass that applied fixes moves the text past what it found.
+
  Rules see only the tree, so a fixed text is parsed fresh before the next pass. A pass that would produce
  text the parser rejects is discarded, and the file keeps the last text that parsed. A fixer that breaks a
  file must never be the reason the file stops compiling.
@@ -19,6 +24,8 @@ struct FileFixer {
         var file: ParsedFile
         var applied: Int
         var refusalsByReason: [String: Int]
+        /* Each enabled rule that applies, with what it found in `file` as returned; nil when the text moved after the last walk. */
+        var findingsOfFinalText: [String: [FindingRecord]]?
     }
 
     let configuration: RuleConfiguration
@@ -29,11 +36,16 @@ struct FileFixer {
         var current = file
         var applied = 0
         var refusals: [String: Int] = [:]
+        var findingsOfFinalText: [String: [FindingRecord]]?
         for _ in 0..<maximumPasses {
-            let edits = rules
-                .filter { configuration.severity(of: $0.name) != .off && $0.applies(to: current) }
-                .flatMap { $0.findings(in: current) }
-                .flatMap(\.fixes)
+            var findingsByRule: [String: [FindingRecord]] = [:]
+            var edits: [FindingRecord.Edit] = []
+            for rule in rules where configuration.severity(of: rule.name) != .off && rule.applies(to: current) {
+                let found = rule.findings(in: current)
+                findingsByRule[rule.name] = found
+                edits.append(contentsOf: found.flatMap(\.fixes))
+            }
+            findingsOfFinalText = findingsByRule
             guard !edits.isEmpty else { break }
             let result = FixApplier.apply(edits, to: current.source)
             refusals["overlaps another fix", default: 0] += result.refusedOverlapping
@@ -55,7 +67,9 @@ struct FileFixer {
                 nodeCount: counter.count
             )
             applied += result.applied
+            /* The text moved past what this pass found; only a later pass over it can stand for lint. */
+            findingsOfFinalText = nil
         }
-        return Result(file: current, applied: applied, refusalsByReason: refusals.filter { $0.value > 0 })
+        return Result(file: current, applied: applied, refusalsByReason: refusals.filter { $0.value > 0 }, findingsOfFinalText: findingsOfFinalText)
     }
 }
