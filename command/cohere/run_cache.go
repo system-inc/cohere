@@ -168,7 +168,7 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 
 	tablePath := cacheTablePath(location.Root)
 	table, err := program.ReadCacheTable(tablePath, cacheTableIdentity())
-	if errors.Is(err, program.ErrCacheTableUnreadable) {
+	if errors.Is(err, program.ErrCacheTableUnreadable) || errors.Is(err, program.ErrCacheTablePartlyKept) {
 		// Said once, before the recording starts, so it reaches the terminal and never a replay. A table
 		// thrown away on every run would otherwise look like a cache that is merely cold.
 		fmt.Fprintf(os.Stderr, "note: %v; this run starts cold and writes a new one\n", err)
@@ -237,7 +237,9 @@ func dumpCacheTable(location projectLocation) error {
 			return nil
 		}
 		fmt.Printf("%v\n", err)
-		return nil
+		if !errors.Is(err, program.ErrCacheTablePartlyKept) {
+			return nil
+		}
 	}
 	program.DumpCacheTable(os.Stdout, path, table, cacheTableIdentity())
 	return nil

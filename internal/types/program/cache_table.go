@@ -43,6 +43,12 @@ import (
 // that wrote the file. Any of them differing, a decode error, or a byte left over after the body is a
 // discard of the whole file: the run starts cold, says so once on stderr, and writes a fresh table. A
 // discard costs one ordinary run. A repaired cache that is wrong costs a green run over a broken tree.
+//
+// One exception, and it is narrow. A table written by another cohere commit, with the same format, compiler,
+// toolchain and platform, keeps its format record and drops everything else. The format record is keyed by
+// the formatter's own identity (FormatSection.Key), which moves only when the formatter can print
+// differently, so a cohere commit that never touched the formatter need not reformat every file. The
+// encoding is still guaranteed by the format version, so nothing here reads a field from the wrong place.
 type CacheTable struct {
 	// Runs is one recorded run per invocation, keyed by CacheTableInvocation. A bare run and `--no-fix`
 	// print different reports under different keys, and kept apart they never overwrite each other.
@@ -95,6 +101,11 @@ const cacheTableMagic = "cohere cache table"
 // ErrCacheTableUnreadable means the file is not a table this build may use. Never a reason to fail a run:
 // the answer is to run cold and write a new one.
 var ErrCacheTableUnreadable = errors.New("cache table discarded")
+
+// ErrCacheTablePartlyKept means the table was written by another cohere commit: its format record is kept,
+// for its own key to decide, and its runs and findings are dropped. Reported like a discard, since most of
+// what the table held is gone.
+var ErrCacheTablePartlyKept = errors.New("cache table written by another cohere commit")
 
 type cacheTableHeader struct {
 	Magic    string
@@ -173,8 +184,14 @@ func DecodeCacheTable(buffer []byte, identity CacheTableIdentity) (*CacheTable, 
 	if header.Version != cacheTableVersion {
 		return nil, fmt.Errorf("%w: format version %d, this build reads %d", ErrCacheTableUnreadable, header.Version, cacheTableVersion)
 	}
+	onlySelfCommitDiffers := false
 	if header.Identity != identity {
-		return nil, fmt.Errorf("%w: written by %s, this is %s", ErrCacheTableUnreadable, header.Identity, identity)
+		otherCommit := header.Identity
+		otherCommit.SelfCommit = identity.SelfCommit
+		if otherCommit != identity {
+			return nil, fmt.Errorf("%w: written by %s, this is %s", ErrCacheTableUnreadable, header.Identity, identity)
+		}
+		onlySelfCommitDiffers = true
 	}
 
 	var body cacheTableBody
@@ -185,6 +202,13 @@ func DecodeCacheTable(buffer []byte, identity CacheTableIdentity) (*CacheTable, 
 	// file longer than its contents is a file something else wrote into.
 	if reader.Len() != 0 {
 		return nil, fmt.Errorf("%w: %d bytes after the body", ErrCacheTableUnreadable, reader.Len())
+	}
+
+	if onlySelfCommitDiffers {
+		table := NewCacheTable()
+		table.Formatted = body.Formatted
+		return table, fmt.Errorf("%w (%s, this is %s): its runs and findings are dropped, and its format record is kept for its own key to decide",
+			ErrCacheTablePartlyKept, orUnknown(header.Identity.SelfCommit), orUnknown(identity.SelfCommit))
 	}
 
 	table := &CacheTable{Runs: body.Runs, Formatted: body.Formatted}
@@ -281,10 +305,11 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 	return cache, nil
 }
 
-// ReadCacheTable loads a table. It always returns one: the table on disk when it is readable, and an
-// empty one otherwise. The error says why it was empty. A missing file wraps os.ErrNotExist, which is a
-// first run and nothing to report. Anything else wraps ErrCacheTableUnreadable, which a caller reports,
-// because a cache that is silently thrown away every run is a saving that quietly never appears.
+// ReadCacheTable loads a table. It always returns one: the table on disk when it is readable, what may be
+// kept of it when another cohere commit wrote it, and an empty one otherwise. The error says why it is not
+// whole. A missing file wraps os.ErrNotExist, which is a first run and nothing to report. Anything else
+// wraps ErrCacheTableUnreadable or ErrCacheTablePartlyKept, which a caller reports, because a cache that
+// is silently thrown away every run is a saving that quietly never appears.
 func ReadCacheTable(path string, identity CacheTableIdentity) (*CacheTable, error) {
 	contents, err := os.ReadFile(path)
 	if err != nil {
@@ -294,6 +319,9 @@ func ReadCacheTable(path string, identity CacheTableIdentity) (*CacheTable, erro
 		return NewCacheTable(), fmt.Errorf("%w: %v", ErrCacheTableUnreadable, err)
 	}
 	table, err := DecodeCacheTable(contents, identity)
+	if errors.Is(err, ErrCacheTablePartlyKept) {
+		return table, err
+	}
 	if err != nil {
 		return NewCacheTable(), err
 	}

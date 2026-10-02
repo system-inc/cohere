@@ -74,8 +74,6 @@ func TestCacheTableDiscardsWhatItCannotTrust(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encoding: %v", err)
 	}
-	otherBuild := testIdentity
-	otherBuild.SelfCommit = "another"
 	otherCompiler := testIdentity
 	otherCompiler.CompilerCommit = "another"
 	otherToolchain := testIdentity
@@ -94,7 +92,6 @@ func TestCacheTableDiscardsWhatItCannotTrust(t *testing.T) {
 		{"one byte short", valid[:len(valid)-1], testIdentity},
 		{"trailing bytes", append(append([]byte{}, valid...), 0, 0, 0, 0), testIdentity},
 		{"not a table at all", []byte("{\"version\":5}"), testIdentity},
-		{"written by another cohere commit", valid, otherBuild},
 		{"written against another compiler commit", valid, otherCompiler},
 		{"written by another Go toolchain", valid, otherToolchain},
 		{"written for another platform", valid, otherPlatform},
@@ -111,6 +108,33 @@ func TestCacheTableDiscardsWhatItCannotTrust(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A table from another cohere commit keeps only its format record, whose own key decides whether it still
+// holds, and drops the runs and findings, whose keys name the binary and could never match anyway. Read
+// through ReadCacheTable too, since that is what every caller uses and what must hand the record on.
+func TestCacheTableFromAnotherCohereCommitKeepsOnlyTheFormatRecord(t *testing.T) {
+	otherCommit := testIdentity
+	otherCommit.SelfCommit = "another"
+	path := filepath.Join(t.TempDir(), "table.gob")
+	if err := program.WriteCacheTable(path, sampleCacheTable(), otherCommit); err != nil {
+		t.Fatal(err)
+	}
+
+	table, err := program.ReadCacheTable(path, testIdentity)
+	if !errors.Is(err, program.ErrCacheTablePartlyKept) {
+		t.Fatalf("a table from another cohere commit should be partly kept, got %v", err)
+	}
+	if errors.Is(err, program.ErrCacheTableUnreadable) {
+		t.Error("a partly kept table was reported as wholly discarded")
+	}
+	if table.Formatted == nil || table.Formatted.Key != "format-key" || len(table.Formatted.Entries) != 1 {
+		t.Errorf("the format record did not survive: %+v", table.Formatted)
+	}
+	if len(table.Runs) != 0 || table.Findings != nil {
+		t.Errorf("runs or findings from another cohere commit were kept: %d runs, findings %v", len(table.Runs), table.Findings != nil)
+	}
+	table.Runs["bare"] = nil
 }
 
 // TestReadCacheTableAlwaysReturnsATable pins the caller's contract: a table to use, and an error that says
