@@ -72,7 +72,10 @@ type formatEngine interface {
 func formatTransform(engine formatEngine) edit.Transform {
 	return func(fileName string, text string) (string, error) {
 		if engine == nil {
-			return "", fmt.Errorf("%w: no formatter is configured", edit.ErrSkipped)
+			// Said as what happened. A nil engine is a run that did not ask to format, and every repository
+			// cohere gates has a format block, so "no formatter is configured" was false on every plain
+			// --no-fix run: `11 not formatted (11 no formatter is configured)` on ahra, which has one.
+			return "", fmt.Errorf("%w: not requested", edit.ErrSkipped)
 		}
 
 		if !engine.Handles(fileName) {
@@ -154,8 +157,8 @@ func extensionOf(fileName string) string {
 // configuredFormatter returns the formatter the pipeline runs, or nil when formatting was not asked
 // for.
 //
-// A nil engine skips with "no formatter is configured" and that reaches the coverage line, so a run
-// with no formatter reports as a run with no formatter rather than as a perfectly formatted tree.
+// A nil engine skips with "not requested" and that reaches the coverage line, so a run that did not
+// format reports as one that did not format rather than as a perfectly formatted tree.
 //
 // The formatter is cohere's native printers. They replaced the goja Prettier fork when they matched it
 // on every file of ahra, www-phi-health and api-phi-health, and when a whole-tree run of each engine

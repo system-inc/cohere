@@ -70,7 +70,7 @@ func TestAWholeTreeScopeDoesNotFilter(t *testing.T) {
 
 // A nil transform stays nil through scoping. Wrapping nothing would produce a transform that
 // reports skips for a formatter that does not exist, which is a different and less useful statement
-// than "no formatter is configured".
+// than "not requested".
 func TestScopingANilTransformStaysNil(t *testing.T) {
 	if scopedTransform(nil, wholeTreeScope()) != nil {
 		t.Fatalf("a nil transform became non-nil")

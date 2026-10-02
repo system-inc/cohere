@@ -260,18 +260,20 @@ func TestAnUnhandledFileIsNeverHandedToTheEngine(t *testing.T) {
 	}
 }
 
-// No configured formatter is a skip with a reason, never a crash and never a silent pass.
+// A run that did not ask to format is a skip with a reason, never a crash and never a silent pass.
 //
-// A nil engine reaching this code means the pipeline was assembled without a formatter, and that
-// must show up in the coverage line rather than as a tree that reports itself perfectly formatted.
-func TestNoConfiguredFormatterSkipsWithAReason(t *testing.T) {
+// A nil engine reaching this code means formatting was not requested, and that must show up in the
+// coverage line rather than as a tree that reports itself perfectly formatted. The reason says so,
+// not that no formatter is configured: a plain --no-fix run on ahra, which has a format block, printed
+// `11 not formatted (11 no formatter is configured)`.
+func TestAnUnrequestedFormatSkipsWithAReason(t *testing.T) {
 	_, err := formatTransform(nil)("a.ts", "const a = 1;\n")
 
 	if !errors.Is(err, edit.ErrSkipped) {
-		t.Fatalf("a missing formatter should skip, got %v", err)
+		t.Fatalf("a run that did not ask to format should skip, got %v", err)
 	}
-	if !strings.Contains(err.Error(), "no formatter is configured") {
-		t.Fatalf("the skip did not say why: %v", err)
+	if !strings.HasSuffix(err.Error(), ": not requested") {
+		t.Fatalf("the skip did not say formatting was not requested: %v", err)
 	}
 }
 
