@@ -86,6 +86,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/tools/tooldirectory"
 )
 
