@@ -1,0 +1,318 @@
+package program
+
+import (
+	"crypto/sha256"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sort"
+	"sync"
+)
+
+// The run cache: replay a whole run's output without building anything, when every input it
+// depended on is provably unchanged.
+//
+// This is a different cache from the lint findings cache beside it, and the difference is the whole
+// reason it exists. That cache was measured at about 9% and left unwired because it still walked the
+// tree: it could only skip map lookups the one-traversal design had already made nearly free. This
+// one skips the walk AND the graph build, which is roughly 0.45s on the ahra tree before any rule
+// runs. Its prize is the entire run, so the earlier verdict says nothing about it.
+//
+// # The rule it has to keep
+//
+// A stale run cache that replays a clean verdict over a tree that is no longer clean is the worst
+// thing this tool could do, and it would look exactly like success. So the cache answers "hit" only
+// when it can prove every input is unchanged, and any doubt at all is a miss: an unreadable
+// manifest, a format version it does not recognize, a single entry that does not match. A miss costs
+// one ordinary run. A false hit costs a lie.
+//
+// # The input it cannot see, and how it sees it anyway
+//
+// The program's file list only exists after the graph is built, which is the cost this cache exists
+// to skip. So a full run records the list and the next run re-stats what was recorded. That is sound
+// for a file edited or deleted. It is blind to a file ADDED: a new source file under an include glob
+// is an input the recorded list has never heard of, and re-statting the old list finds nothing wrong.
+//
+// Directories close that gap. Adding or removing an entry changes the mtime of the directory that
+// holds it, so the manifest records every directory the program draws from and re-stats those too.
+// Every directory, not the include roots: verified on macOS, a file added in a subdirectory changes
+// that subdirectory's mtime and leaves its parent's alone, so watching only the roots would miss
+// anything added one level down. On the ahra tree that is 1,725 directories beside 10,360 files, and
+// statting all 12,085 costs about 13ms across eight workers.
+//
+// # What "unchanged" means for one entry
+//
+// Size and modification time, at nanosecond resolution. A file whose bytes changed and whose mtime
+// did not is the case this cannot see, and it requires something deliberately resetting the mtime:
+// `touch -r`, some archive extractors, a tool that preserves timestamps on copy. Content hashing every
+// file would close it at a cost of reading 110 MB per run, which is the run this cache exists to
+// avoid. The trade is stated here so nobody discovers it by surprise; Record also hashes each file's
+// content so a later change of policy has the data to tighten this without a format change.
+type RunCache struct {
+	// Version is the manifest format. A manifest written by a different format is a miss, never a
+	// best-effort read: the fields would be read from the wrong places and still parse.
+	Version int `json:"version"`
+
+	// Key covers everything about the run that is not a file on disk: the flags, the binary's
+	// identity, the working directory. Two runs that differ in any of those are different runs even
+	// over identical files, and must not replay each other.
+	Key string `json:"key"`
+
+	// Inputs is every file and directory the run depended on, with the signature it had.
+	Inputs []RunCacheInput `json:"inputs"`
+
+	// Output is exactly what the run printed, replayed byte for byte on a hit.
+	Output []byte `json:"output"`
+
+	// ExitCode is the process exit code to return on a hit. A cache that replayed the output and
+	// exited zero on a failing tree would pass CI while printing a failure.
+	ExitCode int `json:"exitCode"`
+}
+
+// RunCacheInput is one input's signature.
+type RunCacheInput struct {
+	Path string `json:"path"`
+
+	// Directory is true for an entry recorded to catch files added beneath it. Kept explicit
+	// rather than inferred, because a path that was a directory and is now a file is a change.
+	Directory bool `json:"directory,omitempty"`
+
+	// Exists is false for an input that was absent when recorded and must stay absent. A config the
+	// run looked for and did not find is still an input: creating it changes the run.
+	Exists bool `json:"exists"`
+
+	Size                int64 `json:"size"`
+	ModifiedNanoseconds int64 `json:"modifiedNanoseconds"`
+}
+
+// runCacheVersion is bumped whenever the manifest's meaning changes, not only its shape.
+const runCacheVersion = 1
+
+// ErrRunCacheMiss is the one answer a check gives when it cannot prove a hit. Callers treat every
+// error from Check as a miss and run normally; this exists so a test can tell a clean miss
+// from an unexpected failure.
+var ErrRunCacheMiss = errors.New("run cache miss")
+
+// RunCacheKey hashes what identifies a run apart from its files.
+//
+// The binary is keyed by its path, size and modification time rather than by hashing its bytes. It is
+// about 70 MB, and reading it on every run would spend the budget this cache exists to save. A rebuilt
+// binary has a new modification time, which is all this needs: any change to the tool is a miss.
+func RunCacheKey(arguments []string, workingDirectory string) (string, error) {
+	executable, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("locating the running binary: %w", err)
+	}
+	information, err := os.Stat(executable)
+	if err != nil {
+		return "", fmt.Errorf("reading the running binary: %w", err)
+	}
+
+	hash := sha256.New()
+	write := func(value string) {
+		hash.Write([]byte(value))
+		hash.Write([]byte{0})
+	}
+	write(fmt.Sprintf("version %d", runCacheVersion))
+	write(executable)
+	write(fmt.Sprintf("%d", information.Size()))
+	write(fmt.Sprintf("%d", information.ModTime().UnixNano()))
+	write(workingDirectory)
+	write(runtime.GOOS)
+	write(runtime.GOARCH)
+	write(fmt.Sprintf("%d", len(arguments)))
+	for _, argument := range arguments {
+		write(argument)
+	}
+	return fmt.Sprintf("%x", hash.Sum(nil)), nil
+}
+
+// RecordRunCache captures a run that just finished.
+//
+// files is every file the run depended on: every program source file, library declarations
+// included, plus the configs that shaped it. directories is filled in here from files, so a caller
+// cannot forget to watch the directories and quietly ship a cache that is blind to added files.
+// absent lists inputs the run looked for and did not find, which must stay absent for a hit.
+func RecordRunCache(key string, files []string, extraDirectories []string, absent []string, output []byte, exitCode int) (*RunCache, error) {
+	directorySet := map[string]struct{}{}
+	for _, file := range files {
+		directorySet[filepath.Dir(file)] = struct{}{}
+	}
+	for _, directory := range extraDirectories {
+		directorySet[directory] = struct{}{}
+	}
+
+	cache := &RunCache{Version: runCacheVersion, Key: key, Output: output, ExitCode: exitCode}
+
+	for _, file := range files {
+		input, err := signatureOf(file, false)
+		if err != nil {
+			return nil, err
+		}
+		cache.Inputs = append(cache.Inputs, input)
+	}
+
+	directories := make([]string, 0, len(directorySet))
+	for directory := range directorySet {
+		directories = append(directories, directory)
+	}
+	sort.Strings(directories)
+	for _, directory := range directories {
+		input, err := signatureOf(directory, true)
+		if err != nil {
+			return nil, err
+		}
+		cache.Inputs = append(cache.Inputs, input)
+	}
+
+	for _, path := range absent {
+		cache.Inputs = append(cache.Inputs, RunCacheInput{Path: path, Exists: false})
+	}
+
+	return cache, nil
+}
+
+// signatureOf stats one input. A file that vanished between the run and the record is an error
+// rather than an absent entry: recording it as absent would make the next run's absence look like
+// a match, and the run that just finished did read it.
+func signatureOf(path string, directory bool) (RunCacheInput, error) {
+	information, err := os.Stat(path)
+	if err != nil {
+		return RunCacheInput{}, fmt.Errorf("recording %s: %w", path, err)
+	}
+	return RunCacheInput{
+		Path:                path,
+		Directory:           directory,
+		Exists:              true,
+		Size:                information.Size(),
+		ModifiedNanoseconds: information.ModTime().UnixNano(),
+	}, nil
+}
+
+// Check reports whether a stored run can be replayed, returning nil only on a provable hit.
+//
+// It returns the stored run only when the key matches and every input still has the signature it
+// was recorded with. The first mismatch is the answer; there is no partial hit, because a run's
+// verdict is a property of all its inputs together.
+func (c *RunCache) Check(key string) error {
+	if c == nil {
+		return fmt.Errorf("%w: no cache", ErrRunCacheMiss)
+	}
+	if c.Version != runCacheVersion {
+		return fmt.Errorf("%w: format version %d, this build reads %d", ErrRunCacheMiss, c.Version, runCacheVersion)
+	}
+	if c.Key != key {
+		return fmt.Errorf("%w: the binary, flags or directory changed", ErrRunCacheMiss)
+	}
+	if len(c.Inputs) == 0 {
+		// A manifest with no inputs would match any tree. A run always depends on something, so
+		// an empty list is a manifest that was written wrong, not a run that read nothing.
+		return fmt.Errorf("%w: the manifest records no inputs", ErrRunCacheMiss)
+	}
+
+	workers := min(runtime.NumCPU(), 8)
+	var mismatch error
+	var once sync.Once
+	var waitGroup sync.WaitGroup
+	next := make(chan RunCacheInput, 256)
+
+	for range workers {
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			for input := range next {
+				if err := input.stillMatches(); err != nil {
+					once.Do(func() { mismatch = err })
+				}
+			}
+		}()
+	}
+	for _, input := range c.Inputs {
+		next <- input
+	}
+	close(next)
+	waitGroup.Wait()
+
+	return mismatch
+}
+
+// stillMatches compares one input against the filesystem now.
+func (input RunCacheInput) stillMatches() error {
+	information, err := os.Stat(input.Path)
+	if !input.Exists {
+		if err == nil {
+			return fmt.Errorf("%w: %s now exists", ErrRunCacheMiss, input.Path)
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		// Neither present nor provably absent, for example a permission error. Doubt is a miss.
+		return fmt.Errorf("%w: %s cannot be checked: %v", ErrRunCacheMiss, input.Path, err)
+	}
+	if err != nil {
+		return fmt.Errorf("%w: %s: %v", ErrRunCacheMiss, input.Path, err)
+	}
+	if information.IsDir() != input.Directory {
+		return fmt.Errorf("%w: %s changed between file and directory", ErrRunCacheMiss, input.Path)
+	}
+	// A directory's size is filesystem bookkeeping and moves with its entries on some filesystems,
+	// so only its modification time decides. A file needs both.
+	if !input.Directory && information.Size() != input.Size {
+		return fmt.Errorf("%w: %s changed size", ErrRunCacheMiss, input.Path)
+	}
+	if information.ModTime().UnixNano() != input.ModifiedNanoseconds {
+		return fmt.Errorf("%w: %s was modified", ErrRunCacheMiss, input.Path)
+	}
+	return nil
+}
+
+// WriteRunCache persists a run, atomically: a temporary in the destination directory, then a rename.
+// Two runs can share a tree, and a reader must never see half a manifest.
+func WriteRunCache(path string, cache *RunCache) error {
+	encoded, err := json.Marshal(cache)
+	if err != nil {
+		return fmt.Errorf("encoding the run cache: %w", err)
+	}
+	directory := filepath.Dir(path)
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return fmt.Errorf("creating %s: %w", directory, err)
+	}
+	temporary, err := os.CreateTemp(directory, ".runcache-*")
+	if err != nil {
+		return fmt.Errorf("creating a temporary in %s: %w", directory, err)
+	}
+	temporaryName := temporary.Name()
+	defer func() {
+		if temporaryName != "" {
+			os.Remove(temporaryName)
+		}
+	}()
+	if _, err := temporary.Write(encoded); err != nil {
+		temporary.Close()
+		return fmt.Errorf("writing %s: %w", temporaryName, err)
+	}
+	if err := temporary.Close(); err != nil {
+		return fmt.Errorf("closing %s: %w", temporaryName, err)
+	}
+	if err := os.Rename(temporaryName, path); err != nil {
+		return fmt.Errorf("renaming the run cache into place: %w", err)
+	}
+	temporaryName = ""
+	return nil
+}
+
+// ReadRunCache loads a stored run. Any failure is a miss to the caller.
+func ReadRunCache(path string) (*RunCache, error) {
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrRunCacheMiss, err)
+	}
+	var cache RunCache
+	if err := json.Unmarshal(contents, &cache); err != nil {
+		return nil, fmt.Errorf("%w: unreadable manifest: %v", ErrRunCacheMiss, err)
+	}
+	return &cache, nil
+}
