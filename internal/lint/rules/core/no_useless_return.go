@@ -2,6 +2,7 @@ package core
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/control_flow_graph"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -94,7 +95,8 @@ type noUselessReturnEvent struct {
 // whether a statement merely follows; the second rules out asking whether it is contained in the
 // try. What answers both is comparing the statement's position against the try statement's end.
 var NoUselessReturn = rule.Rule{
-	Name: "no-useless-return",
+	Name:             "no-useless-return",
+	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
@@ -150,6 +152,9 @@ func noUselessReturnCheckRoot(ctx rule.Context, root *ast.Node) {
 				continue
 			}
 			if noUselessReturnSomethingRunsAfter(block, index, event.enclosingTry) {
+				continue
+			}
+			if noUselessReturnTheCompilerRequiresIt(ctx, root, candidate) {
 				continue
 			}
 
@@ -321,6 +326,96 @@ func noUselessReturnEnclosingTryBlock(node *ast.Node, root *ast.Node) *ast.Node 
 		}
 	}
 	return nil
+}
+
+// noUselessReturnTheCompilerRequiresIt reports whether deleting this return stops the file compiling.
+//
+// A `return;` that ends a function where it was ending anyway changes nothing at run time, but it can
+// still be the only thing satisfying the compiler. TypeScript requires an explicit return statement
+// from a function whose declared return type is neither `void`-including, `any`, nor exactly
+// `undefined` (TS2355, `checkAllCodePathsInNonVoidFunctionReturnOrThrow` in the vendored checker),
+// and from every `get` accessor whatever its type (TS2378). Upstream is not type-aware and reports
+// it anyway; its fixer then breaks the build.
+//
+// Found on api-phi-health's `GoogleAdsEnhancedConversionsService.ts`, a method declared
+// `DictionaryType<unknown> | undefined` whose body was `return;`. Every row below was compiled after
+// deleting the return rather than predicted:
+//
+//	DictionaryType<unknown> | undefined   TS2355     unknown                TS2355
+//	Promise<string | undefined>, async    TS2355     get g(): string | ...  TS2378
+//	undefined, void, Promise<void>, any   compiles   unannotated            compiles
+//	Nothing | string, Nothing = void      compiles   another return remains compiles
+//
+// The alias row is why this asks the checker rather than reading the annotation: `void` can sit
+// behind a name. The last row is why it matters that the candidate is the only return: TS2355 is
+// the compiler's "no explicit return at all" check, so one other return of any kind satisfies it.
+//
+// A generator with an annotated return type declines without a type question. The checker unwraps
+// its return type through the generator's own type arguments, which is not ported, and staying
+// silent costs a missed report where guessing costs a broken build.
+func noUselessReturnTheCompilerRequiresIt(ctx rule.Context, root *ast.Node, candidate *ast.Node) bool {
+	if !ast.IsFunctionLikeDeclaration(root) || !noUselessReturnIsTheOnlyReturn(root, candidate) {
+		return false
+	}
+	if root.Kind == ast.KindGetAccessor {
+		return true
+	}
+	if root.Type() == nil {
+		return false
+	}
+	flags := ast.GetFunctionFlags(root)
+	if flags&ast.FunctionFlagsGenerator != 0 {
+		return true
+	}
+	declared := ctx.TypeChecker.GetTypeFromTypeNode(root.Type())
+	if flags&ast.FunctionFlagsAsync != 0 {
+		declared = ctx.TypeChecker.GetPromisedTypeOfPromise(declared)
+	}
+	if declared == nil {
+		return true
+	}
+	return !noUselessReturnMaybeTypeOfKind(declared, checker.TypeFlagsVoid) &&
+		declared.Flags()&(checker.TypeFlagsAny|checker.TypeFlagsUndefined) == 0
+}
+
+// noUselessReturnIsTheOnlyReturn reports whether the candidate is the only return statement in its
+// function, which is the binder's `HasExplicitReturn` with the candidate removed. A nested function
+// owns its own returns.
+func noUselessReturnIsTheOnlyReturn(root *ast.Node, candidate *ast.Node) bool {
+	only := true
+	var visit func(*ast.Node) bool
+	visit = func(current *ast.Node) bool {
+		if current == nil || !only {
+			return true
+		}
+		if current != root && (ast.IsFunctionLike(current) || current.Kind == ast.KindClassStaticBlockDeclaration) {
+			return false
+		}
+		if current.Kind == ast.KindReturnStatement && current != candidate {
+			only = false
+			return true
+		}
+		current.ForEachChild(visit)
+		return false
+	}
+	root.ForEachChild(visit)
+	return only
+}
+
+// noUselessReturnMaybeTypeOfKind is the checker's `maybeTypeOfKind`: the type has the flag, or a
+// union or intersection member does.
+func noUselessReturnMaybeTypeOfKind(t *checker.Type, kind checker.TypeFlags) bool {
+	if t.Flags()&kind != 0 {
+		return true
+	}
+	if t.Flags()&checker.TypeFlagsUnionOrIntersection != 0 {
+		for _, member := range t.Types() {
+			if noUselessReturnMaybeTypeOfKind(member, kind) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // noUselessReturnFix proposes deleting the return statement, or declines.

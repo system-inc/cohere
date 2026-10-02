@@ -285,9 +285,66 @@ func TestNoUselessReturnTypeScriptShapes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := rule_testing.Run(t, NoUselessReturn, "file.ts", testCase.source)
+			// Typed because an annotated function is exactly where the rule asks the checker
+			// whether the compiler needs the return. See TestNoUselessReturnKeepsAReturnTheCompilerRequires.
+			// The typed harness writes the fixture with a trailing newline, which the repair keeps.
+			result := rule_testing.RunTyped(t, NoUselessReturn, "file.ts", testCase.source)
 			rule_testing.ExpectFindings(t, result, "unnecessaryReturn")
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed+"\n")
+		})
+	}
+}
+
+// TestNoUselessReturnKeepsAReturnTheCompilerRequires pins the shapes where deleting the return stops
+// the file compiling. The real site is api-phi-health's `GoogleAdsEnhancedConversionsService.ts`, a
+// method declared `DictionaryType<unknown> | undefined` whose whole body was `return;`.
+//
+// Every expectation here was compiled with the return deleted rather than predicted: each silent row
+// fails with TS2355 or TS2378, and each reporting row compiles.
+func TestNoUselessReturnKeepsAReturnTheCompilerRequires(t *testing.T) {
+	t.Parallel()
+
+	const prelude = "type DictionaryType<T> = Record<string, T>;\ntype Nothing = void;\n" +
+		"declare const condition: boolean;\ndeclare function bar(): void;\n"
+
+	silent := []struct {
+		name   string
+		source string
+	}{
+		{"GoogleAdsEnhancedConversionsService.ts: an alias joined with undefined",
+			"export class S {\n    generateRecurringPurchaseEvent(): DictionaryType<unknown> | undefined {\n" +
+				"        return;\n    }\n}\n"},
+		{"a union with undefined after other work", "export function f(): string | undefined { bar(); return; }\n"},
+		{"unknown", "export function f(): unknown { bar(); return; }\n"},
+		{"an async function's promised type", "export async function f(): Promise<string | undefined> { bar(); return; }\n"},
+		{"a getter, whatever its type", "export class S { get g() { bar(); return; } }\n"},
+		{"a nested function's return does not satisfy the outer one",
+			"export function f(): string | undefined { const g = () => { return 'x'; }; g(); return; }\n"},
+	}
+	for _, testCase := range silent {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUselessReturn, "file.ts", prelude+testCase.source))
+		})
+	}
+
+	reporting := []struct {
+		name   string
+		source string
+	}{
+		{"exactly undefined", "export function f(): undefined { bar(); return; }\n"},
+		{"void behind an alias", "export function f(): Nothing | string { bar(); return; }\n"},
+		{"Promise of void", "export async function f(): Promise<void> { bar(); return; }\n"},
+		{"any", "export function f(): any { bar(); return; }\n"},
+		{"unannotated", "export function f() { bar(); return; }\n"},
+		{"another return still satisfies the compiler",
+			"export function f(): string | undefined { if (condition) { return 'x'; } bar(); return; }\n"},
+	}
+	for _, testCase := range reporting {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUselessReturn, "file.ts", prelude+testCase.source),
+				"unnecessaryReturn")
 		})
 	}
 }
