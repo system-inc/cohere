@@ -34,6 +34,20 @@ public struct FileSymbols: Sendable {
         }
 
         /*
+         The module a declaration of a module's own type lives in, read from the symbol's leading length-prefixed
+         name: `s:7Control6StatusO7runningyA2CmF` is `Control`'s. Nil for anything that does not start that way:
+         the standard library's, an extension's member on another module's type, an Objective-C name.
+         */
+        public var declaringModule: String? {
+            guard symbol.hasPrefix("s:") else { return nil }
+            let rest = symbol.utf8.dropFirst(2)
+            let digits = rest.prefix { $0 >= UInt8(ascii: "0") && $0 <= UInt8(ascii: "9") }
+            guard let length = Int(String(decoding: digits, as: UTF8.self)), length > 0 else { return nil }
+            let name = rest.dropFirst(digits.count).prefix(length)
+            return name.count == length ? String(decoding: name, as: UTF8.self) : nil
+        }
+
+        /*
          Declared by the Swift standard library. Its symbols name their type first, as a standard substitution
          (`s:Sa`, `s:ST`) or `s` and a length-prefixed name and a kind letter (`s:s14_ArrayProtocolP`). The prefix
          alone is not enough: a member an extension adds names the extending module next, `s:ST7ControlE6sorted`
@@ -81,10 +95,22 @@ public struct FileSymbols: Sendable {
 
     private let byPosition: [Position: [Occurrence]]
     public let count: Int
+    /*
+     The modules the checked package owns, as the compiler names them (a target's name with anything that is not
+     an identifier character made `_`). Vendored packages' modules are not in it. Lets a rule tell a declaration
+     of ours from a dependency's.
+     */
+    public var ownedModules: Set<String> = []
 
-    public init(_ occurrences: [Occurrence]) {
+    public init(_ occurrences: [Occurrence], ownedModules: Set<String> = []) {
         byPosition = Dictionary(grouping: occurrences) { Position(line: $0.line, column: $0.column) }
         count = occurrences.count
+        self.ownedModules = ownedModules
+    }
+
+    /* Whether the declaration was written in a module this package owns. */
+    public func isOwned(_ occurrence: Occurrence) -> Bool {
+        occurrence.declaringModule.map(ownedModules.contains) ?? false
     }
 
     /* Every occurrence that starts at this place: usually one, more where one name both declares and refers. */

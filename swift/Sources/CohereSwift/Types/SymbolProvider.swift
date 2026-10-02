@@ -22,6 +22,8 @@ struct SymbolProvider {
 
     let scratchPaths: [URL]
     let runner: ProcessRunner
+    /* Handed to every file's symbols, so a rule can tell our declarations from a dependency's. */
+    var ownedModules: Set<String> = []
 
     func symbols(for files: [ParsedFile]) -> Result {
         var result = Result(symbols: [:], unavailable: [:], fromIndex: 0, fromSourcekitd: 0)
@@ -32,7 +34,8 @@ struct SymbolProvider {
         }
         var needSourcekitd: [ParsedFile] = []
         for file in files {
-            if let found = stores.lazy.compactMap({ $0.symbols(of: file.url) }).first {
+            if var found = stores.lazy.compactMap({ $0.symbols(of: file.url) }).first {
+                found.ownedModules = ownedModules
                 result.symbols[file.url.path] = found
                 result.fromIndex += 1
             } else {
@@ -57,7 +60,9 @@ struct SymbolProvider {
                 continue
             }
             do {
-                result.symbols[file.url.path] = try session.symbols(file: file.url.resolvingSymlinksInPath().path, arguments: command.arguments)
+                var found = try session.symbols(file: file.url.resolvingSymlinksInPath().path, arguments: command.arguments)
+                found.ownedModules = ownedModules
+                result.symbols[file.url.path] = found
                 result.fromSourcekitd += 1
             } catch {
                 result.unavailable[file.url.path] = "the build's index does not describe it as it stands, and sourcekitd could not index it: \(error)"

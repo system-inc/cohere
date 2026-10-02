@@ -289,7 +289,9 @@ public struct Pipeline {
             let typedCandidates = parsed.files.filter { file in
                 RuleRegistry.typedRules.contains { configuration.severity(of: $0.name) != .off && $0.applies(to: file) }
             }
-            linter.symbols = SymbolProvider(scratchPaths: Self.symbolScratchPaths(package: package, root: root), runner: runner).symbols(for: typedCandidates)
+            var symbolProvider = SymbolProvider(scratchPaths: Self.symbolScratchPaths(package: package, root: root), runner: runner)
+            symbolProvider.ownedModules = Self.ownedModules(of: package)
+            linter.symbols = symbolProvider.symbols(for: typedCandidates)
             let lint = await linter.run(package: package, manifests: await manifests(of: package), files: parsed.files, reusable: reusableFindings)
             for finding in lint.findings {
                 try writer.write(finding)
@@ -380,6 +382,14 @@ public struct Pipeline {
         guard result.succeeded else { return root }
         let path = String(decoding: result.standardOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         return URL(fileURLWithPath: path, isDirectory: true)
+    }
+
+    /* The modules of every target this package owns, vendored packages left out, spelled as the compiler spells a module: non-identifier characters made `_`. */
+    static func ownedModules(of package: PackageModel) -> Set<String> {
+        let owned = package.allPackages.filter { $0.root == package.root || !package.isVendored($0) }
+        return Set(owned.flatMap(\.targets).map { target in
+            String(target.name.map { $0.isLetter || $0.isNumber || $0 == "_" ? $0 : "_" })
+        })
     }
 
     /* Every scratch a build of this package writes an index store into: the root's, and each local package's that the types phase builds for its tests. */

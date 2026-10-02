@@ -39,4 +39,13 @@ struct FileSymbolsTests {
         /* Found by the is-disjoint rule on presence: CoreGraphics' `CGRect.intersection`, a type imported from C. */
         #expect(!Self.isStandardLibrary("s:So6CGRectV12CoreGraphicsE12intersectionyA2BF"))
     }
+
+    @Test func aDeclarationOfOursKnowsItsModule() {
+        let element = FileSymbols.Occurrence(line: 1, column: 1, symbol: "s:7Control6StatusO7runningyA2CmF", name: "running", isReference: true)
+        #expect(element.declaringModule == "Control")
+        #expect(FileSymbols([element], ownedModules: ["Control"]).isOwned(element))
+        #expect(!FileSymbols([element], ownedModules: ["Other"]).isOwned(element))
+        let standard = FileSymbols.Occurrence(line: 1, column: 1, symbol: "s:Sa5countSivp", name: "count", isReference: true)
+        #expect(standard.declaringModule == nil)
+    }
 }
