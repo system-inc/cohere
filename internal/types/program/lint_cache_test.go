@@ -12,6 +12,14 @@ import (
 func sampleLintCache() *program.LintCache {
 	return &program.LintCache{
 		Key: program.HashRuleSet([]string{"no-debugger", "no-empty"}),
+		DesignSystem: &program.DesignSystemKey{
+			Reads: []program.DesignSystemKeyRead{
+				{Path: "/project/theme.css", Present: true, Hash: program.HashContent("@theme {}")},
+				{Path: "/project/styles", Present: true, Directory: true, Hash: program.HashContent("ftheme.css")},
+				{Path: "/project/node_modules/tailwindcss/index.css"},
+			},
+			Fingerprint: program.HashContent("a design system fingerprint"),
+		},
 		Entries: []program.LintCacheEntry{
 			{
 				Path:        "/project/source/dirty.ts",
@@ -24,8 +32,11 @@ func sampleLintCache() *program.LintCache {
 				// Not zero and not the type fingerprint, so an encoder that dropped it or swapped the two
 				// could not match.
 				ShapeFingerprint: program.HashContent("the shapes debugger; can see"),
-				Listening:        []string{"no-debugger", "no-empty", "await-thenable", "no-floating-promises"},
-				VisitedNodes:     5,
+				DesignRules:      []string{"better-tailwindcss/no-unknown-classes"},
+				// Not zero and not either other fingerprint, for the same reason.
+				DesignFingerprint: program.HashContent("the design system debugger; was checked under"),
+				Listening:         []string{"no-debugger", "no-empty", "await-thenable", "no-floating-promises"},
+				VisitedNodes:      5,
 				Findings: []program.LintCacheFinding{
 					{
 						RuleName: "no-debugger", Start: 0, End: 9,
@@ -98,6 +109,9 @@ func TestLintCacheRoundTripsEveryField(t *testing.T) {
 	if decoded.Key != original.Key {
 		t.Errorf("key did not survive: %x against %x", decoded.Key, original.Key)
 	}
+	if !reflect.DeepEqual(decoded.DesignSystem, original.DesignSystem) || original.DesignSystem == nil {
+		t.Errorf("the design system key did not survive: %+v against %+v", decoded.DesignSystem, original.DesignSystem)
+	}
 	if len(decoded.Entries) != len(original.Entries) {
 		t.Fatalf("entries: %d back from %d", len(decoded.Entries), len(original.Entries))
 	}
@@ -124,6 +138,12 @@ func TestLintCacheRoundTripsEveryField(t *testing.T) {
 		}
 		if got.ShapeFingerprint != want.ShapeFingerprint {
 			t.Errorf("entry %d ShapeFingerprint: %x against %x", index, got.ShapeFingerprint, want.ShapeFingerprint)
+		}
+		if strings.Join(got.DesignRules, ",") != strings.Join(want.DesignRules, ",") {
+			t.Errorf("entry %d DesignRules: %v against %v", index, got.DesignRules, want.DesignRules)
+		}
+		if got.DesignFingerprint != want.DesignFingerprint {
+			t.Errorf("entry %d DesignFingerprint: %x against %x", index, got.DesignFingerprint, want.DesignFingerprint)
 		}
 		if strings.Join(got.Listening, ",") != strings.Join(want.Listening, ",") {
 			t.Errorf("entry %d Listening: %v against %v", index, got.Listening, want.Listening)
@@ -307,7 +327,7 @@ func TestLintCacheFindingHasNoUncheckedFields(t *testing.T) {
 func TestLintCacheEntryHasNoUncheckedFields(t *testing.T) {
 	compared := map[string]struct{}{
 		"Path": {}, "ContentHash": {}, "Rules": {}, "TypedRules": {}, "TypeFingerprint": {}, "Listening": {},
-		"VisitedNodes": {}, "Findings": {}, "ShapedRules": {}, "ShapeFingerprint": {},
+		"VisitedNodes": {}, "Findings": {}, "ShapedRules": {}, "ShapeFingerprint": {}, "DesignRules": {}, "DesignFingerprint": {},
 	}
 	entryType := reflect.TypeOf(program.LintCacheEntry{})
 	for index := range entryType.NumField() {

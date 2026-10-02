@@ -424,9 +424,10 @@ func TestAnEditToAGlobalDeclarationReachesEveryTypeAwareFinding(t *testing.T) {
 // keeps a rule out of the cache even when it also reads the checker. Reading this file's module
 // resolution makes a rule type-aware without a checker, since the type fingerprint is what covers it.
 // Compiler options and the default library leave a rule where its checker puts it, since the key
-// covers both.
-func TestCacheClassesSplitsThreeWays(t *testing.T) {
-	pure, typeAware, never := program.CacheClasses([]rule.Rule{
+// covers both. Reading the design system makes a rule a design-system rule (#35nqkwc), unless it also
+// reads the types, which no key here covers together.
+func TestCacheClassesSplitsFourWays(t *testing.T) {
+	pure, typeAware, design, never := program.CacheClasses([]rule.Rule{
 		{Name: "pure"},
 		{Name: "options", ProgramReads: rule.ReadsCompilerOptions},
 		{Name: "typed", NeedsTypeChecker: true},
@@ -435,6 +436,8 @@ func TestCacheClassesSplitsThreeWays(t *testing.T) {
 		{Name: "program", ProgramReads: rule.ReadsOtherFiles},
 		{Name: "design-system", ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem},
 		{Name: "both", ProgramReads: rule.ReadsOtherFiles | rule.ReadsModuleResolution, NeedsTypeChecker: true},
+		{Name: "design-and-types", ProgramReads: rule.ReadsDesignSystem, NeedsTypeChecker: true},
+		{Name: "design-and-program", ProgramReads: rule.ReadsDesignSystem | rule.ReadsOtherFiles},
 	})
 	names := func(rules []rule.Rule) string {
 		joined := ""
@@ -443,7 +446,8 @@ func TestCacheClassesSplitsThreeWays(t *testing.T) {
 		}
 		return joined
 	}
-	if names(pure) != "pure options " || names(typeAware) != "typed typed-library resolution " || names(never) != "program design-system both " {
-		t.Errorf("pure [%s] typed [%s] never [%s]", names(pure), names(typeAware), names(never))
+	if names(pure) != "pure options " || names(typeAware) != "typed typed-library resolution " || names(design) != "design-system " ||
+		names(never) != "program both design-and-types design-and-program " {
+		t.Errorf("pure [%s] typed [%s] design [%s] never [%s]", names(pure), names(typeAware), names(design), names(never))
 	}
 }

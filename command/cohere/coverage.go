@@ -590,7 +590,8 @@ func writeCoverageNotes(out io.Writer, summary coverageSummary, details bool) {
 // replayedFromCache says how much of a verdict was remembered rather than walked, so a reader can always
 // tell the two apart, and how many replayed files ran type-aware rules again because something they import
 // changed: content-keyed rules on every importer of a changed file, shape-keyed ones only where a shape
-// changed. Empty when nothing was replayed.
+// changed. The design-system rules are counted apart, since what re-runs them is a stylesheet rather than an
+// import. Empty when nothing was replayed.
 func replayedFromCache(result program.Result) string {
 	if result.FilesReplayed == 0 {
 		return ""
@@ -598,6 +599,9 @@ func replayedFromCache(result program.Result) string {
 	replayed := fmt.Sprintf("; %d of %d files replayed from cache", result.FilesReplayed, result.Coverage.FilesWalked)
 	if result.TypeAwareRerun > 0 || result.ShapeKeyedRerun > 0 {
 		replayed += fmt.Sprintf(" (type-aware rules ran again on %d of them, shape-keyed on %d)", result.TypeAwareRerun, result.ShapeKeyedRerun)
+	}
+	if result.DesignSystemRerun > 0 {
+		replayed += fmt.Sprintf(" (design-system rules ran again on %d of them)", result.DesignSystemRerun)
 	}
 	return replayed
 }

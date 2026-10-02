@@ -67,6 +67,10 @@ type LintCache struct {
 	// Entries is one record per cached file.
 	Entries []LintCacheEntry
 
+	// DesignSystem is the design system the design-system rules' findings were produced under, nil when none
+	// was recorded. See DesignSystemKey.
+	DesignSystem *DesignSystemKey
+
 	// index maps path to position in Entries, built lazily on the first Lookup. Not serialized:
 	// it is derived from Entries and rebuilding it costs less than storing it.
 	index map[string]int
@@ -101,6 +105,14 @@ type LintCacheEntry struct {
 
 	// ShapeFingerprint is the file's shape fingerprint when ShapedRules' findings were produced.
 	ShapeFingerprint [sha256.Size]byte
+
+	// DesignRules is the rules applied to this file that read the design system (rule.ReadsDesignSystem). Their
+	// findings replay while the design system is the one DesignFingerprint names. See DesignSystemKey.
+	DesignRules []string
+
+	// DesignFingerprint is the design system's fingerprint when DesignRules' findings were produced, zero when
+	// they cannot be replayed under any.
+	DesignFingerprint [sha256.Size]byte
 
 	// Listening is the subset of Rules and TypedRules that registered a listener on this file. A replay
 	// counts them as listening, which is what keeps the coverage line identical to a walked run's.
@@ -200,6 +212,9 @@ func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 
 // lintCacheVersion is bumped whenever the format's meaning changes.
 //
+// 7: entries carry design-system rules and the design system they were produced under, and the cache carries
+// that design system's read set.
+//
 // 6: entries carry shape-keyed type-aware rules and the shape fingerprint they were produced under.
 //
 // 5: entries carry type-aware rules and the type fingerprint they were produced under.
@@ -213,7 +228,7 @@ func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 // The encoding itself is no longer this version's business. The cache is the findings section of the
 // cache table (cache_table.go), encoded with gob behind the table's header, so a change to the encoded
 // shape moves cacheTableVersion. This one moves when what an entry means changes.
-const lintCacheVersion = 6
+const lintCacheVersion = 7
 
 // Lookup returns a file's cached entry, and whether the cache had a usable answer.
 //
@@ -297,9 +312,9 @@ func (c *LintCache) Store(entry LintCacheEntry) {
 	c.index = nil
 }
 
-// CacheClasses splits a rule set three ways, in order: rules whose findings depend only on the file's
-// bytes, type-aware rules whose findings also depend on the types the file can see, and rules that may
-// never be cached.
+// CacheClasses splits a rule set four ways, in order: rules whose findings depend only on the file's
+// bytes, type-aware rules whose findings also depend on the types the file can see, design-system rules
+// whose findings also depend on the stylesheets the design system read, and rules that may never be cached.
 //
 // ReadsOtherFiles is the one disqualification left. A rule reading the program's file list, a file by
 // name, another file's imports, or the file system reaches something a per-file key cannot name, so
@@ -314,28 +329,34 @@ func (c *LintCache) Store(entry LintCacheEntry) {
 // the fingerprint and re-runs the rule. Measured on ahra before the change: 164 of the 172 rules this
 // excluded were excluded for the type checker alone.
 //
+// ReadsDesignSystem is keyed on the design system's read set, everything its load asked the file system about,
+// observed rather than listed (#pyhm2t2, #35nqkwc). A rule reading the design system and also the types is
+// excluded rather than given a fifth class: none does, and a key over both would need both to hold.
+//
 // The asymmetry still holds. Including a rule wrongly serves stale findings silently and forever;
 // excluding one wrongly costs a cache miss. A rule that reads other files and the checker both is
 // excluded, since other files are the larger reach.
-func CacheClasses(rules []rule.Rule) (pure []rule.Rule, typeAware []rule.Rule, uncacheable []rule.Rule) {
+func CacheClasses(rules []rule.Rule) (pure []rule.Rule, typeAware []rule.Rule, design []rule.Rule, uncacheable []rule.Rule) {
 	for _, subject := range rules {
+		readsTypes := subject.NeedsTypeChecker || subject.ProgramReads&rule.ReadsModuleResolution != 0
+		readsDesignSystem := subject.ProgramReads&rule.ReadsDesignSystem != 0
 		switch {
-		// ReadsDesignSystem is uncacheable until the table keys it on the design system's read set
-		// (#pyhm2t2); the declaration and its recorded reads land first so nothing changes meanwhile.
-		case subject.ProgramReads&(rule.ReadsOtherFiles|rule.ReadsDesignSystem) != 0:
+		case subject.ProgramReads&rule.ReadsOtherFiles != 0, readsDesignSystem && readsTypes:
 			uncacheable = append(uncacheable, subject)
-		case subject.NeedsTypeChecker || subject.ProgramReads&rule.ReadsModuleResolution != 0:
+		case readsDesignSystem:
+			design = append(design, subject)
+		case readsTypes:
 			typeAware = append(typeAware, subject)
 		default:
 			pure = append(pure, subject)
 		}
 	}
-	return pure, typeAware, uncacheable
+	return pure, typeAware, design, uncacheable
 }
 
 // CacheableRules splits a rule set into the rules whose findings depend on nothing but the file's
 // bytes, and everything else. See CacheClasses for the three-way split the walk uses.
 func CacheableRules(rules []rule.Rule) (cacheable []rule.Rule, uncacheable []rule.Rule) {
-	pure, typeAware, never := CacheClasses(rules)
-	return pure, append(typeAware, never...)
+	pure, typeAware, design, never := CacheClasses(rules)
+	return pure, append(append(typeAware, design...), never...)
 }

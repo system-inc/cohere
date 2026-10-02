@@ -98,8 +98,11 @@ type CacheTableIdentity struct {
 // half is enforced by TestCacheTableShapeIsPinnedToItsVersion; the meaning half is the reason each
 // section also keeps its own version.
 //
+// 3: findings entries carry design-system rules and their fingerprint, and the findings section carries the
+// design system's key.
+//
 // 2: findings entries carry shape-keyed rules and their fingerprint, and the table holds Signatures.
-const cacheTableVersion = 2
+const cacheTableVersion = 3
 
 // cacheTableMagic opens every table, so a file that is not one is refused on its first field.
 const cacheTableMagic = "cohere cache table"
@@ -135,6 +138,8 @@ type lintCacheWire struct {
 	Key     [sha256.Size]byte
 	Lists   [][]string
 	Entries []lintCacheWireEntry
+
+	DesignSystem *DesignSystemKey
 }
 
 type lintCacheWireEntry struct {
@@ -149,6 +154,9 @@ type lintCacheWireEntry struct {
 
 	ShapedRules      int
 	ShapeFingerprint [sha256.Size]byte
+
+	DesignRules       int
+	DesignFingerprint [sha256.Size]byte
 }
 
 // NewCacheTable is an empty table, what a first run and every discard start from.
@@ -250,7 +258,7 @@ func orUnknown(value string) string {
 // wire interns the findings cache's rule lists. It is stamped with this build's lintCacheVersion: a cache in
 // memory always means what this build means.
 func (c *LintCache) wire() *lintCacheWire {
-	wire := &lintCacheWire{Version: lintCacheVersion, Key: c.Key}
+	wire := &lintCacheWire{Version: lintCacheVersion, Key: c.Key, DesignSystem: c.DesignSystem}
 	positions := map[string]int{}
 	intern := func(list []string) int {
 		joined := strings.Join(list, "\x00")
@@ -274,6 +282,9 @@ func (c *LintCache) wire() *lintCacheWire {
 
 			ShapedRules:      intern(entry.ShapedRules),
 			ShapeFingerprint: entry.ShapeFingerprint,
+
+			DesignRules:       intern(entry.DesignRules),
+			DesignFingerprint: entry.DesignFingerprint,
 		})
 	}
 	return wire
@@ -288,7 +299,7 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 	if wire.Version != lintCacheVersion {
 		return nil, nil
 	}
-	cache := &LintCache{Version: wire.Version, Key: wire.Key, Entries: make([]LintCacheEntry, 0, len(wire.Entries))}
+	cache := &LintCache{Version: wire.Version, Key: wire.Key, Entries: make([]LintCacheEntry, 0, len(wire.Entries)), DesignSystem: wire.DesignSystem}
 	list := func(index int) ([]string, error) {
 		if index < 0 || index >= len(wire.Lists) {
 			return nil, fmt.Errorf("list %d of %d", index, len(wire.Lists))
@@ -304,6 +315,8 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 			Findings:        stored.Findings,
 
 			ShapeFingerprint: stored.ShapeFingerprint,
+
+			DesignFingerprint: stored.DesignFingerprint,
 		}
 		var err error
 		if entry.Rules, err = list(stored.Rules); err != nil {
@@ -317,6 +330,9 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 		}
 		if entry.ShapedRules, err = list(stored.ShapedRules); err != nil {
 			return nil, fmt.Errorf("entry %d shaped rules: %v", position, err)
+		}
+		if entry.DesignRules, err = list(stored.DesignRules); err != nil {
+			return nil, fmt.Errorf("entry %d design-system rules: %v", position, err)
 		}
 		cache.Entries = append(cache.Entries, entry)
 	}
@@ -432,10 +448,25 @@ func DumpCacheTable(out io.Writer, path string, table *CacheTable, identity Cach
 		findingCount += len(entry.Findings)
 	}
 	fmt.Fprintf(out, "findings: %d files, %d findings, key %x\n", len(table.Findings.Entries), findingCount, table.Findings.Key[:6])
+	if design := table.Findings.DesignSystem; design == nil {
+		fmt.Fprintln(out, "  design system: none recorded")
+	} else {
+		fmt.Fprintf(out, "  design system: %x, %d paths read\n", design.Fingerprint[:6], len(design.Reads))
+		for _, read := range design.Reads {
+			state := "absent"
+			switch {
+			case read.Directory:
+				state = fmt.Sprintf("directory %x", read.Hash[:6])
+			case read.Present:
+				state = fmt.Sprintf("file %x", read.Hash[:6])
+			}
+			fmt.Fprintf(out, "    %s  %s\n", read.Path, state)
+		}
+	}
 	for _, entry := range table.Findings.Entries {
-		fmt.Fprintf(out, "  %s  content %x  types %x  shapes %x  %d pure + %d type-aware + %d shape-keyed rules, %d listening, %d nodes, %d findings\n",
-			entry.Path, entry.ContentHash[:6], entry.TypeFingerprint[:6], entry.ShapeFingerprint[:6], len(entry.Rules),
-			len(entry.TypedRules), len(entry.ShapedRules), len(entry.Listening), entry.VisitedNodes, len(entry.Findings))
+		fmt.Fprintf(out, "  %s  content %x  types %x  shapes %x  design %x  %d pure + %d type-aware + %d shape-keyed + %d design-system rules, %d listening, %d nodes, %d findings\n",
+			entry.Path, entry.ContentHash[:6], entry.TypeFingerprint[:6], entry.ShapeFingerprint[:6], entry.DesignFingerprint[:6], len(entry.Rules),
+			len(entry.TypedRules), len(entry.ShapedRules), len(entry.DesignRules), len(entry.Listening), entry.VisitedNodes, len(entry.Findings))
 		for _, finding := range entry.Findings {
 			fmt.Fprintf(out, "    %d-%d %s/%s: %s\n", finding.Start, finding.End, finding.RuleName, finding.MessageId, finding.MessageDescription)
 		}

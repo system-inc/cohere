@@ -222,7 +222,9 @@ func (view *programView) FS() vfs.FS {
 
 func (view *programView) DesignSystemFS() *RecordingFS {
 	view.require(ReadsDesignSystem, "DesignSystemFS")
-	return NewRecordingFS(view.program.Host().FS())
+	recorder := NewRecordingFS(view.program.Host().FS())
+	recordDesignSystemFS(view.program, recorder)
+	return recorder
 }
 
 func (view *programView) Identity() ProgramIdentity {

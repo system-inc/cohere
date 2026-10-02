@@ -27,9 +27,18 @@ type FindingsReuse struct {
 	key      [sha256.Size]byte
 	previous *LintCache
 
+	// designFingerprint is the previous run's design system when every path it read still holds, so its
+	// design-system rules' findings may replay; zero when it does not, or there was none.
+	designFingerprint [sha256.Size]byte
+
 	mutex    sync.Mutex
 	next     map[string]LintCacheEntry
 	replayed atomic.Int64
+
+	// designReads and designLoaded are what this run's design system read, gathered from each walk. See
+	// NoteDesignSystem.
+	designReads  []rule.FileRead
+	designLoaded bool
 }
 
 // NewFindingsReuse prepares a run's reuse. A previous cache under a different key is dropped at
@@ -41,10 +50,28 @@ func NewFindingsReuse(key [sha256.Size]byte, previous *LintCache) *FindingsReuse
 	if previous != nil && previous.Key != key {
 		previous = nil
 	}
+	reuse := &FindingsReuse{key: key, previous: previous, next: map[string]LintCacheEntry{}}
 	if previous != nil {
 		previous.ensureIndex()
+		// Checked once, here, by re-hashing what the design system read last time: a few stats and small reads,
+		// against building the design system to find out.
+		if previous.DesignSystem.stillHolds() {
+			reuse.designFingerprint = previous.DesignSystem.Fingerprint
+		}
 	}
-	return &FindingsReuse{key: key, previous: previous, next: map[string]LintCacheEntry{}}
+	return reuse
+}
+
+// NoteDesignSystem records what this run's design system read, from rule.DesignSystemReads after a walk. A run
+// that walks more than once adds every walk's reads, and loaded is whether any walk loaded it at all.
+func (r *FindingsReuse) NoteDesignSystem(reads []rule.FileRead, loaded bool) {
+	if r == nil || !loaded {
+		return
+	}
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.designLoaded = true
+	r.designReads = append(r.designReads, reads...)
 }
 
 // Replayed is how many files this run served from cache.
@@ -57,15 +84,49 @@ func (r *FindingsReuse) Replayed() int {
 
 // Recorded is what this run leaves for the next: every file it served or walked eligibly, under
 // this run's key. Files this run did not reach are dropped, so the cache never outgrows the tree.
+//
+// The design system is settled here, once the walks are done. Entries whose design-system rules ran this run
+// carry a zero fingerprint until now; they take this run's. Entries that replayed theirs keep the previous one,
+// unless this run loaded a design system that differs from it, and then every entry's design-system findings
+// are dropped from replay, since which design system they saw can no longer be told.
 func (r *FindingsReuse) Recorded() *LintCache {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	cache := &LintCache{Version: lintCacheVersion, Key: r.key, Entries: make([]LintCacheEntry, 0, len(r.next))}
+	design, keepReplayed := r.settleDesignSystem()
+	cache := &LintCache{Version: lintCacheVersion, Key: r.key, Entries: make([]LintCacheEntry, 0, len(r.next)), DesignSystem: design}
 	for _, entry := range r.next {
+		switch {
+		case entry.DesignFingerprint == [sha256.Size]byte{} && design != nil:
+			entry.DesignFingerprint = design.Fingerprint
+		case !keepReplayed:
+			entry.DesignFingerprint = [sha256.Size]byte{}
+		}
 		cache.Entries = append(cache.Entries, entry)
 	}
 	sort.Slice(cache.Entries, func(first, second int) bool { return cache.Entries[first].Path < cache.Entries[second].Path })
 	return cache
+}
+
+// settleDesignSystem decides the design system this run's entries were produced under, and whether entries that
+// replayed design-system findings under the previous one may keep them.
+//
+// A run that loaded the design system keys its reads, unless a path moved under it, and then nothing it
+// produced is replayable. A run that never loaded it produced design-system findings that read no stylesheet,
+// true under any; it carries the previous key when that still held, so the entries that replayed under it
+// stay valid, and otherwise records the empty key.
+func (r *FindingsReuse) settleDesignSystem() (key *DesignSystemKey, keepReplayed bool) {
+	zero := [sha256.Size]byte{}
+	if r.designLoaded {
+		key, held := designSystemKeyFromReads(r.designReads)
+		if !held {
+			return nil, false
+		}
+		return key, r.designFingerprint == zero || r.designFingerprint == key.Fingerprint
+	}
+	if r.designFingerprint != zero {
+		return r.previous.DesignSystem, true
+	}
+	return emptyDesignSystemKey(), true
 }
 
 // ShapeClasses splits CacheClasses' type-aware rules by what they can see of imported files: those that
@@ -91,22 +152,35 @@ type cacheKeys struct {
 	typeFingerprint  [sha256.Size]byte
 	shaped           []string
 	shapeFingerprint [sha256.Size]byte
+	design           []string
 }
 
-// lookup reports whether a file's pure rules can be replayed, and whether each type-aware class can be
-// too. Both need the first, and each also needs its own rule list and its own fingerprint unchanged: an
-// importer of an edited file has unchanged bytes and a changed type fingerprint, so its pure rules replay
-// and its content-keyed rules run again, while its shape-keyed rules replay unless the edit changed a shape.
-func (r *FindingsReuse) lookup(path string, keys cacheKeys) (entry LintCacheEntry, pureHit bool, typedHit bool, shapedHit bool) {
-	entry, pureHit = r.previous.Lookup(path, keys.contentHash, r.key, keys.pure)
+// lookup reports whether a file's pure rules can be replayed, and whether each keyed class can be too. All
+// need the first, and each also needs its own rule list and its own fingerprint unchanged: an importer of an
+// edited file has unchanged bytes and a changed type fingerprint, so its pure rules replay and its
+// content-keyed rules run again, while its shape-keyed rules replay unless the edit changed a shape. The
+// design-system rules replay while the design system still holds (NewFindingsReuse) and is the one the entry
+// names; a file none of them applies to has nothing to replay or run.
+func (r *FindingsReuse) lookup(path string, keys cacheKeys) (entry LintCacheEntry, hits classHits) {
+	entry, pureHit := r.previous.Lookup(path, keys.contentHash, r.key, keys.pure)
 	if !pureHit {
-		return LintCacheEntry{}, false, false, false
+		return LintCacheEntry{}, classHits{}
 	}
 	r.replayed.Add(1)
 	r.keep(entry)
-	typedHit = equalStrings(entry.TypedRules, keys.typed) && entry.TypeFingerprint == keys.typeFingerprint
-	shapedHit = equalStrings(entry.ShapedRules, keys.shaped) && entry.ShapeFingerprint == keys.shapeFingerprint
-	return entry, true, typedHit, shapedHit
+	return entry, classHits{
+		pure:   true,
+		typed:  equalStrings(entry.TypedRules, keys.typed) && entry.TypeFingerprint == keys.typeFingerprint,
+		shaped: equalStrings(entry.ShapedRules, keys.shaped) && entry.ShapeFingerprint == keys.shapeFingerprint,
+		design: equalStrings(entry.DesignRules, keys.design) && (len(keys.design) == 0 ||
+			r.designFingerprint != [sha256.Size]byte{} && entry.DesignFingerprint == r.designFingerprint),
+	}
+}
+
+// classHits is which of a file's classes replay: pure, the two type-aware ones, and the design-system rules.
+// The others need pure.
+type classHits struct {
+	pure, typed, shaped, design bool
 }
 
 func (r *FindingsReuse) keep(entry LintCacheEntry) {
@@ -126,23 +200,14 @@ func ruleNames(rules []rule.Rule) []string {
 
 // replayEntry turns a cached entry back into the walk's diagnostics and coverage for one file.
 //
-// typedToo and shapedToo say whether each type-aware class is replayed as well. A class that is not runs
-// again on this file and counts its own coverage, so replaying its coverage here would count it twice.
-func replayEntry(entry LintCacheEntry, typedToo bool, shapedToo bool, sourceFile *ast.SourceFile, diagnostics *[]rule.Diagnostic,
+// hits says which keyed classes are replayed as well as the pure one. A class that is not runs again on this
+// file and counts its own coverage, so replaying its coverage here would count it twice.
+func replayEntry(entry LintCacheEntry, hits classHits, sourceFile *ast.SourceFile, diagnostics *[]rule.Diagnostic,
 	reporting map[string]int, offered map[string]int, listening map[string]int) {
-	replays := make(map[string]bool, len(entry.Rules)+len(entry.TypedRules)+len(entry.ShapedRules))
-	for _, name := range entry.Rules {
-		replays[name] = true
-		offered[name]++
-	}
-	if typedToo {
-		for _, name := range entry.TypedRules {
-			replays[name] = true
-			offered[name]++
-		}
-	}
-	if shapedToo {
-		for _, name := range entry.ShapedRules {
+	replays := make(map[string]bool, len(entry.Rules)+len(entry.TypedRules)+len(entry.ShapedRules)+len(entry.DesignRules))
+	for _, names := range [][]string{entry.Rules, classIf(hits.typed, entry.TypedRules), classIf(hits.shaped, entry.ShapedRules),
+		classIf(hits.design, entry.DesignRules)} {
+		for _, name := range names {
 			replays[name] = true
 			offered[name]++
 		}
@@ -166,6 +231,14 @@ func replayEntry(entry LintCacheEntry, typedToo bool, shapedToo bool, sourceFile
 	}
 }
 
+// classIf is names when the class is included, and nothing otherwise.
+func classIf(included bool, names []string) []string {
+	if included {
+		return names
+	}
+	return nil
+}
+
 // recordableEntry builds the entry a fully walked file would leave, or reports that it must not leave
 // one.
 //
@@ -178,7 +251,7 @@ func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics
 	if silenced.applied != 0 || silenced.unusedDirectives != 0 {
 		return LintCacheEntry{}, false
 	}
-	cacheable := append(append(append([]string{}, keys.pure...), keys.typed...), keys.shaped...)
+	cacheable := append(append(append(append([]string{}, keys.pure...), keys.typed...), keys.shaped...), keys.design...)
 	isCacheable := make(map[string]bool, len(cacheable))
 	for _, name := range cacheable {
 		isCacheable[name] = true
@@ -191,6 +264,7 @@ func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics
 		TypeFingerprint:  keys.typeFingerprint,
 		ShapedRules:      keys.shaped,
 		ShapeFingerprint: keys.shapeFingerprint,
+		DesignRules:      keys.design,
 		VisitedNodes:     visited,
 	}
 	for _, name := range cacheable {
@@ -216,36 +290,23 @@ func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics
 	return entry, true
 }
 
-// refreshTyped is an entry whose pure part was replayed and one or both of whose type-aware classes just
-// ran again: the old findings and listening of every class that replayed, and the fresh ones of every class
-// that ran, under this run's fingerprints. Refused, like any recording, when a fresh finding carries a fix
-// or a suggestion.
-func refreshTyped(old LintCacheEntry, keys cacheKeys, typedRan bool, shapedRan bool,
+// refreshClasses is an entry whose pure part was replayed and one or more of whose keyed classes just ran
+// again: the old findings and listening of every class that replayed, and the fresh ones of every class that
+// ran, under this run's fingerprints. Refused, like any recording, when a fresh finding carries a fix or a
+// suggestion.
+//
+// A design-system class that ran takes a zero fingerprint, settled to this run's design system in Recorded.
+func refreshClasses(old LintCacheEntry, keys cacheKeys, hits classHits,
 	fileDiagnostics []rule.Diagnostic, fileListening map[string]int) (LintCacheEntry, bool) {
 	ran := map[string]bool{}
-	if typedRan {
-		for _, name := range keys.typed {
-			ran[name] = true
-		}
+	for _, name := range append(append(append([]string{}, classIf(!hits.typed, keys.typed)...), classIf(!hits.shaped, keys.shaped)...),
+		classIf(!hits.design, keys.design)...) {
+		ran[name] = true
 	}
-	if shapedRan {
-		for _, name := range keys.shaped {
-			ran[name] = true
-		}
-	}
-	kept := make(map[string]bool, len(old.Rules)+len(old.TypedRules)+len(old.ShapedRules))
-	for _, name := range old.Rules {
+	kept := make(map[string]bool, len(old.Rules)+len(old.TypedRules)+len(old.ShapedRules)+len(old.DesignRules))
+	for _, name := range append(append(append(append([]string{}, old.Rules...), classIf(hits.typed, old.TypedRules)...),
+		classIf(hits.shaped, old.ShapedRules)...), classIf(hits.design, old.DesignRules)...) {
 		kept[name] = true
-	}
-	if !typedRan {
-		for _, name := range old.TypedRules {
-			kept[name] = true
-		}
-	}
-	if !shapedRan {
-		for _, name := range old.ShapedRules {
-			kept[name] = true
-		}
 	}
 	refreshed := LintCacheEntry{
 		Path:             old.Path,
@@ -255,14 +316,18 @@ func refreshTyped(old LintCacheEntry, keys cacheKeys, typedRan bool, shapedRan b
 		TypeFingerprint:  keys.typeFingerprint,
 		ShapedRules:      keys.shaped,
 		ShapeFingerprint: keys.shapeFingerprint,
+		DesignRules:      keys.design,
 		VisitedNodes:     old.VisitedNodes,
+	}
+	if hits.design {
+		refreshed.DesignFingerprint = old.DesignFingerprint
 	}
 	for _, name := range old.Listening {
 		if kept[name] {
 			refreshed.Listening = append(refreshed.Listening, name)
 		}
 	}
-	for _, names := range [][]string{keys.typed, keys.shaped} {
+	for _, names := range [][]string{keys.typed, keys.shaped, keys.design} {
 		for _, name := range names {
 			if ran[name] && fileListening[name] > 0 {
 				refreshed.Listening = append(refreshed.Listening, name)

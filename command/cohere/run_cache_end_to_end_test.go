@@ -115,7 +115,7 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	durations := regexp.MustCompile(`\d+(\.\d+)?(ms|s|µs| GB)\b`)
 	// The findings cache's clause says how much of the verdict was remembered; a cold run never has it,
 	// so it comes off before a comparison and is required or forbidden separately per scenario.
-	layerTwoClause := regexp.MustCompile(`; \d+ of \d+ files replayed from cache( \(type-aware rules ran again on \d+ of them, shape-keyed on \d+\))?`)
+	layerTwoClause := regexp.MustCompile(`; \d+ of \d+ files replayed from cache( \(type-aware rules ran again on \d+ of them, shape-keyed on \d+\))?( \(design-system rules ran again on \d+ of them\))?`)
 	// A cold run is a `--no-cache` run, which says so in a line no cached run prints.
 	cacheOffLine := regexp.MustCompile(`(?m)^  cache: off, by --no-cache.*\n`)
 	normalized := func(output string) string {
