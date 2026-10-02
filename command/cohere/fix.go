@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -169,22 +172,25 @@ func applyProposedFixes(
 	}
 	sort.Strings(fileNames)
 
-	results := make([]edit.FileResult, 0, len(fileNames))
-	for _, fileName := range fileNames {
-		// The first pass reuses the proposals already collected; later passes re-lint the rewritten
-		// text. Reusing them for the first pass and only the first pass is what keeps offsets honest:
-		// a proposal is valid exactly against the text it was computed from.
+	// propose is what a file's fixpoint asks for proposals. The first pass reuses the proposals already
+	// collected; later passes re-lint the rewritten text. Reusing them for the first pass and only the
+	// first pass is what keeps offsets honest: a proposal is valid exactly against the text it was
+	// computed from.
+	//
+	// relint is how a later pass gets its proposals: the rules on the serial path, or, on the parallel
+	// one, a refusal that sends the file back to the serial path.
+	propose := func(fileName string, relint edit.Propose) edit.Propose {
 		firstPass := byFileName[fileName]
 		used := false
 
-		// A format candidate inside a nested repository is formatted and never fixed on a whole-tree run.
-		// Its first-pass proposals were withheld above, and without this its later passes re-linted the
-		// formatted text and applied them anyway: formatting one file in nexus rewrote it under
+		// A format candidate inside a nested repository is formatted and never fixed on a whole-tree
+		// run. Its first-pass proposals were withheld above, and without this its later passes re-linted
+		// the formatted text and applied them anyway: formatting one file in nexus rewrote it under
 		// nexus/consistency-no-multiline-arrow-function on a run that reported the repository's fixes as
 		// not applied.
 		fixesWithheld := writable.Everything && root != "" && formatfiles.NestedRepositoryContaining(root, fileName) != ""
 
-		propose := func(_ string, text string) ([]edit.Proposal, error) {
+		return func(_ string, text string) ([]edit.Proposal, error) {
 			if !used {
 				used = true
 				return firstPass, nil
@@ -192,10 +198,23 @@ func applyProposedFixes(
 			if fixesWithheld {
 				return nil, nil
 			}
-			return proposalsForText(fileName, text, graph, rules)
+			return relint(fileName, text)
 		}
+	}
+	serially := func(fileName string, text string) ([]edit.Proposal, error) {
+		return proposalsForText(fileName, text, graph, rules)
+	}
 
-		fileResult, err := process(fileName, propose, transform, maxPasses)
+	attempts := formatInParallel(fileNames, byFileName, func(fileName string) (edit.FileResult, error) {
+		return process(fileName, propose(fileName, refuseToRelint), transform, maxPasses)
+	})
+
+	results := make([]edit.FileResult, 0, len(fileNames))
+	for index, fileName := range fileNames {
+		fileResult, err := attempts[index].result, attempts[index].err
+		if !attempts[index].done {
+			fileResult, err = process(fileName, propose(fileName, serially), transform, maxPasses)
+		}
 		if err != nil {
 			// One file failing must not abandon the rest. The failure is reported rather than
 			// swallowed, and the tree is left in a state where every other fix still landed.
@@ -216,6 +235,68 @@ func applyProposedFixes(
 	summary := edit.Summarize(results)
 	summary.Checked = !write
 	return summary, result, nil
+}
+
+// errRelintRefused is what the parallel format pass's proposer answers when a file would need its
+// rules run again, which sends the file back to the serial path.
+var errRelintRefused = errors.New("re-linting is left to the serial path")
+
+// refuseToRelint is the parallel pass's answer to a later fix pass: no rule runs off the serial path.
+func refuseToRelint(string, string) ([]edit.Proposal, error) {
+	return nil, errRelintRefused
+}
+
+// parallelFormatWorkers is how many files the parallel pass formats at once. A variable so a test can
+// set it to zero, which leaves every file to the serial path, and compare the two runs.
+var parallelFormatWorkers = func() int { return runtime.GOMAXPROCS(0) }
+
+// formatAttempt is one file's result from the parallel pass. done is false when the file is left to the
+// serial path, because it had proposals or its formatting led back to the rules.
+type formatAttempt struct {
+	result edit.FileResult
+	err    error
+	done   bool
+}
+
+// formatInParallel runs the fix phase's own processing, in parallel, over the candidates no rule proposed
+// anything for, and returns one attempt per file name, in the same order.
+//
+// A first run with no format record visits every file the formatter handles: 5,090 on ahra, one at a
+// time, took 84.6s. Almost all of them have no proposals and are already formatted, and for those the
+// whole of the work is a parse and a print, both pure per file. So they are done here at once.
+//
+// The rules are another matter: a rule may keep state of its own, and nothing has shown that every one
+// of them can run beside itself. So nothing here runs one. A file whose formatting changed its text
+// would be re-linted next, and its proposer refuses instead (refuseToRelint), which discards the attempt
+// before anything is written and leaves the file to the serial loop. That loop then does exactly what it
+// always did, in the same order, so the run's findings, its summary and what it writes are the serial
+// run's, and only the already-formatted majority moved.
+func formatInParallel(fileNames []string, byFileName map[string][]edit.Proposal, process func(string) (edit.FileResult, error)) []formatAttempt {
+	attempts := make([]formatAttempt, len(fileNames))
+	next := make(chan int, len(fileNames))
+	for index, fileName := range fileNames {
+		if len(byFileName[fileName]) == 0 {
+			next <- index
+		}
+	}
+	close(next)
+
+	var workers sync.WaitGroup
+	for range parallelFormatWorkers() {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for index := range next {
+				result, err := process(fileNames[index])
+				if errors.Is(err, errRelintRefused) {
+					continue
+				}
+				attempts[index] = formatAttempt{result: result, err: err, done: true}
+			}
+		}()
+	}
+	workers.Wait()
+	return attempts
 }
 
 // printWouldChange reports each file a `--no-fix` run found that `--fix` would rewrite, one finding
