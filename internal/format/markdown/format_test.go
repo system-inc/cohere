@@ -59,8 +59,9 @@ var formatFixtures = []string{
 	"a\n    ===", "a\n    ---", "a\n-", "a\n+ b", "a\n# b", "a\n1. b", "a\n> b", "a\n10) b",
 	// Front matter.
 	"---\na: b\n---\n\nc", "---\n---\n\na", "+++\na = 1\n+++\n\nb",
-	// Whitespace at the edges and line endings.
-	"", "\n", "a", "a\n", "\n\na\n\n", "a\r\nb", "a\rb", "\ufeffa",
+	// Whitespace at the edges. Byte order marks and carriage returns are native.Formatter's, and
+	// tested there for every language.
+	"", "\n", "a", "a\n", "\n\na\n\n",
 }
 
 var formatVariants = func() []prettier.Options {

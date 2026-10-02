@@ -78,12 +78,6 @@ var formatCases = []formatCase{
 			"{properties.items.map((item) => <span key={item}>{item}</span>)}<></></div> }\nconst generic = <T,>(value: T) => value;\n",
 	},
 	{
-		name:     "a byte order mark is kept and carriage returns become newlines (main/core.js)",
-		fileName: "Probe.ts",
-		source:   "\xef\xbb\xbfconst a = { b: 1 }\r\n// comment\r\nconst c = `line\r\nline`\r",
-		contains: []string{"\xef\xbb\xbfconst a = { b: 1 };\n// comment\n", "`line\nline`"},
-	},
-	{
 		name:     "javascript: JSDoc types stay comments, numeric keys unquote under babel, JSX parses",
 		fileName: "Probe.js",
 		source: "/**\n * @typedef {{ a: number }} Shape\n * @param {string} name\n * @returns {Shape}\n */\nexport function make (name) { return /** @type {Shape} */ ({ 'a': 1, '2': name, 'b-c': 3 }) }\n" +

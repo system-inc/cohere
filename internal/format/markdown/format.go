@@ -4,7 +4,6 @@ package markdown
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/markdown/mdast"
@@ -56,11 +55,8 @@ func formatWithProseWrap(text string, prettierOptions prettier.Options, proseWra
 		}
 	}()
 
-	const byteOrderMark = "\ufeff"
-	hasByteOrderMark := strings.HasPrefix(text, byteOrderMark)
-	text = strings.TrimPrefix(text, byteOrderMark)
-	text = strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
-
+	// Byte order marks and line endings, main/core.js's part, are normalized by the caller,
+	// native.Formatter, once for every printer.
 	ast, err := mdast.ParseMarkdown(text)
 	if err != nil {
 		return "", err
@@ -84,14 +80,5 @@ func formatWithProseWrap(text string, prettierOptions prettier.Options, proseWra
 		return "", err
 	}
 
-	formatted = doc.Print(document, doc.Options{PrintWidth: prettierOptions.PrintWidth, TabWidth: prettierOptions.TabWidth, UseTabs: prettierOptions.UseTabs})
-	if prettierOptions.EndOfLine == "crlf" {
-		formatted = strings.ReplaceAll(formatted, "\n", "\r\n")
-	} else if prettierOptions.EndOfLine == "cr" {
-		formatted = strings.ReplaceAll(formatted, "\n", "\r")
-	}
-	if hasByteOrderMark {
-		formatted = byteOrderMark + formatted
-	}
-	return formatted, nil
+	return doc.Print(document, doc.Options{PrintWidth: prettierOptions.PrintWidth, TabWidth: prettierOptions.TabWidth, UseTabs: prettierOptions.UseTabs}), nil
 }

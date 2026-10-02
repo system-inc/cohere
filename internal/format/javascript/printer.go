@@ -3,7 +3,6 @@ package javascript
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
@@ -70,26 +69,14 @@ func JSONParser(fileName string) string {
 	return "json"
 }
 
-// format is main/core.js's formatWithCursor for one printer: the byte order mark comes off before
-// parsing and goes back on after, and carriage returns become newlines. endOfLine is always "lf" (the
-// config resolver refuses anything else), so nothing converts them back.
+// format parses, prints and lays out one file. Byte order marks and line endings, main/core.js's part,
+// are normalized by the caller, native.Formatter, once for every printer.
 func format(fileName string, text string, options prettier.Options, parser string, textToDoc printing.TextToDoc) (string, error) {
-	const byteOrderMark = "\xef\xbb\xbf"
-	hasByteOrderMark := strings.HasPrefix(text, byteOrderMark)
-	text = strings.TrimPrefix(text, byteOrderMark)
-	if strings.Contains(text, "\r") {
-		text = strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
-	}
-
 	document, err := printToDoc(fileName, text, options, parser, "", textToDoc)
 	if err != nil {
 		return "", err
 	}
-	formatted := doc.Print(document, doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs})
-	if hasByteOrderMark {
-		formatted = byteOrderMark + formatted
-	}
-	return formatted, nil
+	return doc.Print(document, doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs}), nil
 }
 
 // PrintToDoc is upstream's textToDoc (src/main/multiparser.js) for a JavaScript-family parser: the doc

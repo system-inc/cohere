@@ -158,8 +158,27 @@ func (formatter Formatter) Format(fileName string, text string) (string, error) 
 	if !present {
 		return "", fmt.Errorf("native: no printer for %s yet", fileName)
 	}
-	return print(fileName, text, formatter.Options)
+
+	// main/core.js's formatWithCursor, once for every language as upstream does it: the byte order mark
+	// comes off before parsing and goes back on after, and carriage returns become newlines. endOfLine
+	// is always "lf" (prettier.ResolveOptions refuses anything else), so nothing converts them back.
+	hasByteOrderMark := strings.HasPrefix(text, byteOrderMark)
+	text = strings.TrimPrefix(text, byteOrderMark)
+	if strings.Contains(text, "\r") {
+		text = strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
+	}
+
+	formatted, err := print(fileName, text, formatter.Options)
+	if err != nil {
+		return "", err
+	}
+	if hasByteOrderMark {
+		formatted = byteOrderMark + formatted
+	}
+	return formatted, nil
 }
+
+const byteOrderMark = "\ufeff"
 
 func lookup(fileName string) (Print, bool) {
 	mutex.RLock()
