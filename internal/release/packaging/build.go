@@ -310,13 +310,27 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 		"-X", packagePath+".goToolchain="+goToolchain,
 	)
 
-	linkerFlags := strings.Join(stamps, " ")
+	command := goBuildCommand(options.ModuleDirectory, target, strings.Join(stamps, " "), binaryPath)
+	command.Stderr = os.Stderr
 
+	if err := command.Run(); err != nil {
+		return fmt.Errorf("go build: %w", err)
+	}
+	return nil
+}
+
+// goBuildCommand is the `go build` that produces cohere for one target.
+//
+// It is the single definition of how a target is compiled, shared by the release and by
+// TestEveryReleaseTargetCompiles, so a flag or an environment variable added here for the release
+// is one the test compiles with too. A test with its own copy would keep passing on the copy after
+// the release had changed.
+func goBuildCommand(moduleDirectory string, target Target, linkerFlags string, binaryPath string) *exec.Cmd {
 	arguments := append([]string{"build"}, BuildFlags...)
 	arguments = append(arguments, "-ldflags="+linkerFlags, "-o", binaryPath, "./command/cohere")
 
 	command := exec.Command("go", arguments...)
-	command.Dir = options.ModuleDirectory
+	command.Dir = moduleDirectory
 	command.Env = append(os.Environ(),
 		"GOOS="+target.GoOperatingSystem,
 		"GOARCH="+target.GoArchitecture,
@@ -326,12 +340,7 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 		// else's CI.
 		"CGO_ENABLED=0",
 	)
-	command.Stderr = os.Stderr
-
-	if err := command.Run(); err != nil {
-		return fmt.Errorf("go build: %w", err)
-	}
-	return nil
+	return command
 }
 
 // cohereBinary confirms the build produced an executable for the platform it claims, returning its
