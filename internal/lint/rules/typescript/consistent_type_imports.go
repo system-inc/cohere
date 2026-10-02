@@ -164,15 +164,13 @@ func consistentTypeImportsSomeAreOnlyTypes(names []string) rule.Message {
 // resolved away before any rule sees it, so reproducing the flags rather than the outcome would be
 // reproducing a mechanism instead of a decision.
 //
-// # `React` is exempted by its local name, spelled out
+// # JSX makes the JSX factory a value use
 //
-// A default or namespace specifier whose local name is exactly `React` is skipped, so
-// `import React from 'react'; type T = React.FC;` is clean. This is a string comparison and not a
-// resolution: probed on the binary, renaming the local to `Renamed` makes the identical file
-// report. Upstream carries a `TODO` saying it should consult the tsconfig `jsx` field instead, and
-// that gap is reproduced here rather than improved on, because improving it would change which
-// files report and the differential harness compares against upstream. Named imports are not
-// exempt, only the default and namespace forms.
+// In a file with JSX, the binding named for the JSX factory (`React` unless `jsxFactory` says
+// otherwise) is a value use, under any import form, because ESLint's scope manager makes every JSX
+// element a reference to it. In a file without JSX it is judged like any other name, so
+// `import React from 'react'` used only as `React.FC` reports. This was a skip by local name, taken
+// from oxc, until phi web found the gap; see `consistentTypeImportsJsxValueNames`.
 //
 // # The repair is upstream's, delivered as one edit
 //
@@ -307,6 +305,7 @@ func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile, 
 	// value imports at all pays nothing for the index.
 	var byText map[string][]*ast.Node
 	var metadataRoots map[*ast.Node]bool
+	var jsxValueNames map[string]bool
 
 	for _, statement := range sourceFile.Statements.Nodes {
 		if statement.Kind != ast.KindImportDeclaration {
@@ -327,6 +326,7 @@ func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile, 
 		if byText == nil {
 			byText = consistentTypeImportsIdentifiers(sourceFile)
 			metadataRoots = decoratorMetadataRoots(ctx, sourceFile)
+			jsxValueNames = consistentTypeImportsJsxValueNames(ctx, sourceFile)
 		}
 
 		bindings := imports.BindingsOf(statement)
@@ -335,17 +335,14 @@ func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile, 
 		// The specifier nodes behind typeOnlyNames, which is what the repair moves.
 		typeOnlySpecifiers := map[*ast.Node]bool{}
 
-		consider := func(specifier *ast.Node, local *ast.Node, exemptReact bool, alreadyTypeOnly bool) {
+		consider := func(specifier *ast.Node, local *ast.Node, alreadyTypeOnly bool) {
 			if local == nil {
 				return
 			}
 			specifierCount++
-			if exemptReact && local.Text() == "React" {
-				// Skipped rather than counted as a value use. Upstream `continue`s before the
-				// check, so the name is absent from both sides of the all-are-types comparison,
-				// which is why `import React from 'react'` alone is silent rather than reporting
-				// as a wholly type-only import.
-				specifierCount--
+			if jsxValueNames[local.Text()] {
+				// Every JSX element in the file is a value reference to the JSX factory, so the
+				// binding it names is a value use. See consistentTypeImportsJsxValueNames.
 				return
 			}
 			if alreadyTypeOnly {
@@ -357,15 +354,15 @@ func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile, 
 			}
 		}
 
-		consider(bindings.Default, bindings.Default, true, false)
+		consider(bindings.Default, bindings.Default, false)
 		if bindings.Namespace != nil {
-			consider(bindings.Namespace, bindings.Namespace.Name(), true, false)
+			consider(bindings.Namespace, bindings.Namespace.Name(), false)
 		}
 		for _, named := range bindings.Named {
 			if named.Kind != ast.KindImportSpecifier {
 				continue
 			}
-			consider(named, named.Name(), false, named.AsImportSpecifier().IsTypeOnly)
+			consider(named, named.Name(), named.AsImportSpecifier().IsTypeOnly)
 		}
 		fix := func() (rule.Fix, bool) {
 			return consistentTypeImportsTypeImportFix(sourceFile, statement, typeOnlySpecifiers, fixStyle)
@@ -398,6 +395,59 @@ func reportConsistentTypeImportsWithFix(ctx rule.Context, node *ast.Node, messag
 		return
 	}
 	ctx.ReportNode(node, message)
+}
+
+// consistentTypeImportsJsxValueNames names the bindings JSX in this file uses as values.
+//
+// ESLint's scope manager makes every JSX element and fragment a value reference to the JSX pragma,
+// and every fragment one to the fragment factory too. The pragma is the first identifier of the
+// program's `jsxFactory`, `React` when none is set, whatever the `jsx` mode; the fragment name is the
+// first identifier of `jsxFragmentFactory`, and nothing when none is set. Read from
+// @typescript-eslint/parser and scope-manager as installed, which is the gate this rule is held to.
+//
+// This replaced a skip by local name, which was oxc's: a default or namespace import spelled `React`
+// was never judged at all, so `import React from 'react'` used only in types in a file with no JSX
+// was silent where ESLint reports it, a parity gap phi web found. The binding is a value use exactly
+// when the file has JSX, under any import form, and a renamed import is not the pragma.
+func consistentTypeImportsJsxValueNames(ctx rule.Context, sourceFile *ast.SourceFile) map[string]bool {
+	hasJsx := false
+	hasFragment := false
+	var visit func(*ast.Node)
+	visit = func(current *ast.Node) {
+		if current == nil || hasFragment {
+			return
+		}
+		switch current.Kind {
+		case ast.KindJsxElement, ast.KindJsxSelfClosingElement:
+			hasJsx = true
+		case ast.KindJsxFragment:
+			hasJsx = true
+			hasFragment = true
+		}
+		current.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return false
+		})
+	}
+	visit(sourceFile.AsNode())
+	if !hasJsx {
+		return nil
+	}
+
+	firstIdentifier := func(factory string) string {
+		return strings.TrimSpace(strings.SplitN(factory, ".", 2)[0])
+	}
+	names := map[string]bool{"React": true}
+	if ctx.Program != nil {
+		options := ctx.Program.Options()
+		if options.JsxFactory != "" {
+			names = map[string]bool{firstIdentifier(options.JsxFactory): true}
+		}
+		if hasFragment && options.JsxFragmentFactory != "" {
+			names[firstIdentifier(options.JsxFragmentFactory)] = true
+		}
+	}
+	return names
 }
 
 // consistentTypeImportsIdentifiers indexes a file's identifiers by their text, once.

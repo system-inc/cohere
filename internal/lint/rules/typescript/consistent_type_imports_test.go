@@ -3,6 +3,8 @@ package typescript
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -661,18 +663,39 @@ var consistentTypeImportsMeasuredCases = []struct {
 		ids:     []string{"typeOverValue"},
 	},
 	{
-		// Exempted by the literal local name. Upstream's corpus pins this only through a JSX case whose
-		// verdict several other lines could explain.
-		name:    "reactDefaultImportIsExempt",
+		// No JSX, so nothing makes `React` a value, and it reports like any other type-only import.
+		// This was a skip by name, oxc's, until phi web found ESLint reporting it. All five React
+		// cases here were measured on the installed ESLint and typescript-eslint, 8.67.0.
+		name:    "reactDefaultImportWithoutJsxReports",
 		source:  "import React from 'react';\ntype T = React.FC;\n",
+		options: "",
+		ids:     []string{"typeOverValue"},
+	},
+	{
+		name:    "reactNamespaceImportWithoutJsxReports",
+		source:  "import * as React from 'react';\ntype T = React.FC;\n",
+		options: "",
+		ids:     []string{"typeOverValue"},
+	},
+	{
+		// JSX is a value reference to the factory, `React` by default, so the import is a value use.
+		name:    "reactWithJsxIsAValueUse",
+		source:  "import React from 'react';\ntype T = React.FC;\nconst x = <div />;\n",
 		options: "",
 	},
 	{
-		// The namespace form takes the same exemption as the default form, and this is the arm the
-		// corpus never writes at all.
-		name:    "reactNamespaceImportIsExempt",
-		source:  "import * as React from 'react';\ntype T = React.FC;\n",
+		// Only the factory's own name counts: a renamed import is not the pragma, JSX or no JSX.
+		name:    "renamedReactWithJsxReports",
+		source:  "import Renamed from 'react';\ntype T = Renamed.FC;\nconst x = <div />;\n",
 		options: "",
+		ids:     []string{"typeOverValue"},
+	},
+	{
+		// The factory is a value use and its type-only sibling still reports, by name.
+		name:    "reactValueBesideATypeOnlyName",
+		source:  "import React, { FC } from 'react';\nconst C: FC = () => <div />;\n",
+		options: "",
+		ids:     []string{"someImportsAreOnlyTypes"},
 	},
 	{
 		// The distinguishing input for the exemption: identical module, identical use, different local
@@ -1104,4 +1127,45 @@ func TestConsistentTypeImportsWithNilOptions(t *testing.T) {
 	clean := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 		"consistent_type_imports.tsx", "import type { Foo } from 'foo';\nlet foo: Foo;\n", nil)
 	rule_testing.ExpectClean(t, clean)
+}
+
+// TestConsistentTypeImportsReadsTheJsxFactoryFromTheProgram covers the pragma when `jsxFactory` names
+// one, which is how the parser resolves it when a project is configured: the first identifier of the
+// factory, so `h` for preact, and `React` stops being special.
+func TestConsistentTypeImportsReadsTheJsxFactoryFromTheProgram(t *testing.T) {
+	t.Parallel()
+
+	withFactory := func(directory string) {
+		config := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], ` +
+			`"moduleDetection": "force", "types": [], "jsx": "react", "jsxFactory": "h.createElement", ` +
+			`"jsxFragmentFactory": "Fragment"}, ` +
+			`"include": ["**/*.ts", "**/*.tsx"]}`
+		if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); err != nil {
+			t.Fatalf("writing the tsconfig: %v", err)
+		}
+	}
+	cases := []struct {
+		name   string
+		source string
+		ids    []string
+	}{
+		{"the factory's binding is a value use", "import { h } from 'preact';\ntype T = h.JSX.Element;\nconst x = <div />;\n", nil},
+		{"React is an ordinary name under another factory", "import React from 'react';\ntype T = React.FC;\nconst x = <div />;\n", []string{"typeOverValue"}},
+		// The fragment factory is a value use only where a fragment is written. Both measured on the
+		// installed ESLint with `jsxPragma: 'h'` and `jsxFragmentName: 'Fragment'`.
+		{"a fragment makes the fragment factory a value use", "import { h, Fragment } from 'preact';\ntype T = Fragment;\nconst x = <></>;\n", nil},
+		{"without a fragment the fragment factory is a type use", "import { h, Fragment } from 'preact';\ntype T = Fragment;\nconst x = <div />;\n", []string{"someImportsAreOnlyTypes"}},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(t, ConsistentTypeImports,
+				map[string]string{"/repository/source/Factory.tsx": testCase.source}, "/repository/source/Factory.tsx",
+				DefaultConsistentTypeImportsOptions(), withFactory)
+			if len(testCase.ids) == 0 {
+				rule_testing.ExpectClean(t, result)
+				return
+			}
+			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		})
+	}
 }
