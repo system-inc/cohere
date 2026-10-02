@@ -546,3 +546,50 @@ func TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern(t *testing.T) {
 		t.Errorf("an explicit caughtErrorsIgnorePattern ignores it; got %d", len(result.Diagnostics))
 	}
 }
+
+// TestNoUnusedVarsReportsAValueUsedOnlyAsAType covers typescript-eslint's `usedOnlyAsType`: a value
+// whose only references are `typeof` type queries is unused, because a type query reads nothing at
+// runtime. The reporting cases are typescript-eslint's own invalid cases for that message, and the
+// silent ones are the controls that keep the change from reaching too far. All measured on the
+// installed plugin, 8.67.0.
+//
+// Not covered, recorded on #a2vq6d3: upstream's three cases where a value merges with an interface of
+// the same name and is referenced only as that type.
+func TestNoUnusedVarsReportsAValueUsedOnlyAsAType(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		source string
+		ids    []string
+	}{
+		{"typeof", "const foo: number = 1;\n\nexport type Foo = typeof foo;\n", []string{"usedOnlyAsType"}},
+		{"typeof inside a union", "const foo: number = 1;\n\nexport type Foo = typeof foo | string;\n", []string{"usedOnlyAsType"}},
+		{"typeof inside an intersection", "const foo: number = 1;\n\nexport type Foo = (typeof foo | string) & { __brand: 'foo' };\n", []string{"usedOnlyAsType"}},
+		{"typeof of a member", "const foo = {\n  bar: {\n    baz: 123,\n  },\n};\n\nexport type Bar = typeof foo.bar;\n", []string{"usedOnlyAsType"}},
+		{"an indexed typeof", "const foo = {\n  bar: {\n    baz: 123,\n  },\n};\n\nexport type Bar = (typeof foo)['bar'];\n", []string{"usedOnlyAsType"}},
+		{"a parameter read only by its own return type", "export const myTypeGuard2 = (data2: unknown): typeof data2 => {\n  return true;\n};\n", []string{"usedOnlyAsType"}},
+		{"a type predicate's parameter", "export const myTypeGuard = (data: unknown): data is string => {\n  return true;\n};\n", []string{"usedOnlyAsType"}},
+		{"keyof typeof", "const defaults = { a: 1 };\nexport type Key = keyof typeof defaults;\n", []string{"usedOnlyAsType"}},
+		{"a function behind ReturnType", "function make() { return 1; }\nexport type Made = ReturnType<typeof make>;\n", []string{"usedOnlyAsType"}},
+
+		// A value read anywhere is read, and an export is a use.
+		{"read as a value too", "const defaults = { a: 1 };\nexport type Defaults = typeof defaults;\nconsole.log(defaults);\n", nil},
+		{"exported", "export const defaults = { a: 1 };\nexport type Defaults = typeof defaults;\n", nil},
+		// A type-only import can only ever be read by a type query, so the query is its use.
+		{"a type-only import read by typeof", "import type { foo } from 'foo';\nexport type Foo = typeof foo;\n", nil},
+		// A value import read only by typeof is consistent-type-imports' finding, so this rule stays
+		// out of it, as upstream does.
+		{"a value import read only by typeof", "import { foo } from 'foo';\nexport type Foo = typeof foo;\n", nil},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTyped(t, NoUnusedVars, "/repository/source/TypeOnly.ts", testCase.source)
+			if len(testCase.ids) == 0 {
+				rule_testing.ExpectClean(t, result)
+				return
+			}
+			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		})
+	}
+}

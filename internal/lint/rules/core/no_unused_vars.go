@@ -240,6 +240,22 @@ type candidateBinding struct {
 // Two passes rather than one, and the order is forced. A read can precede its declaration in source
 // order — a hoisted function body referring to a `const` declared below it is legal and common — so
 // no single walk can decide a binding at the moment it sees it.
+// noUnusedVarsUsedOnlyAsTypeMessage renders the finding for a binding whose only references are
+// `typeof` type queries, typescript-eslint's `usedOnlyAsType`.
+func noUnusedVarsUsedOnlyAsTypeMessage(name string, assigned bool) rule.Message {
+	action := "declared"
+	if assigned {
+		action = "assigned a value"
+	}
+	return rule.Message{
+		Id: "usedOnlyAsType",
+		Description: "'" + name + "' is " + action + " but only used as a type. Every reference is a " +
+			"`typeof`, which reads the binding's type while compiling and nothing at runtime, so the " +
+			"value itself is built for no reader. Write the type out and delete the value, or keep " +
+			"the value if something outside this file is meant to read it and export it.",
+	}
+}
+
 func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUnusedVarsOptions) {
 	candidates := collectCandidateBindings(sourceFile)
 	if len(candidates) == 0 {
@@ -254,7 +270,7 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 		interesting[candidate.name.Text()] = true
 	}
 
-	reads, writes := collectReadSymbols(ctx, sourceFile, interesting)
+	reads, writes, typeOnlyReads := collectReadSymbols(ctx, sourceFile, interesting)
 
 	for _, candidate := range candidates {
 		if isExemptFromUnusedReport(ctx, candidate, candidates, settings, reads) {
@@ -262,8 +278,22 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 		}
 		name := candidate.name.Text()
 		var candidateWrites []*ast.Node
+		usedOnlyAsType := false
 		if symbol := ctx.TypeChecker.GetSymbolAtLocation(candidate.name); symbol != nil {
 			candidateWrites = writes[symbol]
+			usedOnlyAsType = typeOnlyReads[symbol]
+		}
+		if usedOnlyAsType {
+			// A value import read only through `typeof` is consistent-type-imports' finding, so
+			// upstream withholds this one rather than report the import twice.
+			if candidate.kind == bindingImport {
+				continue
+			}
+			ctx.ReportNode(
+				unusedBindingReportNode(candidate, candidateWrites),
+				noUnusedVarsUsedOnlyAsTypeMessage(name, len(candidateWrites) != 0 || declaringNameIsInitialized(candidate.name)),
+			)
+			continue
 		}
 		ctx.ReportNode(
 			unusedBindingReportNode(candidate, candidateWrites),
@@ -350,14 +380,33 @@ func declaringNameIsInitialized(name *ast.Node) bool {
 // It also returns every write to those symbols, which the report needs and the read test does not:
 // where the finding points, and whether the binding was ever given a value. A write here is any
 // non-declaring occurrence that stores, update forms included, which is ESLint's `isWrite()`.
-func collectReadSymbols(ctx rule.Context, sourceFile *ast.Node, interesting map[string]bool) (map[*ast.Symbol]bool, map[*ast.Symbol][]*ast.Node) {
+//
+// The third map holds the symbols read through a `typeof` type query or named by a type predicate.
+// typescript-eslint counts such a read as type-only, not a use, so a value whose every reference is
+// one is unused and reports as "only used as a type". Measured on the installed plugin, 8.67.0:
+// `const d = {}; export type D = typeof d;` reports, and so do `keyof typeof d` and
+// `ReturnType<typeof f>`. A symbol here that is also read is exempt before this map is asked, and an
+// import is never reported from it at all, so neither needs excluding here: upstream's exception for
+// a type-only import reaches the same silence.
+func collectReadSymbols(ctx rule.Context, sourceFile *ast.Node, interesting map[string]bool) (map[*ast.Symbol]bool, map[*ast.Symbol][]*ast.Node, map[*ast.Symbol]bool) {
 	reads := map[*ast.Symbol]bool{}
 	writes := map[*ast.Symbol][]*ast.Node{}
+	typeOnlyReads := map[*ast.Symbol]bool{}
 
 	var visit func(*ast.Node)
 	visit = func(current *ast.Node) {
 		if current == nil {
 			return
+		}
+
+		if current.Kind == ast.KindIdentifier && interesting[current.Text()] &&
+			current.Parent != nil && current.Parent.Kind == ast.KindTypePredicate &&
+			current.Parent.AsTypePredicateNode().ParameterName == current {
+			// `data is string` names the parameter without reading it. Still no read, as before, but
+			// typescript-eslint words the finding "only used as a type", so it is recorded as one.
+			for _, symbol := range resolveIdentifierSymbols(ctx, current) {
+				typeOnlyReads[symbol] = true
+			}
 		}
 
 		if current.Kind == ast.KindIdentifier && interesting[current.Text()] {
@@ -369,9 +418,14 @@ func collectReadSymbols(ctx rule.Context, sourceFile *ast.Node, interesting map[
 				if !countsAsRead(current, declaringScopeOf(symbol)) {
 					continue
 				}
-				if !isSelfReferenceWithinOwnDeclaration(ctx, current, symbol) {
-					reads[symbol] = true
+				if isSelfReferenceWithinOwnDeclaration(ctx, current, symbol) {
+					continue
 				}
+				if isInsideTypeQuery(current) {
+					typeOnlyReads[symbol] = true
+					continue
+				}
+				reads[symbol] = true
 			}
 		}
 
@@ -382,7 +436,22 @@ func collectReadSymbols(ctx rule.Context, sourceFile *ast.Node, interesting map[
 	}
 	visit(sourceFile)
 
-	return reads, writes
+	return reads, writes, typeOnlyReads
+}
+
+// isInsideTypeQuery is typescript-eslint's `referenceContainsTypeQuery`: the identifier sits in a
+// `typeof` type query, reached through nothing but qualified names, so `typeof a.b` counts for `a`.
+func isInsideTypeQuery(identifier *ast.Node) bool {
+	for current := identifier.Parent; current != nil; current = current.Parent {
+		switch current.Kind {
+		case ast.KindTypeQuery:
+			return true
+		case ast.KindQualifiedName:
+			continue
+		}
+		return false
+	}
+	return false
 }
 
 // declaringScopeOf returns the variable scope a symbol is declared in, or nil when that cannot be

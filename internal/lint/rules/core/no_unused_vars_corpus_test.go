@@ -302,7 +302,9 @@ var noUnusedVarsUpstreamClean = []string{
 	"for (let len = 10; len;) {}",
 	"for (let len = 10;; len++) {}",
 	"for (let len = 10; len < 0; len += 1) {}",
-	"const foo = 123; export type Foo = typeof foo;",
+	// oxc's clean case `const foo = 123; export type Foo = typeof foo;` is withheld here: typescript-eslint
+	// reports it as usedOnlyAsType, measured on the installed 8.67.0 and listed invalid in its own corpus,
+	// and ESLint is the gate. It is pinned in no_unused_vars_test.go's type-only table instead.
 	"\n        import { ClassDecoratorFactory } from 'decorators';\n        @ClassDecoratorFactory()\n        export class Foo {}\n            ",
 	"\n        import { ClassDecorator } from 'decorators';\n        @ClassDecorator\n        export class Foo {}\n            ",
 	"\n        import { AccessorDecoratorFactory } from 'decorators';\n        export class Foo {\n          @AccessorDecoratorFactory(true)\n          get bar() {}\n        }\n            ",
