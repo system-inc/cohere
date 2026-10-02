@@ -359,16 +359,21 @@ func TestABrokenChainRefusesTheWholeLoad(t *testing.T) {
 	})
 }
 
-// `settings` and `format` have readers that do not follow the chain, so a value in a base would be
-// ignored silently. The project's own file keeps them, and that must still load.
-func TestABaseMayNotCarryKeysWhoseReadersIgnoreTheChain(t *testing.T) {
-	for _, key := range []string{"settings", "format"} {
+// `settings` has a reader that does not follow the chain, so a value in a base would be ignored
+// silently. `format` has one that does (formatoptions applies each file's block over the one it
+// extends), so a base may carry it. Both still load from the project's own file.
+func TestABaseMayCarryOnlyKeysWhoseReadersFollowTheChain(t *testing.T) {
+	for key, followed := range map[string]bool{"settings": false, "format": true} {
 		t.Run(key, func(t *testing.T) {
 			inBase := writeConfigs(t, map[string]string{
 				"base.json":           `{"` + key + `": {}, "rules": {}}`,
 				"CohereSettings.json": `{"extends": "./base.json"}`,
 			})
-			refusedWith(t, filepath.Join(inBase, "CohereSettings.json"), `declares "`+key+`"`)
+			if followed {
+				loadOrFail(t, filepath.Join(inBase, "CohereSettings.json"))
+			} else {
+				refusedWith(t, filepath.Join(inBase, "CohereSettings.json"), `declares "`+key+`"`)
+			}
 
 			inProject := writeConfigs(t, map[string]string{
 				"base.json":           `{"rules": {}}`,

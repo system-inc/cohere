@@ -255,8 +255,9 @@ func RulesFromPlugins(plugins []string, named map[string]RuleSetting) map[string
 //   - `plugins` are a union, and plugin defaults are computed once, over the merged rules.
 //   - `ignorePatterns` and `overrides` concatenate, the base's first, so a later block still wins.
 //     Every pattern resolves against Root: a house pattern is a shape like `**/*.test.ts`, not a path.
-//   - A base may not carry `settings` or `format`, because their readers do not follow the chain and
-//     a value there would be ignored silently.
+//   - A base may carry `format`: its reader (internal/format/formatoptions) follows the chain, applying
+//     each file's block over the one it extends. A base may not carry `settings`, because its reader
+//     does not follow the chain and a value there would be ignored silently.
 //   - A rule set differently from the file it extends must be named under `departures` with a reason,
 //     and a `departures` entry that departs from nothing is refused, so the list cannot rot.
 //
@@ -288,15 +289,11 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 
 	for index, layer := range layers {
 		isBase := index < len(layers)-1
-		if isBase {
-			for _, key := range []string{"settings", "format"} {
-				if layer.present[key] {
-					return nil, fmt.Errorf("lint config %s declares %q, and it is extended by %s: "+
-						"the reader of %q does not follow `extends`, so the value would be ignored "+
-						"silently. Keep %q in the project's own file",
-						layer.path, key, layers[len(layers)-1].path, key, key)
-				}
-			}
+		if isBase && layer.present["settings"] {
+			return nil, fmt.Errorf("lint config %s declares \"settings\", and it is extended by %s: "+
+				"the reader of \"settings\" does not follow `extends`, so the value would be ignored "+
+				"silently. Keep \"settings\" in the project's own file",
+				layer.path, layers[len(layers)-1].path)
 		}
 
 		// What the layers below wrote, frozen before this one writes anything. Comparing against the

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/lint/configuration"
 )
 
 /*
@@ -19,11 +21,13 @@ import (
  * differential run: api-phi-health sets `bracketSameLine: true`, the oracle did not, and its JSX
  * numbers described a formatter that repository does not use.
  *
- * So this resolves from the nearest CohereSettings.json walking up from the directory, and refuses
- * every case that would otherwise format with options nobody chose: a CohereSettings.json without a
- * `format` block, and Prettier config left behind in its old place. The only way to get Prettier's
- * defaults is to configure nothing anywhere, which is the honest meaning of a default. A refusal says
- * which file and why.
+ * So this resolves from the nearest CohereSettings.json walking up from the directory, following its
+ * `extends` chain as the lint loader does: each file's `format` block applies over the one it extends,
+ * key by key, from the outermost base to the project's own file. A house format is then written once,
+ * in a tier, as house rulings are (#rkm5a31). It refuses every case that would otherwise format with
+ * options nobody chose: a chain where no file has a `format` block, and Prettier config left behind in
+ * its old place. The only way to get Prettier's defaults is to configure nothing anywhere, which is the
+ * honest meaning of a default. A refusal says which file and why.
  */
 
 // SettingsFileName is the file a repository's cohere configuration lives in.
@@ -62,8 +66,8 @@ var prettierConfigFiles = []string{
 type Resolution struct {
 	Options Options
 
-	// Source is the CohereSettings.json the options came from, or empty when none was found and
-	// Prettier's own defaults apply.
+	// Source is the CohereSettings.json the options were resolved from, or empty when none was found and
+	// Prettier's own defaults apply. The files it extends may have written some of them.
 	Source string
 }
 
@@ -108,17 +112,8 @@ func Resolve(directory string) (Resolution, error) {
 		}
 
 		path := filepath.Join(current, SettingsFileName)
-		contents, err := os.ReadFile(path)
-		if err == nil {
-			var settings map[string]json.RawMessage
-			if err := json.Unmarshal(contents, &settings); err != nil {
-				return Resolution{}, fmt.Errorf("%s is not valid JSON: %w", path, err)
-			}
-			block, present := settings["format"]
-			if !present {
-				return Resolution{}, fmt.Errorf("%s has no \"format\" block, so it does not say how to format; add one rather than formatting with Prettier's defaults", path)
-			}
-			resolution, err := applyFormatBlock(path, block, false)
+		if _, err := os.Stat(path); err == nil {
+			resolution, err := resolveChain(path)
 			if err != nil {
 				return Resolution{}, err
 			}
@@ -142,6 +137,43 @@ func Resolve(directory string) (Resolution, error) {
 	}
 }
 
+// resolveChain applies the format block of path and of every file it extends, the outermost base first,
+// so a key the project's own file writes wins over a base's and a key it leaves out is inherited.
+//
+// The chain is read by the lint loader's own SourcesOf rather than by a second walk of `extends` here,
+// so the two readers cannot disagree about which files a configuration is made of.
+func resolveChain(path string) (Resolution, error) {
+	sources, err := configuration.SourcesOf(path)
+	if err != nil {
+		return Resolution{}, err
+	}
+
+	options := PrettierDefaults()
+	configured := false
+	for index := len(sources) - 1; index >= 0; index-- {
+		contents, err := os.ReadFile(sources[index])
+		if err != nil {
+			return Resolution{}, err
+		}
+		var settings map[string]json.RawMessage
+		if err := json.Unmarshal(contents, &settings); err != nil {
+			return Resolution{}, fmt.Errorf("%s is not valid JSON: %w", sources[index], err)
+		}
+		block, present := settings["format"]
+		if !present {
+			continue
+		}
+		configured = true
+		if options, err = applyFormatBlock(sources[index], block, options, false); err != nil {
+			return Resolution{}, err
+		}
+	}
+	if !configured {
+		return Resolution{}, fmt.Errorf("%s has no \"format\" block, and neither does any file it extends, so it does not say how to format; add one rather than formatting with Prettier's defaults", path)
+	}
+	return Resolution{Options: options, Source: path}, nil
+}
+
 // leftoverConfig is Prettier config found where cohere no longer reads it.
 //
 // It is tolerated only while it agrees with the format block, key for key, so a repository mid-move
@@ -162,13 +194,13 @@ func (leftover leftoverConfig) agreesWith(resolution Resolution) error {
 		return fmt.Errorf("%s: %w in a form cohere cannot compare with %s; delete it",
 			leftover.path, ErrPrettierConfigRemains, resolution.Source)
 	}
-	old, err := applyFormatBlock(leftover.path, leftover.raw, true)
+	old, err := applyFormatBlock(leftover.path, leftover.raw, PrettierDefaults(), true)
 	if err != nil {
 		return fmt.Errorf("%s: %w and cannot be read: %v", leftover.path, ErrPrettierConfigRemains, err)
 	}
-	if old.Options != resolution.Options {
+	if old != resolution.Options {
 		return fmt.Errorf("%s: %w and disagrees with %s (%+v against %+v); delete it, since cohere formats with the format block",
-			leftover.path, ErrPrettierConfigRemains, resolution.Source, old.Options, resolution.Options)
+			leftover.path, ErrPrettierConfigRemains, resolution.Source, old, resolution.Options)
 	}
 	return nil
 }
@@ -201,18 +233,18 @@ func prettierConfigIn(directory string) (leftoverConfig, bool, error) {
 	return leftoverConfig{}, false, nil
 }
 
-// applyFormatBlock decodes one format block over Prettier's defaults, refusing any key it would have to
+// applyFormatBlock decodes one format block over the options given, refusing any key it would have to
 // ignore. ignorePluginKeys lets a leftover Prettier config through with its Tailwind plugin settings
 // (plugins, tailwind*), which were never format options, so it can be compared with the format block;
 // a format block itself must not carry them.
-func applyFormatBlock(path string, raw json.RawMessage, ignorePluginKeys bool) (Resolution, error) {
+func applyFormatBlock(path string, raw json.RawMessage, over Options, ignorePluginKeys bool) (Options, error) {
 	var block map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &block); err != nil {
-		return Resolution{}, fmt.Errorf("%s: the \"format\" block is not a JSON object: %w", path, err)
+		return Options{}, fmt.Errorf("%s: the \"format\" block is not a JSON object: %w", path, err)
 	}
 
-	resolution := Resolution{Options: PrettierDefaults(), Source: path}
-	options := &resolution.Options
+	applied := over
+	options := &applied
 
 	keys := make([]string, 0, len(block))
 	for key := range block {
@@ -248,15 +280,15 @@ func applyFormatBlock(path string, raw json.RawMessage, ignorePluginKeys bool) (
 			if ignorePluginKeys && (key == "plugins" || strings.HasPrefix(key, "tailwind")) {
 				continue
 			}
-			return Resolution{}, fmt.Errorf("%s: format option %q is not one cohere applies; add it to Options rather than formatting without it", path, key)
+			return Options{}, fmt.Errorf("%s: format option %q is not one cohere applies; add it to Options rather than formatting without it", path, key)
 		}
 		if err != nil {
-			return Resolution{}, fmt.Errorf("%s: format option %q: %w", path, key, err)
+			return Options{}, fmt.Errorf("%s: format option %q: %w", path, key, err)
 		}
 	}
 
 	if options.EndOfLine != "lf" {
-		return Resolution{}, fmt.Errorf("%s sets endOfLine %q; only \"lf\" is supported", path, options.EndOfLine)
+		return Options{}, fmt.Errorf("%s sets endOfLine %q; only \"lf\" is supported", path, options.EndOfLine)
 	}
-	return resolution, nil
+	return applied, nil
 }
