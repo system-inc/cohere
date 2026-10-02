@@ -52,6 +52,10 @@ type settings struct {
 	// Only print/key.js and utilities/print-string.js read it.
 	Parser string
 
+	// ParentParser is upstream's options.parentParser: the parser of the file this text is embedded in,
+	// set by main/multiparser.js's textToDoc on every embed, "" for a file of its own.
+	ParentParser string
+
 	callArguments      map[Node][]Node
 	functionParameters map[Node][]Node
 	strippedText       string

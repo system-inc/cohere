@@ -39,29 +39,40 @@ var estreePrinter = &printing.Printer[*estree.Node]{
 }
 
 // Format is Prettier's format for a TypeScript file: parse, attach comments, print to a doc, and lay the
-// doc out. fileName decides JSX and is what upstream's options.filepath carries.
-func Format(fileName string, text string, options prettier.Options) (string, error) {
-	return format(fileName, text, options, "typescript", estreePrinter)
+// doc out. fileName decides JSX and is what upstream's options.filepath carries. textToDoc formats the
+// languages a file embeds (GraphQL in a gql template), or is nil.
+func Format(fileName string, text string, options prettier.Options, textToDoc printing.TextToDoc) (string, error) {
+	return format(fileName, text, options, "typescript", textToDoc)
 }
 
 // FormatJavaScript is Prettier's format for a .js, .mjs, .cjs or .jsx file, which upstream parses with
 // babel. The parser name matters to the printer only in print/key.js: under babel a numeric string
 // key unquotes (`{ "1": a }` prints `{ 1: a }`), which TypeScript forbids.
-func FormatJavaScript(fileName string, text string, options prettier.Options) (string, error) {
-	return format(fileName, text, options, "babel", estreePrinter)
+func FormatJavaScript(fileName string, text string, options prettier.Options, textToDoc printing.TextToDoc) (string, error) {
+	return format(fileName, text, options, "babel", textToDoc)
+}
+
+// FormatJSON is Prettier's format for a JSON file, with the parser JSONParser picks. JSON embeds
+// nothing.
+func FormatJSON(fileName string, text string, options prettier.Options) (string, error) {
+	return format(fileName, text, options, JSONParser(fileName), nil)
+}
+
+// JSONParser is the parser language-json/languages gives a .json file: the files package managers
+// write (package.json, package-lock.json, composer.json) use json-stringify, which prints the way
+// JSON.stringify does, and every other .json file uses json, which prints with the JavaScript printer.
+func JSONParser(fileName string) string {
+	switch filepath.Base(fileName) {
+	case "package.json", "package-lock.json", "composer.json":
+		return "json-stringify"
+	}
+	return "json"
 }
 
 // format is main/core.js's formatWithCursor for one printer: the byte order mark comes off before
 // parsing and goes back on after, and carriage returns become newlines. endOfLine is always "lf" (the
 // config resolver refuses anything else), so nothing converts them back.
-func format(fileName string, text string, options prettier.Options, parser string,
-	printer *printing.Printer[*estree.Node]) (formatted string, err error) {
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			formatted, err = "", fmt.Errorf("formatting %s: %v", fileName, recovered)
-		}
-	}()
-
+func format(fileName string, text string, options prettier.Options, parser string, textToDoc printing.TextToDoc) (string, error) {
 	const byteOrderMark = "\xef\xbb\xbf"
 	hasByteOrderMark := strings.HasPrefix(text, byteOrderMark)
 	text = strings.TrimPrefix(text, byteOrderMark)
@@ -69,8 +80,42 @@ func format(fileName string, text string, options prettier.Options, parser strin
 		text = strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
 	}
 
+	document, err := printToDoc(fileName, text, options, parser, "", textToDoc)
+	if err != nil {
+		return "", err
+	}
+	formatted := doc.Print(document, doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs})
+	if hasByteOrderMark {
+		formatted = byteOrderMark + formatted
+	}
+	return formatted, nil
+}
+
+// PrintToDoc is upstream's textToDoc (src/main/multiparser.js) for a JavaScript-family parser: the doc
+// for text embedded in another language's file, with its trailing hardline stripped, for the outer
+// printer to lay out at its own indentation. parser is "typescript", "babel", "json" or
+// "json-stringify"; parentParser is the outer file's parser, which upstream sets on every embed.
+func PrintToDoc(fileName string, text string, options prettier.Options, parser string, parentParser string,
+	textToDoc printing.TextToDoc) (doc.Doc, error) {
+	document, err := printToDoc(fileName, text, options, parser, parentParser, textToDoc)
+	if err != nil {
+		return nil, err
+	}
+	return doc.StripTrailingHardline(document), nil
+}
+
+// printToDoc parses with the parser and prints the tree to a doc.
+func printToDoc(fileName string, text string, options prettier.Options, parser string, parentParser string,
+	textToDoc printing.TextToDoc) (document doc.Doc, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			document, err = nil, fmt.Errorf("formatting %s: %v", fileName, recovered)
+		}
+	}()
+
 	var root *estree.Node
 	var comments []*estree.Node
+	printer := estreePrinter
 	switch parser {
 	case "typescript":
 		root, comments, err = estree.ParseTypeScript(fileName, text)
@@ -78,43 +123,25 @@ func format(fileName string, text string, options prettier.Options, parser strin
 		root, comments, err = estree.ParseJavaScript(fileName, text)
 	case "json":
 		root, comments, err = estree.ParseJSON(text, true)
+		// main/normalize-format-options.js: the json parser never prints a trailing comma.
+		options.TrailingComma = "none"
 	case "json-stringify":
 		root, comments, err = estree.ParseJSON(text, false)
+		printer = estreeJSONPrinter
 	default:
 		err = fmt.Errorf("no parser %q", parser)
 	}
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	printOptions := &Options{
 		Printer:                    printer,
 		OriginalText:               text,
-		Settings:                   &settings{Options: options, FilePath: fileName, Parser: parser},
+		Settings:                   &settings{Options: options, FilePath: fileName, Parser: parser, ParentParser: parentParser},
 		EmbeddedLanguageFormatting: "auto",
+		TextToDoc:                  textToDoc,
 	}
-	document, err := printing.PrintAstToDoc(root, comments, printOptions)
-	if err != nil {
-		return "", err
-	}
-	formatted = doc.Print(document, doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs})
-	if hasByteOrderMark {
-		formatted = byteOrderMark + formatted
-	}
-	return formatted, nil
-}
-
-// FormatJSON is Prettier's format for a JSON file. The parser follows language-json/languages: the
-// files package managers write (package.json, package-lock.json, composer.json) use json-stringify,
-// which prints the way JSON.stringify does, and every other .json file uses json, which prints with
-// the JavaScript printer.
-func FormatJSON(fileName string, text string, options prettier.Options) (string, error) {
-	switch filepath.Base(fileName) {
-	case "package.json", "package-lock.json", "composer.json":
-		return format(fileName, text, options, "json-stringify", estreeJSONPrinter)
-	}
-	// main/normalize-format-options.js: the json parser never prints a trailing comma.
-	options.TrailingComma = "none"
-	return format(fileName, text, options, "json", estreePrinter)
+	return printing.PrintAstToDoc(root, comments, printOptions)
 }
 
 // hasPrettierIgnore is upstream's hasPrettierIgnore, utilities/is-ignored.js through printers.js.

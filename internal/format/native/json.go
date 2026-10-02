@@ -11,4 +11,5 @@ func init() {
 	Register(".json", func(fileName string, text string, options prettier.Options) (string, error) {
 		return javascript.FormatJSON(fileName, text, options)
 	})
+	RegisterDoc(".json", javascript.PrintToDoc)
 }

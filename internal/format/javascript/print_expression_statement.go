@@ -2,12 +2,38 @@ package javascript
 
 import "github.com/system-inc/cohere/internal/format/printing"
 
-// print/expression-statement.js and semicolon/semicolon.js. The Vue event binding, HTML inline event
-// handler and markdown-embedded JSX paths answer false here: those hosts never run this printer.
+// print/expression-statement.js and semicolon/semicolon.js. The Vue event binding and HTML inline
+// event handler paths answer false here: those hosts never run this printer.
 
 // shouldPrintSemicolon is upstream's shouldPrintSemicolon.
 func shouldPrintSemicolon(path *Path, options *Options) bool {
-	return settingsOf(options).Semi
+	if !settingsOf(options).Semi {
+		return false
+	}
+
+	// Do not append semicolon after the only JSX element in a program
+	if isSingleJsxExpressionStatementInMarkdown(path, options) {
+		return false
+	}
+
+	return true
+}
+
+// isSingleExpressionStatement is upstream's isSingleExpressionStatement. typescript-estree has no
+// directives list: a directive is an ExpressionStatement in the body, so upstream's directives test is
+// its `!parent.directives` branch, always true here.
+func isSingleExpressionStatement(path *Path) bool {
+	parent := parentOf(path)
+	return node(path).Is("ExpressionStatement") && parent.Is("Program") && len(parent.List("body")) == 1
+}
+
+// isSingleJsxExpressionStatementInMarkdown is upstream's isSingleJsxExpressionStatementInMarkdown: a
+// markdown code block holding one JSX element prints without the semicolon.
+func isSingleJsxExpressionStatementInMarkdown(path *Path, options *Options) bool {
+	parentParser := settingsOf(options).ParentParser
+	return (parentParser == "markdown" || parentParser == "mdx") &&
+		isSingleExpressionStatement(path) &&
+		isJsxElement(node(path).Child("expression"))
 }
 
 // printExpressionStatement is upstream's printExpressionStatement.

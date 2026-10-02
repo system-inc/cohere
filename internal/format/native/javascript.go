@@ -9,9 +9,10 @@ import (
 // javascript.FormatJavaScript describes.
 func init() {
 	print := func(fileName string, text string, options prettier.Options) (string, error) {
-		return javascript.FormatJavaScript(fileName, text, options)
+		return javascript.FormatJavaScript(fileName, text, options, TextToDoc(options, "babel"))
 	}
 	for _, extension := range []string{".js", ".mjs", ".cjs", ".jsx"} {
 		Register(extension, print)
+		RegisterDoc(extension, javascript.PrintToDoc)
 	}
 }

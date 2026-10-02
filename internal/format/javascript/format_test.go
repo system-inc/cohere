@@ -111,18 +111,22 @@ func formatFor(fileName string) func(string, string, prettier.Options) (string, 
 	case strings.HasSuffix(fileName, ".json"):
 		return FormatJSON
 	case strings.HasSuffix(fileName, ".js"):
-		return FormatJavaScript
+		return func(fileName string, text string, options prettier.Options) (string, error) {
+			return FormatJavaScript(fileName, text, options, nil)
+		}
 	}
-	return Format
+	return func(fileName string, text string, options prettier.Options) (string, error) {
+		return Format(fileName, text, options, nil)
+	}
 }
 
 // TestJavaScriptRefusesWhatTypeScriptReadsDifferently: `a < b > (c)` is two comparisons to babel and a
 // generic call to TypeScript, so printing the TSX parse would rewrite the program's meaning.
 func TestJavaScriptRefusesWhatTypeScriptReadsDifferently(t *testing.T) {
-	if _, err := FormatJavaScript("Probe.js", "const result = a < b > (c);\n", prettier.DefaultOptions()); err == nil {
+	if _, err := FormatJavaScript("Probe.js", "const result = a < b > (c);\n", prettier.DefaultOptions(), nil); err == nil {
 		t.Fatal("a JavaScript file that parses as a TypeScript generic call was printed instead of refused")
 	}
-	if _, err := FormatJavaScript("Probe.js", "const result = a < b;\n", prettier.DefaultOptions()); err != nil {
+	if _, err := FormatJavaScript("Probe.js", "const result = a < b;\n", prettier.DefaultOptions(), nil); err != nil {
 		t.Fatalf("plain JavaScript was refused: %v", err)
 	}
 }
