@@ -96,7 +96,11 @@ func TestAlignMethodCallScopesReachesTheCorpus(t *testing.T) {
 	// State freezing exposes Menu's findIndex property/result pair: 61. See STATE_EFFECTS.md.
 	// Effect-hook signatures expose 79 useEffect pairs in 48 more functions: EFFECT_HOOK_EFFECTS.md.
 	// Immutable alias-edge refinement exposes four more functions, listed in IMMUTABLE_ALIAS_EDGES.md.
-	const knownChanged = 113
+	//
+	// 109 when the walk moved to the frozen corpus (pinnedCorpusFiles), 2026-10-01. A corpus move, not
+	// a pass move: over the live tree the analysis at 04501c3 and at ddc86c0 both gave 109, so the four
+	// functions left with edits to the live directory before the input was frozen.
+	const knownChanged = 109
 	if changed != knownChanged {
 		t.Errorf("the pass changed %d of %d functions, want %d", changed, functions, knownChanged)
 	}

@@ -1,10 +1,8 @@
 package high_level_intermediate_representation
 
 import (
-	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -26,32 +24,11 @@ func forEachCorpusFunction(t *testing.T, limit int,
 	visit func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes)) {
 	t.Helper()
 
-	var files []string
-	err := filepath.Walk(corpusRoot, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return nil
-		}
-		if strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".tsx") {
-			files = append(files, path)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("walking the corpus: %v", err)
-	}
-	sort.Strings(files)
-	if len(files) > limit {
-		files = files[:limit]
-	}
-	if len(files) < 10 {
-		t.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
-	}
+	// Frozen, so a count asserted over it moves only when the analysis does. See pinnedCorpusFiles.
+	files, contentsOf := pinnedCorpusFiles(t, limit)
 
 	for _, path := range files {
-		contents, readErr := os.ReadFile(path)
-		if readErr != nil {
-			continue
-		}
+		contents := contentsOf[path]
 		fileName := "/corpus/" + filepath.Base(path)
 		probe := rule.Rule{
 			Name:             "merge-corpus",
@@ -77,7 +54,7 @@ func forEachCorpusFunction(t *testing.T, limit int,
 				}
 			},
 		}
-		rule_testing.RunTypedFiles(t, probe, map[string]string{fileName: string(contents)}, fileName)
+		rule_testing.RunTypedFiles(t, probe, map[string]string{fileName: contents}, fileName)
 	}
 }
 
