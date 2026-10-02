@@ -11,13 +11,13 @@ import (
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
-// embed/index.js, embed/utilities.js, embed/graphql.js, and the tests of embed/css.js, embed/html.js
+// embed/index.js, embed/utilities.js, embed/graphql.js, embed/css.js, and the tests of embed/html.js
 // and embed/markdown.js: template literals in another language, printed by that language's printer.
 //
-// Only GraphQL has a native printer to embed today. The others keep upstream's tests, because a
-// whitespace-only template in any embedded language prints as `` before its printer is consulted,
-// and their print fails, which upstream treats as an embed that could not format: the template prints
-// as written. Markdown also needs its printer's __inJsTemplate option (fences in `~` rather than
+// GraphQL and CSS (as scss) have native printers to embed. HTML, Angular and markdown keep upstream's
+// tests, because a whitespace-only template in any embedded language prints as `` before its printer
+// is consulted, and their print fails, which upstream treats as an embed that could not format: the
+// template prints as written. Markdown also needs its printer's __inJsTemplate option (fences in `~` rather than
 // backticks), which the markdown port does not carry yet.
 
 // embedPrint is a printer upstream's embed returns: given textToDoc, the doc for the template.
