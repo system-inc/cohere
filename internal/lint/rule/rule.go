@@ -173,6 +173,31 @@ func Cached[Value any](cache *FileCache, key string, compute func() Value) Value
 // design exists to refuse.
 type Listeners map[ast.Kind]func(node *ast.Node)
 
+// NoListenerKind is why a rule may register no listener on a file it was offered and still have done
+// its job there.
+//
+// Coverage cannot tell three rules apart by their numbers: offered files, listened to none, reported
+// nothing. One answers from the file in Run and needs no walk, one declines every file it is not about
+// and met none, and one is left inert by its options and checks nothing anywhere. The first two are
+// working and the third is dead, so the rule says which it is (#j69gvka). A rule that declares nothing
+// is expected to listen, and registering no listener anywhere is then reported as checking nothing.
+type NoListenerKind string
+
+const (
+	// NoListenerUndeclared is a rule that listens on the files it is about, so no listener anywhere
+	// means it checked nothing.
+	NoListenerUndeclared NoListenerKind = ""
+
+	// NoListenerAnswersInRun is a rule that does its whole job in Run and never registers a listener:
+	// it reads what it needs off the file, reports, and returns nil.
+	NoListenerAnswersInRun NoListenerKind = "AnswersInRun"
+
+	// NoListenerDeclinesIrrelevantFiles is a rule that registers listeners only on files that can hold
+	// what it checks (by path, by language, or by what the file imports), so a tree with no such file
+	// gives it none.
+	NoListenerDeclinesIrrelevantFiles NoListenerKind = "DeclinesIrrelevantFiles"
+)
+
 // Rule is a name, and a function that returns what it wants to listen to.
 //
 // Run is called once per file, so a rule may allocate per-file state in its closure and read
@@ -182,6 +207,11 @@ type Listeners map[ast.Kind]func(node *ast.Node)
 type Rule struct {
 	Name string
 	Run  func(ctx Context, options any) Listeners
+
+	// NoListener declares why this rule may register no listener on a file it was offered and still
+	// have done its job. See NoListenerKind. Left undeclared, a rule offered files that registers no
+	// listener on any of them is reported by default as having checked nothing.
+	NoListener NoListenerKind
 
 	// NeedsTypeChecker declares that this rule reads ctx.TypeChecker.
 	//

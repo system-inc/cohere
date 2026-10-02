@@ -105,7 +105,8 @@ type GetterReturnOptions struct {
 // this. Conversely `return` inside a nested function must not credit the outer getter, which is why
 // the walk stops at every function boundary.
 var GetterReturn = rule.Rule{
-	Name: "getter-return",
+	Name:       "getter-return",
+	NoListener: rule.NoListenerDeclinesIrrelevantFiles,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		allowImplicit := false
 		if parsed, isParsed := rule.OptionsAs[GetterReturnOptions](options); isParsed {

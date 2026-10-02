@@ -66,7 +66,8 @@ var inferOptionsTypeNames = map[string]bool{
 // at what the second argument actually is, and that is reproduced here rather than simplified: a
 // simplification would report "options must be third" at a call site where second is correct.
 var NetworkRequireHookOptionsParameter = rule.Rule{
-	Name: "structure/network-require-hook-options-parameter",
+	Name:       "structure/network-require-hook-options-parameter",
+	NoListener: rule.NoListenerAnswersInRun,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		analysis := NetworkFileAnalysisFor(ctx)
 		if len(analysis.HookDeclarations) == 0 {

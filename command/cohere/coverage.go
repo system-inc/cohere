@@ -87,14 +87,14 @@ var coverageCategoryMeanings = map[coverageCategory]string{
 	// (#7n4zxrb). So a quiet rule the config kept from some files is counted apart, with the files it ran
 	// on beside the files it did not.
 	coverageRanOnPartOfTheTree: "ran and found nothing on the files it ran on, and the config turned it off or never enabled it for the rest, so its silence covers only those files",
-	// Three different rules look identical here, and the run cannot tell them apart. A rule whose whole
-	// job is answered from the file itself does its work in Run and returns no listener
+	// Three different rules look identical here by their numbers. A rule whose whole job is answered
+	// from the file itself does its work in Run and returns no listener
 	// (network-require-hook-request-suffix inspects every hook and reports before returning). A rule
-	// that declines by path registers nothing on a tree with no file it is about. And a rule its
+	// that declines files it is not about registers nothing on a tree with none of them. And a rule its
 	// options leave inert (init-declarations with no mode) registers nothing anywhere. The first two
-	// are working, the third is dead, and only a declaration on the rule can separate them; see
-	// answersInRunUndeclared.
-	coverageNoListener:        "offered files and registered no listener on any: an eager rule that answers in Run, a rule that declines by path, or one its options leave inert, and this run cannot tell which",
+	// are working and the third is dead, so each rule declares which it is (rule.NoListenerKind), and a
+	// rule declaring neither prints by default as having checked nothing.
+	coverageNoListener:        "offered files and registered no listener on any; each says whether it answers in Run, declines files it is not about, or declares neither and checked nothing",
 	coverageListenedToNothing: "nothing gave it a file, or it declined every one, so its silence says nothing about the tree",
 	coverageOffByTheConfig:    "the config turns it off for every file it would have run on",
 	// "Someone turned this rule off" and "nobody has said whether this rule should run" are different
@@ -116,8 +116,9 @@ type ruleCoverageEntry struct {
 	// that ran on most files and is off by the config for six is a rule that ran, with "off by the
 	// config for 6 files" beside its name rather than a second line in a second category.
 	Details []string
-	// NeedsAction marks a rule that offered files, registered nothing, and does not answer in Run. That
-	// is the dead-rule signal these notes were invented for, so it prints in full by default.
+	// NeedsAction marks a rule that was offered files, registered nothing, and declares no reason it may
+	// (rule.NoListenerKind). That is the dead-rule signal these notes were invented for, so it prints in
+	// full by default.
 	NeedsAction bool
 }
 
@@ -185,18 +186,10 @@ func (s coverageSummary) total() int {
 	return total
 }
 
-// answersInRunUndeclared is the predicate the run passes for "this rule does its work in Run and
-// registers no listener by design", for as long as no rule declares it.
-//
-// Today nothing can: rule.Rule carries no such field, and the walk sees an eager rule, a rule that
-// declines by path, and a rule its options leave inert as the same three numbers (offered, listened
-// to none, reported nothing). Until the declaration exists, every no-listener rule is presumed to
-// answer in Run, which keeps them counted on the default line and named under `--coverage` rather
-// than printing one line each that a run cannot tell is wrong (fourteen on ahra on 2026-10-02, a
-// measurement that will drift). When rule.Rule declares it, this becomes a lookup of that field and
-// the inert ones print in full by default with no other change.
-func answersInRunUndeclared(ruleName string) bool {
-	return true
+// noListenerReasons is how a declared reason reads beside a rule's name under `--coverage`.
+var noListenerReasons = map[rule.NoListenerKind]string{
+	rule.NoListenerAnswersInRun:            "answers in Run",
+	rule.NoListenerDeclinesIrrelevantFiles: "declines files it is not about",
 }
 
 // classifyTypeScriptCoverage puts every registered rule, and every rule the config asks for that this
@@ -211,7 +204,6 @@ func classifyTypeScriptCoverage(
 	rules []rule.Rule,
 	coverage program.Coverage,
 	lintConfig *configuration.Config,
-	answersInRun func(ruleName string) bool,
 ) coverageSummary {
 	summary := coverageSummary{
 		FilesIgnored: coverage.FilesIgnored,
@@ -242,7 +234,11 @@ func classifyTypeScriptCoverage(
 		case offered > 0:
 			entry.Category = coverageNoListener
 			entry.Details = append(entry.Details, fmt.Sprintf("offered %d files", offered))
-			entry.NeedsAction = !answersInRun(name)
+			if reason, declared := noListenerReasons[subject.NoListener]; declared {
+				entry.Details = append(entry.Details, reason)
+			} else {
+				entry.NeedsAction = true
+			}
 		case scopedOff > 0:
 			entry.Category = coverageOffByTheConfig
 			entry.Details = append(entry.Details, fmt.Sprintf("%d files", scopedOff))
@@ -406,7 +402,7 @@ func writeCoverageDetails(out io.Writer, summary coverageSummary) {
 			line := "    " + entry.Name
 			details := entry.Details
 			if entry.NeedsAction {
-				details = append(append([]string(nil), details...), "does not answer in Run, so it checked nothing")
+				details = append(append([]string(nil), details...), "declares no reason to register none, so it checked nothing")
 			}
 			if len(details) > 0 {
 				line += " (" + strings.Join(details, ", ") + ")"
@@ -513,8 +509,7 @@ type lintReport struct {
 	// WalkCost says how the walk was paid for: `in 5.64s`, or which phase walked it.
 	WalkCost string
 	// Details is `--coverage`: name every rule once rather than only counting them.
-	Details      bool
-	AnswersInRun func(ruleName string) bool
+	Details bool
 }
 
 // writeLintReport prints the findings, the lint line, and the coverage block.
@@ -534,11 +529,7 @@ func writeLintReport(out io.Writer, report lintReport) {
 		replayedFromCache(report.Result),
 	)
 
-	answersInRun := report.AnswersInRun
-	if answersInRun == nil {
-		answersInRun = answersInRunUndeclared
-	}
-	summary := classifyTypeScriptCoverage(report.Rules, coverage, report.LintConfig, answersInRun)
+	summary := classifyTypeScriptCoverage(report.Rules, coverage, report.LintConfig)
 	fmt.Fprintln(out, summary.coverageCountedLine())
 	fmt.Fprintln(out, summary.coverageFilesLine(report.Details))
 	writeParityCoverage(out, report.Rules, report.LintConfig)
@@ -591,7 +582,7 @@ func writeCoverageNotes(out io.Writer, summary coverageSummary, details bool) {
 		if !entry.NeedsAction {
 			continue
 		}
-		fmt.Fprintf(out, "  no listener: rule %s was %s and registered no listener on any, and it does not answer in Run, so it checked nothing\n",
+		fmt.Fprintf(out, "  no listener: rule %s was %s and registered no listener on any, and it declares no reason it may (answering in Run, or declining files it is not about), so it checked nothing\n",
 			entry.Name, strings.Join(entry.Details, ", "))
 	}
 }

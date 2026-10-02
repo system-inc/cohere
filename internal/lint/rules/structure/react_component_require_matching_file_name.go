@@ -167,7 +167,8 @@ var companionFileSuffixes = []string{".test", ".spec", ".stories", ".story"}
 // with its own tooling and its own review, not a lint edit applied unattended to one file, and an
 // edit to one file cannot express it anyway.
 var ReactComponentRequireMatchingFileName = rule.Rule{
-	Name: "structure/react-component-require-matching-file-name",
+	Name:       "structure/react-component-require-matching-file-name",
+	NoListener: rule.NoListenerAnswersInRun,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

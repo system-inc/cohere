@@ -122,6 +122,7 @@ var NoDuplicateHead = rule.Rule{
 	// the shadow cases and the member-tag case both turn on which binding a tag resolves to rather
 	// than on how it is spelled. Two siblings in this package resolve JSX tags the same way.
 	NeedsTypeChecker: true,
+	NoListener:       rule.NoListenerDeclinesIrrelevantFiles,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Every declaration node that binds a local name `Head` at the module root. Keyed by node
 		// so identity is compared rather than kind: two files can each declare a `Head` and a tag

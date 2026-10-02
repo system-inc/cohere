@@ -41,7 +41,8 @@ var messageFileShouldEndWithRequest = rule.Message{
 // is stripped, matching the original: chaining the strips would rewrite `useQueryHook` past what
 // anyone asked for.
 var NetworkRequireHookRequestSuffix = rule.Rule{
-	Name: "structure/network-require-hook-request-suffix",
+	Name:       "structure/network-require-hook-request-suffix",
+	NoListener: rule.NoListenerAnswersInRun,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		analysis := NetworkFileAnalysisFor(ctx)
 		if len(analysis.HookDeclarations) == 0 {

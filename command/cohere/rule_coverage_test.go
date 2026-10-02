@@ -84,7 +84,7 @@ func TestCoverageCountsAddUpToTheRuleTotal(t *testing.T) {
 		"unported-off":    {Severity: configuration.SeverityOff},
 	}}
 
-	summary := classifyTypeScriptCoverage(rules, coverage, config, answersInRunUndeclared)
+	summary := classifyTypeScriptCoverage(rules, coverage, config)
 	if summary.total() != len(rules)+2 {
 		t.Fatalf("the summary accounts for %d rules, want %d registered plus 2 not ported", summary.total(), len(rules))
 	}
@@ -141,7 +141,7 @@ func TestSwiftCoverageRefusesPartsLargerThanTheWhole(t *testing.T) {
 // other was never handed anything. The pair was once separable only because a second line about missing
 // config happened to print for one of them, which is why this asserts the categories themselves.
 func TestCoverageSeparatesUnwiredFromOfferedAndSilent(t *testing.T) {
-	rules := []rule.Rule{{Name: "satisfied-rule"}, {Name: "unwired-rule"}}
+	rules := []rule.Rule{{Name: "satisfied-rule", NoListener: rule.NoListenerDeclinesIrrelevantFiles}, {Name: "unwired-rule"}}
 	coverage := program.Coverage{
 		RulesOffered:   map[string]int{"satisfied-rule": 3407},
 		RulesListening: map[string]int{},
@@ -151,7 +151,7 @@ func TestCoverageSeparatesUnwiredFromOfferedAndSilent(t *testing.T) {
 	requireLines(t, output,
 		"coverage: 2 rules = 1 registered no listener + 1 offered no files\n",
 		"  registered no listener (1): offered files and registered no listener on any",
-		"    satisfied-rule (offered 3407 files)\n",
+		"    satisfied-rule (offered 3407 files, declines files it is not about)\n",
 		"  offered no files (1): nothing wired it",
 		"    unwired-rule\n",
 	)
@@ -163,7 +163,7 @@ func TestCoverageSeparatesUnwiredFromOfferedAndSilent(t *testing.T) {
 // buried the lines a reader must act on. The count is the honest summary, and the names are one flag
 // away.
 func TestARuleThatRanIsCountedAndNotNamedByDefault(t *testing.T) {
-	rules := []rule.Rule{{Name: "quiet-rule"}, {Name: "working-rule"}, {Name: "eager-rule"}, {Name: "unconfigured-rule"}}
+	rules := []rule.Rule{{Name: "quiet-rule"}, {Name: "working-rule"}, {Name: "eager-rule", NoListener: rule.NoListenerAnswersInRun}, {Name: "unconfigured-rule"}}
 	coverage := program.Coverage{
 		RulesOffered:      map[string]int{"quiet-rule": 3407, "working-rule": 3407, "eager-rule": 3407},
 		RulesListening:    map[string]int{"quiet-rule": 3407, "working-rule": 412},
@@ -188,7 +188,7 @@ func TestARuleThatRanIsCountedAndNotNamedByDefault(t *testing.T) {
 func TestCoverageDetailsNameEachRuleOnce(t *testing.T) {
 	rules := []rule.Rule{
 		{Name: "off-everywhere"}, {Name: "nobody-configured"}, {Name: "partly-off"},
-		{Name: "override-only"}, {Name: "off-and-unconfigured"}, {Name: "quiet"}, {Name: "eager"},
+		{Name: "override-only"}, {Name: "off-and-unconfigured"}, {Name: "quiet"}, {Name: "eager", NoListener: rule.NoListenerAnswersInRun},
 	}
 	coverage := program.Coverage{
 		RulesOffered:      map[string]int{"partly-off": 3779, "override-only": 40, "quiet": 3785, "eager": 3785},
@@ -318,18 +318,32 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 	})
 
 	t.Run("a rule offered files that registered nothing when it should have", func(t *testing.T) {
+		// Three rules with the same numbers: offered 40 files, listened to none, reported nothing. Only
+		// the one declaring no reason is dead, and only it prints by default (#j69gvka). Before the
+		// declaration every such rule was presumed eager, so the inert one printed nothing.
 		coverage := cleanCoverage()
-		coverage.RulesOffered["inert-rule"] = 40
-		inertRules := append([]rule.Rule{{Name: "inert-rule"}}, rules...)
-		answersInRun := func(ruleName string) bool { return ruleName != "inert-rule" }
-		output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: inertRules, WalkCost: "in 1s", AnswersInRun: answersInRun})
-		requireLines(t, output, "  no listener: rule inert-rule was offered 40 files and registered no listener on any, and it does not answer in Run, so it checked nothing\n")
+		for _, name := range []string{"inert-rule", "eager-rule", "declining-rule"} {
+			coverage.RulesOffered[name] = 40
+		}
+		silentRules := append([]rule.Rule{
+			{Name: "inert-rule"},
+			{Name: "eager-rule", NoListener: rule.NoListenerAnswersInRun},
+			{Name: "declining-rule", NoListener: rule.NoListenerDeclinesIrrelevantFiles},
+		}, rules...)
+		output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: silentRules, WalkCost: "in 1s"})
+		requireLines(t, output, "  no listener: rule inert-rule was offered 40 files and registered no listener on any, and it declares no reason it may (answering in Run, or declining files it is not about), so it checked nothing\n")
+		forbidLines(t, output, "eager-rule", "declining-rule")
 
-		// And with details it is named once, under its category, rather than twice.
-		detailed := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: inertRules, WalkCost: "in 1s", AnswersInRun: answersInRun, Details: true})
+		// And with details each is named once, under its category, with what it declared.
+		detailed := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: silentRules, WalkCost: "in 1s", Details: true})
 		if strings.Count(detailed, "inert-rule") != 1 {
 			t.Errorf("a rule needing action is named %d times under --coverage, want 1:\n%s", strings.Count(detailed, "inert-rule"), detailed)
 		}
+		requireLines(t, detailed,
+			"    declining-rule (offered 40 files, declines files it is not about)\n",
+			"    eager-rule (offered 40 files, answers in Run)\n",
+			"    inert-rule (offered 40 files, declares no reason to register none, so it checked nothing)\n",
+		)
 	})
 
 	t.Run("suppressions without a reason", func(t *testing.T) {
@@ -397,7 +411,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 // A clean run prints the counts and nothing per rule: the shape of the default output, held so a
 // later printer that adds a per-rule line to every run has to change this test to do it.
 func TestACleanRunPrintsTwoCoverageLines(t *testing.T) {
-	rules := []rule.Rule{{Name: "quiet-rule"}, {Name: "off-rule"}, {Name: "unconfigured-rule"}, {Name: "eager-rule"}}
+	rules := []rule.Rule{{Name: "quiet-rule"}, {Name: "off-rule"}, {Name: "unconfigured-rule"}, {Name: "eager-rule", NoListener: rule.NoListenerAnswersInRun}}
 	coverage := program.Coverage{
 		RulesOffered:      map[string]int{"quiet-rule": 10, "eager-rule": 10},
 		RulesListening:    map[string]int{"quiet-rule": 10},

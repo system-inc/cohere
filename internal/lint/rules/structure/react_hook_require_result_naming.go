@@ -54,7 +54,8 @@ var emptySuffixes = []string{"Result", "Data", "Value", "State", "Hook"}
 // Three message ids for three different complaints about the same name, so the message says which
 // one applies rather than making a reader work out why their name was rejected.
 var ReactHookRequireResultNaming = rule.Rule{
-	Name: "structure/react-hook-require-result-naming",
+	Name:       "structure/react-hook-require-result-naming",
+	NoListener: rule.NoListenerAnswersInRun,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if !FileContextFor(ctx.SourceFile.FileName()).IsReactFile {
 			return nil

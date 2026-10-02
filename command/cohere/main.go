@@ -842,12 +842,11 @@ func run() error {
 		// The findings, the lint line, and the coverage block, which prints unconditionally. See
 		// writeLintReport.
 		writeLintReport(os.Stdout, lintReport{
-			Result:       result,
-			Rules:        rules,
-			LintConfig:   lintConfig,
-			WalkCost:     lintWalkCost,
-			Details:      *showCoverage,
-			AnswersInRun: answersInRunUndeclared,
+			Result:     result,
+			Rules:      rules,
+			LintConfig: lintConfig,
+			WalkCost:   lintWalkCost,
+			Details:    *showCoverage,
 		})
 
 		// Every phase ran and a file still went unchecked. The phase line cannot express that, so the
