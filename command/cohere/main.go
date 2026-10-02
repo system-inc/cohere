@@ -662,7 +662,8 @@ func run() error {
 			report.Write(os.Stdout)
 			return fmt.Errorf("fix: %w", err)
 		}
-		fmt.Println(fixSummary)
+		// True of the tree and actionable, so a replay keeps it, but it says which run produced it.
+		fmt.Fprintln(provenanceOutput(os.Stdout), fixSummary)
 
 		// A run that rewrote files must not be replayed. The run cache stats inputs when it records, which
 		// is after the rewrite, so the manifest would match the fixed tree and the next run would replay

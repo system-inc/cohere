@@ -93,6 +93,10 @@ func (t *teeStream) start(target **os.File) error {
 			if len(line) > 0 {
 				if rest, tagged := bytes.CutPrefix(line, invocationTag); tagged {
 					t.real.Write(rest)
+				} else if rest, tagged := bytes.CutPrefix(line, provenanceTag); tagged {
+					// Kept tagged in the recording, so a replay knows to say where the line came from.
+					t.real.Write(rest)
+					t.buffer.Write(line)
 				} else {
 					t.real.Write(line)
 					t.buffer.Write(line)
@@ -204,7 +208,7 @@ func replayRunCache(stored *program.RunCache) {
 	fmt.Fprintf(os.Stdout,
 		"cached: no input has changed since the run at %s, so graph, types and lint did not run; its verdict follows\n",
 		recorded)
-	os.Stdout.Write(stored.Output)
+	os.Stdout.Write(replayLines(stored.Output, recorded))
 	os.Stderr.Write(stored.Errors)
 	fmt.Fprintf(os.Stdout, "phases: replayed the run at %s · fix, types and lint did not run\n", recorded)
 	fmt.Fprintf(os.Stdout, "  this run: %s, after checking %d inputs\n", round(time.Since(processStart)), len(stored.Inputs))
@@ -304,12 +308,13 @@ func invocationOutput(out io.Writer) io.Writer {
 	if activeRunCache == nil {
 		return out
 	}
-	return &taggingWriter{out: out, atLineStart: true}
+	return &taggingWriter{out: out, tag: invocationTag, atLineStart: true}
 }
 
-// taggingWriter puts invocationTag at the start of every line it writes.
+// taggingWriter puts its tag at the start of every line it writes.
 type taggingWriter struct {
 	out         io.Writer
+	tag         []byte
 	atLineStart bool
 }
 
@@ -317,7 +322,7 @@ func (w *taggingWriter) Write(data []byte) (int, error) {
 	written := 0
 	for len(data) > 0 {
 		if w.atLineStart {
-			if _, err := w.out.Write(invocationTag); err != nil {
+			if _, err := w.out.Write(w.tag); err != nil {
 				return written, err
 			}
 			w.atLineStart = false
@@ -336,4 +341,42 @@ func (w *taggingWriter) Write(data []byte) (int, error) {
 		data = data[len(chunk):]
 	}
 	return written, nil
+}
+
+// provenanceTag marks a line that is true of the tree but was produced by a phase, so a replay prints it
+// with where it came from.
+//
+// "fix: 0 of 5 files rewritten, 5 not formatted" is true of an unchanged tree and its not-formatted count
+// is actionable, so a replay keeps it. Printed bare it would claim the fix phase ran on a run where
+// nothing ran, so it is replayed as "fix (from the cached run at 03:41): ...". Unlike invocationTag the
+// line stays in the recording, tagged, so the replay can find it without matching on its text.
+var provenanceTag = []byte("\x1ecohere-provenance\x1e")
+
+// provenanceOutput returns where to write such a line. Without a recording it is out itself.
+func provenanceOutput(out io.Writer) io.Writer {
+	if activeRunCache == nil {
+		return out
+	}
+	return &taggingWriter{out: out, tag: provenanceTag, atLineStart: true}
+}
+
+// replayLines is a recording made printable: each provenance-tagged line "label: rest" becomes
+// "label (from the cached run at recorded): rest", and no tag survives.
+func replayLines(output []byte, recorded string) []byte {
+	var replayed bytes.Buffer
+	for _, line := range bytes.SplitAfter(output, []byte("\n")) {
+		rest, tagged := bytes.CutPrefix(line, provenanceTag)
+		if !tagged {
+			replayed.Write(line)
+			continue
+		}
+		label, detail, found := bytes.Cut(rest, []byte(": "))
+		if !found {
+			// A line with no label still must not claim to be current, so the source goes in front.
+			fmt.Fprintf(&replayed, "(from the cached run at %s) %s", recorded, rest)
+			continue
+		}
+		fmt.Fprintf(&replayed, "%s (from the cached run at %s): %s", label, recorded, detail)
+	}
+	return replayed.Bytes()
 }

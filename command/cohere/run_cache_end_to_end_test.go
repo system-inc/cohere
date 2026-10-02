@@ -127,8 +127,15 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	verdict := func(cold string) string {
 		return keepLines(cold, "graph built in ", "types: ", "lint: ", "phases: ", "  total ")
 	}
+	// A replay says which run a phase's line came from; that label comes off before the comparison,
+	// and is required separately below so a replay that lost it fails.
+	provenance := regexp.MustCompile(`^fix \(from the cached run at \d\d:\d\d:\d\d\): `)
 	replayBody := func(replay string) string {
-		return keepLines(replay, "cached: ", "phases: replayed ", "  this run: ")
+		lines := strings.Split(keepLines(replay, "cached: ", "phases: replayed ", "  this run: "), "\n")
+		for index, line := range lines {
+			lines[index] = provenance.ReplaceAllString(line, "fix: ")
+		}
+		return strings.Join(lines, "\n")
 	}
 
 	establishHit := func() {
@@ -221,6 +228,9 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			next, nextExit := run(true)
 			if !isReplay(next) {
 				t.Fatalf("the run after that did not replay the new truth:\n%s", next)
+			}
+			if !provenance.MatchString(keepLines(next, "cached: ")) {
+				t.Fatalf("the replay printed the fix line as though the fix phase had just run:\n%s", next)
 			}
 			if replayBody(next) != verdict(cold) || nextExit != coldExit {
 				t.Fatalf("the replay is not the cold run's verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",

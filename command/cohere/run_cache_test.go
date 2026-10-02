@@ -16,7 +16,7 @@ import (
 // worth testing, since Fprintf can hand over a line in pieces.
 func TestTaggingWriterTagsEveryLine(t *testing.T) {
 	var out bytes.Buffer
-	writer := &taggingWriter{out: &out, atLineStart: true}
+	writer := &taggingWriter{out: &out, tag: invocationTag, atLineStart: true}
 	fmt.Fprint(writer, "graph built in ")
 	fmt.Fprint(writer, "436ms\ntypes ran")
 	fmt.Fprint(writer, " in 409ms\n")
@@ -58,9 +58,9 @@ func TestTeeStripsTagsFromTheTerminalAndTheReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Fprint(target, "fix: 0 of 5 files rewritten\n")
-	fmt.Fprint(&taggingWriter{out: target, atLineStart: true}, "graph built in 436ms\n")
+	fmt.Fprint(&taggingWriter{out: target, tag: invocationTag, atLineStart: true}, "graph built in 436ms\n")
 	fmt.Fprint(target, "coverage: 460 rules\n")
-	fmt.Fprint(&taggingWriter{out: target, atLineStart: true}, "phases: fix ran in 2.9s\n  total 4.0s\n")
+	fmt.Fprint(&taggingWriter{out: target, tag: invocationTag, atLineStart: true}, "phases: fix ran in 2.9s\n  total 4.0s\n")
 	fmt.Fprint(target, "  this binary was built from a modified tree\n")
 	tee.stop(&target)
 
@@ -82,5 +82,45 @@ func TestTeeStripsTagsFromTheTerminalAndTheReplay(t *testing.T) {
 	}
 	if strings.Contains(tee.buffer.String(), string(invocationTag)) || bytes.Contains(shown, invocationTag) {
 		t.Error("the tag itself escaped into the terminal or the replay")
+	}
+}
+
+// A provenance-tagged line reaches the terminal untagged and stays tagged in the recording, so a replay
+// can say where it came from; and replayLines turns it into "label (from the cached run at T): rest"
+// with no tag left anywhere.
+func TestProvenanceLinesAreKeptTaggedAndReplayedWithTheirSource(t *testing.T) {
+	terminal, err := os.Create(filepath.Join(t.TempDir(), "terminal"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer terminal.Close()
+
+	target := terminal
+	var tee teeStream
+	if err := tee.start(&target); err != nil {
+		t.Fatal(err)
+	}
+	fmt.Fprintln(&taggingWriter{out: target, tag: provenanceTag, atLineStart: true}, "fix: 0 of 5 files rewritten, 5 not formatted")
+	fmt.Fprint(target, "coverage: 460 rules\n")
+	tee.stop(&target)
+
+	shown, err := os.ReadFile(terminal.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(shown) != "fix: 0 of 5 files rewritten, 5 not formatted\ncoverage: 460 rules\n" {
+		t.Errorf("the terminal saw the tag or lost the line: %q", shown)
+	}
+	if !bytes.HasPrefix(tee.buffer.Bytes(), provenanceTag) {
+		t.Fatalf("the recording lost the provenance tag, so a replay would print the line as current: %q", tee.buffer.String())
+	}
+
+	replayed := string(replayLines(tee.buffer.Bytes(), "03:41:07"))
+	want := "fix (from the cached run at 03:41:07): 0 of 5 files rewritten, 5 not formatted\ncoverage: 460 rules\n"
+	if replayed != want {
+		t.Errorf("the replay:\n  got  %q\n  want %q", replayed, want)
+	}
+	if strings.Contains(replayed, string(provenanceTag)) || strings.Contains(replayed, string(invocationTag)) {
+		t.Error("a tag survived into the replay")
 	}
 }
