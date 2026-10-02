@@ -290,12 +290,7 @@ func skipReasonOf(err error) string {
 // formatted. It is guarded exactly as a fix pass is: a transform that errors, or whose output does
 // not parse, is discarded whole and the file is left alone.
 func FixAndTransformFile(fileName string, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
-	text, err := readFile(fileName)
-	if err != nil {
-		return FileResult{FileName: fileName}, err
-	}
-
-	result, err := FixAndTransformText(fileName, text, propose, transform, maxPasses)
+	result, err := CheckFile(fileName, propose, transform, maxPasses)
 	if err != nil {
 		return result, err
 	}
@@ -320,6 +315,20 @@ func FixAndTransformFile(fileName string, propose Propose, transform Transform, 
 	}
 
 	return result, nil
+}
+
+// CheckFile is FixAndTransformFile without the write: the file is read now, driven through the same
+// fixpoint and transform, and left untouched, with what a run would write in FileResult.Text.
+//
+// It is `--no-fix`'s answer to "what would change". Every decision is the writing run's own, reached
+// through the same function the writing run calls before it writes, so a file this reports as
+// unchanged is a file `--fix` would leave alone, and the two cannot drift apart.
+func CheckFile(fileName string, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
+	text, err := readFile(fileName)
+	if err != nil {
+		return FileResult{FileName: fileName}, err
+	}
+	return FixAndTransformText(fileName, text, propose, transform, maxPasses)
 }
 
 // FixAndTransformText is FixAndTransformFile on text in hand, writing nothing: the fixpoint, then the
@@ -443,6 +452,26 @@ type Summary struct {
 	// others reports a real number under the wrong heading — which reads as a finding about the
 	// rules when it is actually a finding about the file.
 	FilesFailed []string
+
+	// ChangedFiles names every file counted in FilesChanged, with what changed it, sorted by name.
+	//
+	// The count says how much; this says where and why, which is what `--no-fix` reports as findings:
+	// a file that would change is a finding against that file, and the reader needs the rule or the
+	// formatter that would change it to know whether to run the fixer or read the code.
+	ChangedFiles []ChangedFile
+
+	// Checked is set when the run computed what it would write and wrote nothing, so the summary line
+	// says "would be rewritten" rather than claiming a rewrite that never happened.
+	Checked bool
+}
+
+// ChangedFile is one file a run rewrote, or under `--no-fix` would rewrite, and what rewrote it.
+type ChangedFile struct {
+	FileName string
+
+	// Changers names the fixing rules whose repairs landed, distinct and in the order they first
+	// landed, followed by "format" when the whole-text transform changed the result.
+	Changers []string
 }
 
 // Summarize folds per-file results into a run summary.
@@ -459,6 +488,11 @@ func Summarize(results []FileResult) Summary {
 		summary.FilesConsidered++
 		if result.Changed {
 			summary.FilesChanged++
+			changers := ruleNamesOf(result.Applied)
+			if result.Transformed {
+				changers = append(changers, transformRuleName)
+			}
+			summary.ChangedFiles = append(summary.ChangedFiles, ChangedFile{FileName: result.FileName, Changers: changers})
 		}
 		if result.Transformed {
 			summary.FilesTransformed++
@@ -498,6 +532,9 @@ func Summarize(results []FileResult) Summary {
 	sort.Strings(summary.FilesNotConverged)
 	sort.Strings(summary.FilesRefused)
 	sort.Strings(summary.FilesFailed)
+	sort.Slice(summary.ChangedFiles, func(first, second int) bool {
+		return summary.ChangedFiles[first].FileName < summary.ChangedFiles[second].FileName
+	})
 	return summary
 }
 
@@ -521,9 +558,15 @@ func reasonKey(reason string) string {
 // indistinguishable from a clean tree. The same ambiguity is available to a fixer, and this is what
 // closes it.
 func (s Summary) String() string {
+	// A checked run states the same numbers in the conditional, because "3 files rewritten" over a tree
+	// nobody wrote to is a count claiming work that never happened.
+	rewritten, applied, reformatted := "rewritten", "applied", "reformatted"
+	if s.Checked {
+		rewritten, applied, reformatted = "would be rewritten", "would apply", "would be reformatted"
+	}
 	line := fmt.Sprintf(
-		"fix: %d of %d files rewritten, %d fixes applied, %d refused",
-		s.FilesChanged, s.FilesConsidered, s.FixesApplied, s.FixesRefused,
+		"fix: %d of %d files %s, %d fixes %s, %d refused",
+		s.FilesChanged, s.FilesConsidered, rewritten, s.FixesApplied, applied, s.FixesRefused,
 	)
 
 	// The refusal breakdown attaches to the refusal count and must stay adjacent to it. It was
@@ -552,7 +595,7 @@ func (s Summary) String() string {
 	// Formatting reports its own number rather than hiding inside the rewrite count, so a run where
 	// the formatter did nothing is distinguishable from one where nothing needed formatting.
 	if s.FilesTransformed > 0 {
-		line += fmt.Sprintf(", %d reformatted", s.FilesTransformed)
+		line += fmt.Sprintf(", %d %s", s.FilesTransformed, reformatted)
 	}
 
 	// Skips print whenever there are any, and they name the reason. A formatter that declined four

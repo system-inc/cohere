@@ -300,8 +300,9 @@ func run() error {
 	unusedRequest := requestedPhases{phaseUnused: runUnused}
 
 	// `--no-fix` mutates nothing, which is what continuous integration needs and what anyone asking
-	// "what would this change" needs. It wins over `--fix` rather than erroring, because the safe
-	// reading of a contradictory pair is the one that does not write to disk.
+	// "what would this change" needs. The fix phase still runs under it, in memory: every file a
+	// writing run would rewrite is reported as a finding, so an unformatted file cannot pass a clean
+	// run. Naming it with `--fix` is refused below.
 	mutate := runFix && !*noFix
 	if *noFix && *fixOnly {
 		// Naming both is a contradiction the user should hear about rather than have silently
@@ -537,9 +538,11 @@ func run() error {
 	switch {
 	case !runFix:
 		report.record(phaseFix, outcomeSkipped, 0, "not requested")
-	case !mutate:
-		report.record(phaseFix, outcomeSkipped, 0, "--no-fix")
 	default:
+		// Under `--no-fix` everything below runs exactly as it does for a writing run, scope and
+		// formatter included, and only the write is withheld: see applyProposedFixes. It used to skip
+		// the phase, and a tree with an unformatted file printed `lint: 0 findings` over it on every
+		// clean run, with `fix skipped (--no-fix)` the only word on the phase that would have seen it.
 		// Formatting is scoped to changed files by default, and the scope is resolved before the phase
 		// runs so its description can be reported whether or not anything was formatted.
 		//
@@ -591,7 +594,11 @@ func run() error {
 		// Built before the fix phase rather than inside it, so a formatter that cannot load its
 		// bundles stops the run here with a reason rather than degrading into the nil that means
 		// nobody asked for one.
-		formatter, err := configuredFormatter(*format)
+		//
+		// `--format-all` asks for formatting by naming its scope, so it turns the formatter on. Alone it
+		// used to configure none: `cohere --format-all` formatted nothing, and `cohere --no-fix
+		// --format-all` checked nothing, each printing a clean run.
+		formatter, err := configuredFormatter(*format || *formatAll)
 		if err != nil {
 			return err
 		}
@@ -651,6 +658,7 @@ func run() error {
 			scope.formatCandidates(),
 			writeScope,
 			*maxFixPasses,
+			mutate,
 		)
 		fixDuration := time.Since(fixStart)
 		if err != nil {
@@ -668,7 +676,7 @@ func run() error {
 		// A run that rewrote files must not be replayed. The run cache stats inputs when it records, which
 		// is after the rewrite, so the manifest would match the fixed tree and the next run would replay
 		// "files rewritten" over a tree it never touched.
-		if fixSummary.FilesChanged > 0 {
+		if mutate && fixSummary.FilesChanged > 0 {
 			declineRunCache("the fix phase rewrote files")
 		}
 
@@ -676,13 +684,21 @@ func run() error {
 		// changes, staged changes, and a base-branch diff are three different answers to "what
 		// changed", and a reader cannot tell which one they got from a number alone.
 		fmt.Printf("format scope: %s\n", scope.Description)
-		report.record(phaseFix, outcomeRan, fixDuration, "")
+		if mutate {
+			report.record(phaseFix, outcomeRan, fixDuration, "")
+		} else {
+			// Each file a writing run would change is a finding, and the count joins the verdict: a
+			// `--no-fix` run over a tree `--fix` would rewrite is not clean.
+			printWouldChange(os.Stdout, fixSummary.ChangedFiles)
+			findings += len(fixSummary.ChangedFiles)
+			report.recordChecked(phaseFix, fixDuration, len(fixSummary.ChangedFiles))
+		}
 
 		// Files were rewritten, so the graph built from the old bytes no longer describes the tree.
 		// Every phase after this must read the new text or it reports findings against source that no
 		// longer exists — which is the same stale-read corruption the edit engine refuses internally,
 		// one level up.
-		if fixSummary.FilesChanged > 0 && (runTypes || runLint) {
+		if mutate && fixSummary.FilesChanged > 0 && (runTypes || runLint) {
 			rebuiltGraph, rebuildDuration, err := rebuildGraph(location.ConfigFileName, location.Root, *singleThreaded, lintConfig)
 			if err != nil {
 				report.markRemainingNotReachedFor(phaseFix, fmt.Sprintf("the graph could not be rebuilt after fixing: %v", err), unusedRequest)
@@ -718,7 +734,9 @@ func run() error {
 		//
 		// With no program file in scope the fix phase did not walk at all, and its empty result is not a
 		// walk to reuse: lint walks for itself and refuses the empty set, as it always has.
-		if fixSummary.FilesChanged == 0 && len(projectFiles) > 0 {
+		//
+		// A checked run wrote nothing whatever its count, so its walk is always the graph's own.
+		if (!mutate || fixSummary.FilesChanged == 0) && len(projectFiles) > 0 {
 			reusableWalk = &fixWalk
 		}
 	}

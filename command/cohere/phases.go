@@ -61,7 +61,7 @@ const (
 	// outcomeRan is the only outcome that means the phase's findings can be trusted as complete.
 	outcomeRan phaseOutcome = "ran"
 
-	// outcomeSkipped is a phase the caller turned off — a flag, or `--no-fix`.
+	// outcomeSkipped is a phase the caller turned off with a flag.
 	outcomeSkipped phaseOutcome = "skipped"
 
 	// outcomeNotReached is a phase that would have run and never got the chance, because an earlier
@@ -85,6 +85,14 @@ const (
 	// was conditional on what ran before it. A reused phase reporting a zero would have reintroduced
 	// it in a new place: a number that is arithmetically consistent and describes nothing.
 	outcomeReused phaseOutcome = "reused"
+
+	// outcomeChecked is the fix phase under `--no-fix`: it ran everything a writing run runs, wrote
+	// nothing, and counted the files that would have changed.
+	//
+	// Distinct from skipped, which is what `--no-fix` used to record, and the difference is a finding.
+	// A skipped fix phase looked at nothing, so an unformatted file passed a clean run unseen; a
+	// checked one looked at every candidate, and its count is in the verdict.
+	outcomeChecked phaseOutcome = "checked"
 )
 
 // phaseRecord is one phase's outcome, and what it cost.
@@ -186,6 +194,17 @@ func (r *pipelineReport) record(name phaseName, outcome phaseOutcome, elapsed ti
 	})
 }
 
+// recordChecked notes the fix phase under `--no-fix`: it ran, wrote nothing, and found this many files
+// that a writing run would change.
+func (r *pipelineReport) recordChecked(name phaseName, elapsed time.Duration, wouldChange int) {
+	r.records = append(r.records, phaseRecord{
+		Name:     name,
+		Outcome:  outcomeChecked,
+		Elapsed:  elapsed,
+		Findings: wouldChange,
+	})
+}
+
 // requested records which phases the caller actually asked for.
 //
 // Only consulted for the opt-in phases. A phase that runs by default is always "requested" in the
@@ -243,11 +262,11 @@ func (r *pipelineReport) has(name phaseName) bool {
 //
 // The warning this drives is about coverage of the *checks*, so it asks whether anything that could
 // have found a problem was prevented from looking. That is a narrower question than "did all three
-// phases run", and the difference is `--no-fix`: it deliberately mutates nothing, and a run that
-// checked types and lint completely is not a partial check merely because it declined to write. A
-// warning that fired there would appear on every continuous-integration run, and a warning that
-// fires when nothing is wrong is one people learn to stop reading — which would cost exactly the
-// case it exists for.
+// phases run", and the difference is the fix phase: a run that checked types and lint completely is
+// not a partial check merely because it was told not to fix (`--lint`, `--types`). A warning that
+// fired there would appear on every narrowed run, and a warning that fires when nothing is wrong is
+// one people learn to stop reading — which would cost exactly the case it exists for. Under
+// `--no-fix` the fix phase is not skipped at all: it is checked, and its count is in the verdict.
 //
 // A phase that was cut off is always a gap, including the fix phase, because a bail means the run
 // stopped early rather than chose not to act.
@@ -300,6 +319,11 @@ func (r *pipelineReport) Write(out io.Writer) {
 				// Says whose work it was, because "reused" without a source is an unfalsifiable claim:
 				// a reader cannot check a number that names no owner.
 				parts = append(parts, fmt.Sprintf("%s reused %s", record.Name, record.Detail))
+			case outcomeChecked:
+				// The count rides on the phase, zero included, so a clean `--no-fix` run states that it
+				// looked and found nothing to change rather than leaving that to be inferred.
+				parts = append(parts, fmt.Sprintf("%s checked in %s, %d file%s would change",
+					record.Name, round(record.Elapsed), record.Findings, plural(record.Findings)))
 			}
 		}
 	}
@@ -311,8 +335,8 @@ func (r *pipelineReport) Write(out io.Writer) {
 	// The explicit sentence for the case that matters most. A reader who takes only the last line
 	// away from a bailed run must not take away a clean bill of health.
 	//
-	// It fires on a genuine gap in what was checked, not on every partial run. `--no-fix` withholds
-	// no finding, and `--lint` alone is a deliberate narrowing whose own phase line already says so;
+	// It fires on a genuine gap in what was checked, not on every partial run. A skipped fix phase
+	// withholds no finding, and `--lint` alone is a deliberate narrowing whose own phase line already says so;
 	// warning on those would put the sentence on ordinary runs until people stopped reading it,
 	// which would cost exactly the case it exists for.
 	// A binary built from a modified tree reproduces no commit, so a number it produced cannot be
@@ -387,7 +411,7 @@ func (r *pipelineReport) writeAccounting(out io.Writer) {
 		// Only phases that actually spent the time are summed. A reused phase records a zero elapsed
 		// because its work is already counted under the phase that performed it, and adding anything
 		// for it here would double-count a single walk across two rows.
-		if record.Outcome == outcomeRan {
+		if record.Outcome == outcomeRan || record.Outcome == outcomeChecked {
 			accounted += record.Elapsed
 		}
 	}

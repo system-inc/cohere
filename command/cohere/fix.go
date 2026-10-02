@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -28,6 +29,11 @@ import (
 // Only files with at least one proposal are considered. A file nobody proposed anything for is never
 // opened, never re-parsed, and never written, which is what keeps a fix run proportional to the work
 // rather than to the tree.
+//
+// With write false this is `--no-fix`: every file goes through the same fixpoint and transform and
+// nothing reaches the disk, so the summary is what a writing run would do, stated as what would
+// change. One function with a switch rather than a second copy, because a check that decided
+// anything differently from the write would report a tree as clean that `--fix` then rewrites.
 func applyProposedFixes(
 	ctx context.Context,
 	graph *program.Graph,
@@ -37,6 +43,7 @@ func applyProposedFixes(
 	formatCandidates []string,
 	writable formatScope,
 	maxPasses int,
+	write bool,
 ) (edit.Summary, program.Result, error) {
 	// This walk is the run's FIRST walk over the program, and it is returned so the lint phase can
 	// reuse it rather than repeat it.
@@ -126,7 +133,14 @@ func applyProposedFixes(
 	if len(candidates) == 0 {
 		// An empty run still reports its population, so "nothing proposed a fix" cannot be confused
 		// with "the fixer never ran".
-		return edit.Summarize(nil), result, nil
+		summary := edit.Summarize(nil)
+		summary.Checked = !write
+		return summary, result, nil
+	}
+
+	process := edit.FixAndTransformFile
+	if !write {
+		process = edit.CheckFile
 	}
 
 	// Sorted so a run is reproducible and a diff of two runs is readable.
@@ -152,7 +166,7 @@ func applyProposedFixes(
 			return proposalsForText(fileName, text, graph, rules)
 		}
 
-		fileResult, err := edit.FixAndTransformFile(fileName, propose, transform, maxPasses)
+		fileResult, err := process(fileName, propose, transform, maxPasses)
 		if err != nil {
 			// One file failing must not abandon the rest. The failure is reported rather than
 			// swallowed, and the tree is left in a state where every other fix still landed.
@@ -170,7 +184,24 @@ func applyProposedFixes(
 		results = append(results, fileResult)
 	}
 
-	return edit.Summarize(results), result, nil
+	summary := edit.Summarize(results)
+	summary.Checked = !write
+	return summary, result, nil
+}
+
+// printWouldChange reports each file a `--no-fix` run found that `--fix` would rewrite, one finding
+// per file, in the shape every other finding prints so an editor's problem matcher and a reader keyed
+// on `[rule/id]` both see it.
+//
+// A file, not a fix, is the unit: formatting rewrites a file as a whole, and the fixable findings
+// behind a repair already print under lint at their own positions. What this adds is the fact the
+// rest of the run cannot state, that this file is not what the gate would leave, and which rules or
+// the formatter would change it. Before it, an unformatted file passed a clean `--no-fix` run unseen.
+func printWouldChange(out io.Writer, changed []edit.ChangedFile) {
+	for _, file := range changed {
+		fmt.Fprintf(out, "%s:1:1 - --fix would rewrite this file: %s [fix/would-change]\n",
+			file.FileName, strings.Join(file.Changers, ", "))
+	}
 }
 
 // reportWithheld names the files whose repairs were withheld because they sit outside what the

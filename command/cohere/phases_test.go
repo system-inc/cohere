@@ -113,19 +113,26 @@ func warnsAboutCoverage(line string) bool {
 	return strings.Contains(line, "did not check everything")
 }
 
-// `--no-fix` withholds no finding, so it must not warn. This is the continuous-integration path and
-// a warning that fires on every green run is one people stop reading — which costs exactly the case
+// `--no-fix` checks the fix phase rather than skipping it, and says how many files would change, zero
+// included. It must not warn: it withheld nothing. This is the continuous-integration path and a
+// warning that fires on every green run is one people stop reading — which costs exactly the case
 // the warning exists for.
-func TestNoFixDoesNotWarn(t *testing.T) {
-	report := &pipelineReport{}
-	report.record(phaseFix, outcomeSkipped, 0, "--no-fix")
-	report.record(phaseTypes, outcomeRan, 12*time.Millisecond, "")
-	report.record(phaseLint, outcomeRan, 7*time.Millisecond, "")
+func TestNoFixChecksAndDoesNotWarn(t *testing.T) {
+	for _, testCase := range []struct {
+		wouldChange int
+		want        string
+	}{
+		{0, "phases: fix checked in 3ms, 0 files would change · types ran in 12ms · lint ran in 7ms\n"},
+		{1, "phases: fix checked in 3ms, 1 file would change · types ran in 12ms · lint ran in 7ms\n"},
+	} {
+		report := &pipelineReport{}
+		report.recordChecked(phaseFix, 3*time.Millisecond, testCase.wouldChange)
+		report.record(phaseTypes, outcomeRan, 12*time.Millisecond, "")
+		report.record(phaseLint, outcomeRan, 7*time.Millisecond, "")
 
-	got := render(report)
-	want := "phases: fix skipped (--no-fix) · types ran in 12ms · lint ran in 7ms\n"
-	if got != want {
-		t.Fatalf("--no-fix warned or read wrong:\n  want %q\n  got  %q", want, got)
+		if got := render(report); got != testCase.want {
+			t.Fatalf("--no-fix warned or read wrong:\n  want %q\n  got  %q", testCase.want, got)
+		}
 	}
 }
 

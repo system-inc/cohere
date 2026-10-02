@@ -479,3 +479,54 @@ func TestTheWholeSummaryLineReadsCorrectly(t *testing.T) {
 		})
 	}
 }
+
+// CheckFile is FixAndTransformFile without the write: the same result, the file untouched. It is what
+// `--no-fix` reports, so a result that differed from the writing run's would report a tree as clean
+// that `--fix` then rewrites.
+func TestCheckFileComputesTheWriteAndLeavesTheFile(t *testing.T) {
+	directory := t.TempDir()
+	original := "const a = 'old';\n"
+	checked := filepath.Join(directory, "checked.ts")
+	written := filepath.Join(directory, "written.ts")
+	for _, fileName := range []string{checked, written} {
+		if err := os.WriteFile(fileName, []byte(original), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	transform := func(_ string, text string) (string, error) {
+		return strings.ReplaceAll(text, "const", "export const"), nil
+	}
+
+	checkResult, err := CheckFile(checked, proposeWhileContains("'old'", "'new'", "renamer"), transform, DefaultMaxPasses)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeResult, err := FixAndTransformFile(written, proposeWhileContains("'old'", "'new'", "renamer"), transform, DefaultMaxPasses)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if contents, _ := os.ReadFile(checked); string(contents) != original {
+		t.Fatalf("CheckFile wrote to disk:\n%s", contents)
+	}
+	if contents, _ := os.ReadFile(written); checkResult.Text != string(contents) || !checkResult.Changed || !checkResult.Transformed {
+		t.Fatalf("the check and the write disagree:\n  checked %q (changed %v, transformed %v)\n  written %q",
+			checkResult.Text, checkResult.Changed, checkResult.Transformed, contents)
+	}
+
+	// The summary names the file and what changed it, the rule before the formatter, and a checked
+	// run says so in the conditional rather than claiming a rewrite.
+	summary := Summarize([]FileResult{checkResult})
+	summary.Checked = true
+	if len(summary.ChangedFiles) != 1 || summary.ChangedFiles[0].FileName != checked ||
+		strings.Join(summary.ChangedFiles[0].Changers, ",") != "renamer,format" {
+		t.Fatalf("the changed file was not named with what changed it: %+v", summary.ChangedFiles)
+	}
+	if line := summary.String(); !strings.Contains(line, "1 of 1 files would be rewritten, 1 fixes would apply") ||
+		!strings.Contains(line, "1 would be reformatted") {
+		t.Fatalf("a checked summary claims a rewrite: %s", line)
+	}
+	if line := Summarize([]FileResult{writeResult}).String(); !strings.Contains(line, "1 of 1 files rewritten, 1 fixes applied") {
+		t.Fatalf("the writing run's line moved: %s", line)
+	}
+}
