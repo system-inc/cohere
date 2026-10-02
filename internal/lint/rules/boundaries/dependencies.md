@@ -30,7 +30,7 @@ Two blocks of `BaseLintConfiguration.ts` turn it on, each with its own elements:
 
 Upstream reads elements from `settings["boundaries/elements"]`. cohere has no plugin settings and its
 overrides carry rules alone, so the elements travel inside the rule's options as `elements`. Nothing
-else moves. `translate-base-eslint-to-cohere.mjs` (task 8zg74pq) writes them there.
+else moves.
 
 ## What is refused, by name, when the config is read
 
