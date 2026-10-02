@@ -50,6 +50,26 @@ func TestARecordingFileSystemNotesEveryPathAndRefusesWrites(t *testing.T) {
 		t.Errorf("recorded:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 
+	// A present file keeps the size and modification time it had when read, so a cache hashing it
+	// later can tell it moved in between; an absent one has neither.
+	info, err := os.Stat(project + "/source/theme.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, read := range recording.Reads() {
+		switch {
+		case strings.HasSuffix(read.Path, "/source/theme.css"):
+			if read.Size != info.Size() || read.ModifiedNanoseconds != info.ModTime().UnixNano() {
+				t.Errorf("the stylesheet recorded size %d and time %d, want %d and %d",
+					read.Size, read.ModifiedNanoseconds, info.Size(), info.ModTime().UnixNano())
+			}
+		case !read.Present:
+			if read.Size != 0 || read.ModifiedNanoseconds != 0 {
+				t.Errorf("absent %s recorded a size or a time", read.Path)
+			}
+		}
+	}
+
 	for name, write := range map[string]func(){
 		"WriteFile":  func() { recording.WriteFile(project+"/out.css", "") },
 		"AppendFile": func() { recording.AppendFile(project+"/out.css", "") },

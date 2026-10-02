@@ -13,9 +13,15 @@ import (
 //
 // Absence is recorded as carefully as presence: a design system that looked for an entry point and did
 // not find it depends on that file staying absent, since creating it changes the design system.
+//
+// A present path keeps the size and modification time it had when it was first asked about, so a
+// cache hashing it afterwards can re-stat and decline to record a file that moved between the read and
+// the hash, the race the run cache closes the same way for its own inputs.
 type FileRead struct {
-	Path    string
-	Present bool
+	Path                string
+	Present             bool
+	Size                int64
+	ModifiedNanoseconds int64
 }
 
 // RecordingFS is a file system that notes every path it is asked about and refuses to write.
@@ -27,14 +33,14 @@ type FileRead struct {
 type RecordingFS struct {
 	underlying vfs.FS
 	mutex      sync.Mutex
-	reads      map[string]bool
+	reads      map[string]FileRead
 }
 
 var _ vfs.FS = (*RecordingFS)(nil)
 
 // NewRecordingFS wraps underlying.
 func NewRecordingFS(underlying vfs.FS) *RecordingFS {
-	return &RecordingFS{underlying: underlying, reads: map[string]bool{}}
+	return &RecordingFS{underlying: underlying, reads: map[string]FileRead{}}
 }
 
 // Reads is every path asked about, sorted. A path seen both present and absent keeps present.
@@ -42,8 +48,8 @@ func (recording *RecordingFS) Reads() []FileRead {
 	recording.mutex.Lock()
 	defer recording.mutex.Unlock()
 	reads := make([]FileRead, 0, len(recording.reads))
-	for path, present := range recording.reads {
-		reads = append(reads, FileRead{Path: path, Present: present})
+	for _, read := range recording.reads {
+		reads = append(reads, read)
 	}
 	sort.Slice(reads, func(first, second int) bool { return reads[first].Path < reads[second].Path })
 	return reads
@@ -51,8 +57,18 @@ func (recording *RecordingFS) Reads() []FileRead {
 
 func (recording *RecordingFS) note(path string, present bool) {
 	recording.mutex.Lock()
-	recording.reads[path] = recording.reads[path] || present
-	recording.mutex.Unlock()
+	defer recording.mutex.Unlock()
+	if earlier, seen := recording.reads[path]; seen && (earlier.Present || !present) {
+		return
+	}
+	read := FileRead{Path: path, Present: present}
+	if present {
+		if info := recording.underlying.Stat(path); info != nil {
+			read.Size = info.Size()
+			read.ModifiedNanoseconds = info.ModTime().UnixNano()
+		}
+	}
+	recording.reads[path] = read
 }
 
 func (recording *RecordingFS) refuse(method string, path string) {
