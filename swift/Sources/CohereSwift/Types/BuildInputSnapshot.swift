@@ -64,7 +64,7 @@ struct BuildInputSnapshot: Equatable, Codable {
         }
         let lines = settings + files.map { "\($0.key)\t\($0.value)" }.sorted()
         let digest = SHA256.hash(data: Data(lines.joined(separator: "\n").utf8))
-        return BuildInputSnapshot(fingerprint: digest.map { String(format: "%02x", $0) }.joined(), settings: settings, files: files)
+        return BuildInputSnapshot(fingerprint: digest.map { String($0 >> 4, radix: 16) + String($0 & 0x0f, radix: 16) }.joined(), settings: settings, files: files)
     }
 
     /*

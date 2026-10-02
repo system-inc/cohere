@@ -22,8 +22,11 @@ import Synchronization
  A file is opened as an editor document before it is asked about, because a cold `source.request.diagnostics`
  on a file nobody opened returned an empty answer in the design's first probe. It is closed afterwards, so
  the session does not hold every AST of a 472-file module at once.
+
+ `@safe` though it holds sourcekitd's C functions: they are private and called only in `send`, `uid` and the
+ `set`s, and a question sees its request only as a `Request`, never as the pointer inside it.
  */
-final class Sourcekitd: Sendable {
+@safe final class Sourcekitd: Sendable {
     /* The library could not be found or loaded, or answered a request with an error. */
     struct Failure: Error, CustomStringConvertible {
         var description: String
@@ -107,6 +110,15 @@ final class Sourcekitd: Sendable {
         }
     }
 
+    /*
+     A request while it is being filled, the sourcekitd object kept private so the questions below fill it in
+     Swift values. `@safe` because only the `set`s below reach the object, and `send` creates each request, lends
+     it to the fill, and releases it only after the response arrives.
+     */
+    @safe private struct Request {
+        fileprivate let object: CohereSourcekitdObject
+    }
+
     /* An answer read only for whether it was an error: opening and closing a document. */
     private struct Acknowledgement: Decodable {}
 
@@ -151,31 +163,36 @@ final class Sourcekitd: Sendable {
     }
 
     private init(libraryPath: String) throws {
-        guard let handle = dlopen(libraryPath, RTLD_NOW | RTLD_LOCAL) else {
-            let reason = dlerror().map { String(cString: $0) } ?? "no reason given"
+        guard let handle = unsafe dlopen(libraryPath, RTLD_NOW | RTLD_LOCAL) else {
+            let reason = unsafe dlerror().map { unsafe String(cString: $0) } ?? "no reason given"
             throw Failure(description: "could not load sourcekitd at \(libraryPath): \(reason)")
         }
+        /*
+         One entry point, bound to the type the shim declares for it. Unsafe because the cast trusts the symbol to
+         have that C signature, which holds because the shim's types follow sourcekitd.h, the header SourceKit-LSP
+         compiles against. Each binding below is unsafe for the same reason.
+         */
         func symbol<Function>(_ name: String, as type: Function.Type) throws -> Function {
-            guard let address = dlsym(handle, name) else {
+            guard let address = unsafe dlsym(handle, name) else {
                 throw Failure(description: "sourcekitd at \(libraryPath) has no \(name)")
             }
-            return unsafeBitCast(address, to: type)
+            return unsafe unsafeBitCast(address, to: type)
         }
-        uidFromString = try symbol("sourcekitd_uid_get_from_cstr", as: CohereSourcekitdUidGetFromCString.self)
-        dictionaryCreate = try symbol("sourcekitd_request_dictionary_create", as: CohereSourcekitdRequestDictionaryCreate.self)
-        dictionarySetString = try symbol("sourcekitd_request_dictionary_set_string", as: CohereSourcekitdRequestDictionarySetString.self)
-        dictionarySetUid = try symbol("sourcekitd_request_dictionary_set_uid", as: CohereSourcekitdRequestDictionarySetUid.self)
-        dictionarySetInteger = try symbol("sourcekitd_request_dictionary_set_int64", as: CohereSourcekitdRequestDictionarySetInt64.self)
-        dictionarySetValue = try symbol("sourcekitd_request_dictionary_set_value", as: CohereSourcekitdRequestDictionarySetValue.self)
-        arrayCreate = try symbol("sourcekitd_request_array_create", as: CohereSourcekitdRequestArrayCreate.self)
-        arraySetString = try symbol("sourcekitd_request_array_set_string", as: CohereSourcekitdRequestArraySetString.self)
-        requestRelease = try symbol("sourcekitd_request_release", as: CohereSourcekitdRequestRelease.self)
-        sendSynchronously = try symbol("sourcekitd_send_request_sync", as: CohereSourcekitdSendRequestSync.self)
-        responseIsError = try symbol("sourcekitd_response_is_error", as: CohereSourcekitdResponseIsError.self)
-        errorDescription = try symbol("sourcekitd_response_error_get_description", as: CohereSourcekitdResponseErrorGetDescription.self)
-        responseValue = try symbol("sourcekitd_response_get_value", as: CohereSourcekitdResponseGetValue.self)
-        jsonDescription = try symbol("sourcekitd_variant_json_description_copy", as: CohereSourcekitdVariantJsonDescriptionCopy.self)
-        responseDispose = try symbol("sourcekitd_response_dispose", as: CohereSourcekitdResponseDispose.self)
+        unsafe uidFromString = try symbol("sourcekitd_uid_get_from_cstr", as: CohereSourcekitdUidGetFromCString.self)
+        unsafe dictionaryCreate = try symbol("sourcekitd_request_dictionary_create", as: CohereSourcekitdRequestDictionaryCreate.self)
+        unsafe dictionarySetString = try symbol("sourcekitd_request_dictionary_set_string", as: CohereSourcekitdRequestDictionarySetString.self)
+        unsafe dictionarySetUid = try symbol("sourcekitd_request_dictionary_set_uid", as: CohereSourcekitdRequestDictionarySetUid.self)
+        unsafe dictionarySetInteger = try symbol("sourcekitd_request_dictionary_set_int64", as: CohereSourcekitdRequestDictionarySetInt64.self)
+        unsafe dictionarySetValue = try symbol("sourcekitd_request_dictionary_set_value", as: CohereSourcekitdRequestDictionarySetValue.self)
+        unsafe arrayCreate = try symbol("sourcekitd_request_array_create", as: CohereSourcekitdRequestArrayCreate.self)
+        unsafe arraySetString = try symbol("sourcekitd_request_array_set_string", as: CohereSourcekitdRequestArraySetString.self)
+        unsafe requestRelease = try symbol("sourcekitd_request_release", as: CohereSourcekitdRequestRelease.self)
+        unsafe sendSynchronously = try symbol("sourcekitd_send_request_sync", as: CohereSourcekitdSendRequestSync.self)
+        unsafe responseIsError = try symbol("sourcekitd_response_is_error", as: CohereSourcekitdResponseIsError.self)
+        unsafe errorDescription = try symbol("sourcekitd_response_error_get_description", as: CohereSourcekitdResponseErrorGetDescription.self)
+        unsafe responseValue = try symbol("sourcekitd_response_get_value", as: CohereSourcekitdResponseGetValue.self)
+        unsafe jsonDescription = try symbol("sourcekitd_variant_json_description_copy", as: CohereSourcekitdVariantJsonDescriptionCopy.self)
+        unsafe responseDispose = try symbol("sourcekitd_response_dispose", as: CohereSourcekitdResponseDispose.self)
         let initialize = try symbol("sourcekitd_initialize", as: CohereSourcekitdInitialize.self)
         initialize()
     }
@@ -268,50 +285,60 @@ final class Sourcekitd: Sendable {
         return try body()
     }
 
-    /* One request, answered synchronously, its response decoded from the JSON sourcekitd describes it as. */
-    private func send<Response: Decodable>(_ kind: String, _ fill: (CohereSourcekitdObject) -> Void) throws -> Response {
-        guard let request = dictionaryCreate(nil, nil, 0) else {
+    /*
+     One request, answered synchronously, its response decoded from the JSON sourcekitd describes it as. Its calls
+     into sourcekitd are marked: each passes an object this function created and has not yet released, and the
+     JSON is copied into Swift before it is freed.
+     */
+    private func send<Response: Decodable>(_ kind: String, _ fill: (Request) -> Void) throws -> Response {
+        guard let request = unsafe dictionaryCreate(nil, nil, 0) else {
             throw Failure(description: "sourcekitd could not create a request")
         }
-        defer { requestRelease(request) }
-        dictionarySetUid(request, uid("key.request"), uid(kind))
-        fill(request)
-        guard let response = sendSynchronously(request) else {
+        defer { unsafe requestRelease(request) }
+        unsafe dictionarySetUid(request, uid("key.request"), uid(kind))
+        fill(unsafe Request(object: request))
+        guard let response = unsafe sendSynchronously(request) else {
             throw Failure(description: "sourcekitd returned no response to \(kind)")
         }
-        defer { responseDispose(response) }
-        if responseIsError(response) {
-            let reason = errorDescription(response).map { String(cString: $0) } ?? "no reason given"
+        defer { unsafe responseDispose(response) }
+        if unsafe responseIsError(response) {
+            let reason = unsafe errorDescription(response).map { unsafe String(cString: $0) } ?? "no reason given"
             throw Failure(description: "sourcekitd answered \(kind) with an error: \(reason)")
         }
-        guard let json = jsonDescription(responseValue(response)) else {
+        guard let json = unsafe jsonDescription(responseValue(response)) else {
             throw Failure(description: "sourcekitd's answer to \(kind) could not be described")
         }
-        defer { free(json) }
-        return try JSONDecoder().decode(Response.self, from: Data(String(cString: json).utf8))
+        defer { unsafe free(json) }
+        return try JSONDecoder().decode(Response.self, from: unsafe Data(String(cString: json).utf8))
     }
 
     /* `SOURCEKITD_ARRAY_APPEND`, `(size_t)-1`: `size_t` arrives in Swift as `Int`, so its all-ones bit pattern is -1. */
     private static let arrayAppend = Int(bitPattern: UInt.max)
 
+    /* A key's interned identifier. Unsafe only as a call into sourcekitd: it copies the name, so the Swift string need outlive nothing. */
     private func uid(_ name: String) -> CohereSourcekitdUid? {
-        uidFromString(name)
+        unsafe uidFromString(name)
     }
 
-    private func set(_ request: CohereSourcekitdObject, _ key: String, _ value: String) {
-        dictionarySetString(request, uid(key), value)
+    /*
+     The three ways a question fills its request, the only code that reaches inside a `Request`. Unsafe as calls
+     into sourcekitd; correct because they run only inside `send`'s fill, while the request is alive, and
+     sourcekitd copies every string and takes its own reference to the array.
+     */
+    private func set(_ request: Request, _ key: String, _ value: String) {
+        unsafe dictionarySetString(request.object, uid(key), value)
     }
 
-    private func set(_ request: CohereSourcekitdObject, _ key: String, _ value: Int64) {
-        dictionarySetInteger(request, uid(key), value)
+    private func set(_ request: Request, _ key: String, _ value: Int64) {
+        unsafe dictionarySetInteger(request.object, uid(key), value)
     }
 
-    private func set(_ request: CohereSourcekitdObject, _ key: String, _ values: [String]) {
-        guard let array = arrayCreate(nil, 0) else { return }
+    private func set(_ request: Request, _ key: String, _ values: [String]) {
+        guard let array = unsafe arrayCreate(nil, 0) else { return }
         for value in values {
-            arraySetString(array, Self.arrayAppend, value)
+            unsafe arraySetString(array, Self.arrayAppend, value)
         }
-        dictionarySetValue(request, uid(key), array)
-        requestRelease(array)
+        unsafe dictionarySetValue(request.object, uid(key), array)
+        unsafe requestRelease(array)
     }
 }

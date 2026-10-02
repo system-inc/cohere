@@ -56,6 +56,7 @@ public enum RuleRegistry {
     public static let packageRules: [any PackageRule] = [
         RequireSwiftSixLanguageMode(),
         RequireUpcomingFeatures(),
+        RequireStrictMemorySafety(),
     ]
 
     /* Sorted, so two binaries' lists can be compared with `diff`. */

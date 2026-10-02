@@ -15,8 +15,8 @@ import Foundation
  Neither is on by default in Swift 6 language mode. Both are read from SwiftPM's own answer
  (`dump-package`), so a target that enables them any way the manifest can spell is seen as enabled.
 
- Strict memory safety (SE-0458) is not required here: it lights up unsafe-pointer code like ByteRing
- throughout, and whether the house requires it is Kirk's decision, put to him with counts.
+ Strict memory safety (SE-0458) is a setting rather than an upcoming feature, so its own rule requires it
+ (`require-strict-memory-safety`).
 
  Plugin and macro targets are skipped: their settings serve the build tool, not the code being judged. So
  is a target with no Swift sources (a C or C++ target like Presence's `MotionCorrection`): Swift features

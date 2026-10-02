@@ -29,6 +29,7 @@ let sourceTreeModified = Context.gitInformation?.hasUncommittedChanges ?? true
 let houseSettings: [SwiftSetting] = [
     .enableUpcomingFeature("ExistentialAny"),
     .enableUpcomingFeature("MemberImportVisibility"),
+    .strictMemorySafety(),
 ]
 
 let package = Package(

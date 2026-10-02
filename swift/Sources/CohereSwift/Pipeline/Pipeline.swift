@@ -473,7 +473,7 @@ public struct Pipeline {
 
     public static func scratchPath(for root: URL) -> URL {
         let digest = SHA256.hash(data: Data(root.resolvingSymlinksInPath().path.utf8))
-        let key = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+        let key = digest.prefix(8).map { String($0 >> 4, radix: 16) + String($0 & 0x0f, radix: 16) }.joined()
         return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Caches/cohere/swift", isDirectory: true)
             .appendingPathComponent(key, isDirectory: true)

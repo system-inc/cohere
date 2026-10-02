@@ -13,8 +13,12 @@ import IndexStoreShim
  no longer there.
 
  Measured on Presence: 2,531 units, listed in 9ms.
+
+ `@safe` though it holds the store and the library's C functions: they are private, bound in `init` and called
+ only in the readers at the bottom of this class, and every string the library lends there is copied into Swift
+ before the reader that lent it is disposed.
  */
-final class IndexStore {
+@safe final class IndexStore {
     /* The library or the store could not be opened. */
     struct Failure: Error, CustomStringConvertible {
         var description: String
@@ -71,6 +75,35 @@ final class IndexStore {
 
         var isReference: Bool { roles & IndexStore.referenceRole != 0 }
         var isDeclaration: Bool { roles & IndexStore.declarationRoles != 0 }
+        var isImplicit: Bool { roles & IndexStore.implicitRole != 0 }
+    }
+
+    /* One unit as its reader reports it, copied whole before the reader is disposed, since every string it lends dies with it. */
+    private struct UnitReading {
+        var mainFile: String
+        var module: String
+        var outputFile: String
+        var isSystem: Bool
+        var dependencies: [Dependency]
+    }
+
+    /* One dependency of a unit, of the three kinds `units` reads. */
+    private enum Dependency {
+        /* A module the unit's file imports, empty when the store names none. */
+        case module(String)
+        /* A record the unit names, and the file it describes. */
+        case record(name: String, file: String)
+        /* A file the compile read without recording it. */
+        case file(String)
+    }
+
+    /* A Swift closure boxed so a C iterator can carry it as its context pointer. */
+    private final class Visitor<Element> {
+        let visit: (Element) -> Void
+
+        init(_ visit: @escaping (Element) -> Void) {
+            self.visit = visit
+        }
     }
 
     private let store: CohereIndexStore
@@ -102,48 +135,53 @@ final class IndexStore {
     private var cachedUnits: [Unit]?
 
     init(libraryPath: String, storePath: URL) throws {
-        guard let handle = dlopen(libraryPath, RTLD_NOW | RTLD_LOCAL) else {
-            let reason = dlerror().map { String(cString: $0) } ?? "no reason given"
+        guard let handle = unsafe dlopen(libraryPath, RTLD_NOW | RTLD_LOCAL) else {
+            let reason = unsafe dlerror().map { unsafe String(cString: $0) } ?? "no reason given"
             throw Failure(description: "could not load the index store library at \(libraryPath): \(reason)")
         }
+        /*
+         One entry point, bound to the type the shim declares for it. Unsafe because the cast trusts the symbol to
+         have that C signature, which holds because the shim's types follow indexstore.h, the header IndexStoreDB
+         compiles against. Each binding below is unsafe for the same reason.
+         */
         func symbol<Function>(_ name: String, as type: Function.Type) throws -> Function {
-            guard let address = dlsym(handle, name) else {
+            guard let address = unsafe dlsym(handle, name) else {
                 throw Failure(description: "the index store library at \(libraryPath) has no \(name)")
             }
-            return unsafeBitCast(address, to: type)
+            return unsafe unsafeBitCast(address, to: type)
         }
-        let create = try symbol("indexstore_store_create", as: CohereIndexStoreCreate.self)
-        dispose = try symbol("indexstore_store_dispose", as: CohereIndexStoreDispose.self)
-        unitsApply = try symbol("indexstore_store_units_apply_f", as: CohereIndexStoreUnitsApply.self)
-        unitReaderCreate = try symbol("indexstore_unit_reader_create", as: CohereIndexUnitReaderCreate.self)
-        unitReaderDispose = try symbol("indexstore_unit_reader_dispose", as: CohereIndexUnitReaderDispose.self)
-        unitMainFile = try symbol("indexstore_unit_reader_get_main_file", as: CohereIndexUnitReaderGetMainFile.self)
-        unitModuleName = try symbol("indexstore_unit_reader_get_module_name", as: CohereIndexUnitReaderGetModuleName.self)
-        unitOutputFile = try symbol("indexstore_unit_reader_get_output_file", as: CohereIndexUnitReaderGetOutputFile.self)
-        unitIsSystem = try symbol("indexstore_unit_reader_is_system_unit", as: CohereIndexUnitReaderIsSystemUnit.self)
-        dependenciesApply = try symbol("indexstore_unit_reader_dependencies_apply_f", as: CohereIndexUnitReaderDependenciesApply.self)
-        dependencyKind = try symbol("indexstore_unit_dependency_get_kind", as: CohereIndexUnitDependencyGetKind.self)
-        dependencyName = try symbol("indexstore_unit_dependency_get_name", as: CohereIndexUnitDependencyGetName.self)
-        dependencyFilePath = try symbol("indexstore_unit_dependency_get_filepath", as: CohereIndexUnitDependencyGetFilePath.self)
-        dependencyModuleName = try symbol("indexstore_unit_dependency_get_modulename", as: CohereIndexUnitDependencyGetModuleName.self)
-        recordReaderCreate = try symbol("indexstore_record_reader_create", as: CohereIndexRecordReaderCreate.self)
-        recordReaderDispose = try symbol("indexstore_record_reader_dispose", as: CohereIndexRecordReaderDispose.self)
-        occurrencesApply = try symbol("indexstore_record_reader_occurrences_apply_f", as: CohereIndexRecordReaderOccurrencesApply.self)
-        occurrenceSymbol = try symbol("indexstore_occurrence_get_symbol", as: CohereIndexOccurrenceGetSymbol.self)
-        occurrenceRoles = try symbol("indexstore_occurrence_get_roles", as: CohereIndexOccurrenceGetRoles.self)
-        occurrenceLineColumn = try symbol("indexstore_occurrence_get_line_col", as: CohereIndexOccurrenceGetLineColumn.self)
-        symbolName = try symbol("indexstore_symbol_get_name", as: CohereIndexSymbolGetString.self)
-        symbolIdentifier = try symbol("indexstore_symbol_get_usr", as: CohereIndexSymbolGetString.self)
-        symbolKind = try symbol("indexstore_symbol_get_kind", as: CohereIndexSymbolGetKind.self)
-        guard FileManager.default.fileExists(atPath: storePath.appendingPathComponent("v5/units").path), let store = create(storePath.path, nil) else {
+        let create = try unsafe symbol("indexstore_store_create", as: CohereIndexStoreCreate.self)
+        unsafe dispose = try symbol("indexstore_store_dispose", as: CohereIndexStoreDispose.self)
+        unsafe unitsApply = try symbol("indexstore_store_units_apply_f", as: CohereIndexStoreUnitsApply.self)
+        unsafe unitReaderCreate = try symbol("indexstore_unit_reader_create", as: CohereIndexUnitReaderCreate.self)
+        unsafe unitReaderDispose = try symbol("indexstore_unit_reader_dispose", as: CohereIndexUnitReaderDispose.self)
+        unsafe unitMainFile = try symbol("indexstore_unit_reader_get_main_file", as: CohereIndexUnitReaderGetMainFile.self)
+        unsafe unitModuleName = try symbol("indexstore_unit_reader_get_module_name", as: CohereIndexUnitReaderGetModuleName.self)
+        unsafe unitOutputFile = try symbol("indexstore_unit_reader_get_output_file", as: CohereIndexUnitReaderGetOutputFile.self)
+        unsafe unitIsSystem = try symbol("indexstore_unit_reader_is_system_unit", as: CohereIndexUnitReaderIsSystemUnit.self)
+        unsafe dependenciesApply = try symbol("indexstore_unit_reader_dependencies_apply_f", as: CohereIndexUnitReaderDependenciesApply.self)
+        unsafe dependencyKind = try symbol("indexstore_unit_dependency_get_kind", as: CohereIndexUnitDependencyGetKind.self)
+        unsafe dependencyName = try symbol("indexstore_unit_dependency_get_name", as: CohereIndexUnitDependencyGetName.self)
+        unsafe dependencyFilePath = try symbol("indexstore_unit_dependency_get_filepath", as: CohereIndexUnitDependencyGetFilePath.self)
+        unsafe dependencyModuleName = try symbol("indexstore_unit_dependency_get_modulename", as: CohereIndexUnitDependencyGetModuleName.self)
+        unsafe recordReaderCreate = try symbol("indexstore_record_reader_create", as: CohereIndexRecordReaderCreate.self)
+        unsafe recordReaderDispose = try symbol("indexstore_record_reader_dispose", as: CohereIndexRecordReaderDispose.self)
+        unsafe occurrencesApply = try symbol("indexstore_record_reader_occurrences_apply_f", as: CohereIndexRecordReaderOccurrencesApply.self)
+        unsafe occurrenceSymbol = try symbol("indexstore_occurrence_get_symbol", as: CohereIndexOccurrenceGetSymbol.self)
+        unsafe occurrenceRoles = try symbol("indexstore_occurrence_get_roles", as: CohereIndexOccurrenceGetRoles.self)
+        unsafe occurrenceLineColumn = try symbol("indexstore_occurrence_get_line_col", as: CohereIndexOccurrenceGetLineColumn.self)
+        unsafe symbolName = try symbol("indexstore_symbol_get_name", as: CohereIndexSymbolGetString.self)
+        unsafe symbolIdentifier = try symbol("indexstore_symbol_get_usr", as: CohereIndexSymbolGetString.self)
+        unsafe symbolKind = try symbol("indexstore_symbol_get_kind", as: CohereIndexSymbolGetKind.self)
+        guard FileManager.default.fileExists(atPath: storePath.appendingPathComponent("v5/units").path), let store = unsafe create(storePath.path, nil) else {
             throw Failure(description: "no index store at \(storePath.path): the build wrote none, or wrote it where this engine does not look")
         }
-        self.store = store
+        unsafe self.store = store
         self.storePath = storePath
     }
 
     deinit {
-        dispose(store)
+        unsafe dispose(store)
     }
 
     /* The library beside the `swift` that `xcrun` resolves. */
@@ -162,37 +200,17 @@ final class IndexStore {
         let path = file.resolvingSymlinksInPath().path
         let sourceModified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantFuture
         guard let newest = records()[path]?.filter({ $0.written >= sourceModified }).max(by: { $0.written < $1.written }) else { return nil }
-        guard let reader = recordReaderCreate(store, newest.record, nil) else { return nil }
-        defer { recordReaderDispose(reader) }
-        final class Collected {
-            var occurrences: [FileSymbols.Occurrence] = []
-            let store: IndexStore
-            init(store: IndexStore) { self.store = store }
-        }
-        let collected = Collected(store: self)
-        _ = occurrencesApply(reader, Unmanaged.passUnretained(collected).toOpaque()) { context, occurrence in
-            guard let context, let occurrence else { return true }
-            let collected = Unmanaged<Collected>.fromOpaque(context).takeUnretainedValue()
-            collected.occurrences.append(collected.store.occurrence(occurrence))
-            return true
-        }
-        return FileSymbols(collected.occurrences)
-    }
-
-    private func occurrence(_ occurrence: CohereIndexOccurrence) -> FileSymbols.Occurrence {
-        var line: UInt32 = 0
-        var column: UInt32 = 0
-        occurrenceLineColumn(occurrence, &line, &column)
-        let symbol = occurrenceSymbol(occurrence)
-        let roles = occurrenceRoles(occurrence)
-        return FileSymbols.Occurrence(
-            line: Int(line),
-            column: Int(column),
-            symbol: Self.text(symbolIdentifier(symbol)),
-            name: Self.text(symbolName(symbol)),
-            isReference: roles & Self.referenceRole != 0,
-            isImplicit: roles & Self.implicitRole != 0
-        )
+        guard let recorded = occurrences(inRecord: newest.record) else { return nil }
+        return FileSymbols(recorded.map { occurrence in
+            FileSymbols.Occurrence(
+                line: occurrence.line,
+                column: occurrence.column,
+                symbol: occurrence.symbol,
+                name: occurrence.name,
+                isReference: occurrence.isReference,
+                isImplicit: occurrence.isImplicit
+            )
+        })
     }
 
     /* Each file's records, by resolved path, with when the unit naming them was written. */
@@ -226,116 +244,158 @@ final class IndexStore {
         if let cachedUnits {
             return cachedUnits
         }
-        final class Names {
-            var values: [String] = []
-        }
-        let names = Names()
-        _ = unitsApply(store, 0, Unmanaged.passUnretained(names).toOpaque()) { context, name in
-            guard let context else { return false }
-            Unmanaged<Names>.fromOpaque(context).takeUnretainedValue().values.append(IndexStore.text(name))
-            return true
-        }
         let unitsDirectory = storePath.appendingPathComponent("v5/units", isDirectory: true)
         var units: [Unit] = []
         let sdkRoots = SDKRoots()
-        for name in names.values {
-            guard let reader = unitReaderCreate(store, name, nil) else { continue }
-            defer { unitReaderDispose(reader) }
-            let mainFile = Self.text(unitMainFile(reader))
+        for name in unitNames() {
+            guard let reading = readUnit(named: name) else { continue }
             let written = (try? unitsDirectory.appendingPathComponent(name).resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-            final class Dependencies {
-                let store: IndexStore
-                let mainFile: String
-                let sdkRoots: SDKRoots
-                var imported: [String] = []
-                var own: [String] = []
-                var all: [String] = []
-                var recordFiles: [String: String] = [:]
-                var files: [String] = []
-                init(store: IndexStore, mainFile: String, sdkRoots: SDKRoots) {
-                    self.store = store
-                    self.mainFile = mainFile
-                    self.sdkRoots = sdkRoots
-                }
-            }
-            let dependencies = Dependencies(store: self, mainFile: mainFile, sdkRoots: sdkRoots)
-            _ = dependenciesApply(reader, Unmanaged.passUnretained(dependencies).toOpaque()) { context, dependency in
-                guard let context, let dependency else { return true }
-                let dependencies = Unmanaged<Dependencies>.fromOpaque(context).takeUnretainedValue()
-                let store = dependencies.store
-                switch store.dependencyKind(dependency) {
-                case IndexStore.unitDependency:
-                    let module = IndexStore.text(store.dependencyModuleName(dependency))
+            var imported: [String] = []
+            var own: [String] = []
+            var all: [String] = []
+            var recordFiles: [String: String] = [:]
+            var files: [String] = []
+            for dependency in reading.dependencies {
+                switch dependency {
+                case .module(let module):
                     if !module.isEmpty {
-                        dependencies.imported.append(module)
+                        imported.append(module)
                     }
-                case IndexStore.recordDependency:
-                    let record = IndexStore.text(store.dependencyName(dependency))
-                    let file = IndexStore.text(store.dependencyFilePath(dependency))
-                    dependencies.all.append(record)
-                    dependencies.recordFiles[record] = dependencies.sdkRoots.canonical(file)
+                case .record(let record, let file):
+                    all.append(record)
+                    recordFiles[record] = sdkRoots.canonical(file)
                     /* The record of the unit's own file, matched by path: a unit's other records belong to files it only read. */
-                    if file == dependencies.mainFile {
-                        dependencies.own.append(record)
+                    if file == reading.mainFile {
+                        own.append(record)
                     }
-                case IndexStore.fileDependency:
-                    dependencies.files.append(dependencies.sdkRoots.canonical(IndexStore.text(store.dependencyFilePath(dependency))))
-                default:
-                    break
+                case .file(let file):
+                    files.append(sdkRoots.canonical(file))
                 }
-                return true
             }
             units.append(Unit(
                 name: name,
-                mainFile: mainFile.isEmpty ? "" : URL(fileURLWithPath: mainFile).resolvingSymlinksInPath().path,
-                module: Self.text(unitModuleName(reader)),
-                outputFile: Self.text(unitOutputFile(reader)),
-                isSystem: unitIsSystem(reader),
+                mainFile: reading.mainFile.isEmpty ? "" : URL(fileURLWithPath: reading.mainFile).resolvingSymlinksInPath().path,
+                module: reading.module,
+                outputFile: reading.outputFile,
+                isSystem: reading.isSystem,
                 written: written,
-                importedModules: dependencies.imported,
-                ownRecords: dependencies.own,
-                allRecords: dependencies.all,
-                recordFiles: dependencies.recordFiles,
-                files: dependencies.files
+                importedModules: imported,
+                ownRecords: own,
+                allRecords: all,
+                recordFiles: recordFiles,
+                files: files
             ))
         }
         cachedUnits = units
         return units
     }
 
-    /* Every occurrence one record holds, or nil when the record cannot be read. */
+    /*
+     Every occurrence one record holds, or nil when the record cannot be read. A reader: each call into the library
+     is handed the open reader or an occurrence it yielded, and `text` copies every string before the `defer`
+     disposes the reader.
+     */
     func occurrences(inRecord record: String) -> [RecordOccurrence]? {
-        guard let reader = recordReaderCreate(store, record, nil) else { return nil }
-        defer { recordReaderDispose(reader) }
-        final class Collected {
-            var occurrences: [RecordOccurrence] = []
-            let store: IndexStore
-            init(store: IndexStore) { self.store = store }
-        }
-        let collected = Collected(store: self)
-        _ = occurrencesApply(reader, Unmanaged.passUnretained(collected).toOpaque()) { context, occurrence in
-            guard let context, let occurrence else { return true }
-            let collected = Unmanaged<Collected>.fromOpaque(context).takeUnretainedValue()
-            let store = collected.store
+        guard let reader = unsafe recordReaderCreate(store, record, nil) else { return nil }
+        defer { unsafe recordReaderDispose(reader) }
+        var occurrences: [RecordOccurrence] = []
+        unsafe Self.forEach(in: reader, occurrencesApply) { occurrence in
             var line: UInt32 = 0
             var column: UInt32 = 0
-            store.occurrenceLineColumn(occurrence, &line, &column)
-            let symbol = store.occurrenceSymbol(occurrence)
-            collected.occurrences.append(RecordOccurrence(
+            unsafe occurrenceLineColumn(occurrence, &line, &column)
+            let symbol = unsafe occurrenceSymbol(occurrence)
+            unsafe occurrences.append(RecordOccurrence(
                 line: Int(line),
                 column: Int(column),
-                symbol: IndexStore.text(store.symbolIdentifier(symbol)),
-                name: IndexStore.text(store.symbolName(symbol)),
-                roles: store.occurrenceRoles(occurrence),
-                kind: Int32(store.symbolKind(symbol))
+                symbol: Self.text(symbolIdentifier(symbol)),
+                name: Self.text(symbolName(symbol)),
+                roles: occurrenceRoles(occurrence),
+                kind: Int32(symbolKind(symbol))
             ))
-            return true
         }
-        return collected.occurrences
+        return occurrences
     }
 
-    static func text(_ string: CohereIndexString) -> String {
-        guard let data = string.data else { return "" }
-        return String(decoding: UnsafeRawBufferPointer(start: data, count: string.length), as: UTF8.self)
+    /*
+     One unit's reader, read whole into Swift values. A reader like `occurrences(inRecord:)`, unsafe and correct for
+     the same reasons: every getter is handed the open reader or a dependency it yielded, and every string is copied
+     before the `defer` disposes the reader.
+     */
+    private func readUnit(named name: String) -> UnitReading? {
+        guard let reader = unsafe unitReaderCreate(store, name, nil) else { return nil }
+        defer { unsafe unitReaderDispose(reader) }
+        let mainFile = unsafe Self.text(unitMainFile(reader))
+        var dependencies: [Dependency] = []
+        unsafe Self.forEach(in: reader, dependenciesApply) { dependency in
+            switch unsafe dependencyKind(dependency) {
+            case Self.unitDependency:
+                dependencies.append(.module(unsafe Self.text(dependencyModuleName(dependency))))
+            case Self.recordDependency:
+                dependencies.append(unsafe .record(name: Self.text(dependencyName(dependency)), file: Self.text(dependencyFilePath(dependency))))
+            case Self.fileDependency:
+                dependencies.append(.file(unsafe Self.text(dependencyFilePath(dependency))))
+            default:
+                break
+            }
+        }
+        return unsafe UnitReading(
+            mainFile: mainFile,
+            module: Self.text(unitModuleName(reader)),
+            outputFile: Self.text(unitOutputFile(reader)),
+            isSystem: unitIsSystem(reader),
+            dependencies: dependencies
+        )
+    }
+
+    /*
+     The name of every unit in the store. With `forEach`, one of the two places a Swift closure crosses into the
+     library, here for the iterator that yields names rather than handles. Unsafe and correct for the reasons
+     `forEach` gives; each name is copied inside the applier, since the store lends it only for the call.
+     */
+    private func unitNames() -> [String] {
+        var names: [String] = []
+        let visitor = Visitor<String> { names.append($0) }
+        withExtendedLifetime(visitor) {
+            _ = unsafe unitsApply(store, 0, Unmanaged.passUnretained(visitor).toOpaque()) { context, name in
+                guard let context = unsafe context else { return false }
+                unsafe Unmanaged<Visitor<String>>.fromOpaque(context).takeUnretainedValue().visit(IndexStore.text(name))
+                return true
+            }
+        }
+        return names
+    }
+
+    /*
+     Hands `visit` each handle a reader's iterator yields: a unit's dependencies or a record's occurrences, whose
+     iterators share one C type. A C applier can capture nothing, so `visit` crosses as the context pointer, boxed
+     and unretained. Unsafe because nothing in that pointer says what it points at or keeps it alive; correct
+     because only this function's applier reads it back, as the type it boxed, and the iterator is synchronous,
+     calling the applier only before it returns, while `withExtendedLifetime` holds the box.
+     */
+    private static func forEach(
+        in reader: UnsafeMutableRawPointer,
+        _ iterate: CohereIndexRecordReaderOccurrencesApply,
+        _ visit: (UnsafeMutableRawPointer) -> Void
+    ) {
+        unsafe withoutActuallyEscaping(visit) { visit in
+            let visitor = unsafe Visitor(visit)
+            unsafe withExtendedLifetime(visitor) {
+                _ = unsafe iterate(reader, Unmanaged.passUnretained(visitor).toOpaque()) { context, handle in
+                    guard let context = unsafe context, let handle = unsafe handle else { return true }
+                    unsafe Unmanaged<Visitor<UnsafeMutableRawPointer>>.fromOpaque(context).takeUnretainedValue().visit(handle)
+                    return true
+                }
+            }
+        }
+    }
+
+    /*
+     A string the store lends, copied into a Swift one. Unsafe because the store lends a bare pointer and a length,
+     not NUL-terminated; correct because the length bounds the read and every caller copies before the reader that
+     lent the string is disposed.
+     */
+    private static func text(_ string: CohereIndexString) -> String {
+        guard let data = unsafe string.data else { return "" }
+        return unsafe String(decoding: UnsafeRawBufferPointer(start: data, count: string.length), as: UTF8.self)
     }
 }

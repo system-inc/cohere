@@ -15,7 +15,7 @@ import Testing
 @Suite(.serialized)
 struct PipelineControlTests {
     static let manifest = """
-        // swift-tools-version:6.0
+        // swift-tools-version:6.2
         import PackageDescription
 
         let package = Package(
@@ -23,7 +23,7 @@ struct PipelineControlTests {
             targets: [
                 .target(
                     name: "Control",
-                    swiftSettings: [.enableUpcomingFeature("ExistentialAny"), .enableUpcomingFeature("MemberImportVisibility")]
+                    swiftSettings: [.enableUpcomingFeature("ExistentialAny"), .enableUpcomingFeature("MemberImportVisibility"), .strictMemorySafety()]
                 )
             ]
         )

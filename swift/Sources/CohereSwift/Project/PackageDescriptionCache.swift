@@ -94,7 +94,7 @@ struct PackageDescriptionCache {
     /* A file's content hash, or a fixed word when it is absent, so "no Package.resolved" is a fingerprint too. */
     static func fingerprint(of file: URL) -> String {
         guard let data = try? Data(contentsOf: file) else { return "absent" }
-        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        return SHA256.hash(data: data).map { String($0 >> 4, radix: 16) + String($0 & 0x0f, radix: 16) }.joined()
     }
 
     /* Every directory under every target, with its modification time, sorted so two walks compare equal. */

@@ -22,7 +22,7 @@ enum InterfaceFingerprint {
     static func of(_ tree: SourceFileSyntax) -> String {
         let visitor = Visitor(viewMode: .sourceAccurate)
         visitor.walk(tree)
-        return visitor.hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        return visitor.hasher.finalize().map { String($0 >> 4, radix: 16) + String($0 & 0x0f, radix: 16) }.joined()
     }
 
     private final class Visitor: SyntaxVisitor {

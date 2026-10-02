@@ -10,8 +10,11 @@ import Synchronization
  is its mangled name with `s:` in place of `$s`. A typed rule that needs more than which declaration (the type
  of a parameter, say) reads it here, in the compiler's own words, rather than in a reading of the mangling of
  ours. Loaded at run time, as the index store library is, so the binary never carries one Xcode's path.
+
+ `@safe` though it holds a C function: the function is private, and its one call is in `demangle`, which hands it
+ a buffer `demangle` sized and owns.
  */
-final class SwiftDemangler: Sendable {
+@safe final class SwiftDemangler: Sendable {
     /* The library could not be found or opened. */
     struct Failure: Error, CustomStringConvertible {
         var description: String
@@ -37,14 +40,15 @@ final class SwiftDemangler: Sendable {
     }
 
     init(libraryPath: String) throws {
-        guard let handle = dlopen(libraryPath, RTLD_NOW | RTLD_LOCAL) else {
-            let reason = dlerror().map { String(cString: $0) } ?? "no reason given"
+        guard let handle = unsafe dlopen(libraryPath, RTLD_NOW | RTLD_LOCAL) else {
+            let reason = unsafe dlerror().map { unsafe String(cString: $0) } ?? "no reason given"
             throw Failure(description: "could not load the demangler at \(libraryPath): \(reason)")
         }
-        guard let address = dlsym(handle, "swift_demangle_getDemangledName") else {
+        guard let address = unsafe dlsym(handle, "swift_demangle_getDemangledName") else {
             throw Failure(description: "the demangler at \(libraryPath) has no swift_demangle_getDemangledName")
         }
-        getDemangledName = unsafeBitCast(address, to: GetDemangledName.self)
+        /* Unsafe because the cast trusts the symbol to have the signature `GetDemangledName` spells, the one SwiftDemangle.h declares. */
+        unsafe getDemangledName = unsafeBitCast(address, to: GetDemangledName.self)
     }
 
     /* The library beside the `swift` that `xcrun` resolves. */
@@ -67,9 +71,14 @@ final class SwiftDemangler: Sendable {
         var capacity = 512
         while true {
             var buffer = [CChar](repeating: 0, count: capacity)
+            /*
+             The one call into the library, unsafe because a C function is trusted with a raw buffer. It stays in
+             bounds because it is told the buffer's own count and writes no further, and the buffer is lent only
+             for the call.
+             */
             let length = mangled.withCString { name in
                 buffer.withUnsafeMutableBufferPointer { output in
-                    getDemangledName(name, output.baseAddress, capacity)
+                    unsafe getDemangledName(name, output.baseAddress, output.count)
                 }
             }
             guard length > 0 else { return nil }
