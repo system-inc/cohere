@@ -71,25 +71,68 @@ public struct PackageModel: Equatable, Sendable {
         [self] + localPackages
     }
 
-    public static func load(root: URL, scratchPath: URL, runner: ProcessRunner = ProcessRunner()) throws -> PackageModel {
+    /* One package's two answers from SwiftPM, wherever they came from. */
+    typealias Answers = (describe: Data, dump: Data)
+
+    /* The cache had no answer for a package the traversal reached, so the run describes cold. */
+    private struct CacheMiss: Error {}
+
+    /*
+     With a known `toolchain`, answers come from `PackageDescriptionCache` when every fingerprint still holds,
+     and a cold description refills it. Without one (the parity harness, or a toolchain `swift --version`
+     could not name) every run describes cold, because an entry keyed on an unknown toolchain could survive
+     a toolchain change.
+     */
+    public static func load(root: URL, scratchPath: URL, runner: ProcessRunner = ProcessRunner(), toolchain: String? = nil) throws -> PackageModel {
+        let cache = PackageDescriptionCache(scratchPath: scratchPath)
+        let cacheable = toolchain.map { !$0.hasPrefix("unknown") } ?? false
+        if cacheable, let toolchain, let cached = cache.members(root: root, toolchain: toolchain) {
+            do {
+                return try traverse(root: root, scratchPath: scratchPath) { packageRoot, _ in
+                    guard let member = cached[packageRoot.path] else { throw CacheMiss() }
+                    return (member.describe, member.dump)
+                }.model
+            } catch {
+                /* A member the cache never held: describe cold below, which also refills it. */
+            }
+        }
+        let cold = try traverse(root: root, scratchPath: scratchPath) { packageRoot, packageScratch in
+            (
+                try runPackageCommand(["describe", "--type", "json"], root: packageRoot, scratchPath: packageScratch, runner: runner),
+                try runPackageCommand(["dump-package"], root: packageRoot, scratchPath: packageScratch, runner: runner)
+            )
+        }
+        if cacheable, let toolchain {
+            cache.store(root: root, toolchain: toolchain, answers: cold.answers)
+        }
+        return cold.model
+    }
+
+    /* The root and every local package inside it, each described by `answer`, which either asks SwiftPM or reads the cache. */
+    private static func traverse(
+        root: URL,
+        scratchPath: URL,
+        answer: (URL, URL) throws -> Answers
+    ) throws -> (model: PackageModel, answers: [(root: URL, describe: Data, dump: Data, model: PackageModel)]) {
+        var answers: [(root: URL, describe: Data, dump: Data, model: PackageModel)] = []
+        func loadOne(_ packageRoot: URL, _ packageScratch: URL) throws -> PackageModel {
+            let given = try answer(packageRoot, packageScratch)
+            let model = try PackageModel(root: packageRoot, describeJson: given.describe, dumpPackageJson: given.dump)
+            answers.append((packageRoot, given.describe, given.dump, model))
+            return model
+        }
         var seen: Set<String> = [root.resolvingSymlinksInPath().path]
-        var model = try loadOne(root: root, scratchPath: scratchPath, runner: runner)
+        var model = try loadOne(root, scratchPath)
         var pending = model.localDependencyRoots
         while let next = pending.popLast() {
             guard seen.insert(next.resolvingSymlinksInPath().path).inserted else { continue }
-            let dependency = try loadOne(root: next, scratchPath: scratchPath.appendingPathComponent(next.lastPathComponent), runner: runner)
+            let dependency = try loadOne(next, scratchPath.appendingPathComponent(next.lastPathComponent))
             /* A local package's own local packages count only while they stay inside the root, the same test the root applied. */
             pending.append(contentsOf: dependency.localDependencyRoots.filter { isInside($0, root) })
             model.localPackages.append(dependency)
         }
         model.localPackages.sort { $0.root.path < $1.root.path }
-        return model
-    }
-
-    private static func loadOne(root: URL, scratchPath: URL, runner: ProcessRunner) throws -> PackageModel {
-        let description = try runPackageCommand(["describe", "--type", "json"], root: root, scratchPath: scratchPath, runner: runner)
-        let manifest = try runPackageCommand(["dump-package"], root: root, scratchPath: scratchPath, runner: runner)
-        return try PackageModel(root: root, describeJson: description, dumpPackageJson: manifest)
+        return (model, answers)
     }
 
     /*

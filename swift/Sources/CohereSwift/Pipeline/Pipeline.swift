@@ -36,7 +36,8 @@ public struct Pipeline {
     }
 
     public func run() async throws -> Int32 {
-        try writer.write(EngineVersion.provenance(toolchain: EngineVersion.toolchain(runner: runner)))
+        let toolchain = EngineVersion.toolchain(runner: runner)
+        try writer.write(EngineVersion.provenance(toolchain: toolchain))
         if options.showVersion {
             return 0
         }
@@ -83,7 +84,7 @@ public struct Pipeline {
          second, cold.
          */
         let describeStart = Date()
-        let package = try PackageModel.load(root: root, scratchPath: Self.scratchPath(for: root), runner: runner)
+        let package = try PackageModel.load(root: root, scratchPath: Self.scratchPath(for: root), runner: runner, toolchain: toolchain)
         let fileSet = try FileSet.build(package: package, runner: runner)
         let scope = try FileScope.resolve(options: options, fileSet: fileSet, root: root, workingDirectory: workingDirectory, runner: runner)
         if !scope.nothingToCheck.isEmpty {
