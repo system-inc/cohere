@@ -156,7 +156,7 @@ var NoRequireImports = rule.Rule{
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := options.(NoRequireImportsOptions)
+		settings, _ := rule.OptionsAs[NoRequireImportsOptions](options)
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

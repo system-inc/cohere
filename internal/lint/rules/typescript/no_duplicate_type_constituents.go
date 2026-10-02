@@ -140,7 +140,7 @@ var NoDuplicateTypeConstituents = rule.Rule{
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := options.(NoDuplicateTypeConstituentsOptions)
+		settings, isSettings := rule.OptionsAs[NoDuplicateTypeConstituentsOptions](options)
 		if !isSettings {
 			settings = DefaultNoDuplicateTypeConstituentsSettings()
 		}

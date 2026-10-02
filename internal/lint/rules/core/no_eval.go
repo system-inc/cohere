@@ -113,7 +113,7 @@ var NoEval = rule.Rule{
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		allowIndirect := false
-		if typed, ok := options.(NoEvalOptions); ok {
+		if typed, ok := rule.OptionsAs[NoEvalOptions](options); ok {
 			allowIndirect = typed.AllowIndirect
 		}
 

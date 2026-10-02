@@ -123,7 +123,7 @@ var NoMultiComp = rule.Rule{
 		}
 
 		settings := DefaultNoMultiCompOptions()
-		if configured, isConfigured := options.(NoMultiCompOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[NoMultiCompOptions](options); isConfigured {
 			settings = configured
 		}
 

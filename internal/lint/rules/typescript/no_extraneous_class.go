@@ -133,7 +133,7 @@ var NoExtraneousClass = rule.Rule{
 	Name: "@typescript-eslint/no-extraneous-class",
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := options.(NoExtraneousClassOptions)
+		settings, isSettings := rule.OptionsAs[NoExtraneousClassOptions](options)
 		if !isSettings {
 			settings = DefaultNoExtraneousClassSettings()
 		}

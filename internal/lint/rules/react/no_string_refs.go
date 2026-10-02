@@ -238,7 +238,7 @@ var NoStringRefs = rule.Rule{
 		// An unconfigured rule is handed nil, and the zero value is upstream's answer under this
 		// repository's configuration: template refs unreported, and the `this.refs` half off
 		// because no configured React version means `999.999.999`.
-		settings, _ := options.(NoStringRefsOptions)
+		settings, _ := rule.OptionsAs[NoStringRefsOptions](options)
 
 		listeners := rule.Listeners{
 			ast.KindJsxAttribute: func(node *ast.Node) {

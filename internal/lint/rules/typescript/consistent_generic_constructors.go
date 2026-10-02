@@ -155,7 +155,7 @@ var ConsistentGenericConstructors = rule.Rule{
 	ReadsProgram: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := options.(ConsistentGenericConstructorsOptions)
+		settings, isSettings := rule.OptionsAs[ConsistentGenericConstructorsOptions](options)
 		if !isSettings {
 			// A rule configured as a bare severity reaches here with nil options, so the assertion
 			// fails and the fallback is what `"error"` means.

@@ -541,7 +541,7 @@ var Dependencies = rule.Rule{
 		if ctx.SourceFile == nil || ctx.Program == nil {
 			return nil
 		}
-		settings, configured := options.(DependenciesOptions)
+		settings, configured := rule.OptionsAs[DependenciesOptions](options)
 		if !configured || len(settings.Elements) == 0 {
 			return nil
 		}

@@ -142,7 +142,7 @@ func DecodeNoInvalidThisOptions(raw []byte) (any, error) {
 // noInvalidThisSettingsFrom recovers the settings from whatever the config layer handed over,
 // falling back to the documented defaults for nil.
 func noInvalidThisSettingsFrom(options any) noInvalidThisSettings {
-	if settings, ok := options.(noInvalidThisSettings); ok {
+	if settings, ok := rule.OptionsAs[noInvalidThisSettings](options); ok {
 		return settings
 	}
 	return DefaultNoInvalidThisSettings()

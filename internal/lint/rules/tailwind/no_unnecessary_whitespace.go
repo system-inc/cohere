@@ -56,7 +56,7 @@ var NoUnnecessaryWhitespace = rule.Rule{
 		}
 
 		settings := DefaultClassLiteralSettings()
-		if configured, isConfigured := options.(NoUnnecessaryWhitespaceOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[NoUnnecessaryWhitespaceOptions](options); isConfigured {
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}

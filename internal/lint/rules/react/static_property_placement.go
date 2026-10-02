@@ -221,7 +221,7 @@ var StaticPropertyPlacement = rule.Rule{
 		}
 
 		settings := DefaultStaticPropertyPlacementOptions()
-		if configured, isConfigured := options.(StaticPropertyPlacementOptions); isConfigured &&
+		if configured, isConfigured := rule.OptionsAs[StaticPropertyPlacementOptions](options); isConfigured &&
 			configured.Positions != nil {
 			settings = configured
 		}

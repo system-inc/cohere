@@ -146,7 +146,7 @@ var CheckedRequiresOnChangeOrReadOnly = rule.Rule{
 	Name:             "react/checked-requires-onchange-or-readonly",
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := options.(CheckedRequiresOnChangeOrReadOnlyOptions)
+		settings, _ := rule.OptionsAs[CheckedRequiresOnChangeOrReadOnlyOptions](options)
 
 		report := func(node *ast.Node, present map[string]bool) {
 			if !present["checked"] {

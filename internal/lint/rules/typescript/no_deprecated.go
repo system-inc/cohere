@@ -80,7 +80,7 @@ var NoDeprecated = rule.Rule{
 			return nil
 		}
 
-		settings, _ := options.(NoDeprecatedOptions)
+		settings, _ := rule.OptionsAs[NoDeprecatedOptions](options)
 
 		// report emits with the right message id for whether a reason was given.
 		//

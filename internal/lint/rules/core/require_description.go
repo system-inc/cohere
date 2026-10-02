@@ -155,7 +155,7 @@ var RequireDescription = rule.Rule{
 		}
 		// A bare severity decodes to the zero options, and a harness that bypasses the decoder hands
 		// nil. Both mean upstream's defaults: ignore nothing, no additional directives.
-		configured, _ := options.(RequireDescriptionOptions)
+		configured, _ := rule.OptionsAs[RequireDescriptionOptions](options)
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {

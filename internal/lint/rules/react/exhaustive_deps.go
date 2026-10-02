@@ -404,7 +404,7 @@ var hooksUselessWithoutDependencies = map[string]bool{"useMemo": true, "useCallb
 var effectHookNamePattern = regexp.MustCompile(`Effect($|[^a-z])`)
 
 func runExhaustiveDeps(ctx rule.Context, options any) rule.Listeners {
-	settings, _ := options.(ExhaustiveDepsOptions)
+	settings, _ := rule.OptionsAs[ExhaustiveDepsOptions](options)
 	var additionalHooks *regexp.Regexp
 	if settings.AdditionalHooks != "" {
 		// A malformed pattern disables the extension rather than failing the run. See the option's

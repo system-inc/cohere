@@ -142,7 +142,7 @@ var NoUnstableNestedComponents = rule.Rule{
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(NoUnstableNestedComponentsOptions)
+		settings, ok := rule.OptionsAs[NoUnstableNestedComponentsOptions](options)
 		if !ok {
 			// A rule configured as a bare `"error"` is handed nil options, which is not this type.
 			// Without this the zero value would apply and the empty pattern would match nothing.

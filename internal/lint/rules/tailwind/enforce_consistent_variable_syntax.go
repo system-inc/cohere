@@ -77,7 +77,7 @@ var EnforceConsistentVariableSyntax = rule.Rule{
 
 		settings := DefaultClassLiteralSettings()
 		syntax := variableSyntaxShorthand
-		if configured, isConfigured := options.(EnforceConsistentVariableSyntaxOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[EnforceConsistentVariableSyntaxOptions](options); isConfigured {
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}

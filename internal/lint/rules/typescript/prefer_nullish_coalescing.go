@@ -294,7 +294,7 @@ var PreferNullishCoalescing = rule.Rule{
 	NeedsTypeChecker: true,
 	ReadsProgram:     true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(PreferNullishCoalescingOptions)
+		settings, ok := rule.OptionsAs[PreferNullishCoalescingOptions](options)
 		if !ok {
 			settings = DefaultPreferNullishCoalescingOptions()
 		}

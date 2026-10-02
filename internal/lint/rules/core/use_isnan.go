@@ -85,7 +85,7 @@ var UseIsNaN = rule.Rule{
 		// rule gets the strict reading when the config says nothing, so a misconfiguration cannot
 		// quietly disable half the rule.
 		enforceForSwitchCase := true
-		if settings, hasSettings := options.(UseIsNaNOptions); hasSettings && settings.EnforceForSwitchCase != nil {
+		if settings, hasSettings := rule.OptionsAs[UseIsNaNOptions](options); hasSettings && settings.EnforceForSwitchCase != nil {
 			enforceForSwitchCase = *settings.EnforceForSwitchCase
 		}
 

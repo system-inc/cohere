@@ -148,7 +148,7 @@ var NoIrregularWhitespace = rule.Rule{
 		// reporting it would flag every file that holds a no-break space on purpose.
 		skipComments, skipStrings, skipTemplates := false, true, false
 		skipRegExps, skipJSXText := false, false
-		if settings, hasSettings := options.(NoIrregularWhitespaceOptions); hasSettings {
+		if settings, hasSettings := rule.OptionsAs[NoIrregularWhitespaceOptions](options); hasSettings {
 			if settings.SkipComments != nil {
 				skipComments = *settings.SkipComments
 			}

@@ -115,7 +115,7 @@ var NoGlobalAssign = rule.Rule{
 		// (`defaultOptions: [{ exceptions: [] }]`). A config typo must not silently exempt
 		// everything, so the failure direction here is "report as usual".
 		exempt := map[string]bool{}
-		if decoded, ok := options.(NoGlobalAssignOptions); ok {
+		if decoded, ok := rule.OptionsAs[NoGlobalAssignOptions](options); ok {
 			for _, name := range decoded.Exceptions {
 				exempt[name] = true
 			}

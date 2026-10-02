@@ -444,8 +444,9 @@ func TestDecodeTripleSlashReferenceOptions(t *testing.T) {
 // and zero on a probe tree seeded with directives that must report. The registration count is what
 // separated this from an unwired rule; the finding count is what said it was broken anyway.
 //
-// The nil case is the one the config actually produces. The others are here because a value of the
-// wrong type reaches the same line and must not silently disable the rule either.
+// The nil case is the one the config actually produces. A value of the wrong type must not silently
+// disable the rule either, and since #qmvkf83 it cannot: rule.OptionsAs panics on it, which
+// TestTripleSlashReferenceRefusesOptionsOfTheWrongType holds.
 func TestTripleSlashReferenceUsesDefaultsWhenTheConfigNamesNoOptions(t *testing.T) {
 	t.Parallel()
 
@@ -454,8 +455,6 @@ func TestTripleSlashReferenceUsesDefaultsWhenTheConfigNamesNoOptions(t *testing.
 		options any
 	}{
 		{"nil, which is what a bare severity in the config produces", nil},
-		{"a value of some other type", "error"},
-		{"a pointer rather than the value", &TripleSlashReferenceOptions{}},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -520,5 +519,31 @@ func TestTripleSlashReferenceScansEveryDirectiveBeforeTheCutoff(t *testing.T) {
 		if got != want {
 			t.Fatalf("finding %d: expected %q, got %q", index, want, got)
 		}
+	}
+}
+
+// Options of a type the decoder never returns are a disagreement between the registration and the
+// rule, and that fails loudly rather than defaulting: these used to fall back to the defaults, which
+// is the silence that let unified-signatures ignore its options (#qmvkf83).
+func TestTripleSlashReferenceRefusesOptionsOfTheWrongType(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		options any
+	}{
+		{"a value of some other type", "error"},
+		{"a pointer rather than the value", &TripleSlashReferenceOptions{}},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("expected options of the wrong type to panic rather than default")
+				}
+			}()
+			rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
+				"/// <reference path=\"foo\" />\n", testCase.options)
+		})
 	}
 }

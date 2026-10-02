@@ -180,7 +180,7 @@ func noInnerDeclarationsApplyFirst(settings NoInnerDeclarationsOptions, value st
 var NoInnerDeclarations = rule.Rule{
 	Name: "no-inner-declarations",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := options.(NoInnerDeclarationsOptions)
+		settings, isSettings := rule.OptionsAs[NoInnerDeclarationsOptions](options)
 		if !isSettings {
 			settings = DefaultNoInnerDeclarationsSettings()
 		}

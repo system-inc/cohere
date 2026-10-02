@@ -199,7 +199,7 @@ var OnlyThrowError = rule.Rule{
 	ReadsProgram: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := options.(OnlyThrowErrorOptions)
+		settings, _ := rule.OptionsAs[OnlyThrowErrorOptions](options)
 
 		// A rule configured as bare `"error"` is handed nil options, and `options.(T)` on nil yields
 		// the zero value, which is three nil pointers. Every default here is TRUE, so defaulting

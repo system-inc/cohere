@@ -166,7 +166,7 @@ var ConsistentTypeAssertions = rule.Rule{
 	Name: "@typescript-eslint/consistent-type-assertions",
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := options.(ConsistentTypeAssertionsOptions)
+		settings, isSettings := rule.OptionsAs[ConsistentTypeAssertionsOptions](options)
 		if !isSettings {
 			settings = DefaultConsistentTypeAssertionsSettings()
 		}

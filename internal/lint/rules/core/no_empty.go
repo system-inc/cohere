@@ -79,7 +79,7 @@ var NoEmpty = rule.Rule{
 		}
 
 		settings := NoEmptyOptions{}
-		if configured, isConfigured := options.(NoEmptyOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[NoEmptyOptions](options); isConfigured {
 			settings = configured
 		}
 

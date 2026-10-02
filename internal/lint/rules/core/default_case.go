@@ -90,7 +90,7 @@ var DefaultCase = rule.Rule{
 	Name: "default-case",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		pattern := defaultCaseDefaultCommentPattern
-		if resolved, isDefaultCaseOptions := options.(DefaultCaseOptions); isDefaultCaseOptions &&
+		if resolved, isDefaultCaseOptions := rule.OptionsAs[DefaultCaseOptions](options); isDefaultCaseOptions &&
 			resolved.CommentPattern != "" {
 			// Upstream builds `new RegExp(options.commentPattern, "u")`, which THROWS on a bad
 			// pattern and takes the lint run down naming the rule. A pattern Go's RE2 cannot compile

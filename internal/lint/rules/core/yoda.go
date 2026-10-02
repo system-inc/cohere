@@ -165,7 +165,7 @@ var messageYodaExpected = rule.Message{
 var Yoda = rule.Rule{
 	Name: "yoda",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(YodaSettings)
+		settings, ok := rule.OptionsAs[YodaSettings](options)
 		if !ok {
 			settings = DefaultYodaSettings()
 		}

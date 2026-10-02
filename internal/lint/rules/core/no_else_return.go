@@ -128,7 +128,7 @@ var NoElseReturn = rule.Rule{
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(NoElseReturnSettings)
+		settings, ok := rule.OptionsAs[NoElseReturnSettings](options)
 		if !ok {
 			settings = DefaultNoElseReturnSettings()
 		}

@@ -138,7 +138,7 @@ func DecodeNoRestrictedPropertiesOptions(list []byte) (any, error) {
 var NoRestrictedProperties = rule.Rule{
 	Name: "no-restricted-properties",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, configured := options.(NoRestrictedPropertiesOptions)
+		settings, configured := rule.OptionsAs[NoRestrictedPropertiesOptions](options)
 		if !configured || len(settings.Restrictions) == 0 {
 			// Upstream returns an empty visitor object here rather than a no-op listener, so the
 			// rule costs nothing at all when it has nothing to enforce.

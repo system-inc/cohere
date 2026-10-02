@@ -207,7 +207,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 	ReadsProgram: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		opts, ok := options.(SwitchExhaustivenessCheckOptions)
+		opts, ok := rule.OptionsAs[SwitchExhaustivenessCheckOptions](options)
 		if !ok {
 			opts = SwitchExhaustivenessCheckOptions{}
 		}

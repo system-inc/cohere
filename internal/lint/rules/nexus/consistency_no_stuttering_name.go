@@ -59,7 +59,7 @@ var ConsistencyNoStutteringName = rule.Rule{
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		genericNames := map[string]bool{}
 		names := defaultGenericNames
-		if settings, hasSettings := options.(ConsistencyNoStutteringNameOptions); hasSettings && len(settings.GenericNames) > 0 {
+		if settings, hasSettings := rule.OptionsAs[ConsistencyNoStutteringNameOptions](options); hasSettings && len(settings.GenericNames) > 0 {
 			names = settings.GenericNames
 		}
 		for _, name := range names {

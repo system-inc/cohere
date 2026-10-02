@@ -108,7 +108,7 @@ var contextRequiresAccessDownstreamResolvers = map[string]struct{}{
 var ContextRequiresAccess = rule.Rule{
 	Name: "base/context-requires-access",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, configured := options.(ContextRequiresAccessOptions)
+		settings, configured := rule.OptionsAs[ContextRequiresAccessOptions](options)
 		if !configured || len(settings.Requirements) == 0 {
 			// Nothing configured means nothing to enforce, and the source returns an empty visitor
 			// object rather than a no-op listener. Reproduced so the rule costs nothing at all in a

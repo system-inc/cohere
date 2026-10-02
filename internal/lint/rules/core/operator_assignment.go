@@ -197,7 +197,7 @@ var operatorAssignmentLongForm = func() map[ast.Kind]struct {
 var OperatorAssignment = rule.Rule{
 	Name: "operator-assignment",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := options.(OperatorAssignmentOptions)
+		settings, _ := rule.OptionsAs[OperatorAssignmentOptions](options)
 		if settings.Require == nil {
 			settings = DefaultOperatorAssignmentSettings()
 		}

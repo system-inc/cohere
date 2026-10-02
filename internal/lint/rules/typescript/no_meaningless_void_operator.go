@@ -111,7 +111,7 @@ var NoMeaninglessVoidOperator = rule.Rule{
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := options.(NoMeaninglessVoidOperatorOptions)
+		settings, isSettings := rule.OptionsAs[NoMeaninglessVoidOperatorOptions](options)
 		if !isSettings {
 			settings = DefaultNoMeaninglessVoidOperatorSettings()
 		}

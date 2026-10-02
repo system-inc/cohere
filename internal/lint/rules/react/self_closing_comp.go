@@ -115,7 +115,7 @@ var SelfClosingComp = rule.Rule{
 		}
 
 		settings := DefaultSelfClosingCompOptions()
-		if configured, isConfigured := options.(SelfClosingCompOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[SelfClosingCompOptions](options); isConfigured {
 			settings = configured
 		}
 

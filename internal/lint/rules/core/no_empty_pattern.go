@@ -78,7 +78,7 @@ var NoEmptyPattern = rule.Rule{
 		}
 
 		settings := NoEmptyPatternOptions{}
-		if configured, isConfigured := options.(NoEmptyPatternOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[NoEmptyPatternOptions](options); isConfigured {
 			settings = configured
 		}
 

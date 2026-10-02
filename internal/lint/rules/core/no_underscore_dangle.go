@@ -155,7 +155,7 @@ var messageNoUnderscoreDangle = rule.Message{
 var NoUnderscoreDangle = rule.Rule{
 	Name: "no-underscore-dangle",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := options.(NoUnderscoreDangleOptions)
+		settings, _ := rule.OptionsAs[NoUnderscoreDangleOptions](options)
 
 		reportNamed := func(node *ast.Node, identifier string) {
 			ctx.ReportNode(node, rule.Message{

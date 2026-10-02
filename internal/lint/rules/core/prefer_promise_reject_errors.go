@@ -60,7 +60,7 @@ var PreferPromiseRejectErrors = rule.Rule{
 			return nil
 		}
 
-		settings, _ := options.(PreferPromiseRejectErrorsOptions)
+		settings, _ := rule.OptionsAs[PreferPromiseRejectErrorsOptions](options)
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

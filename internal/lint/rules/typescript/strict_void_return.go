@@ -113,7 +113,7 @@ var StrictVoidReturn = rule.Rule{
 	ReadsProgram: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := options.(StrictVoidReturnOptions)
+		settings, isSettings := rule.OptionsAs[StrictVoidReturnOptions](options)
 		if !isSettings {
 			settings = DefaultStrictVoidReturnSettings()
 		}

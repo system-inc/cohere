@@ -55,7 +55,7 @@ var BoundaryNoProjectImport = rule.Rule{
 			return nil
 		}
 
-		settings, hasSettings := options.(BoundaryNoProjectImportOptions)
+		settings, hasSettings := rule.OptionsAs[BoundaryNoProjectImportOptions](options)
 		if !hasSettings || settings.LibraryDirectory == "" {
 			return nil
 		}

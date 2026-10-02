@@ -81,7 +81,7 @@ var NoUnusedExpressions = rule.Rule{
 	Name: "@typescript-eslint/no-unused-expressions",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		verdict := unusedExpressionVerdict{}
-		if parsed, ok := options.(NoUnusedExpressionsOptions); ok {
+		if parsed, ok := rule.OptionsAs[NoUnusedExpressionsOptions](options); ok {
 			verdict.options = parsed
 		}
 

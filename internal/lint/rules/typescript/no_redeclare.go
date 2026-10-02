@@ -178,7 +178,7 @@ var NoRedeclare = rule.Rule{
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(NoRedeclareOptions)
+		settings, ok := rule.OptionsAs[NoRedeclareOptions](options)
 		if !ok {
 			// A rule configured as a bare "error" is handed nil, and `options.(T)` on nil yields the
 			// zero value, whose false `IgnoreDeclarationMerge` inverts this rule rather than

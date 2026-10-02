@@ -82,7 +82,7 @@ var ConsistencyNoBooleanOutcome = rule.Rule{
 		}
 
 		allowedTypeNames := map[string]bool{}
-		if settings, hasSettings := options.(ConsistencyNoBooleanOutcomeOptions); hasSettings {
+		if settings, hasSettings := rule.OptionsAs[ConsistencyNoBooleanOutcomeOptions](options); hasSettings {
 			for _, name := range settings.AllowedTypeNames {
 				allowedTypeNames[name] = true
 			}

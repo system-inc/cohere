@@ -190,7 +190,7 @@ var ForbidPropTypes = rule.Rule{
 	// required, so a later revert fails loudly instead of silently losing one shape.
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(ForbidPropTypesOptions)
+		settings, ok := rule.OptionsAs[ForbidPropTypesOptions](options)
 		if !ok {
 			// A rule configured as bare `"error"` arrives with nil options, which type-asserts to
 			// the zero value. That happens to be the right default here, since a nil Forbid means

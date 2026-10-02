@@ -212,7 +212,7 @@ var InitDeclarations = rule.Rule{
 	Name: "@typescript-eslint/init-declarations",
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := options.(InitDeclarationsOptions)
+		settings, isSettings := rule.OptionsAs[InitDeclarationsOptions](options)
 		if !isSettings {
 			settings = DefaultInitDeclarationsSettings()
 		}

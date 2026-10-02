@@ -145,18 +145,16 @@ func DecodeNoUseBeforeDefineOptions(raw []byte) (any, error) {
 // The brief records a rule that shipped that way: 3,407 registrations, zero findings, every fixture
 // green, because every fixture reached the rule through the decoder and nothing tested the path the
 // live config actually uses.
+//
+// The decoder returns the value, and rule.OptionsAs panics on any other type rather than defaulting
+// in silence, which is how a mismatch hid in unified-signatures (#qmvkf83). The pointer arm this
+// replaced had no caller: nothing hands this rule a pointer.
 func resolveNoUseBeforeDefineSettings(options any) noUseBeforeDefineSettings {
-	switch typed := options.(type) {
-	case NoUseBeforeDefineOptions:
-		return typed.resolve()
-	case *NoUseBeforeDefineOptions:
-		if typed == nil {
-			return defaultNoUseBeforeDefineSettings()
-		}
-		return typed.resolve()
-	default:
+	typed, configured := rule.OptionsAs[NoUseBeforeDefineOptions](options)
+	if !configured {
 		return defaultNoUseBeforeDefineSettings()
 	}
+	return typed.resolve()
 }
 
 // useBeforeDefineMessage renders the finding for one read, true to the kind of binding it reads.

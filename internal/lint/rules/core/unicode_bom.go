@@ -188,7 +188,7 @@ var UnicodeBom = rule.Rule{
 		// A rule configured as a bare severity is handed nil, which the type assertion turns into a
 		// zero-valued struct whose Require is nil. That is the live config's shape, so the fallback
 		// below is the ordinary path rather than a defensive one.
-		settings, _ := options.(UnicodeBomOptions)
+		settings, _ := rule.OptionsAs[UnicodeBomOptions](options)
 		if settings.Require == nil {
 			settings = DefaultUnicodeBomSettings()
 		}

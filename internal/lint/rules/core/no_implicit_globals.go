@@ -122,7 +122,7 @@ var NoImplicitGlobals = rule.Rule{
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(NoImplicitGlobalsSettings)
+		settings, ok := rule.OptionsAs[NoImplicitGlobalsSettings](options)
 		if !ok {
 			settings = DefaultNoImplicitGlobalsSettings()
 		}

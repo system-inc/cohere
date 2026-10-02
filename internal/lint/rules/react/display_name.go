@@ -102,7 +102,7 @@ var DisplayName = rule.Rule{
 		}
 
 		settings := DefaultDisplayNameOptions()
-		if configured, isConfigured := options.(DisplayNameOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[DisplayNameOptions](options); isConfigured {
 			settings = configured
 		}
 

@@ -181,7 +181,7 @@ var ArrowBodyStyle = rule.Rule{
 	Name: "arrow-body-style",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings := ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}
-		if decoded, configured := options.(ArrowBodyStyleOptions); configured {
+		if decoded, configured := rule.OptionsAs[ArrowBodyStyleOptions](options); configured {
 			settings = decoded
 			if settings.Mode == "" {
 				// A rule configured as a bare severity is handed nil, and `options.(T)` on nil

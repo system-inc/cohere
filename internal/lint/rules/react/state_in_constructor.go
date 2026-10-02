@@ -215,7 +215,7 @@ var StateInConstructor = rule.Rule{
 	// and the parity guard strips the namespace on a `/` boundary.
 	Name: "react/state-in-constructor",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(StateInConstructorOptions)
+		settings, ok := rule.OptionsAs[StateInConstructorOptions](options)
 		if !ok {
 			// A rule configured as bare `"error"` reaches here with nil options, which type-asserts
 			// to the zero value whose Mode matches neither arm. Falling back to the default is what

@@ -79,7 +79,7 @@ var NoConstantBinaryExpression = rule.Rule{
 	Name: "no-constant-binary-expression",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		checkRelationalComparisons := false
-		if parsed, ok := options.(NoConstantBinaryExpressionOptions); ok {
+		if parsed, ok := rule.OptionsAs[NoConstantBinaryExpressionOptions](options); ok {
 			checkRelationalComparisons = parsed.CheckRelationalComparisons
 		}
 

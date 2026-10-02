@@ -170,7 +170,7 @@ var PreferRegexLiterals = rule.Rule{
 			return nil
 		}
 
-		settings, _ := options.(PreferRegexLiteralsOptions)
+		settings, _ := rule.OptionsAs[PreferRegexLiteralsOptions](options)
 
 		check := func(node *ast.Node) {
 			callee, arguments := calleeAndArguments(node)

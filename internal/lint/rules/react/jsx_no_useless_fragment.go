@@ -138,7 +138,7 @@ func DecodeJsxNoUselessFragmentOptions(raw []byte) (any, error) {
 var JsxNoUselessFragment = rule.Rule{
 	Name: "react/jsx-no-useless-fragment",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(JsxNoUselessFragmentOptions)
+		settings, ok := rule.OptionsAs[JsxNoUselessFragmentOptions](options)
 		if !ok {
 			settings = JsxNoUselessFragmentOptions{}
 		}

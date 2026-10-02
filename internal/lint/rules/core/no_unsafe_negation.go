@@ -92,7 +92,7 @@ var NoUnsafeNegation = rule.Rule{
 		}
 
 		enforceForOrderingRelations := false
-		if parsed, ok := options.(NoUnsafeNegationOptions); ok {
+		if parsed, ok := rule.OptionsAs[NoUnsafeNegationOptions](options); ok {
 			enforceForOrderingRelations = parsed.EnforceForOrderingRelations
 		}
 

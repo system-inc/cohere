@@ -83,7 +83,7 @@ var EnforceConsistentImportantPosition = rule.Rule{
 
 		settings := DefaultClassLiteralSettings()
 		position := importantPositionRecommended
-		if configured, isConfigured := options.(EnforceConsistentImportantPositionOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[EnforceConsistentImportantPositionOptions](options); isConfigured {
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}

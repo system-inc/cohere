@@ -138,7 +138,7 @@ var ForbidForeignPropTypes = rule.Rule{
 	Name: "react/forbid-foreign-prop-types",
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := options.(ForbidForeignPropTypesOptions)
+		settings, _ := rule.OptionsAs[ForbidForeignPropTypesOptions](options)
 
 		// unwrapParentheses walks up past the parentheses our parser keeps and upstream's folds
 		// away. A loop rather than a single step, because `((x))` nests, and written here rather

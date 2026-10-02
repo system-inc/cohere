@@ -284,7 +284,7 @@ var JsxNoScriptUrl = rule.Rule{
 	Name: "react/jsx-no-script-url",
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := options.(JsxNoScriptUrlOptions)
+		settings, _ := rule.OptionsAs[JsxNoScriptUrlOptions](options)
 		components := jsxNoScriptUrlLinkComponents(settings)
 
 		return rule.Listeners{

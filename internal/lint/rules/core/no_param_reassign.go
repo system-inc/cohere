@@ -112,7 +112,7 @@ var NoParamReassign = rule.Rule{
 		}
 
 		var settings NoParamReassignOptions
-		if parsed, ok := options.(NoParamReassignOptions); ok {
+		if parsed, ok := rule.OptionsAs[NoParamReassignOptions](options); ok {
 			settings = parsed
 		}
 		ignored := compileIgnoredNames(settings)

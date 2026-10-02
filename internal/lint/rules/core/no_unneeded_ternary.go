@@ -105,7 +105,7 @@ var NoUnneededTernary = rule.Rule{
 	Name: "no-unneeded-ternary",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		allowDefaultAssignment := noUnneededTernaryDefaultAssignment
-		if decoded, configured := options.(NoUnneededTernaryOptions); configured {
+		if decoded, configured := rule.OptionsAs[NoUnneededTernaryOptions](options); configured {
 			allowDefaultAssignment = decoded.resolve()
 		}
 		return rule.Listeners{

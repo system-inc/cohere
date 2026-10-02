@@ -1162,7 +1162,7 @@ var NoUnknownProperty = rule.Rule{
 	Name: "react/no-unknown-property",
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := options.(NoUnknownPropertyOptions)
+		settings, _ := rule.OptionsAs[NoUnknownPropertyOptions](options)
 		ignored := make(map[string]bool, len(settings.Ignore))
 		for _, name := range settings.Ignore {
 			ignored[name] = true

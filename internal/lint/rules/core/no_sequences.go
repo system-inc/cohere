@@ -127,7 +127,7 @@ var NoSequences = rule.Rule{
 		// value of NoSequencesOptions. Its AllowInParentheses is a nil pointer, which the accessor
 		// reads as upstream's `true`.
 		var settings NoSequencesOptions
-		if parsed, ok := options.(NoSequencesOptions); ok {
+		if parsed, ok := rule.OptionsAs[NoSequencesOptions](options); ok {
 			settings = parsed
 		}
 		allowInParentheses := settings.allowInParentheses()

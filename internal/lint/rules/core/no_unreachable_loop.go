@@ -127,7 +127,7 @@ var NoUnreachableLoop = rule.Rule{
 		// zero value. Upstream's default is `{ ignore: [] }`, so the zero value is right, and the
 		// fallback is still written out rather than relied on.
 		settings := NoUnreachableLoopOptions{}
-		if decoded, configured := options.(NoUnreachableLoopOptions); configured {
+		if decoded, configured := rule.OptionsAs[NoUnreachableLoopOptions](options); configured {
 			settings = decoded
 		}
 

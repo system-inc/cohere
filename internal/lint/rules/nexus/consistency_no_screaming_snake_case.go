@@ -59,7 +59,7 @@ var ConsistencyNoScreamingSnakeCase = rule.Rule{
 	Name: "nexus/consistency-no-screaming-snake-case",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		allowed := map[string]bool{}
-		if settings, hasSettings := options.(ConsistencyNoScreamingSnakeCaseOptions); hasSettings {
+		if settings, hasSettings := rule.OptionsAs[ConsistencyNoScreamingSnakeCaseOptions](options); hasSettings {
 			for _, name := range settings.Allow {
 				allowed[name] = true
 			}

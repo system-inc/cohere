@@ -46,7 +46,7 @@ func DecodeSortVarsOptions(raw []byte) (any, error) {
 
 // sortVarsSettingsFrom recovers the settings from whatever the config layer handed over.
 func sortVarsSettingsFrom(options any) SortVarsSettings {
-	if settings, ok := options.(SortVarsSettings); ok {
+	if settings, ok := rule.OptionsAs[SortVarsSettings](options); ok {
 		return settings
 	}
 	return DefaultSortVarsSettings()

@@ -131,7 +131,7 @@ func DecodeConsistentTypeDefinitionsOptions(raw []byte) (any, error) {
 var ConsistentTypeDefinitions = rule.Rule{
 	Name: "@typescript-eslint/consistent-type-definitions",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, configured := options.(ConsistentTypeDefinitionsOptions)
+		settings, configured := rule.OptionsAs[ConsistentTypeDefinitionsOptions](options)
 		if !configured {
 			settings = DefaultConsistentTypeDefinitionsSettings()
 		}

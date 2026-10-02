@@ -120,7 +120,7 @@ var UnboundMethod = rule.Rule{
 	ReadsProgram: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := options.(UnboundMethodOptions)
+		settings, isSettings := rule.OptionsAs[UnboundMethodOptions](options)
 		if !isSettings {
 			settings = DefaultUnboundMethodSettings()
 		}

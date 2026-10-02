@@ -185,7 +185,7 @@ var ReturnAwait = rule.Rule{
 			return nil
 		}
 
-		settings, isSettings := options.(ReturnAwaitOptions)
+		settings, isSettings := rule.OptionsAs[ReturnAwaitOptions](options)
 		if !isSettings {
 			settings = DefaultReturnAwaitSettings()
 		}

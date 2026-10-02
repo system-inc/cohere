@@ -114,7 +114,7 @@ var NoLabels = rule.Rule{
 		// relying on that means the rule is right by accident. Naming it makes the default a
 		// decision. `TestNoLabelsDefaultsWithoutTheDecoder` bypasses the decoder to pin it.
 		settings := NoLabelsOptions{}
-		if decoded, ok := options.(NoLabelsOptions); ok {
+		if decoded, ok := rule.OptionsAs[NoLabelsOptions](options); ok {
 			settings = decoded
 		}
 

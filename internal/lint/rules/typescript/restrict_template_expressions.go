@@ -188,7 +188,7 @@ var RestrictTemplateExpressions = rule.Rule{
 	ReadsProgram: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := options.(RestrictTemplateExpressionsOptions)
+		settings, isSettings := rule.OptionsAs[RestrictTemplateExpressionsOptions](options)
 		if !isSettings {
 			// A rule configured as a bare severity reaches here with nil options, and the zero
 			// value of this struct is upstream's STRICT preset rather than its default. Routing

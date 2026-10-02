@@ -160,7 +160,7 @@ const dangerousPropertyName = "dangerouslySetInnerHTML"
 var NoDanger = rule.Rule{
 	Name: "react/no-danger",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(NoDangerOptions)
+		settings, ok := rule.OptionsAs[NoDangerOptions](options)
 		if !ok {
 			// A rule configured as a bare severity reaches here with nil rather than with the
 			// struct. Falling back to the documented default keeps that path a decision.

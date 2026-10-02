@@ -145,7 +145,7 @@ var NoBaseToString = rule.Rule{
 	ReadsProgram: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := options.(NoBaseToStringOptions)
+		settings, isSettings := rule.OptionsAs[NoBaseToStringOptions](options)
 		if !isSettings {
 			settings = DefaultNoBaseToStringSettings()
 		}

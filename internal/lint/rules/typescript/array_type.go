@@ -170,7 +170,7 @@ var ArrayType = rule.Rule{
 		// errors on empty input and the config layer turns that into nil. A bare type assertion
 		// would then yield an empty `default`, which matches no arm below, and the rule would
 		// register on every file and report nothing while every fixture stayed green.
-		parsed, decoded := options.(ArrayTypeOptions)
+		parsed, decoded := rule.OptionsAs[ArrayTypeOptions](options)
 		if !decoded {
 			parsed = DefaultArrayTypeOptions()
 		}

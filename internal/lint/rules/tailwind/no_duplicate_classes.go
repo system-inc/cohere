@@ -67,7 +67,7 @@ var NoDuplicateClasses = rule.Rule{
 		}
 
 		settings := DefaultClassLiteralSettings()
-		if configured, isConfigured := options.(NoDuplicateClassesOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[NoDuplicateClassesOptions](options); isConfigured {
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}

@@ -82,7 +82,7 @@ type NoFallthroughOptions struct {
 var NoFallthrough = rule.Rule{
 	Name: "no-fallthrough",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		parsed, _ := options.(NoFallthroughOptions)
+		parsed, _ := rule.OptionsAs[NoFallthroughOptions](options)
 		matchesFallthroughComment := fallthroughCommentMatcher(parsed.CommentPattern)
 
 		return rule.Listeners{

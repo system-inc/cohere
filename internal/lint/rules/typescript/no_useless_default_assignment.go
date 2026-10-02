@@ -123,7 +123,7 @@ var NoUselessDefaultAssignment = rule.Rule{
 	ReadsProgram: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := options.(NoUselessDefaultAssignmentOptions)
+		settings, isSettings := rule.OptionsAs[NoUselessDefaultAssignmentOptions](options)
 		if !isSettings {
 			settings = DefaultNoUselessDefaultAssignmentSettings()
 		}

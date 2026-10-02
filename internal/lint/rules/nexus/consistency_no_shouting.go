@@ -56,7 +56,7 @@ var ConsistencyNoShouting = rule.Rule{
 		}
 
 		additionalAllowed := map[string]bool{}
-		if settings, hasSettings := options.(ConsistencyNoShoutingOptions); hasSettings {
+		if settings, hasSettings := rule.OptionsAs[ConsistencyNoShoutingOptions](options); hasSettings {
 			for _, token := range settings.Allow {
 				additionalAllowed[token] = true
 			}

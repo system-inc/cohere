@@ -131,7 +131,7 @@ var TripleSlashReference = rule.Rule{
 		// the rule goes silent on every file while every fixture stays green because fixtures reach
 		// the rule through the decoder. Found by the dry run rather than by the suite: 3,407 files,
 		// 3,407 registrations, zero findings, and a seeded probe tree that also reported nothing.
-		parsed, decoded := options.(TripleSlashReferenceOptions)
+		parsed, decoded := rule.OptionsAs[TripleSlashReferenceOptions](options)
 		if !decoded {
 			parsed = DefaultTripleSlashReferenceOptions()
 		}

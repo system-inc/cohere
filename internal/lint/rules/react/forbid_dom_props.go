@@ -221,7 +221,7 @@ var ForbidDomProps = rule.Rule{
 	Name: "react/forbid-dom-props",
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := options.(ForbidDomPropsOptions)
+		settings, _ := rule.OptionsAs[ForbidDomPropsOptions](options)
 
 		// Assignment in list order reproduces upstream's map construction, so a repeated prop name
 		// keeps the last entry.

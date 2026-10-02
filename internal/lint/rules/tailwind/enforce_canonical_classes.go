@@ -107,7 +107,7 @@ var EnforceCanonicalClasses = rule.Rule{
 
 		settings := DefaultClassLiteralSettings()
 		var ignore []string
-		if configured, isConfigured := options.(EnforceCanonicalClassesOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[EnforceCanonicalClassesOptions](options); isConfigured {
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}

@@ -95,7 +95,7 @@ var NoCondAssign = rule.Rule{
 		// Unrecognized and absent both land on the permissive mode. A rule enabled with a bare
 		// severity must not silently run the strict half, and a typo must not silently escalate.
 		always := false
-		if mode, configured := options.(NoCondAssignOptions); configured && mode == NoCondAssignAlways {
+		if mode, configured := rule.OptionsAs[NoCondAssignOptions](options); configured && mode == NoCondAssignAlways {
 			always = true
 		}
 

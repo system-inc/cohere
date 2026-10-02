@@ -172,7 +172,7 @@ var ImportRequirePathAlias = rule.Rule{
 			return nil
 		}
 
-		settings, hasSettings := options.(ImportRequirePathAliasOptions)
+		settings, hasSettings := rule.OptionsAs[ImportRequirePathAliasOptions](options)
 		if !hasSettings || len(settings.Aliases) == 0 || settings.RepositoryRoot == "" {
 			// Without aliases there is nothing to suggest, and without a root nothing can be made
 			// repository-relative. Declining is the honest answer, and it keeps a misconfigured

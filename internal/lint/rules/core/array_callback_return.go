@@ -162,7 +162,7 @@ var ArrayCallbackReturn = rule.Rule{
 		// zero value. All three defaults are false upstream, so the zero value is right, and the
 		// fallback is still written out rather than relied on.
 		settings := ArrayCallbackReturnOptions{}
-		if decoded, configured := options.(ArrayCallbackReturnOptions); configured {
+		if decoded, configured := rule.OptionsAs[ArrayCallbackReturnOptions](options); configured {
 			settings = decoded
 		}
 

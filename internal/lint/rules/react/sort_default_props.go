@@ -108,7 +108,7 @@ var SortDefaultProps = rule.Rule{
 		}
 
 		settings := DefaultSortDefaultPropsOptions()
-		if configured, isConfigured := options.(SortDefaultPropsOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[SortDefaultPropsOptions](options); isConfigured {
 			settings = configured
 		}
 

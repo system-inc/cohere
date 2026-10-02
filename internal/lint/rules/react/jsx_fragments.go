@@ -150,7 +150,7 @@ var JsxFragments = rule.Rule{
 		}
 
 		settings := DefaultJsxFragmentsOptions()
-		if configured, isConfigured := options.(JsxFragmentsOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[JsxFragmentsOptions](options); isConfigured {
 			settings = configured
 		}
 

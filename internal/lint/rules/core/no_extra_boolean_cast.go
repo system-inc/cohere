@@ -115,7 +115,7 @@ var NoExtraBooleanCast = rule.Rule{
 		}
 
 		enforceForInnerExpressions := false
-		if parsed, ok := options.(NoExtraBooleanCastOptions); ok {
+		if parsed, ok := rule.OptionsAs[NoExtraBooleanCastOptions](options); ok {
 			enforceForInnerExpressions = parsed.EnforceForInnerExpressions
 		}
 

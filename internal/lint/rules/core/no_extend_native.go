@@ -155,7 +155,7 @@ var NoExtendNative = rule.Rule{
 		// value is the right default here, and naming it makes that a decision rather than an
 		// accident. `TestNoExtendNativeDefaultsWithoutTheDecoder` bypasses the decoder to pin it.
 		settings := NoExtendNativeOptions{}
-		if decoded, ok := options.(NoExtendNativeOptions); ok {
+		if decoded, ok := rule.OptionsAs[NoExtendNativeOptions](options); ok {
 			settings = decoded
 		}
 		excepted := make(map[string]bool, len(settings.Exceptions))

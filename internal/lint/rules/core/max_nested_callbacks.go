@@ -207,7 +207,7 @@ var MaxNestedCallbacks = rule.Rule{
 		// site at a time, so it is recorded here rather than left looking like two guards where one
 		// would do. The redundancy is cheap and the failure it prevents is a limit of zero, which
 		// reports every callback in the tree.
-		settings, isSettings := options.(MaxNestedCallbacksOptions)
+		settings, isSettings := rule.OptionsAs[MaxNestedCallbacksOptions](options)
 		if !isSettings {
 			settings = DefaultMaxNestedCallbacksSettings()
 		}

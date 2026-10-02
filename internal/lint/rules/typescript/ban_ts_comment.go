@@ -191,7 +191,7 @@ var BanTsComment = rule.Rule{
 		// errors on empty input and the config layer turns that into nil. A bare type assertion
 		// would then yield four zero-valued directive settings, which match no arm, and the rule
 		// would register on every file and report nothing while every fixture stayed green.
-		parsed, decoded := options.(BanTsCommentOptions)
+		parsed, decoded := rule.OptionsAs[BanTsCommentOptions](options)
 		if !decoded {
 			parsed = DefaultBanTsCommentOptions()
 		}

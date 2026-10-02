@@ -79,7 +79,7 @@ var UnifiedSignatures = rule.Rule{
 		// The value type, because that is what `DecodeOptionsInto` hands over. This line asserted a
 		// pointer once, the comma-ok form swallowed the mismatch, and both options read false for
 		// every configuration; `TestUnifiedSignaturesOptionsArriveThroughTheDecoder` holds it.
-		settings, _ := options.(UnifiedSignaturesOptions)
+		settings, _ := rule.OptionsAs[UnifiedSignaturesOptions](options)
 
 		// One listener that walks the file itself, rather than a listener per scope kind with an
 		// exit hook. Upstream pairs each `X` with an `X:exit` and checks a scope when it closes;

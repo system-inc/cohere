@@ -97,7 +97,7 @@ func DecodeNoInferrableTypesOptions(raw []byte) (any, error) {
 var NoInferrableTypes = rule.Rule{
 	Name: "@typescript-eslint/no-inferrable-types",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, configured := options.(NoInferrableTypesOptions)
+		settings, configured := rule.OptionsAs[NoInferrableTypesOptions](options)
 		if !configured {
 			settings = NoInferrableTypesOptions{}
 		}

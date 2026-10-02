@@ -191,7 +191,7 @@ var PreferEs6Class = rule.Rule{
 	// the parity guard strips the namespace on a `/` boundary.
 	Name: "react/prefer-es6-class",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(PreferEs6ClassOptions)
+		settings, ok := rule.OptionsAs[PreferEs6ClassOptions](options)
 		if !ok {
 			// A rule configured as bare `"error"` reaches here with nil options, which type-asserts
 			// to the zero value whose Mode matches neither arm. Falling back to the default is what

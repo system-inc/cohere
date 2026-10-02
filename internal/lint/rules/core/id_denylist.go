@@ -77,7 +77,7 @@ func DecodeIdDenylistOptions(list []byte) (any, error) {
 
 // idDenylistSettingsFrom recovers the settings from whatever the config layer handed over.
 func idDenylistSettingsFrom(options any) IdDenylistSettings {
-	if settings, ok := options.(IdDenylistSettings); ok {
+	if settings, ok := rule.OptionsAs[IdDenylistSettings](options); ok {
 		return settings
 	}
 	return DefaultIdDenylistSettings()

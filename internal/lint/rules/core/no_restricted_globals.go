@@ -233,7 +233,7 @@ var NoRestrictedGlobals = rule.Rule{
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(NoRestrictedGlobalsSettings)
+		settings, ok := rule.OptionsAs[NoRestrictedGlobalsSettings](options)
 		if !ok || len(settings.Globals) == 0 {
 			// Upstream returns an empty visitor when nothing is restricted. Registering no listener
 			// is the same decision, and it is also what a rule configured as a bare severity gets,

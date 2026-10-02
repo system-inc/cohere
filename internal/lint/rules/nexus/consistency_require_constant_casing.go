@@ -125,7 +125,7 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 	ReadsProgram: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		frameworkConstantNames := map[string]bool{}
-		if settings, hasSettings := options.(ConsistencyRequireConstantCasingOptions); hasSettings {
+		if settings, hasSettings := rule.OptionsAs[ConsistencyRequireConstantCasingOptions](options); hasSettings {
 			for _, name := range settings.FrameworkConstantNames {
 				frameworkConstantNames[name] = true
 			}

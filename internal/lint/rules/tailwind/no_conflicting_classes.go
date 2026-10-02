@@ -96,7 +96,7 @@ var NoConflictingClasses = rule.Rule{
 		}
 
 		settings := DefaultClassLiteralSettings()
-		if configured, isConfigured := options.(NoConflictingClassesOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[NoConflictingClassesOptions](options); isConfigured {
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}

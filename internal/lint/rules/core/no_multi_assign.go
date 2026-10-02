@@ -98,7 +98,7 @@ var NoMultiAssign = rule.Rule{
 		// value. That is correct here only because the one option defaults to false; the fallback is
 		// written out rather than relied on so a later default change cannot invert the rule
 		// silently.
-		settings, _ := options.(NoMultiAssignOptions)
+		settings, _ := rule.OptionsAs[NoMultiAssignOptions](options)
 		ignoreNonDeclaration := settings.IgnoreNonDeclaration != nil && *settings.IgnoreNonDeclaration
 
 		return rule.Listeners{

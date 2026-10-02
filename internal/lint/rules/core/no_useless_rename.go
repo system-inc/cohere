@@ -108,7 +108,7 @@ func DecodeNoUselessRenameOptions(raw []byte) (any, error) {
 var NoUselessRename = rule.Rule{
 	Name: "no-useless-rename",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(NoUselessRenameSettings)
+		settings, ok := rule.OptionsAs[NoUselessRenameSettings](options)
 		if !ok {
 			settings = DefaultNoUselessRenameSettings()
 		}

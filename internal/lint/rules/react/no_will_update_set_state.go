@@ -151,7 +151,7 @@ var NoWillUpdateSetState = rule.Rule{
 		// An unconfigured rule gets the zero value, which is upstream's permissive default. The
 		// comma-ok form matters: the plain harness and a bare severity in the config both hand this
 		// a nil, and an unchecked assertion would panic on every real file.
-		settings, _ := options.(NoWillUpdateSetStateOptions)
+		settings, _ := rule.OptionsAs[NoWillUpdateSetStateOptions](options)
 		reportInsideNestedFunctions := settings.Mode == "disallow-in-func"
 
 		return rule.Listeners{

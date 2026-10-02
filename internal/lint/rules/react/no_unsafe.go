@@ -205,7 +205,7 @@ var NoUnsafe = rule.Rule{
 		// An unconfigured rule gets the zero value, which is upstream's default of false. The
 		// comma-ok form matters: the plain harness and a bare severity in the config both hand this
 		// a nil, and an unchecked assertion would panic on every real file.
-		settings, _ := options.(NoUnsafeOptions)
+		settings, _ := rule.OptionsAs[NoUnsafeOptions](options)
 
 		report := func(name *ast.Node, message rule.Message) {
 			// The key, not the member. Upstream's span is `key.span()` on both arms, so

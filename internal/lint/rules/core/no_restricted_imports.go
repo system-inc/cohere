@@ -364,7 +364,7 @@ func noRestrictedImportsValidate(options *NoRestrictedImportsOptions) error {
 var NoRestrictedImports = rule.Rule{
 	Name: "no-restricted-imports",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, configured := options.(NoRestrictedImportsOptions)
+		settings, configured := rule.OptionsAs[NoRestrictedImportsOptions](options)
 		if !configured || (len(settings.Paths) == 0 && len(settings.Patterns) == 0) {
 			// Upstream's `if (Object.keys(restrictedPaths).length === 0 &&
 			// restrictedPatternGroups.length === 0) return {}`.

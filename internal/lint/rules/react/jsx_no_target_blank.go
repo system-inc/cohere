@@ -248,7 +248,7 @@ var JsxNoTargetBlank = rule.Rule{
 		// whose `Links` is false rather than upstream's true. That difference decides nothing today
 		// because nothing reads `Links`, but relying on that would make a future wiring of `Links`
 		// silently wrong for every unconfigured file, so the default is restored explicitly.
-		settings, configured := options.(JsxNoTargetBlankOptions)
+		settings, configured := rule.OptionsAs[JsxNoTargetBlankOptions](options)
 		if !configured {
 			settings = JsxNoTargetBlankOptions{Links: true}
 		}

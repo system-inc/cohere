@@ -107,7 +107,7 @@ const complexityNeverReports = int(^uint(0) >> 1)
 
 // complexitySettingsFrom recovers the settings from whatever the config layer handed over.
 func complexitySettingsFrom(options any) ComplexitySettings {
-	if settings, ok := options.(ComplexitySettings); ok {
+	if settings, ok := rule.OptionsAs[ComplexitySettings](options); ok {
 		return settings
 	}
 	return DefaultComplexitySettings()

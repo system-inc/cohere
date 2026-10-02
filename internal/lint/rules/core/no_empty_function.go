@@ -153,7 +153,7 @@ var NoEmptyFunction = rule.Rule{
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// A rule configured as bare "error" is handed nil, so the type assertion yields the zero
 		// value. Correct here only because `allow` defaults to empty.
-		settings, _ := options.(NoEmptyFunctionOptions)
+		settings, _ := rule.OptionsAs[NoEmptyFunctionOptions](options)
 
 		report := func(node *ast.Node) {
 			body := node.Body()

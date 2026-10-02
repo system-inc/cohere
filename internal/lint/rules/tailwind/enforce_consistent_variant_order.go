@@ -97,7 +97,7 @@ var EnforceConsistentVariantOrder = rule.Rule{
 		}
 
 		settings := DefaultClassLiteralSettings()
-		if configured, isConfigured := options.(EnforceConsistentVariantOrderOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[EnforceConsistentVariantOrderOptions](options); isConfigured {
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}

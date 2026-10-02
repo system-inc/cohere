@@ -94,7 +94,7 @@ var NoUnknownClasses = rule.Rule{
 
 		settings := DefaultClassLiteralSettings()
 		var ignore []string
-		if configured, isConfigured := options.(NoUnknownClassesOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[NoUnknownClassesOptions](options); isConfigured {
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}

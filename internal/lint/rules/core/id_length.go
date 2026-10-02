@@ -102,7 +102,7 @@ func DecodeIdLengthOptions(raw []byte) (any, error) {
 
 // idLengthSettingsFrom recovers the settings from whatever the config layer handed over.
 func idLengthSettingsFrom(options any) IdLengthSettings {
-	if settings, ok := options.(IdLengthSettings); ok {
+	if settings, ok := rule.OptionsAs[IdLengthSettings](options); ok {
 		return settings
 	}
 	return DefaultIdLengthSettings()

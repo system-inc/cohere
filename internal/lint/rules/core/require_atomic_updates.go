@@ -264,7 +264,7 @@ var RequireAtomicUpdates = rule.Rule{
 		// because a rule whose default arrives by accident is one field rename away from silently
 		// inverting.
 		settings := RequireAtomicUpdatesOptions{AllowProperties: false}
-		if decoded, configured := options.(RequireAtomicUpdatesOptions); configured {
+		if decoded, configured := rule.OptionsAs[RequireAtomicUpdatesOptions](options); configured {
 			settings = decoded
 		}
 

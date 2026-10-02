@@ -135,7 +135,7 @@ var NoShadowRestrictedNames = rule.Rule{
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings := NoShadowRestrictedNamesOptions{}
-		if configured, isConfigured := options.(NoShadowRestrictedNamesOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[NoShadowRestrictedNamesOptions](options); isConfigured {
 			settings = configured
 		}
 

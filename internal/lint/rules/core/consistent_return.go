@@ -122,7 +122,7 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 var ConsistentReturn = rule.Rule{
 	Name: "consistent-return",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(ConsistentReturnSettings)
+		settings, ok := rule.OptionsAs[ConsistentReturnSettings](options)
 		if !ok {
 			settings = DefaultConsistentReturnSettings()
 		}

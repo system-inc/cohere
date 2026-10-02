@@ -128,7 +128,7 @@ var NoMisusedSpread = rule.Rule{
 			return nil
 		}
 
-		settings, _ := options.(NoMisusedSpreadOptions)
+		settings, _ := rule.OptionsAs[NoMisusedSpreadOptions](options)
 
 		allowed := func(t *checker.Type) bool {
 			return type_checking.TypeMatchesSomeSpecifier(t, settings.Allow, settings.AllowInline, ctx.Program)

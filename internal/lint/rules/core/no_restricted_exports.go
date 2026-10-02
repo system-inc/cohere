@@ -199,7 +199,7 @@ func DecodeNoRestrictedExportsOptions(raw []byte) (any, error) {
 var NoRestrictedExports = rule.Rule{
 	Name: "no-restricted-exports",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, configured := options.(NoRestrictedExportsOptions)
+		settings, configured := rule.OptionsAs[NoRestrictedExportsOptions](options)
 		if !configured {
 			return rule.Listeners{}
 		}

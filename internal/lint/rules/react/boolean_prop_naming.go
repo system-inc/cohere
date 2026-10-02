@@ -163,7 +163,7 @@ var BooleanPropNaming = rule.Rule{
 			return nil
 		}
 
-		settings, hasSettings := options.(BooleanPropNamingOptions)
+		settings, hasSettings := rule.OptionsAs[BooleanPropNamingOptions](options)
 		if !hasSettings {
 			// RequiresOptions means the config layer declines the file before this, so reaching
 			// here without options is a harness path. Declining matches upstream's own behaviour

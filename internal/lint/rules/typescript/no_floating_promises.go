@@ -277,7 +277,7 @@ var NoFloatingPromises = rule.Rule{
 	ReadsProgram: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		opts, ok := options.(NoFloatingPromisesOptions)
+		opts, ok := rule.OptionsAs[NoFloatingPromisesOptions](options)
 		if !ok {
 			opts = NoFloatingPromisesOptions{
 				AllowForKnownSafeCalls:          []type_checking.TypeOrValueSpecifier{},

@@ -140,7 +140,7 @@ var messageUnnecessarilyComputedProperty = rule.Message{
 var NoUselessComputedKey = rule.Rule{
 	Name: "no-useless-computed-key",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(NoUselessComputedKeySettings)
+		settings, ok := rule.OptionsAs[NoUselessComputedKeySettings](options)
 		if !ok {
 			// A rule configured as a bare severity is handed nil options, and the zero value of
 			// this struct switches off class members rather than disabling the rule.

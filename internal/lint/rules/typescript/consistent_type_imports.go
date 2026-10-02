@@ -202,7 +202,7 @@ var ConsistentTypeImports = rule.Rule{
 	ReadsProgram: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(ConsistentTypeImportsOptions)
+		settings, ok := rule.OptionsAs[ConsistentTypeImportsOptions](options)
 		if !ok {
 			// A rule configured as a bare `"error"` is handed nil, and every default here is
 			// non-zero. Without this line the rule registers, passes its fixtures through the

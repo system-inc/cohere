@@ -55,7 +55,7 @@ func DefaultRestrictPlusOperandsSettings() restrictPlusOperandsSettings {
 func restrictPlusOperandsSettingsFrom(options any) restrictPlusOperandsSettings {
 	settings := DefaultRestrictPlusOperandsSettings()
 
-	decoded, ok := options.(RestrictPlusOperandsOptions)
+	decoded, ok := rule.OptionsAs[RestrictPlusOperandsOptions](options)
 	if !ok {
 		// A rule configured as a bare "error" is handed nil options, and `options.(T)` on nil yields
 		// the zero value rather than failing. Returning the DEFAULTS here rather than the zero

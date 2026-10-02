@@ -154,7 +154,7 @@ var GroupedAccessorPairs = rule.Rule{
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// A rule configured as bare "error" is handed nil, so the fallback here is what keeps the
 		// order check from comparing against an empty string that matches no arm.
-		settings, isSettings := options.(GroupedAccessorPairsOptions)
+		settings, isSettings := rule.OptionsAs[GroupedAccessorPairsOptions](options)
 		if !isSettings {
 			settings = GroupedAccessorPairsOptions{Order: GroupedAccessorPairsAnyOrder}
 		}

@@ -199,7 +199,7 @@ var Eqeqeq = rule.Rule{
 	Name: "eqeqeq",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings := EqeqeqOptions{}.resolve()
-		if decoded, configured := options.(EqeqeqOptions); configured {
+		if decoded, configured := rule.OptionsAs[EqeqeqOptions](options); configured {
 			settings = decoded.resolve()
 		}
 		return rule.Listeners{

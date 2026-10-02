@@ -1437,7 +1437,7 @@ func oneVarLastCommentRunStart(text string, from int) int {
 var OneVar = rule.Rule{
 	Name: "one-var",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(OneVarSettings)
+		settings, ok := rule.OptionsAs[OneVarSettings](options)
 		if !ok {
 			// A rule configured as a bare `"error"` is handed nil, and `options.(T)` on nil yields
 			// the zero value -- every group unconfigured, so the rule would register on every file

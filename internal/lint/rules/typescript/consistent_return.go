@@ -183,7 +183,7 @@ var ConsistentReturn = rule.Rule{
 	NeedsTypeChecker: true,
 	ReadsProgram:     true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(ConsistentReturnSettings)
+		settings, ok := rule.OptionsAs[ConsistentReturnSettings](options)
 		if !ok {
 			settings = ConsistentReturnSettings{}
 		}

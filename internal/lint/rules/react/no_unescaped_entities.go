@@ -308,7 +308,7 @@ func quotedAlternatives(alternatives []string) string {
 // A rule reaching the scan with an empty list here would register on every file and find nothing,
 // which is the failure that looks exactly like success.
 func configuredEntities(options any) []forbiddenEntity {
-	decoded, isOurs := options.(NoUnescapedEntitiesOptions)
+	decoded, isOurs := rule.OptionsAs[NoUnescapedEntitiesOptions](options)
 	if !isOurs || decoded.Forbid == nil {
 		return defaultForbiddenEntities
 	}

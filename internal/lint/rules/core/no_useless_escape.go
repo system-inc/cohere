@@ -104,7 +104,7 @@ var NoUselessEscape = rule.Rule{
 	Name: "no-useless-escape",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		allowed := map[rune]bool{}
-		if configured, isConfigured := options.(NoUselessEscapeOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[NoUselessEscapeOptions](options); isConfigured {
 			for _, entry := range configured.AllowRegexCharacters {
 				// One character per entry. A longer string can never equal a single escaped
 				// character, so admitting it would widen nothing and hide a typo in the configuration.

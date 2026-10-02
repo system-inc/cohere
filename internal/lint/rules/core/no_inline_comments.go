@@ -95,7 +95,7 @@ var NoInlineComments = rule.Rule{
 	Name: "no-inline-comments",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		var ignorePattern *regexp.Regexp
-		if resolved, isNoInlineCommentsOptions := options.(NoInlineCommentsOptions); isNoInlineCommentsOptions &&
+		if resolved, isNoInlineCommentsOptions := rule.OptionsAs[NoInlineCommentsOptions](options); isNoInlineCommentsOptions &&
 			resolved.IgnorePattern != "" {
 			// A pattern Go's RE2 cannot compile is dropped rather than crashing the run, which
 			// reports MORE rather than less. Upstream's `new RegExp` throws and takes every other

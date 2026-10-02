@@ -106,7 +106,7 @@ func DecodeRequireOptimizationOptions(raw []byte) (any, error) {
 var RequireOptimization = rule.Rule{
 	Name: "react/require-optimization",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(RequireOptimizationOptions)
+		settings, ok := rule.OptionsAs[RequireOptimizationOptions](options)
 		if !ok {
 			settings = RequireOptimizationOptions{}
 		}

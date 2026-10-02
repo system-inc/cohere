@@ -50,7 +50,7 @@ var NoConstantCondition = rule.Rule{
 	Name: "no-constant-condition",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		checkLoops := "allExceptWhileTrue"
-		if parsed, ok := options.(NoConstantConditionOptions); ok && parsed.CheckLoops != "" {
+		if parsed, ok := rule.OptionsAs[NoConstantConditionOptions](options); ok && parsed.CheckLoops != "" {
 			checkLoops = parsed.CheckLoops
 		}
 

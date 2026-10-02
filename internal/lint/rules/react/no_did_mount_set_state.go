@@ -140,7 +140,7 @@ var NoDidMountSetState = rule.Rule{
 		// Measured before removal: the same class reported in `.tsx` and produced nothing in `.ts`.
 
 		// An unconfigured rule gets the zero value, which is upstream's `Allowed` default.
-		settings, _ := options.(NoDidMountSetStateOptions)
+		settings, _ := rule.OptionsAs[NoDidMountSetStateOptions](options)
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

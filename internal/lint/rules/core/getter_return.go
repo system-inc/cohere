@@ -108,7 +108,7 @@ var GetterReturn = rule.Rule{
 	Name: "getter-return",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		allowImplicit := false
-		if parsed, isParsed := options.(GetterReturnOptions); isParsed {
+		if parsed, isParsed := rule.OptionsAs[GetterReturnOptions](options); isParsed {
 			allowImplicit = parsed.AllowImplicit
 		}
 

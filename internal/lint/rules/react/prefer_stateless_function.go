@@ -168,7 +168,7 @@ var messagePreferStatelessFunction = rule.Message{
 var PreferStatelessFunction = rule.Rule{
 	Name: "react/prefer-stateless-function",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(PreferStatelessFunctionOptions)
+		settings, ok := rule.OptionsAs[PreferStatelessFunctionOptions](options)
 		if !ok {
 			settings = DefaultPreferStatelessFunctionOptions()
 		}

@@ -167,7 +167,7 @@ var NoConfusingVoidExpression = rule.Rule{
 	ReadsProgram: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(NoConfusingVoidExpressionSettings)
+		settings, ok := rule.OptionsAs[NoConfusingVoidExpressionSettings](options)
 		if !ok {
 			settings = DefaultNoConfusingVoidExpressionSettings()
 		}

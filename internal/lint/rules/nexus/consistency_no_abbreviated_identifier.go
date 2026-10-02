@@ -114,7 +114,7 @@ func messageNoWordSegment(name string, word string, suggestion string) rule.Mess
 var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 	Name: "nexus/consistency-no-abbreviated-identifier",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := options.(ConsistencyNoAbbreviatedIdentifierOptions)
+		settings, _ := rule.OptionsAs[ConsistencyNoAbbreviatedIdentifierOptions](options)
 
 		fileName := imports.NormalizedFileName(ctx.SourceFile)
 		isFrameworkParameterFile := matchesAnyFilePattern(fileName, settings.FrameworkParameterFilePatterns)

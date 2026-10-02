@@ -121,7 +121,7 @@ var NoWarningComments = rule.Rule{
 	Name: "no-warning-comments",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings := NoWarningCommentsOptions{}
-		if decoded, configured := options.(NoWarningCommentsOptions); configured {
+		if decoded, configured := rule.OptionsAs[NoWarningCommentsOptions](options); configured {
 			settings = decoded
 		}
 		terms := settings.Terms

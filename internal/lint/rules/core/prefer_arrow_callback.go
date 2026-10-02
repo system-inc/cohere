@@ -59,7 +59,7 @@ func DecodePreferArrowCallbackOptions(raw []byte) (any, error) {
 
 // preferArrowCallbackSettingsFrom recovers the settings from whatever the config layer handed over.
 func preferArrowCallbackSettingsFrom(options any) PreferArrowCallbackSettings {
-	if settings, ok := options.(PreferArrowCallbackSettings); ok {
+	if settings, ok := rule.OptionsAs[PreferArrowCallbackSettings](options); ok {
 		return settings
 	}
 	return DefaultPreferArrowCallbackSettings()

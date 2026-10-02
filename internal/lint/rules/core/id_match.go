@@ -122,7 +122,7 @@ func DecodeIdMatchOptions(list []byte) (any, error) {
 
 // idMatchSettingsFrom recovers the settings from whatever the config layer handed over.
 func idMatchSettingsFrom(options any) IdMatchSettings {
-	if settings, ok := options.(IdMatchSettings); ok {
+	if settings, ok := rule.OptionsAs[IdMatchSettings](options); ok {
 		return settings
 	}
 	return DefaultIdMatchSettings()

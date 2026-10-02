@@ -173,7 +173,7 @@ var NoImplicitCoercion = rule.Rule{
 	Name:             "no-implicit-coercion",
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := options.(NoImplicitCoercionOptions)
+		settings, _ := rule.OptionsAs[NoImplicitCoercionOptions](options)
 		defaults := DefaultNoImplicitCoercionSettings()
 		if settings.Boolean == nil {
 			settings.Boolean = defaults.Boolean

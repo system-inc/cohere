@@ -154,7 +154,7 @@ var NoUnnecessaryBooleanLiteralCompare = rule.Rule{
 		// the rule would report cases upstream is silent on. A rule configured as a bare `"error"`
 		// is handed nil options, because `DecodeOptionsInto` errors on empty input and the config
 		// layer turns that into nil.
-		parsed, decoded := options.(NoUnnecessaryBooleanLiteralCompareOptions)
+		parsed, decoded := rule.OptionsAs[NoUnnecessaryBooleanLiteralCompareOptions](options)
 		if !decoded {
 			parsed = DefaultNoUnnecessaryBooleanLiteralCompareOptions()
 		}

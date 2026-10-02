@@ -174,7 +174,7 @@ var StylePropObject = rule.Rule{
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := options.(StylePropObjectOptions)
+		settings, _ := rule.OptionsAs[StylePropObjectOptions](options)
 		allowed := make(map[string]bool, len(settings.Allow))
 		for _, name := range settings.Allow {
 			allowed[name] = true

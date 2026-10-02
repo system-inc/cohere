@@ -200,7 +200,7 @@ var EnforceShorthandClasses = rule.Rule{
 		}
 
 		settings := DefaultClassLiteralSettings()
-		if configured, isConfigured := options.(EnforceShorthandClassesOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[EnforceShorthandClassesOptions](options); isConfigured {
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}

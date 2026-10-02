@@ -135,7 +135,7 @@ var EnforceConsistentClassOrder = rule.Rule{
 		}
 
 		settings := DefaultClassLiteralSettings()
-		if configured, isConfigured := options.(EnforceConsistentClassOrderOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[EnforceConsistentClassOrderOptions](options); isConfigured {
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}

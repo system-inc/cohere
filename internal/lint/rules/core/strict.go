@@ -175,7 +175,7 @@ var Strict = rule.Rule{
 	Name: "strict",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings := StrictOptions{}
-		if decoded, configured := options.(StrictOptions); configured {
+		if decoded, configured := rule.OptionsAs[StrictOptions](options); configured {
 			settings = decoded
 		}
 		return rule.Listeners{

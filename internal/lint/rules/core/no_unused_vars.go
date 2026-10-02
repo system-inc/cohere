@@ -1875,7 +1875,7 @@ type NoUnusedVarsOptions struct {
 // wrong answers. So the nil case is written explicitly rather than relying on the zero value, which
 // is the shape a shipped rule got wrong on 3,407 files.
 func resolveNoUnusedVarsOptions(options any) NoUnusedVarsOptions {
-	settings, _ := options.(NoUnusedVarsOptions)
+	settings, _ := rule.OptionsAs[NoUnusedVarsOptions](options)
 
 	if settings.Vars == "" {
 		settings.Vars = "all"

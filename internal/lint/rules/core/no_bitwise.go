@@ -193,7 +193,7 @@ var NoBitwise = rule.Rule{
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// A rule configured as bare "error" is handed nil, so the assertion yields the zero value.
 		// Correct here only because both options default to off.
-		settings, _ := options.(NoBitwiseOptions)
+		settings, _ := rule.OptionsAs[NoBitwiseOptions](options)
 
 		report := func(node *ast.Node, operator ast.Kind) {
 			spelling, bitwise := noBitwiseOperatorSpellings[operator]

@@ -173,7 +173,7 @@ func objectShorthandModeFor(text string) (ObjectShorthandMode, bool) {
 
 // objectShorthandSettingsFrom recovers the settings from whatever the config layer handed over.
 func objectShorthandSettingsFrom(options any) ObjectShorthandSettings {
-	if settings, ok := options.(ObjectShorthandSettings); ok && settings.Mode != "" {
+	if settings, ok := rule.OptionsAs[ObjectShorthandSettings](options); ok && settings.Mode != "" {
 		return settings
 	}
 	return DefaultObjectShorthandSettings()

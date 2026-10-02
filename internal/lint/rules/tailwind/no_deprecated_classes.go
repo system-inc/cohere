@@ -128,7 +128,7 @@ var NoDeprecatedClasses = rule.Rule{
 		}
 
 		settings := DefaultClassLiteralSettings()
-		if configured, isConfigured := options.(NoDeprecatedClassesOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[NoDeprecatedClassesOptions](options); isConfigured {
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}

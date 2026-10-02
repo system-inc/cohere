@@ -52,7 +52,7 @@ var ConsistencyNoLongLineComment = rule.Rule{
 		}
 
 		maximumLineCount := defaultMaximumLineCount
-		if settings, hasSettings := options.(ConsistencyNoLongLineCommentOptions); hasSettings && settings.MaximumLineCount > 0 {
+		if settings, hasSettings := rule.OptionsAs[ConsistencyNoLongLineCommentOptions](options); hasSettings && settings.MaximumLineCount > 0 {
 			maximumLineCount = settings.MaximumLineCount
 		}
 

@@ -194,7 +194,7 @@ var PreferConst = rule.Rule{
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings := PreferConstOptions{}
-		if configured, ok := options.(PreferConstOptions); ok {
+		if configured, ok := rule.OptionsAs[PreferConstOptions](options); ok {
 			settings = configured
 		}
 

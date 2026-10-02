@@ -171,7 +171,7 @@ var DotNotation = rule.Rule{
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		allowKeywords := true
 		var allowPattern *regexp.Regexp
-		if resolved, isDotNotationOptions := options.(DotNotationOptions); isDotNotationOptions {
+		if resolved, isDotNotationOptions := rule.OptionsAs[DotNotationOptions](options); isDotNotationOptions {
 			if resolved.AllowKeywords != nil {
 				allowKeywords = *resolved.AllowKeywords
 			}

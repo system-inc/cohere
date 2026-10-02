@@ -173,7 +173,7 @@ var PreferPromiseRejectErrors = rule.Rule{
 	ReadsProgram: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := options.(PreferPromiseRejectErrorsOptions)
+		settings, _ := rule.OptionsAs[PreferPromiseRejectErrorsOptions](options)
 
 		// A rule configured as bare `"error"` is handed nil options, and `options.(T)` on nil yields
 		// the zero value. Every default here is FALSE, so the zero value is already correct and no

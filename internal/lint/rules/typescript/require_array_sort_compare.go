@@ -133,7 +133,7 @@ var RequireArraySortCompare = rule.Rule{
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := options.(RequireArraySortCompareOptions)
+		settings, isSettings := rule.OptionsAs[RequireArraySortCompareOptions](options)
 		if !isSettings {
 			// A rule configured as a bare "error" is handed nil options, and `options.(T)` on nil
 			// yields the zero value, which for this rule is the INVERSE of upstream's default. The

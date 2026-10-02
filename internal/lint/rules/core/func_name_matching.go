@@ -206,7 +206,7 @@ var FuncNameMatching = rule.Rule{
 	Name: "func-name-matching",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		resolved := DefaultFuncNameMatchingOptions()
-		if given, isFuncNameMatchingOptions := options.(FuncNameMatchingOptions); isFuncNameMatchingOptions {
+		if given, isFuncNameMatchingOptions := rule.OptionsAs[FuncNameMatchingOptions](options); isFuncNameMatchingOptions {
 			resolved = given
 		}
 		direction := resolved.Direction

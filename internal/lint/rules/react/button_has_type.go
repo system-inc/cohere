@@ -204,7 +204,7 @@ var ButtonHasType = rule.Rule{
 	Name:             "react/button-has-type",
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(ButtonHasTypeOptions)
+		settings, ok := rule.OptionsAs[ButtonHasTypeOptions](options)
 		if !ok {
 			// Nil options reach here when the config layer turns a decoder error into nil for a
 			// non-required rule. The zero value would forbid all three types and report on correct

@@ -240,7 +240,7 @@ func sortCompUnsortedProps(propertyA string, position string, propertyB string) 
 var SortComp = rule.Rule{
 	Name: "react/sort-comp",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		resolved, isSortCompOptions := options.(SortCompOptions)
+		resolved, isSortCompOptions := rule.OptionsAs[SortCompOptions](options)
 		if !isSortCompOptions {
 			// A rule configured as a bare `"error"` is handed nil options rather than the decoded
 			// default, and `options.(T)` on nil yields the zero value silently. Falling back

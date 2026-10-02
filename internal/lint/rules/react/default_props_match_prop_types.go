@@ -110,7 +110,7 @@ var DefaultPropsMatchPropTypes = rule.Rule{
 		}
 
 		settings := DefaultDefaultPropsMatchPropTypesOptions()
-		if configured, isConfigured := options.(DefaultPropsMatchPropTypesOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[DefaultPropsMatchPropTypesOptions](options); isConfigured {
 			settings = configured
 		}
 

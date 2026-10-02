@@ -105,7 +105,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := options.(ConsistentIndexedObjectStyleOptions)
+		settings, isSettings := rule.OptionsAs[ConsistentIndexedObjectStyleOptions](options)
 		if !isSettings {
 			settings = DefaultConsistentIndexedObjectStyleSettings()
 		}

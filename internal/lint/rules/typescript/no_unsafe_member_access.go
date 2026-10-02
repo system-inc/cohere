@@ -86,7 +86,7 @@ var NoUnsafeMemberAccess = rule.Rule{
 	ReadsProgram: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(NoUnsafeMemberAccessOptions)
+		settings, ok := rule.OptionsAs[NoUnsafeMemberAccessOptions](options)
 		if !ok {
 			// A rule configured as a bare "error" is handed nil, and the zero value of the settings
 			// struct happens to be upstream's default here because the only option defaults to

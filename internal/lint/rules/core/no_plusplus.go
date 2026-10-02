@@ -78,7 +78,7 @@ var NoPlusplus = rule.Rule{
 	Name: "no-plusplus",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		allowForLoopAfterthoughts := false
-		if resolved, isNoPlusplusOptions := options.(NoPlusplusOptions); isNoPlusplusOptions {
+		if resolved, isNoPlusplusOptions := rule.OptionsAs[NoPlusplusOptions](options); isNoPlusplusOptions {
 			allowForLoopAfterthoughts = resolved.AllowForLoopAfterthoughts
 		}
 

@@ -140,7 +140,7 @@ var NoThisAlias = rule.Rule{
 			return nil
 		}
 
-		parsed, _ := options.(NoThisAliasOptions)
+		parsed, _ := rule.OptionsAs[NoThisAliasOptions](options)
 
 		allowed := make(map[string]bool, len(parsed.AllowedNames))
 		for _, name := range parsed.AllowedNames {

@@ -122,7 +122,7 @@ var ImportRequireModuleAlias = rule.Rule{
 		for source, alias := range defaultModuleAliases {
 			configuredModules[source] = alias
 		}
-		if settings, hasSettings := options.(ImportRequireModuleAliasOptions); hasSettings {
+		if settings, hasSettings := rule.OptionsAs[ImportRequireModuleAliasOptions](options); hasSettings {
 			for source, alias := range settings.Modules {
 				if alias.Name == "" {
 					continue

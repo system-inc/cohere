@@ -199,7 +199,7 @@ var PreserveCaughtError = rule.Rule{
 		// (upstream's `requireCatchParameter` defaults to false), but it is written as an explicit
 		// two-value assertion rather than a bare one so that the nil path is visible at the site
 		// rather than implied.
-		parsed, _ := options.(PreserveCaughtErrorOptions)
+		parsed, _ := rule.OptionsAs[PreserveCaughtErrorOptions](options)
 
 		return rule.Listeners{
 			ast.KindCatchClause: func(node *ast.Node) {

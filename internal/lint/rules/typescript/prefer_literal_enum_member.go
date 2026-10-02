@@ -131,7 +131,7 @@ var PreferLiteralEnumMember = rule.Rule{
 	Name: "@typescript-eslint/prefer-literal-enum-member",
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := options.(PreferLiteralEnumMemberOptions)
+		settings, isSettings := rule.OptionsAs[PreferLiteralEnumMemberOptions](options)
 		if !isSettings {
 			settings = DefaultPreferLiteralEnumMemberSettings()
 		}

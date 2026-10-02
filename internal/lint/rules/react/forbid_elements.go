@@ -234,7 +234,7 @@ var ForbidElements = rule.Rule{
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := options.(ForbidElementsOptions)
+		settings, _ := rule.OptionsAs[ForbidElementsOptions](options)
 
 		// A rule with an empty list matches nothing, which is the unconfigured state. Building the
 		// lookup anyway costs one allocation and keeps the two paths identical.

@@ -115,7 +115,7 @@ func DecodeMaxDepthOptions(raw []byte) (any, error) {
 
 // maxDepthSettingsFrom recovers the settings from whatever the config layer handed over.
 func maxDepthSettingsFrom(options any) MaxDepthSettings {
-	if settings, ok := options.(MaxDepthSettings); ok {
+	if settings, ok := rule.OptionsAs[MaxDepthSettings](options); ok {
 		return settings
 	}
 	return DefaultMaxDepthSettings()

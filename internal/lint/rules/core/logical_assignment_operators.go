@@ -305,7 +305,7 @@ var LogicalAssignmentOperators = rule.Rule{
 	// and is why the untyped fixtures agree on everything else.
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := options.(LogicalAssignmentOperatorsOptions)
+		settings, _ := rule.OptionsAs[LogicalAssignmentOperatorsOptions](options)
 		if settings.Require == nil {
 			settings = DefaultLogicalAssignmentOperatorsSettings()
 		}

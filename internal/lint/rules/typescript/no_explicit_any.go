@@ -129,7 +129,7 @@ var NoExplicitAny = rule.Rule{
 			return nil
 		}
 
-		parsed, _ := options.(NoExplicitAnyOptions)
+		parsed, _ := rule.OptionsAs[NoExplicitAnyOptions](options)
 
 		return rule.Listeners{
 			ast.KindAnyKeyword: func(node *ast.Node) {

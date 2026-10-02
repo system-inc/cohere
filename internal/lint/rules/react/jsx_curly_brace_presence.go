@@ -196,7 +196,7 @@ func jsxCurlyBracePresenceIsValidSetting(value jsxCurlyBracePresenceSetting) boo
 var JsxCurlyBracePresence = rule.Rule{
 	Name: "react/jsx-curly-brace-presence",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(JsxCurlyBracePresenceOptions)
+		settings, ok := rule.OptionsAs[JsxCurlyBracePresenceOptions](options)
 		if !ok {
 			settings = DefaultJsxCurlyBracePresenceOptions()
 		}

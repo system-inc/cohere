@@ -125,7 +125,7 @@ var NoPromiseExecutorReturn = rule.Rule{
 		// A rule configured as bare "error" is handed nil, so the type assertion yields the zero
 		// value. Correct here only because the option defaults to false; written out so a later
 		// default change cannot invert the rule silently.
-		settings, _ := options.(NoPromiseExecutorReturnOptions)
+		settings, _ := rule.OptionsAs[NoPromiseExecutorReturnOptions](options)
 		allowVoid := settings.AllowVoid != nil && *settings.AllowVoid
 
 		reportArrowBody := func(node *ast.Node) {

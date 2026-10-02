@@ -154,7 +154,7 @@ func DecodeConsistentThisOptions(list []byte) (any, error) {
 var ConsistentThis = rule.Rule{
 	Name: "consistent-this",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(ConsistentThisSettings)
+		settings, ok := rule.OptionsAs[ConsistentThisSettings](options)
 		if !ok || len(settings.Aliases) == 0 {
 			// A rule configured as a bare severity is handed nil options, and the zero value of the
 			// struct is an empty alias list, which would invert the rule rather than disable it.

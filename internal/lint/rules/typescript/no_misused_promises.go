@@ -249,7 +249,7 @@ var NoMisusedPromises = rule.Rule{
 			return nil
 		}
 
-		opts, ok := options.(NoMisusedPromisesOptions)
+		opts, ok := rule.OptionsAs[NoMisusedPromisesOptions](options)
 		if !ok {
 			opts = NoMisusedPromisesOptions{}
 		}

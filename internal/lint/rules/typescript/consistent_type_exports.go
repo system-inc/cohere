@@ -114,7 +114,7 @@ var ConsistentTypeExports = rule.Rule{
 		// false, but the fallback is written anyway: a later option with a true default would
 		// otherwise invert silently, and a reader should not have to check the default to know
 		// whether nil is handled.
-		parsed, decoded := options.(ConsistentTypeExportsOptions)
+		parsed, decoded := rule.OptionsAs[ConsistentTypeExportsOptions](options)
 		if !decoded {
 			parsed = DefaultConsistentTypeExportsOptions()
 		}

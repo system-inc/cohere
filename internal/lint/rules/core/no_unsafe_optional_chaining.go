@@ -146,7 +146,7 @@ var NoUnsafeOptionalChaining = rule.Rule{
 		}
 
 		disallowArithmeticOperators := false
-		if settings, hasSettings := options.(NoUnsafeOptionalChainingOptions); hasSettings {
+		if settings, hasSettings := rule.OptionsAs[NoUnsafeOptionalChainingOptions](options); hasSettings {
 			disallowArithmeticOperators = settings.DisallowArithmeticOperators
 		}
 

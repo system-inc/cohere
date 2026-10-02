@@ -198,7 +198,7 @@ var JsxKey = rule.Rule{
 	// files while passing every fixture in this package.
 	Name: "react/jsx-key",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := options.(JsxKeyOptions)
+		settings, _ := rule.OptionsAs[JsxKeyOptions](options)
 		pragma := reactPragmaFor(ctx)
 
 		// Upstream keeps a WeakSet so a key attribute reported once as a duplicate is not reported

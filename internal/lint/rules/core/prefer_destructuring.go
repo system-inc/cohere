@@ -194,7 +194,7 @@ var messagePreferDestructuring = rule.Message{
 var PreferDestructuring = rule.Rule{
 	Name: "prefer-destructuring",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(PreferDestructuringOptions)
+		settings, ok := rule.OptionsAs[PreferDestructuringOptions](options)
 		if !ok {
 			enabled := true
 			settings = PreferDestructuringOptions{

@@ -177,7 +177,7 @@ var Gating = rule.Rule{
 	// on a `/` boundary, so `react-gating` would match no inventory entry and lint nothing.
 	Name: "react-hooks/gating",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		gatingOptions, _ := options.(GatingOptions)
+		gatingOptions, _ := rule.OptionsAs[GatingOptions](options)
 		if gatingOptions.RequireDynamicGatingOption {
 			return nil
 		}

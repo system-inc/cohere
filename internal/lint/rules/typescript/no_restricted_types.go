@@ -70,7 +70,7 @@ var NoRestrictedTypes = rule.Rule{
 	Name: "@typescript-eslint/no-restricted-types",
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := options.(NoRestrictedTypesOptions)
+		settings, ok := rule.OptionsAs[NoRestrictedTypesOptions](options)
 		if !ok || len(settings.Types) == 0 {
 			// Configured nothing, so there is nothing to enforce. Upstream defaults `types` to an
 			// empty object and reaches the same silence one lookup later.

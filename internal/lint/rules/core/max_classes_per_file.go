@@ -170,7 +170,7 @@ var MaxClassesPerFile = rule.Rule{
 		// A rule configured as a bare severity is handed nil, which the assertion turns into a zero
 		// struct whose pointers are nil. Falling back matters more here than usual: a nil Maximum
 		// read as 0 would report every file holding one class.
-		settings, _ := options.(MaxClassesPerFileOptions)
+		settings, _ := rule.OptionsAs[MaxClassesPerFileOptions](options)
 		defaults := DefaultMaxClassesPerFileSettings()
 		if settings.Maximum == nil {
 			settings.Maximum = defaults.Maximum

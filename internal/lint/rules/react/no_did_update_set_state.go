@@ -107,7 +107,7 @@ var NoDidUpdateSetState = rule.Rule{
 	Name: "react/no-did-update-set-state",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's permissive default.
-		settings, _ := options.(NoDidUpdateSetStateOptions)
+		settings, _ := rule.OptionsAs[NoDidUpdateSetStateOptions](options)
 		reportInsideNestedFunctions := settings.Mode == "disallow-in-func"
 
 		return rule.Listeners{

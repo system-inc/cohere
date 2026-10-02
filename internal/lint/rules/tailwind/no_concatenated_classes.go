@@ -66,7 +66,7 @@ var NoConcatenatedClasses = rule.Rule{
 		}
 
 		settings := DefaultClassLiteralSettings()
-		if configured, isConfigured := options.(NoConcatenatedClassesOptions); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[NoConcatenatedClassesOptions](options); isConfigured {
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}

@@ -171,7 +171,7 @@ var AccessorPairs = rule.Rule{
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings := defaultAccessorPairsSettings()
-		if decoded, configured := options.(AccessorPairsOptions); configured {
+		if decoded, configured := rule.OptionsAs[AccessorPairsOptions](options); configured {
 			settings = decoded.resolve()
 		}
 
