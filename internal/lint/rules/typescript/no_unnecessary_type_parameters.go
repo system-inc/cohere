@@ -181,8 +181,8 @@ func checkTypeParameterOwner(ctx rule.Context, node *ast.Node, descriptor string
 			continue
 		}
 
-		// Deliberately quieter than upstream. See isExactEqualityWitnessParameter.
-		if isExactEqualityWitnessParameter(ctx, node, typeParameter) {
+		// Deliberately quieter than upstream. See isTypeWitnessParameter.
+		if isTypeWitnessParameter(ctx, node, typeParameter) {
 			continue
 		}
 
@@ -197,65 +197,83 @@ func checkTypeParameterOwner(ctx rule.Context, node *ast.Node, descriptor string
 	}
 }
 
-// isExactEqualityWitnessParameter recognizes the exact type-equality idiom, where a type parameter
-// used once is the mechanism rather than decoration. This is where cohere is deliberately quieter
-// than upstream, which reports it (its own corpus pins `Equal<X, Y>` as invalid57).
+// isTypeWitnessParameter recognizes a type parameter that cannot be a hidden cast, which is where
+// cohere is deliberately quieter than upstream.
 //
-//	(<T>() => T extends L ? 1 : 2) extends <T>() => T extends R ? 1 : 2 ? true : false
+// The rule exists because a type parameter used once is usually a cast in disguise: `parse<T>(input:
+// string): T` lets a caller pick any `T` for a value the function made from `input`, and the
+// signature promises a relationship nothing checks. That argument needs something to cast FROM. A
+// function with no value parameters at all has nothing a caller hands it, so a type parameter that
+// appears only in its return type is not relating an input to an output. It is a witness: the caller
+// names a type and the function carries it, which is the whole point of the declaration. Kirk's
+// ruling of 2026-10-01, stated as the principle rather than as a list of names:
 //
-// The checker defers a conditional type whose check type is an unresolved type parameter, and it
-// relates two deferred conditionals only when their extends types are IDENTICAL, which is how this
-// asks "is L exactly R" where plain assignability would let `any` through. `T` has to be a fresh
-// parameter of the function type for the conditional to stay deferred, so the rule's suggestion,
-// replacing it with its constraint, resolves both sides eagerly and destroys the comparison.
+//	no value parameters      `this` counts as one, since a receiver can be cast from
+//	the type parameter       referenced at least once, and only inside the return type annotation
+//	                         (its own declaration aside), so not in another parameter's constraint
+//	                         or default
 //
-// Three facts, all syntactic and all required, make the idiom and nothing else:
+// Two idioms this tree uses are the motivating cases, and the principle covers both rather than
+// naming either:
 //
-//	its return type is a conditional    whose check type is THIS parameter, by symbol
-//	the owner is a comparison operand   the check or extends type of an enclosing conditional
-//	                                    type, through any parentheses, so it is only ever compared
-//	                                    and never the type of a value a caller could invoke
+//   - `typeOnly<Shape>(): Shape` in `nexus/source/types/ObjectTypes.ts:93`, a phantom-type witness
+//     returning null that attaches a compile-time shape to a runtime object (about 228 call sites).
+//   - The exact type-equality idiom, `(<T>() => T extends L ? 1 : 2) extends <T>() => T extends R ?
+//     1 : 2`, in `nexus/source/types/UnionFromClasses.test.ts:23`. The checker defers a conditional
+//     whose check type is an unresolved type parameter and relates two deferred conditionals only
+//     when their extends types are identical. This was a separate, narrower recognizer
+//     (`isExactEqualityWitnessParameter`, matching the comparison by shape); every case it silenced
+//     has no value parameters and uses `T` only in its return, so the principle subsumes it and the
+//     narrower check was removed rather than kept as dead weight.
 //
-// The operand test also decides the owner's kind. Of the kinds this rule listens on, only a function
-// type and a constructor type can stand where a conditional takes a type, so a declaration, a
-// `declare function`, a method or a call signature (any of which a caller can invoke as a disguised
-// cast) never qualifies. A separate kind check was mutated away and survived every fixture, because
-// the operand test already excludes everything it excluded; `new <T>() => T extends L ? 1 : 2` is the
-// same idiom and is silent too.
+// What it costs, stated so nobody rediscovers it as a surprise: a parameterless function that reads
+// I/O and returns `T` (`readConfig<T>(): T` over `JSON.parse`) is a cast from the world rather than
+// from an argument, and the principle stays silent on it. On ahra no such function exists today; the
+// rule's only finding there was `typeOnly`.
 //
-// The real site is `nexus/source/types/UnionFromClasses.test.ts:23` in ahra, two findings in ESLint.
-func isExactEqualityWitnessParameter(ctx rule.Context, owner *ast.Node, typeParameter *ast.Node) bool {
+// typescript-eslint reports every one of these (its own corpus pins `Equal<X, Y>` as invalid57).
+func isTypeWitnessParameter(ctx rule.Context, owner *ast.Node, typeParameter *ast.Node) bool {
+	if !ast.IsFunctionLike(owner) || len(owner.Parameters()) > 0 {
+		return false
+	}
 	returnType := owner.Type()
 	if returnType == nil {
 		return false
 	}
-	returnType = ast.SkipTypeParentheses(returnType)
-	if returnType.Kind != ast.KindConditionalType {
-		return false
-	}
-	checkType := ast.SkipTypeParentheses(returnType.AsConditionalTypeNode().CheckType)
-	if checkType == nil || checkType.Kind != ast.KindTypeReference {
-		return false
-	}
-	checkTypeName := checkType.AsTypeReferenceNode().TypeName
-	if checkTypeName == nil || !ast.IsIdentifier(checkTypeName) {
-		return false
-	}
-	declarationSymbol := ctx.TypeChecker.GetSymbolAtLocation(typeParameter.Name())
-	if declarationSymbol == nil || ctx.TypeChecker.GetSymbolAtLocation(checkTypeName) != declarationSymbol {
+	declarationName := typeParameter.Name()
+	declarationSymbol := ctx.TypeChecker.GetSymbolAtLocation(declarationName)
+	if declarationSymbol == nil {
 		return false
 	}
 
-	operand := owner
-	for operand.Parent != nil && operand.Parent.Kind == ast.KindParenthesizedType {
-		operand = operand.Parent
-	}
-	enclosing := operand.Parent
-	if enclosing == nil || enclosing.Kind != ast.KindConditionalType {
+	insideReturn := false
+	outsideReturn := false
+	body := owner.Body()
+	var visit func(node *ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node == body || outsideReturn {
+			return false
+		}
+		if node.Kind == ast.KindIdentifier && node != declarationName &&
+			ctx.TypeChecker.GetSymbolAtLocation(node) == declarationSymbol {
+			if node.Pos() >= returnType.Pos() && node.End() <= returnType.End() {
+				insideReturn = true
+			} else {
+				outsideReturn = true
+			}
+		}
+		node.ForEachChild(visit)
 		return false
 	}
-	comparison := enclosing.AsConditionalTypeNode()
-	return comparison.CheckType == operand || comparison.ExtendsType == operand
+	owner.ForEachChild(visit)
+	// SUBSUMED IN PRACTICE, measured, and kept as the principle's own second clause. Dropping
+	// `!outsideReturn` survives every fixture. A parameter only reaches this test after the syntactic
+	// pass counted at most one type-position use outside its own span, so a use in the return leaves
+	// room for an outside use only inside its own constraint or default, and the type walk counts every
+	// such shape past the threshold (probed: `<T extends (x: T) => void>`, `{ a: T }`, `keyof T`, `T[]`,
+	// `[T]`, `Record<string, T>`, a template literal, `= T`; all silent with and without the clause).
+	// Kept because that is two other layers' arithmetic agreeing, not a property of this test.
+	return insideReturn && !outsideReturn
 }
 
 // usesCountedBefore is upstream's `node.body?.range[0] ?? node.returnType?.range[1]`.

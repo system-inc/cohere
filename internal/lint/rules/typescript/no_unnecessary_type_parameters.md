@@ -27,27 +27,26 @@ types are identical, which is how this asks "is L exactly R" where assignability
 through. The rule's suggestion, replacing `T` with its constraint, resolves both sides eagerly and
 destroys the comparison, so both findings are false.
 
-The condition (`isExactEqualityWitnessParameter`): the owner's return type is a conditional type
-whose check type is this parameter (by symbol, through parentheses), and the owner is itself the
-check or extends operand of an enclosing conditional type (through parentheses). Only a function type
-or a constructor type can stand there, so a declaration, a `declare function`, a method or a call
-signature returning the same conditional, any of which a caller can invoke as a disguised cast,
-still reports.
+The principle (`isTypeWitnessParameter`, Kirk's ruling of 2026-10-01): a type parameter is a witness,
+not a disguised cast, when its owner has no value parameters (a `this` parameter counts as one) and the
+parameter is referenced only inside the return type annotation. A cast needs something to cast from,
+and a function nobody hands a value has nothing. The exact-equality idiom above meets it, and so does
+`ObjectTypes.ts:93` `typeOnly<Shape>(): Shape`, the phantom-type witness behind about 228 call sites.
+Both are silent here and reported by ESLint.
 
-The real site is `libraries/structure/libraries/nexus/source/types/UnionFromClasses.test.ts:23`, two
-findings (columns 7 and 49) before and none after: 28 findings before, 26 after. Upstream's own corpus
-pins the idiom as reporting (invalid57, `Equal<X, Y>` over `Compute`); that case moved out of the
-reporting table and is asserted silent.
+This replaced a narrower recognizer that matched the equality idiom by shape. Every case it silenced
+has no value parameters and uses `T` only in its return, so the principle subsumes it.
 
-Fixtures: `TestNoUnnecessaryTypeParametersRecognizesTheExactEqualityIdiom` in
-`no_unnecessary_type_parameters_test.go`, four silent rows (the real site verbatim, invalid57
-verbatim, a parenthesized check type, the constructor-type spelling) and six reporting controls. The
-differential harness records both columns of the real site in `internal/differential/acknowledged.go`
-as gate-only findings.
+What it costs: a parameterless function that reads the world and returns `T` (`readConfig<T>(): T`
+over `JSON.parse`) is a cast from I/O rather than from an argument, and the principle stays silent on
+it. On ahra no such function exists today.
 
-`ObjectTypes.ts:93` `typeOnly<Shape>(): Shape` is still reported, and correctly: it is a return-only
-type parameter on a callable function, a disguised cast by construction, and its one sanctioned use is
-a decision for Kirk rather than something the rule can tell from types.
+The real sites are `libraries/structure/libraries/nexus/source/types/UnionFromClasses.test.ts:23`
+(columns 7 and 49) and `ObjectTypes.ts:93`. Upstream's own corpus pins the idiom as reporting
+(invalid57, `Equal<X, Y>` over `Compute`); that case is asserted silent here. Fixtures live in
+`no_unnecessary_type_parameters_test.go`: the equality idiom's silent rows, the witness rows, and
+reporting controls for a value parameter, a `this` parameter, and a parameter that escapes the return
+type.
 
 ## Why this recommendation
 

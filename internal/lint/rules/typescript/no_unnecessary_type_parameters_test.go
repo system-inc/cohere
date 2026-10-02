@@ -395,7 +395,6 @@ var noUnnecessaryTypeParametersInvalidCases = []noUnnecessaryTypeParametersCase{
 	{name: "invalid0", source: `const func = <T,>(param: T) => null;`, ids: []string{"sole"}},
 	{name: "invalid1", source: `const func = <T,>(param: [T]) => null;`, ids: []string{"sole"}},
 	{name: "invalid2", source: `const func = <T,>(param: T[]) => null;`, ids: []string{"sole"}},
-	{name: "invalid3", source: `const f1 = <T,>(): T => {};`, ids: []string{"sole"}},
 	{name: "invalid4", source: `
 interface I {
   <T>(value: T): void;
@@ -426,11 +425,6 @@ declare class C {
   method<T, U>(param: T): U;
 }
       `, ids: []string{"sole", "sole"}},
-	{name: "invalid10", source: `
-declare class C {
-  prop: <P>() => P;
-}
-      `, ids: []string{"sole"}},
 	{name: "invalid11", source: `
 declare class Foo {
   foo<T>(this: T): void;
@@ -512,8 +506,6 @@ function getLength<T extends Lengthy>(x: T) {
 }
       `, ids: []string{"sole"}},
 	{name: "invalid23", source: `declare function get<T>(): unknown;`, ids: []string{"sole"}},
-	{name: "invalid24", source: `declare function get<T>(): T;`, ids: []string{"sole"}},
-	{name: "invalid25", source: `declare function get<T extends object>(): T;`, ids: []string{"sole"}},
 	{name: "invalid26", source: `declare function take<T>(param: T): void;`, ids: []string{"sole"}},
 	{name: "invalid27", source: `declare function take<T extends object>(param: T): void;`, ids: []string{"sole"}},
 	{name: "invalid28", source: `declare function take<T, U = T>(param1: T, param2: U): void;`, ids: []string{"sole"}},
@@ -524,9 +516,6 @@ function getLength<T extends Lengthy>(x: T) {
 	{name: "invalid33", source: `declare function compare<T, U extends T>(param1: T, param2: U): boolean;`, ids: []string{"sole"}},
 	{name: "invalid34", source: `declare function get<T>(param: <U, V>(param: U) => V): T;`, ids: []string{"sole", "sole", "sole"}},
 	{name: "invalid35", source: `declare function get<T>(param: <T, U>(param: T) => U): T;`, ids: []string{"sole", "sole", "sole"}},
-	{name: "invalid36", source: `declare function makeReadonlyArray<T>(): readonly T[];`, ids: []string{"sole"}},
-	{name: "invalid37", source: `declare function makeReadonlyTuple<T>(): readonly [T];`, ids: []string{"sole"}},
-	{name: "invalid38", source: `declare function makeReadonlyTupleNullish<T>(): readonly [T | null];`, ids: []string{"sole"}},
 	{name: "invalid39", source: `declare function takeArray<T>(input: T[]): void;`, ids: []string{"sole"}},
 	{name: "invalid40", source: `declare function takeArrayNullish<T>(input: (T | null)[]): void;`, ids: []string{"sole"}},
 	{name: "invalid41", source: `declare function takeTuple<T>(input: [T]): void;`, ids: []string{"sole"}},
@@ -536,7 +525,6 @@ declare function takeTupleMultiUnrelatedNullish<T>(
   input: [T | null, null],
 ): void;
       `, ids: []string{"sole"}},
-	{name: "invalid44", source: `type Fn = <T>() => T;`, ids: []string{"sole"}},
 	{name: "invalid45", source: `type Fn = <T>() => [];`, ids: []string{"sole"}},
 	{name: "invalid46", source: `
 type Other = 0;
@@ -547,11 +535,7 @@ type Other = 0 | 1;
 type Fn = <T>() => Other;
       `, ids: []string{"sole"}},
 	{name: "invalid48", source: `type Fn = <U>(param: U) => void;`, ids: []string{"sole"}},
-	{name: "invalid49", source: `type Ctr = new <T>() => T;`, ids: []string{"sole"}},
-	{name: "invalid50", source: `type Fn = <T>() => { [K in keyof T]: K };`, ids: []string{"sole"}},
-	{name: "invalid51", source: `type Fn = <T>() => { [K in 'a']: T };`, ids: []string{"sole"}},
 	{name: "invalid52", source: `type Fn = <T>(value: unknown) => value is T;`, ids: []string{"sole"}},
-	{name: "invalid53", source: "type Fn = <T extends string>() => `a${T}b`;", ids: []string{"sole"}},
 	{name: "invalid54", source: `
 declare function mapObj<K extends string, V>(
   obj: { [key in K]?: V },
@@ -606,19 +590,6 @@ function join<T extends (string | number)>(els: T[]) {
 function join<T extends { hoge: string } | { hoge: number }>(els: T['hoge'][]) {
   return els.map(el => '' + el).join(',');
 }
-      `, ids: []string{"sole"}},
-	{name: "invalid65", source: `
-type A = string;
-type B = string;
-type C = string;
-declare function f<T extends A | B>(): T & C;
-      `, ids: []string{"sole"}},
-	{name: "invalid66", source: `
-type A = string;
-type B = string;
-type C = string;
-type D = string;
-declare function f<T extends (A extends B ? C : D)>(): T | null;
       `, ids: []string{"sole"}},
 }
 
@@ -1055,12 +1026,10 @@ func TestNoUnnecessaryTypeParametersIndexSignaturesCountTwice(t *testing.T) {
 // which typescript-eslint pins as reporting twice; it is the same idiom and moved here from the
 // reporting table.
 //
-// The reporting rows keep the exemption exactly as wide as the idiom: the same conditional-returning
-// function type NOT used as a comparison operand (a disguised cast at every call site), a function
-// type that is an operand but whose return is not a conditional on its own parameter, an operand
-// whose conditional checks a different type, a function DECLARATION returning the conditional, a
-// method signature returning it inside a compared type literal (a member, never itself the operand),
-// and the conditional reached through a parameter rather than the return.
+// The idiom is silenced by the type-witness principle (isTypeWitnessParameter), not by a recognizer
+// of its own, so the five rows after the first four, once controls that reported, are silent for the
+// same reason. The one reporting row is what still separates the idiom from a cast: the conditional
+// reached through a value parameter rather than the return.
 func TestNoUnnecessaryTypeParametersRecognizesTheExactEqualityIdiom(t *testing.T) {
 	t.Parallel()
 
@@ -1079,6 +1048,14 @@ type Equal<X, Y> =
       `},
 		{name: "parenthesized check type inside the witness", source: "type Same<L, R> = (<T>() => (T) extends L ? 1 : 2) extends (<T>() => T extends R ? 1 : 2) ? true : false;\n"},
 		{name: "the constructor-type spelling of the idiom", source: "type Same<L, R> = (new <T>() => T extends L ? 1 : 2) extends (new <T>() => T extends R ? 1 : 2) ? true : false;\n"},
+		// These five reported while the idiom had its own recognizer, as controls for how narrowly it
+		// matched the comparison. Each has no value parameter and uses `T` only in its return, so the
+		// witness principle that replaced the recognizer is silent on all five.
+		{name: "the witness shape outside a comparison", source: "type Witness = <T>() => T extends string ? 1 : 2;\n"},
+		{name: "an operand whose return is not a conditional", source: "type Same<L, R> = (<T>() => T) extends (<T>() => T) ? true : false;\n"},
+		{name: "an operand whose conditional checks another type", source: "type Same<L, R> = (<T>() => L extends T ? 1 : 2) extends (<T>() => R extends T ? 1 : 2) ? true : false;\n"},
+		{name: "a declaration returning the conditional", source: "declare function witness<T>(): T extends string ? 1 : 2;\n"},
+		{name: "a method signature inside a compared type literal", source: "type Same<L> = { m<T>(): T extends L ? 1 : 2 } extends {} ? true : false;\n"},
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -1092,12 +1069,82 @@ type Equal<X, Y> =
 		source string
 		ids    []string
 	}{
-		{name: "the witness shape outside a comparison", source: "type Witness = <T>() => T extends string ? 1 : 2;\n", ids: []string{"sole"}},
-		{name: "an operand whose return is not a conditional", source: "type Same<L, R> = (<T>() => T) extends (<T>() => T) ? true : false;\n", ids: []string{"sole", "sole"}},
-		{name: "an operand whose conditional checks another type", source: "type Same<L, R> = (<T>() => L extends T ? 1 : 2) extends (<T>() => R extends T ? 1 : 2) ? true : false;\n", ids: []string{"sole", "sole"}},
-		{name: "a declaration returning the conditional", source: "declare function witness<T>(): T extends string ? 1 : 2;\n", ids: []string{"sole"}},
-		{name: "a method signature inside a compared type literal", source: "type Same<L> = { m<T>(): T extends L ? 1 : 2 } extends {} ? true : false;\n", ids: []string{"sole"}},
 		{name: "the conditional in a parameter of an operand", source: "type Same<L> = (<T>(input: T extends L ? 1 : 2) => void) extends (() => void) ? true : false;\n", ids: []string{"sole"}},
+	}
+	for _, testCase := range reporting {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		})
+	}
+}
+
+// TestNoUnnecessaryTypeParametersTypeWitnesses pins the type-witness principle (isTypeWitnessParameter):
+// a function with no value parameters whose type parameter appears only in its return type cannot be
+// a hidden cast, because there is nothing to cast from. Kirk's ruling of 2026-10-01.
+//
+// typescript-eslint reports every silent row. The first is ahra's own site; the rest are upstream's
+// invalid cases of exactly this shape, moved here verbatim from the invalid table (fourteen of its 66),
+// so the corpus still holds them and closing the divergence makes this test fail rather than
+// silently changing a count. `declare function get<T>(): T` (invalid24) is upstream's canonical
+// return-only generic, and it is silent here by the same principle as `typeOnly`: syntax cannot tell
+// the two apart, which is why the ruling is a principle rather than a name.
+func TestNoUnnecessaryTypeParametersTypeWitnesses(t *testing.T) {
+	t.Parallel()
+
+	silent := []noUnnecessaryTypeParametersCase{
+		{name: "ObjectTypes.ts:93, typeOnly", source: "export function typeOnly<Shape>(): Shape {\n    return null as unknown as Shape;\n}\n"},
+		{name: "invalid3", source: `const f1 = <T,>(): T => {};`},
+		{name: "invalid10", source: `
+declare class C {
+  prop: <P>() => P;
+}
+      `},
+		{name: "invalid24", source: `declare function get<T>(): T;`},
+		{name: "invalid25", source: `declare function get<T extends object>(): T;`},
+		{name: "invalid36", source: `declare function makeReadonlyArray<T>(): readonly T[];`},
+		{name: "invalid37", source: `declare function makeReadonlyTuple<T>(): readonly [T];`},
+		{name: "invalid38", source: `declare function makeReadonlyTupleNullish<T>(): readonly [T | null];`},
+		{name: "invalid44", source: `type Fn = <T>() => T;`},
+		{name: "invalid49", source: `type Ctr = new <T>() => T;`},
+		{name: "invalid50", source: `type Fn = <T>() => { [K in keyof T]: K };`},
+		{name: "invalid51", source: `type Fn = <T>() => { [K in 'a']: T };`},
+		{name: "invalid53", source: "type Fn = <T extends string>() => `a${T}b`;"},
+		{name: "invalid65", source: `
+type A = string;
+type B = string;
+type C = string;
+declare function f<T extends A | B>(): T & C;
+      `},
+		{name: "invalid66", source: `
+type A = string;
+type B = string;
+type C = string;
+type D = string;
+declare function f<T extends (A extends B ? C : D)>(): T | null;
+      `},
+	}
+	for _, testCase := range silent {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			rule_testing.ExpectClean(t, result)
+		})
+	}
+
+	// Each control differs from a witness in one property the principle reads, and reports.
+	reporting := []noUnnecessaryTypeParametersCase{
+		{name: "a value parameter is something to cast from", source: "declare function parse<T>(input: string): T;\n", ids: []string{"sole"}},
+		{name: "typeOnly with a parameter", source: "export function typeOnly<Shape>(seed: unknown): Shape {\n    return seed as Shape;\n}\n", ids: []string{"sole"}},
+		{name: "a this parameter is a receiver to cast from", source: "declare function fromThis<T>(this: Window): T;\n", ids: []string{"sole"}},
+		{name: "a parameter with a default is still a parameter", source: "declare function make<T>(seed?: number): T;\n", ids: []string{"sole"}},
+		{name: "never used is not a witness", source: "declare function nothing<T>(): void;\n", ids: []string{"sole"}},
+		{name: "used in another parameter's constraint, outside the return", source: "declare function pair<T, U extends T>(): U;\n", ids: []string{"sole"}},
+		{name: "a method with a parameter", source: "interface Store { read<T>(key: string): T }\n", ids: []string{"sole"}},
+		// The default spelling of the row above. A use inside a parameter's OWN constraint has no control:
+		// the type walk counts every self-constrained shape (`<T extends Array<T>>(): T`) three times,
+		// past the threshold, so it is silent before the witness test is ever asked.
+		{name: "used in another parameter's default, outside the return", source: "declare function pick<T, U = T>(): U;\n", ids: []string{"sole"}},
+		{name: "no return annotation to witness through", source: "export function inferred<T>() { return null as unknown as T; }\n", ids: []string{"sole"}},
 	}
 	for _, testCase := range reporting {
 		t.Run(testCase.name, func(t *testing.T) {
