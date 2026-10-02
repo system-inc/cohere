@@ -97,7 +97,11 @@ type RunCacheInput struct {
 }
 
 // runCacheVersion is bumped whenever the manifest's meaning changes, not only its shape.
-const runCacheVersion = 1
+//
+// 2: Output no longer carries the lines that describe the recorded invocation (graph built in, types and
+// lint durations, the phases and total lines). A version-1 manifest has them, and replaying one would
+// print a graph build that did not happen.
+const runCacheVersion = 2
 
 // ErrRunCacheMiss is the one answer a check gives when it cannot prove a hit. Callers treat every
 // error from Check as a miss and run normally; this exists so a test can tell a clean miss

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/sha256"
 	"fmt"
@@ -82,8 +83,25 @@ func (t *teeStream) start(target **os.File) error {
 	t.done = make(chan struct{})
 	go func() {
 		defer close(t.done)
-		io.Copy(io.MultiWriter(t.real, &t.buffer), reader)
-		reader.Close()
+		defer reader.Close()
+		// Line by line, so a line tagged as describing this invocation reaches the terminal untagged
+		// and never reaches the replay. The tag travels in the stream itself because the tee is a pipe:
+		// noting the buffer's length at the moment of printing would read it before the pipe delivered.
+		lines := bufio.NewReader(reader)
+		for {
+			line, err := lines.ReadBytes('\n')
+			if len(line) > 0 {
+				if rest, tagged := bytes.CutPrefix(line, invocationTag); tagged {
+					t.real.Write(rest)
+				} else {
+					t.real.Write(line)
+					t.buffer.Write(line)
+				}
+			}
+			if err != nil {
+				return
+			}
+		}
 	}()
 	*target = writer
 	return nil
@@ -182,13 +200,14 @@ func runCachePath(root string) string {
 // replayRunCache prints a recorded run, framed so its durations cannot be read as this run's, and
 // exits with its exit code.
 func replayRunCache(stored *program.RunCache) {
-	recorded := time.Unix(0, stored.RecordedUnixNanoseconds)
-	fmt.Fprintf(os.Stdout, "cached: no input has changed since the run at %s, so its report follows as it printed then\n",
-		recorded.Format("15:04:05"))
+	recorded := time.Unix(0, stored.RecordedUnixNanoseconds).Format("15:04:05")
+	fmt.Fprintf(os.Stdout,
+		"cached: no input has changed since the run at %s, so graph, types and lint did not run; its verdict follows\n",
+		recorded)
 	os.Stdout.Write(stored.Output)
 	os.Stderr.Write(stored.Errors)
-	fmt.Fprintf(os.Stdout, "  this run: %s, replayed after checking %d inputs, without building the graph\n",
-		round(time.Since(processStart)), len(stored.Inputs))
+	fmt.Fprintf(os.Stdout, "phases: replayed the run at %s · fix, types and lint did not run\n", recorded)
+	fmt.Fprintf(os.Stdout, "  this run: %s, after checking %d inputs\n", round(time.Since(processStart)), len(stored.Inputs))
 	os.Exit(stored.ExitCode)
 }
 
@@ -268,4 +287,53 @@ func firstLine(text string) string {
 		return text[:index]
 	}
 	return text
+}
+
+// invocationTag marks a line that is true of this invocation and false of any replay of it.
+//
+// A recorded report says "graph built in 436ms" and "types ran in 409ms". Replayed, those lines claim
+// a graph was built that was not, and durations this run did not spend. So each line describing the
+// invocation rather than the tree is written through invocationOutput, which tags it; the tee strips
+// the tag before the terminal and keeps the line out of what is replayed. The tag is a record
+// separator, which no line of cohere's output contains.
+var invocationTag = []byte("\x1ecohere-invocation\x1e")
+
+// invocationOutput returns where to write a line that describes this invocation rather than the tree.
+// Without a recording it is out itself, so a run that is not recorded prints exactly what it always did.
+func invocationOutput(out io.Writer) io.Writer {
+	if activeRunCache == nil {
+		return out
+	}
+	return &taggingWriter{out: out, atLineStart: true}
+}
+
+// taggingWriter puts invocationTag at the start of every line it writes.
+type taggingWriter struct {
+	out         io.Writer
+	atLineStart bool
+}
+
+func (w *taggingWriter) Write(data []byte) (int, error) {
+	written := 0
+	for len(data) > 0 {
+		if w.atLineStart {
+			if _, err := w.out.Write(invocationTag); err != nil {
+				return written, err
+			}
+			w.atLineStart = false
+		}
+		end := bytes.IndexByte(data, '\n')
+		chunk := data
+		if end >= 0 {
+			chunk = data[:end+1]
+			w.atLineStart = true
+		}
+		n, err := w.out.Write(chunk)
+		written += n
+		if err != nil {
+			return written, err
+		}
+		data = data[len(chunk):]
+	}
+	return written, nil
 }

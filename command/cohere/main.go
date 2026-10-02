@@ -459,7 +459,7 @@ func run() error {
 	}
 
 	if lintScope.Everything {
-		fmt.Printf(
+		fmt.Fprintf(invocationOutput(os.Stdout),
 			"graph built in %s — %d files in the program, %d of them ours\n",
 			round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
 		)
@@ -475,13 +475,13 @@ func run() error {
 		// for one file and sees eleven checked should be told why without having to know that this
 		// binary walks imports at all.
 		if lintScope.DependentCount > 0 {
-			fmt.Printf(
+			fmt.Fprintf(invocationOutput(os.Stdout),
 				"graph built in %s — %d files in the program, %d of them ours, %d in scope (%s plus %d that import it)\n",
 				round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
 				len(projectFiles), lintScope.RequestDescription, lintScope.DependentCount,
 			)
 		} else {
-			fmt.Printf(
+			fmt.Fprintf(invocationOutput(os.Stdout),
 				"graph built in %s — %d files in the program, %d of them ours, %d in scope (%s)\n",
 				round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
 				len(projectFiles), lintScope.RequestDescription,
@@ -738,7 +738,7 @@ func run() error {
 		}
 		findings += len(typeDiagnostics)
 
-		fmt.Printf(
+		fmt.Fprintf(invocationOutput(os.Stdout),
 			"types: %d diagnostics over %d files in %s\n",
 			len(typeDiagnostics), len(projectFiles), round(typesDuration),
 		)

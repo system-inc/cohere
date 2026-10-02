@@ -304,7 +304,7 @@ func (r *pipelineReport) Write(out io.Writer) {
 		}
 	}
 
-	fmt.Fprintf(out, "phases: %s\n", strings.Join(parts, " · "))
+	fmt.Fprintf(invocationOutput(out), "phases: %s\n", strings.Join(parts, " · "))
 
 	r.writeAccounting(out)
 
@@ -379,7 +379,7 @@ func (r *pipelineReport) writeAccounting(out io.Writer) {
 		graphLabel, graphNotBuiltSentence = r.graphLabel, r.graphNotBuiltSentence
 	}
 	if r.graphNotBuilt {
-		fmt.Fprintf(out, "  total %s — %s\n", round(total), graphNotBuiltSentence)
+		fmt.Fprintf(invocationOutput(out), "  total %s — %s\n", round(total), graphNotBuiltSentence)
 		return
 	}
 	accounted := r.graph
@@ -397,12 +397,12 @@ func (r *pipelineReport) writeAccounting(out io.Writer) {
 		// The phases run concurrently with each other in places, so a sum can exceed the wall
 		// clock. Reporting a negative remainder would be nonsense; reporting the overlap honestly
 		// is the useful reading.
-		fmt.Fprintf(out, "  total %s — %s %s plus phases, overlapping by %s\n",
+		fmt.Fprintf(invocationOutput(out), "  total %s — %s %s plus phases, overlapping by %s\n",
 			round(total), graphLabel, round(r.graph), round(-unaccounted))
 		return
 	}
 
-	fmt.Fprintf(out, "  total %s — %s %s, phases %s, %s outside any phase\n",
+	fmt.Fprintf(invocationOutput(out), "  total %s — %s %s, phases %s, %s outside any phase\n",
 		round(total), graphLabel, round(r.graph), round(accounted-r.graph), round(unaccounted))
 }
 

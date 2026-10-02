@@ -474,7 +474,7 @@ func writeLintReport(out io.Writer, report lintReport) {
 		printRuleDiagnostic(out, diagnostic)
 	}
 	coverage := report.Result.Coverage
-	fmt.Fprintf(out,
+	fmt.Fprintf(invocationOutput(out),
 		"lint: %d findings — %d rules over %d files, %d nodes visited, %s\n",
 		len(report.Result.Diagnostics), coverage.RulesRun, coverage.FilesWalked, coverage.NodesVisited, report.WalkCost,
 	)
