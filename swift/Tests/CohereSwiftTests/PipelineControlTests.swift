@@ -125,6 +125,31 @@ struct PipelineControlTests {
         #expect(reused.findings == ["cohere-swift/no-force-unwrap:5"])
     }
 
+    /*
+     swift-format's default config turns `/** */` doc comments back into `///`, undoing the comment fixer. The
+     run must say so as a refusal, and must not count fixes that never land.
+     */
+    @Test func aFixTheFormatterUndoesIsARefusalNotAFixApplied() async throws {
+        let source = """
+            /// One.
+            /// Two.
+            /// Three.
+            /// Four.
+            /// Five.
+            struct Control {
+                let value: Int
+            }
+
+            """
+        let run = try await Self.run(source: source, mutating: true)
+        let fix = try #require(run.of("fix").first)
+        #expect(fix["fixesApplied"] as? Int == 0)
+        #expect(fix["filesRewritten"] as? Int == 0)
+        let refusals = fix["refusalsByReason"] as? [String: Int] ?? [:]
+        #expect((refusals[Pipeline.undoneByFormatter] ?? 0) > 0, "refusals were \(refusals)")
+        #expect(run.findings.contains { $0.hasPrefix("cohere-swift/no-long-line-comment") }, "the finding the fix could not land must still be reported")
+    }
+
     @Test func typesCatchesATypeErrorAndStopsLint() async throws {
         let source = Self.cleanSource.replacingOccurrences(of: "        value * 2", with: "        let text: Int = \"two\"\n        return value * text")
         let run = try await Self.run(source: source)
