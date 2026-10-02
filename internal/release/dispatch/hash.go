@@ -140,18 +140,11 @@ func goEnvironment(moduleDirectory string) (string, error) {
 	return strings.Join(strings.Fields(string(output)), " "), nil
 }
 
-// typeScriptCommit reads the pinned commit of the vendored compiler.
+// typeScriptCommit reads the commit the vendored compiler's checkout is at, from its own files.
 func typeScriptCommit(moduleDirectory string) (string, error) {
-	command := exec.Command("git", "-C", filepath.Join(moduleDirectory, "TypeScript"), "rev-parse", "HEAD")
-
-	output, err := command.Output()
+	commit, err := readHead(filepath.Join(moduleDirectory, "TypeScript"))
 	if err != nil {
 		return "", fmt.Errorf("reading the pinned TypeScript commit: %w", err)
-	}
-
-	commit := strings.TrimSpace(string(output))
-	if commit == "" {
-		return "", fmt.Errorf("the pinned TypeScript commit came back empty")
 	}
 	return commit, nil
 }

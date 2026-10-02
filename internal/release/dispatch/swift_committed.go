@@ -58,7 +58,7 @@ var swiftEngineInputs = []string{"swift/Package.swift", "swift/Package.resolved"
 
 // resolveCommittedSwiftEngine returns the engine for commit, building it when the cache has none.
 func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, contract int) (string, bool, error) {
-	hash, err := committedSwiftEngineHash(paths.ModuleDirectory, commit, toolchain)
+	hash, err := committedSwiftEngineHash(paths, commit, toolchain)
 	if err != nil {
 		return "", false, err
 	}
@@ -107,23 +107,12 @@ func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, c
 // committedSwiftEngineHash names the engine for commit without reading a single file from disk.
 //
 // Git object ids are content addresses, so `commit:swift/Sources` names exactly the sources at that
-// commit, and asking for it costs one `git rev-parse`. A cache hit therefore never touches the
-// worktree.
-func committedSwiftEngineHash(moduleDirectory string, commit string, toolchain string) (string, error) {
-	specifications := make([]string, 0, len(swiftEngineInputs))
-	for _, input := range swiftEngineInputs {
-		specifications = append(specifications, commit+":"+input)
-	}
-	// No --verify: it accepts exactly one argument. Each specification here is `<hex commit>:<path>`.
-	output, err := gitOutput(moduleDirectory, append([]string{"rev-parse"}, specifications...)...)
+// commit. A cache hit therefore never touches the worktree, and after the first run at a commit it
+// starts no git either: see swiftEngineInputObjects.
+func committedSwiftEngineHash(paths Paths, commit string, toolchain string) (string, error) {
+	objects, err := swiftEngineInputObjects(paths, commit)
 	if err != nil {
-		// rev-parse with several arguments stops at the first it cannot resolve, so the message names
-		// what was asked rather than guessing which one was missing.
-		return "", fmt.Errorf("reading the Swift engine's inputs at %s (%s): %w", release.ShortCommit(commit), strings.Join(swiftEngineInputs, ", "), err)
-	}
-	objects := strings.Fields(output)
-	if len(objects) != len(swiftEngineInputs) {
-		return "", fmt.Errorf("asked git for %d Swift engine inputs at %s and got %d answers", len(swiftEngineInputs), release.ShortCommit(commit), len(objects))
+		return "", err
 	}
 
 	digest := sha256.New()
@@ -134,6 +123,56 @@ func committedSwiftEngineHash(moduleDirectory string, commit string, toolchain s
 		fmt.Fprintf(digest, "input\x00%s\x00%s\x00", input, objects[index])
 	}
 	return hex.EncodeToString(digest.Sum(nil))[:hashLength], nil
+}
+
+// swiftEngineInputObjects are the object ids of the engine's inputs at commit, one per
+// swiftEngineInputs entry.
+//
+// A commit's tree never changes, so the answer is asked of git once and kept, named for the commit and
+// for the list of inputs asked about: a cohere whose list differs reads its own file. A kept answer that
+// is not the right number of object names is asked again rather than trusted.
+func swiftEngineInputObjects(paths Paths, commit string) ([]string, error) {
+	list := sha256.Sum256([]byte(strings.Join(swiftEngineInputs, "\x00")))
+	kept := filepath.Join(paths.CacheDirectory, "swift-inputs", commit+"-"+hex.EncodeToString(list[:])[:hashLength])
+	if contents, err := os.ReadFile(kept); err == nil {
+		objects := strings.Fields(string(contents))
+		valid := len(objects) == len(swiftEngineInputs)
+		for _, object := range objects {
+			valid = valid && isObjectName(object)
+		}
+		if valid {
+			return objects, nil
+		}
+	}
+
+	specifications := make([]string, 0, len(swiftEngineInputs))
+	for _, input := range swiftEngineInputs {
+		specifications = append(specifications, commit+":"+input)
+	}
+	// No --verify: it accepts exactly one argument. Each specification here is `<hex commit>:<path>`.
+	output, err := gitOutput(paths.ModuleDirectory, append([]string{"rev-parse"}, specifications...)...)
+	if err != nil {
+		// rev-parse with several arguments stops at the first it cannot resolve, so the message names
+		// what was asked rather than guessing which one was missing.
+		return nil, fmt.Errorf("reading the Swift engine's inputs at %s (%s): %w", release.ShortCommit(commit), strings.Join(swiftEngineInputs, ", "), err)
+	}
+	objects := strings.Fields(output)
+	if len(objects) != len(swiftEngineInputs) {
+		return nil, fmt.Errorf("asked git for %d Swift engine inputs at %s and got %d answers", len(swiftEngineInputs), release.ShortCommit(commit), len(objects))
+	}
+
+	// Kept through a temporary and a rename, so a concurrent run reads a whole answer or none. Failing to
+	// keep it costs the next run one git call, so it is not an error.
+	if err := os.MkdirAll(filepath.Dir(kept), 0o755); err == nil {
+		if temporary, err := os.CreateTemp(filepath.Dir(kept), ".inputs-*"); err == nil {
+			_, writeErr := temporary.WriteString(strings.Join(objects, "\n") + "\n")
+			closeErr := temporary.Close()
+			if writeErr != nil || closeErr != nil || os.Rename(temporary.Name(), kept) != nil {
+				os.Remove(temporary.Name())
+			}
+		}
+	}
+	return objects, nil
 }
 
 // checkOutWorktree puts the worktree at commit, creating it the first time.

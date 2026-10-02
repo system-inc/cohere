@@ -103,23 +103,24 @@ func ResolveCommitted(paths Paths, packagePath string) (binaryPath string, commi
 		return binaryPath, build.Commit, false, nil
 	}
 
+	// Asked only for a build. The commit already decides the binary's name, the pin included, so a run
+	// that finds its binary has no use for it, and reading a tree is the one question that needs git.
+	build.CompilerCommit, err = pinnedCompilerCommit(paths.ModuleDirectory, build.Commit)
+	if err != nil {
+		return "", "", false, err
+	}
 	if err := buildCommitted(paths, packagePath, build, binaryPath); err != nil {
 		return "", "", false, err
 	}
 	return binaryPath, build.Commit, true, nil
 }
 
-// readCommittedBuild reads HEAD, the compiler commit HEAD pins, and the toolchain.
+// readCommittedBuild reads HEAD and the toolchain, which is everything a binary's name depends on. The
+// compiler commit HEAD pins is read only when a build needs it; see ResolveCommitted.
 func readCommittedBuild(moduleDirectory string) (committedBuild, error) {
-	commitOutput, err := gitOutput(moduleDirectory, "rev-parse", "--verify", "HEAD^{commit}")
+	commit, err := readHead(moduleDirectory)
 	if err != nil {
 		return committedBuild{}, fmt.Errorf("reading the commit to build cohere from: %w", err)
-	}
-	commit := strings.TrimSpace(commitOutput)
-
-	compilerCommit, err := pinnedCompilerCommit(moduleDirectory, commit)
-	if err != nil {
-		return committedBuild{}, err
 	}
 
 	goVersion, err := goEnvironment(moduleDirectory)
@@ -127,7 +128,7 @@ func readCommittedBuild(moduleDirectory string) (committedBuild, error) {
 		return committedBuild{}, err
 	}
 
-	return committedBuild{Commit: commit, CompilerCommit: compilerCommit, GoVersion: goVersion}, nil
+	return committedBuild{Commit: commit, GoVersion: goVersion}, nil
 }
 
 // pinnedCompilerCommit reads the vendored compiler's commit from a commit's tree.
