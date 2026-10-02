@@ -16,6 +16,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
 // ClassLiteral is one string in the source that holds Tailwind class names.
@@ -272,8 +273,13 @@ func stringLiteralOf(node *ast.Node) *ast.Node {
 // The range excludes the surrounding quotes so that a fix replaces class text and nothing else. Any
 // literal whose source form is shorter than two characters cannot have quotes to strip, so it is
 // reported with its own range rather than a negative one.
+//
+// The range starts at the literal's token, not at its Loc. Loc includes the whitespace before the
+// literal, so for one on its own line or after a comma the quote strip cut the opening quote, the
+// fixed file stopped parsing, and the edit engine refused that file's whole fix batch, every other
+// rule's fixes included (#vf1hd6j, measured at 174 files in ahra).
 func classLiteralFrom(literal *ast.Node, origin ClassLiteralOrigin) ClassLiteral {
-	contentRange := literal.Loc
+	contentRange := rule.TokenRange(ast.GetSourceFileOfNode(literal), literal)
 	if contentRange.End()-contentRange.Pos() >= 2 {
 		contentRange = core.NewTextRange(contentRange.Pos()+1, contentRange.End()-1)
 	}
