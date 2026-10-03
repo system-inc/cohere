@@ -16,7 +16,7 @@ encoder's tests both read them, so neither side can drift without the other's te
 | `TypesBail.jsonl` | Under `--no-fix`, a compiler error cuts lint off as `notReached`. The run is incomplete. Exit 1. |
 | `CrashWithoutSummary.jsonl` | The stream stops after the fix phase. The front door must say nothing was checked and exit 1. |
 | `Unreadable.jsonl` | One file the engine could not read: named beside the excluded files, every phase ran, nothing found, and still incomplete with exit 1. |
-| `Unused.jsonl` | `--unused`: two `unused` records and the `unusedCoverage` record after lint, the unused phase ran, and the summary counts no findings and exits 0, because the report is not a gate. |
+| `Unused.jsonl` | `--unused`: after lint, each rule's `unused` records then its `unusedCoverage`, `unused-import` first and `unused-declaration` second (the declaration section is from a real run on ahraos-presence), the unused phase ran, and the summary counts no findings and exits 0, because the report is not a gate. |
 
 **Version 2** (2026-10-02) added the `unreadable` record. Before it, a file the engine could not read was a
 note on stderr: the summary said the run fell short and the front door believed it, but could not say

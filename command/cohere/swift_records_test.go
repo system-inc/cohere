@@ -177,10 +177,28 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 			"  not checked for unused imports: 1 files (it has #if, and the index describes only the configuration the build compiled)\n",
 			"  not checked for unused imports: 1 files (the build has not compiled it as it stands)\n",
 			"  never reported: 1 imports (re-exported with @_exported, which is API)\n",
+			// The second rule's section, from a real run on ahraos-presence: its own heading and count, its
+			// items, and its own coverage lines, every skip reason by name.
+			"\n  declarations nothing uses — 2\n",
+			"    /project/Sources/AhraOSPresence/Stage/StagePane+HandTouchProbe.swift:42:13 — var deepestAt\n",
+			"    /project/Sources/AhraOSPresence/Studio/Panels/VariantsMenuProbe.swift:349:25 — func after(_:_:)\n",
+			"  looked at 1092 files and 4311 declarations (cohere-swift/unused-declaration)\n",
+			"  not checked for unused declarations: 156 files (it has #if, and the index describes only the configuration the build compiled)\n",
+			"  never reported: 358 declarations (a stored property of a type whose conformances may read every stored property (Codable))\n",
+			"  never reported: 175 declarations (an override or a protocol witness, reached through what it overrides)\n",
+			"  never reported: 23 declarations (reached by the Objective-C runtime (@objc, @IBAction, @IBOutlet, @NSManaged, dynamic))\n",
 		)
-		forbidLines(t, output, "did not check everything", "Main.swift:1:1 - ")
+		forbidLines(t, output, "did not check everything", "Main.swift:1:1 - ", "deepestAt - ")
 		if strings.Index(output, "imports nothing uses") < strings.Index(output, "lint: ") {
 			t.Errorf("the unused report printed before the lint line:\n%s", output)
+		}
+		// Each rule's section in the order the engine wrote them, and every skip reason printed: ten for
+		// declarations, counted rather than listed so a dropped one cannot hide among the pinned three.
+		if strings.Index(output, "declarations nothing uses") < strings.Index(output, "never reported: 1 imports") {
+			t.Errorf("the declarations section printed before the imports section ended:\n%s", output)
+		}
+		if got := strings.Count(output, "never reported: "); got != 11 {
+			t.Errorf("%d never-reported lines, the fixture holds 1 for imports and 10 for declarations:\n%s", got, output)
 		}
 	})
 
@@ -199,8 +217,10 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 			"\n  cohere-swift/unused-parameter — 3\n",
 			"  looked at 2 files and 6 items (cohere-swift/unused-parameter)\n",
 			"  not checked for unused items: 1 files (the build has not compiled it as it stands)\n",
+			// The known rule beside it keeps its own words.
+			"\n  declarations nothing uses — 2\n",
 		)
-		forbidLines(t, output, "imports nothing uses", "declarations nothing uses")
+		forbidLines(t, output, "imports nothing uses")
 	})
 
 	// The contract's crash: the stream stops after the fix phase. Exit 0 or 1 without a summary is a
@@ -274,8 +294,11 @@ func TestSwiftRunRefusesBrokenStreams(t *testing.T) {
 		{"an unused record with no subject", replace(unused, 8, strings.Replace(unused[8], `"subject":`, `"unnamed":`, 1)), 0, "missing its file, position, rule or subject"},
 		{"an unused record before the lint phase", append(append(append([]string(nil), unused[:7]...), unused[8], unused[7]), unused[9:]...), 0, "outside the unused phase"},
 		{"an unused coverage count that disagrees", replace(unused, 11, strings.Replace(unused[11], `"found":3`, `"found":4`, 1)), 0, "counts 4 found and 3"},
-		{"unused records with no coverage record", without(unused, 11), 0, "with no unusedCoverage record"},
-		{"an unused phase that ran with no coverage", without(without(without(without(unused, 11), 10), 9), 8), 0, "no unusedCoverage record said"},
+		// The fixture holds two rules: unused-import's records at 8-10 and its coverage at 11, then
+		// unused-declaration's records at 12-13 and its coverage at 14.
+		{"unused records with no coverage record", without(unused, 14), 0, "with no unusedCoverage record"},
+		{"one rule's records interleaved before another's coverage", without(unused, 11), 0, "of another rule arrived before the coverage record"},
+		{"an unused phase that ran with no coverage", without(without(without(without(without(without(without(unused, 14), 13), 12), 11), 10), 9), 8), 0, "no unusedCoverage record said"},
 	}
 
 	for _, testCase := range cases {
