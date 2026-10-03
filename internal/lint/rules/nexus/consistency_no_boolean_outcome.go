@@ -30,6 +30,19 @@ var thirdPartyRequestFieldNames = map[string]bool{
 	"isLoading": true, "isPending": true, "isFetching": true, "isRefetching": true, "status": true,
 }
 
+// thirdPartyEnvelopes are result envelopes another system defines and sends over the wire, each the
+// full field set its documentation gives. A declaration carrying every field of one is mirroring that
+// system's result rather than declaring our own, so the naming is not ours. The whole set is required,
+// so a shape of our own that shares a field or two with one is still reported.
+var thirdPartyEnvelopes = []struct {
+	name   string
+	fields []string
+}{
+	// Every Cloudflare API v4 response, success or failure:
+	// https://developers.cloudflare.com/email-service/api/send-emails/rest-api/
+	{"Cloudflare API v4", []string{"success", "errors", "messages", "result"}},
+}
+
 // roleSuffixes are stripped from a declaration name so the suggestion reads right:
 // ClaudeCallResultInterface suggests ClaudeCall.
 var roleSuffixes = regexp.MustCompile(`(Interface|Type|Result|Response|Properties)+$`)
@@ -64,7 +77,8 @@ func messageBooleanOutcome(flagName string, declaration string, suggested string
 // The exemptions are what make it usable, and each is structural rather than a name guess. A flag
 // with no companion field is ordinary state, so a bare isVisible or a lone succeeded column is left
 // alone. React properties describe what to render, so an isError there is display state the parent
-// hands down. A declaration carrying TanStack's field set is mirroring someone else's result.
+// hands down. A declaration carrying TanStack's field set is mirroring someone else's result, and so is
+// one carrying every field of a third-party wire envelope, like Cloudflare API v4's.
 // isSuccess and isError together describe one settled state from two sides, which is that same
 // third-party shape rather than an envelope. Generated output belongs to its generator.
 //
@@ -208,6 +222,20 @@ func findBooleanOutcomeFlag(members []*ast.Node) *ast.Node {
 	// Mirroring a third-party request result rather than declaring our own.
 	for _, name := range order {
 		if thirdPartyRequestFieldNames[name] {
+			return nil
+		}
+	}
+
+	// Mirroring a third-party wire envelope, every one of its documented fields.
+	for _, envelope := range thirdPartyEnvelopes {
+		carriesAll := true
+		for _, field := range envelope.fields {
+			if _, carries := properties[field]; !carries {
+				carriesAll = false
+				break
+			}
+		}
+		if carriesAll {
 			return nil
 		}
 	}

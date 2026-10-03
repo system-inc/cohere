@@ -21,6 +21,9 @@ func TestConsistencyNoBooleanOutcomeFires(t *testing.T) {
 		{"failed with a reason", "export interface CallResult {\n    failed: boolean;\n    reason: string;\n}\n"},
 		{"succeeded with data", "export interface CallResult {\n    succeeded: boolean;\n    data: string;\n}\n"},
 		{"isError alone with a message", "export interface CallResult {\n    isError: boolean;\n    message: string;\n}\n"},
+		// A third-party envelope exempts only on its whole documented field set, so a shape of our own
+		// that shares three of Cloudflare v4's four fields is still ours.
+		{"three of cloudflare's four fields", "export interface SyncResult {\n    success: boolean;\n    errors: string[];\n    result: string;\n}\n"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -44,6 +47,7 @@ func TestConsistencyNoBooleanOutcomeStaysSilent(t *testing.T) {
 		{"a lone flag on a database row", outcomeFile, "export interface JobRow {\n    id: string;\n    succeeded: boolean;\n}\n"},
 		{"react properties are display state", outcomeFile, "export interface BannerProperties {\n    isError: boolean;\n    message: string;\n}\n"},
 		{"tanstack field set is not ours", outcomeFile, "export interface QueryResult {\n    isError: boolean;\n    isLoading: boolean;\n    error: string;\n}\n"},
+		{"cloudflare's v4 envelope is not ours", outcomeFile, "export interface R2CloudflareApiResponseInterface {\n    success: boolean;\n    errors: unknown;\n    messages: unknown;\n    result: unknown;\n}\n"},
 		{"isSuccess and isError are one settled state", outcomeFile, "export interface QueryResult {\n    isSuccess: boolean;\n    isError: boolean;\n    error: string;\n}\n"},
 		{"generated files belong to the generator", "/repository/source/generated/Api.ts", "export interface LookupResult {\n    success: boolean;\n    error: string;\n}\n"},
 		{"dot-generated files too", "/repository/source/Api.generated.ts", "export interface LookupResult {\n    success: boolean;\n    error: string;\n}\n"},
