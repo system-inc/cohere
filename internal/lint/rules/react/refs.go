@@ -396,9 +396,67 @@ func refsIsUseRefType(ctx rule.Context, function *high_level_intermediate_repres
 		return false
 	}
 	node := refsIdentifierNode(function, id)
-	if node == nil {
+	if node == nil || refsCannotHaveRefType(node) {
 		return false
 	}
+	return refsNodeHasRefType(ctx, node)
+}
+
+// refsCannotHaveRefType reports whether the language fixes a node's type as something no ref type
+// can be, so the checker need not be asked.
+//
+// The first ask about a node is where the checker computes its type, and for a JSX element that
+// means resolving the component and checking every attribute against its props. Profiled on ahra,
+// www and connected, 2.1 million asks came from this rule, and only identifiers, calls, property
+// accesses and variable declarations ever answered yes. The kinds below answer no by construction,
+// not by measurement: a literal, a template, a JSX node, an arithmetic, comparison, bitwise or unary
+// result, an object or array literal, and an anonymous function, whose type symbol is the
+// anonymous `__function`. `TestRefsCannotHaveRefTypeAgreesWithTheChecker` asks the checker about
+// every node this declines in a source written to tempt it.
+//
+// Deliberately absent: `&&`, `||`, `??`, the comma and the assignments `=`, `&&=`, `||=` and `??=`,
+// whose result is an operand and can be a ref; a conditional, an `await`, a `new`, an `as`; and a
+// named function, because its type's symbol carries the function's name, so `function RefCallback`
+// would answer yes to a test that reads the symbol's name.
+func refsCannotHaveRefType(node *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
+		ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression,
+		ast.KindRegularExpressionLiteral, ast.KindNullKeyword, ast.KindTrueKeyword,
+		ast.KindFalseKeyword,
+		ast.KindJsxElement, ast.KindJsxSelfClosingElement, ast.KindJsxFragment, ast.KindJsxText,
+		ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression, ast.KindArrowFunction,
+		ast.KindPrefixUnaryExpression, ast.KindPostfixUnaryExpression, ast.KindTypeOfExpression,
+		ast.KindVoidExpression, ast.KindDeleteExpression:
+		return true
+	case ast.KindFunctionExpression:
+		return node.AsFunctionExpression().Name() == nil
+	case ast.KindBinaryExpression:
+		return refsOperatorYieldsAPrimitive(node.AsBinaryExpression().OperatorToken.Kind)
+	}
+	return false
+}
+
+// refsOperatorYieldsAPrimitive reports whether a binary operator's result is a number, a bigint, a
+// string or a boolean whatever its operands are.
+func refsOperatorYieldsAPrimitive(operator ast.Kind) bool {
+	switch operator {
+	case ast.KindPlusToken, ast.KindMinusToken, ast.KindAsteriskToken, ast.KindSlashToken,
+		ast.KindPercentToken, ast.KindAsteriskAsteriskToken,
+		ast.KindAmpersandToken, ast.KindBarToken, ast.KindCaretToken,
+		ast.KindLessThanLessThanToken, ast.KindGreaterThanGreaterThanToken,
+		ast.KindGreaterThanGreaterThanGreaterThanToken,
+		ast.KindLessThanToken, ast.KindGreaterThanToken, ast.KindLessThanEqualsToken,
+		ast.KindGreaterThanEqualsToken, ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken,
+		ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken,
+		ast.KindInstanceOfKeyword, ast.KindInKeyword:
+		return true
+	}
+	return false
+}
+
+// refsNodeHasRefType is refsIsUseRefType's checker half, over a node.
+func refsNodeHasRefType(ctx rule.Context, node *ast.Node) bool {
 	valueType := ctx.TypeChecker.GetTypeAtLocation(node)
 	if valueType == nil {
 		return false

@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -767,4 +769,83 @@ func TestRefsAdmitsNamespacedHookCalls(t *testing.T) {
 			"}\n",
 	})
 	rule_testing.ExpectClean(t, notAHook)
+}
+
+// TestRefsCannotHaveRefTypeAgreesWithTheChecker is the proof behind refsCannotHaveRefType.
+//
+// That function answers "no ref" without asking the checker, so it is safe exactly when the checker
+// would also say no. This walks every node of a source written to tempt it (refs inside object and
+// array literals, behind `??` and `||`, returned from an arrow, passed through JSX, interpolated in a
+// template) and asks the checker about each node the exclusion declines. The tempting shapes the
+// exclusion keeps asking about must answer yes, which is what shows the checker half can see a ref
+// here at all.
+func TestRefsCannotHaveRefTypeAgreesWithTheChecker(t *testing.T) {
+	t.Parallel()
+
+	const source = `import {useRef, type RefObject} from "./react";
+
+declare function render(value: unknown): void;
+declare const maybe: RefObject<number> | undefined;
+
+export function Component({label}: {label: string}) {
+  const ref = useRef(0);
+  const bag = {ref, nested: [ref, maybe]};
+  const either = maybe ?? ref;
+  const fallback = maybe || ref;
+  const pick = (other: RefObject<number>) => other;
+  const named = function namedFunction() { return ref; };
+  const callback = function RefCallback() { return ref; };
+  const chosen = label ? ref : pick(ref);
+  const text = ` + "`${label}${ref.current}`" + `;
+  const sum = ref.current + 1;
+  const same = ref === maybe;
+  const negated = !ref;
+  render([bag, either, fallback, pick, named, callback, chosen, text, sum, same, negated, typeof ref, void ref]);
+  return <div ref={undefined} title={label}>{label}<span>{text}</span></div>;
+}
+`
+
+	declined := map[ast.Kind]int{}
+	asked := map[string]bool{}
+	probe := rule.Rule{
+		Name:             "refs-cannot-have-ref-type-probe",
+		NeedsTypeChecker: true,
+		Run: func(ctx rule.Context, options any) rule.Listeners {
+			return rule.Listeners{
+				ast.KindSourceFile: func(root *ast.Node) {
+					var visit func(node *ast.Node) bool
+					visit = func(node *ast.Node) bool {
+						if refsCannotHaveRefType(node) {
+							declined[node.Kind]++
+							if refsNodeHasRefType(ctx, node) {
+								t.Errorf("declined %s at %d, which the checker types as a ref", node.Kind, node.Pos())
+							}
+						}
+						if node.Kind == ast.KindBinaryExpression || node.Kind == ast.KindConditionalExpression ||
+							node.Kind == ast.KindFunctionExpression {
+							text := ctx.SourceFile.Text()[node.Pos():node.End()]
+							asked[strings.TrimSpace(text)] = !refsCannotHaveRefType(node) && refsNodeHasRefType(ctx, node)
+						}
+						return node.ForEachChild(visit)
+					}
+					visit(root)
+				},
+			}
+		},
+	}
+	rule_testing.RunTypedFiles(t, probe, map[string]string{"react.d.ts": reactStub, "a.tsx": source}, "a.tsx")
+
+	for _, kind := range []ast.Kind{ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression,
+		ast.KindArrowFunction, ast.KindTemplateExpression, ast.KindJsxElement, ast.KindBinaryExpression,
+		ast.KindPrefixUnaryExpression, ast.KindTypeOfExpression, ast.KindVoidExpression} {
+		if declined[kind] == 0 {
+			t.Errorf("no %s was declined, so this source does not test it", kind)
+		}
+	}
+	for _, shape := range []string{"maybe ?? ref", "maybe || ref", "label ? ref : pick(ref)",
+		"function RefCallback() { return ref; }"} {
+		if !asked[shape] {
+			t.Errorf("%q must still be asked and typed as a ref; it was not", shape)
+		}
+	}
 }
