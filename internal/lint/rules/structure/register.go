@@ -19,7 +19,7 @@ func init() {
 	rule.Register(
 		rule.Registration{Rule: BoundaryNoProjectThemeValue},
 		rule.Registration{Rule: ConsistencyNoPropertyAlias},
-		rule.Registration{Rule: ConsistencyOrganizeImports},
+		rule.Registration{Rule: ConsistencyRequireOrganizedImports},
 		rule.Registration{Rule: NetworkNoDirectFetch},
 		rule.Registration{Rule: NetworkNoForbiddenImport},
 		rule.Registration{Rule: NetworkNoInvalidateCacheInOnSuccess},
@@ -39,14 +39,14 @@ func init() {
 		rule.Registration{Rule: ReactComponentRequireNamedExport},
 		rule.Registration{Rule: ReactComponentRequirePropertiesParameter},
 		rule.Registration{Rule: ReactComponentRequirePropertiesTypeSuffix},
-		rule.Registration{Rule: ReactHookAnyType},
+		rule.Registration{Rule: ReactHookNoAnyType},
 		rule.Registration{Rule: ReactHookNoDestructuring},
 		rule.Registration{Rule: ReactHookNoPropertiesInDependencies},
 		rule.Registration{Rule: ReactHookRequireEffectComment},
 		rule.Registration{Rule: ReactHookRequireResultNaming},
-		rule.Registration{Rule: ReactImportNoDestructuring},
-		rule.Registration{Rule: ReactNoAnchorElement},
-		rule.Registration{Rule: ReactNoHorizontalRuleElement},
+		rule.Registration{Rule: ImportRequireReactNamespace},
+		rule.Registration{Rule: ReactElementNoAnchor},
+		rule.Registration{Rule: ReactElementNoHorizontalRule},
 		rule.Registration{Rule: StorageNoDirectLocalStorage},
 	)
 }

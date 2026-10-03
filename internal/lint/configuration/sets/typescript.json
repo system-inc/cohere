@@ -120,7 +120,7 @@
         "use-isnan": "error",
         "valid-typeof": "error",
         "nexus/performance-no-independent-await-in-loop": "error",
-        "nexus/consistency-require-return-matching-type": "error",
+        "nexus/consistency-require-matching-return-type": "error",
         "nexus/boundary-no-internal-import": "error",
         "nexus/boundary-no-nexus-outside-import": "error",
         "nexus/consistency-no-ambiguous-identifier": "error",

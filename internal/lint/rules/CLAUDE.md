@@ -11,7 +11,7 @@ repository ships its defects.**
 to be called `verify` and is now `cohere`. Ordinary English ("verify that the fixture
 fails") is not the program. And **Base's validation decorators are not the program
 either**: `VerifyIsEmail`, `VerifyIsArray`, `VerifyBy` and about forty siblings, plus the
-rules `base/verify-array-parity` and `base/verify-optional-parity`, are Kam's public API
+rules `base/correctness-require-verify-array-parity` and `base/correctness-require-verify-optional-parity`, are Kam's public API
 in the Base framework and keep that spelling forever. `base/doc.go` explains why. Those
 rules key on those literal strings, so a renaming sweep makes them match nothing, report
 nothing, and leave the tree green having checked less than it appears to. A sweep already

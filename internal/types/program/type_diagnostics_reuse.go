@@ -35,12 +35,23 @@ import (
 // program state. And everything, whenever the run that recorded the section saw a global diagnostic: those
 // are produced as a side effect of checking files, so a run that skipped the files could not reproduce
 // them. Syntactic and bind diagnostics are not cached at all; they are cheap and every run computes them.
+//
+// # What the fingerprint cannot see
+//
+// The compiler options. Turning on strict moves no file's text, shape or resolutions, and every file it
+// newly fails would replay as clean (#hfv0ae3, proven against 3bef97f). So the section carries a key over
+// what the caller knows the options come from, and a section under another key replays nothing.
 
-const typesSectionVersion = 1
+// Version 2 added the key; a version 1 section, which has none, is never replayed.
+const typesSectionVersion = 2
 
 // TypesSection is the types phase's section of the cache table.
 type TypesSection struct {
 	Version int
+
+	// Key is what the diagnostics depend on beyond the files the fingerprints cover: the tsconfig and
+	// everything it extends. See NewTypeDiagnosticsReuse.
+	Key [sha256.Size]byte
 
 	// GlobalsClean is whether the run that recorded it saw no global diagnostics. Only then can a run that
 	// skips files report what a run that checked them all would.
@@ -79,15 +90,29 @@ type StoredDiagnostic struct {
 // TypeDiagnosticsReuse is one run's use of the section: what was stored, and what this run records.
 type TypeDiagnosticsReuse struct {
 	stored *TypesSection
+	key    [sha256.Size]byte
 
 	mutex    sync.Mutex
 	recorded *TypesSection
 	replayed int
 }
 
-// NewTypeDiagnosticsReuse wraps what the table held, which may be nil.
-func NewTypeDiagnosticsReuse(stored *TypesSection) *TypeDiagnosticsReuse {
-	return &TypeDiagnosticsReuse{stored: stored}
+// NewTypeDiagnosticsReuse wraps what the table held, which may be nil, for a run whose compiler options
+// hash to key. Only a section recorded under the same key is replayed, and what this run records carries it.
+func NewTypeDiagnosticsReuse(stored *TypesSection, key [sha256.Size]byte) *TypeDiagnosticsReuse {
+	return &TypeDiagnosticsReuse{stored: stored, key: key}
+}
+
+// Unchanged reports whether what this run recorded is what the table already holds: every file replayed
+// under the same key, and the global verdict the same. Writing it back would rewrite the table for nothing.
+func (r *TypeDiagnosticsReuse) Unchanged() bool {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	if r.recorded == nil || r.stored == nil {
+		return r.recorded == nil
+	}
+	return r.stored.Key == r.recorded.Key && r.stored.GlobalsClean == r.recorded.GlobalsClean &&
+		r.replayed == len(r.recorded.Entries) && len(r.recorded.Entries) == len(r.stored.Entries)
 }
 
 // Replayed is how many files' semantic diagnostics this run took from the section.

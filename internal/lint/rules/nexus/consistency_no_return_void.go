@@ -64,7 +64,7 @@ var consistencyNoReturnVoidMessage = rule.Message{
 //     without them the `return;` would run unconditionally.
 //
 // The fix always writes `return;`. In a function whose type says it returns a value, that is the bare
-// return `nexus/consistency-require-return-matching-type` then rewrites to `return undefined;`, so the
+// return `nexus/consistency-require-matching-return-type` then rewrites to `return undefined;`, so the
 // two fixes converge on the right spelling in one run rather than this rule repeating that judgment.
 var ConsistencyNoReturnVoid = rule.Rule{
 	Name: "nexus/consistency-no-return-void",

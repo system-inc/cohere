@@ -50,7 +50,7 @@ var messageNoHtmlLinkForPages = rule.Message{
 // workaround for a constraint we lack, it is the other rule's route model, and the ported rule does
 // not have one.
 //
-// # This is not the same rule as structure/react-no-anchor-element
+// # This is not the same rule as structure/react-element-no-anchor
 //
 // That rule reports every raw <a> as a house-style matter and names our own Link component as the
 // remedy. This one reports a subset of anchors, by href, and names `next/link`. Neither supersedes

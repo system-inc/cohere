@@ -7,7 +7,7 @@
         "@typescript-eslint/unified-signatures": "ignoreDifferentlyNamedParameters, ruled by @system_cohere in 17339 and corrected in 17361, mirrored in Base ESLint defaults c4d3916 (api 3f87fa5e)"
     },
     "rules": {
-        "base/context-requires-access": [
+        "base/security-require-context-access": [
             "error",
             {
                 "requirements": [
@@ -26,21 +26,21 @@
                 ]
             }
         ],
-        "base/graphql-nullable-parity": "error",
-        "base/graphql-operation-context-matches-return": "error",
-        "base/inject-type-matches-parameter": "error",
-        "base/no-bare-throw": "error",
-        "base/no-console": "error",
-        "base/no-hand-built-declared-error": "error",
-        "base/no-global-container": "error",
-        "base/orm-column-nullable-parity": "error",
-        "base/orm-column-requires-declare": "error",
-        "base/pagination-decorator": "error",
-        "base/provider-return-matches-token": "error",
-        "base/relation-must-be-optional": "warn",
-        "base/serializable-nullable-parity": "error",
-        "base/verify-array-parity": "error",
-        "base/verify-optional-parity": "error",
+        "base/correctness-require-graphql-nullable-parity": "error",
+        "base/correctness-require-matching-operation-context": "error",
+        "base/correctness-require-matching-inject-type": "error",
+        "base/consistency-no-bare-throw": "error",
+        "base/consistency-no-console": "error",
+        "base/consistency-no-hand-built-declared-error": "error",
+        "base/boundary-no-global-container": "error",
+        "base/correctness-require-orm-column-nullable-parity": "error",
+        "base/correctness-require-orm-column-declare": "error",
+        "base/consistency-require-pagination-argument-name": "error",
+        "base/correctness-require-matching-provider-return": "error",
+        "base/correctness-require-optional-relation": "warn",
+        "base/correctness-require-serializable-nullable-parity": "error",
+        "base/correctness-require-verify-array-parity": "error",
+        "base/correctness-require-verify-optional-parity": "error",
         "nexus/consistency-no-abbreviated-identifier": "error",
         "nexus/consistency-require-constant-casing": "error",
         "@typescript-eslint/no-extraneous-class": [

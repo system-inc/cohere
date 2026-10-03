@@ -1,6 +1,0 @@
-{
-    "rule": "base/context-requires-access",
-    "assertedMessageIds": [
-        "missingProtector"
-    ]
-}

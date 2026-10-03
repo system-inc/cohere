@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
@@ -163,6 +164,10 @@ type Options struct {
 	// ContentPack, when set, serves files whose stat is unchanged from the bytes recorded by earlier runs,
 	// so they are not opened, and collects what this build read from disk. Nil reads everything from disk.
 	ContentPack *ContentPack
+
+	// Timing, when set, is filled with what the build cost by part. Nil reads no clocks and wraps
+	// nothing, so a build nobody is timing costs what it did before this existed. See GraphTiming.
+	Timing *GraphTiming
 }
 
 // Build resolves a tsconfig and constructs the program and its checkers.
@@ -183,13 +188,13 @@ func Build(options Options) (*Graph, error) {
 	// broken config, so it gets one fresh build, from a fresh filesystem cache, before anything is
 	// reported. Measured on 2026-10-03: with a root listed and unloadable, the guard this replaced
 	// panicked and blamed path casing.
-	verdict, missing := graph.verifyProjectFiles(inspectRootOnDisk)
+	verdict, missing := graph.timedVerify(options.Timing)
 	if verdict == rootsMoved {
 		graph, err = buildOnce(options)
 		if err != nil {
 			return nil, err
 		}
-		verdict, missing = graph.verifyProjectFiles(inspectRootOnDisk)
+		verdict, missing = graph.timedVerify(options.Timing)
 		if verdict == rootsMoved {
 			return nil, fmt.Errorf("program: files %s named disappeared before they could be read, in two "+
 				"builds in a row: %s. Something is rewriting the tree faster than a build; run again once "+
@@ -206,6 +211,17 @@ func Build(options Options) (*Graph, error) {
 		return nil, errors.New(projectFilesMismatchMessage(len(graph.Config.FileNames()), len(graph.projectFiles)))
 	}
 	return graph, nil
+}
+
+// timedVerify is verifyProjectFiles against the disk, timed when the build is.
+func (g *Graph) timedVerify(timing *GraphTiming) (rootsVerdict, []string) {
+	if timing == nil {
+		return g.verifyProjectFiles(inspectRootOnDisk)
+	}
+	started := time.Now()
+	verdict, missing := g.verifyProjectFiles(inspectRootOnDisk)
+	timing.Verify += time.Since(started)
+	return verdict, missing
 }
 
 // rootState is what the disk says about a file the config named, read now rather than from the build's
@@ -345,6 +361,16 @@ func buildOnce(options Options) (*Graph, error) {
 	if options.Inputs != nil {
 		disk = &recordingFS{FS: disk, recorder: options.Inputs}
 	}
+	// Timed just beneath the cache, so it counts the calls that reach the disk (or the pack), and what the
+	// recorder costs them, but not the ones the cache answered.
+	var timedDisk *timingFS
+	var configDisk, programDisk diskCounters
+	if options.Timing != nil {
+		options.Timing.Builds++
+		timedDisk = &timingFS{FS: disk}
+		timedDisk.current.Store(&configDisk)
+		disk = timedDisk
+	}
 	var fileSystem vfs.FS = cachedvfs.From(bundled.WrapFS(disk))
 	if len(options.Overlay) > 0 {
 		fileSystem = newOverlayFS(fileSystem, options.Overlay)
@@ -352,6 +378,7 @@ func buildOnce(options Options) (*Graph, error) {
 
 	host := &configHost{fs: fileSystem, currentDirectory: currentDirectory}
 
+	configStarted := time.Now()
 	if !fileSystem.FileExists(configFileName) {
 		return nil, fmt.Errorf("no tsconfig at %s", configFileName)
 	}
@@ -380,6 +407,11 @@ func buildOnce(options Options) (*Graph, error) {
 	// is the distinction every silent-green failure in this project's history collapsed.
 	if len(config.FileNames()) == 0 {
 		return nil, fmt.Errorf("%s matched no files: check its include, files, and exclude", configFileName)
+	}
+	if options.Timing != nil {
+		options.Timing.Config += time.Since(configStarted)
+		options.Timing.ConfigDisk = options.Timing.ConfigDisk.plus(configDisk.snapshot())
+		timedDisk.current.Store(&programDisk)
 	}
 
 	libraryPath := options.LibraryPath
@@ -410,11 +442,26 @@ func buildOnce(options Options) (*Graph, error) {
 	// was removed from ProgramOptions in the move to `microsoft/TypeScript` — the compiler now decides
 	// per file rather than taking a program-wide mode — so there is nothing to pass and nothing to
 	// preserve.
+	// The program is built through a timing host when the build is timed, and the graph keeps the plain
+	// one either way, so nothing after the build reads through the instrument.
+	var programHost compiler.CompilerHost = compilerHost
+	var timedHost *timingHost
+	if options.Timing != nil {
+		timedHost = &timingHost{CompilerHost: compilerHost}
+		programHost = timedHost
+	}
+	programStarted := time.Now()
 	builtProgram := compiler.NewProgram(compiler.ProgramOptions{
 		Config:         config,
-		Host:           compilerHost,
+		Host:           programHost,
 		SingleThreaded: singleThreaded,
 	})
+	if options.Timing != nil {
+		options.Timing.Program += time.Since(programStarted)
+		options.Timing.SourceFileLoads += timedHost.loads.Load()
+		options.Timing.SourceFileSummed += time.Duration(timedHost.summed.Load())
+		options.Timing.ProgramDisk = options.Timing.ProgramDisk.plus(programDisk.snapshot())
+	}
 	if builtProgram == nil {
 		return nil, fmt.Errorf("building a program from %s produced nothing", configFileName)
 	}

@@ -416,52 +416,52 @@
                 "arrow-body-style": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "base/context-requires-access": {
+                "base/boundary-no-global-container": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "base/graphql-nullable-parity": {
+                "base/consistency-no-bare-throw": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "base/graphql-operation-context-matches-return": {
+                "base/consistency-no-console": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "base/inject-type-matches-parameter": {
+                "base/consistency-no-hand-built-declared-error": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "base/no-bare-throw": {
+                "base/consistency-require-pagination-argument-name": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "base/no-console": {
+                "base/correctness-require-graphql-nullable-parity": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "base/no-global-container": {
+                "base/correctness-require-matching-inject-type": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "base/no-hand-built-declared-error": {
+                "base/correctness-require-matching-operation-context": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "base/orm-column-nullable-parity": {
+                "base/correctness-require-matching-provider-return": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "base/orm-column-requires-declare": {
+                "base/correctness-require-optional-relation": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "base/pagination-decorator": {
+                "base/correctness-require-orm-column-declare": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "base/provider-return-matches-token": {
+                "base/correctness-require-orm-column-nullable-parity": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "base/relation-must-be-optional": {
+                "base/correctness-require-serializable-nullable-parity": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "base/serializable-nullable-parity": {
+                "base/correctness-require-verify-array-parity": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "base/verify-array-parity": {
+                "base/correctness-require-verify-optional-parity": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "base/verify-optional-parity": {
+                "base/security-require-context-access": {
                     "$ref": "#/$defs/ruleSetting"
                 },
                 "better-tailwindcss/enforce-canonical-classes": {
@@ -638,7 +638,7 @@
                 "nexus/consistency-require-constant-casing": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "nexus/consistency-require-return-matching-type": {
+                "nexus/consistency-require-matching-return-type": {
                     "$ref": "#/$defs/ruleSetting"
                 },
                 "nexus/consistency-require-type-suffix": {
@@ -1373,7 +1373,13 @@
                 "structure/consistency-no-property-alias": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "structure/consistency-organize-imports": {
+                "structure/consistency-require-matching-file-name": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
+                "structure/consistency-require-organized-imports": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
+                "structure/import-require-react-namespace": {
                     "$ref": "#/$defs/ruleSetting"
                 },
                 "structure/network-no-direct-fetch": {
@@ -1427,9 +1433,6 @@
                 "structure/react-component-no-separate-named-export": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "structure/react-component-require-matching-file-name": {
-                    "$ref": "#/$defs/ruleSetting"
-                },
                 "structure/react-component-require-named-export": {
                     "$ref": "#/$defs/ruleSetting"
                 },
@@ -1439,7 +1442,13 @@
                 "structure/react-component-require-properties-type-suffix": {
                     "$ref": "#/$defs/ruleSetting"
                 },
-                "structure/react-hook-any-type": {
+                "structure/react-element-no-anchor": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
+                "structure/react-element-no-horizontal-rule": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
+                "structure/react-hook-no-any-type": {
                     "$ref": "#/$defs/ruleSetting"
                 },
                 "structure/react-hook-no-destructuring": {
@@ -1452,15 +1461,6 @@
                     "$ref": "#/$defs/ruleSetting"
                 },
                 "structure/react-hook-require-result-naming": {
-                    "$ref": "#/$defs/ruleSetting"
-                },
-                "structure/react-import-no-destructuring": {
-                    "$ref": "#/$defs/ruleSetting"
-                },
-                "structure/react-no-anchor-element": {
-                    "$ref": "#/$defs/ruleSetting"
-                },
-                "structure/react-no-horizontal-rule-element": {
                     "$ref": "#/$defs/ruleSetting"
                 },
                 "structure/storage-no-direct-local-storage": {

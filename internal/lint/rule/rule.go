@@ -330,7 +330,7 @@ type Rule struct {
 	//
 	// So a message naming every NeedsTypeChecker rule as blinded would be confidently wrong about
 	// thirty-nine of them, and a message naming a hardcoded list would be confidently wrong the week a
-	// fifth rule ships. `structure/react-hook-any-type` reads this flag off the live catalog instead,
+	// fifth rule ships. `structure/react-hook-no-any-type` reads this flag off the live catalog instead,
 	// which is why the flag is a declaration on the rule rather than a list somewhere else: the rule
 	// that goes blind is the only thing that knows it does.
 	//

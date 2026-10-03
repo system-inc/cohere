@@ -157,7 +157,7 @@ var SetStateInRender = rule.Rule{
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 	// The setter is identified by the type's alias, so a `useState` resolving to `any` carries
-	// no alias and this rule declines the whole file in silence. `structure/react-hook-any-type`
+	// no alias and this rule declines the whole file in silence. `structure/react-hook-no-any-type`
 	// reads this flag to name that cost at the site where the types went bad.
 	ResolvesReactValueTypes: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {

@@ -69,7 +69,7 @@ func TestAgainstTheLiveConfig(t *testing.T) {
 	}
 
 	// The other two live override blocks.
-	if loaded.Resolve("next-env.d.ts").Enabled("structure/consistency-organize-imports") {
+	if loaded.Resolve("next-env.d.ts").Enabled("structure/consistency-require-organized-imports") {
 		t.Error("the next-env.d.ts override did not apply")
 	}
 	if loaded.Resolve("modules/finance/connections/QuickBooksAdapter.ts").Enabled("structure/network-no-direct-fetch") {

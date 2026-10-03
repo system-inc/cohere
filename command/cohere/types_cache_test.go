@@ -82,3 +82,49 @@ func TestTypeDiagnosticsReplayOnlyWhatAnEditCannotReach(t *testing.T) {
 		}
 	}
 }
+
+// A file's semantic diagnostics depend on the compiler options as much as on its text, and no shape
+// fingerprint sees an option. So turning on strict, with no source file touched, must not replay the
+// diagnostics a lax run recorded: the implicit any it now reports would be replayed as clean (#hfv0ae3).
+func TestTypeDiagnosticsDoNotReplayAcrossCompilerOptions(t *testing.T) {
+	binary := buildCohere(t)
+	root := t.TempDir()
+	write := func(name string, contents string) {
+		t.Helper()
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tsconfig := func(strict bool) string {
+		return fmt.Sprintf(`{"compilerOptions":{"strict":%t,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`, strict)
+	}
+	write("tsconfig.json", tsconfig(false))
+	write("CohereSettings.json", `{"rules":{"no-debugger":"error"}}`)
+	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
+	write(".gitignore", ".cache/\nnode_modules/\n")
+	write("source/a.ts", "export function identity(value) {\n    return value;\n}\n")
+	for index := range 5 {
+		write(fmt.Sprintf("source/c%d.ts", index), fmt.Sprintf("export const c%d: number = %d;\n", index, index))
+	}
+
+	typeError := regexp.MustCompile(`(?m)^\S+:\d+:\d+ - error TS\d+: .*$`)
+	if lax, _ := runCohere(t, binary, root, "--no-fix"); len(typeError.FindAllString(lax, -1)) != 0 {
+		t.Fatalf("the lax run reports a type error, so the fixture proves nothing:\n%s", lax)
+	}
+
+	write("tsconfig.json", tsconfig(true))
+	warm, _ := runCohere(t, binary, root, "--no-fix")
+	cold, _ := runCohere(t, binary, root, "--no-fix", "--no-cache")
+	warmErrors, coldErrors := typeError.FindAllString(warm, -1), typeError.FindAllString(cold, -1)
+	if len(coldErrors) == 0 {
+		t.Fatalf("the strict cold run reports no type error, so the fixture proves nothing:\n%s", cold)
+	}
+	if strings.Join(warmErrors, "\n") != strings.Join(coldErrors, "\n") {
+		t.Fatalf("after turning on strict, warm reports %d type errors and cold %d\n--- warm\n%s\n--- cold\n%s",
+			len(warmErrors), len(coldErrors), warm, cold)
+	}
+}

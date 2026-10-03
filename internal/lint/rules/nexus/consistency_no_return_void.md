@@ -37,7 +37,7 @@ braces the `return;` would run unconditionally). Offered only when the statement
 parse as a declaration or a block.
 
 The fix always writes `return;`. In a function typed to return a value,
-`nexus/consistency-require-return-matching-type` then rewrites that bare return to
+`nexus/consistency-require-matching-return-type` then rewrites that bare return to
 `return undefined;`, so the two converge in one run.
 
 ## Divergence from ESLint

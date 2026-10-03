@@ -21,13 +21,13 @@ var messageNoHorizontalRuleElement = rule.Message{
 		"looks lands everywhere at once rather than in the files somebody remembered.",
 }
 
-// ReactNoAnchorElement flags a raw <a> element outside the Link component's own implementation.
+// ReactElementNoAnchor flags a raw <a> element outside the Link component's own implementation.
 //
 //	valid:   <Link href="/about">About</Link>
 //	valid:   an <a> inside components/navigation/Link.tsx
 //	invalid: <a href="/about">About</a>
-var ReactNoAnchorElement = rule.Rule{
-	Name: "structure/react-no-anchor-element",
+var ReactElementNoAnchor = rule.Rule{
+	Name: "structure/react-element-no-anchor",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		fileContext := FileContextFor(ctx.SourceFile.FileName())
 		if fileContext.IsLinkComponentFile {
@@ -37,13 +37,13 @@ var ReactNoAnchorElement = rule.Rule{
 	},
 }
 
-// ReactNoHorizontalRuleElement flags a raw <hr> element outside HorizontalRule's implementation.
+// ReactElementNoHorizontalRule flags a raw <hr> element outside HorizontalRule's implementation.
 //
 //	valid:   <HorizontalRule />
 //	valid:   an <hr> inside components/layout/HorizontalRule.tsx
 //	invalid: <hr />
-var ReactNoHorizontalRuleElement = rule.Rule{
-	Name: "structure/react-no-horizontal-rule-element",
+var ReactElementNoHorizontalRule = rule.Rule{
+	Name: "structure/react-element-no-horizontal-rule",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		fileContext := FileContextFor(ctx.SourceFile.FileName())
 		if fileContext.IsHorizontalRuleComponentFile {

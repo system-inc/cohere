@@ -72,8 +72,8 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 		NetworkRequireHookRequestSuffix,
 		NetworkRequireHookOptionsParameter,
 		NetworkRequireHookVariablesType,
-		ReactNoAnchorElement,
-		ReactNoHorizontalRuleElement,
+		ReactElementNoAnchor,
+		ReactElementNoHorizontalRule,
 		ReactComponentNoForwardRef,
 		NextNoPageState,
 		NextRequireApiParameterName,
@@ -87,7 +87,7 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 		ReactHookRequireEffectComment,
 		ReactHookRequireResultNaming,
 		ReactHookRequireResultNaming,
-		ReactImportNoDestructuring,
+		ImportRequireReactNamespace,
 		StorageNoDirectLocalStorage,
 	}
 

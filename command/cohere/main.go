@@ -111,7 +111,7 @@ func run() error {
 	// so enabling is a separate decision from wiring.
 	format := flag.Bool("format", false, "format the files not on record as formatted, or the paths named; with --no-fix, report them instead")
 	maxFixPasses := flag.Int("fix-passes", edit.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
-	showTiming := flag.Bool("timing", false, "report what each rule cost, most expensive first")
+	showTiming := flag.Bool("timing", false, "report what building the graph and each rule cost, most expensive rule first")
 	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run")
 	// The counts print on every run; this names every rule once under the one coverage fact that
 	// describes it. Behind a flag because 170 per-rule notes on a clean run buried the lines that need
@@ -364,13 +364,21 @@ func run() error {
 	// exits, before the graph is built. Otherwise this starts recording. See run_cache.go.
 	runCacheInputs := beginRunCache(location)
 
+	// Under --timing the build says what it was made of, not only how long it took (#cazsft3).
+	var graphTiming *program.GraphTiming
+	if *showTiming {
+		graphTiming = &program.GraphTiming{}
+	}
 	buildStart := time.Now()
+	contentPack := openContentPack(location.Root)
+	contentPackOpened := time.Since(buildStart)
 	graph, err := program.Build(program.Options{
 		ConfigFileName:   location.ConfigFileName,
 		CurrentDirectory: location.Root,
 		SingleThreaded:   *singleThreaded,
 		Inputs:           runCacheInputs,
-		ContentPack:      openContentPack(location.Root),
+		ContentPack:      contentPack,
+		Timing:           graphTiming,
 	})
 	if err != nil {
 		// A program that fails to build is a loud failure and never an empty result. An empty file list
@@ -463,6 +471,10 @@ func run() error {
 				len(projectFiles), lintScope.RequestDescription,
 			)
 		}
+	}
+
+	if graphTiming != nil {
+		printGraphTiming(os.Stdout, graphTiming, buildDuration, contentPackOpened)
 	}
 
 	findings := 0

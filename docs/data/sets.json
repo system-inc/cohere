@@ -624,7 +624,7 @@
                 "severity": "error"
             },
             {
-                "name": "nexus/consistency-require-return-matching-type",
+                "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
             {
@@ -1798,7 +1798,7 @@
                 "severity": "error"
             },
             {
-                "name": "nexus/consistency-require-return-matching-type",
+                "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
             {
@@ -3146,7 +3146,67 @@
                 "severity": "error"
             },
             {
-                "name": "base/context-requires-access",
+                "name": "base/boundary-no-global-container",
+                "severity": "error"
+            },
+            {
+                "name": "base/consistency-no-bare-throw",
+                "severity": "error"
+            },
+            {
+                "name": "base/consistency-no-console",
+                "severity": "error"
+            },
+            {
+                "name": "base/consistency-no-hand-built-declared-error",
+                "severity": "error"
+            },
+            {
+                "name": "base/consistency-require-pagination-argument-name",
+                "severity": "error"
+            },
+            {
+                "name": "base/correctness-require-graphql-nullable-parity",
+                "severity": "error"
+            },
+            {
+                "name": "base/correctness-require-matching-inject-type",
+                "severity": "error"
+            },
+            {
+                "name": "base/correctness-require-matching-operation-context",
+                "severity": "error"
+            },
+            {
+                "name": "base/correctness-require-matching-provider-return",
+                "severity": "error"
+            },
+            {
+                "name": "base/correctness-require-optional-relation",
+                "severity": "warn"
+            },
+            {
+                "name": "base/correctness-require-orm-column-declare",
+                "severity": "error"
+            },
+            {
+                "name": "base/correctness-require-orm-column-nullable-parity",
+                "severity": "error"
+            },
+            {
+                "name": "base/correctness-require-serializable-nullable-parity",
+                "severity": "error"
+            },
+            {
+                "name": "base/correctness-require-verify-array-parity",
+                "severity": "error"
+            },
+            {
+                "name": "base/correctness-require-verify-optional-parity",
+                "severity": "error"
+            },
+            {
+                "name": "base/security-require-context-access",
                 "severity": "error",
                 "options": [
                     {
@@ -3177,66 +3237,6 @@
                         ]
                     }
                 ]
-            },
-            {
-                "name": "base/graphql-nullable-parity",
-                "severity": "error"
-            },
-            {
-                "name": "base/graphql-operation-context-matches-return",
-                "severity": "error"
-            },
-            {
-                "name": "base/inject-type-matches-parameter",
-                "severity": "error"
-            },
-            {
-                "name": "base/no-bare-throw",
-                "severity": "error"
-            },
-            {
-                "name": "base/no-console",
-                "severity": "error"
-            },
-            {
-                "name": "base/no-global-container",
-                "severity": "error"
-            },
-            {
-                "name": "base/no-hand-built-declared-error",
-                "severity": "error"
-            },
-            {
-                "name": "base/orm-column-nullable-parity",
-                "severity": "error"
-            },
-            {
-                "name": "base/orm-column-requires-declare",
-                "severity": "error"
-            },
-            {
-                "name": "base/pagination-decorator",
-                "severity": "error"
-            },
-            {
-                "name": "base/provider-return-matches-token",
-                "severity": "error"
-            },
-            {
-                "name": "base/relation-must-be-optional",
-                "severity": "warn"
-            },
-            {
-                "name": "base/serializable-nullable-parity",
-                "severity": "error"
-            },
-            {
-                "name": "base/verify-array-parity",
-                "severity": "error"
-            },
-            {
-                "name": "base/verify-optional-parity",
-                "severity": "error"
             },
             {
                 "name": "block-scoped-var",
@@ -3387,7 +3387,7 @@
                 "severity": "error"
             },
             {
-                "name": "nexus/consistency-require-return-matching-type",
+                "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
             {
@@ -4626,7 +4626,7 @@
                 ]
             },
             {
-                "name": "nexus/consistency-require-return-matching-type",
+                "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
             {
@@ -5234,7 +5234,15 @@
                 "severity": "error"
             },
             {
-                "name": "structure/consistency-organize-imports",
+                "name": "structure/consistency-require-matching-file-name",
+                "severity": "error"
+            },
+            {
+                "name": "structure/consistency-require-organized-imports",
+                "severity": "error"
+            },
+            {
+                "name": "structure/import-require-react-namespace",
                 "severity": "error"
             },
             {
@@ -5306,10 +5314,6 @@
                 "severity": "error"
             },
             {
-                "name": "structure/react-component-require-matching-file-name",
-                "severity": "error"
-            },
-            {
                 "name": "structure/react-component-require-named-export",
                 "severity": "error"
             },
@@ -5322,7 +5326,15 @@
                 "severity": "error"
             },
             {
-                "name": "structure/react-hook-any-type",
+                "name": "structure/react-element-no-anchor",
+                "severity": "error"
+            },
+            {
+                "name": "structure/react-element-no-horizontal-rule",
+                "severity": "error"
+            },
+            {
+                "name": "structure/react-hook-no-any-type",
                 "severity": "error"
             },
             {
@@ -5339,18 +5351,6 @@
             },
             {
                 "name": "structure/react-hook-require-result-naming",
-                "severity": "error"
-            },
-            {
-                "name": "structure/react-import-no-destructuring",
-                "severity": "error"
-            },
-            {
-                "name": "structure/react-no-anchor-element",
-                "severity": "error"
-            },
-            {
-                "name": "structure/react-no-horizontal-rule-element",
                 "severity": "error"
             },
             {
@@ -5420,7 +5420,7 @@
                         "severity": "off"
                     },
                     {
-                        "name": "structure/consistency-organize-imports",
+                        "name": "structure/consistency-require-organized-imports",
                         "severity": "off"
                     }
                 ]
@@ -6009,7 +6009,7 @@
                 "severity": "error"
             },
             {
-                "name": "nexus/consistency-require-return-matching-type",
+                "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
             {
@@ -7176,7 +7176,7 @@
                 "severity": "error"
             },
             {
-                "name": "nexus/consistency-require-return-matching-type",
+                "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
             {

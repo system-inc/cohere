@@ -3974,7 +3974,252 @@
             ]
         },
         {
-            "name": "base/context-requires-access",
+            "name": "base/boundary-no-global-container",
+            "language": "TypeScript",
+            "namespace": "base",
+            "origin": "house",
+            "typeAware": false,
+            "messageIds": [
+                "boundaryNoGlobalContainer"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "base/consistency-no-bare-throw",
+            "language": "TypeScript",
+            "namespace": "base",
+            "origin": "house",
+            "typeAware": false,
+            "messageIds": [
+                "consistencyNoBareThrow"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "base/consistency-no-console",
+            "language": "TypeScript",
+            "namespace": "base",
+            "origin": "house",
+            "typeAware": false,
+            "messageIds": [
+                "consistencyNoConsole"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "base/consistency-no-hand-built-declared-error",
+            "language": "TypeScript",
+            "namespace": "base",
+            "origin": "house",
+            "typeAware": false,
+            "messageIds": [
+                "consistencyNoHandBuiltDeclaredError"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "base/consistency-require-pagination-argument-name",
+            "language": "TypeScript",
+            "namespace": "base",
+            "origin": "house",
+            "typeAware": false,
+            "messageIds": [
+                "invalidName"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "base/correctness-require-graphql-nullable-parity",
+            "language": "TypeScript",
+            "namespace": "base",
+            "origin": "house",
+            "typeAware": true,
+            "messageIds": [
+                "decoratorNullableButInputExcludesNull",
+                "decoratorNullableButTypeNot",
+                "typeNullableButDecoratorNot"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "base/correctness-require-matching-inject-type",
+            "language": "TypeScript",
+            "namespace": "base",
+            "origin": "house",
+            "typeAware": true,
+            "messageIds": [
+                "mismatch"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "base/correctness-require-matching-operation-context",
+            "language": "TypeScript",
+            "namespace": "base",
+            "origin": "house",
+            "typeAware": true,
+            "messageIds": [
+                "mismatch",
+                "wrongBaseType"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "base/correctness-require-matching-provider-return",
+            "language": "TypeScript",
+            "namespace": "base",
+            "origin": "house",
+            "typeAware": true,
+            "messageIds": [
+                "mismatch"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "base/correctness-require-optional-relation",
+            "language": "TypeScript",
+            "namespace": "base",
+            "origin": "house",
+            "typeAware": true,
+            "messageIds": [
+                "mustBeOptional"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "warn"
+                }
+            ]
+        },
+        {
+            "name": "base/correctness-require-orm-column-declare",
+            "language": "TypeScript",
+            "namespace": "base",
+            "origin": "house",
+            "typeAware": false,
+            "messageIds": [
+                "missingDeclare"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "base/correctness-require-orm-column-nullable-parity",
+            "language": "TypeScript",
+            "namespace": "base",
+            "origin": "house",
+            "typeAware": true,
+            "messageIds": [
+                "columnNullableButTypeNot"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "base/correctness-require-serializable-nullable-parity",
+            "language": "TypeScript",
+            "namespace": "base",
+            "origin": "house",
+            "typeAware": true,
+            "messageIds": [
+                "decoratorOptionalButTypeNot",
+                "typeOptionalButDecoratorNot"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "base/correctness-require-verify-array-parity",
+            "language": "TypeScript",
+            "namespace": "base",
+            "origin": "house",
+            "typeAware": true,
+            "messageIds": [
+                "missingArrayRule"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "base/correctness-require-verify-optional-parity",
+            "language": "TypeScript",
+            "namespace": "base",
+            "origin": "house",
+            "typeAware": true,
+            "messageIds": [
+                "optionalButTypeNot",
+                "typeOptionalButNoVerify"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "base/security-require-context-access",
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
@@ -3990,302 +4235,7 @@
                     "set": "cohere:system-inc/base",
                     "severity": "error"
                 }
-            ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
-        },
-        {
-            "name": "base/graphql-nullable-parity",
-            "language": "TypeScript",
-            "namespace": "base",
-            "origin": "house",
-            "typeAware": true,
-            "messageIds": [
-                "decoratorNullableButInputExcludesNull",
-                "decoratorNullableButTypeNot",
-                "typeNullableButDecoratorNot"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/base",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
-        },
-        {
-            "name": "base/graphql-operation-context-matches-return",
-            "language": "TypeScript",
-            "namespace": "base",
-            "origin": "house",
-            "typeAware": true,
-            "messageIds": [
-                "mismatch",
-                "wrongBaseType"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/base",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
-        },
-        {
-            "name": "base/inject-type-matches-parameter",
-            "language": "TypeScript",
-            "namespace": "base",
-            "origin": "house",
-            "typeAware": true,
-            "messageIds": [
-                "mismatch"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/base",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
-        },
-        {
-            "name": "base/no-bare-throw",
-            "language": "TypeScript",
-            "namespace": "base",
-            "origin": "house",
-            "typeAware": false,
-            "messageIds": [
-                "noBareThrow"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/base",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "Ported",
-                "swiftRule": "cohere-swift/no-bare-throw"
-            }
-        },
-        {
-            "name": "base/no-console",
-            "language": "TypeScript",
-            "namespace": "base",
-            "origin": "house",
-            "typeAware": false,
-            "messageIds": [
-                "noConsole"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/base",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "Ported",
-                "swiftRule": "cohere-swift/no-print"
-            }
-        },
-        {
-            "name": "base/no-global-container",
-            "language": "TypeScript",
-            "namespace": "base",
-            "origin": "house",
-            "typeAware": false,
-            "messageIds": [
-                "noGlobalContainer"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/base",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
-        },
-        {
-            "name": "base/no-hand-built-declared-error",
-            "language": "TypeScript",
-            "namespace": "base",
-            "origin": "house",
-            "typeAware": false,
-            "messageIds": [
-                "noHandBuiltDeclaredError"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/base",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
-        },
-        {
-            "name": "base/orm-column-nullable-parity",
-            "language": "TypeScript",
-            "namespace": "base",
-            "origin": "house",
-            "typeAware": true,
-            "messageIds": [
-                "columnNullableButTypeNot"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/base",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
-        },
-        {
-            "name": "base/orm-column-requires-declare",
-            "language": "TypeScript",
-            "namespace": "base",
-            "origin": "house",
-            "typeAware": false,
-            "messageIds": [
-                "missingDeclare"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/base",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
-        },
-        {
-            "name": "base/pagination-decorator",
-            "language": "TypeScript",
-            "namespace": "base",
-            "origin": "house",
-            "typeAware": false,
-            "messageIds": [
-                "invalidName"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/base",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
-        },
-        {
-            "name": "base/provider-return-matches-token",
-            "language": "TypeScript",
-            "namespace": "base",
-            "origin": "house",
-            "typeAware": true,
-            "messageIds": [
-                "mismatch"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/base",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
-        },
-        {
-            "name": "base/relation-must-be-optional",
-            "language": "TypeScript",
-            "namespace": "base",
-            "origin": "house",
-            "typeAware": true,
-            "messageIds": [
-                "mustBeOptional"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/base",
-                    "severity": "warn"
-                }
-            ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
-        },
-        {
-            "name": "base/serializable-nullable-parity",
-            "language": "TypeScript",
-            "namespace": "base",
-            "origin": "house",
-            "typeAware": true,
-            "messageIds": [
-                "decoratorOptionalButTypeNot",
-                "typeOptionalButDecoratorNot"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/base",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "Compiler"
-            }
-        },
-        {
-            "name": "base/verify-array-parity",
-            "language": "TypeScript",
-            "namespace": "base",
-            "origin": "house",
-            "typeAware": true,
-            "messageIds": [
-                "missingArrayRule"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/base",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
-        },
-        {
-            "name": "base/verify-optional-parity",
-            "language": "TypeScript",
-            "namespace": "base",
-            "origin": "house",
-            "typeAware": true,
-            "messageIds": [
-                "optionalButTypeNot",
-                "typeOptionalButNoVerify"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/base",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
+            ]
         },
         {
             "name": "better-tailwindcss/enforce-canonical-classes",
@@ -5431,7 +5381,7 @@
             ],
             "swift": {
                 "verdict": "Ported",
-                "swiftRule": "cohere-swift/no-abbreviated-identifier"
+                "swiftRule": "cohere-swift/consistency-no-abbreviated-identifier"
             }
         },
         {
@@ -5473,7 +5423,7 @@
             ],
             "swift": {
                 "verdict": "Ported",
-                "swiftRule": "cohere-swift/no-ambiguous-identifier"
+                "swiftRule": "cohere-swift/consistency-no-ambiguous-identifier"
             }
         },
         {
@@ -5942,7 +5892,7 @@
             ],
             "swift": {
                 "verdict": "Ported",
-                "swiftRule": "cohere-swift/no-stuttering-name"
+                "swiftRule": "cohere-swift/consistency-no-stuttering-name"
             }
         },
         {
@@ -5983,7 +5933,7 @@
             ],
             "swift": {
                 "verdict": "Ported",
-                "swiftRule": "cohere-swift/no-utils-folder"
+                "swiftRule": "cohere-swift/consistency-no-utils-folder"
             }
         },
         {
@@ -6018,7 +5968,7 @@
             }
         },
         {
-            "name": "nexus/consistency-require-return-matching-type",
+            "name": "nexus/consistency-require-matching-return-type",
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
@@ -6053,10 +6003,7 @@
                     "set": "cohere:typescript",
                     "severity": "error"
                 }
-            ],
-            "swift": {
-                "verdict": "Compiler"
-            }
+            ]
         },
         {
             "name": "nexus/consistency-require-type-suffix",
@@ -6177,7 +6124,8 @@
                 "identicalBranches"
             ],
             "swift": {
-                "verdict": "Port"
+                "verdict": "Ported",
+                "swiftRule": "cohere-swift/correctness-no-identical-branches"
             }
         },
         {
@@ -6269,7 +6217,8 @@
                 "unclearedRaceTimeout"
             ],
             "swift": {
-                "verdict": "Port"
+                "verdict": "Ported",
+                "swiftRule": "cohere-swift/correctness-no-uncleared-race-timeout"
             }
         },
         {
@@ -6282,7 +6231,8 @@
                 "writeOnlyCollection"
             ],
             "swift": {
-                "verdict": "Port"
+                "verdict": "Ported",
+                "swiftRule": "cohere-swift/correctness-no-write-only-collection"
             }
         },
         {
@@ -12672,7 +12622,23 @@
             }
         },
         {
-            "name": "structure/consistency-organize-imports",
+            "name": "structure/consistency-require-matching-file-name",
+            "language": "TypeScript",
+            "namespace": "structure",
+            "origin": "house",
+            "typeAware": false,
+            "messageIds": [
+                "requireMatchingFileName"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "structure/consistency-require-organized-imports",
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
@@ -12686,10 +12652,26 @@
                     "set": "cohere:system-inc/structure",
                     "severity": "error"
                 }
+            ]
+        },
+        {
+            "name": "structure/import-require-react-namespace",
+            "language": "TypeScript",
+            "namespace": "structure",
+            "origin": "house",
+            "typeAware": false,
+            "messageIds": [
+                "noCallWithoutPrefix",
+                "noDestructuringFromReact",
+                "noNamedImport",
+                "noTypeReferenceWithoutPrefix"
             ],
-            "swift": {
-                "verdict": "Formatter"
-            }
+            "sets": [
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                }
+            ]
         },
         {
             "name": "structure/network-no-direct-fetch",
@@ -13034,26 +13016,6 @@
             }
         },
         {
-            "name": "structure/react-component-require-matching-file-name",
-            "language": "TypeScript",
-            "namespace": "structure",
-            "origin": "house",
-            "typeAware": false,
-            "messageIds": [
-                "requireMatchingFileName"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/structure",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "Ported",
-                "swiftRule": "cohere-swift/file-named-for-type"
-            }
-        },
-        {
             "name": "structure/react-component-require-named-export",
             "language": "TypeScript",
             "namespace": "structure",
@@ -13115,23 +13077,49 @@
             }
         },
         {
-            "name": "structure/react-hook-any-type",
+            "name": "structure/react-element-no-anchor",
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
-            "typeAware": true,
+            "typeAware": false,
+            "sets": [
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
+            "name": "structure/react-element-no-horizontal-rule",
+            "language": "TypeScript",
+            "namespace": "structure",
+            "origin": "house",
+            "typeAware": false,
             "messageIds": [
-                "reactHookAnyType"
+                "noHrElement"
             ],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
                     "severity": "error"
                 }
+            ]
+        },
+        {
+            "name": "structure/react-hook-no-any-type",
+            "language": "TypeScript",
+            "namespace": "structure",
+            "origin": "house",
+            "typeAware": true,
+            "messageIds": [
+                "reactHookNoAnyType"
             ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
+            "sets": [
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                }
+            ]
         },
         {
             "name": "structure/react-hook-no-destructuring",
@@ -13200,63 +13188,6 @@
                 "hookResultNamingBadSuffix",
                 "hookResultNamingGeneric",
                 "hookResultNamingMismatch"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/structure",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
-        },
-        {
-            "name": "structure/react-import-no-destructuring",
-            "language": "TypeScript",
-            "namespace": "structure",
-            "origin": "house",
-            "typeAware": false,
-            "messageIds": [
-                "noCallWithoutPrefix",
-                "noDestructuringFromReact",
-                "noNamedImport",
-                "noTypeReferenceWithoutPrefix"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/structure",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
-        },
-        {
-            "name": "structure/react-no-anchor-element",
-            "language": "TypeScript",
-            "namespace": "structure",
-            "origin": "house",
-            "typeAware": false,
-            "sets": [
-                {
-                    "set": "cohere:system-inc/structure",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "NotApplicable"
-            }
-        },
-        {
-            "name": "structure/react-no-horizontal-rule-element",
-            "language": "TypeScript",
-            "namespace": "structure",
-            "origin": "house",
-            "typeAware": false,
-            "messageIds": [
-                "noHrElement"
             ],
             "sets": [
                 {

@@ -53,7 +53,7 @@
         ],
         "structure/boundary-no-project-theme-value": "error",
         "structure/consistency-no-property-alias": "error",
-        "structure/consistency-organize-imports": "error",
+        "structure/consistency-require-organized-imports": "error",
         "structure/network-no-direct-fetch": "error",
         "structure/network-no-forbidden-import": "error",
         "structure/network-no-invalidate-cache-in-on-success": "error",
@@ -71,18 +71,18 @@
         "structure/react-component-no-display-name": "error",
         "structure/react-component-no-forward-ref": "error",
         "structure/react-component-no-separate-named-export": "error",
-        "structure/react-component-require-matching-file-name": "error",
+        "structure/consistency-require-matching-file-name": "error",
         "structure/react-component-require-named-export": "error",
         "structure/react-component-require-properties-parameter": "error",
         "structure/react-component-require-properties-type-suffix": "error",
-        "structure/react-hook-any-type": "error",
+        "structure/react-hook-no-any-type": "error",
         "structure/react-hook-no-destructuring": "error",
         "structure/react-hook-no-properties-in-dependencies": "error",
         "structure/react-hook-require-effect-comment": "error",
         "structure/react-hook-require-result-naming": "error",
-        "structure/react-import-no-destructuring": "error",
-        "structure/react-no-anchor-element": "error",
-        "structure/react-no-horizontal-rule-element": "error",
+        "structure/import-require-react-namespace": "error",
+        "structure/react-element-no-anchor": "error",
+        "structure/react-element-no-horizontal-rule": "error",
         "structure/storage-no-direct-local-storage": "error",
         "structure/tailwind-no-physical-direction": "error"
     },
@@ -113,7 +113,7 @@
             ],
             "rules": {
                 "@typescript-eslint/triple-slash-reference": "off",
-                "structure/consistency-organize-imports": "off"
+                "structure/consistency-require-organized-imports": "off"
             }
         }
     ]

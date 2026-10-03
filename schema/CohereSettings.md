@@ -316,22 +316,22 @@ it records a decision about a rule, and is reported as unported rather than refu
 
 <details><summary><code>base</code>, 16 rules</summary>
 
-- `base/context-requires-access`
-- `base/graphql-nullable-parity`
-- `base/graphql-operation-context-matches-return`
-- `base/inject-type-matches-parameter`
-- `base/no-bare-throw`
-- `base/no-console`
-- `base/no-global-container`
-- `base/no-hand-built-declared-error`
-- `base/orm-column-nullable-parity`
-- `base/orm-column-requires-declare`
-- `base/pagination-decorator`
-- `base/provider-return-matches-token`
-- `base/relation-must-be-optional`
-- `base/serializable-nullable-parity`
-- `base/verify-array-parity`
-- `base/verify-optional-parity`
+- `base/boundary-no-global-container`
+- `base/consistency-no-bare-throw`
+- `base/consistency-no-console`
+- `base/consistency-no-hand-built-declared-error`
+- `base/consistency-require-pagination-argument-name`
+- `base/correctness-require-graphql-nullable-parity`
+- `base/correctness-require-matching-inject-type`
+- `base/correctness-require-matching-operation-context`
+- `base/correctness-require-matching-provider-return`
+- `base/correctness-require-optional-relation`
+- `base/correctness-require-orm-column-declare`
+- `base/correctness-require-orm-column-nullable-parity`
+- `base/correctness-require-serializable-nullable-parity`
+- `base/correctness-require-verify-array-parity`
+- `base/correctness-require-verify-optional-parity`
+- `base/security-require-context-access`
 
 </details>
 
@@ -554,7 +554,7 @@ it records a decision about a rule, and is reported as unported rather than refu
 - `nexus/consistency-no-stuttering-name`
 - `nexus/consistency-no-utils-folder`
 - `nexus/consistency-require-constant-casing`
-- `nexus/consistency-require-return-matching-type`
+- `nexus/consistency-require-matching-return-type`
 - `nexus/consistency-require-type-suffix`
 - `nexus/correctness-no-callback-in-parse-try`
 - `nexus/correctness-no-collection-misuse`
@@ -679,7 +679,9 @@ it records a decision about a rule, and is reported as unported rather than refu
 
 - `structure/boundary-no-project-theme-value`
 - `structure/consistency-no-property-alias`
-- `structure/consistency-organize-imports`
+- `structure/consistency-require-matching-file-name`
+- `structure/consistency-require-organized-imports`
+- `structure/import-require-react-namespace`
 - `structure/network-no-direct-fetch`
 - `structure/network-no-forbidden-import`
 - `structure/network-no-invalidate-cache-in-on-success`
@@ -697,18 +699,16 @@ it records a decision about a rule, and is reported as unported rather than refu
 - `structure/react-component-no-display-name`
 - `structure/react-component-no-forward-ref`
 - `structure/react-component-no-separate-named-export`
-- `structure/react-component-require-matching-file-name`
 - `structure/react-component-require-named-export`
 - `structure/react-component-require-properties-parameter`
 - `structure/react-component-require-properties-type-suffix`
-- `structure/react-hook-any-type`
+- `structure/react-element-no-anchor`
+- `structure/react-element-no-horizontal-rule`
+- `structure/react-hook-no-any-type`
 - `structure/react-hook-no-destructuring`
 - `structure/react-hook-no-properties-in-dependencies`
 - `structure/react-hook-require-effect-comment`
 - `structure/react-hook-require-result-naming`
-- `structure/react-import-no-destructuring`
-- `structure/react-no-anchor-element`
-- `structure/react-no-horizontal-rule-element`
 - `structure/storage-no-direct-local-storage`
 - `structure/tailwind-no-physical-direction`
 

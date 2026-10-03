@@ -143,7 +143,7 @@ var nestedOptionCases = []nestedOptionCase{
 	{rule: "@typescript-eslint/prefer-promise-reject-errors", baseline: `{"allow": [{"from": "file", "name": "Rejected"}]}`, probe: `{"allow": [{"from": "file", "name": "Rejected", "paths": "x"}]}`, refusal: "paths"},
 	{rule: "@typescript-eslint/prefer-nullish-coalescing", baseline: `{"ignorePrimitives": {"string": true}}`, probe: `{"ignorePrimitives": {"strings": true}}`, refusal: "strings"},
 	{rule: "no-shadow-restricted-names", baseline: `{"reportGlobalThis": false}`, probe: `{"allowGlobalThis": true}`, refusal: "allowGlobalThis"},
-	{rule: "base/context-requires-access", baseline: `{"requirements": [{"contextKey": "user", "requiresAny": ["Authenticated"]}]}`, probe: `{"requirements": [{"contextKey": "user", "requiresAny": ["Authenticated"], "requireAll": true}]}`, refusal: "requireAll"},
+	{rule: "base/security-require-context-access", baseline: `{"requirements": [{"contextKey": "user", "requiresAny": ["Authenticated"]}]}`, probe: `{"requirements": [{"contextKey": "user", "requiresAny": ["Authenticated"], "requireAll": true}]}`, refusal: "requireAll"},
 
 	// Spelling, which a tag now declares: a key that matches its field only case-insensitively.
 	{rule: "no-empty", baseline: `{"allowEmptyCatch": true}`, probe: `{"AllowEmptyCatch": true}`, refusal: "AllowEmptyCatch"},
