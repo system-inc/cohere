@@ -464,11 +464,17 @@ func signatureOfFile(path string) fileSignature {
 // it always did; after, the caller has moved on and its terminal may hold someone else's prompt, so it is
 // kept beside the table for the next run to say instead (printPreviousNotes).
 func (session *runCacheSession) note(text string) {
+	cacheNote(session.tablePath, text)
+}
+
+// cacheNote says something about the cache beside tablePath: on stderr while the caller is still waiting,
+// and to the next run once it has its verdict.
+func cacheNote(tablePath string, text string) {
 	if !verdictSent {
 		fmt.Fprintf(os.Stderr, "note: %s\n", text)
 		return
 	}
-	file, err := os.OpenFile(previousNotesPath(session.tablePath), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	file, err := os.OpenFile(previousNotesPath(tablePath), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return
 	}

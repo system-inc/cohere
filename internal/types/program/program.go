@@ -149,6 +149,10 @@ type Options struct {
 	// record what this build depended on by observation rather than by a list. Nil records nothing and
 	// costs nothing.
 	Inputs *InputRecorder
+
+	// ContentPack, when set, serves files whose stat is unchanged from the bytes recorded by earlier runs,
+	// so they are not opened, and collects what this build read from disk. Nil reads everything from disk.
+	ContentPack *ContentPack
 }
 
 // Build resolves a tsconfig and constructs the program and its checkers.
@@ -322,7 +326,12 @@ func buildOnce(options Options) (*Graph, error) {
 	//
 	// The input recorder wraps the real disk innermost: beneath the memoizing layer, so it sees each path
 	// about once, and beneath the lib overlay, so the embedded libs never reach it.
+	//
+	// The content pack is beneath even that, so a file it serves is still a file the recorder saw read.
 	var disk vfs.FS = osvfs.FS()
+	if options.ContentPack != nil {
+		disk = options.ContentPack.wrap(disk)
+	}
 	if options.Inputs != nil {
 		disk = &recordingFS{FS: disk, recorder: options.Inputs}
 	}

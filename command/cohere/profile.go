@@ -37,8 +37,9 @@ func exitProcess(code int) {
 		}
 		profileFile = nil
 	}
-	// Every exit answers the caller, if a run cache has not already: what follows, the heap's teardown, is
-	// nothing the caller waits for. See sendVerdict.
+	// Every exit answers the caller, if a run cache has not already: what follows, keeping what the run read
+	// in the content pack and the heap's teardown, is nothing the caller waits for. See sendVerdict.
 	sendVerdict(code)
+	saveContentPack()
 	os.Exit(code)
 }

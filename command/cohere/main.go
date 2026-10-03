@@ -370,6 +370,7 @@ func run() error {
 		CurrentDirectory: location.Root,
 		SingleThreaded:   *singleThreaded,
 		Inputs:           runCacheInputs,
+		ContentPack:      openContentPack(location.Root),
 	})
 	if err != nil {
 		// A program that fails to build is a loud failure and never an empty result. An empty file list
@@ -957,6 +958,7 @@ func rebuildGraph(
 		ConfigFileName:   configFileName,
 		CurrentDirectory: directory,
 		SingleThreaded:   singleThreaded,
+		ContentPack:      openContentPack(directory),
 	})
 	if err != nil {
 		return nil, time.Since(start), err
