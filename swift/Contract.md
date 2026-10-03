@@ -250,7 +250,7 @@ like a formatter that found everything already correct.
 
 ```json
 {"kind":"types","diagnostics":1,"files":149,"elapsedMilliseconds":2187,
- "filesWithoutRecord":[],"build":"swift build, scratch ~/Library/Caches/cohere/swift/<hash>"}
+ "filesWithoutRecord":[],"build":"swift build, scratch <root>/.cache/cohere/swift"}
 ```
 
 Rendered as `types: 1 diagnostics over 149 files in 2.187s`. Each entry in `filesWithoutRecord`

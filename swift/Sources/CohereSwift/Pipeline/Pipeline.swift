@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /*
@@ -479,19 +478,17 @@ public struct Pipeline {
         return Dictionary(result.files.map { ($0.targetName, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
-    /*
-     Where SwiftPM writes when the engine runs it: outside the project, keyed by the package's path, so a run
-     never takes the developer's `.build` lock and `--no-fix` writes nothing into the project.
-     */
     /* The refusal reason for fixes the formatter undid. */
     public static let undoneByFormatter = "undone by the formatter: a rule and .swift-format disagree, so these files never settle"
 
+    /*
+     Where SwiftPM writes when the engine runs it: the project's own `.cache/cohere/swift`, beside the dispatcher's
+     table (#wb3xz1h), so deleting that one folder is always a correct answer and a worktree gets its own. It is
+     never `.build`, so a run never takes the developer's lock, and SwiftPM and the engine's walks skip hidden
+     directories, so nothing here is ever read as source. `--no-fix` writes no source file; this cache is cohere's.
+     */
     public static func scratchPath(for root: URL) -> URL {
-        let digest = SHA256.hash(data: Data(root.resolvingSymlinksInPath().path.utf8))
-        let key = digest.prefix(8).map { String($0 >> 4, radix: 16) + String($0 & 0x0f, radix: 16) }.joined()
-        return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Caches/cohere/swift", isDirectory: true)
-            .appendingPathComponent(key, isDirectory: true)
+        root.appendingPathComponent(".cache/cohere/swift", isDirectory: true)
     }
 
     static func milliseconds(since start: Date) -> Int {
