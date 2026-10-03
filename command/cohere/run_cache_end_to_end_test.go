@@ -118,8 +118,11 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	layerTwoClause := regexp.MustCompile(`; \d+ of \d+ files replayed from cache( \(type-aware rules ran again on \d+ of them, shape-keyed on \d+\))?( \(design-system rules ran again on \d+ of them\))?`)
 	// A cold run is a `--no-cache` run, which says so in a line no cached run prints.
 	cacheOffLine := regexp.MustCompile(`(?m)^  cache: off, by --no-cache.*\n`)
+	// The total line's shape depends on timing as well as its numbers: the types phase's check runs alongside
+	// the fix walk, so whether the phases overlap is a property of this invocation, never of the tree.
+	totalLine := regexp.MustCompile(`(?m)^  total .*\n`)
 	normalized := func(output string) string {
-		return cacheOffLine.ReplaceAllString(layerTwoClause.ReplaceAllString(durations.ReplaceAllString(output, "T"), ""), "")
+		return totalLine.ReplaceAllString(cacheOffLine.ReplaceAllString(layerTwoClause.ReplaceAllString(durations.ReplaceAllString(output, "T"), ""), ""), "")
 	}
 	isReplay := func(output string) bool { return strings.HasPrefix(output, "cached: ") }
 	keepLines := func(output string, drop ...string) string {

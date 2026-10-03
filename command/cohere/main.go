@@ -479,6 +479,13 @@ func run() error {
 		attachFindingsCache(graph, location)
 	}
 
+	// The types phase's checking starts here, alongside the fix phase's walk, rather than after it. See
+	// startTypeCheck. Its result is used only if the walk leaves this graph in place.
+	var earlyTypeCheck *typeCheck
+	if runTypes && runFix {
+		earlyTypeCheck = startTypeCheck(ctx, graph, !cacheOff)
+	}
+
 	switch {
 	case !runFix:
 		report.record(phaseFix, outcomeSkipped, 0, "not requested")
@@ -649,6 +656,11 @@ func run() error {
 				return fmt.Errorf("rebuilding the type graph after fixing: %w", err)
 			}
 			graph = rebuiltGraph
+			// The early check was of the bytes the fixer just replaced.
+			if earlyTypeCheck != nil {
+				earlyTypeCheck.cancel()
+				earlyTypeCheck = nil
+			}
 			// The scope survives the rebuild. Taking every project file here turned a run scoped to
 			// one named path, or to what changed, into a whole-tree run the moment a fixer landed:
 			// the graph line said `1 in scope` and the types and lint lines then reported every file
@@ -692,8 +704,18 @@ func run() error {
 		// `--no-fix` promises not to write a byte, and the incremental build info is a byte. It was
 		// rewritten on every run regardless, which made the flag's own help text false: measured, the
 		// mtime of ahra's tsconfig.tsbuildinfo moved across a `--no-fix` run.
-		typeDiagnostics := collectTypeDiagnostics(ctx, graph, projectFiles, !cacheOff, !*noFix)
-		typesDuration := time.Since(typesStart)
+		check := earlyTypeCheck
+		if check == nil {
+			check = startTypeCheck(ctx, graph, !cacheOff)
+		}
+		typeDiagnostics := finishTypeCheck(ctx, check, projectFiles, !*noFix)
+		// The check's own time plus what finishing it took, rather than the wait here, which is nothing when the
+		// check ran alongside the walk. The phase line can then add up to more than the run, and says by how much.
+		finishing := check.finished
+		if typesStart.After(finishing) {
+			finishing = typesStart
+		}
+		typesDuration := check.elapsed + time.Since(finishing)
 
 		for _, diagnostic := range typeDiagnostics {
 			printCompilerDiagnostic(diagnostic)
@@ -994,39 +1016,82 @@ func optionsBase(lintConfig *configuration.Config, projectRoot string) rule.Opti
 // else; reading costs nothing the promise forbids, and refusing to read would make every CI run cold
 // for no reason.
 func collectTypeDiagnostics(ctx context.Context, graph *program.Graph, files []*ast.SourceFile, incremental bool, persist bool) []*ast.Diagnostic {
-	ours := make(map[*ast.SourceFile]struct{}, len(files))
-	for _, sourceFile := range files {
-		ours[sourceFile] = struct{}{}
-	}
+	return finishTypeCheck(ctx, startTypeCheck(ctx, graph, incremental), files, persist)
+}
 
+// typeCheck is TypeScript's own checking of a graph, under way or done.
+type typeCheck struct {
+	graph   *program.Graph
+	session *program.IncrementalSession
+	checked []*ast.Diagnostic
+	done    chan struct{}
+	cancel  context.CancelFunc
+
+	// elapsed is how long the checking itself took, and finished when it ended, both set as it finishes. The
+	// phase reports these rather than its wait, which is nothing when the check ran alongside the walk.
+	elapsed  time.Duration
+	finished time.Time
+}
+
+// startTypeCheck begins checking every file, and returns at once.
+//
+// It runs alongside the fix phase's walk rather than after it. Both use the same checkers, each file under
+// its own checker's lock, so on one checker the two take turns while different checkers go on in parallel:
+// the run ends when the slowest checker has done its walk and its check, rather than after the slowest
+// walk and then the whole check. Traced on ahra (#zqsdzbq), the check was a separate 0.1 to 0.2s after a
+// walk whose slowest checker set its end.
+//
+// Only the per-file checking starts early. What reads every checker at once, the global and config
+// diagnostics, waits for finishTypeCheck, when the walk has let go of them.
+func startTypeCheck(ctx context.Context, graph *program.Graph, incremental bool) *typeCheck {
+	checkContext, cancel := context.WithCancel(ctx)
+	check := &typeCheck{graph: graph, done: make(chan struct{}), cancel: cancel}
 	// One session across check-then-write. The build info has to be emitted from the same
 	// incremental program that did the checking: that program's snapshot is what records which
 	// files were checked, and emitting from a second one writes a build info that skips nothing
 	// while looking correct. See program.IncrementalSession.
-	var checked []*ast.Diagnostic
-	var session *program.IncrementalSession
-	if incremental {
-		session = graph.NewIncrementalSession()
-	}
-	if session != nil {
-		checked = session.Diagnostics(ctx)
-		// The read already happened inside NewIncrementalSession; only the write is conditional.
-		if persist {
-			if writeDiagnostics := session.Write(ctx); len(writeDiagnostics) > 0 {
-				// A failed build-info write must not pass silently. The next run would be cold while
-				// this one reported success, and the symptom is a saving that quietly never appears.
-				for _, diagnostic := range writeDiagnostics {
-					fmt.Fprintf(os.Stderr, "cohere: writing the incremental cache: %s\n",
-						diagnostic.MessageKey())
-				}
+	go func() {
+		start := time.Now()
+		defer close(check.done)
+		defer func() { check.elapsed, check.finished = time.Since(start), time.Now() }()
+		// Begun here rather than before, since reading the build info and snapshotting the program is work
+		// too, and it overlaps the walk as well as the check does.
+		if incremental {
+			check.session = graph.NewIncrementalSession()
+		}
+		if check.session != nil {
+			check.checked = check.session.Diagnostics(checkContext)
+		} else {
+			check.checked = graph.AllDiagnostics(checkContext)
+		}
+	}()
+	return check
+}
+
+// finishTypeCheck waits for the check, writes the build info if asked, and returns the diagnostics that
+// belong to files, plus the program's own.
+func finishTypeCheck(ctx context.Context, check *typeCheck, files []*ast.SourceFile, persist bool) []*ast.Diagnostic {
+	<-check.done
+	defer check.cancel()
+
+	// The read already happened when the session began; only the write is conditional.
+	if check.session != nil && persist {
+		if writeDiagnostics := check.session.Write(ctx); len(writeDiagnostics) > 0 {
+			// A failed build-info write must not pass silently. The next run would be cold while
+			// this one reported success, and the symptom is a saving that quietly never appears.
+			for _, diagnostic := range writeDiagnostics {
+				fmt.Fprintf(os.Stderr, "cohere: writing the incremental cache: %s\n",
+					diagnostic.MessageKey())
 			}
 		}
-	} else {
-		checked = graph.AllDiagnostics(ctx)
 	}
 
-	diagnostics := graph.ConfigDiagnostics(ctx)
-	for _, diagnostic := range checked {
+	ours := make(map[*ast.SourceFile]struct{}, len(files))
+	for _, sourceFile := range files {
+		ours[sourceFile] = struct{}{}
+	}
+	diagnostics := check.graph.ConfigDiagnostics(ctx)
+	for _, diagnostic := range check.checked {
 		// A diagnostic with no file is about the program rather than about any one file, so it is ours
 		// by default: dropping it would hide exactly the configuration errors that matter most.
 		if sourceFile := diagnostic.File(); sourceFile != nil {
