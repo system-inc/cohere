@@ -651,3 +651,40 @@ func TestNoUnusedPrivateClassMembersDivergesOnReceiverReach(t *testing.T) {
 		noUnusedPrivateClassMembersFile, "class Foo {\n  private prop: number = 1;\n}\n"),
 		"unusedPrivateClassMember")
 }
+
+// TestNoUnusedPrivateClassMembersDivergesOnDeclareField pins the second place this port parts from
+// upstream: a `declare` field is never reported, since it emits nothing and exists to make the class
+// nominal. Measured on the installed 8.67.0 build: upstream reports the first and fourth cases and is
+// silent on the other two, so those two rows are the divergence and the rest are agreement.
+//
+//	declare private brand, never read     upstream REPORTS, we are clean: the brand is the design
+//	declare private brand, read           clean in both: the read keeps it alive either way
+//	declare public brand                  clean in both: not private, so neither rule judges it
+//	declare static private brand          upstream REPORTS, we are clean: it emits nothing either
+//
+// The firing half matters as much: a real `private` field beside the brand must still report, or the
+// arm could be skipping the whole class rather than the one member.
+func TestNoUnusedPrivateClassMembersDivergesOnDeclareField(t *testing.T) {
+	t.Parallel()
+
+	cases := []string{
+		"class TypedBinding {\n  declare private readonly __brand: 'TypedBinding';\n}\n",
+		"class TypedBinding {\n  declare private readonly __brand: 'TypedBinding';\n  read() {\n    return this.__brand;\n  }\n}\n",
+		"class TypedBinding {\n  declare readonly __brand: 'TypedBinding';\n}\n",
+		"class TypedBinding {\n  declare private static readonly __brand: 'TypedBinding';\n}\n",
+	}
+	for index, sourceText := range cases {
+		t.Run(noUnusedPrivateClassMembersCaseName(index), func(t *testing.T) {
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnusedPrivateClassMembers,
+				noUnusedPrivateClassMembersFile, sourceText))
+		})
+	}
+
+	// The control: the brand stays silent and the real dead field beside it still reports, once.
+	result := rule_testing.RunTyped(t, NoUnusedPrivateClassMembers, noUnusedPrivateClassMembersFile,
+		"class TypedBinding {\n  declare private readonly __brand: 'TypedBinding';\n  private readonly unused: number = 1;\n}\n")
+	rule_testing.ExpectFindings(t, result, "unusedPrivateClassMember")
+	if description := result.Diagnostics[0].Message.Description; !strings.Contains(description, "'unused'") {
+		t.Fatalf("expected the finding on 'unused', got %q", description)
+	}
+}

@@ -67,6 +67,14 @@ import (
 // own declaration through a local receiver. For an unused-thing rule the direction is the one that
 // matters, since a false positive asks a reader to delete working code.
 //
+// # A `declare` field is never unused
+//
+//	valid:   class C { declare private readonly __brand: 'C'; }
+//
+// A `declare` field has no runtime existence. Its job is to make a type nominal, so nothing reading
+// it is the design rather than dead weight, and deleting it would change what the type checker
+// accepts while removing no code. Upstream reports it; this rule does not, deliberately.
+//
 // # A use outside the class body is not a use
 //
 // `const c = new C(); c.privateThing;` resolves to the member and upstream still REPORTS it, which
@@ -193,6 +201,15 @@ func collectPrivateKeywordMembers(members *ast.NodeList) []*privateKeywordMember
 			// `#name` is private by its spelling and needs no modifier.
 			isHashPrivate := name.Kind == ast.KindPrivateIdentifier
 			if !isHashPrivate && !hasPrivateKeyword(member) {
+				continue
+			}
+			// A `declare` field emits nothing: no slot, no initializer, no runtime existence at all.
+			// It exists to make the class nominal (`declare private readonly __brand: X`), so never
+			// being read is its purpose rather than a defect, and there is no code to delete. Upstream
+			// reports it (measured on 8.67.0), which is a divergence in our favour recorded in the
+			// rule's .md. Only a property can carry the modifier, and never a `#name`, which the
+			// compiler rejects, so this one test covers every shape.
+			if ast.HasSyntacticModifier(member, ast.ModifierFlagsAmbient) {
 				continue
 			}
 			declared = append(declared, &privateKeywordMember{
