@@ -2,8 +2,10 @@ package typescript
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -132,6 +134,12 @@ func DecodeNoExtraneousClassOptions(raw []byte) (any, error) {
 var NoExtraneousClass = rule.Rule{
 	Name: "@typescript-eslint/no-extraneous-class",
 
+	// The checker answers only the load-bearing-empty-class question (see
+	// noExtraneousClassEmptyIsLoadBearing), on an empty class, which is rare. Every other verdict is
+	// syntax. It reads a reference's contextual type, which an imported declaration's shape covers.
+	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
+
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[NoExtraneousClassOptions](options)
 		if !isSettings {
@@ -169,6 +177,10 @@ var NoExtraneousClass = rule.Rule{
 
 			if len(members.Nodes) == 0 {
 				if settings.AllowEmpty {
+					return
+				}
+				if node.Kind == ast.KindClassDeclaration && name != nil &&
+					noExtraneousClassEmptyIsLoadBearing(ctx, node, name) {
 					return
 				}
 				ctx.ReportRange(reportRange, noExtraneousClassEmptyMessage)
@@ -229,6 +241,116 @@ var NoExtraneousClass = rule.Rule{
 			},
 		}
 	},
+}
+
+// noExtraneousClassEmptyIsLoadBearing reports whether an empty class does a job no other token
+// could, by @system_cohere's ruling of 2026-10-03 (#ynneze5, Base's tests). Two shapes, both exact:
+//
+//   - Another class in the file extends it. It is a base, not an extraneous class.
+//   - Every value use of it goes into a position whose contextual type has a construct signature:
+//     a parameter, element or property typed as a constructor. The code it is handed needs a
+//     constructor (it keys a registry by one, reads `.name`, walks its prototype), and an empty class
+//     is the smallest constructor there is.
+//
+// Use as a type changes nothing at runtime and is not counted either way. The class must not leave
+// the file, by an `export` modifier or an export specifier, because a use this rule cannot see would
+// then decide the question. A class nothing references is still reported, as upstream reports it.
+//
+// A deliberate divergence from typescript-eslint, which has no notion of either shape: the second
+// needs type information, and the first is a case upstream simply reports. In cohere's favor, since
+// each exempt class is load-bearing.
+func noExtraneousClassEmptyIsLoadBearing(ctx rule.Context, classNode *ast.Node, name *ast.Node) bool {
+	if ctx.TypeChecker == nil || noExtraneousClassIsExported(classNode) {
+		return false
+	}
+	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	if symbol == nil {
+		return false
+	}
+
+	extended := false
+	escapes := false
+	valueUses := 0
+	constructorSlots := 0
+	var visit func(node *ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if escapes {
+			return true
+		}
+		// An export specifier's identifier resolves to the export alias, not the class, so it is
+		// matched by name. A specifier with no module specifier names a binding of this file, and a
+		// class declaration's name is one, so the name is exact here.
+		if ast.IsExportSpecifier(node) && node.Parent != nil && node.Parent.Parent != nil &&
+			node.Parent.Parent.ModuleSpecifier() == nil {
+			local := node.AsExportSpecifier().PropertyName
+			if local == nil {
+				local = node.Name()
+			}
+			if local != nil && local.Text() == name.Text() {
+				escapes = true
+				return true
+			}
+		}
+		if ast.IsIdentifier(node) && node != name && node.Text() == name.Text() &&
+			ctx.TypeChecker.GetSymbolAtLocation(node) == symbol {
+			switch {
+			case ast.IsExportAssignment(node.Parent):
+				escapes = true
+			// Only a class's `extends` reaches here. An `implements` clause and an interface's
+			// `extends` are type positions, where the reference resolves to a symbol other than the
+			// class's, so the test above already skips them. Two fixtures pin that: if resolution
+			// ever changed, both would turn silent and fail.
+			case ast.IsExpressionWithTypeArguments(node.Parent) && ast.IsHeritageClause(node.Parent.Parent):
+				extended = true
+			case ast.IsPartOfTypeNode(node):
+			default:
+				valueUses++
+				if noExtraneousClassIsConstructorSlot(ctx, node) {
+					constructorSlots++
+				}
+			}
+		}
+		node.ForEachChild(visit)
+		return escapes
+	}
+	ctx.SourceFile.ForEachChild(visit)
+
+	if escapes {
+		return false
+	}
+	return extended || (valueUses > 0 && constructorSlots == valueUses)
+}
+
+// noExtraneousClassIsExported reports whether the class carries an `export` modifier.
+func noExtraneousClassIsExported(classNode *ast.Node) bool {
+	modifiers := classNode.Modifiers()
+	if modifiers == nil {
+		return false
+	}
+	for _, modifier := range modifiers.Nodes {
+		if modifier.Kind == ast.KindExportKeyword {
+			return true
+		}
+	}
+	return false
+}
+
+// noExtraneousClassIsConstructorSlot reports whether a reference sits where the compiler expects a
+// constructor: its contextual type, or any member of it when it is a union, has a construct signature.
+// A generic parameter needs no arm of its own: for `key<Target extends new () => object>(Token)` the
+// compiler hands back the inferred `typeof Token`, which carries the signature, and no reference to a
+// class reached a bare type parameter in any case written for this.
+func noExtraneousClassIsConstructorSlot(ctx rule.Context, reference *ast.Node) bool {
+	contextual := checker.Checker_getContextualType(ctx.TypeChecker, reference, checker.ContextFlagsNone)
+	if contextual == nil {
+		return false
+	}
+	for _, part := range type_checking.UnionTypeParts(contextual) {
+		if len(type_checking.GetConstructSignatures(ctx.TypeChecker, part)) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 var noExtraneousClassEmptyMessage = rule.Message{

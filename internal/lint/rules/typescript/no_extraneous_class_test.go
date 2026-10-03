@@ -656,3 +656,51 @@ func TestNoExtraneousClassSeparatesADecoratorFromOtherModifiers(t *testing.T) {
 		})
 	}
 }
+
+// TestNoExtraneousClassExemptsALoadBearingEmptyClass pins cohere's divergence from typescript-eslint, by
+// @system_cohere's ruling of 2026-10-03 (#ynneze5, Base's tests): an empty class is not extraneous when
+// another class extends it, or when every value use of it goes where a constructor is expected. Each
+// silent row has a reported neighbour, so a mutant dropping or widening either shape fails here.
+func TestNoExtraneousClassExemptsALoadBearingEmptyClass(t *testing.T) {
+	t.Parallel()
+
+	slots := "type Constructor = new (...args: any[]) => object;\n" +
+		"declare function register(target: Constructor): void;\n" +
+		"declare function key<Target extends new () => object>(target: Target): void;\n" +
+		"declare const scope: ReadonlySet<new () => object>;\n"
+	silent := []struct {
+		name   string
+		source string
+	}{
+		{"a base another class extends", "class Base {}\nclass Child extends Base {\n  value = 1;\n}\nnew Child();\n"},
+		{"a constructor-typed parameter", slots + "class Token {}\nregister(Token);\n"},
+		{"a set of constructors", slots + "class Unrelated {}\nscope.has(Unrelated);\n"},
+		{"a type parameter constrained to a constructor", slots + "class Token {}\nkey(Token);\n"},
+		{"every one of several uses is a constructor slot", slots + "class Token {}\nregister(Token);\nscope.has(Token);\n"},
+		{"a use as a type does not count against it", slots + "class Token {}\nregister(Token);\ndeclare const typed: Token;\n"},
+	}
+	for _, testCase := range silent {
+		t.Run(testCase.name, func(t *testing.T) {
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtraneousClass, noExtraneousClassFile, testCase.source, nil))
+		})
+	}
+
+	reported := []struct {
+		name   string
+		source string
+	}{
+		{"nothing references it", "class Foo {}\n"},
+		{"a value use that wants no constructor", "class Token {}\nconsole.log(Token);\n"},
+		{"one use in a constructor slot and one that is not", slots + "class Token {}\nregister(Token);\nconst alias = Token;\nconsole.log(alias);\n"},
+		{"instantiated, which needs no class", "class Foo {}\nconsole.log(new Foo());\n"},
+		{"exported, so uses elsewhere decide it", slots + "export class Token {}\nregister(Token);\n"},
+		{"exported by a specifier", slots + "class Token {}\nregister(Token);\nexport { Token };\n"},
+		{"extended by an interface, which uses it only as a type", "class Shape {}\ninterface Square extends Shape {\n  side: number;\n}\ndeclare const square: Square;\nconsole.log(square);\n"},
+		{"implemented rather than extended", "class Shape {}\nclass Square implements Shape {\n  side = 1;\n}\nnew Square();\n"},
+	}
+	for _, testCase := range reported {
+		t.Run(testCase.name, func(t *testing.T) {
+			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoExtraneousClass, noExtraneousClassFile, testCase.source, nil), "empty")
+		})
+	}
+}
