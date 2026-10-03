@@ -1,0 +1,590 @@
+[
+  {
+    "typeScriptRule": "base/context-requires-access",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Base's decorator-driven request-context injection has no Swift counterpart."
+  },
+  {
+    "typeScriptRule": "base/graphql-nullable-parity",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "TypeScript GraphQL field decorators have no Swift counterpart in either proving ground."
+  },
+  {
+    "typeScriptRule": "base/graphql-operation-context-matches-return",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "TypeScript GraphQL operation decorators have no Swift counterpart."
+  },
+  {
+    "typeScriptRule": "base/inject-type-matches-parameter",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Base's @Inject<T>() decorator DI has no Swift counterpart, and Swift generics are compile-checked anyway."
+  },
+  {
+    "typeScriptRule": "base/no-bare-throw",
+    "verdict": "Port",
+    "swiftRule": null,
+    "reason": "Swift can only throw an Error-conforming type, but a hand-built `NSError(domain: \"X\", code: 1, userInfo: [...])` is the message-only error a caller cannot match (1 macos, 3 presence sites); the other side is that it is rare enough to call compiler-covered."
+  },
+  {
+    "typeScriptRule": "base/no-console",
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/no-print",
+    "reason": null
+  },
+  {
+    "typeScriptRule": "base/no-global-container",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Base's DI container has no Swift counterpart."
+  },
+  {
+    "typeScriptRule": "base/no-hand-built-declared-error",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Base's declared-error tiers have no Swift counterpart."
+  },
+  {
+    "typeScriptRule": "base/orm-column-nullable-parity",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Base ORM decorators have no counterpart, and neither proving ground uses a Swift ORM."
+  },
+  {
+    "typeScriptRule": "base/orm-column-requires-declare",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "TypeScript's class-field `declare` keyword has no Swift meaning."
+  },
+  {
+    "typeScriptRule": "base/pagination-decorator",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Base GraphQL pagination decorators have no Swift counterpart."
+  },
+  {
+    "typeScriptRule": "base/provider-return-matches-token",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Base DI provider tokens have no Swift counterpart."
+  },
+  {
+    "typeScriptRule": "base/relation-must-be-optional",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Base ORM relation decorators have no Swift counterpart."
+  },
+  {
+    "typeScriptRule": "base/serializable-nullable-parity",
+    "verdict": "Compiler",
+    "swiftRule": null,
+    "reason": "Codable derives optionality from the property type itself (`T?` decodes if present), so there is no second flag to disagree with it."
+  },
+  {
+    "typeScriptRule": "base/verify-array-parity",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Base validation decorators have no Swift counterpart."
+  },
+  {
+    "typeScriptRule": "base/verify-optional-parity",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Base validation decorators have no Swift counterpart."
+  },
+  {
+    "typeScriptRule": "nexus/boundary-no-internal-import",
+    "verdict": "Compiler",
+    "swiftRule": null,
+    "reason": "Swift imports modules rather than folders, and `internal`, `package` and `fileprivate` access control is the compiler-checked ownership boundary."
+  },
+  {
+    "typeScriptRule": "nexus/boundary-no-nexus-outside-import",
+    "verdict": "Compiler",
+    "swiftRule": null,
+    "reason": "A SwiftPM target can import only the targets it declares and the package graph refuses cycles, so an upward import fails the build."
+  },
+  {
+    "typeScriptRule": "nexus/boundary-no-project-import",
+    "verdict": "Compiler",
+    "swiftRule": null,
+    "reason": "A library target cannot import an application target it does not depend on, and SwiftPM refuses the cycle."
+  },
+  {
+    "typeScriptRule": "nexus/concurrency-no-check-then-write",
+    "verdict": "Port",
+    "swiftRule": null,
+    "reason": "A `while FileManager.default.fileExists(atPath:)` free-name loop followed by a `write(to:)` without `.withoutOverwriting` lets two writers claim one name, with 1 exact site and 2 helper variants in presence."
+  },
+  {
+    "typeScriptRule": "nexus/concurrency-no-lost-update",
+    "verdict": "Port",
+    "swiftRule": null,
+    "reason": "Actor and @MainActor reentrancy reproduce the bug exactly (state read before an `await`, written back after it), and strict concurrency checking prevents data races but not this."
+  },
+  {
+    "typeScriptRule": "nexus/consistency-no-abbreviated-identifier",
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/no-abbreviated-identifier",
+    "reason": null
+  },
+  {
+    "typeScriptRule": "nexus/consistency-no-ambiguous-identifier",
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/no-ambiguous-identifier",
+    "reason": null
+  },
+  {
+    "typeScriptRule": "nexus/consistency-no-boolean-outcome",
+    "verdict": "Port",
+    "swiftRule": null,
+    "reason": "A result struct or tuple pairing `success: Bool` with an error or value field should be an enum with payloads, though Swift's enums make the shape rare (1 macos site), so the other side is that the language already nudges it away."
+  },
+  {
+    "typeScriptRule": "nexus/consistency-no-enum",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "The ban answers TypeScript-specific enum flaws, and Swift enums are the idiomatic exhaustive sum type."
+  },
+  {
+    "typeScriptRule": "nexus/consistency-no-for-in",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Swift `for x in sequence` iterates a Sequence and there is no prototype chain to guard."
+  },
+  {
+    "typeScriptRule": "nexus/consistency-no-hand-rolled-delay",
+    "verdict": "Port",
+    "swiftRule": null,
+    "reason": "Both proving grounds already have the primitive (`Task.sleepUnlessCancelled(for:)`), so a scattered `try? await Task.sleep(...)` or a continuation around `asyncAfter` is the hand-rolled spelling to flag."
+  },
+  {
+    "typeScriptRule": "nexus/consistency-no-iso-string-date-cut",
+    "verdict": "Port",
+    "swiftRule": null,
+    "reason": "`Date.ISO8601FormatStyle` and `ISO8601DateFormatter` default to UTC, so `.formatted(.iso8601.year().month().day())` or a `.prefix(10)` cut gives the UTC day without saying so."
+  },
+  {
+    "typeScriptRule": "nexus/consistency-no-long-line-comment",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Kirk ruled on 2026-10-03 (#r3hfpe8) that Swift keeps plain // runs as lines and /// for documentation, never folding either into a block, so a run's length is not judged."
+  },
+  {
+    "typeScriptRule": "nexus/consistency-no-multiline-arrow-function",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Swift closures (trailing closures, SwiftUI builders) are the idiom, with no hoisting difference and no function-identity listener removal."
+  },
+  {
+    "typeScriptRule": "nexus/consistency-no-return-void",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Swift has no `void` operator."
+  },
+  {
+    "typeScriptRule": "nexus/consistency-no-screaming-snake-case",
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/require-lower-camel-case",
+    "reason": null
+  },
+  {
+    "typeScriptRule": "nexus/consistency-no-shouting",
+    "verdict": "Port",
+    "swiftRule": null,
+    "reason": "Uppercase words in comments carry over directly to Swift comment trivia, provided the TypeScript safe list is shared so acronyms are not reported."
+  },
+  {
+    "typeScriptRule": "nexus/consistency-no-single-line-jsdoc",
+    "verdict": "Formatter",
+    "swiftRule": null,
+    "reason": "swift-format's UseTripleSlashForDocumentationComments, on in both proving grounds, rewrites `/** one line */` doc comments to `///`."
+  },
+  {
+    "typeScriptRule": "nexus/consistency-no-stuttering-name",
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/no-stuttering-name",
+    "reason": null
+  },
+  {
+    "typeScriptRule": "nexus/consistency-no-utils-folder",
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/no-utils-folder",
+    "reason": null
+  },
+  {
+    "typeScriptRule": "nexus/consistency-require-constant-casing",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Swift's convention, enforced by cohere-swift/require-lower-camel-case, spells every value lowerCamelCase and lets access control state scope, so porting the PascalCase-export rule would contradict it on about 1,470 static lets; the other side is that the scope-signalling idea is Kirk's and could override Swift's convention by ruling."
+  },
+  {
+    "typeScriptRule": "nexus/consistency-require-return-matching-type",
+    "verdict": "Compiler",
+    "swiftRule": null,
+    "reason": "A bare `return` in a non-Void Swift function is a compile error and `nil` must always be written, so the two spellings cannot be confused."
+  },
+  {
+    "typeScriptRule": "nexus/consistency-require-type-suffix",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "The Type/Interface/Kind suffixes name TypeScript aliases, interfaces and `as const` objects, and in Swift `.Type` already means the metatype."
+  },
+  {
+    "typeScriptRule": "nexus/correctness-no-callback-in-parse-try",
+    "verdict": "Compiler",
+    "swiftRule": null,
+    "reason": "Only a closure declared `throws` can throw into the catch, and it must be called as `try callback(...)`, so Swift makes the hazard visible at the call; the other side is that it is still writable, and a narrow port could flag it (0 sites today)."
+  },
+  {
+    "typeScriptRule": "nexus/correctness-no-collection-misuse",
+    "verdict": "Compiler",
+    "swiftRule": null,
+    "reason": "Swift has no `in` operator, a Dictionary subscript is its real API, a Set has no key subscript and there is no `Object.keys`; the one shape that still compiles, `count < 0`, has 0 sites, which is the case for a small port."
+  },
+  {
+    "typeScriptRule": "nexus/correctness-no-discarded-outcome",
+    "verdict": "Compiler",
+    "swiftRule": null,
+    "reason": "swiftc warns that the result of a call is unused for any return value not marked @discardableResult, a Result included."
+  },
+  {
+    "typeScriptRule": "nexus/correctness-no-discarded-pure-result",
+    "verdict": "Compiler",
+    "swiftRule": null,
+    "reason": "swiftc warns that the result of a call such as `uppercased()` is unused (probed), and mutating methods have separate names."
+  },
+  {
+    "typeScriptRule": "nexus/correctness-no-global-listener-target-assertion",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a DOM event-model hazard with no Swift counterpart."
+  },
+  {
+    "typeScriptRule": "nexus/correctness-no-identical-branches",
+    "verdict": "Port",
+    "swiftRule": null,
+    "reason": "`cond ? a : a` and identical if/else bodies are writable in Swift and no cohere-swift rule compares branch bodies, although both proving grounds are clean today."
+  },
+  {
+    "typeScriptRule": "nexus/correctness-no-import-cycle-load-time-read",
+    "verdict": "Compiler",
+    "swiftRule": null,
+    "reason": "Swift modules cannot import each other cyclically, and globals and statics initialize lazily on first access, so there is no load order to get wrong."
+  },
+  {
+    "typeScriptRule": "nexus/correctness-no-leaked-number-render",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a JSX rendering hazard, and a SwiftUI `if` requires a Bool."
+  },
+  {
+    "typeScriptRule": "nexus/correctness-no-mock-on-module-namespace",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "node:test and ES module namespaces have no Swift counterpart."
+  },
+  {
+    "typeScriptRule": "nexus/correctness-no-nullish-stripping-assertion",
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/no-force-cast",
+    "reason": null
+  },
+  {
+    "typeScriptRule": "nexus/correctness-no-process-exit-after-output",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Swift output is synchronous and `exit()` flushes C stdio, so there is no in-flight pipe write to truncate."
+  },
+  {
+    "typeScriptRule": "nexus/correctness-no-test-on-global-regex",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Swift `Regex` and `NSRegularExpression` carry no lastIndex state between calls."
+  },
+  {
+    "typeScriptRule": "nexus/correctness-no-uncleared-race-timeout",
+    "verdict": "Port",
+    "swiftRule": null,
+    "reason": "A task-group timeout child that is never cancelled holds the whole group for the full timeout, because the group awaits every child before it returns."
+  },
+  {
+    "typeScriptRule": "nexus/correctness-no-write-only-collection",
+    "verdict": "Port",
+    "swiftRule": null,
+    "reason": "swiftc gives no warning for a local array, set or dictionary that is only appended to (probed), though both proving grounds are clean today."
+  },
+  {
+    "typeScriptRule": "nexus/correctness-require-blocking-standard-streams",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Swift writes to stdout synchronously and `exit()` flushes stdio, so there is nothing to block."
+  },
+  {
+    "typeScriptRule": "nexus/correctness-require-child-process-error-listener",
+    "verdict": "Compiler",
+    "swiftRule": null,
+    "reason": "`Process.run()` throws, so a launch failure must be handled at the call."
+  },
+  {
+    "typeScriptRule": "nexus/correctness-require-response-status-check",
+    "verdict": "Port",
+    "swiftRule": null,
+    "reason": "URLSession does not throw on 4xx or 5xx, so decoding `data` from `URLSession.data(for:)` without reading `HTTPURLResponse.statusCode` is the same bug, though all 3 macos sites check today."
+  },
+  {
+    "typeScriptRule": "nexus/import-no-forbidden-source",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "The configured sources are Next.js modules, and a Swift banned-module list would be a new rule with its own list."
+  },
+  {
+    "typeScriptRule": "nexus/import-require-module-alias",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Swift `import Module` has no alias syntax."
+  },
+  {
+    "typeScriptRule": "nexus/import-require-node-namespace",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Node builtins have no Swift counterpart."
+  },
+  {
+    "typeScriptRule": "nexus/import-require-path-alias",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Swift imports modules, not file paths."
+  },
+  {
+    "typeScriptRule": "nexus/localization-no-untranslated-value",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "The Swift counterpart would be a String Catalog (.xcstrings) check rather than a source rule, and neither proving ground localizes yet."
+  },
+  {
+    "typeScriptRule": "nexus/performance-no-independent-await-in-loop",
+    "verdict": "Port",
+    "swiftRule": null,
+    "reason": "A `for` loop that awaits independent work one item at a time (`results.append(await lane.snapshot())`) should be a task group, and macos has 2 real sites."
+  },
+  {
+    "typeScriptRule": "nexus/security-no-interpolated-shell-command",
+    "verdict": "Port",
+    "swiftRule": null,
+    "reason": "Interpolating a value into the string after `zsh -c` or `-lc` on a `Process` is the same injection, with real sites in both proving grounds (MemberLifecycle.swift:34 splices an unquoted home path)."
+  },
+  {
+    "typeScriptRule": "nexus/security-no-interpolated-sql-string",
+    "verdict": "Port",
+    "swiftRule": null,
+    "reason": "A `String` interpolated between the single quotes of a SQLite statement is the same bug, with 3 source and 3 test sites in presence."
+  },
+  {
+    "typeScriptRule": "structure/boundary-no-project-theme-value",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Structure's Tailwind theme map has no Swift counterpart."
+  },
+  {
+    "typeScriptRule": "structure/consistency-no-property-alias",
+    "verdict": "Port",
+    "swiftRule": null,
+    "reason": "Reach-over-alias is a house principle with large Swift demand (17 macos, 344 presence), but in Swift `let x = obj.x` is often a deliberate snapshot taken before an `await` or a value-type copy, so the port needs that exemption or it fights the lost-update fix."
+  },
+  {
+    "typeScriptRule": "structure/consistency-organize-imports",
+    "verdict": "Formatter",
+    "swiftRule": null,
+    "reason": "swift-format's OrderedImports, on in both proving grounds, orders the handful of module imports a Swift file has."
+  },
+  {
+    "typeScriptRule": "structure/network-no-direct-fetch",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "No sanctioned Swift network client exists (macos's two raw URLSessions are deliberate), so there is nothing to require; it becomes a port if one is named."
+  },
+  {
+    "typeScriptRule": "structure/network-no-forbidden-import",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "The forbidden imports are npm packages."
+  },
+  {
+    "typeScriptRule": "structure/network-no-invalidate-cache-in-on-success",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is Structure NetworkService's React API."
+  },
+  {
+    "typeScriptRule": "structure/network-no-invalidate-cache-literal-key",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is Structure NetworkService's React API."
+  },
+  {
+    "typeScriptRule": "structure/network-no-string-literal-query",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is TypeScript GraphQL codegen."
+  },
+  {
+    "typeScriptRule": "structure/network-require-hook-options-parameter",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a React hook convention."
+  },
+  {
+    "typeScriptRule": "structure/network-require-hook-request-suffix",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a React hook convention."
+  },
+  {
+    "typeScriptRule": "structure/network-require-hook-variables-type",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is TypeScript GraphQL codegen."
+  },
+  {
+    "typeScriptRule": "structure/next-no-near-miss-route-export",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a Next.js routing convention."
+  },
+  {
+    "typeScriptRule": "structure/next-no-page-state",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a Next.js App Router behaviour."
+  },
+  {
+    "typeScriptRule": "structure/next-require-api-parameter-name",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a Next.js argument-naming contract."
+  },
+  {
+    "typeScriptRule": "structure/next-require-page-default-export",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a Next.js routing convention."
+  },
+  {
+    "typeScriptRule": "structure/react-component-no-const-assignment",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a React component declaration style."
+  },
+  {
+    "typeScriptRule": "structure/react-component-no-destructuring",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a React props convention."
+  },
+  {
+    "typeScriptRule": "structure/react-component-no-display-name",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a React DevTools convention."
+  },
+  {
+    "typeScriptRule": "structure/react-component-no-forward-ref",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a React API."
+  },
+  {
+    "typeScriptRule": "structure/react-component-no-separate-named-export",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is ES module export syntax."
+  },
+  {
+    "typeScriptRule": "structure/react-component-require-matching-file-name",
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/file-named-for-type",
+    "reason": null
+  },
+  {
+    "typeScriptRule": "structure/react-component-require-named-export",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Swift has no default export."
+  },
+  {
+    "typeScriptRule": "structure/react-component-require-properties-parameter",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a React props convention, and a Swift `props` identifier already hits no-abbreviated-identifier."
+  },
+  {
+    "typeScriptRule": "structure/react-component-require-properties-type-suffix",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a React props convention."
+  },
+  {
+    "typeScriptRule": "structure/react-hook-any-type",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This guards against React types being missing, and an unresolved Swift call simply does not compile."
+  },
+  {
+    "typeScriptRule": "structure/react-hook-no-destructuring",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a React hook convention, and Swift cannot destructure structs."
+  },
+  {
+    "typeScriptRule": "structure/react-hook-no-properties-in-dependencies",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a React dependency-array hazard."
+  },
+  {
+    "typeScriptRule": "structure/react-hook-require-effect-comment",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a React useEffect convention, and the nearest SwiftUI modifiers (`.task`, `.onChange`) have never been ruled on."
+  },
+  {
+    "typeScriptRule": "structure/react-hook-require-result-naming",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a React hook naming convention."
+  },
+  {
+    "typeScriptRule": "structure/react-import-no-destructuring",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a React import style."
+  },
+  {
+    "typeScriptRule": "structure/react-no-anchor-element",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a JSX element ban."
+  },
+  {
+    "typeScriptRule": "structure/react-no-horizontal-rule-element",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a JSX element ban."
+  },
+  {
+    "typeScriptRule": "structure/storage-no-direct-local-storage",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Browser localStorage has no Swift counterpart, and direct `UserDefaults.standard` has no sanctioned wrapper to point at in either proving ground."
+  },
+  {
+    "typeScriptRule": "structure/tailwind-no-physical-direction",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is about Tailwind classes, and SwiftUI layout speaks only leading/trailing."
+  }
+]
