@@ -99,10 +99,6 @@ func TestConsistencyNoLongLineCommentStaysSilent(t *testing.T) {
 			"// eslint-disable-next-line no-console\n// eslint-disable-next-line no-alert\n" +
 				"// @ts-expect-error one\n// @ts-expect-error two\n// prettier-ignore\nexport const value = 1;\n",
 		},
-
-		// A generator rewrites these on its next run, so a fix here churns the file every build.
-		{"generated folder", "/repository/source/generated/Thing.ts", lineCommentRun(9)},
-		{"generated suffix", "/repository/source/Thing.generated.ts", lineCommentRun(9)},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -114,6 +110,16 @@ func TestConsistencyNoLongLineCommentStaysSilent(t *testing.T) {
 
 // TestConsistencyNoLongLineCommentFixes pins the rewrite, because a fix that lands wrong destroys
 // the comment it was repairing and the finding disappears with it.
+// Generated code is held to the rule like hand-written code (Kirk's ruling on generated code, #c076xbg):
+// the generator writes a block comment, so a finding here is a defect in the generator. The rule used
+// to skip these files.
+func TestConsistencyNoLongLineCommentHoldsGeneratedFilesToTheRule(t *testing.T) {
+	for _, fileName := range []string{"/repository/source/generated/Thing.ts", "/repository/source/Thing.generated.ts"} {
+		result := rule_testing.Run(t, ConsistencyNoLongLineComment, fileName, lineCommentRun(9))
+		rule_testing.ExpectFindings(t, result, "longLineComment")
+	}
+}
+
 func TestConsistencyNoLongLineCommentFixes(t *testing.T) {
 	t.Parallel()
 

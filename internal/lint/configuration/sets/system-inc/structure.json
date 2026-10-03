@@ -100,16 +100,6 @@
     "overrides": [
         {
             "files": [
-                "**/generated/**/*.{ts,tsx}"
-            ],
-            "rules": {
-                "nexus/consistency-no-abbreviated-identifier": "off",
-                "nexus/consistency-require-type-suffix": "off",
-                "@typescript-eslint/no-explicit-any": "off"
-            }
-        },
-        {
-            "files": [
                 "**/graphql/GraphQl*.generated.ts"
             ],
             "reason": "Interim, until the last open decision on the generated-code ruling (#c076xbg) lands: the GraphQL schema itself names fields like min, max and idx, a wire change waiting on Kirk because the Phi mobile app may read them. When it lands, this override is deleted.",

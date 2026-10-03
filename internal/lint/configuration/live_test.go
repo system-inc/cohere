@@ -36,15 +36,29 @@ func TestAgainstTheLiveConfig(t *testing.T) {
 		t.Fatalf("overrides=%d ignorePatterns=%d, expected both non-empty", len(loaded.Overrides), len(loaded.IgnorePatterns))
 	}
 
-	// The 336 case, against the real override block.
-	generated := loaded.Resolve("libraries/structure/source/api/graphql/generated/GraphQlOperations.ts")
+	// Generated code gets every rule (#c076xbg). The one override left is the GraphQL output's
+	// abbreviation rule, waiting on a wire decision; everything else runs there, and on any other
+	// generated file nothing is off.
+	graphQlOutput := loaded.Resolve("libraries/structure/source/api/graphql/GraphQlOperations.generated.ts")
+	if graphQlOutput.Enabled("nexus/consistency-no-abbreviated-identifier") {
+		t.Error("the GraphQL output's interim abbreviation override did not apply")
+	}
+	workerBundle := loaded.Resolve("libraries/structure/source/api/web-sockets/shared-worker/WebSocketSharedWorkerCode.generated.ts")
+	// The folder spelling the ruling retired: a `generated/` override coming back would turn rules off here.
+	inGeneratedFolder := loaded.Resolve("libraries/structure/source/api/graphql/generated/GraphQlOperations.ts")
 	for _, ruleName := range []string{
 		"nexus/consistency-require-type-suffix",
 		"nexus/consistency-no-abbreviated-identifier",
-		"typescript/no-explicit-any",
+		"@typescript-eslint/no-explicit-any",
 	} {
-		if generated.Enabled(ruleName) {
-			t.Errorf("%s is still enabled inside generated/, so its findings would come back", ruleName)
+		if !graphQlOutput.Enabled(ruleName) && ruleName != "nexus/consistency-no-abbreviated-identifier" {
+			t.Errorf("%s is off for the GraphQL output; generated code gets every rule", ruleName)
+		}
+		if !workerBundle.Enabled(ruleName) {
+			t.Errorf("%s is off for a generated file; generated code gets every rule", ruleName)
+		}
+		if !inGeneratedFolder.Enabled(ruleName) {
+			t.Errorf("%s is off inside a generated/ folder; generated code gets every rule", ruleName)
 		}
 	}
 

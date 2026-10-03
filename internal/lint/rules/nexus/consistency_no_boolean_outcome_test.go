@@ -49,8 +49,6 @@ func TestConsistencyNoBooleanOutcomeStaysSilent(t *testing.T) {
 		{"tanstack field set is not ours", outcomeFile, "export interface QueryResult {\n    isError: boolean;\n    isLoading: boolean;\n    error: string;\n}\n"},
 		{"cloudflare's v4 envelope is not ours", outcomeFile, "export interface R2CloudflareApiResponseInterface {\n    success: boolean;\n    errors: unknown;\n    messages: unknown;\n    result: unknown;\n}\n"},
 		{"isSuccess and isError are one settled state", outcomeFile, "export interface QueryResult {\n    isSuccess: boolean;\n    isError: boolean;\n    error: string;\n}\n"},
-		{"generated files belong to the generator", "/repository/source/generated/Api.ts", "export interface LookupResult {\n    success: boolean;\n    error: string;\n}\n"},
-		{"dot-generated files too", "/repository/source/Api.generated.ts", "export interface LookupResult {\n    success: boolean;\n    error: string;\n}\n"},
 		// A discriminated union is the shape this rule steers toward, so it must never fire on one.
 		{"a union alias is already the answer", outcomeFile, "export type PostOutcomeType =\n    | { outcome: 'Found'; value: string }\n    | { outcome: 'NotFound'; message: string };\n"},
 		// A literal arm inside a discriminated union is fine, since only a bare boolean counts.
@@ -62,6 +60,15 @@ func TestConsistencyNoBooleanOutcomeStaysSilent(t *testing.T) {
 			result := rule_testing.Run(t, ConsistencyNoBooleanOutcome, testCase.fileName, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
+	}
+}
+
+// Generated code is held to the rule like hand-written code (Kirk's ruling on generated code, #c076xbg):
+// a generator emitting a boolean outcome is fixed at the generator. The rule used to skip these files.
+func TestConsistencyNoBooleanOutcomeHoldsGeneratedFilesToTheRule(t *testing.T) {
+	for _, fileName := range []string{"/repository/source/generated/Api.ts", "/repository/source/Api.generated.ts"} {
+		result := rule_testing.Run(t, ConsistencyNoBooleanOutcome, fileName, "export interface LookupResult {\n    success: boolean;\n    error: string;\n}\n")
+		rule_testing.ExpectFindings(t, result, "booleanOutcome")
 	}
 }
 

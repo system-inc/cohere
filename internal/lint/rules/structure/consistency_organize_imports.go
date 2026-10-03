@@ -82,12 +82,6 @@ var messageImportsNotOrganized = rule.Message{
 var ConsistencyOrganizeImports = rule.Rule{
 	Name: "structure/consistency-organize-imports",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		// Generated output is regenerated from a template nobody edits, so a finding asks for a
-		// change the next generation undoes. The original declines the same files.
-		if FileContextFor(ctx.SourceFile.FileName()).IsGeneratedFile {
-			return nil
-		}
-
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				checkImportOrganization(ctx, node)

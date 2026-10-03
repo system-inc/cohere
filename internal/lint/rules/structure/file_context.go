@@ -21,10 +21,6 @@ type FileContext struct {
 	// components belong in a file has no standing in one.
 	IsSpecialNextJsFile bool
 
-	// IsGeneratedFile marks output nobody edits by hand, where a finding asks for a change that the
-	// next generation would undo.
-	IsGeneratedFile bool
-
 	// IsNetworkServiceFile marks the one implementation allowed to touch the raw fetch primitive.
 	// Every rule routing network access through NetworkService has to exempt NetworkService itself,
 	// or the rule forbids the thing it is asking people to use.
@@ -90,7 +86,6 @@ func FileContextFor(fileName string) FileContext {
 	return FileContext{
 		IsReactFile:         isReactFile,
 		IsSpecialNextJsFile: isSpecialNextJsFile,
-		IsGeneratedFile:     strings.Contains(normalizedPath, "/generated/"),
 		// Every file of the NetworkService module, by where it lives rather than by name, the same way
 		// Link's exemption is matched: the module is split across an internal/ directory whose files
 		// each own part of what the rules forbid elsewhere, and a file elsewhere named after

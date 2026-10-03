@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -87,11 +86,6 @@ var ConsistencyNoBooleanOutcome = rule.Rule{
 	Name: "nexus/consistency-no-boolean-outcome",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
-			return nil
-		}
-
-		filePath := imports.NormalizedFileName(ctx.SourceFile)
-		if strings.Contains(filePath, "/generated/") || strings.Contains(filePath, ".generated.") {
 			return nil
 		}
 

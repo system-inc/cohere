@@ -138,13 +138,6 @@ func TestConsistencyOrganizeImportsStaysSilent(t *testing.T) {
 			source: "// Dependencies - Third-party\nimport a from 'alpha';\nimport z from 'zebra';\n\nexport const X = 1;\n",
 		},
 		{
-			// Generated output is declined before a single node is read. Measured on the original:
-			// this file is unsorted and unheadered and still reports nothing.
-			name:     "a generated file is declined however wrong its imports are",
-			fileName: "/repository/app/generated/Thing.tsx",
-			source:   "import z from 'zebra';\nimport a from 'alpha';\n\nexport const X = 1;\n",
-		},
-		{
 			// use server takes its OWN comment, not the client one. Nothing else here can see the
 			// two directives being told apart: the reporting cases pass through a directive with no
 			// comment at all, which reports whichever text the rule would have written.
@@ -201,6 +194,16 @@ func TestConsistencyOrganizeImportsStaysSilent(t *testing.T) {
 			result := rule_testing.Run(t, ConsistencyOrganizeImports, fileName, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
+	}
+}
+
+// Generated code is held to the rule like hand-written code (Kirk's ruling on generated code, #c076xbg):
+// the generator writes the house form, so a finding here is a defect in the generator. The rule used to
+// decline these files, and both spellings of generated output are reported now.
+func TestConsistencyOrganizeImportsHoldsGeneratedFilesToTheRule(t *testing.T) {
+	for _, fileName := range []string{"/repository/app/generated/Thing.tsx", "/repository/app/Thing.generated.ts"} {
+		result := rule_testing.Run(t, ConsistencyOrganizeImports, fileName, "import z from 'zebra';\nimport a from 'alpha';\n\nexport const X = 1;\n")
+		rule_testing.ExpectFindings(t, result, "importsNotOrganized")
 	}
 }
 

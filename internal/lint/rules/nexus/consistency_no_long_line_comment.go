@@ -7,7 +7,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -41,13 +40,6 @@ var ConsistencyNoLongLineComment = rule.Rule{
 	Name: "nexus/consistency-no-long-line-comment",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
-			return nil
-		}
-
-		// A generator rewrites these on its next run, so a fix here is lost and the file churns on
-		// every build.
-		fileName := imports.NormalizedFileName(ctx.SourceFile)
-		if strings.Contains(fileName, "/generated/") || strings.Contains(fileName, ".generated.") {
 			return nil
 		}
 
