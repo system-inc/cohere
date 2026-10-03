@@ -139,9 +139,9 @@
   },
   {
     "typeScriptRule": "nexus/consistency-no-boolean-outcome",
-    "verdict": "Port",
-    "swiftRule": null,
-    "reason": "A result struct or tuple pairing `success: Bool` with an error or value field should be an enum with payloads, though Swift's enums make the shape rare (1 macos site), so the other side is that the language already nudges it away."
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/consistency-no-boolean-outcome",
+    "reason": null
   },
   {
     "typeScriptRule": "nexus/consistency-no-enum",
