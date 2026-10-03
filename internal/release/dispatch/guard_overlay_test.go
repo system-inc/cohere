@@ -3,10 +3,14 @@ package dispatch
 import (
 	"encoding/json"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -172,26 +176,28 @@ func TestTheTypeReachGuardReadsTheGoFlagsOverlay(t *testing.T) {
 	for _, name := range baseline.claims {
 		claimed[name] = true
 	}
-	target, file := "", ""
-	for name, reader := range baseline.reason {
+	// The first such rule by name, so every run plants into the same file.
+	var candidates []string
+	for name := range baseline.reason {
 		if !claimed[name] {
-			target, file = name, filepath.Join(root, "internal/lint/rules", reader)
-			break
+			candidates = append(candidates, name)
 		}
 	}
-	if target == "" {
+	if len(candidates) == 0 {
 		t.Fatal("no rule reads imported bodies without claiming Shapes, so there is nothing to plant a claim in")
 	}
+	slices.Sort(candidates)
+	target := candidates[0]
+	file := filepath.Join(root, "internal/lint/rules", baseline.reason[target])
 	original, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)
 	}
-	nameField := fmt.Sprintf("Name: %q,", target)
-	if strings.Contains(string(original), "TypeReach:") || !strings.Contains(string(original), nameField) {
-		t.Fatalf("%s does not spell its rule as the plant expects; update the probe", file)
+	planted, err := plantShapesClaim(original)
+	if err != nil {
+		t.Fatalf("%s: %v", file, err)
 	}
-	planted := strings.Replace(string(original), nameField, nameField+"\n\t\tTypeReach: rule.TypeReachShapes,", 1)
-	t.Setenv("GOFLAGS", "-overlay="+writeOverlay(t, file, planted))
+	t.Setenv("GOFLAGS", "-overlay="+writeOverlay(t, file, string(planted)))
 
 	scan := scanTypeReach(t, guardOverlay(t))
 	caught := false
@@ -200,6 +206,98 @@ func TestTheTypeReachGuardReadsTheGoFlagsOverlay(t *testing.T) {
 	}
 	if !caught {
 		t.Fatalf("a Shapes claim on %s that exists only in the GOFLAGS overlay was not caught", target)
+	}
+}
+
+// plantShapesClaim returns a rule file whose rule.Rule literal claims TypeReach Shapes: the literal's own
+// TypeReach replaced, or one added before its first element. Found by parsing, not by matching text, so
+// a column-aligned `Name:` or any other spelling of the literal is planted the same way, and spelled with
+// the literal's own package qualifier.
+func plantShapesClaim(source []byte) ([]byte, error) {
+	file, err := parser.ParseFile(token.NewFileSet(), "", source, 0)
+	if err != nil {
+		return nil, err
+	}
+	var literal *ast.CompositeLit
+	var qualifier string
+	ast.Inspect(file, func(node ast.Node) bool {
+		if literal != nil {
+			return false
+		}
+		candidate, ok := node.(*ast.CompositeLit)
+		if !ok {
+			return true
+		}
+		selector, ok := candidate.Type.(*ast.SelectorExpr)
+		if !ok || selector.Sel.Name != "Rule" {
+			return true
+		}
+		if identifier, ok := selector.X.(*ast.Ident); ok && len(candidate.Elts) > 0 {
+			literal, qualifier = candidate, identifier.Name
+		}
+		return false
+	})
+	if literal == nil {
+		return nil, fmt.Errorf("no rule.Rule literal with elements")
+	}
+	// Offsets in a file parsed alone start at 1.
+	offset := func(position token.Pos) int { return int(position) - 1 }
+	claim := qualifier + ".TypeReachShapes"
+	for _, element := range literal.Elts {
+		pair, ok := element.(*ast.KeyValueExpr)
+		if key, isIdentifier := pair.Key.(*ast.Ident); ok && isIdentifier && key.Name == "TypeReach" {
+			return slices.Concat(source[:offset(pair.Value.Pos())], []byte(claim), source[offset(pair.Value.End()):]), nil
+		}
+	}
+	first := offset(literal.Elts[0].Pos())
+	return slices.Concat(source[:first], []byte("TypeReach: "+claim+",\n"), source[first:]), nil
+}
+
+// The plant works on every rule there is, read back the way the scan reads a claim, so the probe above
+// cannot miss on whichever rule it happens to pick.
+func TestAShapesClaimPlantsIntoEveryRuleFile(t *testing.T) {
+	root, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, err := filepath.Glob(filepath.Join(root, "internal/lint/rules/*/*.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	planted := 0
+	for _, path := range files {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		original, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		parsed, err := parser.ParseFile(token.NewFileSet(), path, original, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		name, _ := ruleLiteralTypeReach(parsed)
+		if name == "" {
+			continue
+		}
+		result, err := plantShapesClaim(original)
+		if err != nil {
+			t.Errorf("%s: %v", path, err)
+			continue
+		}
+		reparsed, err := parser.ParseFile(token.NewFileSet(), path, result, 0)
+		if err != nil {
+			t.Errorf("%s: the planted file does not parse: %v", path, err)
+			continue
+		}
+		if plantedName, claims := ruleLiteralTypeReach(reparsed); plantedName != name || !claims {
+			t.Errorf("%s: planted, the rule reads as %q claiming Shapes %v, want %q claiming it", path, plantedName, claims, name)
+		}
+		planted++
+	}
+	if planted < 100 {
+		t.Fatalf("planted into %d rule files, too few to be every rule", planted)
 	}
 }
 
