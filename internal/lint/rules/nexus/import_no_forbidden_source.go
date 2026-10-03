@@ -1,6 +1,8 @@
 package nexus
 
 import (
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -15,12 +17,19 @@ type forbiddenSource struct {
 	Specifier   string
 	Replacement string
 	Message     rule.Message
+
+	// Owners are where the sanctioned wrapper lives, matched as path substrings. The wrapper imports
+	// the forbidden source by design, so a file there is exempt, and reporting it would also have the
+	// fix rewrite the wrapper into an import of itself. A package with no wrapper has no owner.
+	Owners []string
 }
 
 var forbiddenSources = []forbiddenSource{
 	{
 		Specifier:   "next/navigation",
 		Replacement: "@structure/source/router/Navigation",
+		// Navigation spans its router directory: its useRouter hook imports Next's own.
+		Owners: []string{"/source/router/"},
 		Message: rule.Message{
 			Id: "forbiddenNavigationImport",
 			Description: "Importing from 'next/navigation' is not allowed. Use " +
@@ -31,6 +40,8 @@ var forbiddenSources = []forbiddenSource{
 	{
 		Specifier:   "next/link",
 		Replacement: "@structure/source/components/navigation/Link",
+		// A single file, since the components beside it must still use the wrapper.
+		Owners: []string{"/source/components/navigation/Link.tsx"},
 		Message: rule.Message{
 			Id: "forbiddenLinkImport",
 			Description: "Importing from 'next/link' is not allowed. Use " +
@@ -41,6 +52,7 @@ var forbiddenSources = []forbiddenSource{
 	{
 		Specifier:   "next/image",
 		Replacement: "@structure/source/components/images/Image",
+		Owners:      []string{"/source/components/images/Image.tsx"},
 		Message: rule.Message{
 			Id: "forbiddenImageImport",
 			Description: "Importing from 'next/image' is not allowed. Use " +
@@ -87,10 +99,19 @@ var ImportNoForbiddenSource = rule.Rule{
 		// only match the line after itself, so the finding was unreachable by any suppression that
 		// could be written, and it reads as a real finding in every count. Report the node the
 		// original reports.
+		if ctx.SourceFile == nil {
+			return nil
+		}
+		fileName := strings.ReplaceAll(ctx.SourceFile.FileName(), `\`, "/")
 		report := func(specifierNode *ast.Node, source string) {
 			for _, forbidden := range forbiddenSources {
 				if source != forbidden.Specifier {
 					continue
+				}
+				for _, owner := range forbidden.Owners {
+					if strings.Contains(fileName, owner) {
+						return
+					}
 				}
 				ctx.ReportNodeWithFixes(
 					specifierNode,
