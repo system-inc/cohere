@@ -87,7 +87,7 @@ nothing else.
 {"kind":"project","root":"/…/ahraos-macos","package":"AhraOs","elapsedMilliseconds":412,
  "filesInPackage":152,"filesOurs":149,"filesInScope":149,"scopeDescription":"",
  "targets":[{"name":"AhraOsCore","kind":"library","files":14,"languageMode":"6"}],
- "excluded":[{"file":"/…/Generated.swift","reason":"marked // @generated"}]}
+ "excluded":[{"file":"/…/Scratch.swift","reason":"ignored by git"}]}
 ```
 
 - `filesInPackage` is every `.swift` file in a root target. `filesOurs` is the subset that is

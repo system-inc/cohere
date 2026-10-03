@@ -4,9 +4,10 @@ import Foundation
  Which of the package's Swift files this run treats as ours, and why each of the others is not.
 
  A file is ours when a target of the package, or of a local package inside it that is not vendored,
- compiles it, git does not ignore it, and it is not generated. What git ignores is read from the ignore
- files themselves (`IgnoreRules`), with no git process, and it includes untracked files that are not
- ignored. A new file someone is still writing is exactly the one a gate must see, and TypeScript's program
+ compiles it, and git does not ignore it. A generated file is ours too: Kirk's convention (2026-10-03,
+ shared with TypeScript) names it `*.generated.swift` and gives it every rule and the formatter, exempting
+ it only from max-file-lines, by that name. What git ignores is read from the ignore files themselves
+ (`IgnoreRules`), with no git process, and it includes untracked files that are not ignored. A new file someone is still writing is exactly the one a gate must see, and TypeScript's program
  already includes it, because a tsconfig reads the disk rather than the index.
 
  Every file a target compiles and this run does not check is listed with a reason, so the coverage line
@@ -28,9 +29,6 @@ public struct FileSet: Equatable, Sendable {
             self.targetKind = targetKind
         }
     }
-
-    /* The leading bytes searched for a generated-code marker. A marker below this point is not a file header. */
-    static let generatedMarkerWindow = 1024
 
     public var filesInPackage: [URL]
     public var owned: [OwnedFile]
@@ -67,10 +65,6 @@ public struct FileSet: Equatable, Sendable {
                     /* Resolved, as the repository root is: a root reached through a symlink (`/tmp` is `/private/tmp`) would otherwise sit outside the repository and exclude everything. */
                     if let ignoreRules, !ignoreRules.isVisible(source.resolvingSymlinksInPath().path) {
                         excluded.append(.init(file: source.path, reason: "ignored by git"))
-                        continue
-                    }
-                    if try isGenerated(source) {
-                        excluded.append(.init(file: source.path, reason: "marked @generated"))
                         continue
                     }
                     owned.append(OwnedFile(url: source, targetName: target.name, targetKind: kind, packageRoot: member.root))
@@ -120,13 +114,5 @@ public struct FileSet: Equatable, Sendable {
             }
         }
         return false
-    }
-
-    /* A file that declares itself generated in its header: `// @generated`, the marker Apollo and most generators write. */
-    static func isGenerated(_ url: URL) throws -> Bool {
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { handle.closeFile() }
-        let head = handle.readData(ofLength: generatedMarkerWindow)
-        return String(decoding: head, as: UTF8.self).contains("@generated")
     }
 }
