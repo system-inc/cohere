@@ -428,6 +428,16 @@ func isNoRestrictedGlobalsValueReference(node *ast.Node) bool {
 		return false
 	}
 
+	// A declaration's own name introduces it rather than reading it. In a source file the shadow
+	// check declines it anyway, since the symbol is declared right there; in a declaration file it
+	// sees only a declaration file, so Base's photon_rs_bg.d.ts:41 reported the parameter `top` of a
+	// declared function. A shorthand property and a local export specifier are declarations whose
+	// name is also a read, so they stay judged, each resolved to what it reads by the shadow check.
+	if ast.IsDeclarationName(node) && parent.Kind != ast.KindShorthandPropertyAssignment &&
+		parent.Kind != ast.KindExportSpecifier {
+		return false
+	}
+
 	switch parent.Kind {
 	// Upstream's TYPE_NODES.
 	case ast.KindTypeReference, ast.KindTypeQuery, ast.KindQualifiedName:
@@ -475,14 +485,15 @@ func isNoRestrictedGlobalsValueReference(node *ast.Node) bool {
 	}
 	return true
 
-	// TWO arms were written here first and both are deliberately absent, because both are subsumed
-	// by the shadow check at the call site rather than by anything in this function.
+	// TWO arms were written here first and both were left out, as subsumed by the shadow check at the
+	// call site rather than by anything in this function.
 	//
 	// One declined a name being INTRODUCED: a variable, a parameter, a function or class name, an
 	// import or export specifier, a type parameter. One declined a PROPERTY KEY: an object
 	// property, a class field, a method, either accessor, a signature member, an enum member.
 	// Every shape either arm could catch resolves to a symbol whose declaration is in this source
-	// file, so `identifierIsShadowed` already declines it. Two shapes are the exception, and each
+	// file, so `identifierIsShadowed` already declines it. That held only in a source file: in a
+	// declaration file nothing is declared in source, so the declaration-name test above came back. Two shapes are the exception, and each
 	// has its own arm above: a destructuring key resolves to the destructured type's property, and an
 	// imported or export-from name to the other module's export, wherever either lives.
 	//

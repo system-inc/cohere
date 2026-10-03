@@ -616,3 +616,37 @@ func TestNoRestrictedGlobalsSkipsAnotherModulesExportName(t *testing.T) {
 		})
 	}
 }
+
+// TestNoRestrictedGlobalsSkipsDeclarationNamesInADeclarationFile pins a name being introduced.
+//
+// A declaration's own name is never a read, and in a source file the shadow check declines it,
+// since the name's symbol is declared right there. In a declaration file that check sees only a
+// declaration file and declines nothing, so Base's photon_rs_bg.d.ts:41 reported the parameter
+// `top` of a declared function once `top` was restricted. ESLint 10 under @typescript-eslint/parser
+// is clean on each row below, restricting `top`.
+//
+// The firing row is the control: a value read in a declaration file is still a read.
+func TestNoRestrictedGlobalsSkipsDeclarationNamesInADeclarationFile(t *testing.T) {
+	t.Parallel()
+
+	run := func(t *testing.T, source string) rule_testing.Result {
+		t.Helper()
+		return rule_testing.RunTypedFilesWithOptions(t, NoRestrictedGlobals, map[string]string{
+			"photon.d.ts": source,
+		}, "photon.d.ts", decodeNoRestrictedGlobalsOptionsForTest(t, `["top"]`))
+	}
+
+	silent := []struct{ name, source string }{
+		{"photon_rs_bg.d.ts:41, a parameter of a declared function", "export function crop(left: number, top: number): void;\n"},
+		{"a declared constant", "export declare const top: number;\n"},
+		{"an interface member", "export interface Box { top: number }\n"},
+		{"a type query is a type position", "export declare const edge: typeof top;\n"},
+	}
+	for _, testCase := range silent {
+		t.Run(testCase.name, func(t *testing.T) {
+			rule_testing.ExpectClean(t, run(t, testCase.source))
+		})
+	}
+
+	rule_testing.ExpectFindings(t, run(t, "export declare const edge: number;\nexport default top;\n"), "defaultMessage")
+}
