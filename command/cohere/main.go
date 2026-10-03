@@ -510,6 +510,10 @@ func run() error {
 		// The run cache's second layer, attached once the config is known and before anything walks.
 		attachFindingsCache(graph, location)
 	}
+	// A run the run cache does not record still replays and records the types section. See typesRecord.
+	if runTypes {
+		attachTypesCache(graph, location)
+	}
 
 	// The types phase's checking starts here, alongside the fix phase's walk, rather than after it. See
 	// startTypeCheck. Its result is used only if the walk leaves this graph in place.

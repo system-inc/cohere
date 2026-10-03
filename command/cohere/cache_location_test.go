@@ -83,7 +83,11 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(t *testing.T) {
 	}
 
 	// Each shape of --no-cache leaves both caches exactly as they were. A writing types run makes the
-	// build info first, so there is one to leave alone.
+	// build info first, so there is one to leave alone. Without the table, since its types section would let
+	// that run replay every file and never open the build info; the run writes a new table too.
+	if err := os.Remove(table); err != nil {
+		t.Fatal(err)
+	}
 	run(first, "--types")
 	// Then a new file, so the build info is behind the tree: an incremental check would rewrite it, and
 	// only a run that does not use it leaves it alone.
@@ -103,11 +107,13 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(t *testing.T) {
 	}
 	cold := regexp.MustCompile(`(?m)^  cache: off, by --no-cache.*$`)
 	durations := regexp.MustCompile(`\d+(\.\d+)?(ms|s|µs)\b`)
+	// How a cached run's types line was paid for, which a cold run cannot share.
+	replayedClause := regexp.MustCompile(`; \d+ of \d+ files' semantic diagnostics replayed from cache`)
 	findings := func(output string) string {
 		kept := []string{}
 		for _, line := range strings.Split(output, "\n") {
 			if strings.Contains(line, " - ") || strings.HasPrefix(line, "lint: ") || strings.HasPrefix(line, "types: ") {
-				kept = append(kept, durations.ReplaceAllString(line, "T"))
+				kept = append(kept, replayedClause.ReplaceAllString(durations.ReplaceAllString(line, "T"), ""))
 			}
 		}
 		return strings.Join(kept, "\n")

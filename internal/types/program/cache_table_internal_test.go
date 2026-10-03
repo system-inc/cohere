@@ -99,6 +99,7 @@ var pinnedCacheTableShapes = map[int]string{
 	3: "c01be7eecead0ab5c95964ed45cb149bcfd0883b2130a21e39d8d25e3c1d3622",
 	4: "f215adaa07ccb0ee6926835db75c04bc8d9b001003eefac84388b95e1f85e9e9",
 	5: "850508d7af486cc0b05eab3dd93ac299e60b678a00ff30e8702f98210505949f",
+	6: "cc48115e6624c13b4d674cf5c0d4c47da536f02516afdd5575344321ce77dc2b",
 }
 
 func TestCacheTableShapeIsPinnedToItsVersion(t *testing.T) {

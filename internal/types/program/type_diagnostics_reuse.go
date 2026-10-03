@@ -158,11 +158,12 @@ func (p TypeDiagnosticParts) All() []*ast.Diagnostic {
 
 // CheckReusing checks the project files whose shape fingerprint moved since the section was recorded and
 // replays the rest. It reports false when it cannot, and the caller runs the full check and hands its parts
-// to RecordFull: no section, a section from a run that saw global diagnostics, no shapes this run, or so
+// to RecordFull: no section, a section under other compiler options or from a run that saw global
+// diagnostics, no shapes this run, or so
 // much changed that the full check, which spreads every checker over every file, is the faster way.
 func (g *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (TypeDiagnosticParts, bool) {
 	stored := reuse.stored
-	if stored == nil || stored.Version != typesSectionVersion || !stored.GlobalsClean || g.Shapes == nil {
+	if stored == nil || stored.Version != typesSectionVersion || stored.Key != reuse.key || !stored.GlobalsClean || g.Shapes == nil {
 		return TypeDiagnosticParts{}, false
 	}
 	syntactic := g.Program.GetSyntacticDiagnostics(ctx, nil)
@@ -207,7 +208,7 @@ func (g *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (
 	reuse.mutex.Lock()
 	reuse.replayed = replayedFiles
 	if ctx.Err() == nil {
-		reuse.recorded = &TypesSection{Version: typesSectionVersion, Entries: entries}
+		reuse.recorded = &TypesSection{Version: typesSectionVersion, Key: reuse.key, Entries: entries}
 	}
 	reuse.mutex.Unlock()
 	return TypeDiagnosticParts{Bind: bind, Semantic: compiler.SortAndDeduplicateDiagnostics(semantic)}, true
@@ -230,7 +231,7 @@ func (g *Graph) RecordFull(ctx context.Context, reuse *TypeDiagnosticsReuse, par
 		}
 	}
 	reuse.mutex.Lock()
-	reuse.recorded = &TypesSection{Version: typesSectionVersion, Entries: entries}
+	reuse.recorded = &TypesSection{Version: typesSectionVersion, Key: reuse.key, Entries: entries}
 	reuse.mutex.Unlock()
 }
 

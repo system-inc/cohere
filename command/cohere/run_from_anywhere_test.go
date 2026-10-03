@@ -137,7 +137,12 @@ func TestCohereRunsFromAnywhere(t *testing.T) {
 			t.Fatalf("a --no-fix run created the build info (stat: %v)", err)
 		}
 
-		// The control: without --no-fix the same run writes it, so the absence above is the flag.
+		// The control: without --no-fix the same run writes it, so the absence above is the flag. The run above
+		// recorded the types section, which this one would replay without opening the build info at all, so
+		// the table goes first.
+		if err := os.Remove(cacheTablePath(root)); err != nil {
+			t.Fatal(err)
+		}
 		if output, code := runCohere(t, binary, root, "--types"); code != 0 {
 			t.Fatalf("exit %d:\n%s", code, output)
 		}

@@ -83,6 +83,61 @@ func TestTypeDiagnosticsReplayOnlyWhatAnEditCannotReach(t *testing.T) {
 	}
 }
 
+// A run the run cache does not record, scoped and flagged the way the editor's save is, replays the types
+// section too, and after an edit it still reports what a cold run of the same scope does (#hfv0ae3). Before,
+// such a run read and rewrote the incremental build info whatever its scope.
+func TestTypeDiagnosticsReplayOnAScopedRun(t *testing.T) {
+	binary := buildCohere(t)
+	root := t.TempDir()
+	write := func(name string, contents string) {
+		t.Helper()
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
+	write("CohereSettings.json", `{"rules":{"no-debugger":"error"}}`)
+	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
+	write(".gitignore", ".cache/\nnode_modules/\n")
+	const original = "export function value(): number {\n    return 1;\n}\n"
+	write("source/a.ts", original)
+	write("source/b.ts", "import { value } from './a';\nexport const b: number = value();\n")
+	for index := range 5 {
+		write(fmt.Sprintf("source/c%d.ts", index), fmt.Sprintf("export const c%d: number = %d;\n", index, index))
+	}
+
+	typeError := regexp.MustCompile(`(?m)^\S+:\d+:\d+ - error TS\d+: .*$`)
+	replayed := regexp.MustCompile(`files' semantic diagnostics replayed from cache`)
+	scoped := []string{"--types", "source/b.ts"}
+	runCohere(t, binary, root, scoped...)
+
+	for _, step := range []struct {
+		name       string
+		aTS        string
+		wantErrors int
+	}{
+		{"a body edit", "export function value(): number {\n    return 2;\n}\n", 0},
+		{"an export edit the scoped file cannot take", "export function value(): string {\n    return 'two';\n}\n", 1},
+		{"the export edit undone", original, 0},
+	} {
+		write("source/a.ts", step.aTS)
+		warm, _ := runCohere(t, binary, root, scoped...)
+		cold, _ := runCohere(t, binary, root, append([]string{"--no-cache"}, scoped...)...)
+		warmErrors, coldErrors := typeError.FindAllString(warm, -1), typeError.FindAllString(cold, -1)
+		if strings.Join(warmErrors, "\n") != strings.Join(coldErrors, "\n") || len(coldErrors) != step.wantErrors {
+			t.Fatalf("%s: warm reports %d type errors and cold %d, want %d\n--- warm\n%s\n--- cold\n%s",
+				step.name, len(warmErrors), len(coldErrors), step.wantErrors, warm, cold)
+		}
+		if !replayed.MatchString(warm) {
+			t.Fatalf("%s: the scoped run replayed no file's semantic diagnostics, so it proves nothing about replaying:\n%s", step.name, warm)
+		}
+	}
+}
+
 // A file's semantic diagnostics depend on the compiler options as much as on its text, and no shape
 // fingerprint sees an option. So turning on strict, with no source file touched, must not replay the
 // diagnostics a lax run recorded: the implicit any it now reports would be replayed as clean (#hfv0ae3).

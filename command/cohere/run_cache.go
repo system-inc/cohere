@@ -399,6 +399,13 @@ func finishRunCache(exitCode int) {
 		}
 		session.write(recorded)
 		release()
+	} else if record := pendingTypes; record != nil {
+		// A run nothing records still leaves the types section for the next, after its caller has the answer.
+		pendingTypes = nil
+		release := holdTableLock(record.tablePath)
+		sendVerdict(exitCode)
+		record.write()
+		release()
 	}
 	exitProcess(exitCode)
 }
@@ -640,16 +647,78 @@ func attachFindingsCache(graph *program.Graph, location projectLocation) {
 		session.shapes = shapes
 	}
 	graph.FindingsReuse = session.findings
-	session.types = program.NewTypeDiagnosticsReuse(session.table.Types)
+	if typesKey, err := typesCacheKey(graph, location); err == nil {
+		session.types = program.NewTypeDiagnosticsReuse(session.table.Types, typesKey)
+	}
 }
 
-// activeTypesReuse is the types section a check in this run reads and records, nil when the run is not
-// recorded or never reached a walk.
+// activeTypesReuse is the types section a check in this run reads and records, nil when the cache is off
+// or the run never reached a check.
 func activeTypesReuse() *program.TypeDiagnosticsReuse {
-	if activeRunCache == nil {
-		return nil
+	if activeRunCache != nil {
+		return activeRunCache.types
 	}
-	return activeRunCache.types
+	if pendingTypes != nil {
+		return pendingTypes.reuse
+	}
+	return nil
+}
+
+// pendingTypes is the types section of a run the run cache does not record, nil for every other run.
+var pendingTypes *typesRecord
+
+// typesRecord is the types section's own reading and writing, for a run with no recording to carry it: any
+// flag, any named path, the editor's save of one file (#hfv0ae3). Those runs paid the full incremental
+// session, about 180ms reading the build info and 150ms rewriting it, whether they checked 84 files or
+// 3,889. The section is keyed per file on the shape fingerprint and on the compiler options, never on the
+// arguments, so a scoped run may replay what a bare run recorded and the other way round.
+type typesRecord struct {
+	tablePath string
+	reuse     *program.TypeDiagnosticsReuse
+
+	// shapes is every project file's shape this run, kept for the next when computedShapes says any was
+	// computed rather than carried from the table.
+	shapes         map[string]program.SignatureEntry
+	computedShapes int
+}
+
+// attachTypesCache gives a run the run cache does not record the types section, and the shapes it is keyed
+// on. A recorded run already has both from attachFindingsCache.
+func attachTypesCache(graph *program.Graph, location projectLocation) {
+	if cacheOff || activeRunCache != nil || graph == nil {
+		return
+	}
+	typesKey, err := typesCacheKey(graph, location)
+	if err != nil {
+		return
+	}
+	prepareCacheDirectory(location.Root)
+	tablePath := cacheTablePath(location.Root)
+	waitForTableWriter(tablePath, tableWriterWait)
+	table, _ := program.ReadCacheTable(tablePath, cacheTableIdentity())
+	record := &typesRecord{tablePath: tablePath, reuse: program.NewTypeDiagnosticsReuse(table.Types, typesKey)}
+	record.shapes, record.computedShapes = graph.Signatures(context.Background(), graph.SeedSignatures(table.Signatures))
+	graph.Shapes = record.shapes
+	pendingTypes = record
+}
+
+// write puts the section, and the shapes when any was computed, into the table as it is on disk now, and
+// writes nothing when neither moved. The caller holds the table's lock.
+func (record *typesRecord) write() {
+	if record.reuse.Unchanged() && record.computedShapes == 0 {
+		return
+	}
+	identity := cacheTableIdentity()
+	table, _ := program.ReadCacheTable(record.tablePath, identity)
+	if recorded := record.reuse.Recorded(); recorded != nil {
+		table.Types = recorded
+	}
+	if record.computedShapes > 0 {
+		table.Signatures = record.shapes
+	}
+	if err := program.WriteCacheTable(record.tablePath, table, identity); err != nil {
+		cacheNote(record.tablePath, fmt.Sprintf("the cache table could not be written: %v", firstLine(err.Error())))
+	}
 }
 
 // anyRuleKeyedOnShapes reports whether any rule declares rule.TypeReachShapes.
@@ -670,15 +739,6 @@ func anyRuleKeyedOnShapes(rules []rule.Rule) bool {
 // parse. Rule options come from the lint config and the root, both already here.
 func findingsCacheKey(graph *program.Graph, location projectLocation) ([sha256.Size]byte, error) {
 	facts := []string{}
-	fileFact := func(label string, path string) error {
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		sum := sha256.Sum256(contents)
-		facts = append(facts, fmt.Sprintf("%s %s=%x", label, path, sum))
-		return nil
-	}
 	// Every file in the lint config's extends chain, as the tsconfig's chain is below: a base edited
 	// alone changes which rules run and with what options.
 	lintConfigFiles, err := configuration.SourcesOf(location.LintConfigFileName)
@@ -693,16 +753,11 @@ func findingsCacheKey(graph *program.Graph, location projectLocation) ([sha256.S
 		}
 		facts = append(facts, fmt.Sprintf("lint-config %s=%x", lintConfigFile, sha256.Sum256(contents)))
 	}
-	if err := fileFact("tsconfig", location.ConfigFileName); err != nil {
+	compilerFacts, err := compilerOptionsFacts(graph, location)
+	if err != nil {
 		return [sha256.Size]byte{}, err
 	}
-	if graph.Config != nil {
-		for _, extended := range graph.Config.ExtendedSourceFiles() {
-			if err := fileFact("extends", extended); err != nil {
-				return [sha256.Size]byte{}, err
-			}
-		}
-	}
+	facts = append(facts, compilerFacts...)
 	names := make([]string, 0, len(registry.All()))
 	for _, registered := range registry.All() {
 		names = append(names, registered.Name)
@@ -714,4 +769,44 @@ func findingsCacheKey(graph *program.Graph, location projectLocation) ([sha256.S
 		return [sha256.Size]byte{}, err
 	}
 	return sha256.Sum256([]byte(key)), nil
+}
+
+// typesCacheKey covers what a file's semantic diagnostics depend on that no shape fingerprint sees: the
+// binary, the project root, and the compiler options, as the bytes of the tsconfig and every file it extends.
+// The lint config and the rules are left out, since the compiler reads neither.
+func typesCacheKey(graph *program.Graph, location projectLocation) ([sha256.Size]byte, error) {
+	facts, err := compilerOptionsFacts(graph, location)
+	if err != nil {
+		return [sha256.Size]byte{}, err
+	}
+	key, err := program.RunCacheKey(nil, location.Root, facts...)
+	if err != nil {
+		return [sha256.Size]byte{}, err
+	}
+	return sha256.Sum256([]byte(key)), nil
+}
+
+// compilerOptionsFacts is the tsconfig and every file in its extends chain, by path and bytes. It decides how
+// each file parses, which a cacheable rule walks, and how each checks, which the types section replays.
+func compilerOptionsFacts(graph *program.Graph, location projectLocation) ([]string, error) {
+	facts := []string{}
+	fileFact := func(label string, path string) error {
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		facts = append(facts, fmt.Sprintf("%s %s=%x", label, path, sha256.Sum256(contents)))
+		return nil
+	}
+	if err := fileFact("tsconfig", location.ConfigFileName); err != nil {
+		return nil, err
+	}
+	if graph.Config != nil {
+		for _, extended := range graph.Config.ExtendedSourceFiles() {
+			if err := fileFact("extends", extended); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return facts, nil
 }
