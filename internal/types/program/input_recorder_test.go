@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -57,7 +58,7 @@ func TestInputRecorderRecordsAFileProbedAsADirectoryAsPresent(t *testing.T) {
 
 	// And the whole recording replays as a hit on the untouched tree, which is the property all of
 	// this serves.
-	cache, err := program.RecordRunCache("k", present, nil, absent, nil, 0)
+	cache, err := program.RecordRunCache("k", present, nil, absent, nil, 0, time.Time{})
 	if err != nil {
 		t.Fatalf("record: %v", err)
 	}

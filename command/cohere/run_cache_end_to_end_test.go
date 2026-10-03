@@ -182,6 +182,21 @@ func TestRunCacheEndToEnd(t *testing.T) {
 		{"a source file edited to add a finding", true, nil,
 			func() { write("source/a.ts", "export const a: number = \"x\";\n") },
 			func() { write("source/a.ts", "export const a: number = 1;\n") }},
+		// The same size and the old modification time, as cp -p, rsync -t and touch -r leave a file: only
+		// the change time and the bytes moved.
+		{"a same-size edit with its modification time restored", true, nil,
+			func() {
+				information, err := os.Stat(filepath.Join(root, "source/a.ts"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				time.Sleep(10 * time.Millisecond)
+				write("source/a.ts", "export const a: string = 1;\n")
+				if err := os.Chtimes(filepath.Join(root, "source/a.ts"), information.ModTime(), information.ModTime()); err != nil {
+					t.Fatal(err)
+				}
+			},
+			func() { write("source/a.ts", "export const a: number = 1;\n") }},
 		{"a file added at the top level", true, nil,
 			func() { write("source/z.ts", "export const z: number = \"x\";\n") },
 			func() { remove("source/z.ts") }},

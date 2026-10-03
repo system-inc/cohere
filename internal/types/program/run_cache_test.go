@@ -67,7 +67,7 @@ func writeFile(t *testing.T, path string, contents string) {
 // record captures the tree as a run that printed one finding and exited 1.
 func (tree *runCacheTree) record(t *testing.T) *program.RunCache {
 	t.Helper()
-	cache, err := program.RecordRunCache(tree.key, tree.files, nil, tree.absent, []byte("a.ts:1 finding\n"), 1)
+	cache, err := program.RecordRunCache(tree.key, tree.files, nil, tree.absent, []byte("a.ts:1 finding\n"), 1, time.Time{})
 	if err != nil {
 		t.Fatalf("record: %v", err)
 	}
@@ -310,7 +310,7 @@ func TestRunCacheReplaysOutputAndExitCodeThroughDisk(t *testing.T) {
 func TestRunCacheRecordsADirectoryAmongTheFilesAsADirectory(t *testing.T) {
 	tree := newRunCacheTree(t)
 	withDirectory := append(append([]string(nil), tree.files...), tree.subdir, tree.root)
-	cache, err := program.RecordRunCache(tree.key, withDirectory, nil, tree.absent, []byte("x"), 0)
+	cache, err := program.RecordRunCache(tree.key, withDirectory, nil, tree.absent, []byte("x"), 0, time.Time{})
 	if err != nil {
 		t.Fatalf("record: %v", err)
 	}
@@ -378,7 +378,7 @@ func TestRunCacheRecordsInParallelInTheSerialOrder(t *testing.T) {
 		shuffled[index], shuffled[other] = shuffled[other], shuffled[index]
 	}
 	absent := []string{filepath.Join(root, "missing.ts")}
-	cache, err := program.RecordRunCache("key", shuffled, nil, absent, nil, 0)
+	cache, err := program.RecordRunCache("key", shuffled, nil, absent, nil, 0, time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -413,7 +413,7 @@ func TestRunCacheRecordsInParallelInTheSerialOrder(t *testing.T) {
 	if err := os.Remove(files[len(files)/2]); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := program.RecordRunCache("key", shuffled, nil, absent, nil, 0); err == nil {
+	if _, err := program.RecordRunCache("key", shuffled, nil, absent, nil, 0, time.Time{}); err == nil {
 		t.Error("a file that vanished before the record was recorded anyway")
 	}
 }

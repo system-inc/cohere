@@ -65,6 +65,10 @@ type runCacheSession struct {
 	key      string
 	recorder *program.InputRecorder
 
+	// readSince is when the run began reading its inputs. An input changed after it keeps the run from
+	// being recorded.
+	readSince time.Time
+
 	// declared is set once the build succeeds and the inputs are known. A session that never declares
 	// is never recorded.
 	declared   bool
@@ -210,6 +214,9 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		tableSignature: tableSignature,
 		key:            key,
 		recorder:       program.NewInputRecorder(),
+		// Taken here, after the cache directory exists and before the build reads anything, so an input
+		// changed after it is one the run may have read before the change. See program.RecordRunCache.
+		readSince: time.Now(),
 	}
 	if err := session.stdout.start(&os.Stdout); err != nil {
 		return nil
@@ -397,7 +404,7 @@ func (session *runCacheSession) record(exitCode int) *program.RunCache {
 	present, absent := session.recorder.Inputs()
 	files := append(present, session.extraFiles...)
 	cache, err := program.RecordRunCache(session.key, files, nil, absent,
-		session.stdout.buffer.Bytes(), exitCode)
+		session.stdout.buffer.Bytes(), exitCode, session.readSince)
 	if err != nil {
 		// Not recording is always safe. Said on stderr because a cache that silently never records is
 		// a saving that quietly never appears.

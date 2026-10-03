@@ -98,11 +98,13 @@ type CacheTableIdentity struct {
 // half is enforced by TestCacheTableShapeIsPinnedToItsVersion; the meaning half is the reason each
 // section also keeps its own version.
 //
+// 4: run-cache inputs carry their change time and inode.
+//
 // 3: findings entries carry design-system rules and their fingerprint, and the findings section carries the
 // design system's key.
 //
 // 2: findings entries carry shape-keyed rules and their fingerprint, and the table holds Signatures.
-const cacheTableVersion = 3
+const cacheTableVersion = 4
 
 // cacheTableMagic opens every table, so a file that is not one is refused on its first field.
 const cacheTableMagic = "cohere cache table"

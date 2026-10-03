@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"sort"
 	"sync"
+	"time"
 )
 
 // The run cache: replay a whole run's output without building anything, when every input it
@@ -93,6 +94,13 @@ type RunCacheInput struct {
 
 	Size                int64
 	ModifiedNanoseconds int64
+
+	// ChangedNanoseconds and Inode catch what the modification time cannot: different bytes of the same
+	// size under a restored modification time, as cp -p, rsync -t and touch -r leave a file. Nothing in
+	// userland can set a change time, and a file replaced by a rename has a new inode. Zero where the
+	// platform's stat does not give them.
+	ChangedNanoseconds int64
+	Inode              uint64
 }
 
 // runCacheVersion is bumped whenever the manifest's meaning changes, not only its shape.
@@ -103,7 +111,10 @@ type RunCacheInput struct {
 //
 // 3: Output carries a tag on lines a replay prints with where they came from, the fix line among them.
 // A version-2 manifest has none, and would replay "fix: ..." as though the fix phase had just run.
-const runCacheVersion = 3
+//
+// 4: Inputs carry their change time and inode. A version-3 input has neither, and checked against a
+// stat that does, every one would read as changed.
+const runCacheVersion = 4
 
 // ErrRunCacheMiss is the one answer a check gives when it cannot prove a hit. Callers treat every
 // error from Check as a miss and run normally; this exists so a test can tell a clean miss
@@ -164,7 +175,12 @@ func RunCacheKey(arguments []string, workingDirectory string, facts ...string) (
 // The directory holding each file is added here too, so a caller cannot forget them and quietly ship
 // a cache blind to added files. extraDirectories adds more, and absent lists paths the run looked for
 // and did not find, which must stay absent for a hit.
-func RecordRunCache(key string, files []string, extraDirectories []string, absent []string, output []byte, exitCode int) (*RunCache, error) {
+//
+// readSince is when the run began reading its inputs. An input changed after it may have been read before
+// the change, so the stat taken here would sign the new bytes against a verdict computed from the old ones,
+// and the next run would replay that verdict over a tree it does not describe: a file saved in an editor
+// while cohere runs is exactly this. Such a run is not recorded. The zero time checks nothing.
+func RecordRunCache(key string, files []string, extraDirectories []string, absent []string, output []byte, exitCode int, readSince time.Time) (*RunCache, error) {
 	cache := &RunCache{Version: runCacheVersion, Key: key, Output: output, ExitCode: exitCode}
 
 	// One entry per path. A path can arrive as a file read, a directory listed, and the parent of
@@ -220,6 +236,26 @@ func RecordRunCache(key string, files []string, extraDirectories []string, absen
 			return nil, err
 		}
 	}
+	if !readSince.IsZero() {
+		// Files, and the directories holding them, where a file added mid-run beside the ones read would be
+		// missed. A directory only probed on the way to a node_modules or a package.json is left out: such
+		// ancestors sit above the project, other processes move them all the time (a temporary directory
+		// never stops), and checking them would keep most runs from ever being recorded.
+		holdsARead := map[string]bool{}
+		for _, input := range cache.Inputs {
+			if !input.Directory {
+				holdsARead[filepath.Dir(input.Path)] = true
+			}
+		}
+		for _, input := range cache.Inputs {
+			if input.Directory && !holdsARead[input.Path] {
+				continue
+			}
+			if max(input.ModifiedNanoseconds, input.ChangedNanoseconds) > readSince.UnixNano() {
+				return nil, fmt.Errorf("%s changed after the run began reading, so what the run saw of it is not known", input.Path)
+			}
+		}
+	}
 
 	for _, path := range absent {
 		if seen[path] {
@@ -242,12 +278,15 @@ func signatureOf(path string) (RunCacheInput, error) {
 	if err != nil {
 		return RunCacheInput{}, fmt.Errorf("recording %s: %w", path, err)
 	}
+	changed, inode := changeTimeAndInode(information)
 	return RunCacheInput{
 		Path:                path,
 		Directory:           information.IsDir(),
 		Exists:              true,
 		Size:                information.Size(),
 		ModifiedNanoseconds: information.ModTime().UnixNano(),
+		ChangedNanoseconds:  changed,
+		Inode:               inode,
 	}, nil
 }
 
@@ -324,6 +363,9 @@ func (input RunCacheInput) stillMatches() error {
 	}
 	if information.ModTime().UnixNano() != input.ModifiedNanoseconds {
 		return fmt.Errorf("%w: %s was modified", ErrRunCacheMiss, input.Path)
+	}
+	if changed, inode := changeTimeAndInode(information); changed != input.ChangedNanoseconds || inode != input.Inode {
+		return fmt.Errorf("%w: %s was changed or replaced under its modification time", ErrRunCacheMiss, input.Path)
 	}
 	return nil
 }

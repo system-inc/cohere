@@ -1,6 +1,9 @@
 package program
 
-import "syscall"
+import (
+	"os"
+	"syscall"
+)
 
 // statIdentity is what stat says identifies a file's current bytes, following symlinks as a read does.
 func statIdentity(path string) (fileIdentity, bool) {
@@ -15,4 +18,13 @@ func statIdentity(path string) (fileIdentity, bool) {
 		inode:               status.Ino,
 		device:              uint64(status.Dev),
 	}, true
+}
+
+// changeTimeAndInode reads a stat's change time and inode, which os.FileInfo does not carry itself.
+func changeTimeAndInode(information os.FileInfo) (changedNanoseconds int64, inode uint64) {
+	status, ok := information.Sys().(*syscall.Stat_t)
+	if !ok {
+		return 0, 0
+	}
+	return status.Ctim.Nano(), status.Ino
 }
