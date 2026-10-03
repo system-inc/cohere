@@ -6,14 +6,14 @@ import Testing
 @testable import CohereSwift
 
 /*
- `no-default-for-owned-enum` both ways. The unit cases parse a source string and hand the rule symbols built by
+ `correctness-no-default-for-owned-enum` both ways. The unit cases parse a source string and hand the rule symbols built by
  position, one occurrence at every name token the case gives a symbol for, so each case says what the compiler
  would have resolved. The symbols are the ones a probe package's index recorded. There is no SwiftLint rule to
  take examples from, so the cases are the shapes the rule reads and every miss its header names. The end-to-end
  case runs a real package, so the symbols come from the index the build wrote.
  */
 @Suite(.serialized)
-struct NoDefaultForOwnedEnumTests {
+struct CorrectnessNoDefaultForOwnedEnumTests {
     static let running = "s:7Control6StatusO7runningyA2CmF"
     static let failed = "s:7Control6StatusO6failedyACSScACmF"
     static let done = "s:7Control6StatusO4doneyA2CmF"
@@ -56,7 +56,7 @@ struct NoDefaultForOwnedEnumTests {
                 occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: patternOperator, name: "~=(_:_:)", isReference: true, isImplicit: true))
             }
         }
-        return NoDefaultForOwnedEnum().findings(in: file, symbols: FileSymbols(occurrences, ownedModules: ownedModules)).map { "\($0.line):\($0.column) \($0.message)" }
+        return CorrectnessNoDefaultForOwnedEnum().findings(in: file, symbols: FileSymbols(occurrences, ownedModules: ownedModules)).map { "\($0.line):\($0.column) \($0.message)" }
     }
 
     static let statusSymbols = ["running": running, "failed": failed, "done": done, "preferred": preferred]
@@ -438,18 +438,18 @@ struct NoDefaultForOwnedEnumTests {
         ("s:7Control0A5StateO2onyA2CmF", "s:7Control0A5StateO", "ControlState"),
     ])
     func anElementsSymbolReadsAsItsEnum(element: String, enumSymbol: String, enumName: String) {
-        #expect(NoDefaultForOwnedEnum.element(element) == NoDefaultForOwnedEnum.Element(enumSymbol: enumSymbol, enumName: enumName))
+        #expect(CorrectnessNoDefaultForOwnedEnum.element(element) == CorrectnessNoDefaultForOwnedEnum.Element(enumSymbol: enumSymbol, enumName: enumName))
     }
 
     @Test(arguments: ["s:7Control6StatusO", "s:7Control6StatusO9preferredACvpZ", "s:7Control6StatusO4makeACyFZ", "s:7Control5PointV4zeroACvpZ", "s:Sq4someyxSgxcABmlF", "s:7Control6StatusO007running", "c:@M@Control@E@Bridged"])
     func otherSymbolsDoNotReadAsAnElement(symbol: String) {
-        #expect(NoDefaultForOwnedEnum.element(symbol) == nil)
+        #expect(CorrectnessNoDefaultForOwnedEnum.element(symbol) == nil)
     }
 
     @Test func aFileWithNoDefaultDoesNotApply() {
         let source = "func describe(status: Status) {\n    switch status {\n    case .running: break\n    }\n}\n"
         let file = ParsedFile(url: URL(fileURLWithPath: "/Plain.swift"), targetName: "Control", targetKind: "regular", source: source, tree: Parser.parse(source: source), nodeCount: 0)
-        #expect(!NoDefaultForOwnedEnum().applies(to: file))
+        #expect(!CorrectnessNoDefaultForOwnedEnum().applies(to: file))
     }
 
     /*
@@ -544,13 +544,13 @@ struct NoDefaultForOwnedEnumTests {
         _ = try await Pipeline(options: options, writer: ContractWriter { _ in }, workingDirectory: root).run()
         let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: ProcessRunner())
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
-        let candidates = parsed.files.filter { NoDefaultForOwnedEnum().applies(to: $0) }
+        let candidates = parsed.files.filter { CorrectnessNoDefaultForOwnedEnum().applies(to: $0) }
         var provider = SymbolProvider(scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root), runner: ProcessRunner())
         provider.ownedModules = Pipeline.ownedModules(of: package)
         let symbols = provider.symbols(for: candidates)
         #expect(symbols.fromIndex == 1, "the build's index should describe the file: \(symbols.unavailable)")
         let found = candidates.flatMap { file in
-            NoDefaultForOwnedEnum().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.line):\($0.column)" }
+            CorrectnessNoDefaultForOwnedEnum().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.line):\($0.column)" }
         }
         #expect(found == ["16:5", "61:9", "66:9"], "expected the defaults over Status that decide, and not its projections or the look-alikes: \(found)")
     }

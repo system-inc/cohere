@@ -35,8 +35,8 @@ import Foundation
  directory named `Utils` is a utils folder like any other. A file whose package root is unknown is not
  judged at all, rather than judged against a guess.
  */
-public struct NoUtilsFolder: FileRule {
-    public let name = "cohere-swift/no-utils-folder"
+public struct ConsistencyNoUtilsFolder: FileRule {
+    public let name = "cohere-swift/consistency-no-utils-folder"
 
     public init() {}
 

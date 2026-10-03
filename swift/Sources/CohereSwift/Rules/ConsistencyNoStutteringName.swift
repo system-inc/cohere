@@ -36,7 +36,7 @@ import SwiftSyntax
    leave those alone, and the price is a miss, never a wrong finding.
  - an `override`'s single-name parameter, which is the superclass's argument label. A parameter with two names
    is judged by its second, which is always ours. A non-overriding single-name parameter is judged, as
-   `no-abbreviated-identifier` judges it, because the repair keeps the label and adds a name
+   `consistency-no-abbreviated-identifier` judges it, because the repair keeps the label and adds a name
    (`result outcome: Outcome`), so a protocol's label survives the rename.
  - `if let value`, `guard let value` and a `[value]` capture with no initializer, which re-bind the outer
    `value` under its own name: resolution continues outward to the declaration that chose the word.
@@ -49,8 +49,8 @@ import SwiftSyntax
  access `outcome['outcome']` has no Swift spelling to carry over; a subscript with a string key is a lookup,
  not a member.
  */
-public struct NoStutteringName: FileRule {
-    public let name = "cohere-swift/no-stuttering-name"
+public struct ConsistencyNoStutteringName: FileRule {
+    public let name = "cohere-swift/consistency-no-stuttering-name"
 
     /*
      The words that count as saying nothing when they stutter: the Go rule's `defaultGenericNames`, kept short
@@ -90,8 +90,8 @@ public struct NoStutteringName: FileRule {
                 case .identifier = base.baseName.tokenKind,
                 case .identifier = node.declName.baseName.tokenKind
             else { return .visitChildren }
-            let word = NoStutteringName.spelling(base.baseName)
-            guard word == NoStutteringName.spelling(node.declName.baseName), NoStutteringName.genericNames.contains(word) else {
+            let word = ConsistencyNoStutteringName.spelling(base.baseName)
+            guard word == ConsistencyNoStutteringName.spelling(node.declName.baseName), ConsistencyNoStutteringName.genericNames.contains(word) else {
                 return .visitChildren
             }
             if Resolution.isChosenHere(word, from: Syntax(base)) {
@@ -166,7 +166,7 @@ public struct NoStutteringName: FileRule {
                 return parameters(subscriptDeclaration.parameterClause.parameters, declare: word, overriding: isOverride(subscriptDeclaration.modifiers))
             }
             if let accessor = scope.as(AccessorDeclSyntax.self), child.id == accessor.body?.id {
-                return accessor.parameters.map { NoStutteringName.spelling($0.name) == word } == true ? .chosenHere : .notDeclared
+                return accessor.parameters.map { ConsistencyNoStutteringName.spelling($0.name) == word } == true ? .chosenHere : .notDeclared
             }
             if let conditions = scope.as(ConditionElementListSyntax.self) {
                 /* A condition sees the bindings of the conditions before it. */
@@ -229,14 +229,14 @@ public struct NoStutteringName: FileRule {
         /* Closure parameters, and captures that give a new name; `[word]` alone re-binds the outer `word`. */
         static func closureDeclares(_ closure: ClosureExprSyntax, _ word: String) -> Verdict {
             guard let signature = closure.signature else { return .notDeclared }
-            if let captures = signature.capture?.items, captures.contains(where: { NoStutteringName.spelling($0.name) == word && $0.initializer != nil }) {
+            if let captures = signature.capture?.items, captures.contains(where: { ConsistencyNoStutteringName.spelling($0.name) == word && $0.initializer != nil }) {
                 return .chosenHere
             }
             switch signature.parameterClause {
             case .simpleInput(let shorthand):
-                return shorthand.contains { NoStutteringName.spelling($0.name) == word } ? .chosenHere : .notDeclared
+                return shorthand.contains { ConsistencyNoStutteringName.spelling($0.name) == word } ? .chosenHere : .notDeclared
             case .parameterClause(let clause):
-                return clause.parameters.contains { NoStutteringName.spelling($0.secondName ?? $0.firstName) == word } ? .chosenHere : .notDeclared
+                return clause.parameters.contains { ConsistencyNoStutteringName.spelling($0.secondName ?? $0.firstName) == word } ? .chosenHere : .notDeclared
             case nil:
                 return .notDeclared
             }
@@ -249,10 +249,10 @@ public struct NoStutteringName: FileRule {
         static func parameters(_ list: FunctionParameterListSyntax, declare word: String, overriding: Bool) -> Verdict {
             for parameter in list {
                 if let secondName = parameter.secondName {
-                    if NoStutteringName.spelling(secondName) == word {
+                    if ConsistencyNoStutteringName.spelling(secondName) == word {
                         return .chosenHere
                     }
-                } else if NoStutteringName.spelling(parameter.firstName) == word {
+                } else if ConsistencyNoStutteringName.spelling(parameter.firstName) == word {
                     return overriding ? .dictated : .chosenHere
                 }
             }
@@ -266,7 +266,7 @@ public struct NoStutteringName: FileRule {
         /* Whether a pattern introduces the word as a name: any identifier pattern inside it, outside a closure's own scope. */
         static func binds(_ pattern: Syntax, _ word: String) -> Bool {
             if let identifier = pattern.as(IdentifierPatternSyntax.self) {
-                return NoStutteringName.spelling(identifier.identifier) == word
+                return ConsistencyNoStutteringName.spelling(identifier.identifier) == word
             }
             if pattern.is(ClosureExprSyntax.self) {
                 return false

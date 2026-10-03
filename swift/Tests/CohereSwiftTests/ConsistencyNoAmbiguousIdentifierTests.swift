@@ -5,16 +5,16 @@ import Testing
 @testable import CohereSwift
 
 /*
- Fixture pairs for `cohere-swift/no-ambiguous-identifier`, both directions, carrying every case the Go rule's
+ Fixture pairs for `cohere-swift/consistency-no-ambiguous-identifier`, both directions, carrying every case the Go rule's
  own test documents (`consistency_no_ambiguous_identifier_test.go`) that has a Swift shape. Failing cases
  assert the exact line and column of the declared name. The passing cases are the near misses: the
  exemptions, the names somebody else chose, and the comparators that look like comparators and are not.
  */
-struct NoAmbiguousIdentifierTests {
+struct ConsistencyNoAmbiguousIdentifierTests {
     static func findings(_ source: String) -> [FindingRecord] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
         let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
-        return NoAmbiguousIdentifier().findings(in: file)
+        return ConsistencyNoAmbiguousIdentifier().findings(in: file)
     }
 
     static func positions(_ source: String) -> [String] {

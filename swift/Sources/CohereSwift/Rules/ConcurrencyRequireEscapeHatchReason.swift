@@ -12,8 +12,8 @@ import SwiftSyntax
  "Directly above" means a comment in the declaration's leading trivia with no blank line between it and the
  declaration. A comment two paragraphs up is about something else.
  */
-public struct RequireEscapeHatchReason: FileRule {
-    public let name = "cohere-swift/require-escape-hatch-reason"
+public struct ConcurrencyRequireEscapeHatchReason: FileRule {
+    public let name = "cohere-swift/concurrency-require-escape-hatch-reason"
 
     public init() {}
 

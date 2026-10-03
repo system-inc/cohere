@@ -128,13 +128,13 @@
   {
     "typeScriptRule": "nexus/consistency-no-abbreviated-identifier",
     "verdict": "Ported",
-    "swiftRule": "cohere-swift/no-abbreviated-identifier",
+    "swiftRule": "cohere-swift/consistency-no-abbreviated-identifier",
     "reason": null
   },
   {
     "typeScriptRule": "nexus/consistency-no-ambiguous-identifier",
     "verdict": "Ported",
-    "swiftRule": "cohere-swift/no-ambiguous-identifier",
+    "swiftRule": "cohere-swift/consistency-no-ambiguous-identifier",
     "reason": null
   },
   {
@@ -206,13 +206,13 @@
   {
     "typeScriptRule": "nexus/consistency-no-stuttering-name",
     "verdict": "Ported",
-    "swiftRule": "cohere-swift/no-stuttering-name",
+    "swiftRule": "cohere-swift/consistency-no-stuttering-name",
     "reason": null
   },
   {
     "typeScriptRule": "nexus/consistency-no-utils-folder",
     "verdict": "Ported",
-    "swiftRule": "cohere-swift/no-utils-folder",
+    "swiftRule": "cohere-swift/consistency-no-utils-folder",
     "reason": null
   },
   {
@@ -519,7 +519,7 @@
     "typeScriptRule": "structure/react-component-require-properties-parameter",
     "verdict": "NotApplicable",
     "swiftRule": null,
-    "reason": "This is a React props convention, and a Swift `props` identifier already hits no-abbreviated-identifier."
+    "reason": "This is a React props convention, and a Swift `props` identifier already hits consistency-no-abbreviated-identifier."
   },
   {
     "typeScriptRule": "structure/react-component-require-properties-type-suffix",

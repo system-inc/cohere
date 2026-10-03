@@ -28,8 +28,8 @@ import SwiftSyntax
  carry over. No fixer, for the reason the Go rule gives: a rename without scope analysis can break a
  caller, and the suggestion in the message is applied by a reader with the scope in front of them.
  */
-public struct NoAbbreviatedIdentifier: FileRule {
-    public static let ruleName = "cohere-swift/no-abbreviated-identifier"
+public struct ConsistencyNoAbbreviatedIdentifier: FileRule {
+    public static let ruleName = "cohere-swift/consistency-no-abbreviated-identifier"
     public let name = ruleName
     let vocabulary: AbbreviationVocabulary
 

@@ -9,7 +9,7 @@ import Testing
  triggering examples plus `var`, `while`, nested and labeled tuples, a type annotation and the empty tuple,
  each with its exact position on the pattern. The passing cases are SwiftLint's non-triggering examples
  and the pattern matches that look like a binding but are not one. The message cases pin which repair each
- right side gets, and that a `try?` in a condition is reported here and not by `no-discarded-try-optional`.
+ right side gets, and that a `try?` in a condition is reported here and not by `correctness-no-discarded-try-optional`.
  */
 struct UnusedOptionalBindingTests {
     static func findings(_ source: String) -> [FindingRecord] {
@@ -95,14 +95,14 @@ struct UnusedOptionalBindingTests {
         #expect(messageIds == ["unusedOptionalBinding", "unusedOptionalBindingTry", "unusedOptionalBindingCast", "unusedOptionalBinding", "unusedOptionalBinding"])
     }
 
-    /* `no-discarded-try-optional` leaves a `try?` in a condition alone, so this rule is its only report. */
+    /* `correctness-no-discarded-try-optional` leaves a `try?` in a condition alone, so this rule is its only report. */
     @Test func tryOptionalInAConditionIsReportedOnce() {
         let source = """
             if let _ = try? work() {}
             """
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
         let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
-        #expect(NoDiscardedTryOptional().findings(in: file, symbols: FileSymbols([])).isEmpty)
+        #expect(CorrectnessNoDiscardedTryOptional().findings(in: file, symbols: FileSymbols([])).isEmpty)
         #expect(Self.positions(Self.findings(source)) == ["1:8"])
     }
 }

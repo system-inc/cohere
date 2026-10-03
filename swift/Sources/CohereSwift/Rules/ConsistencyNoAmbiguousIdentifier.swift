@@ -9,8 +9,8 @@ import SwiftSyntax
  saved at the declaration and paid for at every read. The repair is the word the letter stands for:
  `count`, `rowIndex`, `error`.
 
- Which names: declared names only, exactly the set `cohere-swift/no-abbreviated-identifier` judges, found by
- its own visitor (`NoAbbreviatedIdentifier.Visitor`). A reference is spelled by whoever declared it, and our
+ Which names: declared names only, exactly the set `cohere-swift/consistency-no-abbreviated-identifier` judges, found by
+ its own visitor (`ConsistencyNoAbbreviatedIdentifier.Visitor`). A reference is spelled by whoever declared it, and our
  own single-letter declaration is reported once, where it is written. That visitor already skips an
  `override`'s name and its single-name labels (the superclass chose them), a label that is not also the
  parameter's name (API another type may dictate), and `if let value` with no initializer (it re-binds a name
@@ -69,8 +69,8 @@ import SwiftSyntax
  No fix, for the Go rule's reason: renaming a binding without following its references through scope leaves
  every other use pointing at a name that no longer exists. The suggested name travels in the message.
  */
-public struct NoAmbiguousIdentifier: FileRule {
-    public let name = "cohere-swift/no-ambiguous-identifier"
+public struct ConsistencyNoAmbiguousIdentifier: FileRule {
+    public let name = "cohere-swift/consistency-no-ambiguous-identifier"
 
     public init() {}
 
@@ -90,7 +90,7 @@ public struct NoAmbiguousIdentifier: FileRule {
     static let comparatorMethodNames: Set<String> = ["sort", "sorted", "min", "max"]
 
     public func findings(in file: ParsedFile) -> [FindingRecord] {
-        let visitor = NoAbbreviatedIdentifier.Visitor(viewMode: .sourceAccurate)
+        let visitor = ConsistencyNoAbbreviatedIdentifier.Visitor(viewMode: .sourceAccurate)
         visitor.walk(file.tree)
         return visitor.declared.compactMap { token in
             let spelled = token.text.trimmingCharacters(in: CharacterSet(charactersIn: "`"))

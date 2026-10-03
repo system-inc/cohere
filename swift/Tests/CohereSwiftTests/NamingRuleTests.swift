@@ -107,7 +107,7 @@ struct NamingRuleTests {
                 }
             }
             """
-        #expect(Self.flagged(NoAbbreviatedIdentifier(vocabulary: try Self.vocabulary()), source) == ["Config:1", "maxBytes:2", "params:3", "idx:4"])
+        #expect(Self.flagged(ConsistencyNoAbbreviatedIdentifier(vocabulary: try Self.vocabulary()), source) == ["Config:1", "maxBytes:2", "params:3", "idx:4"])
     }
 
     /* An override's name and single-name labels are the superclass's; a separate label is API and only the name after it is ours. */
@@ -123,7 +123,7 @@ struct NamingRuleTests {
                 }
             }
             """
-        #expect(Self.flagged(NoAbbreviatedIdentifier(vocabulary: try Self.vocabulary()), source).isEmpty)
+        #expect(Self.flagged(ConsistencyNoAbbreviatedIdentifier(vocabulary: try Self.vocabulary()), source).isEmpty)
     }
 
     @Test func lowerCamelCaseIsSwiftFormatsOwnRule() {

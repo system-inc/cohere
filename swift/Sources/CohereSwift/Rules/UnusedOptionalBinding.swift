@@ -12,7 +12,7 @@ import SwiftSyntax
  - `try? work()`: the question is whether `work()` succeeded. `(try? work()) != nil` asks it, with the
    parentheses, because `try? work() != nil` covers the comparison and yields a `Bool?`. If the failure
    deserves a reason, `do`/`catch` says it. This is the only report such a line gets: cohere's
-   `no-discarded-try-optional` reports a `try?` only when it is a whole statement or the right side of
+   `correctness-no-discarded-try-optional` reports a `try?` only when it is a whole statement or the right side of
    `_ =`, never inside a condition, so the two rules cannot both report one `try?`.
  - `value as? Type`: the question is a type test, and `value is Type` is its name.
 

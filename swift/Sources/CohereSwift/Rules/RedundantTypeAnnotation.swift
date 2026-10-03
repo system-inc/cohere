@@ -45,7 +45,7 @@ import SwiftSyntax
  is its last member's. An enum case of the annotation's own enum (`Direction.up`, `Direction.moved(by: 1)`) is
  always that enum. Any other last member is read from its declaration, demangled into the compiler's own words
  by the toolchain's demangler (`Foundation.URL.deletingLastPathComponent() -> Foundation.URL`), with the
- signature reading `no-discarded-try-optional` uses, and its result must be the annotation's own declaration as
+ signature reading `correctness-no-discarded-try-optional` uses, and its result must be the annotation's own declaration as
  the demangler prints it, or `Self` on it. `Self` is printed two ways: `Self` for a class's dynamic `Self`, and
  `A` for a protocol's (`static (extension in Swift):Swift.FixedWidthInteger.random(in: Swift.ClosedRange<A>) -> A`),
  where `A` is `Self` only because the member is a protocol's; on a type, `A` is the member's own generic
@@ -256,7 +256,7 @@ public struct RedundantTypeAnnotation: TypedFileRule {
 
     /*
      A member's declaration as the demangler prints it, read for its context and its result: a function's result
-     after its arrow, read by `no-discarded-try-optional`'s signature, which checks the labels against the index's
+     after its arrow, read by `correctness-no-discarded-try-optional`'s signature, which checks the labels against the index's
      name (`random(in:)`), or a property's type after its colon (`static Foundation.CharacterSet.alphanumerics :
      Foundation.CharacterSet`). A call must be of a function and a read must be of a property: a called property
      of function type, or a function read without a call, is not read.
@@ -267,7 +267,7 @@ public struct RedundantTypeAnnotation: TypedFileRule {
 
         init?(demangled: String, name: String, isCalled: Bool) {
             let characters = Array(demangled)
-            guard let depths = NoDiscardedTryOptional.Signature.depths(characters) else { return nil }
+            guard let depths = CorrectnessNoDiscardedTryOptional.Signature.depths(characters) else { return nil }
             let baseName = name.firstIndex(of: "(").map { String(name[..<$0]) } ?? name
             guard isCalled == (baseName != name) else { return nil }
             let needle = Array(".\(baseName)")
@@ -278,7 +278,7 @@ public struct RedundantTypeAnnotation: TypedFileRule {
             }
             guard starts.count == 1, let start = starts.first else { return nil }
             if isCalled {
-                guard let signature = NoDiscardedTryOptional.Signature(demangled: demangled, name: name) else { return nil }
+                guard let signature = CorrectnessNoDiscardedTryOptional.Signature(demangled: demangled, name: name) else { return nil }
                 result = signature.result
             } else {
                 let colon = Array(" : ")

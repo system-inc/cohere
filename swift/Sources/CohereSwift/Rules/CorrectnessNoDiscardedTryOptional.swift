@@ -50,8 +50,8 @@ import SwiftSyntax
  The statement shapes need no types, but a typed rule reports all its shapes together, so a file that no
  source of symbols describes is reported as unchecked for them too, never as clean.
  */
-public struct NoDiscardedTryOptional: TypedFileRule {
-    public let name = "cohere-swift/no-discarded-try-optional"
+public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
+    public let name = "cohere-swift/correctness-no-discarded-try-optional"
 
     public init() {}
 

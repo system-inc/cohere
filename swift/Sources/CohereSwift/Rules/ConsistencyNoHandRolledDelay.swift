@@ -21,7 +21,7 @@ import SwiftSyntax
    (`withCheckedContinuation` around `DispatchQueue.main.asyncAfter`), which is the TypeScript shape's own
    semantics but would change behavior if rewritten to the primitive.
  - "Resolves with nothing" is the `try?`'s `()?` going nowhere: the `try?` is a whole statement that is no body's
-   value, or the right side of `_ =`, read with `no-discarded-try-optional`'s own tests for those positions. The
+   value, or the right side of `_ =`, read with `correctness-no-discarded-try-optional`'s own tests for those positions. The
    TypeScript rule also flags a delay promise held in a variable, because a promise resolved with `undefined`
    carries nothing; a `try?`'s `()?` carries whether the pause was cut short, so one that is read
    (`if (try? await Task.sleep(for: x)) == nil { return }`) is a signal, not a pause, and is not flagged.
@@ -45,7 +45,7 @@ import SwiftSyntax
  executable or iOS target beside the one that declares it, as Presence's `CapturePhone`) is flagged all the same:
  the pause is still the primitive written by hand, and the repair starts by making the one primitive reachable.
 
- Beside `no-discarded-try-optional`: that rule flags the `try?` form too, as an error thrown away, and its repair,
+ Beside `correctness-no-discarded-try-optional`: that rule flags the `try?` form too, as an error thrown away, and its repair,
  a `do`/`catch` with the reason in the catch, applied to a sleep writes this rule's second shape, which it does not
  flag. This rule names the house's pause for both, and its message says the `do`/`catch` is not the repair.
 
@@ -110,9 +110,9 @@ public struct ConsistencyNoHandRolledDelay: FileRule {
                 return .visitChildren
             }
             let item: CodeBlockItemSyntax?
-            if NoDiscardedTryOptional.Visitor.isStatement(node) {
+            if CorrectnessNoDiscardedTryOptional.Visitor.isStatement(node) {
                 item = node.parent?.as(CodeBlockItemSyntax.self)
-            } else if NoDiscardedTryOptional.Visitor.isDiscardAssignment(node) {
+            } else if CorrectnessNoDiscardedTryOptional.Visitor.isDiscardAssignment(node) {
                 /* `_ = try? ...` is the sequence `_`, `=`, `try? ...`, whose list sits in a sequence expression that is the statement. */
                 item = node.parent?.parent?.parent?.as(CodeBlockItemSyntax.self)
             } else {

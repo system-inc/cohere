@@ -5,17 +5,17 @@ import Testing
 @testable import CohereSwift
 
 /*
- Fixture pairs for `no-stuttering-name`, both directions. The firing cases carry over every case the Go rule's
+ Fixture pairs for `consistency-no-stuttering-name`, both directions. The firing cases carry over every case the Go rule's
  test fires on (`result`, `outcome`, `data`, `value`, `response`, optional chaining, inside a comparison) and
  add one for each Swift binding form the lookup resolves. The silent cases carry over the Go rule's near
  misses and add Swift's own: implicit `self`, re-binding shorthands, overrides, and bindings that are not in
  scope where the stutter is read.
  */
-struct NoStutteringNameTests {
+struct ConsistencyNoStutteringNameTests {
     static func findings(_ source: String) -> [FindingRecord] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
         let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
-        return NoStutteringName().findings(in: file)
+        return ConsistencyNoStutteringName().findings(in: file)
     }
 
     static func positions(_ source: String) -> [String] {

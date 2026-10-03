@@ -59,8 +59,8 @@ import SwiftSyntax
  a function, which this reading of the symbol does not follow. An element whose symbol does not read as above is
  not flagged.
  */
-public struct NoDefaultForOwnedEnum: TypedFileRule {
-    public let name = "cohere-swift/no-default-for-owned-enum"
+public struct CorrectnessNoDefaultForOwnedEnum: TypedFileRule {
+    public let name = "cohere-swift/correctness-no-default-for-owned-enum"
 
     public init() {}
 

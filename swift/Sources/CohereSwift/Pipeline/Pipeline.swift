@@ -67,7 +67,7 @@ public struct Pipeline {
          nothing, and its rule list holds an empty vocabulary that is never consulted.
          */
         var vocabulary = AbbreviationVocabulary()
-        if configuration.severity(of: NoAbbreviatedIdentifier.ruleName) != .off && (options.runFix || options.runLint) {
+        if configuration.severity(of: ConsistencyNoAbbreviatedIdentifier.ruleName) != .off && (options.runFix || options.runLint) {
             let vocabularyFile = options.abbreviations ?? AbbreviationVocabulary.defaultFile
             do {
                 vocabulary = try AbbreviationVocabulary.load(contentsOf: vocabularyFile)

@@ -174,7 +174,7 @@ struct ConsistencyNoHandRolledDelayTests {
         #expect(Self.positions(Self.findings(source)) == ["2:5"])
     }
 
-    /* What `no-discarded-try-optional`'s repair writes for the PhoneRig flash: the same pause, spelled longer. */
+    /* What `correctness-no-discarded-try-optional`'s repair writes for the PhoneRig flash: the same pause, spelled longer. */
     @Test func anEmptyCatchAroundTheSleepIsFound() {
         let source = """
             Task { @MainActor in

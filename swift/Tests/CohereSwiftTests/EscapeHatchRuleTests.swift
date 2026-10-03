@@ -52,11 +52,11 @@ struct EscapeHatchRuleTests {
             nonisolated(unsafe) var explained = 0
             @preconcurrency import Darwin
             """
-        #expect(Self.lines(RequireEscapeHatchReason(), source) == [1, 8, 11])
+        #expect(Self.lines(ConcurrencyRequireEscapeHatchReason(), source) == [1, 8, 11])
     }
 
     @Test func plainSendableAndNonisolatedAreNotHatches() {
-        #expect(Self.lines(RequireEscapeHatchReason(), "struct Value: Sendable {}\nnonisolated func work() {}\n").isEmpty)
+        #expect(Self.lines(ConcurrencyRequireEscapeHatchReason(), "struct Value: Sendable {}\nnonisolated func work() {}\n").isEmpty)
     }
 
     @Test func discardedTryOptionalsAreFound() {
@@ -68,7 +68,7 @@ struct EscapeHatchRuleTests {
                 if let value = try? load() { use(value) }
             }
             """
-        #expect(Self.lines(NoDiscardedTryOptional(), source) == [2, 3])
+        #expect(Self.lines(CorrectnessNoDiscardedTryOptional(), source) == [2, 3])
     }
 
     /* A discarded sleep is consistency-no-hand-rolled-delay's, which names the house primitive, so this rule leaves it and every other try? on the same lines is still found. */
@@ -81,7 +81,7 @@ struct EscapeHatchRuleTests {
                 try? await save()
             }
             """
-        #expect(Self.lines(NoDiscardedTryOptional(), source) == [4, 5])
+        #expect(Self.lines(CorrectnessNoDiscardedTryOptional(), source) == [4, 5])
         #expect(Self.lines(ConsistencyNoHandRolledDelay(), source) == [2, 3])
     }
 
@@ -101,7 +101,7 @@ struct EscapeHatchRuleTests {
             default: nil
             }
             """
-        #expect(Self.lines(NoDiscardedTryOptional(), values).isEmpty)
+        #expect(Self.lines(CorrectnessNoDiscardedTryOptional(), values).isEmpty)
         let discards = """
             func cleanUp() { try? FileManager.default.removeItem(at: url) }
             func reset() -> Void { try? store.clear() }
@@ -115,7 +115,7 @@ struct EscapeHatchRuleTests {
                 return item
             }
             """
-        #expect(Self.lines(NoDiscardedTryOptional(), discards) == [1, 2, 3, 5, 9])
+        #expect(Self.lines(CorrectnessNoDiscardedTryOptional(), discards) == [1, 2, 3, 5, 9])
     }
 
     @Test func failuresWithoutMessagesAreFound() {
@@ -142,7 +142,7 @@ struct EscapeHatchRuleTests {
 }
 
 /*
- `no-discarded-try-optional` on a closure's sole `try?`, which the types decide. The unit cases parse a source
+ `correctness-no-discarded-try-optional` on a closure's sole `try?`, which the types decide. The unit cases parse a source
  string and hand the rule symbols built by position, one occurrence at every token named in `resolving`, with
  the symbols and names the index recorded for these declarations on a real build; the signatures come from the
  toolchain's own demangler. The end-to-end case runs a real package, so the symbols come from the index too.
@@ -191,7 +191,7 @@ extension EscapeHatchRuleTests {
                 occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: "s:7SwiftUI11ViewBuilderV10buildBlockyxxAA0C0RzlFZ", name: "buildBlock(_:)", isReference: true, isImplicit: true))
             }
         }
-        let rule = NoDiscardedTryOptional()
+        let rule = CorrectnessNoDiscardedTryOptional()
         guard rule.applies(to: subject) else { return [] }
         return rule.findings(in: subject, symbols: FileSymbols(occurrences)).map { "\($0.messageId)@\($0.line)" }
     }
@@ -306,32 +306,32 @@ extension EscapeHatchRuleTests {
     }
 
     @Test func demangledSignaturesAreReadCarefully() throws {
-        let asynchronous = try #require(NoDiscardedTryOptional.Signature(
+        let asynchronous = try #require(CorrectnessNoDiscardedTryOptional.Signature(
             demangled: "(extension in Dispatch):__C.OS_dispatch_queue.async(group: __C.OS_dispatch_group?, qos: Dispatch.DispatchQoS, flags: Dispatch.DispatchWorkItemFlags, execute: @escaping @convention(block) () -> ()) -> ()",
             name: "async(group:qos:flags:execute:)"
         ))
         #expect(asynchronous.labels == ["group", "qos", "flags", "execute"])
-        #expect(asynchronous.parameters.map(NoDiscardedTryOptional.Signature.kind(of:)) == [.other, .other, .other, .function(returning: "()")])
+        #expect(asynchronous.parameters.map(CorrectnessNoDiscardedTryOptional.Signature.kind(of:)) == [.other, .other, .other, .function(returning: "()")])
         #expect(asynchronous.result == "()")
-        let mapping = try #require(NoDiscardedTryOptional.Signature(
+        let mapping = try #require(CorrectnessNoDiscardedTryOptional.Signature(
             demangled: "(extension in Swift):Swift.Collection.map<A, B where B1: Swift.Error>((A.Element) throws(B1) -> A1) throws(B1) -> [A1]",
             name: "map(_:)"
         ))
-        #expect(mapping.parameters.map(NoDiscardedTryOptional.Signature.kind(of:)) == [.function(returning: "A1")])
-        let task = try #require(NoDiscardedTryOptional.Signature(
+        #expect(mapping.parameters.map(CorrectnessNoDiscardedTryOptional.Signature.kind(of:)) == [.function(returning: "A1")])
+        let task = try #require(CorrectnessNoDiscardedTryOptional.Signature(
             demangled: "(extension in _Concurrency):Swift.Task< where B == Swift.Never>.init(name: Swift.String?, priority: Swift.TaskPriority?, operation: __owned @isolated(any) () async -> A) -> Swift.Task<A, Swift.Never>",
             name: "init(name:priority:operation:)"
         ))
-        #expect(task.parameters.map(NoDiscardedTryOptional.Signature.kind(of:)) == [.other, .other, .function(returning: "A")])
-        #expect(NoDiscardedTryOptional.Signature.taskSuccess(task.result) == "A")
-        #expect(NoDiscardedTryOptional.Signature(demangled: "Control.Runner.run(() -> ()) -> ()", name: "run(_:_:)") == nil, "parameters that do not match the name's labels")
-        #expect(NoDiscardedTryOptional.Signature(demangled: "Control.Runner.run(label: () -> ()) -> ()", name: "run(_:)") == nil, "a printed label that is not the name's")
-        #expect(NoDiscardedTryOptional.Signature(demangled: "run #1 (() -> ()) -> () in Control.start() -> ()", name: "run(_:)") == nil, "a local function is not found by name")
-        #expect(NoDiscardedTryOptional.Signature(demangled: "Control.Runner.run(() -> ()", name: "run(_:)") == nil, "text that does not balance")
+        #expect(task.parameters.map(CorrectnessNoDiscardedTryOptional.Signature.kind(of:)) == [.other, .other, .function(returning: "A")])
+        #expect(CorrectnessNoDiscardedTryOptional.Signature.taskSuccess(task.result) == "A")
+        #expect(CorrectnessNoDiscardedTryOptional.Signature(demangled: "Control.Runner.run(() -> ()) -> ()", name: "run(_:_:)") == nil, "parameters that do not match the name's labels")
+        #expect(CorrectnessNoDiscardedTryOptional.Signature(demangled: "Control.Runner.run(label: () -> ()) -> ()", name: "run(_:)") == nil, "a printed label that is not the name's")
+        #expect(CorrectnessNoDiscardedTryOptional.Signature(demangled: "run #1 (() -> ()) -> () in Control.start() -> ()", name: "run(_:)") == nil, "a local function is not found by name")
+        #expect(CorrectnessNoDiscardedTryOptional.Signature(demangled: "Control.Runner.run(() -> ()", name: "run(_:)") == nil, "text that does not balance")
     }
 
     @Test(arguments: [
-        ("(A.Element) throws -> ()", NoDiscardedTryOptional.Signature.Kind.function(returning: "()")),
+        ("(A.Element) throws -> ()", CorrectnessNoDiscardedTryOptional.Signature.Kind.function(returning: "()")),
         ("(() -> ())?", .function(returning: "()")),
         ("@escaping @Sendable () -> ()", .function(returning: "()")),
         ("sending @escaping @isolated(any) () async throws -> A", .function(returning: "A")),
@@ -348,8 +348,8 @@ extension EscapeHatchRuleTests {
         ("@autoclosure () -> A?", .unknown),
         ("() -> ()...", .unknown),
     ])
-    func parameterTypesAreClassified(type: String, kind: NoDiscardedTryOptional.Signature.Kind) {
-        #expect(NoDiscardedTryOptional.Signature.kind(of: type) == kind)
+    func parameterTypesAreClassified(type: String, kind: CorrectnessNoDiscardedTryOptional.Signature.Kind) {
+        #expect(CorrectnessNoDiscardedTryOptional.Signature.kind(of: type) == kind)
     }
 
     /*
@@ -391,7 +391,7 @@ extension EscapeHatchRuleTests {
         var found: [String] = []
         for line in stream.split(separator: UInt8(ascii: "\n")) {
             let record = try #require(try JSONSerialization.jsonObject(with: Data(line)) as? [String: Any])
-            if record["kind"] as? String == "finding", record["rule"] as? String == NoDiscardedTryOptional().name {
+            if record["kind"] as? String == "finding", record["rule"] as? String == CorrectnessNoDiscardedTryOptional().name {
                 found.append("\(record["messageId"] as? String ?? "")@\(record["line"] as? Int ?? 0)")
             }
         }

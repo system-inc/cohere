@@ -5,12 +5,12 @@ import Testing
 @testable import CohereSwift
 
 /*
- Fixture pairs for no-utils-folder, ported from the Go rule's own cases (`consistency_no_utils_folder_test.go`).
+ Fixture pairs for consistency-no-utils-folder, ported from the Go rule's own cases (`consistency_no_utils_folder_test.go`).
  Each path's package root is the directory named `project` on it, as the pipeline would set it. The
  silent cases are the near misses: the spelling the rule asks for, names that contain `utils` without being
  it, a file rather than a folder named `Utils`, and a `utils` above the package.
  */
-struct NoUtilsFolderTests {
+struct ConsistencyNoUtilsFolderTests {
     static let source = "/* A header comment, so the finding is seen to sit before it. */\nlet value = 1\n"
 
     static func findings(_ path: String, targetName: String = "Fixture") -> [FindingRecord] {
@@ -23,7 +23,7 @@ struct NoUtilsFolderTests {
             nodeCount: 0,
             packageRoot: packageRoot(of: path)
         )
-        let rule = NoUtilsFolder()
+        let rule = ConsistencyNoUtilsFolder()
         guard rule.applies(to: file) else { return [] }
         return rule.findings(in: file)
     }

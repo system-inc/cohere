@@ -192,7 +192,7 @@ struct PipelineControlTests {
         try Data(#"{"abbreviations": [{"abbreviation": "qty", "expansion": "quantity", "whole": {"messageId": "noQty", "style": "plain"}}]}"#.utf8).write(to: path)
         let source = Self.cleanSource.replacingOccurrences(of: "    let value: Int", with: "    let qty: Int")
         let run = try await Self.run(source: source.replacingOccurrences(of: "value * 2", with: "qty * 2"), arguments: ["--abbreviations", path.path])
-        #expect(run.findings == ["cohere-swift/no-abbreviated-identifier:2"], "a word only the given file holds is the proof it was read")
+        #expect(run.findings == ["cohere-swift/consistency-no-abbreviated-identifier:2"], "a word only the given file holds is the proof it was read")
     }
 
     /* Contract 2: a file the engine cannot read is a record, between `project` and the first `phase`, and the run is incomplete. */
