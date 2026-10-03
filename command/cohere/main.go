@@ -63,15 +63,17 @@ func run() error {
 	}
 
 	configFileName := flag.String("tsconfig", projectMarker,
-		"the tsconfig that defines the program, relative to where you typed it (default: the nearest tsconfig.json at or above the working directory)")
+		"the tsconfig that defines the program, relative to --directory or else to where you typed it; unnamed, the file of this name in --directory, or else the nearest one at or above the working directory")
 	directory := flag.String("directory", "",
 		"the project root, which every relative path resolves against (default: the directory of the nearest tsconfig.json or Package.swift at or above the working directory)")
-	typesOnly := flag.Bool("types", false, "build the graph and report TypeScript's own diagnostics, running no rules")
-	lintOnly := flag.Bool("lint", false, "run the rules, reporting no type diagnostics")
+	typesOnly := flag.Bool("types", false, "report TypeScript's own diagnostics only, running no rules and writing no fixes")
+	lintOnly := flag.Bool("lint", false, "run the lint rules only, reporting their findings without fixing them and without TypeScript's diagnostics")
 	lintConfigFileName := flag.String("lint-config", "CohereSettings.json",
-		"the config that says which rules apply to which files (default: the one at the project root)")
+		"the settings file that says which rules apply to which files, relative to --directory or else to where you typed it; unnamed, the file of this name at the project root")
 	singleThreaded := flag.Bool("single-threaded", false, "use one checker instead of several")
-	fixOnly := flag.Bool("fix", false, "fix and format only, running no other phase")
+	// It formats nothing unless --format is named too: formatting is its own opt-in, and this flag only
+	// narrows the run to the phase that writes.
+	fixOnly := flag.Bool("fix", false, "apply fixes only, running no other phase; add --format to format as well")
 	// The promise is about the project's source, and it is stated with its boundary because two writes sit
 	// outside it on purpose. cohere keeps its cache for the project in `<root>/.cache/cohere/`, which is its
 	// own and which `--no-cache` turns off. And the launcher rebuilds cohere itself when its rules
@@ -80,7 +82,7 @@ func run() error {
 	noFix := flag.Bool("no-fix", false,
 		"mutate no source in the checked project: report what would change without writing a byte of it "+
 			"(cohere still keeps its own cache in the project's .cache/cohere, unless --no-cache)")
-	formatAll := flag.Bool("format-all", false, "format every file rather than only the ones not on record as formatted")
+	formatAll := flag.Bool("format-all", false, "format every file, not only the ones not on record as formatted (implies --format)")
 	// A cold run on purpose: for measuring one, and for anyone who suspects a cache. Every cache cohere
 	// keeps for a project is named here, so a cold number cannot be read as a warm one: the cache table
 	// (the run replay, the per-file findings, the signatures, the format record) and the tsconfig's
@@ -90,7 +92,7 @@ func run() error {
 	// A binary that implements no rule and a binary whose rule found nothing produce the same empty
 	// finding list, and the differential harness cannot tell them apart from the outside. This is how
 	// it asks.
-	listRules := flag.Bool("rules", false, "print the rules this binary implements, one per line, and exit")
+	listRules := flag.Bool("rules", false, "print the rules this cohere implements for the project's language, one per line, and exit")
 	// `-rules` answers what the binary CAN run; this answers what it WILL. The two differ by every
 	// rule the config never names, and that gap is invisible from the outside: a rule the config
 	// cannot resolve passes its own fixtures and lints nothing, which reads exactly like a rule that
@@ -101,13 +103,13 @@ func run() error {
 	// whether a scoped `off` counts, and the hand-derived set was wrong on 29 of 356 rules when
 	// finally checked against the real resolver. ESLint has had `--print-config` for this reason.
 	listRulesEnabled := flag.Bool("rules-enabled", false,
-		"print the rules the lint config actually resolves, with severity, and exit")
+		"print the rules the lint config resolves for one file (the path given, else index.ts at the project root), with severity, and exit")
 	printConfig := flag.Bool("print-config", false,
-		"print, as JSON in ESLint's --print-config shape, every registered rule's resolved severity and options for a file, and exit")
+		"print, as JSON in ESLint's --print-config shape, every registered rule's resolved severity and options for one file (the path given, else index.ts at the project root), and exit")
 	// Off by default until the engine is shown to agree with the existing gate across the real
 	// corpus. Reformatting the tree away from what the gate produces is worse than not formatting,
 	// so enabling is a separate decision from wiring.
-	format := flag.Bool("format", false, "run the formatter over the candidate files")
+	format := flag.Bool("format", false, "format the files not on record as formatted, or the paths named; with --no-fix, report them instead")
 	maxFixPasses := flag.Int("fix-passes", edit.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
 	showTiming := flag.Bool("timing", false, "report what each rule cost, most expensive first")
 	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run")
@@ -116,21 +118,22 @@ func run() error {
 	// action, and in front of nobody's habit because the counts that add up stay on the default line.
 	showCoverage := flag.Bool("coverage", false, "name every rule once under the coverage fact that describes it, rather than only counting them")
 	unusedReport := flag.Bool("unused", false, "report code that was written and never used: unreferenced exports, and statements nothing can reach")
-	unusedAll := flag.Bool("unused-all", false, "with --unused, list the findings already marked cohere-keep rather than only counting them")
+	unusedAll := flag.Bool("unused-all", false, "list the unused findings already marked cohere-keep rather than only counting them (implies --unused)")
 	// Opt-in on purpose. The closure's claim is strictly stronger than the flat one and it fails
 	// differently: a wrong root mis-reports one file in the flat view and cascades here, going dark
 	// across everything that was alive only through it. Keeping both means the two numbers can be
 	// read against each other before the bigger one is trusted.
-	unusedDeep := flag.Bool("unused-deep", false, "with --unused, also compute the transitive closure and group the dead code into islands")
-	showVersion := flag.Bool("version", false, "print the version and exit")
+	unusedDeep := flag.Bool("unused-deep", false, "also compute the transitive closure of unused code and group it into islands (implies --unused)")
+	showVersion := flag.Bool("version", false, "print the version and what this binary was built from, and exit")
 	cacheDump := flag.Bool("cache-dump", false, "print what the cache table for this project holds, and exit")
 	// The editor's save: the buffer arrives on stdin and what --fix (and --format) would write for this
 	// path leaves on stdout, with nothing written to disk. See stdin.go.
 	stdinFilePath := flag.String("stdin-filepath", "",
-		"with --fix, read one file's text from stdin and print what --fix would write for the file at this path, writing nothing to disk")
+		"with --fix, read one file's text from stdin and print what --fix (and --format, if named) would write for the file at this path, writing nothing to disk")
 	// A profile of a cold run: a profiled run is never one the run cache replays, since only a bare run
 	// or `--no-fix` is.
-	profilePath := flag.String("profile", "", "write a Go CPU profile of the run to this file, for `go tool pprof`")
+	// The backquoted word is the argument's name in the help, which is how the flag package spells one.
+	profilePath := flag.String("profile", "", "write a Go CPU profile of the run to `file`, for go tool pprof")
 	flag.Parse()
 	cacheOff = *noCache
 	if *profilePath != "" {

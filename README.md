@@ -68,13 +68,13 @@ your settings actually turn on.
 | `--fix` | apply fixes only, running no other phase; add `--format` to format as well |
 | `--fix-passes N` | how many times a file may be re-linted while fixes keep landing (default 10) |
 | `--no-fix` | write nothing to your source; report what would change |
-| `--format` | run the formatter over the candidate files |
-| `--format-all` | format every file, not only the ones not already on record as formatted |
-| `--lint` | run the lint rules only, without TypeScript's diagnostics |
-| `--types` | report TypeScript's diagnostics only, running no rules |
+| `--format` | format the files not on record as formatted, or the paths you name; with `--no-fix`, report them |
+| `--format-all` | format every file, not only the ones not already on record as formatted (implies `--format`) |
+| `--lint` | run the lint rules only, reporting what they find without fixing it, and without TypeScript's diagnostics |
+| `--types` | report TypeScript's diagnostics only, running no rules and fixing nothing |
 | `--unused` | report code that is never used: unreferenced exports and unreachable statements |
-| `--unused-all` | with `--unused`, list the findings already marked `cohere-keep`, not only count them |
-| `--unused-deep` | with `--unused`, also group the dead code into islands by what reaches what |
+| `--unused-all` | list the unused findings already marked `cohere-keep`, not only count them (implies `--unused`) |
+| `--unused-deep` | also group the unused code into islands by what reaches what (implies `--unused`) |
 | `--directory PATH` | the project root (default: the nearest `tsconfig.json` or `Package.swift` above you) |
 | `--tsconfig PATH` | the tsconfig that defines the program (default: the nearest `tsconfig.json`) |
 | `--lint-config PATH` | the settings file (default: `CohereSettings.json` at the project root) |
