@@ -630,3 +630,50 @@ func TestNoUnusedVarsJudgesOverrideParametersAsTypeScriptEslintDoes(t *testing.T
 		})
 	}
 }
+
+// TestNoUnusedVarsTreatsADecoratedClassOrParameterAsUsed pins a deliberate divergence from ESLint, by
+// @system_cohere's ruling of 2026-10-03 (#ynneze5): a decorator runs when its class is defined, so a
+// class or a parameter that carries one is used whatever reads its name. The shapes are Base's tests,
+// which declare a class only so its decorators register, or a parameter only so a parameter decorator
+// records it. ESLint reports both.
+//
+// Each exempt row has a neighbour that must still report, so a mutant widening the arm to every class,
+// every parameter, or a decorator on a sibling fails here.
+func TestNoUnusedVarsTreatsADecoratedClassOrParameterAsUsed(t *testing.T) {
+	t.Parallel()
+
+	decorators := "declare const registry: string[];\n" +
+		"function Table(name: string): ClassDecorator { return () => { registry.push(name); }; }\n" +
+		"function Column(): PropertyDecorator { return () => {}; }\n" +
+		"function Argument(name: string): ParameterDecorator { return () => { registry.push(name); }; }\n" +
+		"export { Table, Column, Argument };\n"
+	cases := []struct {
+		name   string
+		source string
+		want   []string
+	}{
+		{"a class declared only so its class decorator runs", decorators + "export function check(): void {\n    @Table('conflict')\n    class TwoFlags {}\n}\n", nil},
+		{"the same class without the decorator still reports", decorators + "export function check(): void {\n    class TwoFlags {}\n}\n", []string{"TwoFlags"}},
+		{"a decorator on a member does not make the class used", decorators + "export function check(): void {\n    class TwoFlags {\n        @Column() declare a: string;\n    }\n}\n", []string{"TwoFlags"}},
+		{"a parameter declared only so its decorator records it", decorators + "export class Resolver {\n    tickets(@Argument('pagination') pagination: number): string { return 'ok'; }\n}\n", nil},
+		{"the same parameter without the decorator still reports", decorators + "export class Resolver {\n    tickets(pagination: number): string { return 'ok'; }\n}\n", []string{"pagination"}},
+		{"a decorated parameter does not exempt the undecorated one after it", decorators + "export class Resolver {\n    tickets(@Argument('pagination') pagination: number, extra: string): string { return 'ok'; }\n}\n", []string{"extra"}},
+		{"a decorated parameter is used even under args all", decorators + "export class Resolver {\n    tickets(@Argument('pagination') pagination: number, used: string): string { return used; }\n}\n", nil},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			options := any(nil)
+			if strings.Contains(testCase.name, "args all") {
+				options = NoUnusedVarsOptions{Args: "all"}
+			}
+			result := rule_testing.RunTypedWithOptions(t, NoUnusedVars, "a.ts", testCase.source, options)
+			var got []string
+			for _, diagnostic := range result.Diagnostics {
+				got = append(got, testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()])
+			}
+			if strings.Join(got, ",") != strings.Join(testCase.want, ",") {
+				t.Fatalf("reported %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}

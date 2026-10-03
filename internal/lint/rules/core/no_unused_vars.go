@@ -891,6 +891,21 @@ func isExemptFromUnusedReport(
 		return true
 	}
 
+	// A class declaration or a parameter that carries a decorator is used, whatever reads its name:
+	// the decorator runs when the class is defined, with the class (or the parameter's index) as its
+	// argument, so deleting the declaration changes what runs. A test that declares a class only so its
+	// decorators register, or a parameter only so a parameter decorator records it, is the shape.
+	//
+	// A deliberate divergence from ESLint, by @system_cohere's ruling of 2026-10-03 (#ynneze5, Base's
+	// 18 test sites). typescript-eslint 8.67's no-unused-vars has no decorator handling, and its scope
+	// manager marks only the decorator function as referenced, so ESLint reports both shapes. The
+	// divergence is in cohere's favor and is exact: no decorated declaration is dead. It is the
+	// decorator, not a naming convention, that exempts, so `argsIgnorePattern` stays unset.
+	if (candidate.declaration.Kind == ast.KindClassDeclaration || candidate.kind == bindingParameter) &&
+		carriesDecorator(candidate.declaration) {
+		return true
+	}
+
 	// A parameter under `args: "none"` is never reported. Under the default `after-used`, only
 	// parameters following the last used one are.
 	if candidate.kind == bindingParameter {
@@ -1509,6 +1524,20 @@ func hasForInOrOfWriteWithLeadingReturn(ctx rule.Context, candidate candidateBin
 // Two shapes. A setter must take exactly one parameter, so an unused one is required by the
 // grammar. And a constructor parameter carrying `public`, `private`, `protected` or `readonly`
 // declares a class property, so it is doing work even when the constructor body never reads it.
+// carriesDecorator reports whether a declaration's own modifiers include a decorator.
+func carriesDecorator(declaration *ast.Node) bool {
+	modifiers := declaration.Modifiers()
+	if modifiers == nil {
+		return false
+	}
+	for _, modifier := range modifiers.Nodes {
+		if modifier.Kind == ast.KindDecorator {
+			return true
+		}
+	}
+	return false
+}
+
 func isStructurallyRequiredParameter(parameter *ast.Node) bool {
 	owner := parameter.Parent
 	if owner == nil {
