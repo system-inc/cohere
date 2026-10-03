@@ -2,8 +2,11 @@ package program_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -348,5 +351,69 @@ func TestRunCacheKeyCoversEveryFact(t *testing.T) {
 		if key == base {
 			t.Errorf("%s left the key unchanged, so that change would replay a stale run", name)
 		}
+	}
+}
+
+// The record stats its inputs across workers, and that changes nothing a serial record would give: the same
+// entries in the same order (files sorted, then their directories, then what was absent), each with its own
+// signature, and a path that vanished before the record is still an error rather than an absence (#a66sfmh).
+func TestRunCacheRecordsInParallelInTheSerialOrder(t *testing.T) {
+	root := t.TempDir()
+	var files []string
+	for directory := range 12 {
+		for file := range 60 {
+			path := filepath.Join(root, fmt.Sprintf("d%02d", directory), fmt.Sprintf("f%02d.ts", file))
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(strings.Repeat("x", directory*60+file)), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			files = append(files, path)
+		}
+	}
+	shuffled := append([]string(nil), files...)
+	for index := range shuffled {
+		other := (index * 7919) % len(shuffled)
+		shuffled[index], shuffled[other] = shuffled[other], shuffled[index]
+	}
+	absent := []string{filepath.Join(root, "missing.ts")}
+	cache, err := program.RecordRunCache("key", shuffled, nil, absent, nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var want []string
+	sorted := append([]string(nil), files...)
+	sort.Strings(sorted)
+	want = append(want, sorted...)
+	for directory := range 12 {
+		want = append(want, filepath.Join(root, fmt.Sprintf("d%02d", directory)))
+	}
+	want = append(want, absent...)
+	if len(cache.Inputs) != len(want) {
+		t.Fatalf("%d inputs recorded, want %d", len(cache.Inputs), len(want))
+	}
+	for index, input := range cache.Inputs {
+		if input.Path != want[index] {
+			t.Fatalf("input %d is %s, want %s: the order is not the serial one", index, input.Path, want[index])
+		}
+		information, err := os.Stat(input.Path)
+		switch {
+		case input.Path == absent[0]:
+			if input.Exists {
+				t.Errorf("%s is recorded present", input.Path)
+			}
+		case err != nil || !input.Exists || input.Size != information.Size() || input.Directory != information.IsDir() ||
+			input.ModifiedNanoseconds != information.ModTime().UnixNano():
+			t.Errorf("%s is recorded with another file's signature: %+v", input.Path, input)
+		}
+	}
+
+	if err := os.Remove(files[len(files)/2]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := program.RecordRunCache("key", shuffled, nil, absent, nil, 0); err == nil {
+		t.Error("a file that vanished before the record was recorded anyway")
 	}
 }

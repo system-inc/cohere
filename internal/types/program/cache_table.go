@@ -259,13 +259,25 @@ func orUnknown(value string) string {
 // memory always means what this build means.
 func (c *LintCache) wire() *lintCacheWire {
 	wire := &lintCacheWire{Version: lintCacheVersion, Key: c.Key, DesignSystem: c.DesignSystem}
-	positions := map[string]int{}
+	// Interned by a cheap key, the length and the two ends, and confirmed by comparing names, never by joining
+	// a list into one string: ahra's entries hold about 18,000 lists of up to ~250 names, and joining each cost
+	// about 25ms of every recording run to find 31 distinct ones (#a66sfmh).
+	type listKey struct {
+		length      int
+		first, last string
+	}
+	positions := map[listKey][]int{}
 	intern := func(list []string) int {
-		joined := strings.Join(list, "\x00")
-		if position, seen := positions[joined]; seen {
-			return position
+		key := listKey{length: len(list)}
+		if len(list) > 0 {
+			key.first, key.last = list[0], list[len(list)-1]
 		}
-		positions[joined] = len(wire.Lists)
+		for _, position := range positions[key] {
+			if equalStrings(wire.Lists[position], list) {
+				return position
+			}
+		}
+		positions[key] = append(positions[key], len(wire.Lists))
 		wire.Lists = append(wire.Lists, append([]string{}, list...))
 		return len(wire.Lists) - 1
 	}

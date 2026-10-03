@@ -170,27 +170,15 @@ func RecordRunCache(key string, files []string, extraDirectories []string, absen
 	// One entry per path. A path can arrive as a file read, a directory listed, and the parent of
 	// something else, and statting it three times would spend the budget on duplicates.
 	seen := map[string]bool{}
-	add := func(path string) error {
-		if seen[path] {
-			return nil
-		}
-		seen[path] = true
-		input, err := signatureOf(path)
-		if err != nil {
-			return err
-		}
-		cache.Inputs = append(cache.Inputs, input)
-		return nil
-	}
-
+	var present []string
 	sortedFiles := append([]string(nil), files...)
 	sort.Strings(sortedFiles)
 	for _, file := range sortedFiles {
-		if err := add(file); err != nil {
-			return nil, err
+		if !seen[file] {
+			seen[file] = true
+			present = append(present, file)
 		}
 	}
-
 	directorySet := map[string]struct{}{}
 	for _, file := range files {
 		directorySet[filepath.Dir(file)] = struct{}{}
@@ -204,7 +192,31 @@ func RecordRunCache(key string, files []string, extraDirectories []string, absen
 	}
 	sort.Strings(directories)
 	for _, directory := range directories {
-		if err := add(directory); err != nil {
+		if !seen[directory] {
+			seen[directory] = true
+			present = append(present, directory)
+		}
+	}
+
+	// Statted in parallel, as Check does, each into its own slot, so the order and the first error are the
+	// ones a serial pass would give. About 17,000 stats on ahra: 64 to 79ms one at a time, under 20ms across
+	// workers (#a66sfmh), on the path between the report printing and the process exiting.
+	cache.Inputs = make([]RunCacheInput, len(present))
+	failures := make([]error, len(present))
+	workers := min(runtime.NumCPU(), 8)
+	var group sync.WaitGroup
+	for worker := range workers {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			for index := worker; index < len(present); index += workers {
+				cache.Inputs[index], failures[index] = signatureOf(present[index])
+			}
+		}()
+	}
+	group.Wait()
+	for _, err := range failures {
+		if err != nil {
 			return nil, err
 		}
 	}

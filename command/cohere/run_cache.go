@@ -58,6 +58,10 @@ type runCacheSession struct {
 	invocation string
 	table      *program.CacheTable
 
+	// tableSignature is the table file's size and time just before it was read, so the write at the end can
+	// tell whether anything has replaced it since. See write.
+	tableSignature fileSignature
+
 	key      string
 	recorder *program.InputRecorder
 
@@ -181,6 +185,9 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 
 	prepareCacheDirectory(location.Root)
 	tablePath := cacheTablePath(location.Root)
+	// Statted before it is read, never after: a table replaced between the two then reads as replaced at the
+	// end, and is read again, where the other order could keep a stale copy.
+	tableSignature := signatureOfFile(tablePath)
 	table, err := program.ReadCacheTable(tablePath, cacheTableIdentity())
 	if errors.Is(err, program.ErrCacheTableUnreadable) || errors.Is(err, program.ErrCacheTablePartlyKept) {
 		// Said once, before the recording starts, so it reaches the terminal and never a replay. A table
@@ -193,11 +200,12 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	}
 
 	session := &runCacheSession{
-		tablePath:  tablePath,
-		invocation: invocation,
-		table:      table,
-		key:        key,
-		recorder:   program.NewInputRecorder(),
+		tablePath:      tablePath,
+		invocation:     invocation,
+		table:          table,
+		tableSignature: tableSignature,
+		key:            key,
+		recorder:       program.NewInputRecorder(),
 	}
 	if err := session.stdout.start(&os.Stdout); err != nil {
 		return nil
@@ -387,10 +395,13 @@ func (session *runCacheSession) record(exitCode int) *program.RunCache {
 
 // write puts this run's record and findings into the table, once.
 //
-// The table is read again here rather than reused from when the run began, because another invocation can
-// have recorded into it since: a bare run and `--no-fix` started together each own their own entry, and
-// writing back the copy read seconds ago would erase the other's. What is lost to a race is a record,
-// which costs a miss; nothing here can make a stale entry match, since every entry carries its own proof.
+// The table is read again here when anything has replaced it since the run began, because another
+// invocation can have recorded into it: a bare run and `--no-fix` started together each own their own entry,
+// and writing back the copy read seconds ago would erase the other's. Every writer renames a new file into
+// place, which moves the size or the time, so an unchanged signature means the copy read at the start is
+// what is on disk, and decoding the same bytes again would only cost the time (about 13ms on ahra,
+// #a66sfmh). What is lost to a race is a record, which costs a miss; nothing here can make a stale entry
+// match, since every entry carries its own proof.
 //
 // The findings are saved even when the run itself was declined. Their entries are keyed on each file's
 // bytes, so a file the fix phase rewrote left an entry for bytes that no longer exist, which can never
@@ -400,7 +411,10 @@ func (session *runCacheSession) write(recorded *program.RunCache) {
 		return
 	}
 	identity := cacheTableIdentity()
-	table, _ := program.ReadCacheTable(session.tablePath, identity)
+	table := session.table
+	if current := signatureOfFile(session.tablePath); !current.exists || current != session.tableSignature {
+		table, _ = program.ReadCacheTable(session.tablePath, identity)
+	}
 	if recorded != nil {
 		table.Runs[session.invocation] = recorded
 	}
@@ -413,6 +427,21 @@ func (session *runCacheSession) write(recorded *program.RunCache) {
 	if err := program.WriteCacheTable(session.tablePath, table, identity); err != nil {
 		fmt.Fprintf(os.Stderr, "note: the cache table could not be written: %v\n", firstLine(err.Error()))
 	}
+}
+
+// fileSignature is what a stat says about a file: whether it is there, its size and its modification time.
+type fileSignature struct {
+	exists              bool
+	size                int64
+	modifiedNanoseconds int64
+}
+
+func signatureOfFile(path string) fileSignature {
+	information, err := os.Stat(path)
+	if err != nil {
+		return fileSignature{}
+	}
+	return fileSignature{exists: true, size: information.Size(), modifiedNanoseconds: information.ModTime().UnixNano()}
 }
 
 func firstLine(text string) string {

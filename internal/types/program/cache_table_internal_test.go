@@ -155,3 +155,33 @@ func describeShape(subject reflect.Type) string {
 	walk(subject, map[reflect.Type]bool{})
 	return out.String()
 }
+
+// Rule lists are interned by their length and their two ends, and that key is only a filter: two lists that
+// share it and differ in the middle stay two lists, and every entry resolves back to exactly its own.
+func TestInterningKeepsListsThatShareTheirEndsApart(t *testing.T) {
+	cache := &LintCache{Version: lintCacheVersion}
+	lists := [][]string{
+		{"a", "b", "c"},
+		{"a", "x", "c"},
+		{"a", "b", "c"},
+		{},
+		nil,
+		{"a", "c"},
+	}
+	for index, list := range lists {
+		cache.Entries = append(cache.Entries, LintCacheEntry{Path: fmt.Sprintf("/f%d.ts", index), Rules: list})
+	}
+	wire := cache.wire()
+	if len(wire.Lists) != 4 {
+		t.Errorf("%d distinct lists interned from 4 distinct ones: %v", len(wire.Lists), wire.Lists)
+	}
+	back, err := wire.cache()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, list := range lists {
+		if strings.Join(back.Entries[index].Rules, ",") != strings.Join(list, ",") {
+			t.Errorf("entry %d came back with %v, want %v", index, back.Entries[index].Rules, list)
+		}
+	}
+}
