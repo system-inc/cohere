@@ -23,19 +23,30 @@ struct NoDefaultForOwnedEnumTests {
     static let red = "s:7Control4TreeO4LeafO3redyA2EmF"
     static let optionalSome = "s:Sq4someyxSgxcABmlF"
     static let patternOperator = "s:s2teoiySbx_xtSQRzlF"
+    static let part = "s:7Control5PieceO4partyAcA4PartOcACmF"
+    static let make = "s:7Control6StatusO4makeACyFZ"
+    static let fallbackName = "s:7Control12fallbackNameSSyF"
+    static let quaternionInitializer = "s:So10simd_quatda2ix2iy2iz1rABSd_S3dtcfc"
 
     /*
-     The findings, as `line:column message`, with each token whose text is a key resolved to that symbol. A token
-     in `matchedByOperator` also gets the implicit `~=` the index records where a pattern is compared, not matched.
+     The findings, as `line:column message`, with each token whose text is a key resolved to that symbol, under
+     the name `declarationNames` gives it (an initializer's `init(ix:iy:iz:r:)`) or else its own text. A token in
+     `matchedByOperator` also gets the implicit `~=` the index records where a pattern is compared, not matched.
      */
-    static func findings(_ source: String, symbols names: [String: String], matchedByOperator: Set<String> = [], ownedModules: Set<String> = ["Control"]) -> [String] {
+    static func findings(
+        _ source: String,
+        symbols names: [String: String],
+        matchedByOperator: Set<String> = [],
+        ownedModules: Set<String> = ["Control"],
+        declarationNames: [String: String] = [:]
+    ) -> [String] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
         let file = ParsedFile(url: url, targetName: "Control", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
         var occurrences: [FileSymbols.Occurrence] = []
         for token in file.tree.tokens(viewMode: .sourceAccurate) {
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
             if let symbol = names[token.text] {
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: symbol, name: token.text, isReference: true))
+                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: symbol, name: declarationNames[token.text] ?? token.text, isReference: true))
             }
             /* As the index records `Status.done`: the type a second time, at the element's own name. */
             if let dot = token.previousToken(viewMode: .sourceAccurate), dot.text == ".", let type = dot.previousToken(viewMode: .sourceAccurate), type.text.first?.isUppercase == true, let symbol = names[type.text] {
@@ -172,6 +183,151 @@ struct NoDefaultForOwnedEnumTests {
         #expect(Self.findings(source, symbols: Self.statusSymbols).isEmpty)
     }
 
+    /*
+     DesignerRail's "not mine" shape: several cases to values, every other case to one constant. Each arm a
+     literal, a raw value, a bare case or static member, or a constructor of constants, written alone or
+     returned, so the `default` is the value a case added later would get anyway.
+     */
+    @Test func aProjectionToConstantsKeepsItsDefault() {
+        let source = """
+            extension Status {
+                var category: String? {
+                    switch self {
+                    case .running, .done: self.rawValue
+                    case .failed: "Failed"
+                    default: nil
+                    }
+                }
+                var slot: Slot? {
+                    switch self {
+                    case .running: .socks
+                    case .done: Garments.Slot.shoes
+                    default: nil
+                    }
+                }
+                var isActive: Bool {
+                    switch self {
+                    case .running: return true
+                    default: return false
+                    }
+                }
+                var piece: Piece? {
+                    switch self {
+                    case .running: .part(.mouth)
+                    case .done: .feelings
+                    default: nil
+                    }
+                }
+                var rotation: Rotator {
+                    switch self {
+                    case .running: Rotator(pitch: 1, yaw: -1, roll: 0.5)
+                    case .done: .init(pitch: 0, yaw: 0, roll: 1)
+                    default: Rotator(pitch: 0, yaw: 0, roll: 0)
+                    }
+                }
+                var quaternion: simd_quatd {
+                    switch self {
+                    case .running: SIMD4<Double>(0, 0, 0, 1).quaternion
+                    default: simd_quatd(ix: 0, iy: 0, iz: 0, r: 1)
+                    }
+                }
+                var limits: [Int] {
+                    switch self {
+                    case .running: [1, 2]
+                    case .done: []
+                    default: [0]
+                    }
+                }
+            }
+
+            """
+        let symbols = Self.statusSymbols.merging(["part": Self.part, "simd_quatd": Self.quaternionInitializer]) { _, written in written }
+        /* `quaternion` reads a member of a constructed value, which is not a constructor, so its default is still found. */
+        let initializer = ["simd_quatd": "init(ix:iy:iz:r:)"]
+        #expect(Self.findings(source, symbols: symbols, declarationNames: initializer) == ["39:9 \(Self.message("Status"))"])
+        let constructed = source.replacingOccurrences(of: "SIMD4<Double>(0, 0, 0, 1).quaternion", with: "simd_quatd(ix: 1, iy: 0, iz: 0, r: 0)")
+        #expect(Self.findings(constructed, symbols: symbols, declarationNames: initializer).isEmpty)
+        /* The same lowercase call, resolved to something that is not an initializer, is a function call. */
+        #expect(Self.findings(constructed, symbols: symbols) == ["39:9 \(Self.message("Status"))"])
+    }
+
+    /* HumanoidBone's VRM 0.x name: a few cases spelled otherwise, every other case its own raw value, read bare or through the subject. */
+    @Test func aRawValuePassthroughKeepsItsDefault() {
+        let source = """
+            extension Status {
+                var legacyName: String {
+                    switch self {
+                    case .running: "busy"
+                    case .done: "finished"
+                    default: rawValue
+                    }
+                }
+            }
+            func legacyName(of status: Status) -> String {
+                switch status {
+                case .running: "busy"
+                default: status.rawValue
+                }
+            }
+
+            """
+        #expect(Self.findings(source, symbols: Self.statusSymbols).isEmpty)
+    }
+
+    /*
+     A switch that decides behavior lists every case, whatever its `default` says: a default calling a function, a
+     constant default beside an arm that calls one, a branch, a payload read, an interpolation, two statements, a
+     bare `rawValue` on a subject that is not `self`, and a member call the index resolved to a static function.
+     */
+    @Test func aSwitchThatDecidesBehaviorStillReportsItsDefault() {
+        let source = """
+            func decide(status: Status, ready: Bool, count: Int) -> String? {
+                switch status {
+                case .running: "busy"
+                default: fallbackName()
+                }
+                switch status {
+                case .running: fallbackName()
+                default: nil
+                }
+                switch status {
+                case .running: ready ? "busy" : "idle"
+                default: nil
+                }
+                switch status {
+                case .failed(let reason): reason
+                default: nil
+                }
+                switch status {
+                case .running: "\\(count) running"
+                default: nil
+                }
+                switch status {
+                case .running:
+                    let label = "busy"
+                    return label
+                default: return nil
+                }
+                switch status {
+                case .running: "busy"
+                default: rawValue
+                }
+                switch status {
+                case .running: .make()
+                default: nil
+                }
+            }
+
+            """
+        let symbols = Self.statusSymbols.merging(["fallbackName": Self.fallbackName, "make": Self.make]) { _, written in written }
+        #expect(
+            Self.findings(source, symbols: symbols) == [
+                "4:5 \(Self.message("Status"))", "8:5 \(Self.message("Status"))", "12:5 \(Self.message("Status"))", "16:5 \(Self.message("Status"))",
+                "20:5 \(Self.message("Status"))", "26:5 \(Self.message("Status"))", "30:5 \(Self.message("Status"))", "34:5 \(Self.message("Status"))",
+            ]
+        )
+    }
+
     /* A tuple subject's `default` stands for the combinations left out. */
     @Test func aTupleSubjectIsNotFound() {
         let source = """
@@ -302,6 +458,8 @@ struct NoDefaultForOwnedEnumTests {
      the standard library's `Optional` are not.
      */
     static let packageSource = """
+        import simd
+
         enum Status {
             case running
             case failed(String)
@@ -336,6 +494,41 @@ struct NoDefaultForOwnedEnumTests {
             return results
         }
 
+        enum Piece {
+            case part(Int)
+            case whole
+
+            static func make() -> Piece { .whole }
+        }
+
+        func fallback() -> Piece? { nil }
+
+        func projections(status: Status) -> [Piece?] {
+            let piece: Piece? =
+                switch status {
+                case .running: .part(1)
+                case .done: .whole
+                default: nil
+                }
+            let rotation: simd_quatd =
+                switch status {
+                case .running: simd_quatd(ix: 1, iy: 0, iz: 0, r: 0)
+                default: simd_quatd(ix: 0, iy: 0, iz: 0, r: 1)
+                }
+            let made: Piece? =
+                switch status {
+                case .running: .make()
+                default: nil
+                }
+            let called: Piece? =
+                switch status {
+                case .running: .whole
+                default: fallback()
+                }
+            _ = rotation
+            return [piece, made, called]
+        }
+
         """
 
     @Test func aDefaultOverOurEnumIsFlaggedAndTheLookAlikesAreNot() async throws {
@@ -359,6 +552,6 @@ struct NoDefaultForOwnedEnumTests {
         let found = candidates.flatMap { file in
             NoDefaultForOwnedEnum().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.line):\($0.column)" }
         }
-        #expect(found == ["14:5"], "expected only the default over Status itself: \(found)")
+        #expect(found == ["16:5", "61:9", "66:9"], "expected the defaults over Status that decide, and not its projections or the look-alikes: \(found)")
     }
 }

@@ -1,3 +1,4 @@
+import SwiftOperators
 import SwiftSyntax
 
 /*
@@ -44,6 +45,18 @@ import SwiftSyntax
  field) `max(by:)` may return a different one of the tied elements than `sorted(by:).last` did. The finding is
  still right about the waste, and the `sortedLast` message says so, so the reader checks whether a tie matters.
 
+ The message names the repair, and a suggestion carries it as edits, offered and never applied (a tie may
+ matter, and only the reader knows): `sorted` renamed, the `.first` or `.last` removed. Which of `min` and `max`
+ follows the end and the comparator's direction. Read literally, `sorted(by: >).first` is `min(by: >)`, the
+ smallest by a reversed order, which is the largest said backwards. So where the comparator is written
+ descending, `by: >` or a closure whose one expression is a comparison with a single `>` outermost
+ (`{ $0.created > $1.created }`), the repair is the other one with the `>` turned to `<`: "newest" reads
+ `max { $0.created < $1.created }`, and `sorted(by: >).last` reads `min(by: <)`. The two are the same answer,
+ tie included: `min(by: >)` and `max(by: <)` both keep the first of the largest, as `sorted(by: >).first` does.
+ A compound predicate (`&&`, a tie-breaker), a `>=`, or a named function is not turned, and the repair keeps the
+ predicate as written. Turning `>` to `<` assumes the type that has one has the other, which `Comparable`
+ guarantees.
+
  Misses, accepted: a type of ours with its own `sorted`, and a collection type of ours that shadows `first` or
  `last`, resolve to ours and are not flagged; `sorted()[0]` and `sorted().prefix(1)` read an end too and are not
  SwiftLint's shapes, so they are left alone. No sibling rule's shape overlaps this one: `first-where` and
@@ -65,22 +78,109 @@ public struct SortedFirstLast: TypedFileRule {
         visitor.walk(file.tree)
         return visitor.found.compactMap { candidate in
             guard Self.resolves(candidate.sorted, in: file, symbols: symbols, symbolPrefix: "s:STs", names: ["sorted()", "sorted(by:)"]) else { return nil }
-            if candidate.end.text == "first" {
+            let isFirst = candidate.end.text == "first"
+            if isFirst {
                 guard Self.resolves(candidate.end, in: file, symbols: symbols, symbolPrefix: "s:Sls", names: ["first"]) else { return nil }
+            } else {
+                guard Self.resolves(candidate.end, in: file, symbols: symbols, symbolPrefix: "s:SKs", names: ["last"]) else { return nil }
+            }
+            let repair = Repair(candidate: candidate, isFirst: isFirst)
+            let suggestion = FindingRecord.Suggestion(message: repair.suggestion, fixes: repair.edits(candidate))
+            if isFirst {
                 return file.finding(
                     at: candidate.node,
                     rule: name,
                     messageId: "sortedFirst",
-                    message: "Sorting a collection to read its first element builds and sorts a whole new array to keep one element. Use min() (or min(by:) with the same predicate): it says what is meant, and it walks the elements once."
+                    message: "Sorting a collection to read its first element builds and sorts a whole new array to keep one element. Use \(repair.phrase): it says what is meant, and it walks the elements once.",
+                    suggestions: [suggestion]
                 )
             }
-            guard Self.resolves(candidate.end, in: file, symbols: symbols, symbolPrefix: "s:SKs", names: ["last"]) else { return nil }
             return file.finding(
                 at: candidate.node,
                 rule: name,
                 messageId: "sortedLast",
-                message: "Sorting a collection to read its last element builds and sorts a whole new array to keep one element. Use max() (or max(by:) with the same predicate): it says what is meant, and it walks the elements once. Among equally ordered elements max returns the first where sorted().last returned the last, so check that a tie does not matter."
+                message: "Sorting a collection to read its last element builds and sorts a whole new array to keep one element. Use \(repair.phrase): it says what is meant, and it walks the elements once. Among equally ordered elements \(repair.method) returns the first where sorted().last returned the last, so check that a tie does not matter.",
+                suggestions: [suggestion]
             )
+        }
+    }
+
+    /*
+     The call that replaces the sort and its end. The end picks `min` or `max`; a comparator written descending,
+     `>` alone or a closure whose one expression is a `>` comparison, picks the other one and its `>` becomes `<`.
+     */
+    struct Repair {
+        var method: String
+        /* The `>` that becomes `<`, where the comparator was written descending. */
+        var descending: TokenSyntax?
+        var hasComparator: Bool
+
+        init(candidate: Candidate, isFirst: Bool) {
+            descending = Self.descendingOperator(candidate.call)
+            let readsSmallest = isFirst != (descending != nil)
+            method = readsSmallest ? "min" : "max"
+            hasComparator = !candidate.call.arguments.isEmpty || candidate.call.trailingClosure != nil
+        }
+
+        var isTurnedAround: Bool { descending != nil }
+
+        /* The repair as the message says it. */
+        var phrase: String {
+            guard hasComparator else { return "\(method)()" }
+            guard isTurnedAround else { return "\(method)(by:) with the same predicate" }
+            let reads = method == "max" ? "the largest by the forward order rather than the smallest by a reversed one" : "the smallest by the forward order rather than the largest by a reversed one"
+            return "\(method)(by:) with the predicate's > turned to <, which reads as \(reads)"
+        }
+
+        /* The repair as the suggestion names it. */
+        var suggestion: String {
+            guard hasComparator else { return "Use \(method)()" }
+            return isTurnedAround ? "Use \(method)(by:) with < for >" : "Use \(method)(by:)"
+        }
+
+        /* `sorted` renamed, a descending `>` turned to `<`, and the `.first` or `.last` removed, with the line break before it when only whitespace sits there. */
+        func edits(_ candidate: Candidate) -> [FindingRecord.Edit] {
+            var edits = [FindingRecord.Edit(start: candidate.sorted.positionAfterSkippingLeadingTrivia.utf8Offset, end: candidate.sorted.endPositionBeforeTrailingTrivia.utf8Offset, text: method)]
+            if let descending {
+                edits.append(FindingRecord.Edit(start: descending.positionAfterSkippingLeadingTrivia.utf8Offset, end: descending.endPositionBeforeTrailingTrivia.utf8Offset, text: "<"))
+            }
+            var removalStart = candidate.node.period.positionAfterSkippingLeadingTrivia
+            if let base = candidate.node.base, (base.trailingTrivia + candidate.node.period.leadingTrivia).allSatisfy(\.isWhitespace) {
+                removalStart = base.endPositionBeforeTrailingTrivia
+            }
+            edits.append(FindingRecord.Edit(start: removalStart.utf8Offset, end: candidate.end.endPositionBeforeTrailingTrivia.utf8Offset, text: ""))
+            return edits
+        }
+
+        /*
+         The `>` of a comparator written descending: `by: >`, or a closure, trailing or labelled `by`, whose one
+         expression, alone or returned, is a comparison whose outermost operator is a single `>`
+         (`{ $0.created > $1.created }`). A compound predicate (`&&`, a tie-breaker) is left as written.
+         */
+        static func descendingOperator(_ call: FunctionCallExprSyntax) -> TokenSyntax? {
+            let comparator = call.trailingClosure.map(ExprSyntax.init) ?? call.arguments.first?.expression
+            guard let comparator else { return nil }
+            if let reference = comparator.as(DeclReferenceExprSyntax.self) {
+                return reference.baseName.tokenKind == .binaryOperator(">") ? reference.baseName : nil
+            }
+            guard let closure = comparator.as(ClosureExprSyntax.self), closure.statements.count == 1, let body = closure.statements.first else { return nil }
+            let comparison: ExprSyntax
+            switch body.item {
+            case .expr(let expression):
+                comparison = expression
+            case .stmt(let statement):
+                guard let returned = statement.as(ReturnStmtSyntax.self)?.expression else { return nil }
+                comparison = returned
+            case .decl:
+                return nil
+            }
+            guard let sequence = comparison.as(SequenceExprSyntax.self) else { return nil }
+            let greater = sequence.elements.compactMap { $0.as(BinaryOperatorExprSyntax.self) }.filter { $0.operator.tokenKind == .binaryOperator(">") }
+            guard greater.count == 1, let only = greater.first,
+                let folded = OperatorTable.standardOperators.foldSingle(sequence, errorHandler: { _ in }).as(InfixOperatorExprSyntax.self),
+                folded.operator.as(BinaryOperatorExprSyntax.self)?.operator.tokenKind == .binaryOperator(">")
+            else { return nil }
+            return only.operator
         }
     }
 
@@ -95,10 +195,11 @@ public struct SortedFirstLast: TypedFileRule {
         return resolved.symbol.hasPrefix(symbolPrefix) && names.contains(resolved.name)
     }
 
-    /* One shape found: the `first` or `last` read, its name token, and the `sorted` name token. */
+    /* One shape found: the `first` or `last` read, its name token, the `sorted` call and its name token. */
     struct Candidate {
         var node: MemberAccessExprSyntax
         var end: TokenSyntax
+        var call: FunctionCallExprSyntax
         var sorted: TokenSyntax
     }
 
@@ -108,10 +209,10 @@ public struct SortedFirstLast: TypedFileRule {
 
         override func visit(_ node: MemberAccessExprSyntax) -> SyntaxVisitorContinueKind {
             let end = node.declName.baseName
-            guard end.text == "first" || end.text == "last", node.declName.argumentNames == nil, !Self.isCalled(node), let base = node.base, let sorted = Self.sortedToken(base) else {
+            guard end.text == "first" || end.text == "last", node.declName.argumentNames == nil, !Self.isCalled(node), let base = node.base, let sorted = Self.sortedCall(base) else {
                 return .visitChildren
             }
-            found.append(Candidate(node: node, end: end, sorted: sorted))
+            found.append(Candidate(node: node, end: end, call: sorted.call, sorted: sorted.name))
             return .visitChildren
         }
 
@@ -121,8 +222,8 @@ public struct SortedFirstLast: TypedFileRule {
             return call.calledExpression.id == node.id
         }
 
-        /* The `sorted` name token of `items.sorted()`, `sorted(by:)`, `sorted { }`, or either inside one pair of parentheses. */
-        static func sortedToken(_ expression: ExprSyntax) -> TokenSyntax? {
+        /* The `sorted` call and its name token: `items.sorted()`, `sorted(by:)`, `sorted { }`, or either inside one pair of parentheses. */
+        static func sortedCall(_ expression: ExprSyntax) -> (call: FunctionCallExprSyntax, name: TokenSyntax)? {
             var callExpression = expression
             if let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1, let only = tuple.elements.first, only.label == nil {
                 callExpression = only.expression
@@ -131,10 +232,10 @@ public struct SortedFirstLast: TypedFileRule {
             let labels = call.arguments.map { $0.label?.text }
             guard labels.isEmpty || labels == ["by"] else { return nil }
             if let member = call.calledExpression.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "sorted", member.declName.argumentNames == nil {
-                return member.declName.baseName
+                return (call, member.declName.baseName)
             }
             if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self), reference.baseName.text == "sorted", reference.argumentNames == nil {
-                return reference.baseName
+                return (call, reference.baseName)
             }
             return nil
         }

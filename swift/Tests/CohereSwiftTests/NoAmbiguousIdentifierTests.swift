@@ -99,6 +99,63 @@ struct NoAmbiguousIdentifierTests {
         #expect(Self.findings(source).isEmpty)
     }
 
+    /*
+     Paper notation in a numeric kernel: a function, or a closure that writes its types, taking only numbers and
+     returning a number, an optional one or nothing. Barycentric `u` and `v` beside `x`, the law of cosines, a
+     ray against triangles held as tuples, a writer with no result, a closure inside a kernel that leaves its
+     types to inference, and a typed closure on its own.
+     */
+    @Test func paperNotationInANumericKernelIsAllowed() {
+        let source = """
+            func barycentric(_ x: Float, _ y: Float, edge1: SIMD2<Float>, edge2: SIMD2<Float>, determinant: Float) -> SIMD2<Float> {
+                let u = (x * edge2.y - edge2.x * y) / determinant
+                let v = (edge1.x * y - x * edge1.y) / determinant
+                return SIMD2(u, v)
+            }
+            func angle(a: Double, b: Double, c: Double) -> Double {
+                acos((a * a + b * b - c * c) / (2 * a * b))
+            }
+            func hit(origin: SIMD3<Float>, direction: SIMD3<Float>, on triangles: [(SIMD3<Float>, SIMD3<Float>, SIMD3<Float>)]) -> Float? {
+                for (a, b, c) in triangles {
+                    let p = simd_cross(direction, c - a)
+                    let t = simd_dot(b - a, p)
+                    if t > 0 { return t }
+                }
+                return nil
+            }
+            func draw(_ a: SIMD3<Float>, _ b: SIMD3<Float>, into depth: inout [Float]) {
+                depth = depth.map { d in d + a.z - b.z }
+            }
+            func slerp(_ p: simd_quatd, _ q: simd_quatd, _ t: Double) -> simd_quatd { simd_slerp(p, q, t) }
+            let lerp = { (a: Float, b: Float, t: Float) -> Float in a + (b - a) * t }
+            """
+        #expect(Self.findings(source).isEmpty)
+    }
+
+    /*
+     Not a kernel, or not a kernel's letter: a parameter that is not a number, a result that is not one, no
+     parameters, integers alone, a type, a nested function or an initializer between the name and the kernel, a
+     letter outside the short set, and `e`, which is never exempt.
+     */
+    @Test func lettersOutsideANumericKernelAreFound() {
+        let source = """
+            func describe(t: Float, body: Body) -> Float { t }
+            func label(t: Float) -> String { "" }
+            func reset() { let t = 0.0 }
+            func join(_ a: Int, _ b: Int) -> Int { a + b }
+            func kernel(_ t: Float) -> Float {
+                struct Sample { let u: Float }
+                func name(of value: Float) -> String { let v = "\\(value)"; return v }
+                let n = 2
+                return t * Float(n)
+            }
+            struct Ray { init(t: Float) { let u = t } }
+            func clamp(_ t: Double) -> Double { do { return t } catch let e { return 0 } }
+            let typed = { (a: Float, name: String) -> Float in a }
+            """
+        #expect(Self.positions(source) == ["1:15", "2:12", "3:20", "4:13", "4:23", "6:25", "7:48", "8:9", "11:19", "11:35", "12:63", "13:16"])
+    }
+
     /* Each of these looks like a comparator and is not one the Go rule would recognize. */
     @Test func aAndBOutsideAComparatorAreFound() {
         let source = """

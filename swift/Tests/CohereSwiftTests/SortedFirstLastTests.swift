@@ -205,6 +205,93 @@ struct SortedFirstLastTests {
         #expect(Self.findings(source).isEmpty)
     }
 
+    /* The findings on a source whose every `sorted`, `first` and `last` resolves to the standard library's. */
+    static func records(_ source: String) -> [FindingRecord] {
+        let url = URL(fileURLWithPath: "/fixture/Subject.swift")
+        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        var occurrences: [FileSymbols.Occurrence] = []
+        for token in file.tree.tokens(viewMode: .sourceAccurate) {
+            let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
+            let resolution: Resolution? =
+                switch token.text {
+                case "sorted": standardSorted(token)
+                case "first": collectionFirst
+                case "last": bidirectionalLast
+                default: nil
+                }
+            guard let resolution else { continue }
+            occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: resolution.symbol, name: resolution.name, isReference: true))
+        }
+        return SortedFirstLast().findings(in: file, symbols: FileSymbols(occurrences))
+    }
+
+    /* The source with every finding's suggested edits applied, last first so each offset still points where it did. */
+    static func repaired(_ source: String) -> String {
+        var bytes = Array(source.utf8)
+        for edit in records(source).flatMap({ $0.suggestions.flatMap(\.fixes) }).sorted(by: { $0.start > $1.start }) {
+            bytes.replaceSubrange(edit.start..<edit.end, with: Array(edit.text.utf8))
+        }
+        return String(decoding: bytes, as: UTF8.self)
+    }
+
+    /*
+     The repair follows the comparator's direction: a descending `>`, alone or the one comparison of a closure,
+     makes the read the other one of `min` and `max` with `<`, so "newest" reads `max { $0.created < $1.created }`.
+     A forward comparator, no comparator, and a compound predicate keep what they say.
+     */
+    @Test func aDescendingComparatorIsRepairedAsTheOtherEndWithTheForwardOne() {
+        let source = """
+            let newest = posts.sorted { $0.created > $1.created }.first
+            let oldest = posts.sorted { $0.created > $1.created }.last
+            let largest = values.sorted(by: >).first
+            let smallest = values.sorted(by: >).last
+            let returned = posts.sorted(by: { first, second in return first.created > second.created }).first
+            let ascending = values.sorted(by: { $0 < $1 }).first
+            let plain = values.sorted().last
+            let compound = posts.sorted { $0.rank > $1.rank || $0.name < $1.name }.first
+            let chained = [3, 1, 2]
+                .sorted(by: >)
+                .first
+
+            """
+        let expected = """
+            let newest = posts.max { $0.created < $1.created }
+            let oldest = posts.min { $0.created < $1.created }
+            let largest = values.max(by: <)
+            let smallest = values.min(by: <)
+            let returned = posts.max(by: { first, second in return first.created < second.created })
+            let ascending = values.min(by: { $0 < $1 })
+            let plain = values.max()
+            let compound = posts.min { $0.rank > $1.rank || $0.name < $1.name }
+            let chained = [3, 1, 2]
+                .max(by: <)
+
+            """
+        #expect(Self.repaired(source) == expected)
+    }
+
+    /* The message says the repair the suggestion makes, and the tie the `last` side still has to check. */
+    @Test func theMessageNamesTheRepair() throws {
+        let source = """
+            let newest = posts.sorted { $0.created > $1.created }.first
+            let smallest = values.sorted(by: >).last
+            let ascending = values.sorted(by: { $0 < $1 }).first
+            let plain = values.sorted().last
+
+            """
+        let findings = Self.records(source)
+        #expect(findings.map { $0.suggestions.map(\.message) } == [["Use max(by:) with < for >"], ["Use min(by:) with < for >"], ["Use min(by:)"], ["Use max()"]])
+        #expect(
+            findings.first?.message
+                == "Sorting a collection to read its first element builds and sorts a whole new array to keep one element. Use max(by:) with the predicate's > turned to <, which reads as the largest by the forward order rather than the smallest by a reversed one: it says what is meant, and it walks the elements once."
+        )
+        let smallest = try #require(findings.dropFirst().first)
+        #expect(smallest.message.contains("Use min(by:) with the predicate's > turned to <, which reads as the smallest by the forward order rather than the largest by a reversed one"))
+        #expect(smallest.message.contains("Among equally ordered elements min returns the first where sorted().last returned the last"))
+        #expect(findings.dropFirst(2).first?.message.contains("Use min(by:) with the same predicate:") == true)
+        #expect(findings.last?.message.contains("Use max():") == true)
+    }
+
     @Test func aFileWithNoSortedDoesNotApply() {
         let source = "let first = items.first\nlet last = items.last\n"
         let file = ParsedFile(url: URL(fileURLWithPath: "/Plain.swift"), targetName: "Control", targetKind: "regular", source: source, tree: Parser.parse(source: source), nodeCount: 0)

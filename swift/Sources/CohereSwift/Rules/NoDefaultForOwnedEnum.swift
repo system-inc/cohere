@@ -31,6 +31,24 @@ import SwiftSyntax
  that one anchor, the subject is the enum or an optional of it, and every other pattern (a static member, a
  `let` binding, a `where` guard) is still a pattern on it.
 
+ One shape keeps its `default`, by Kirk's ruling (2026-10-03): "default is allowed only when every remaining
+ case maps to the same constant, nil or rawValue. A switch that decides behavior still lists every case." A
+ projection names a value for each case, `case .socks: .socks`, `case .glasses: self.rawValue`, `default: nil`,
+ and a case added later has nothing to decide that the constant does not already say: it is not a garment slot,
+ or its name is its raw value. The compiler pointing at every such switch buys a list of cases and no decision.
+ Read by structure: every arm, the listed ones and the `default`, is one expression or one `return` of one, and
+ that expression is a constant. A constant is a literal (a number, a negated number, a string with no
+ interpolation, `true`, `false`, `nil`, an array or dictionary of constants), an enum case or static member named
+ bare (`.socks`, `Garments.Slot.socks`, `RigTransform.identity`), the subject's raw value (`self.rawValue`, a bare
+ `rawValue` when the subject is `self`, `<subject>.rawValue`), or a constructor whose arguments are all constants
+ (`RigRotator(pitch: 0, yaw: 0, roll: 0)`, `.part(.mouth)`). A call named by a type (`RigRotator(...)`,
+ `SIMD3<Float>(...)`, `.init(...)`) is a constructor by its spelling. A call named by a member or a lowercase
+ name (`.part(.mouth)`, `simd_quatd(...)`) could be any function, so it counts only where the index resolved
+ the name to an enum element or an initializer. Anything else in any arm makes the switch behavioral and the
+ `default` is still reported: a call to a function, an assignment, a branch (`value ? 1 : 0`), a binding read
+ from a payload (`case .name(let value): value`), a `break`, or more than one statement. A `where` guard on a
+ listed case is the pattern's, not the arm's, and does not decide.
+
  Misses, accepted. A switch whose patterns name no element: only `default`, values, ranges, `let` bindings,
  `where`-only clauses. A switch whose every element is written with its type (`Status.running`), which no
  leading dot anchors. Tuple subjects (`switch (left, right)`), where a `default` stands for the combinations
@@ -69,12 +87,23 @@ public struct NoDefaultForOwnedEnum: TypedFileRule {
                 }
             }
             guard isAnchored, isOwned, enums.count == 1, let element = enums.values.first else { return nil }
+            if let projection = candidate.projection, projection.calls.allSatisfy({ Self.isConstructor($0, file: file, symbols: symbols) }) {
+                return nil
+            }
             return file.finding(
                 at: candidate.defaultKeyword,
                 rule: name,
                 messageId: "noDefaultForOwnedEnum",
                 message: "This default answers for every case of \(element.enumName), including any added later, so the compiler can no longer say this switch does not handle a new one. List the remaining cases instead."
             )
+        }
+    }
+
+    /* Whether the index resolved this called name to an enum element (`.part(.mouth)`) or an initializer (`simd_quatd(ix:iy:iz:r:)`), not to some other function. */
+    static func isConstructor(_ name: TokenSyntax, file: ParsedFile, symbols: FileSymbols) -> Bool {
+        let location = file.locations.location(for: name.positionAfterSkippingLeadingTrivia)
+        return symbols.occurrences(line: location.line, column: location.column).contains { occurrence in
+            occurrence.isReference && (Self.element(occurrence.symbol) != nil || occurrence.name.hasPrefix("init("))
         }
     }
 
@@ -223,10 +252,16 @@ public struct NoDefaultForOwnedEnum: TypedFileRule {
         var pattern: PatternSyntax
     }
 
-    /* A switch with a plain `default:`, its keyword, and every element its patterns name. */
+    /* A switch with a plain `default:`, its keyword, every element its patterns name, and whether its every arm is a constant. */
     struct Candidate {
         var defaultKeyword: TokenSyntax
         var heads: [Head]
+        var projection: Projection?
+    }
+
+    /* A switch whose every arm is a constant, given that each name in `calls`, a call the spelling cannot vouch for, resolves to a constructor. */
+    struct Projection {
+        var calls: [TokenSyntax]
     }
 
     final class Visitor: SyntaxVisitor {
@@ -238,7 +273,8 @@ public struct NoDefaultForOwnedEnum: TypedFileRule {
             }
             var defaultKeyword: TokenSyntax?
             var heads: [Head] = []
-            for switchCase in Self.cases(node.cases) {
+            let cases = Self.cases(node.cases)
+            for switchCase in cases {
                 switch switchCase.label {
                 case .default(let label):
                     if switchCase.attribute == nil {
@@ -251,9 +287,95 @@ public struct NoDefaultForOwnedEnum: TypedFileRule {
                 }
             }
             if let defaultKeyword {
-                found.append(Candidate(defaultKeyword: defaultKeyword, heads: heads))
+                found.append(Candidate(defaultKeyword: defaultKeyword, heads: heads, projection: Self.projection(cases, subject: node.subject)))
             }
             return .visitChildren
+        }
+
+        /* Every arm one constant, alone or returned, and the calls among them the index must confirm; nil where any arm decides something. */
+        static func projection(_ cases: [SwitchCaseSyntax], subject: ExprSyntax) -> Projection? {
+            var calls: [TokenSyntax] = []
+            for switchCase in cases {
+                guard switchCase.statements.count == 1, let body = switchCase.statements.first else { return nil }
+                let value: ExprSyntax
+                switch body.item {
+                case .expr(let expression):
+                    value = expression
+                case .stmt(let statement):
+                    guard let returned = statement.as(ReturnStmtSyntax.self)?.expression else { return nil }
+                    value = returned
+                case .decl:
+                    return nil
+                }
+                guard isConstant(value, subject: subject, calls: &calls) else { return nil }
+            }
+            return Projection(calls: calls)
+        }
+
+        /* A constant as the header defines one. A call whose name only the index can vouch for is added to `calls`. */
+        static func isConstant(_ expression: ExprSyntax, subject: ExprSyntax, calls: inout [TokenSyntax]) -> Bool {
+            if expression.is(IntegerLiteralExprSyntax.self) || expression.is(FloatLiteralExprSyntax.self) || expression.is(BooleanLiteralExprSyntax.self)
+                || expression.is(NilLiteralExprSyntax.self)
+            {
+                return true
+            }
+            if let string = expression.as(StringLiteralExprSyntax.self) {
+                return string.segments.allSatisfy { $0.is(StringSegmentSyntax.self) }
+            }
+            if let negated = expression.as(PrefixOperatorExprSyntax.self) {
+                return negated.operator.text == "-" && (negated.expression.is(IntegerLiteralExprSyntax.self) || negated.expression.is(FloatLiteralExprSyntax.self))
+            }
+            if let array = expression.as(ArrayExprSyntax.self) {
+                return array.elements.allSatisfy { isConstant($0.expression, subject: subject, calls: &calls) }
+            }
+            if let dictionary = expression.as(DictionaryExprSyntax.self) {
+                guard case .elements(let elements) = dictionary.content else { return true }
+                return elements.allSatisfy { isConstant($0.key, subject: subject, calls: &calls) && isConstant($0.value, subject: subject, calls: &calls) }
+            }
+            if let reference = expression.as(DeclReferenceExprSyntax.self) {
+                return reference.baseName.text == "rawValue" && reference.argumentNames == nil && subject.as(DeclReferenceExprSyntax.self)?.baseName.tokenKind == .keyword(.self)
+            }
+            if let member = expression.as(MemberAccessExprSyntax.self) {
+                guard member.declName.argumentNames == nil else { return false }
+                guard let base = member.base else { return true }
+                if member.declName.baseName.text == "rawValue" {
+                    return base.as(DeclReferenceExprSyntax.self)?.baseName.tokenKind == .keyword(.self) || base.trimmedDescription == subject.trimmedDescription
+                }
+                return isTypeReference(base)
+            }
+            if let call = expression.as(FunctionCallExprSyntax.self) {
+                guard call.trailingClosure == nil, call.additionalTrailingClosures.isEmpty,
+                    call.arguments.allSatisfy({ isConstant($0.expression, subject: subject, calls: &calls) })
+                else { return false }
+                if isTypeReference(call.calledExpression) {
+                    return true
+                }
+                if let member = call.calledExpression.as(MemberAccessExprSyntax.self), member.declName.argumentNames == nil, member.base.map(isTypeReference) ?? true {
+                    if member.declName.baseName.tokenKind != .keyword(.`init`) {
+                        calls.append(member.declName.baseName)
+                    }
+                    return true
+                }
+                if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self), reference.argumentNames == nil {
+                    calls.append(reference.baseName)
+                    return true
+                }
+            }
+            return false
+        }
+
+        /* A type named by its spelling: `RigRotator`, `Garments.Slot`, `SIMD3<Float>`, each part capitalized as types are. */
+        static func isTypeReference(_ expression: ExprSyntax) -> Bool {
+            if let reference = expression.as(DeclReferenceExprSyntax.self) {
+                return reference.argumentNames == nil && reference.baseName.text.first?.isUppercase == true
+            }
+            if let member = expression.as(MemberAccessExprSyntax.self), let base = member.base {
+                return member.declName.argumentNames == nil && member.declName.baseName.text.first?.isUppercase == true && isTypeReference(base)
+            }
+            if let specialized = expression.as(GenericSpecializationExprSyntax.self) {
+                return isTypeReference(specialized.expression)
+            }
+            return false
         }
 
         /* The switch's own cases, through `#if` clauses, and none of a nested switch's. */
