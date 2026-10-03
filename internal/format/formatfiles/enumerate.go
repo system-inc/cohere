@@ -6,6 +6,7 @@ package formatfiles
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -133,6 +134,10 @@ func readIgnoreFile(path string) ([]string, error) {
 // gitignore implementation and must not pretend to be one, because the cost of quietly
 // mis-implementing negation or double-star is a file silently missing, which is the failure this
 // package exists to prevent. Anything more exotic belongs in a real matcher.
+//
+// relative is slash-separated on every platform, and the globs are matched with path.Match, which reads
+// `/` as the separator and `\` as an escape everywhere, as gitignore does. filepath.Match on Windows
+// reads `\` as the separator instead, so `*` crossed `/` there.
 func matchesIgnore(relative string, pattern string) bool {
 	pattern = strings.TrimPrefix(pattern, "/")
 
@@ -148,7 +153,7 @@ func matchesIgnore(relative string, pattern string) bool {
 			segments := strings.Split(relative, "/")
 			wanted := len(strings.Split(directory, "/"))
 			if len(segments) >= wanted {
-				if matched, _ := filepath.Match(directory, strings.Join(segments[:wanted], "/")); matched {
+				if matched, _ := path.Match(directory, strings.Join(segments[:wanted], "/")); matched {
 					return true
 				}
 			}
@@ -159,10 +164,10 @@ func matchesIgnore(relative string, pattern string) bool {
 	}
 	if strings.ContainsAny(pattern, "*?[") {
 		if strings.Contains(pattern, "/") {
-			matched, _ := filepath.Match(pattern, relative)
+			matched, _ := path.Match(pattern, relative)
 			return matched
 		}
-		matched, _ := filepath.Match(pattern, filepath.Base(relative))
+		matched, _ := path.Match(pattern, path.Base(relative))
 		return matched
 	}
 	if relative == pattern || strings.HasSuffix(relative, "/"+pattern) {
@@ -306,6 +311,10 @@ func Enumerate(root string, structureIgnorePath string, handles func(fileName st
 		if relativeError != nil {
 			return nil
 		}
+		// Every ignore pattern is written with `/`, and matchesIgnore reads `/` as the separator. On
+		// Windows Rel answers with `\`, which no nested pattern would match: `dist`, `.next/` and
+		// `modules/*/data/` covered only the top level, and the walk formatted what they name.
+		relative = filepath.ToSlash(relative)
 		if info.IsDir() {
 			// .git is never formatted and walking it is pure cost on a large repo.
 			if info.Name() == ".git" {

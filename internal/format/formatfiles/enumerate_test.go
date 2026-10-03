@@ -358,3 +358,39 @@ func TestNestedRepositoryContainingNamesTheOutermostBelowTheRoot(t *testing.T) {
 		t.Error("a submodule's gitlink file was not recognized as a repository of its own")
 	}
 }
+
+// Ignore patterns cover the paths they name at any depth, not only at the top. On Windows the walk's
+// relative paths came back with `\`, and every pattern that tests a `/` matched only top-level paths:
+// a nested `dist`, `.next/` or `modules/*/data/` was walked and formatted. The walk now hands the
+// matcher slash paths on every platform. This holds the nested cases, so the Windows leg runs it where
+// the separator differs.
+func TestIgnorePatternsCoverNestedPaths(t *testing.T) {
+	root := writeTree(t, map[string]string{
+		".gitignore":                   "dist\n.next/\nmodules/*/data/\nsrc/*.gen.ts\n*.log\n",
+		"kept.ts":                      "export const kept = 1;\n",
+		"packages/web/dist/out.ts":     "export const out = 1;\n",
+		"apps/site/.next/page.ts":      "export const page = 1;\n",
+		"modules/tasks/data/huge.json": "{}\n",
+		"modules/tasks/source/Task.ts": "export const task = 1;\n",
+		"src/model.gen.ts":             "export const generated = 1;\n",
+		"src/deep/model.gen.ts":        "export const deeper = 1;\n",
+		"logs/nested/run.log":          "line\n",
+	})
+
+	enumeration, err := Enumerate(root, "", handlesEveryLanguage)
+	if err != nil {
+		t.Fatalf("enumerate: %v", err)
+	}
+	survivors := []string{}
+	for _, file := range enumeration.Files {
+		relative, _ := filepath.Rel(root, file)
+		survivors = append(survivors, filepath.ToSlash(relative))
+	}
+	sort.Strings(survivors)
+	// `src/*.gen.ts` names one directory, as gitignore reads a pattern holding a slash, so the deeper
+	// file is kept.
+	want := []string{"kept.ts", "modules/tasks/source/Task.ts", "src/deep/model.gen.ts"}
+	if strings.Join(survivors, " ") != strings.Join(want, " ") {
+		t.Errorf("survivors = %v, want %v", survivors, want)
+	}
+}
