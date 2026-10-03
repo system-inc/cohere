@@ -5,7 +5,7 @@ import Foundation
  reported under a cohere name.
 
  Where the incumbent's rule is exactly the house rule, running it is the strongest parity there is: the
- findings are swift-format's by construction, and nothing can drift. `require-lower-camel-case` is
+ findings are swift-format's by construction, and nothing can drift. `always-use-lower-camel-case` is
  `AlwaysUseLowerCamelCase` (with its exemptions: `override`s, and underscores in XCTest and `@Test` method
  names), and `no-leading-underscores` is `NoLeadingUnderscores`. The house adds the reason to each message;
  the location and the name are swift-format's.
@@ -27,7 +27,7 @@ public struct SwiftFormatRule: FileRule {
     }
 
     public static let requireLowerCamelCase = SwiftFormatRule(
-        name: "cohere-swift/require-lower-camel-case",
+        name: "cohere-swift/always-use-lower-camel-case",
         incumbentRule: "AlwaysUseLowerCamelCase",
         reason: "Swift spells values in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name is a word boundary camel case already marks."
     )

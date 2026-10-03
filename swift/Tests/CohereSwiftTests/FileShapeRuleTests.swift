@@ -4,7 +4,7 @@ import Testing
 
 @testable import CohereSwift
 
-/* Fixtures for file-named-for-type: a file named for its main type, and a purpose file with its helpers (Kirk's rulings of 2026-10-03). */
+/* Fixtures for consistency-require-matching-file-name: a file named for its main type, and a purpose file with its helpers (Kirk's rulings of 2026-10-03). */
 struct FileShapeRuleTests {
     static func file(_ name: String, _ source: String) -> ParsedFile {
         ParsedFile(url: URL(fileURLWithPath: "/fixture/\(name)"), targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
@@ -18,16 +18,16 @@ struct FileShapeRuleTests {
 
     @Test func oneTypeWithNestedHelpersPasses() {
         let source = "struct Pane {\n    struct Layout {}\n    enum Mode { case a }\n}\nextension Pane { func draw() {} }\n"
-        #expect(Self.messages(FileNamedForType(), "Pane.swift", source).isEmpty)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Pane.swift", source).isEmpty)
     }
 
     /* How many types a file holds is not judged; the name must lead to one of them, the main one. */
     @Test func aFileOfSeveralTypesIsNamedForTheMainOne() {
         let source = "struct Pane {}\nfinal class Box {}\nactor Worker {}\nprotocol Drawable {}\n"
-        #expect(Self.messages(FileNamedForType(), "Pane.swift", source).isEmpty)
-        #expect(Self.messages(FileNamedForType(), "Utilities.swift", source) == ["fileNotNamedForType"])
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Pane.swift", source).isEmpty)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Utilities.swift", source) == ["fileNotNamedForType"])
         /* The main type need not come first: the one the file is named for is its own. */
-        #expect(Self.messages(FileNamedForType(), "Pane.swift", "final class Helper {}\nstruct Pane {}\n").isEmpty)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Pane.swift", "final class Helper {}\nstruct Pane {}\n").isEmpty)
     }
 
     /* A struct of `lines` lines, braces included, so a fixture can sit exactly at the limit or one past it. */
@@ -35,9 +35,9 @@ struct FileShapeRuleTests {
         "struct \(name) {\n" + (0..<(lines - 2)).map { "    var field\($0) = 0\n" }.joined() + "}\n"
     }
 
-    /* What file-named-for-type says of a purpose file holding `source` beside the extension it is named for. */
+    /* What consistency-require-matching-file-name says of a purpose file holding `source` beside the extension it is named for. */
     static func besidePurpose(_ source: String) -> [String] {
-        Self.messages(FileNamedForType(), "Pane+Layout.swift", "extension Pane {\n    func layout() {}\n}\n" + source)
+        Self.messages(ConsistencyRequireMatchingFileName(), "Pane+Layout.swift", "extension Pane {\n    func layout() {}\n}\n" + source)
     }
 
     /* In a purpose file a private helper stays at any size, and a protocol or a class beside it is a type the file is not named for. */
@@ -75,79 +75,79 @@ struct FileShapeRuleTests {
 
     @Test func aTypeInBothBranchesOfAnIfIsOneType() {
         let source = "#if os(macOS)\nstruct Pane {}\n#else\nstruct Pane {}\n#endif\n"
-        #expect(Self.messages(FileNamedForType(), "Pane.swift", source).isEmpty)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Pane.swift", source).isEmpty)
     }
 
     @Test func aTypeAliasIsNotAType() {
         let source = "typealias Panes = [Pane]\nstruct Pane {}\n"
-        #expect(Self.messages(FileNamedForType(), "Pane.swift", source).isEmpty)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Pane.swift", source).isEmpty)
     }
 
     @Test func aFileNotNamedForItsTypeIsReported() {
-        #expect(Self.messages(FileNamedForType(), "Utilities.swift", "final class Pane {}\n") == ["fileNotNamedForType"])
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Utilities.swift", "final class Pane {}\n") == ["fileNotNamedForType"])
     }
 
     @Test func anExtensionOfAnotherTypeBelongsInItsOwnFile() {
         let source = "struct Pane {}\nextension String { var trimmed: String { self } }\n"
-        #expect(Self.messages(FileNamedForType(), "Pane.swift", source) == ["extensionOutsideItsFile"])
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Pane.swift", source) == ["extensionOutsideItsFile"])
     }
 
     @Test func aPrivateExtensionStaysBesideItsType() {
         let source = "struct App {}\nprivate extension View { var windowEnvironment: Int { 0 } }\n"
-        #expect(Self.messages(FileNamedForType(), "App.swift", source).isEmpty)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "App.swift", source).isEmpty)
     }
 
     @Test func aPrivateHelperExtensionStaysInAPurposeFile() {
         let source = "extension Terminal.SeededVtState { func wireCheckpoint() {} }\nfileprivate extension VtColor { init(value: Int) {} }\n"
-        #expect(Self.messages(FileNamedForType(), "Terminal+AuthoritativeCheckpoint.swift", source).isEmpty)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Terminal+AuthoritativeCheckpoint.swift", source).isEmpty)
     }
 
     /* The control: with no visible face, a private extension is just a misnamed file. */
     @Test func aFileOfOnlyPrivateExtensionsIsStillNamedForWhatItExtends() {
         let source = "private extension VtColor { init(value: Int) {} }\n"
-        #expect(Self.messages(FileNamedForType(), "Helpers.swift", source) == ["extensionOutsideItsFile"])
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Helpers.swift", source) == ["extensionOutsideItsFile"])
     }
 
     /* The SwiftUI modifier idiom: the extension is the modifier's public face. */
     @Test func anExtensionExposingTheFilesTypeStaysBesideIt() {
         let source = "struct DelayWidthUntilIdle: ViewModifier {}\nextension View {\n    func delayWidthUntilIdle() -> some View { modifier(DelayWidthUntilIdle()) }\n}\n"
-        #expect(Self.messages(FileNamedForType(), "DelayWidthUntilIdle.swift", source).isEmpty)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "DelayWidthUntilIdle.swift", source).isEmpty)
     }
 
     /* One member that does not name the type is enough to send the extension to its own file. */
     @Test func anExtensionWithUnrelatedMembersStillMoves() {
         let source = "struct Pane {}\nextension View {\n    func pane() -> Pane { Pane() }\n    func unrelated() {}\n}\n"
-        #expect(Self.messages(FileNamedForType(), "Pane.swift", source) == ["extensionOutsideItsFile"])
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Pane.swift", source) == ["extensionOutsideItsFile"])
     }
 
     @Test func purposeFilesPass() {
-        #expect(Self.messages(FileNamedForType(), "String+Trimming.swift", "extension String {}\n").isEmpty)
-        #expect(Self.messages(FileNamedForType(), "Array+Chunks.swift", "extension Array where Element == Int {}\n").isEmpty)
-        #expect(Self.messages(FileNamedForType(), "Outer+Inner.swift", "extension Outer.Inner {}\n").isEmpty)
-        #expect(Self.messages(FileNamedForType(), "Outer.Inner+Codable.swift", "extension Outer.Inner: Codable {}\n").isEmpty)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "String+Trimming.swift", "extension String {}\n").isEmpty)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Array+Chunks.swift", "extension Array where Element == Int {}\n").isEmpty)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Outer+Inner.swift", "extension Outer.Inner {}\n").isEmpty)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Outer.Inner+Codable.swift", "extension Outer.Inner: Codable {}\n").isEmpty)
     }
 
     /* A purpose file's helpers stay beside the extension it is named for; a bigger internal type, or a file whose only face is the helper, still answers. */
     @Test func aPurposeFileMayHoldHelperTypes() {
         let privateHelper = "extension Prune {\n    func run() {}\n}\nprivate struct BinarySlice {\n    var low: Int\n}\nextension BinarySlice { var isEmpty: Bool { low == 0 } }\n"
-        #expect(Self.messages(FileNamedForType(), "Prune+Search.swift", privateHelper).isEmpty)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Prune+Search.swift", privateHelper).isEmpty)
         let smallValues = "extension StagePane {\n    func probe() {}\n}\nstruct ProbeResult {\n    var score: Double\n}\nenum ProbeStage { case warm, run }\n"
-        #expect(Self.messages(FileNamedForType(), "StagePane+Probe.swift", smallValues).isEmpty)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "StagePane+Probe.swift", smallValues).isEmpty)
         let internalClass = "extension StagePane {\n    func probe() {}\n}\nfinal class ProbeRunner {}\n"
-        #expect(Self.messages(FileNamedForType(), "StagePane+Probe.swift", internalClass).count == 1)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "StagePane+Probe.swift", internalClass).count == 1)
         let helperAsTheOnlyFace = "private extension StagePane {\n    func probe() {}\n}\nprivate struct ProbeResult {}\n"
-        #expect(Self.messages(FileNamedForType(), "StagePane+Probe.swift", helperAsTheOnlyFace).count == 1)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "StagePane+Probe.swift", helperAsTheOnlyFace).count == 1)
     }
 
     @Test func anExtensionOnlyFileNamedForSomethingElseIsReported() {
-        #expect(Self.messages(FileNamedForType(), "Helpers.swift", "extension String {}\n") == ["extensionOutsideItsFile"])
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Helpers.swift", "extension String {}\n") == ["extensionOutsideItsFile"])
     }
 
     @Test func mainKeepsItsName() {
-        #expect(Self.messages(FileNamedForType(), "main.swift", "struct Tool {}\nTool().run()\n").isEmpty)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "main.swift", "struct Tool {}\nTool().run()\n").isEmpty)
     }
 
     @Test func freeFunctionsHaveNoNameToMatch() {
-        #expect(Self.messages(FileNamedForType(), "Math.swift", "func clamp(_ value: Int) -> Int { value }\n").isEmpty)
+        #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Math.swift", "func clamp(_ value: Int) -> Int { value }\n").isEmpty)
     }
 }

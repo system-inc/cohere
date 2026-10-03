@@ -5,8 +5,8 @@
 {"kind":"finding","source":"compiler","file":"/project/Sources/Example/Warning.swift","line":2,"column":9,"endLine":2,"endColumn":21,"severity":"warning","rule":"VariableNeverMutated","messageId":"variable_never_mutated","message":"variable 'neverMutated' was never mutated; consider changing to 'let' constant","fixes":[{"start":30,"end":33,"text":"let"}],"suggestions":[]}
 {"kind":"types","diagnostics":1,"files":2,"elapsedMilliseconds":900,"filesWithoutRecord":[],"build":"swift build, scratch /cache/cohere/swift/0000"}
 {"kind":"phase","name":"types","outcome":"ran","elapsedMilliseconds":900,"detail":""}
-{"kind":"finding","source":"rule","file":"/project/Sources/Example/ByteRing.swift","line":159,"column":61,"endLine":159,"endColumn":62,"severity":"error","rule":"cohere-swift/no-force-unwrap","messageId":"forceUnwrap","message":"A force unwrap crashes the process when the value is nil.\nSay what happens on nil with guard let or if let.","fixes":[],"suggestions":[]}
-{"kind":"lint","findings":1,"rulesRun":4,"filesWalked":2,"nodesVisited":640,"elapsedMilliseconds":12,"reusedFrom":"","rulesSilent":["cohere-swift/no-force-cast"],"rulesWatchedAndQuiet":2,"crashes":[],"rulesScopedOff":{},"rulesNotConfigured":[],"configNote":""}
+{"kind":"finding","source":"rule","file":"/project/Sources/Example/ByteRing.swift","line":159,"column":61,"endLine":159,"endColumn":62,"severity":"error","rule":"cohere-swift/force-unwrapping","messageId":"forceUnwrap","message":"A force unwrap crashes the process when the value is nil.\nSay what happens on nil with guard let or if let.","fixes":[],"suggestions":[]}
+{"kind":"lint","findings":1,"rulesRun":4,"filesWalked":2,"nodesVisited":640,"elapsedMilliseconds":12,"reusedFrom":"","rulesSilent":["cohere-swift/force-cast"],"rulesWatchedAndQuiet":2,"crashes":[],"rulesScopedOff":{},"rulesNotConfigured":[],"configNote":""}
 {"kind":"phase","name":"lint","outcome":"ran","elapsedMilliseconds":12,"detail":""}
 {"kind":"phase","name":"unused","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested — this is a report, ask for it with --unused"}
 {"kind":"summary","findings":2,"complete":true,"exitCode":1}

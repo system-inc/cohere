@@ -9,8 +9,8 @@ import SwiftSyntax
  Interface Builder, and a rule decision belongs in the rule, never in config. Matches SwiftLint's
  `implicitly_unwrapped_optional` and swift-format's `NeverUseImplicitlyUnwrappedOptionals`.
  */
-public struct NoImplicitlyUnwrappedOptional: FileRule {
-    public let name = "cohere-swift/no-implicitly-unwrapped-optional"
+public struct ImplicitlyUnwrappedOptional: FileRule {
+    public let name = "cohere-swift/implicitly-unwrapped-optional"
 
     public init() {}
 

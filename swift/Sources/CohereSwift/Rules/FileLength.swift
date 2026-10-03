@@ -21,8 +21,8 @@ import Foundation
  explanation out of the file, the opposite of what the house wants. SwiftLint reports at the last line; this
  rule reports once at line 1, column 1, zero width, because the file as a whole is what is too long.
  */
-public struct MaxFileLines: FileRule {
-    public let name = "cohere-swift/max-file-lines"
+public struct FileLength: FileRule {
+    public let name = "cohere-swift/file-length"
 
     public static let maximumLines = 2_000
 

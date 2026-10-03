@@ -9,22 +9,22 @@ public enum RuleRegistry {
      leaving the naming rule judging nothing.
      */
     public static func fileRules(vocabulary: AbbreviationVocabulary) -> [any FileRule] { [
-        NoForceUnwrap(),
-        NoForceTry(),
+        ForceUnwrapping(),
+        ForceTry(),
         PerformanceNoIndependentAwaitInLoop(),
-        NoForceCast(),
-        NoImplicitlyUnwrappedOptional(),
-        FileNamedForType(),
-        MaxFileLines(),
-        NoPrint(),
+        ForceCast(),
+        ImplicitlyUnwrappedOptional(),
+        ConsistencyRequireMatchingFileName(),
+        FileLength(),
+        ConsistencyNoPrint(),
         ConcurrencyRequireEscapeHatchReason(),
         FatalErrorMessage(),
-        NoTodoComment(),
+        Todo(),
         ConsistencyNoAbbreviatedIdentifier(vocabulary: vocabulary),
-        NoUnowned(),
+        UnownedVariableCapture(),
         PrivateOverFileprivate(),
         DuplicateImports(),
-        DuplicatedDictionaryKey(),
+        DuplicatedKeyInDictionaryLiteral(),
         IdenticalOperands(),
         DuplicateConditions(),
         CorrectnessNoIdenticalBranches(),
@@ -34,7 +34,7 @@ public enum RuleRegistry {
         ConsistencyNoAmbiguousIdentifier(),
         ConsistencyNoStutteringName(),
         ConsistencyNoUtilsFolder(),
-        NoBareThrow(),
+        ConsistencyNoBareThrow(),
         ConsistencyNoHandRolledDelay(),
         ConcurrencyNoLostUpdate(),
         ConsistencyNoBooleanOutcome(),
@@ -54,7 +54,7 @@ public enum RuleRegistry {
         IsDisjoint(),
         ReduceInto(),
         CorrectnessNoDefaultForOwnedEnum(),
-        NoUnhandledThrowingTask(),
+        UnhandledThrowingTask(),
         RedundantTypeAnnotation(),
         CorrectnessNoDiscardedTryOptional(),
         SecurityNoInterpolatedShellCommand(),
@@ -66,9 +66,9 @@ public enum RuleRegistry {
     ]
 
     public static let packageRules: [any PackageRule] = [
-        RequireSwiftSixLanguageMode(),
-        RequireUpcomingFeatures(),
-        RequireStrictMemorySafety(),
+        ToolchainRequireSwiftSixLanguageMode(),
+        ToolchainRequireUpcomingFeatures(),
+        ToolchainRequireStrictMemorySafety(),
     ]
 
     /* Sorted, so two binaries' lists can be compared with `diff`. */

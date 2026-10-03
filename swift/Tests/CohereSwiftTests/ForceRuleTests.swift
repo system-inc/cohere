@@ -27,7 +27,7 @@ struct ForceRuleTests {
             let second = call()!.member
             let third = chain?.value!
             """
-        #expect(Self.positions(Self.findings(NoForceUnwrap(), source)) == ["1:21", "2:20", "3:25"])
+        #expect(Self.positions(Self.findings(ForceUnwrapping(), source)) == ["1:21", "2:20", "3:25"])
     }
 
     @Test func forceUnwrapNearMissesAreNot() {
@@ -37,7 +37,7 @@ struct ForceRuleTests {
             if let value = optional { use(value) }
             let defaulted = optional ?? 0
             """
-        #expect(Self.findings(NoForceUnwrap(), source).isEmpty)
+        #expect(Self.findings(ForceUnwrapping(), source).isEmpty)
     }
 
     @Test func forceTriesAreFound() {
@@ -45,7 +45,7 @@ struct ForceRuleTests {
             let data = try! load()
             let decoded = try! decode(try! load())
             """
-        #expect(Self.positions(Self.findings(NoForceTry(), source)) == ["1:15", "2:18", "2:30"])
+        #expect(Self.positions(Self.findings(ForceTry(), source)) == ["1:15", "2:18", "2:30"])
     }
 
     @Test func forceTryNearMissesAreNot() {
@@ -53,7 +53,7 @@ struct ForceRuleTests {
             let data = try load()
             let maybe = try? load()
             """
-        #expect(Self.findings(NoForceTry(), source).isEmpty)
+        #expect(Self.findings(ForceTry(), source).isEmpty)
     }
 
     /* Alone and inside a larger expression; the unfolded tree spells both as `UnresolvedAsExprSyntax`. */
@@ -63,7 +63,7 @@ struct ForceRuleTests {
             let width = (item as! NSView).frame.width + margin
             let sum = base + (value as! Int) * 2
             """
-        #expect(Self.positions(Self.findings(NoForceCast(), source)) == ["1:19", "2:21", "3:27"])
+        #expect(Self.positions(Self.findings(ForceCast(), source)) == ["1:19", "2:21", "3:27"])
     }
 
     @Test func forceCastNearMissesAreNot() {
@@ -72,7 +72,7 @@ struct ForceRuleTests {
             let number = 3 as Double
             if item is NSView { }
             """
-        #expect(Self.findings(NoForceCast(), source).isEmpty)
+        #expect(Self.findings(ForceCast(), source).isEmpty)
     }
 
     @Test func implicitlyUnwrappedOptionalsAreFound() {
@@ -80,7 +80,7 @@ struct ForceRuleTests {
             var window: NSWindow!
             func handle(_ callback: (String!) -> Void) {}
             """
-        #expect(Self.positions(Self.findings(NoImplicitlyUnwrappedOptional(), source)) == ["1:13", "2:26"])
+        #expect(Self.positions(Self.findings(ImplicitlyUnwrappedOptional(), source)) == ["1:13", "2:26"])
     }
 
     /* A finding points at the node, not at the whitespace or comments before it, which belong to the line above. */
@@ -89,7 +89,7 @@ struct ForceRuleTests {
             var window:
                 NSWindow!
             """
-        #expect(Self.positions(Self.findings(NoImplicitlyUnwrappedOptional(), source)) == ["2:5"])
+        #expect(Self.positions(Self.findings(ImplicitlyUnwrappedOptional(), source)) == ["2:5"])
     }
 
     @Test func plainOptionalsAreNot() {
@@ -97,11 +97,11 @@ struct ForceRuleTests {
             var window: NSWindow?
             let forced = optional!
             """
-        #expect(Self.findings(NoImplicitlyUnwrappedOptional(), source).isEmpty)
+        #expect(Self.findings(ImplicitlyUnwrappedOptional(), source).isEmpty)
     }
 
     @Test func everyForceRuleIsRegistered() {
         let names = Set(RuleRegistry.allNames)
-        #expect(names.isSuperset(of: [NoForceUnwrap().name, NoForceTry().name, NoForceCast().name, NoImplicitlyUnwrappedOptional().name]))
+        #expect(names.isSuperset(of: [ForceUnwrapping().name, ForceTry().name, ForceCast().name, ImplicitlyUnwrappedOptional().name]))
     }
 }

@@ -10,8 +10,8 @@ import SwiftSyntax
  Matches SwiftLint's `force_unwrapping` and swift-format's `NeverForceUnwrap` (off in our `.swift-format`
  because this rule replaces it). Implicitly unwrapped optional types (`T!`) are their own rule.
  */
-public struct NoForceUnwrap: FileRule {
-    public let name = "cohere-swift/no-force-unwrap"
+public struct ForceUnwrapping: FileRule {
+    public let name = "cohere-swift/force-unwrapping"
 
     public init() {}
 

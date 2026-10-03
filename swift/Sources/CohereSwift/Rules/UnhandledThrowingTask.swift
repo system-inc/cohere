@@ -49,8 +49,8 @@ import SwiftSyntax
  anything but an assignment (`Task { }.cancel()`) is not read, and a typealias of `Task` is not followed. No
  sibling typed rule shares this shape.
  */
-public struct NoUnhandledThrowingTask: TypedFileRule {
-    public let name = "cohere-swift/no-unhandled-throwing-task"
+public struct UnhandledThrowingTask: TypedFileRule {
+    public let name = "cohere-swift/unhandled-throwing-task"
 
     public init() {}
 
@@ -159,7 +159,7 @@ public struct NoUnhandledThrowingTask: TypedFileRule {
          for a specialisation whose failure type is written as anything but `_`.
          */
         static func starter(_ called: ExprSyntax) -> TokenSyntax? {
-            if let member = called.as(MemberAccessExprSyntax.self), NoUnhandledThrowingTask.starterNames.contains(member.declName.baseName.text), let base = member.base {
+            if let member = called.as(MemberAccessExprSyntax.self), UnhandledThrowingTask.starterNames.contains(member.declName.baseName.text), let base = member.base {
                 return taskName(base) == nil ? nil : member.declName.baseName
             }
             return taskName(called)

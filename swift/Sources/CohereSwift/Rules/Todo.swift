@@ -8,8 +8,8 @@ import SwiftSyntax
  The Swift form of our TypeScript `no-warning-comments`. Matched as whole words at the start of a
  comment's text, so prose that mentions "a todo list" is not a finding.
  */
-public struct NoTodoComment: FileRule {
-    public let name = "cohere-swift/no-todo-comment"
+public struct Todo: FileRule {
+    public let name = "cohere-swift/todo"
 
     static let markers = ["TODO", "FIXME"]
 

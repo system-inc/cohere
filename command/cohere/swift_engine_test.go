@@ -45,7 +45,7 @@ func TestRunEngineBinaryEndings(t *testing.T) {
 		if err != nil || exitCode != 1 {
 			t.Fatalf("exit %d, err %v\n%s", exitCode, err, out)
 		}
-		if !strings.Contains(out, "[cohere-swift/no-force-unwrap/forceUnwrap]") || !strings.Contains(out, "phases: ") {
+		if !strings.Contains(out, "[cohere-swift/force-unwrapping/forceUnwrap]") || !strings.Contains(out, "phases: ") {
 			t.Errorf("the stream was not rendered:\n%s", out)
 		}
 	})

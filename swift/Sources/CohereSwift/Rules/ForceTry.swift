@@ -8,8 +8,8 @@ import SwiftSyntax
  Kirk's ruling on force unwraps covers this, since it is the same unchecked assertion: forbidden
  everywhere, report only. Matches SwiftLint's `force_try` and swift-format's `NeverUseForceTry`.
  */
-public struct NoForceTry: FileRule {
-    public let name = "cohere-swift/no-force-try"
+public struct ForceTry: FileRule {
+    public let name = "cohere-swift/force-try"
 
     public init() {}
 

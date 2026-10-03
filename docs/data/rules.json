@@ -3987,7 +3987,10 @@
                     "set": "cohere:system-inc/base",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "base/consistency-no-bare-throw",
@@ -4003,7 +4006,11 @@
                     "set": "cohere:system-inc/base",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "Ported",
+                "swiftRule": "cohere-swift/consistency-no-bare-throw"
+            }
         },
         {
             "name": "base/consistency-no-console",
@@ -4019,7 +4026,11 @@
                     "set": "cohere:system-inc/base",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "Ported",
+                "swiftRule": "cohere-swift/consistency-no-print"
+            }
         },
         {
             "name": "base/consistency-no-hand-built-declared-error",
@@ -4035,7 +4046,10 @@
                     "set": "cohere:system-inc/base",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "base/consistency-require-pagination-argument-name",
@@ -4051,7 +4065,10 @@
                     "set": "cohere:system-inc/base",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "base/correctness-require-graphql-nullable-parity",
@@ -4069,7 +4086,10 @@
                     "set": "cohere:system-inc/base",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "base/correctness-require-matching-inject-type",
@@ -4085,7 +4105,10 @@
                     "set": "cohere:system-inc/base",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "base/correctness-require-matching-operation-context",
@@ -4102,7 +4125,10 @@
                     "set": "cohere:system-inc/base",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "base/correctness-require-matching-provider-return",
@@ -4118,7 +4144,10 @@
                     "set": "cohere:system-inc/base",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "base/correctness-require-optional-relation",
@@ -4134,7 +4163,10 @@
                     "set": "cohere:system-inc/base",
                     "severity": "warn"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "base/correctness-require-orm-column-declare",
@@ -4150,7 +4182,10 @@
                     "set": "cohere:system-inc/base",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "base/correctness-require-orm-column-nullable-parity",
@@ -4166,7 +4201,10 @@
                     "set": "cohere:system-inc/base",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "base/correctness-require-serializable-nullable-parity",
@@ -4183,7 +4221,10 @@
                     "set": "cohere:system-inc/base",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "Compiler"
+            }
         },
         {
             "name": "base/correctness-require-verify-array-parity",
@@ -4199,7 +4240,10 @@
                     "set": "cohere:system-inc/base",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "base/correctness-require-verify-optional-parity",
@@ -4216,7 +4260,10 @@
                     "set": "cohere:system-inc/base",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "base/security-require-context-access",
@@ -4235,7 +4282,10 @@
                     "set": "cohere:system-inc/base",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "better-tailwindcss/enforce-canonical-classes",
@@ -5767,7 +5817,7 @@
             ],
             "swift": {
                 "verdict": "Ported",
-                "swiftRule": "cohere-swift/require-lower-camel-case"
+                "swiftRule": "cohere-swift/always-use-lower-camel-case"
             }
         },
         {
@@ -6003,7 +6053,10 @@
                     "set": "cohere:typescript",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "Compiler"
+            }
         },
         {
             "name": "nexus/consistency-require-type-suffix",
@@ -6178,7 +6231,7 @@
             ],
             "swift": {
                 "verdict": "Ported",
-                "swiftRule": "cohere-swift/no-force-cast"
+                "swiftRule": "cohere-swift/force-cast"
             }
         },
         {
@@ -12635,7 +12688,11 @@
                     "set": "cohere:system-inc/structure",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "Ported",
+                "swiftRule": "cohere-swift/consistency-require-matching-file-name"
+            }
         },
         {
             "name": "structure/consistency-require-organized-imports",
@@ -12652,7 +12709,10 @@
                     "set": "cohere:system-inc/structure",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "Formatter"
+            }
         },
         {
             "name": "structure/import-require-react-namespace",
@@ -12671,7 +12731,10 @@
                     "set": "cohere:system-inc/structure",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "structure/network-no-direct-fetch",
@@ -13087,7 +13150,10 @@
                     "set": "cohere:system-inc/structure",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "structure/react-element-no-horizontal-rule",
@@ -13103,7 +13169,10 @@
                     "set": "cohere:system-inc/structure",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "structure/react-hook-no-any-type",
@@ -13119,7 +13188,10 @@
                     "set": "cohere:system-inc/structure",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "NotApplicable"
+            }
         },
         {
             "name": "structure/react-hook-no-destructuring",

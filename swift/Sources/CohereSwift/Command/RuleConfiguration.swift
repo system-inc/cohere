@@ -3,7 +3,7 @@ import Foundation
 /*
  Which rules run and at what severity, from the `swift` block of `CohereSettings.json`:
 
-     { "swift": { "rules": { "cohere-swift/no-force-unwrap": "error" } } }
+     { "swift": { "rules": { "cohere-swift/force-unwrapping": "error" } } }
 
  A value is a severity (`error`, `warning`, `off`) or an array whose first element is one, the shape the
  TypeScript config uses. Severities and strictness only, never allow lists or ignore names.

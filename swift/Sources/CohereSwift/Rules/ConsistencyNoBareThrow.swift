@@ -28,7 +28,7 @@ import SwiftSyntax
    it is the original's reasoning, not a wider idea.
  - The original exempts tests and the scaffolding they run on, by path, because a test's thrown message is the
    diagnosis and nothing branches on it. Here that is the target kind: a file of a test target is not read,
-   decided inside the rule as `no-print` decides it, never by a path list. The original's other exemptions (the
+   decided inside the rule as `consistency-no-print` decides it, never by a path list. The original's other exemptions (the
    capture path, declaration-time and below-the-vocabulary directories) name places in one TypeScript
    repository that have no Swift counterpart.
 
@@ -60,8 +60,8 @@ import SwiftSyntax
    of a `??`, where it is never optional and the compiler already warns.
  - A test-support file compiled into a library target rather than a test target, which is read and may report.
  */
-public struct NoBareThrow: FileRule {
-    public let name = "cohere-swift/no-bare-throw"
+public struct ConsistencyNoBareThrow: FileRule {
+    public let name = "cohere-swift/consistency-no-bare-throw"
 
     public init() {}
 
@@ -136,7 +136,7 @@ public struct NoBareThrow: FileRule {
             }
             /* An interpolated domain has no single value and is assembled here, so it is ad hoc whatever it spells. */
             if let value = literal.representedLiteralValue,
-                NoBareThrow.platformDomainPrefixes.contains(where: { value.hasPrefix($0) }) || value.hasSuffix(NoBareThrow.platformDomainSuffix)
+                ConsistencyNoBareThrow.platformDomainPrefixes.contains(where: { value.hasPrefix($0) }) || value.hasSuffix(ConsistencyNoBareThrow.platformDomainSuffix)
             {
                 return nil
             }

@@ -52,7 +52,7 @@ import SwiftSyntax
  What it accepts as safe, and why: `try await Task.sleep` (cancellation passed up, as Presence's `WindowClimb`
  does); a `do`/`catch` whose catch does something (macOS's `DelayWidthUntilIdle` returns, so a cancelled debounce
  does not commit); a `do` holding more than the sleep, whose catch also catches the rest; a `try?` whose value is
- read; `try! await Task.sleep`, which `no-force-try` owns; the primitive itself; and any other clock or timer.
+ read; `try! await Task.sleep`, which `force-try` owns; the primitive itself; and any other clock or timer.
 
  Known misses, every one a finding not made and never one invented:
  - A `try?` sleep that is the only statement of a closure (`Task { try? await Task.sleep(for: x) }`) is the

@@ -5,17 +5,17 @@ import Testing
 @testable import CohereSwift
 
 /*
- Fixture pairs for `cohere-swift/no-unowned`, both directions. The capture cases are SwiftLint's
+ Fixture pairs for `cohere-swift/unowned-variable-capture`, both directions. The capture cases are SwiftLint's
  `unowned_variable_capture` examples, triggering and not, with the exact column it marks. The property
  cases are cohere-only, including SwiftLint's own non-triggering `unowned var value: First`, which this rule
  flags on purpose. The near misses are `weak` in both positions, captures with no specifier, and the word
  `unowned` used as an ordinary identifier, label, or member, which the parser never reads as the keyword.
  */
-struct NoUnownedTests {
+struct UnownedVariableCaptureTests {
     static func findings(_ source: String) -> [FindingRecord] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
         let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
-        return NoUnowned().findings(in: file)
+        return UnownedVariableCapture().findings(in: file)
     }
 
     static func positions(_ findings: [FindingRecord]) -> [String] {

@@ -475,8 +475,8 @@ func (r *swiftRun) acceptUnusedCoverage(record *swiftUnusedCoverageRecord) error
 // report's words. A rule not listed here prints under its own id and counts "items", so a new rule never
 // reads under another rule's heading.
 var swiftUnusedWords = map[string]struct{ section, noun string }{
-	"cohere-swift/unused-import":      {"imports nothing uses", "imports"},
-	"cohere-swift/unused-declaration": {"declarations nothing uses", "declarations"},
+	"cohere-swift/correctness-no-unused-import":      {"imports nothing uses", "imports"},
+	"cohere-swift/correctness-no-unused-declaration": {"declarations nothing uses", "declarations"},
 }
 
 // swiftUnusedSection is the heading of one rule's items.

@@ -27,15 +27,15 @@ struct EscapeHatchRuleTests {
     @Test func printIsDecidedByTargetKind() {
         let tool = "import Foundation\nprint(\"usage: tool <file>\")\n"
         let app = "import SwiftUI\nprint(\"tapped\")\n"
-        #expect(Self.lines(NoPrint(), tool, kind: "library") == [2])
-        #expect(Self.lines(NoPrint(), tool, kind: "executable").isEmpty, "a command-line tool's stdout is its interface")
-        #expect(Self.lines(NoPrint(), tool, kind: "application") == [2], "an app's model file imports only Foundation and is still app code")
-        #expect(Self.lines(NoPrint(), app, kind: "test").isEmpty)
+        #expect(Self.lines(ConsistencyNoPrint(), tool, kind: "library") == [2])
+        #expect(Self.lines(ConsistencyNoPrint(), tool, kind: "executable").isEmpty, "a command-line tool's stdout is its interface")
+        #expect(Self.lines(ConsistencyNoPrint(), tool, kind: "application") == [2], "an app's model file imports only Foundation and is still app code")
+        #expect(Self.lines(ConsistencyNoPrint(), app, kind: "test").isEmpty)
     }
 
     @Test func aMethodNamedPrintIsNotPrint() {
-        #expect(Self.lines(NoPrint(), "printer.print(page)\nlet print = 3\n").isEmpty)
-        #expect(Self.lines(NoPrint(), "debugPrint(value)\n") == [1])
+        #expect(Self.lines(ConsistencyNoPrint(), "printer.print(page)\nlet print = 3\n").isEmpty)
+        #expect(Self.lines(ConsistencyNoPrint(), "debugPrint(value)\n") == [1])
     }
 
     @Test func escapeHatchesNeedACommentDirectlyAbove() {
@@ -137,7 +137,7 @@ struct EscapeHatchRuleTests {
             // TODOS are words, but TODOLIST is not a marker
             let value = 1
             """
-        #expect(Self.lines(NoTodoComment(), source) == [1, 2])
+        #expect(Self.lines(Todo(), source) == [1, 2])
     }
 }
 

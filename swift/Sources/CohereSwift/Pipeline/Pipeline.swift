@@ -176,7 +176,7 @@ public struct Pipeline {
                             line: line,
                             column: 1,
                             severity: .error,
-                            rule: "cohere-swift/format",
+                            rule: "cohere-swift/consistency-require-formatting",
                             messageId: "notFormatted",
                             message: "not formatted the way the nearest .swift-format says; a run without --no-fix rewrites it"
                         ))

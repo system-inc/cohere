@@ -6,7 +6,7 @@ import Testing
 @testable import CohereSwift
 
 /*
- `no-unhandled-throwing-task` both ways. The unit cases parse a source string and hand the rule symbols built
+ `unhandled-throwing-task` both ways. The unit cases parse a source string and hand the rule symbols built
  by position, as the index records them: the concurrency `Task` (`s:ScT`) at every `Task` a call names, and
  at the name that starts the task (`Task` itself, or `detached`, `immediate`, `init`) the declaration the
  compiler picked, the one where the failure type is `any Error` when the closure can throw and the one where
@@ -17,7 +17,7 @@ import Testing
  the index the build wrote.
  */
 @Suite(.serialized)
-struct NoUnhandledThrowingTaskTests {
+struct UnhandledThrowingTaskTests {
     static let task = "s:ScT"
     static let ours = "s:7Control4JobsO4TaskV"
 
@@ -75,7 +75,7 @@ struct NoUnhandledThrowingTaskTests {
                 occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: symbol, name: "init(name:priority:operation:)", isReference: true))
             }
         }
-        return NoUnhandledThrowingTask().findings(in: file, symbols: FileSymbols(occurrences)).map { "\($0.line):\($0.column)" }
+        return UnhandledThrowingTask().findings(in: file, symbols: FileSymbols(occurrences)).map { "\($0.line):\($0.column)" }
     }
 
     /* Every call whose called expression names `Task`, outermost first. */
@@ -344,7 +344,7 @@ struct NoUnhandledThrowingTaskTests {
     @Test func aFileWithNoTaskDoesNotApply() {
         let source = "func load() async throws {}\n"
         let file = ParsedFile(url: URL(fileURLWithPath: "/Plain.swift"), targetName: "Control", targetKind: "regular", source: source, tree: Parser.parse(source: source), nodeCount: 0)
-        #expect(!NoUnhandledThrowingTask().applies(to: file))
+        #expect(!UnhandledThrowingTask().applies(to: file))
     }
 
     /*
@@ -396,11 +396,11 @@ struct NoUnhandledThrowingTaskTests {
         _ = try await Pipeline(options: options, writer: ContractWriter { _ in }, workingDirectory: root).run()
         let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: ProcessRunner())
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
-        let candidates = parsed.files.filter { NoUnhandledThrowingTask().applies(to: $0) }
+        let candidates = parsed.files.filter { UnhandledThrowingTask().applies(to: $0) }
         let symbols = SymbolProvider(scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root), runner: ProcessRunner()).symbols(for: candidates)
         #expect(symbols.fromIndex == 1, "the build's index should describe the file: \(symbols.unavailable)")
         let found = candidates.flatMap { file in
-            NoUnhandledThrowingTask().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.messageId)@\($0.line):\($0.column)" }
+            UnhandledThrowingTask().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.messageId)@\($0.line):\($0.column)" }
         }
         #expect(found == ["unhandledThrowingTask@16:5", "unhandledThrowingTask@17:5"], "expected the two dropped throwing tasks and not ours, the quiet one, the handled ones or the held one: \(found)")
     }

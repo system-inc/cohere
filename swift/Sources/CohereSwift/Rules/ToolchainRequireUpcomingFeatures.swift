@@ -16,14 +16,14 @@ import Foundation
  (`dump-package`), so a target that enables them any way the manifest can spell is seen as enabled.
 
  Strict memory safety (SE-0458) is a setting rather than an upcoming feature, so its own rule requires it
- (`require-strict-memory-safety`).
+ (`toolchain-require-strict-memory-safety`).
 
  Plugin and macro targets are skipped: their settings serve the build tool, not the code being judged. So
  is a target with no Swift sources (a C or C++ target like Presence's `MotionCorrection`): Swift features
  mean nothing to it.
  */
-public struct RequireUpcomingFeatures: PackageRule {
-    public let name = "cohere-swift/require-upcoming-features"
+public struct ToolchainRequireUpcomingFeatures: PackageRule {
+    public let name = "cohere-swift/toolchain-require-upcoming-features"
 
     /* The features required, with why each matters, said in the finding. */
     static let required: [(feature: String, reason: String)] = [

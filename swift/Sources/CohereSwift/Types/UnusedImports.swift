@@ -43,7 +43,7 @@ import SwiftSyntax
  through Foundation), so nothing here believes it.
  */
 struct UnusedImports {
-    static let ruleName = "cohere-swift/unused-import"
+    static let ruleName = "cohere-swift/correctness-no-unused-import"
 
     /* Modules every file imports without saying so. */
     static let implicitModules: Set<String> = ["Swift", "_Concurrency", "_StringProcessing", "_SwiftConcurrencyShims", "SwiftOnoneSupport"]

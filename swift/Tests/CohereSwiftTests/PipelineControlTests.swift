@@ -124,14 +124,14 @@ struct PipelineControlTests {
     @Test func formatCatchesAMisindentedLine() async throws {
         let source = Self.cleanSource.replacingOccurrences(of: "    let value: Int", with: "let value: Int")
         let run = try await Self.run(source: source)
-        #expect(run.findings == ["cohere-swift/format:2"])
+        #expect(run.findings == ["cohere-swift/consistency-require-formatting:2"])
         #expect(run.phase("lint") == "ran", "a formatting finding does not stop the phases after it")
     }
 
     @Test func lintCatchesAForceUnwrap() async throws {
         let source = Self.cleanSource.replacingOccurrences(of: "        value * 2", with: "        Int(\"2\")! * value")
         let run = try await Self.run(source: source)
-        #expect(run.findings == ["cohere-swift/no-force-unwrap:5"])
+        #expect(run.findings == ["cohere-swift/force-unwrapping:5"])
         #expect(run.phase("types") == "ran")
     }
 
@@ -147,7 +147,7 @@ struct PipelineControlTests {
         #expect(reused.of("lint").first?["reusedFrom"] as? String == "fix")
         #expect(walked.phase("lint") == "ran")
         #expect(reused.findings == walked.findings)
-        #expect(reused.findings == ["cohere-swift/no-force-unwrap:5"])
+        #expect(reused.findings == ["cohere-swift/force-unwrapping:5"])
     }
 
     @Test func typesCatchesATypeErrorAndStopsLint() async throws {

@@ -5,16 +5,16 @@ import Testing
 @testable import CohereSwift
 
 /*
- Fixture pairs for `cohere-swift/duplicated-dictionary-key`, both directions. The failing cases include
+ Fixture pairs for `cohere-swift/duplicated-key-in-dictionary-literal`, both directions. The failing cases include
  SwiftLint's four triggering examples and assert the exact line and column of each repeat. The passing
  cases include SwiftLint's non-triggering examples, plus the near misses: different spellings of what might
  be the same value, calls and subscripts that may differ per evaluation, NaN, and `KeyValuePairs`.
  */
-struct DuplicatedDictionaryKeyTests {
+struct DuplicatedKeyInDictionaryLiteralTests {
     static func positions(_ source: String) -> [String] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
         let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
-        return DuplicatedDictionaryKey().findings(in: file).map { "\($0.line):\($0.column)" }
+        return DuplicatedKeyInDictionaryLiteral().findings(in: file).map { "\($0.line):\($0.column)" }
     }
 
     @Test func repeatedIntegerKeyIsFound() {

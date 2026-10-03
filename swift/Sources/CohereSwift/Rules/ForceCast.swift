@@ -12,8 +12,8 @@ import SwiftSyntax
 
  Matches SwiftLint's `force_cast`.
  */
-public struct NoForceCast: FileRule {
-    public let name = "cohere-swift/no-force-cast"
+public struct ForceCast: FileRule {
+    public let name = "cohere-swift/force-cast"
 
     public init() {}
 

@@ -19,8 +19,8 @@ import SwiftSyntax
  Only the free functions are matched: a method named `print` on some type (`printer.print(page)`) is
  that type's business.
  */
-public struct NoPrint: FileRule {
-    public let name = "cohere-swift/no-print"
+public struct ConsistencyNoPrint: FileRule {
+    public let name = "cohere-swift/consistency-no-print"
 
     public init() {}
 

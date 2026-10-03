@@ -3,7 +3,7 @@ import Foundation
 import Testing
 
 /* The strict-memory-safety rule, from `dump-package` output shaped as SwiftPM 6.4 writes the setting: `{"kind":{"strictMemorySafety":{}}}`. */
-struct RequireStrictMemorySafetyTests {
+struct ToolchainRequireStrictMemorySafetyTests {
     static let root = URL(fileURLWithPath: "/package", isDirectory: true)
 
     static func model(_ targets: [(name: String, type: String, strict: Bool)]) throws -> PackageModel {
@@ -20,7 +20,7 @@ struct RequireStrictMemorySafetyTests {
     }
 
     static func flagged(_ model: PackageModel) -> [String] {
-        RequireStrictMemorySafety().findings(in: model, manifest: nil).map { String($0.message.prefix { $0 != " " }) }
+        ToolchainRequireStrictMemorySafety().findings(in: model, manifest: nil).map { String($0.message.prefix { $0 != " " }) }
     }
 
     @Test func aTargetWithTheSettingPasses() throws {
@@ -29,7 +29,7 @@ struct RequireStrictMemorySafetyTests {
 
     /* Both directions on one package, so a rule that flagged everything, or nothing, fails here. */
     @Test func onlyTheTargetWithoutItIsNamed() throws {
-        let findings = RequireStrictMemorySafety().findings(in: try Self.model([("Core", "library", true), ("App", "executable", false)]), manifest: nil)
+        let findings = ToolchainRequireStrictMemorySafety().findings(in: try Self.model([("Core", "library", true), ("App", "executable", false)]), manifest: nil)
         #expect(findings.map { String($0.message.prefix { $0 != " " }) } == ["App"])
         #expect(findings.first?.message.contains(".strictMemorySafety()") == true)
         #expect(findings.first?.messageId == "strictMemorySafetyMissing")

@@ -5,7 +5,7 @@ import Testing
 @testable import CohereSwift
 
 /*
- Fixture pairs for `cohere-swift/no-bare-throw`, both directions. The reporting fixtures are the real sites on
+ Fixture pairs for `cohere-swift/consistency-no-bare-throw`, both directions. The reporting fixtures are the real sites on
  the proving grounds, near verbatim: Presence's `DanceImport` (a guard's throw, and a `??` fallback after a
  framework's optional error), its `EffectBench` tool (a throw inside a `do`), and macOS's `scroll-probe` (an
  `NSError` spread over three lines). Each asserts the line and column of the `NSError` call, so a finding on the
@@ -16,7 +16,7 @@ import Testing
  carrying a description (Presence's `RigNarration`), a helper that builds the error and is thrown by its call
  (Presence's `MToonLockerSky`), and the `NSError`s an Objective-C contract asks for without a throw.
  */
-struct NoBareThrowTests {
+struct ConsistencyNoBareThrowTests {
     static func file(_ source: String, targetKind: String = "library") -> ParsedFile {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
         return ParsedFile(url: url, targetName: "Fixture", targetKind: targetKind, source: source, tree: Parser.parse(source: source), nodeCount: 0)
@@ -25,8 +25,8 @@ struct NoBareThrowTests {
     /* The findings for a file the rule agrees to read, and none for one it declines, as the pipeline runs it. */
     static func findings(_ source: String, targetKind: String = "library") -> [FindingRecord] {
         let file = Self.file(source, targetKind: targetKind)
-        guard NoBareThrow().applies(to: file) else { return [] }
-        return NoBareThrow().findings(in: file)
+        guard ConsistencyNoBareThrow().applies(to: file) else { return [] }
+        return ConsistencyNoBareThrow().findings(in: file)
     }
 
     static func positions(_ findings: [FindingRecord]) -> [String] {
@@ -54,7 +54,7 @@ struct NoBareThrowTests {
             found.map(\.message) == [
                 "This throws an NSError made up here, with the domain \"bench\", which names no declared failure: a caller can match it only by repeating that string and the code, and nothing keeps the two in step. Declare the failure as a case of an error type of our own (an enum conforming to Error, and LocalizedError for its text) and throw that case, so a caller catches it by case."
             ])
-        #expect(found.map(\.rule) == ["cohere-swift/no-bare-throw"])
+        #expect(found.map(\.rule) == ["cohere-swift/consistency-no-bare-throw"])
     }
 
     /* Presence's `DanceImport.swift:149`: the fallback after a framework's optional error is the same ad-hoc error. */
@@ -191,16 +191,16 @@ struct NoBareThrowTests {
                 throw NSError(domain: "ChildProcessReaperTests", code: Int(result))
             }
             """
-        #expect(!NoBareThrow().applies(to: Self.file(source, targetKind: "test")))
+        #expect(!ConsistencyNoBareThrow().applies(to: Self.file(source, targetKind: "test")))
         #expect(Self.findings(source, targetKind: "test").isEmpty)
         #expect(Self.positions(Self.findings(source, targetKind: "library")) == ["2:11"])
     }
 
     /* The prefilter is never narrower than the rule: a file holding the shape is read, and one without either word is not. */
     @Test func thePrefilterReadsEveryFileThatCanHoldTheShape() {
-        #expect(NoBareThrow().applies(to: Self.file(#"throw NSError(domain: "X", code: 1)"#)))
-        #expect(!NoBareThrow().applies(to: Self.file(#"let error = NSError(domain: "X", code: 1)"#)))
-        #expect(!NoBareThrow().applies(to: Self.file("throw CocoaError(.fileReadUnknown)")))
+        #expect(ConsistencyNoBareThrow().applies(to: Self.file(#"throw NSError(domain: "X", code: 1)"#)))
+        #expect(!ConsistencyNoBareThrow().applies(to: Self.file(#"let error = NSError(domain: "X", code: 1)"#)))
+        #expect(!ConsistencyNoBareThrow().applies(to: Self.file("throw CocoaError(.fileReadUnknown)")))
     }
 
     /* Half-typed source still parses into a tree the rule walks, and walks without a finding it cannot place. */

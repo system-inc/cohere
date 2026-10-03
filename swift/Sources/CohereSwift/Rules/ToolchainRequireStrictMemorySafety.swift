@@ -12,11 +12,11 @@ import SwiftSyntax
  only what truly must stay unsafe is marked. The warnings themselves are compiler findings, so the types phase
  reports them; this rule only requires the setting that makes the compiler say them.
 
- Read from SwiftPM's own answer (`dump-package`), as `require-upcoming-features` reads its features. Plugin
+ Read from SwiftPM's own answer (`dump-package`), as `toolchain-require-upcoming-features` reads its features. Plugin
  and macro targets, and targets with no Swift sources, are skipped for that rule's reasons.
  */
-public struct RequireStrictMemorySafety: PackageRule {
-    public let name = "cohere-swift/require-strict-memory-safety"
+public struct ToolchainRequireStrictMemorySafety: PackageRule {
+    public let name = "cohere-swift/toolchain-require-strict-memory-safety"
 
     public init() {}
 

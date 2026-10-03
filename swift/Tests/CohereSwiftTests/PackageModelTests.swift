@@ -42,7 +42,7 @@ struct PackageModelTests {
 
     @Test func theSwiftSixRuleReportsOnlyTheFiveTarget() throws {
         let model = try PackageModel(root: Self.root, describeJson: Self.describe(targets: ["A", "B"]), dumpPackageJson: Self.dump(tools: "6.4.0", fiveTarget: "B"))
-        let findings = RequireSwiftSixLanguageMode().findings(in: model, manifest: nil)
+        let findings = ToolchainRequireSwiftSixLanguageMode().findings(in: model, manifest: nil)
         #expect(findings.count == 1)
         #expect(findings.first?.message.hasPrefix("B compiles in Swift 5") == true)
     }

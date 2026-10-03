@@ -21,8 +21,8 @@ import SwiftSyntax
  Nothing is exempt. The keyword is matched as the parser reads it (a closure capture specifier or a
  declaration modifier), so an identifier that happens to be spelled `unowned` is never confused with it.
  */
-public struct NoUnowned: FileRule {
-    public let name = "cohere-swift/no-unowned"
+public struct UnownedVariableCapture: FileRule {
+    public let name = "cohere-swift/unowned-variable-capture"
 
     public init() {}
 

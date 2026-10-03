@@ -1,99 +1,99 @@
 [
   {
-    "typeScriptRule": "base/context-requires-access",
-    "verdict": "NotApplicable",
-    "swiftRule": null,
-    "reason": "Base's decorator-driven request-context injection has no Swift counterpart."
-  },
-  {
-    "typeScriptRule": "base/graphql-nullable-parity",
-    "verdict": "NotApplicable",
-    "swiftRule": null,
-    "reason": "TypeScript GraphQL field decorators have no Swift counterpart in either proving ground."
-  },
-  {
-    "typeScriptRule": "base/graphql-operation-context-matches-return",
-    "verdict": "NotApplicable",
-    "swiftRule": null,
-    "reason": "TypeScript GraphQL operation decorators have no Swift counterpart."
-  },
-  {
-    "typeScriptRule": "base/inject-type-matches-parameter",
-    "verdict": "NotApplicable",
-    "swiftRule": null,
-    "reason": "Base's @Inject<T>() decorator DI has no Swift counterpart, and Swift generics are compile-checked anyway."
-  },
-  {
-    "typeScriptRule": "base/no-bare-throw",
-    "verdict": "Ported",
-    "swiftRule": "cohere-swift/no-bare-throw",
-    "reason": null
-  },
-  {
-    "typeScriptRule": "base/no-console",
-    "verdict": "Ported",
-    "swiftRule": "cohere-swift/no-print",
-    "reason": null
-  },
-  {
-    "typeScriptRule": "base/no-global-container",
+    "typeScriptRule": "base/boundary-no-global-container",
     "verdict": "NotApplicable",
     "swiftRule": null,
     "reason": "Base's DI container has no Swift counterpart."
   },
   {
-    "typeScriptRule": "base/no-hand-built-declared-error",
+    "typeScriptRule": "base/consistency-no-bare-throw",
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/consistency-no-bare-throw",
+    "reason": null
+  },
+  {
+    "typeScriptRule": "base/consistency-no-console",
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/consistency-no-print",
+    "reason": null
+  },
+  {
+    "typeScriptRule": "base/consistency-no-hand-built-declared-error",
     "verdict": "NotApplicable",
     "swiftRule": null,
     "reason": "Base's declared-error tiers have no Swift counterpart."
   },
   {
-    "typeScriptRule": "base/orm-column-nullable-parity",
-    "verdict": "NotApplicable",
-    "swiftRule": null,
-    "reason": "Base ORM decorators have no counterpart, and neither proving ground uses a Swift ORM."
-  },
-  {
-    "typeScriptRule": "base/orm-column-requires-declare",
-    "verdict": "NotApplicable",
-    "swiftRule": null,
-    "reason": "TypeScript's class-field `declare` keyword has no Swift meaning."
-  },
-  {
-    "typeScriptRule": "base/pagination-decorator",
+    "typeScriptRule": "base/consistency-require-pagination-argument-name",
     "verdict": "NotApplicable",
     "swiftRule": null,
     "reason": "Base GraphQL pagination decorators have no Swift counterpart."
   },
   {
-    "typeScriptRule": "base/provider-return-matches-token",
+    "typeScriptRule": "base/correctness-require-graphql-nullable-parity",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "TypeScript GraphQL field decorators have no Swift counterpart in either proving ground."
+  },
+  {
+    "typeScriptRule": "base/correctness-require-matching-inject-type",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Base's @Inject<T>() decorator DI has no Swift counterpart, and Swift generics are compile-checked anyway."
+  },
+  {
+    "typeScriptRule": "base/correctness-require-matching-operation-context",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "TypeScript GraphQL operation decorators have no Swift counterpart."
+  },
+  {
+    "typeScriptRule": "base/correctness-require-matching-provider-return",
     "verdict": "NotApplicable",
     "swiftRule": null,
     "reason": "Base DI provider tokens have no Swift counterpart."
   },
   {
-    "typeScriptRule": "base/relation-must-be-optional",
+    "typeScriptRule": "base/correctness-require-optional-relation",
     "verdict": "NotApplicable",
     "swiftRule": null,
     "reason": "Base ORM relation decorators have no Swift counterpart."
   },
   {
-    "typeScriptRule": "base/serializable-nullable-parity",
+    "typeScriptRule": "base/correctness-require-orm-column-declare",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "TypeScript's class-field `declare` keyword has no Swift meaning."
+  },
+  {
+    "typeScriptRule": "base/correctness-require-orm-column-nullable-parity",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Base ORM decorators have no counterpart, and neither proving ground uses a Swift ORM."
+  },
+  {
+    "typeScriptRule": "base/correctness-require-serializable-nullable-parity",
     "verdict": "Compiler",
     "swiftRule": null,
     "reason": "Codable derives optionality from the property type itself (`T?` decodes if present), so there is no second flag to disagree with it."
   },
   {
-    "typeScriptRule": "base/verify-array-parity",
+    "typeScriptRule": "base/correctness-require-verify-array-parity",
     "verdict": "NotApplicable",
     "swiftRule": null,
     "reason": "Base validation decorators have no Swift counterpart."
   },
   {
-    "typeScriptRule": "base/verify-optional-parity",
+    "typeScriptRule": "base/correctness-require-verify-optional-parity",
     "verdict": "NotApplicable",
     "swiftRule": null,
     "reason": "Base validation decorators have no Swift counterpart."
+  },
+  {
+    "typeScriptRule": "base/security-require-context-access",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "Base's decorator-driven request-context injection has no Swift counterpart."
   },
   {
     "typeScriptRule": "nexus/boundary-no-internal-import",
@@ -188,7 +188,7 @@
   {
     "typeScriptRule": "nexus/consistency-no-screaming-snake-case",
     "verdict": "Ported",
-    "swiftRule": "cohere-swift/require-lower-camel-case",
+    "swiftRule": "cohere-swift/always-use-lower-camel-case",
     "reason": null
   },
   {
@@ -219,10 +219,10 @@
     "typeScriptRule": "nexus/consistency-require-constant-casing",
     "verdict": "NotApplicable",
     "swiftRule": null,
-    "reason": "Swift's convention, enforced by cohere-swift/require-lower-camel-case, spells every value lowerCamelCase and lets access control state scope, so porting the PascalCase-export rule would contradict it on about 1,470 static lets; the other side is that the scope-signalling idea is Kirk's and could override Swift's convention by ruling."
+    "reason": "Swift's convention, enforced by cohere-swift/always-use-lower-camel-case, spells every value lowerCamelCase and lets access control state scope, so porting the PascalCase-export rule would contradict it on about 1,470 static lets; the other side is that the scope-signalling idea is Kirk's and could override Swift's convention by ruling."
   },
   {
-    "typeScriptRule": "nexus/consistency-require-return-matching-type",
+    "typeScriptRule": "nexus/consistency-require-matching-return-type",
     "verdict": "Compiler",
     "swiftRule": null,
     "reason": "A bare `return` in a non-Void Swift function is a compile error and `nil` must always be written, so the two spellings cannot be confused."
@@ -290,7 +290,7 @@
   {
     "typeScriptRule": "nexus/correctness-no-nullish-stripping-assertion",
     "verdict": "Ported",
-    "swiftRule": "cohere-swift/no-force-cast",
+    "swiftRule": "cohere-swift/force-cast",
     "reason": null
   },
   {
@@ -396,10 +396,22 @@
     "reason": "Reach-over-alias is a house principle with large Swift demand (17 macos, 344 presence), but in Swift `let x = obj.x` is often a deliberate snapshot taken before an `await` or a value-type copy, so the port needs that exemption or it fights the lost-update fix."
   },
   {
-    "typeScriptRule": "structure/consistency-organize-imports",
+    "typeScriptRule": "structure/consistency-require-matching-file-name",
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/consistency-require-matching-file-name",
+    "reason": null
+  },
+  {
+    "typeScriptRule": "structure/consistency-require-organized-imports",
     "verdict": "Formatter",
     "swiftRule": null,
     "reason": "swift-format's OrderedImports, on in both proving grounds, orders the handful of module imports a Swift file has."
+  },
+  {
+    "typeScriptRule": "structure/import-require-react-namespace",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a React import style."
   },
   {
     "typeScriptRule": "structure/network-no-direct-fetch",
@@ -504,12 +516,6 @@
     "reason": "This is ES module export syntax."
   },
   {
-    "typeScriptRule": "structure/react-component-require-matching-file-name",
-    "verdict": "Ported",
-    "swiftRule": "cohere-swift/file-named-for-type",
-    "reason": null
-  },
-  {
     "typeScriptRule": "structure/react-component-require-named-export",
     "verdict": "NotApplicable",
     "swiftRule": null,
@@ -528,7 +534,19 @@
     "reason": "This is a React props convention."
   },
   {
-    "typeScriptRule": "structure/react-hook-any-type",
+    "typeScriptRule": "structure/react-element-no-anchor",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a JSX element ban."
+  },
+  {
+    "typeScriptRule": "structure/react-element-no-horizontal-rule",
+    "verdict": "NotApplicable",
+    "swiftRule": null,
+    "reason": "This is a JSX element ban."
+  },
+  {
+    "typeScriptRule": "structure/react-hook-no-any-type",
     "verdict": "NotApplicable",
     "swiftRule": null,
     "reason": "This guards against React types being missing, and an unresolved Swift call simply does not compile."
@@ -556,24 +574,6 @@
     "verdict": "NotApplicable",
     "swiftRule": null,
     "reason": "This is a React hook naming convention."
-  },
-  {
-    "typeScriptRule": "structure/react-import-no-destructuring",
-    "verdict": "NotApplicable",
-    "swiftRule": null,
-    "reason": "This is a React import style."
-  },
-  {
-    "typeScriptRule": "structure/react-no-anchor-element",
-    "verdict": "NotApplicable",
-    "swiftRule": null,
-    "reason": "This is a JSX element ban."
-  },
-  {
-    "typeScriptRule": "structure/react-no-horizontal-rule-element",
-    "verdict": "NotApplicable",
-    "swiftRule": null,
-    "reason": "This is a JSX element ban."
   },
   {
     "typeScriptRule": "structure/storage-no-direct-local-storage",

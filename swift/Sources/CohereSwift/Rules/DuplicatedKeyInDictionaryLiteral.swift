@@ -36,8 +36,8 @@ import SwiftSyntax
  The finding is on the second and every later occurrence of a key, the entry to delete or correct.
  Report only.
  */
-public struct DuplicatedDictionaryKey: FileRule {
-    public let name = "cohere-swift/duplicated-dictionary-key"
+public struct DuplicatedKeyInDictionaryLiteral: FileRule {
+    public let name = "cohere-swift/duplicated-key-in-dictionary-literal"
 
     public init() {}
 

@@ -6,7 +6,7 @@ import Foundation
  A file is ours when a target of the package, or of a local package inside it that is not vendored,
  compiles it, and git does not ignore it. A generated file is ours too: Kirk's convention (2026-10-03,
  shared with TypeScript) names it `*.generated.swift` and gives it every rule and the formatter, exempting
- it only from max-file-lines, by that name. What git ignores is read from the ignore files themselves
+ it only from file-length, by that name. What git ignores is read from the ignore files themselves
  (`IgnoreRules`), with no git process, and it includes untracked files that are not ignored. A new file someone is still writing is exactly the one a gate must see, and TypeScript's program
  already includes it, because a tsconfig reads the disk rather than the index.
 

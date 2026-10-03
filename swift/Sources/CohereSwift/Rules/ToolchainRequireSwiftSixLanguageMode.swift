@@ -11,8 +11,8 @@ import SwiftSyntax
  The mode is SwiftPM's resolved answer (the target's own setting, else the package's list, else the
  tools version's default), so a target that says nothing in a 6.x manifest is correctly in Swift 6.
  */
-public struct RequireSwiftSixLanguageMode: PackageRule {
-    public let name = "cohere-swift/require-swift-6-language-mode"
+public struct ToolchainRequireSwiftSixLanguageMode: PackageRule {
+    public let name = "cohere-swift/toolchain-require-swift-6-language-mode"
 
     public init() {}
 

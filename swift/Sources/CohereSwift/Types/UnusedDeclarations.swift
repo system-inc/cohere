@@ -48,7 +48,7 @@ import SwiftSyntax
  is reported when an unused one holds others, so every declaration reported can go together.
  */
 struct UnusedDeclarations {
-    static let ruleName = "cohere-swift/unused-declaration"
+    static let ruleName = "cohere-swift/correctness-no-unused-declaration"
 
     struct Result {
         /* Each unused declaration, with its keyword and name for the report's line. */

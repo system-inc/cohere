@@ -128,7 +128,7 @@ reports on the files it could.
 
 ```json
 {"kind":"finding","source":"rule","file":"/…/ByteRing.swift","line":159,"column":61,"endLine":159,"endColumn":62,
- "severity":"error","rule":"cohere-swift/no-force-unwrap","messageId":"forceUnwrap",
+ "severity":"error","rule":"cohere-swift/force-unwrapping","messageId":"forceUnwrap",
  "message":"…why, not only what…","fixes":[],"suggestions":[]}
 ```
 
@@ -147,10 +147,10 @@ Rendered, one finding per line. Newlines in `message` are collapsed to spaces, a
 `singleLineDescription` does:
 
 ```
-/…/ByteRing.swift:159:61 - force unwrapping crashes on nil … [cohere-swift/no-force-unwrap/forceUnwrap]
+/…/ByteRing.swift:159:61 - force unwrapping crashes on nil … [cohere-swift/force-unwrapping/forceUnwrap]
 /…/Broken.swift:3:23 - error: cannot convert value of type 'String' to specified type 'Int'
 /…/Warning.swift:2:9 - warning: variable 'neverMutated' was never mutated; consider changing to 'let' constant [#VariableNeverMutated]
-/…/Unformatted.swift:12:1 - not formatted as .swift-format says [cohere-swift/format/notFormatted]
+/…/Unformatted.swift:12:1 - not formatted as .swift-format says [cohere-swift/consistency-require-formatting/notFormatted]
 ```
 
 The compiler line is the TypeScript shape `file:line:col - error TS2322: message`. Swift
@@ -162,9 +162,9 @@ findings, `rule` holds the group name without the `#`, or `""`.
 
 ```json
 {"kind":"unused","file":"/…/Main.swift","line":1,"column":1,"endLine":1,"endColumn":18,
- "rule":"cohere-swift/unused-import","messageId":"unusedImport","message":"…why…","subject":"import Foundation",
+ "rule":"cohere-swift/correctness-no-unused-import","messageId":"unusedImport","message":"…why…","subject":"import Foundation",
  "suggestions":[{"message":"Remove `import Foundation`","fixes":[{"start":0,"end":18,"text":""}]}]}
-{"kind":"unusedCoverage","rule":"cohere-swift/unused-import","filesChecked":217,
+{"kind":"unusedCoverage","rule":"cohere-swift/correctness-no-unused-import","filesChecked":217,
  "filesNotChecked":{"it has #if, and the index describes only the configuration the build compiled":1},
  "checked":471,"skipped":{"re-exported with @_exported, which is API":0},"found":15,"elapsedMilliseconds":2525}
 ```
@@ -194,7 +194,7 @@ unused: a report, not a gate — nothing here fails a build
   imports nothing uses — 2
     /…/Main.swift:1:1 — import Foundation
     /…/Tally.swift:2:1 — import Combine
-  looked at 2 files and 5 imports (cohere-swift/unused-import)
+  looked at 2 files and 5 imports (cohere-swift/correctness-no-unused-import)
   not checked for unused imports: 1 files (it has #if, and the index describes only the configuration the build compiled)
   not checked for unused imports: 1 files (the build has not compiled it as it stands)
   never reported: 1 imports (re-exported with @_exported, which is API)
@@ -291,9 +291,9 @@ differ.
 
 ```json
 {"kind":"lint","findings":3,"rulesRun":15,"filesWalked":149,"nodesVisited":412233,"elapsedMilliseconds":96,
- "reusedFrom":"","rulesSilent":["cohere-swift/no-print"],"rulesWatchedAndQuiet":9,
+ "reusedFrom":"","rulesSilent":["cohere-swift/consistency-no-print"],"rulesWatchedAndQuiet":9,
  "crashes":[{"file":"/…/X.swift","error":"…"}],
- "rulesScopedOff":{"cohere-swift/no-print":12},"rulesNotConfigured":[],"configNote":""}
+ "rulesScopedOff":{"cohere-swift/consistency-no-print":12},"rulesNotConfigured":[],"configNote":""}
 ```
 
 Rendered by the existing lint line and coverage printers:
@@ -324,7 +324,7 @@ back `not requested` is a protocol error, not a smaller run.
 ### `rule`, only under `--rules` and `--rules-enabled`
 
 ```json
-{"kind":"rule","name":"cohere-swift/no-force-unwrap","severity":"error"}
+{"kind":"rule","name":"cohere-swift/force-unwrapping","severity":"error"}
 ```
 
 `--rules` prints names, sorted. `--rules-enabled` prints `name<TAB>severity`. The development-build

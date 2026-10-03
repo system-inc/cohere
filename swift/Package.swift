@@ -36,7 +36,7 @@ import PackageDescription
  */
 let sourceTreeModified = Context.gitInformation?.hasUncommittedChanges ?? true
 
-/* The compiler checks cohere-swift's own `require-upcoming-features` asks of every Swift target, held to here too. */
+/* The compiler checks cohere-swift's own `toolchain-require-upcoming-features` asks of every Swift target, held to here too. */
 let houseSettings: [SwiftSetting] = [
     .enableUpcomingFeature("ExistentialAny"),
     .enableUpcomingFeature("MemberImportVisibility"),

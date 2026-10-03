@@ -3,7 +3,7 @@ import Foundation
 import Testing
 
 /* The upcoming-features rule, from `dump-package` output shaped exactly as SwiftPM 6.4 writes it. */
-struct RequireUpcomingFeaturesTests {
+struct ToolchainRequireUpcomingFeaturesTests {
     static let root = URL(fileURLWithPath: "/package", isDirectory: true)
 
     static func model(_ targets: [(name: String, type: String, features: [String])], fileExtension: String = "swift") throws -> PackageModel {
@@ -20,7 +20,7 @@ struct RequireUpcomingFeaturesTests {
     }
 
     static func flagged(_ model: PackageModel) -> [String] {
-        RequireUpcomingFeatures().findings(in: model, manifest: nil).map { String($0.message.prefix { $0 != " " }) }
+        ToolchainRequireUpcomingFeatures().findings(in: model, manifest: nil).map { String($0.message.prefix { $0 != " " }) }
     }
 
     @Test func aTargetWithBothFeaturesPasses() throws {
@@ -29,7 +29,7 @@ struct RequireUpcomingFeaturesTests {
 
     @Test func aTargetMissingAFeatureIsNamedWithWhatToAdd() throws {
         let model = try Self.model([("Core", "library", ["ExistentialAny"]), ("App", "executable", [])])
-        let findings = RequireUpcomingFeatures().findings(in: model, manifest: nil)
+        let findings = ToolchainRequireUpcomingFeatures().findings(in: model, manifest: nil)
         #expect(findings.map { String($0.message.prefix { $0 != " " }) } == ["App", "Core"])
         #expect(findings.last?.message.contains(#".enableUpcomingFeature("MemberImportVisibility")"#) == true)
         #expect(findings.last?.message.contains(#"("ExistentialAny")"#) == false, "a feature already enabled must not be asked for")

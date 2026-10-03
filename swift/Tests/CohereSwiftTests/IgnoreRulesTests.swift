@@ -71,7 +71,7 @@ struct IgnoreRulesTests {
         #expect(fileSet.note.isEmpty)
     }
 
-    /* A generated file is ours, header marker or not: Kirk's convention names it `*.generated.swift` and gives it every rule but max-file-lines. */
+    /* A generated file is ours, header marker or not: Kirk's convention names it `*.generated.swift` and gives it every rule but file-length. */
     @Test func aGeneratedFileIsOurs() throws {
         let fixture = try Fixture(files: [
             ".gitignore": "",

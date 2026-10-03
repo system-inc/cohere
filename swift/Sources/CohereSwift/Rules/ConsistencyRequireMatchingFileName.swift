@@ -8,7 +8,7 @@ import SwiftSyntax
  Kirk's ruling. A reader looking for `ScrollbackBuffer` opens `ScrollbackBuffer.swift`, and a reader
  looking for what was added to `String` finds every `String+…` file together. The Swift form of our
  TypeScript `require-matching-file-name`. How many types a file holds is not judged (Kirk, 2026-10-03:
- TypeScript has no such rule, and max-file-lines catches the file that is actually too big); what is
+ TypeScript has no such rule, and file-length catches the file that is actually too big); what is
  judged is that the name leads to the main one.
 
  - A file declaring a type is named for it. Holding several, it is named for the main one, so any type
@@ -36,8 +36,8 @@ import SwiftSyntax
    whose only face is a helper still answers to the plain naming rule.
  - A file with no types and no extensions (free functions, a script) has no name to match.
  */
-public struct FileNamedForType: FileRule {
-    public let name = "cohere-swift/file-named-for-type"
+public struct ConsistencyRequireMatchingFileName: FileRule {
+    public let name = "cohere-swift/consistency-require-matching-file-name"
 
     public init() {}
 

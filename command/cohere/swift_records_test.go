@@ -99,12 +99,12 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 			"fix: 1 of 2 files rewritten, 1 fixes applied, 0 refused, 1 reformatted\n",
 			"/project/Sources/Example/Warning.swift:2:9 - warning: variable 'neverMutated' was never mutated; consider changing to 'let' constant [#VariableNeverMutated]\n",
 			// The message's newline is collapsed, so the rule tag stays on the line with the position.
-			"/project/Sources/Example/ByteRing.swift:159:61 - A force unwrap crashes the process when the value is nil. Say what happens on nil with guard let or if let. [cohere-swift/no-force-unwrap/forceUnwrap]\n",
+			"/project/Sources/Example/ByteRing.swift:159:61 - A force unwrap crashes the process when the value is nil. Say what happens on nil with guard let or if let. [cohere-swift/force-unwrapping/forceUnwrap]\n",
 			"coverage: 4 rules = 1 found something + 2 ran and found nothing + 1 listened to no files\n",
 			"  this binary was built from a modified tree, so no commit reproduces these findings\n",
 		)
 		// The silent rule is counted by default and named behind --coverage, as a TypeScript run does.
-		forbidLines(t, output, "did not check everything", "cohere-swift/no-force-cast")
+		forbidLines(t, output, "did not check everything", "cohere-swift/force-cast")
 	})
 
 	// --coverage names each rule the record names exactly once, under its category, and counts the
@@ -121,11 +121,11 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 		output := out.String()
 		requireLines(t, output,
 			"  listened to no files (1): nothing gave it a file, or it declined every one",
-			"    cohere-swift/no-force-cast\n",
+			"    cohere-swift/force-cast\n",
 			"  ran and found nothing (2): ",
 			"    2 the engine's record counts and does not name\n",
 		)
-		if count := strings.Count(output, "cohere-swift/no-force-cast\n"); count != 1 {
+		if count := strings.Count(output, "cohere-swift/force-cast\n"); count != 1 {
 			t.Errorf("the silent rule is named %d times, want 1:\n%s", count, output)
 		}
 		forbidLines(t, output, "details: cohere --coverage")
@@ -173,7 +173,7 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 			// Two items on one line arrive out of column order and print in it.
 			"    /project/Sources/Example/Main.swift:1:1 — import Foundation\n    /project/Sources/Example/Main.swift:1:20 — import Darwin\n",
 			"    /project/Sources/Example/Tally.swift:2:1 — import Combine\n",
-			"  looked at 2 files and 6 imports (cohere-swift/unused-import)\n",
+			"  looked at 2 files and 6 imports (cohere-swift/correctness-no-unused-import)\n",
 			"  not checked for unused imports: 1 files (it has #if, and the index describes only the configuration the build compiled)\n",
 			"  not checked for unused imports: 1 files (the build has not compiled it as it stands)\n",
 			"  never reported: 1 imports (re-exported with @_exported, which is API)\n",
@@ -182,7 +182,7 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 			"\n  declarations nothing uses — 2\n",
 			"    /project/Sources/AhraOSPresence/Stage/StagePane+HandTouchProbe.swift:42:13 — var deepestAt\n",
 			"    /project/Sources/AhraOSPresence/Studio/Panels/VariantsMenuProbe.swift:349:25 — func after(_:_:)\n",
-			"  looked at 1092 files and 4311 declarations (cohere-swift/unused-declaration)\n",
+			"  looked at 1092 files and 4311 declarations (cohere-swift/correctness-no-unused-declaration)\n",
 			"  not checked for unused declarations: 156 files (it has #if, and the index describes only the configuration the build compiled)\n",
 			"  never reported: 358 declarations (a stored property of a type whose conformances may read every stored property (Codable))\n",
 			"  never reported: 175 declarations (an override or a protocol witness, reached through what it overrides)\n",
@@ -207,7 +207,7 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 	t.Run("UnusedUnknownRule", func(t *testing.T) {
 		lines := []string{}
 		for _, line := range contractFixture(t, "Unused.jsonl") {
-			lines = append(lines, strings.ReplaceAll(line, "cohere-swift/unused-import", "cohere-swift/unused-parameter"))
+			lines = append(lines, strings.ReplaceAll(line, "cohere-swift/correctness-no-unused-import", "cohere-swift/unused-parameter"))
 		}
 		output, exitCode, err := renderRecords(t, swiftModeCheck, lines, 0)
 		if err != nil || exitCode != 0 {
@@ -366,17 +366,17 @@ func TestSwiftRunListingModes(t *testing.T) {
 		lines := []string{
 			provenance,
 			`{"kind":"rule","name":"cohere-swift/no-try-bang","severity":"error"}`,
-			`{"kind":"rule","name":"cohere-swift/no-force-unwrap","severity":"warning"}`,
+			`{"kind":"rule","name":"cohere-swift/force-unwrapping","severity":"warning"}`,
 		}
 		output, exitCode, err := renderRecords(t, swiftModeRules, lines, 0)
 		if err != nil || exitCode != 0 {
 			t.Fatalf("exit %d, err %v", exitCode, err)
 		}
-		if output != "cohere-swift/no-force-unwrap\ncohere-swift/no-try-bang\n" {
+		if output != "cohere-swift/force-unwrapping\ncohere-swift/no-try-bang\n" {
 			t.Errorf("rules printed as %q", output)
 		}
 		enabled, _, err := renderRecords(t, swiftModeRulesEnabled, lines, 0)
-		if err != nil || enabled != "cohere-swift/no-force-unwrap\twarning\ncohere-swift/no-try-bang\terror\n" {
+		if err != nil || enabled != "cohere-swift/force-unwrapping\twarning\ncohere-swift/no-try-bang\terror\n" {
 			t.Errorf("rules-enabled printed as %q (err %v)", enabled, err)
 		}
 	})
