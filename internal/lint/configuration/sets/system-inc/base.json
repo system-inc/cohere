@@ -63,6 +63,20 @@
                 "@typescript-eslint/no-require-imports": "off"
             },
             "reason": "CommonJS has no import statement and import() is async, so require is the only module form a .cjs can use."
+        },
+        {
+            "files": [
+                "**/*.test.ts"
+            ],
+            "rules": {
+                "no-use-before-define": [
+                    "error",
+                    {
+                        "classes": false
+                    }
+                ]
+            },
+            "reason": "A test declares ORM entities that relate to each other through relation thunks (() => OtherEntity), so each names a class the other declares later and no order removes the cycle. A thunk runs only after both classes exist. ESLint reports these and cohere does not, so both engines take classes: false here, scoped to test files, and agree (#yfkhkvy)."
         }
     ]
 }
