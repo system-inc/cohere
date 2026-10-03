@@ -675,9 +675,10 @@ func TestNoExtraneousClassExemptsALoadBearingEmptyClass(t *testing.T) {
 		{"a base another class extends", "class Base {}\nclass Child extends Base {\n  value = 1;\n}\nnew Child();\n"},
 		{"a constructor-typed parameter", slots + "class Token {}\nregister(Token);\n"},
 		{"a set of constructors", slots + "class Unrelated {}\nscope.has(Unrelated);\n"},
-		{"a type parameter constrained to a constructor", slots + "class Token {}\nkey(Token);\n"},
 		{"every one of several uses is a constructor slot", slots + "class Token {}\nregister(Token);\nscope.has(Token);\n"},
 		{"a use as a type does not count against it", slots + "class Token {}\nregister(Token);\ndeclare const typed: Token;\n"},
+		{"a class expression inline where a constructor is expected", "declare function snapshot(entry: { target: new () => object }): void;\nsnapshot({ target: class Target {} });\n"},
+		{"a const-bound class expression handed only to constructor slots", slots + "const token = class Token {};\nregister(token);\n"},
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -696,6 +697,12 @@ func TestNoExtraneousClassExemptsALoadBearingEmptyClass(t *testing.T) {
 		{"exported, so uses elsewhere decide it", slots + "export class Token {}\nregister(Token);\n"},
 		{"exported by a specifier", slots + "class Token {}\nregister(Token);\nexport { Token };\n"},
 		{"extended by an interface, which uses it only as a type", "class Shape {}\ninterface Square extends Shape {\n  side: number;\n}\ndeclare const square: Square;\nconsole.log(square);\n"},
+		{"a let-bound class expression that is reassigned, since the write wants no constructor", slots + "let token = class Token {};\nregister(token);\ntoken = class Other {};\n"},
+		{"a const-bound class expression also used otherwise", slots + "const token = class {};\nregister(token);\nconsole.log(token);\n"},
+		{"a class expression inline where no constructor is expected", "console.log(class {});\n"},
+		{"an exported const-bound class expression", slots + "export const token = class {};\nregister(token);\n"},
+		{"a generic parameter, whose contextual type is inferred from the class itself", slots + "declare function rename<Target>(target: Target, name: string): Target;\nclass Token {}\nrename(Token, 'renamed');\n"},
+		{"a generic constrained to a constructor, which inference can't tell apart", slots + "class Token {}\nkey(Token);\n"},
 		{"implemented rather than extended", "class Shape {}\nclass Square implements Shape {\n  side = 1;\n}\nnew Square();\n"},
 	}
 	for _, testCase := range reported {

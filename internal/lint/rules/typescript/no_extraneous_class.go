@@ -179,8 +179,7 @@ var NoExtraneousClass = rule.Rule{
 				if settings.AllowEmpty {
 					return
 				}
-				if node.Kind == ast.KindClassDeclaration && name != nil &&
-					noExtraneousClassEmptyIsLoadBearing(ctx, node, name) {
+				if noExtraneousClassEmptyClassIsLoadBearing(ctx, node, name) {
 					return
 				}
 				ctx.ReportRange(reportRange, noExtraneousClassEmptyMessage)
@@ -259,8 +258,8 @@ var NoExtraneousClass = rule.Rule{
 // A deliberate divergence from typescript-eslint, which has no notion of either shape: the second
 // needs type information, and the first is a case upstream simply reports. In cohere's favor, since
 // each exempt class is load-bearing.
-func noExtraneousClassEmptyIsLoadBearing(ctx rule.Context, classNode *ast.Node, name *ast.Node) bool {
-	if ctx.TypeChecker == nil || noExtraneousClassIsExported(classNode) {
+func noExtraneousClassEmptyIsLoadBearing(ctx rule.Context, exportHolder *ast.Node, name *ast.Node) bool {
+	if ctx.TypeChecker == nil || noExtraneousClassIsExported(exportHolder) {
 		return false
 	}
 	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
@@ -321,6 +320,36 @@ func noExtraneousClassEmptyIsLoadBearing(ctx rule.Context, classNode *ast.Node, 
 	return extended || (valueUses > 0 && constructorSlots == valueUses)
 }
 
+// noExtraneousClassEmptyClassIsLoadBearing applies noExtraneousClassEmptyIsLoadBearing to the binding an
+// empty class has. A declaration is its own binding. A class expression bound to a variable is judged by
+// that binding's uses, exactly as a declaration is: `const token = class Token {}` handed only to
+// constructor slots is the same load-bearing token. A `let` needs no rule of its own: reassigning it is a
+// use that wants no constructor, so a reassigned one is reported, and one never reassigned is a const. Any other class expression has no binding to follow,
+// so its own position decides: `{ target: class Target {} }` in a property typed as a constructor.
+// Found by api's Base pass, where five such tokens came back after the declaration form landed.
+func noExtraneousClassEmptyClassIsLoadBearing(ctx rule.Context, classNode *ast.Node, name *ast.Node) bool {
+	if ctx.TypeChecker == nil {
+		return false
+	}
+	if classNode.Kind == ast.KindClassDeclaration {
+		return name != nil && noExtraneousClassEmptyIsLoadBearing(ctx, classNode, name)
+	}
+	parent := classNode.Parent
+	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		parent = parent.Parent
+	}
+	if parent != nil && ast.IsVariableDeclaration(parent) && parent.Initializer() != nil &&
+		ast.SkipParentheses(parent.Initializer()) == classNode {
+		binding := parent.Name()
+		list := parent.Parent
+		if binding == nil || !ast.IsIdentifier(binding) || list == nil || list.Parent == nil {
+			return false
+		}
+		return noExtraneousClassEmptyIsLoadBearing(ctx, list.Parent, binding)
+	}
+	return noExtraneousClassIsConstructorSlot(ctx, classNode)
+}
+
 // noExtraneousClassIsExported reports whether the class carries an `export` modifier.
 func noExtraneousClassIsExported(classNode *ast.Node) bool {
 	modifiers := classNode.Modifiers()
@@ -337,12 +366,15 @@ func noExtraneousClassIsExported(classNode *ast.Node) bool {
 
 // noExtraneousClassIsConstructorSlot reports whether a reference sits where the compiler expects a
 // constructor: its contextual type, or any member of it when it is a union, has a construct signature.
-// A generic parameter needs no arm of its own: for `key<Target extends new () => object>(Token)` the
-// compiler hands back the inferred `typeof Token`, which carries the signature, and no reference to a
-// class reached a bare type parameter in any case written for this.
+// A generic parameter is never counted, because its contextual type is inferred from the argument.
 func noExtraneousClassIsConstructorSlot(ctx rule.Context, reference *ast.Node) bool {
 	contextual := checker.Checker_getContextualType(ctx.TypeChecker, reference, checker.ContextFlagsNone)
-	if contextual == nil {
+	// A generic parameter's contextual type is inferred from the argument itself, so `<T>(o: T)` hands
+	// back the class's own constructor type and would read as a slot whatever the function wants. A
+	// contextual type identical to the reference's own type proves nothing, so it doesn't count. A
+	// generic constrained to a constructor is reported too, which is the safe direction. Found by api's
+	// Base pass: Object.defineProperty(token, 'name', ...) read as a constructor slot.
+	if contextual == nil || contextual == ctx.TypeChecker.GetTypeAtLocation(reference) {
 		return false
 	}
 	for _, part := range type_checking.UnionTypeParts(contextual) {
