@@ -650,3 +650,16 @@ func TestSetStateInEffectRenamedMemoImportIsAKnownDivergence(t *testing.T) {
 
 	rule_testing.ExpectClean(t, runSetStateInEffect(t, "import {useCallback as useCached, useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = useCached(() => {\n    setState(1);\n  }, []);\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"))
 }
+
+// TestSetStateInEffectJudgesOnlyWhatReactCompiles pins the component-or-hook gate (#1pmwkmv).
+//
+// Upstream reaches its validator only for a function it compiles. This rule judged every function
+// until the gate went in, and `notAComponent` below reported here while React is silent on it. A
+// component declared inside a plain wrapper is still a unit, so the descent is pinned beside it.
+func TestSetStateInEffectJudgesOnlyWhatReactCompiles(t *testing.T) {
+	t.Parallel()
+
+	rule_testing.ExpectClean(t, runSetStateInEffect(t, "import {useEffect, useState} from \"./react\";\n\nexport function notAComponent() {\n  const [state, setState] = useState(0);\n  useEffect(() => {\n    setState(1);\n  });\n  return state;\n}\n"))
+
+	rule_testing.ExpectFindings(t, runSetStateInEffect(t, "import {useEffect, useState} from \"./react\";\n\nexport function wrapper() {\n  function Component() {\n    const [state, setState] = useState(0);\n    useEffect(() => {\n      setState(1);\n    });\n    return state;\n  }\n  return Component;\n}\n"), "setStateInEffect")
+}

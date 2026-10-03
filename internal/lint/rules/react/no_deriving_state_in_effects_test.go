@@ -444,3 +444,14 @@ func TestNoDerivingStateInEffectsRequiresTheTypedHarness(t *testing.T) {
 	untyped := rule_testing.Run(t, NoDerivingStateInEffects, "a.tsx", source)
 	rule_testing.ExpectClean(t, untyped)
 }
+
+// TestNoDerivingStateInEffectsJudgesOnlyWhatReactCompiles pins the component-or-hook gate
+// (#1pmwkmv), with the same two rows as set-state-in-effect's: a plain function is not compiled, so
+// it is silent, and a component nested inside one still is.
+func TestNoDerivingStateInEffectsJudgesOnlyWhatReactCompiles(t *testing.T) {
+	t.Parallel()
+
+	rule_testing.ExpectClean(t, runNoDerivingStateInEffects(t, "import {useEffect, useState} from \"./react\";\n\nexport function deriveName(initialName: string) {\n  const [name, setName] = useState('');\n  useEffect(() => {\n    setName(initialName);\n  }, [initialName]);\n  return name;\n}\n"))
+
+	rule_testing.ExpectFindings(t, runNoDerivingStateInEffects(t, "import {useEffect, useState} from \"./react\";\n\nexport function wrapper() {\n  function Component({initialName}: {initialName: string}) {\n    const [name, setName] = useState('');\n    useEffect(() => {\n      setName(initialName);\n    }, [initialName]);\n    return <div>{name}</div>;\n  }\n  return Component;\n}\n"), "noDerivingStateInEffects")
+}

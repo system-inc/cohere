@@ -5,6 +5,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
+	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -251,6 +252,11 @@ var SetStateInEffect = rule.Rule{
 				if ctx.TypeChecker == nil {
 					return
 				}
+				// A file that cannot hold a component or a hook is not lowered at all; see
+				// high_level_intermediate_representation.MayHoldComponentOrHook for why that is exact.
+				if !high_level_intermediate_representation.MayHoldComponentOrHook(ctx) {
+					return
+				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
 					// Manual memoization is erased first, because upstream validates a graph
 					// where `useMemo` and `useCallback` are already gone; see
@@ -260,24 +266,40 @@ var SetStateInEffect = rule.Rule{
 					if lowered == nil {
 						return
 					}
-					reportSetStateInEffects(ctx, lowered)
+					analyzeSetStateInEffectSubject(ctx, lowered)
 				})
 			},
 		}
 	},
 }
 
-// reportSetStateInEffects is upstream's `validateNoSetStateInEffects` over one lowered function.
+// analyzeSetStateInEffectSubject runs the validator over the functions React would have compiled.
 //
-// Unlike `static-components`, this deliberately does NOT gate on whether upstream would compile the
-// function as a component or a hook. Upstream reaches this validator only for compiled functions,
-// so the gate is implicitly upstream's too, but here it would be redundant and would cost findings:
-// a finding already requires a real `useState` setter and a real React effect hook in the same
-// function, which is a far narrower condition than "looks like a component". Probed on
-// `function notAComponent() { const [s, setS] = useState(0); useEffect(() => setS(1)); }` — upstream
-// is silent because nothing compiles it, and this reports. That is a divergence in the permissive
-// direction on a shape that does not occur, since a `useState` call outside a component or hook is
-// itself a rules-of-hooks violation that a different rule already reports.
+// Upstream reaches `validateNoSetStateInEffects` only for a function it compiles, so the gate is the
+// react shelf's `IsComponentOrHookLike`, the same one purity and set-state-in-render take. A declined
+// function is descended into, because a component nested inside a plain wrapper is still a unit.
+//
+// This rule judged every function before, on the reasoning that a finding already needs a real
+// setter and a real effect hook, which looked narrower than "is a component". It is not narrower in
+// the way that matters: the effect hook is classified by its type, so a value typed `typeof
+// useEffect` reaches it from a function that is no component and spells no hook name, and upstream
+// is silent there, measured on `function notAComponent() { const [s, setS] = useState(0);
+// useEffect(() => setS(1)); }`. Gating also makes `hir.MayHoldComponentOrHook` exact for this rule,
+// so a file that cannot hold a component is not lowered at all (#1pmwkmv).
+func analyzeSetStateInEffectSubject(ctx rule.Context, function *high_level_intermediate_representation.Function) {
+	if function == nil {
+		return
+	}
+	if function.Node == nil || !utilsreact.IsComponentOrHookLike(function.Node) {
+		for _, nested := range function.Functions {
+			analyzeSetStateInEffectSubject(ctx, nested)
+		}
+		return
+	}
+	reportSetStateInEffects(ctx, function)
+}
+
+// reportSetStateInEffects is upstream's `validateNoSetStateInEffects` over one compiled function.
 func reportSetStateInEffects(ctx rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return

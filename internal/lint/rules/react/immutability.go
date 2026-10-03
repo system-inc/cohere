@@ -159,6 +159,11 @@ var Immutability = rule.Rule{
 				if ctx.TypeChecker == nil {
 					return
 				}
+				// A file that cannot hold a component or a hook is not lowered at all; see
+				// high_level_intermediate_representation.MayHoldComponentOrHook for why that is exact.
+				if !high_level_intermediate_representation.MayHoldComponentOrHook(ctx) {
+					return
+				}
 				immutabilityForEachCompiledFunction(node, func(functionNode *ast.Node) {
 					lowered := high_level_intermediate_representation.ForFunction(ctx, functionNode)
 					if lowered == nil {

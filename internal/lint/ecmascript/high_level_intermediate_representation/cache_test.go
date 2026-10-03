@@ -315,3 +315,57 @@ func TestForFunctionWithoutManualMemoizationSeesEscapedSpellings(t *testing.T) {
 		})
 	}
 }
+
+// TestMayHoldComponentOrHookAnswersFromTheText pins the per-file gate in front of all seven React
+// Compiler rules that lower.
+//
+// A wrong "no" is silent in the worst way: the file is never lowered, so every rule goes quiet on
+// it with no error. So each spelling that can reach a component or hook test is a "yes" row, an
+// escape among them, and the "no" rows are what make the gate worth having: a plain module, and a
+// file whose only backslash is an ordinary string escape.
+func TestMayHoldComponentOrHookAnswersFromTheText(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name, file, source string
+		want               bool
+	}{
+		{"a plain module", "plain.ts", "export const total = (values: number[]) => values.reduce((a, b) => a + b, 0);\n", false},
+		{"a backslash that spells no hook", "escape.ts", "export const line = 'a\\tb';\n", false},
+		{"a JSX-variant file with no tag and no hook", "quiet.tsx", "export const count = 1;\n", false},
+		{"a hook call", "hook.ts", "import {useState} from 'react';\nexport function useCounter() { return useState(0); }\n", true},
+		{"a digit after use", "digit.ts", "declare function use2Things(): number;\nexport function useBoth() { return use2Things(); }\n", true},
+		{"an escaped hook name", "escaped.ts", "import {use\\u0053tate} from 'react';\nexport function use\\u0043ounter() { return use\\u0053tate(0); }\n", true},
+		{"an escaped hook name in a computed member", "computed.ts", "declare const React: Record<string, (value: number) => number>;\nexport function counter() { return React['use\\x53tate'](0); }\n", true},
+		{"a tag in a JSX-variant file", "tag.tsx", "export function Shown() { return <div />; }\n", true},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			answered := false
+			var got bool
+			probe := rule.Rule{
+				Name:             "hir-may-hold-component-or-hook-probe",
+				NeedsTypeChecker: true,
+				Run: func(ctx rule.Context, options any) rule.Listeners {
+					return rule.Listeners{
+						ast.KindSourceFile: func(node *ast.Node) {
+							answered = true
+							got = MayHoldComponentOrHook(ctx)
+						},
+					}
+				},
+			}
+			rule_testing.RunTyped(t, probe, testCase.file, testCase.source)
+
+			if !answered {
+				t.Fatal("the probe never ran, so this case proves nothing")
+			}
+			if got != testCase.want {
+				t.Errorf("MayHoldComponentOrHook = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}

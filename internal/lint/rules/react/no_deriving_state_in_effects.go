@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
+	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -129,6 +130,11 @@ var NoDerivingStateInEffects = rule.Rule{
 				if ctx.TypeChecker == nil {
 					return
 				}
+				// A file that cannot hold a component or a hook is not lowered at all; see
+				// high_level_intermediate_representation.MayHoldComponentOrHook for why that is exact.
+				if !high_level_intermediate_representation.MayHoldComponentOrHook(ctx) {
+					return
+				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
 					// Manual memoization is erased first, because upstream validates a graph where
 					// `useMemo` and `useCallback` are already gone.
@@ -136,15 +142,33 @@ var NoDerivingStateInEffects = rule.Rule{
 					if lowered == nil {
 						return
 					}
-					reportDerivedComputationsInEffects(ctx, lowered)
+					analyzeDerivedComputationsSubject(ctx, lowered)
 				})
 			},
 		}
 	},
 }
 
+// analyzeDerivedComputationsSubject runs the validator over the functions React would have compiled.
+//
+// The same gate and the same descent as `analyzeSetStateInEffectSubject`, for the same reason: the
+// effect is classified by its type, so only the component-or-hook test keeps this to the functions
+// upstream validates, and it is what makes `hir.MayHoldComponentOrHook` exact for this rule.
+func analyzeDerivedComputationsSubject(ctx rule.Context, function *high_level_intermediate_representation.Function) {
+	if function == nil {
+		return
+	}
+	if function.Node == nil || !utilsreact.IsComponentOrHookLike(function.Node) {
+		for _, nested := range function.Functions {
+			analyzeDerivedComputationsSubject(ctx, nested)
+		}
+		return
+	}
+	reportDerivedComputationsInEffects(ctx, function)
+}
+
 // reportDerivedComputationsInEffects is upstream's `validateNoDerivedComputationsInEffects` over one
-// lowered function: the gather loop, then a judgment per candidate effect.
+// compiled function: the gather loop, then a judgment per candidate effect.
 func reportDerivedComputationsInEffects(ctx rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return

@@ -47,7 +47,7 @@ var messagePreserveManualMemoizationDependencyMutable = rule.Message{
 // and rebuilt into a reactive tree.
 //
 // That pipeline is already built and measured in
-// `internal/utilities/high_level_intermediate_representation`, where the pass itself lives as
+// `internal/lint/ecmascript/high_level_intermediate_representation`, where the pass itself lives as
 // `ValidatePreservedManualMemoization` behind the `AnalyzePreservedManualMemoization` entry point.
 // This file is the rule surface over it: walk the outermost function-like nodes, lower each one,
 // run the analysis, and turn each finding into a diagnostic anchored where upstream anchors it.
@@ -94,7 +94,7 @@ var messagePreserveManualMemoizationDependencyMutable = rule.Message{
 // carries an `IdentifierId`, which names the DECLARATION, so the per-use span is discarded before
 // the finding is built even though `Place.Range` carries it. Closing it means adding a range to the
 // finding at both report sites in
-// `internal/utilities/high_level_intermediate_representation/preserve_manual_memoization.go`, which
+// `internal/lint/ecmascript/high_level_intermediate_representation/preserve_manual_memoization.go`, which
 // is a change to a shared pass rather than to this rule, and it belongs in its own commit.
 //
 // Its cost on the real tree, measured: 287 findings at 221 distinct locations across 3,516 files, so
@@ -112,10 +112,11 @@ var messagePreserveManualMemoizationDependencyMutable = rule.Message{
 //
 // # What it costs, measured, because it is the most expensive rule in the tree
 //
-// A dry run over ahra: 287 findings across 3,516 files in 7,603ms, which is 43.4% of all rule time
-// and roughly eight times the next most expensive rule (`no-misused-promises` at 920ms). That is not
-// a defect to optimize away casually. The rule lowers every outermost function in every file to the
-// compiler's intermediate representation and runs eighteen pipeline passes over it -- mutable range
+// The first dry run over ahra: 287 findings across 3,516 files in 7,603ms, 43.4% of all rule time,
+// when the rule lowered every outermost function in every file. Since the spelling gate
+// (`hir.MayNameManualMemoization`) it lowers only a function that can name a memo hook, and a
+// profile on 2026-10-03 put it near 620ms. What it pays per function it does lower is inherent: the
+// compiler's intermediate representation and eighteen pipeline passes over it -- mutable range
 // inference, scope assignment, alignment, merging, four prunes and a reactive rebuild -- because the
 // judgment being ported is "what survived compilation", and nothing cheaper can answer it.
 //

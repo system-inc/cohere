@@ -239,6 +239,11 @@ var Purity = rule.Rule{
 				if ctx.TypeChecker == nil {
 					return
 				}
+				// A file that cannot hold a component or a hook is not lowered at all; see
+				// high_level_intermediate_representation.MayHoldComponentOrHook for why that is exact.
+				if !high_level_intermediate_representation.MayHoldComponentOrHook(ctx) {
+					return
+				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
 					// Shared with the other rules that lower this same function; see high_level_intermediate_representation.ForFunction.
 					lowered := high_level_intermediate_representation.ForFunction(ctx, functionNode)
