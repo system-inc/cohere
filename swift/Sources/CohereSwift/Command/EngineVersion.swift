@@ -7,15 +7,23 @@ import Foundation
  reads `Package.resolved` and fails if they disagree, because a provenance line that names the wrong
  parser is worse than none: it sends a reader to the wrong source when a finding looks wrong.
 
- The commit is `dev` until the release build stamps it. Go stamps the TypeScript engine at link time,
- and Swift has no equivalent flag, so stamping waits for @system_cohere_release. Until then a reader
- sees `dev`, which is true.
+ The commit is `dev` unless the release stamped it. Go stamps the TypeScript engine at link time, and
+ Swift has no equivalent flag, and a manifest can pass only boolean defines, never a string. So the
+ release writes `EngineReleaseStamp.generated.swift` beside this file, holding the 40-hex commit inside
+ `#if COHERE_RELEASE_STAMP`, builds with `-Xswiftc -DCOHERE_RELEASE_STAMP`, and removes the file. The file
+ is gitignored, so the stamp never marks the tree modified (measured: SwiftPM's `hasUncommittedChanges`
+ skips ignored files). Neither half can fail quietly: a build without the define says `dev` even with a
+ stale file lying there, and a build with the define and no file does not compile.
  */
 public enum EngineVersion {
     public static let contract = 3
     public static let engine = "cohere-swift"
     public static let version = "0.1.0"
-    public static let commit = "dev"
+    #if COHERE_RELEASE_STAMP
+        public static let commit = EngineReleaseStamp.commit
+    #else
+        public static let commit = "dev"
+    #endif
     public static let swiftSyntax = "604.0.0"
     public static let swiftFormat = "604.0.0"
 

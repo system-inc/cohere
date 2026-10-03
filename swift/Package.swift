@@ -27,7 +27,12 @@ import PackageDescription
  Read from the manifest's own git context, the same signal Go's build info gives the TypeScript engine,
  so a binary carrying code no commit holds says so on every run instead of only under `--version`. It
  covers the whole cohere repository, as Go's does. In a tree where other work is in flight that is
- usually true, and the warning is true with it.
+ usually true, and the warning is true with it. Gitignored files never count.
+
+ SwiftPM caches a manifest's evaluation by the manifest's own text, git state included, so with the default
+ cache this answer is whatever it was the last time this manifest was evaluated. Measured 2026-10-03: a
+ modified tracked file read as clean. A build whose stamp matters (a release) passes
+ `--manifest-cache none`, which evaluates it fresh.
  */
 let sourceTreeModified = Context.gitInformation?.hasUncommittedChanges ?? true
 
