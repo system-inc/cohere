@@ -13,9 +13,16 @@ pnpm add -D @system-inc/cohere
 ```
 
 npm and yarn work the same way. The package installs two commands, `cohere` and its short form `c`,
-and pulls in one prebuilt binary for your platform: macOS, Linux or Windows, each on arm64 or x64.
+and pulls in one prebuilt package for your platform: macOS, Linux or Windows, each on arm64 or x64.
 No Go toolchain is needed. If no binary matches your platform, `cohere` exits with an error naming
 the platform rather than doing nothing.
+
+## Swift, on macOS only
+
+A directory with a `Package.swift` at its root is checked as a Swift package, by `cohere-swift`, an
+engine the two macOS packages ship beside `cohere`. It runs on macOS 15 and later, and types the
+package with the Swift toolchain already on your machine. On Linux and Windows there is no Swift
+engine, and `cohere` refuses a Swift package by name and exits 1 rather than checking nothing.
 
 ## Running it
 

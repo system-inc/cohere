@@ -229,11 +229,32 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 		return StagedPackage{}, err
 	}
 
+	// The Swift engine, beside cohere in the same bin/, on the platforms that ship it. A released cohere
+	// looks for it there and nowhere else, so a package missing it is a broken package, not a smaller
+	// one: the build fails rather than staging without it.
+	executables := []string{binaryPath}
+	enginePath := filepath.Join(directory, "bin", SwiftEngineFileName)
+	if ShipsSwiftEngine(target.GoOperatingSystem) {
+		if err := buildSwiftEngine(options.ModuleDirectory, filepath.Join(options.OutputDirectory, ".swift-build"), target, enginePath); err != nil {
+			return StagedPackage{}, err
+		}
+		executables = append(executables, enginePath)
+	}
+
 	// Signed before the manifest is written, so a signing failure leaves an obviously incomplete
 	// package rather than one that looks finished. Only macOS is signed: Linux and Windows have no
 	// equivalent gate on an npm-installed binary.
 	if target.IsMacOS() && options.Signing.IsConfigured() {
-		if err := Sign(binaryPath, options.Signing); err != nil {
+		for _, executable := range executables {
+			if err := Sign(executable, options.Signing); err != nil {
+				return StagedPackage{}, err
+			}
+		}
+	}
+
+	// After signing, so the pair checked is the pair that ships.
+	if ShipsSwiftEngine(target.GoOperatingSystem) {
+		if err := requireSwiftContract(binaryPath, enginePath); err != nil {
 			return StagedPackage{}, err
 		}
 	}
