@@ -104,6 +104,23 @@ struct PipelineControlTests {
         #expect(run.of("summary").first?["exitCode"] as? Int == 0)
     }
 
+    /*
+     The front door reads a skip whose detail is exactly `not requested` (for unused, that phrase, the dash and how to
+     ask) as no gap, and any other skip as one (f9ec90c, Contract.md). The words are written out here rather than read
+     from the engine's constants, so rewording them fails this test before it breaks every narrowed run.
+     */
+    @Test func aPhaseNobodyAskedForIsSkippedInTheContractsWords() async throws {
+        let run = try await Self.run(source: Self.cleanSource, arguments: ["--lint"])
+        let details = Dictionary(run.of("phase").compactMap { phase in
+            (phase["name"] as? String).map { ($0, "\(phase["outcome"] ?? "")|\(phase["detail"] ?? "")") }
+        }, uniquingKeysWith: { first, _ in first })
+        #expect(details["fix"] == "skipped|not requested")
+        #expect(details["types"] == "skipped|not requested")
+        #expect(details["unused"] == "skipped|not requested — this is a report, ask for it with --unused")
+        #expect(run.phase("lint") == "ran")
+        #expect(run.of("summary").first?["complete"] as? Bool == true)
+    }
+
     @Test func formatCatchesAMisindentedLine() async throws {
         let source = Self.cleanSource.replacingOccurrences(of: "    let value: Int", with: "let value: Int")
         let run = try await Self.run(source: source)
