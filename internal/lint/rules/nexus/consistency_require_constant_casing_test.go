@@ -47,27 +47,14 @@ func TestConsistencyRequireConstantCasingFires(t *testing.T) {
 			"const FormatNumber = function (value: number) { return String(value); };\n",
 			"requireCamelCaseFunction",
 		},
-		// The shape with no local evidence at all: every call site is in another module, so the
-		// factory's own name is what says a function comes back.
-		{
-			"factory-produced function", constantCasingFile,
-			"import { RuleCreator } from 'x';\nexport const CreateEsLintRule = RuleCreator('a');\n",
-			"requireCamelCaseFunction",
-		},
 		// Usage is the evidence: an ordinary call on the right, proven a function by being invoked.
 		{
 			"called like a function", constantCasingFile,
 			"import { build } from 'x';\nconst Handler = build();\nHandler();\n",
 			"requireCamelCaseFunction",
 		},
-		// The declared return type separates a function factory from an instance factory.
-		{
-			"local factory returning a function", constantCasingFile,
-			"function makeMiddleware(): (input: string) => string {\n" +
-				"    return function (input: string) { return input; };\n}\n" +
-				"export const LocaleMiddleware = makeMiddleware();\n",
-			"requireCamelCaseFunction",
-		},
+		// The declared return type of a local resolver says the constant holds an instance. A factory
+		// returning a function is read from the constant's type, in the typed fixtures below.
 		{
 			"local resolver returning a class", constantCasingFile,
 			"class AgentManager {}\nfunction resolveAgentManager(): AgentManager {\n" +
@@ -291,11 +278,8 @@ func TestConsistencyRequireConstantCasingStaysSilent(t *testing.T) {
 			"function numberCompact(value: number) { return String(value); }\n" +
 				"export const formatNumber = numberCompact;\n",
 		},
-		{
-			"alias for a camelCase import is read as a function", constantCasingFile,
-			"import { numberCompact } from 'x';\nexport const formatNumber = numberCompact;\n",
-		},
-		// The inverse: a PascalCase import is not read as a function, so the export keeps PascalCase.
+		// An import is read through its type, in the typed fixtures below, not through its casing.
+		// Without a checker an alias for one has no function evidence, so PascalCase stays data.
 		{
 			"alias for a PascalCase import is data", constantCasingFile,
 			"import { ProjectRoot } from 'x';\nexport const AhraProjectRoot = ProjectRoot;\n",
@@ -440,6 +424,222 @@ func suggestionFrom(t *testing.T, description string) string {
 		t.Fatalf("unterminated suggestion in message: %s", description)
 	}
 	return rest[:closing]
+}
+
+// The factory both real sites call, as ahra's modules/system/base/BaseGraphQlClient.ts declares it:
+// a callable executor that also carries a `requestCapturingSetCookie` method.
+const constantCasingGraphQlClientFactory = "export type BaseGraphQlExecutorType = (\n" +
+	"    query: string,\n    variables?: Record<string, unknown>,\n) => Promise<Record<string, unknown>>;\n" +
+	"export type BaseGraphQlClientType = BaseGraphQlExecutorType & {\n" +
+	"    requestCapturingSetCookie: (query: string) => Promise<{ data: Record<string, unknown> }>;\n};\n" +
+	"export function createGraphQlClient(options: { name: string; defaultApiUrl: string }): BaseGraphQlClientType {\n" +
+	"    const executor = async function (query: string): Promise<Record<string, unknown>> {\n" +
+	"        return { query, name: options.name };\n    };\n" +
+	"    return Object.assign(executor, {\n" +
+	"        requestCapturingSetCookie: async function (query: string) {\n" +
+	"            return { data: { query, url: options.defaultApiUrl } };\n        },\n    });\n}\n"
+
+// Whether a constant holds a function is read from its type through the checker, so the factory that
+// made it can live in any module and carry any name. The two real sites are ConnectedGraphQl.ts:14
+// and PhiGraphQl.ts:57 in ahra, each holding the client `createGraphQlClient` returns and each called
+// by name across 16 files. The rule as it stood could not follow the import, so it told both to
+// become PascalCase and both carried a suppression saying so.
+func TestConsistencyRequireConstantCasingReadsTheRealSitesThroughTheirType(t *testing.T) {
+	t.Parallel()
+
+	const factoryPath = "source/system/base/BaseGraphQlClient.ts"
+	cases := []struct {
+		name    string
+		files   map[string]string
+		subject string
+		wantIds []string
+	}{
+		{
+			"ConnectedGraphQl.ts:14, the client an imported factory returns",
+			map[string]string{
+				factoryPath: constantCasingGraphQlClientFactory,
+				"source/connected/ConnectedGraphQl.ts": "import { createGraphQlClient } from '../system/base/BaseGraphQlClient';\n" +
+					"export const connectedGraphQlClient = createGraphQlClient({\n" +
+					"    name: 'Connected',\n    defaultApiUrl: 'https://api.connected.app/graphql',\n});\n",
+				"source/connected/ConnectedAgents.ts": "import { connectedGraphQlClient } from './ConnectedGraphQl';\n" +
+					"export function listAgents(): Promise<Record<string, unknown>> {\n" +
+					"    return connectedGraphQlClient('query { agents { id } }');\n}\n",
+			},
+			"source/connected/ConnectedGraphQl.ts",
+			nil,
+		},
+		{
+			"PhiGraphQl.ts:57, the same factory reached from deeper in the tree",
+			map[string]string{
+				factoryPath: constantCasingGraphQlClientFactory,
+				"source/phi/core/PhiGraphQl.ts": "import { createGraphQlClient } from '../../system/base/BaseGraphQlClient';\n" +
+					"export const phiGraphQlClient = createGraphQlClient({\n" +
+					"    name: 'Phi',\n    defaultApiUrl: 'https://phi.health/api/graphql',\n});\n",
+				"source/phi/core/PhiTickets.ts": "import { phiGraphQlClient } from './PhiGraphQl';\n" +
+					"export function listTickets(): Promise<Record<string, unknown>> {\n" +
+					"    return phiGraphQlClient('query { tickets { id } }');\n}\n",
+			},
+			"source/phi/core/PhiGraphQl.ts",
+			nil,
+		},
+		{
+			// The other direction: the same client named as data is now told it holds a function.
+			"the same client named PascalCase",
+			map[string]string{
+				factoryPath: constantCasingGraphQlClientFactory,
+				"source/connected/ConnectedGraphQl.ts": "import { createGraphQlClient } from '../system/base/BaseGraphQlClient';\n" +
+					"export const ConnectedGraphQlClient = createGraphQlClient({\n" +
+					"    name: 'Connected',\n    defaultApiUrl: 'https://api.connected.app/graphql',\n});\n",
+			},
+			"source/connected/ConnectedGraphQl.ts",
+			[]string{"requireCamelCaseFunction"},
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			result := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing, testCase.files, testCase.subject)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		})
+	}
+}
+
+// The factories the neighbours below call, one per kind of value a call can hand back.
+const constantCasingFactories = "export interface Store {\n    get(): string;\n    set(value: string): void;\n}\n" +
+	"export declare function createStore(): Store;\n" +
+	"export class Decimal {\n    constructor(public value: number) {}\n}\n" +
+	"export declare function createDecimalClass(): typeof Decimal;\n" +
+	"export interface CallableConstructor {\n    (value: string): string;\n    new (value: string): object;\n}\n" +
+	"export declare function createCallableConstructor(): CallableConstructor;\n" +
+	"export declare function createLimit(): number;\n" +
+	"export declare function createAnything(): any;\n" +
+	"export declare function createLooseHandler(): (value: number) => any;\n" +
+	"export declare function createMaybeHandler(): ((value: number) => number) | undefined;\n" +
+	"export declare function createHandlerOrLabel(): ((value: number) => number) | string;\n" +
+	"export declare function RuleCreator(name: string): (rule: object) => object;\n" +
+	"export type HandlerType = (value: number) => number;\n" +
+	"export declare function pick(): any;\n" +
+	"export function numberCompact(value: number): string {\n    return String(value);\n}\n" +
+	"export const defaultSettings = { retries: 3 };\n"
+
+// The element shape a component returns, standing in for React's own declarations. The check reads
+// members rather than names, so a fixture does not need the real package installed.
+const constantCasingReact = "export interface ReactElement {\n    type: unknown;\n    props: unknown;\n    key: string | null;\n}\n" +
+	"export type ReactNode = ReactElement | string | number | boolean | null | undefined;\n" +
+	"export interface MemoExoticComponent<P> {\n    (props: P): ReactNode;\n    readonly $$typeof: symbol;\n}\n" +
+	"export declare function memo<P>(\n    component: (props: P) => ReactNode,\n" +
+	"    compare?: (previous: P, next: P) => boolean,\n): MemoExoticComponent<P>;\n"
+
+// The neighbours of the real sites: what a type with a call signature must also be, or not be, for
+// the constant to count as a function. Each is a call to a factory in another module, the shape no
+// local evidence can answer.
+func TestConsistencyRequireConstantCasingReadsWhatACallHandsBackThroughItsType(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		sourceText string
+		wantIds    []string
+	}{
+		// An object with methods holds them; it is not called, so it is a constant.
+		{"an object with methods, camelCase", "import { createStore } from './Factories';\nexport const settingsStore = createStore();\n", []string{"requirePascalCaseExported"}},
+		{"an object with methods, PascalCase", "import { createStore } from './Factories';\nexport const SettingsStore = createStore();\n", nil},
+
+		// A constructor keeps the capital `new` expects, even when it can also be called.
+		{"a class", "import { createDecimalClass } from './Factories';\nexport const Decimal = createDecimalClass();\n", nil},
+		{"a class, camelCase", "import { createDecimalClass } from './Factories';\nexport const decimal = createDecimalClass();\n", []string{"requirePascalCaseExported"}},
+		{"callable and constructible", "import { createCallableConstructor } from './Factories';\nexport const Coerce = createCallableConstructor();\n", nil},
+
+		// A plain value is data, wherever it was made.
+		{"a number, camelCase", "import { createLimit } from './Factories';\nexport const retryLimit = createLimit();\n", []string{"requirePascalCaseExported"}},
+		{"a number, PascalCase", "import { createLimit } from './Factories';\nexport const RetryLimit = createLimit();\n", nil},
+
+		// `any` has no signatures and proves nothing, so it is judged on the other evidence, which
+		// here is none.
+		{"any", "import { createAnything } from './Factories';\nexport const anything = createAnything();\n", []string{"requirePascalCaseExported"}},
+
+		// Null and undefined are set aside; a part that is not callable is not.
+		{"a function or undefined", "import { createMaybeHandler } from './Factories';\nexport const handler = createMaybeHandler();\n", nil},
+		{"a function or a string", "import { createHandlerOrLabel } from './Factories';\nexport const handlerOrLabel = createHandlerOrLabel();\n", []string{"requirePascalCaseExported"}},
+
+		// The factory's name no longer matters: a Creator is read like any other call.
+		{"a Creator-named factory, PascalCase", "import { RuleCreator } from './Factories';\nexport const CreateEsLintRule = RuleCreator('a');\n", []string{"requireCamelCaseFunction"}},
+		{"a Creator-named factory, camelCase", "import { RuleCreator } from './Factories';\nexport const createEsLintRule = RuleCreator('a');\n", nil},
+
+		// A local factory, annotated or not.
+		{
+			"a local factory returning a function",
+			"function makeMiddleware(): (input: string) => string {\n" +
+				"    return function (input: string) { return input; };\n}\n" +
+				"export const LocaleMiddleware = makeMiddleware();\n",
+			[]string{"requireCamelCaseFunction"},
+		},
+		{
+			"an unannotated local factory returning a function, camelCase",
+			"function makeMiddleware() {\n    return function (input: string) { return input; };\n}\n" +
+				"export const localeMiddleware = makeMiddleware();\n",
+			nil,
+		},
+
+		// The annotation is the type, whatever its name ends in.
+		{"a function type annotation named Type", "import { pick, type HandlerType } from './Factories';\nexport const handler: HandlerType = pick();\n", nil},
+
+		// An import is followed to what it is, not read from its casing.
+		{"an alias for an imported function", "import { numberCompact } from './Factories';\nexport const formatNumber = numberCompact;\n", nil},
+		{"an alias for an imported object", "import { defaultSettings } from './Factories';\nexport const settings = defaultSettings;\n", []string{"requirePascalCaseExported"}},
+
+		// A component is a function JSX needs capitalized: the compound and memo shapes from
+		// Structure's Dialog.tsx and TableVirtualizedRow.tsx.
+		{
+			"a compound component",
+			"import type { ReactElement } from './react';\n" +
+				"declare function DialogRoot(properties: { open: boolean }): ReactElement;\n" +
+				"declare function DialogTrigger(properties: { label: string }): ReactElement;\n" +
+				"export const Dialog = Object.assign(DialogRoot, { Trigger: DialogTrigger });\n",
+			nil,
+		},
+		{
+			"a memo component with a comparator",
+			"import { memo, type ReactElement } from './react';\n" +
+				"function TableRowInner(properties: { id: string }): ReactElement {\n" +
+				"    return { type: 'tr', props: properties, key: null };\n}\n" +
+				"export const TableRow = memo(TableRowInner, function (previous, next) {\n" +
+				"    return previous.id === next.id;\n});\n",
+			nil,
+		},
+		{
+			"a compound component, camelCase",
+			"import type { ReactElement } from './react';\n" +
+				"declare function DialogRoot(properties: { open: boolean }): ReactElement;\n" +
+				"export const dialog = Object.assign(DialogRoot, { Trigger: DialogRoot });\n",
+			[]string{"requirePascalCaseExported"},
+		},
+		// A return the checker cannot see may be an element: what a component's return becomes
+		// when the JSX types do not resolve. Such a callable is judged as it was before the checker
+		// was asked, so neither casing is reported as a function.
+		{
+			"a compound component whose element type did not resolve",
+			"declare function DialogRoot(properties: { open: boolean }): any;\n" +
+				"export const Dialog = Object.assign(DialogRoot, { Trigger: DialogRoot });\n",
+			nil,
+		},
+		{"a function returning any, PascalCase", "import { createLooseHandler } from './Factories';\nexport const LooseHandler = createLooseHandler();\n", nil},
+		{"a function returning any, camelCase", "import { createLooseHandler } from './Factories';\nexport const looseHandler = createLooseHandler();\n", []string{"requirePascalCaseExported"}},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			result := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing, map[string]string{
+				"source/Factories.ts": constantCasingFactories,
+				"source/react.ts":     constantCasingReact,
+				"source/Subject.ts":   testCase.sourceText,
+				// Imports every export, so an exported camelCase constant gets the PascalCase advice
+				// rather than the drop-the-export one.
+				"source/Consumer.ts": "import * as Subject from './Subject';\nexport const Everything = Subject;\n",
+			}, "source/Subject.ts")
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		})
+	}
 }
 
 // The rename fix, against a real type graph, since references are resolved through the checker.

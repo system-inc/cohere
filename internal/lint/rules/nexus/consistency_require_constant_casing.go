@@ -1,10 +1,11 @@
 package nexus
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -118,7 +119,8 @@ func messageRequireCamelCaseInstance(name string, suggestion string) rule.Messag
 // `constant_casing_importers.go`.
 var ConsistencyRequireConstantCasing = rule.Rule{
 	Name: "nexus/consistency-require-constant-casing",
-	// For the rename fix, which resolves references through the checker, and only at a finding.
+	// For whether a constant holds a function, which is a question about its type, and for the
+	// rename fix, which resolves references through the checker at a finding.
 	NeedsTypeChecker: true,
 	// Every other file's imports, for the drop-the-export advice: resolving another file's imports is
 	// a read of other files, which the view enforces, and a resolution, which the source guard sees.
@@ -221,11 +223,11 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 				}
 
 				// A function is named for what it does, not for how far it reaches, so like an
-				// instance it takes camelCase whatever its reach. Five shapes reach this: an inline
-				// function, an alias for one, a name the file itself calls, a factory call whose
-				// name says a function comes back, and a call to a local factory whose return type
-				// says so. The last three exist because a function exported for other modules to
-				// call has no local evidence at all, since every call site is elsewhere.
+				// instance it takes camelCase whatever its reach. Four kinds of evidence reach this:
+				// an inline function, an alias for one, a name the file itself calls, and a value
+				// whose type is a function. The type is the one that needs no local evidence, which
+				// a function exported for other modules to call does not have, since every call
+				// site is elsewhere; `holdsAFunctionType` says what counts.
 				//
 				// Requiring the casing rather than merely permitting it is what makes this useful.
 				// An exemption only means "do not flag", which leaves a PascalCase function sitting
@@ -234,8 +236,7 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 				if isFunctionValued(initializer) ||
 					usage.isFunctionValuedIdentifier(initializer) ||
 					usage.isCalledLikeAFunction(declaredName) ||
-					isFactoryProducedFunction(initializer) ||
-					usage.isLocallyDeclaredFunctionReturn(initializer) {
+					holdsAFunctionType(ctx, name) {
 					if isCamelCase(declaredName) {
 						return
 					}
@@ -338,31 +339,103 @@ func hasDeclareModifier(statement *ast.Node) bool {
 	return false
 }
 
-// factoryNamePattern matches a callee whose name claims a function comes back.
+// holdsAFunctionType reports whether the constant's type says it holds a function: every part of it,
+// once null and undefined are set aside, can be called and cannot be constructed.
 //
-// Creator and Factory only. The create and build prefixes were too eager: buildRegistry() returns a
-// class instance and createLocaleMiddleware() returns a function, and the name alone cannot tell
-// those apart. What can tell them apart is the declared return type, which the usage index reads
-// when the factory lives in the same file.
-var factoryNamePattern = regexp.MustCompile(`(Creator|Factory)$`)
-
-// isFactoryProducedFunction reports whether the initializer calls a factory whose name says it
-// returns a function.
+// An "export const connectedGraphQlClient = createGraphQlClient({...})" holds a function, and nothing
+// in its file proves it: the factory is imported and every call is in another module. This rule used
+// to guess from the factory instead, by its name (a callee ending in Creator or Factory) or by its
+// declared return type when it lived in the same file, and both guesses missed this line. The
+// constant's own type is the fact both of them were approximating, so it replaces them: it answers
+// for an imported factory, a local one, an annotation, and a cast alike.
 //
-// An "export const createEsLintRule = EsLintUtilities.RuleCreator(...)" holds a function, but
-// nothing local proves it: the calls all live in other modules, so reading usage in this file finds
-// none. Without type information the only remaining evidence is the factory's own name.
+// What the type must show, and why each part is there:
 //
-// This is a naming heuristic rather than a fact, which is why it is narrow. A factory that returns a
-// value rather than a function is still judged on its casing, and the author can say so with a
-// disable comment.
-func isFactoryProducedFunction(initializer *ast.Node) bool {
-	expression := unwrapAssertions(initializer)
-	if expression == nil || expression.Kind != ast.KindCallExpression {
+//   - A call signature. That is what "a function" means to the checker, and it is the only thing a
+//     caller of `connectedGraphQlClient(query)` relies on.
+//   - Properties do not disqualify it. createGraphQlClient's result is a callable that also carries
+//     a `requestCapturingSetCookie` method, and it is still called by name 77 times; a function with
+//     a property hung on it is a function. An object with methods and no call signature is not, and
+//     stays a constant.
+//   - No construct signature. A value that can be built with `new` is a constructor, which keeps the
+//     capital every reader expects at `new Decimal(...)`, even when it can also be called. A class
+//     has only a construct signature, so it never reaches this clause.
+//   - Every part of a union. `string | (() => string)` is sometimes a string, so nothing about it is
+//     reliably a function.
+//   - No call that returns a React element. A component is a function too, and JSX needs its
+//     capital, so it is not this clause's business; see `mayReturnAnElement`. The first version of
+//     this check had no such part and told ten Structure components to become camelCase: seven
+//     compound components built as `Object.assign(DialogRoot, { Trigger, Header })` and three
+//     `React.memo(Row, compare)`.
+//
+// `any` and `unknown` have no signatures, so they prove nothing here and the syntactic and usage
+// evidence beside this answers for them, as it did before the checker was asked.
+//
+// Without a checker (a syntax-only run) this answers false, and that evidence is all there is.
+func holdsAFunctionType(ctx rule.Context, name *ast.Node) bool {
+	if ctx.TypeChecker == nil {
 		return false
 	}
-	name := calleeName(expression.AsCallExpression().Expression)
-	return name != "" && factoryNamePattern.MatchString(name)
+	valueType := ctx.TypeChecker.GetTypeAtLocation(name)
+	if valueType == nil {
+		return false
+	}
+	for _, part := range type_checking.UnionTypeParts(ctx.TypeChecker.GetNonNullableType(valueType)) {
+		callSignatures := ctx.TypeChecker.GetSignaturesOfType(part, checker.SignatureKindCall)
+		if len(callSignatures) == 0 {
+			return false
+		}
+		if len(ctx.TypeChecker.GetSignaturesOfType(part, checker.SignatureKindConstruct)) > 0 {
+			return false
+		}
+		for _, signature := range callSignatures {
+			if mayReturnAnElement(ctx.TypeChecker, checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// elementMemberNames are the members of a React element: what `ReactElement` declares and what
+// `JSX.Element` inherits.
+var elementMemberNames = []string{"type", "props", "key"}
+
+// mayReturnAnElement reports whether a call's return type is, or may be, a React element.
+//
+// Read from the members rather than from the name `ReactElement`, so it holds for `JSX.Element`,
+// which extends it, for the `ReactNode` union a `FunctionComponent` or a `memo` result declares,
+// and for any JSX library typed the same way, without asking where a declaration lives. It only
+// ever withholds the function clause, so reading it broadly can cost a report and never adds one:
+// the constant then falls through to be judged as data, which is what it was before the checker
+// was asked.
+//
+// A return the checker cannot see, `any` or `unknown`, may be an element. That is what a
+// component's return becomes when the JSX types do not resolve, and counting it as a plain function
+// would tell every `Object.assign(DialogRoot, {...})` in such a file to become camelCase.
+func mayReturnAnElement(typeChecker *checker.Checker, returnType *checker.Type) bool {
+	if returnType == nil {
+		return true
+	}
+	if type_checking.IsTypeFlagSet(returnType, checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
+		return true
+	}
+	for _, part := range type_checking.UnionTypeParts(returnType) {
+		if !type_checking.IsObjectType(part) && !type_checking.IsIntersectionType(part) {
+			continue
+		}
+		hasEveryMember := true
+		for _, memberName := range elementMemberNames {
+			if checker.Checker_getPropertyOfType(typeChecker, part, memberName) == nil {
+				hasEveryMember = false
+				break
+			}
+		}
+		if hasEveryMember {
+			return true
+		}
+	}
+	return false
 }
 
 // isClassInstance reports whether the constant holds an instance of a class written here.
