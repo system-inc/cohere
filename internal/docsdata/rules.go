@@ -10,6 +10,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // Rules is rules.json: one row per registered rule, and a note per field saying where it comes from.
@@ -29,9 +30,12 @@ type RuleRow struct {
 	Origin    string `json:"origin"`
 	// UpstreamName is the rule's name in the plugin it was ported from, for a port. A rule registers
 	// under its real upstream spelling, so for a port it is the registered name.
-	UpstreamName string       `json:"upstreamName,omitempty"`
-	TypeAware    bool         `json:"typeAware"`
-	Options      *RuleOptions `json:"options,omitempty"`
+	UpstreamName string `json:"upstreamName,omitempty"`
+	// Category is a house rule's category from the naming scheme (policy/RuleNaming.json). A port has
+	// none: its name is its upstream's, and the scheme does not judge it.
+	Category  string       `json:"category,omitempty"`
+	TypeAware bool         `json:"typeAware"`
+	Options   *RuleOptions `json:"options,omitempty"`
 	// MessageIds and FixKind are what the rule's own tests assert, read from its examples. A rule whose
 	// tests assert no fix has no FixKind rather than "none": a fix no test shows is not a fix absent.
 	MessageIds []string          `json:"messageIds,omitempty"`
@@ -69,6 +73,7 @@ var ruleSourceNotes = map[string]string{
 	"namespace":    "the registered name, before its last slash",
 	"origin":       "the registered namespace, and for a bare name the Go package that registers it",
 	"upstreamName": "the registered name, for a rule ported from a plugin or ESLint core",
+	"category":     "a house rule's name, split by the naming scheme's closed lists (policy/RuleNaming.json)",
 	"typeAware":    "the rule's NeedsTypeChecker declaration",
 	"options":      "the rule's registration: which decoder it carries and whether it requires options",
 	"messageIds":   "the message ids the rule's own tests assert (examples/<rule>.json)",
@@ -134,6 +139,13 @@ func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
 		row.Origin = origin
 		if origin != houseOrigin {
 			row.UpstreamName = name
+		} else {
+			// A house rule whose name does not fit the scheme refuses the build, so it cannot publish.
+			parsed, err := policy.Naming.ParseHouseRuleName(name[strings.LastIndex(name, "/")+1:])
+			if err != nil {
+				return Rules{}, fmt.Errorf("docsdata: %s: %w", name, err)
+			}
+			row.Category = parsed.Category
 		}
 		row.Options = optionsOf(registration)
 		if examples, present := inputs.Examples[name]; present {

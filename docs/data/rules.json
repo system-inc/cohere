@@ -3978,6 +3978,7 @@
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
+            "category": "boundary",
             "typeAware": false,
             "messageIds": [
                 "boundaryNoGlobalContainer"
@@ -3997,6 +3998,7 @@
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "messageIds": [
                 "consistencyNoBareThrow"
@@ -4017,6 +4019,7 @@
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "messageIds": [
                 "consistencyNoConsole"
@@ -4037,6 +4040,7 @@
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "messageIds": [
                 "consistencyNoHandBuiltDeclaredError"
@@ -4056,6 +4060,7 @@
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "messageIds": [
                 "invalidName"
@@ -4075,6 +4080,7 @@
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "decoratorNullableButInputExcludesNull",
@@ -4096,6 +4102,7 @@
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "mismatch"
@@ -4115,6 +4122,7 @@
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "mismatch",
@@ -4135,6 +4143,7 @@
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "mismatch"
@@ -4154,6 +4163,7 @@
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "mustBeOptional"
@@ -4173,6 +4183,7 @@
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
+            "category": "correctness",
             "typeAware": false,
             "messageIds": [
                 "missingDeclare"
@@ -4192,6 +4203,7 @@
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "columnNullableButTypeNot"
@@ -4211,6 +4223,7 @@
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "decoratorOptionalButTypeNot",
@@ -4231,6 +4244,7 @@
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "missingArrayRule"
@@ -4250,6 +4264,7 @@
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "optionalButTypeNot",
@@ -4270,6 +4285,7 @@
             "language": "TypeScript",
             "namespace": "base",
             "origin": "house",
+            "category": "security",
             "typeAware": false,
             "options": {
                 "elements": "one"
@@ -5209,6 +5225,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "boundary",
             "typeAware": false,
             "messageIds": [
                 "aliasedInternal",
@@ -5249,6 +5266,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "boundary",
             "typeAware": false,
             "messageIds": [
                 "forbiddenOutsideImport"
@@ -5288,6 +5306,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "boundary",
             "typeAware": false,
             "options": {
                 "elements": "one",
@@ -5305,6 +5324,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "concurrency",
             "typeAware": true,
             "messageIds": [
                 "checkThenWrite"
@@ -5345,6 +5365,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "concurrency",
             "typeAware": true,
             "messageIds": [
                 "lostUpdate"
@@ -5385,6 +5406,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "options": {
                 "elements": "one"
@@ -5465,6 +5487,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "messageIds": [
                 "noAmbiguousE",
@@ -5507,6 +5530,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "options": {
                 "elements": "one"
@@ -5550,6 +5574,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "messageIds": [
                 "noEnum"
@@ -5589,6 +5614,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "messageIds": [
                 "forIn"
@@ -5628,6 +5654,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "messageIds": [
                 "handRolledDelay"
@@ -5668,6 +5695,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": true,
             "messageIds": [
                 "isoStringCutToDate"
@@ -5682,6 +5710,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "options": {
                 "elements": "one"
@@ -5725,6 +5754,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "messageIds": [
                 "addEventListenerArrow",
@@ -5767,6 +5797,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "messageIds": [
                 "returnVoid"
@@ -5807,6 +5838,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "options": {
                 "elements": "one"
@@ -5851,6 +5883,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "options": {
                 "elements": "one"
@@ -5893,6 +5926,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "messageIds": [
                 "useSimpleComment"
@@ -5933,6 +5967,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "options": {
                 "elements": "one"
@@ -5976,6 +6011,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "messageIds": [
                 "noUnderscoreUtils",
@@ -6017,6 +6053,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": true,
             "options": {
                 "elements": "one"
@@ -6048,6 +6085,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": true,
             "messageIds": [
                 "bareReturnInValueFunction",
@@ -6089,6 +6127,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "messageIds": [
                 "noConstEnumSuffix",
@@ -6130,6 +6169,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "callbackInParseTry"
@@ -6169,6 +6209,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "bracketAccessOnCollection",
@@ -6211,6 +6252,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "outcomeDiscarded"
@@ -6250,6 +6292,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "discardedPureResult"
@@ -6289,6 +6332,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "globalListenerTargetAssertion"
@@ -6328,6 +6372,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "identicalBranches"
@@ -6342,6 +6387,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "loadTimeReadInImportCycle"
@@ -6355,6 +6401,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "leakedNumberRender"
@@ -6368,6 +6415,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "mockOnModuleNamespace"
@@ -6407,6 +6455,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "nullishStrippedByAssertion"
@@ -6421,6 +6470,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "exitAfterOutput"
@@ -6434,6 +6484,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "globalRegexTest"
@@ -6473,6 +6524,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "unclearedRaceTimeout"
@@ -6513,6 +6565,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "writeOnlyCollection"
@@ -6527,6 +6580,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "exitBeforeBlockingStandardStreams"
@@ -6540,6 +6594,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "childProcessWithoutErrorListener"
@@ -6579,6 +6634,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "correctness",
             "typeAware": true,
             "messageIds": [
                 "bodyReadWithoutStatusCheck",
@@ -6594,6 +6650,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "import",
             "typeAware": false,
             "messageIds": [
                 "forbiddenImageImport",
@@ -6637,6 +6694,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "import",
             "typeAware": false,
             "options": {
                 "elements": "one"
@@ -6681,6 +6739,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "import",
             "typeAware": false,
             "messageIds": [
                 "requireCorrectAlias",
@@ -6723,6 +6782,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "import",
             "typeAware": false,
             "options": {
                 "elements": "one",
@@ -6743,6 +6803,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "localization",
             "typeAware": false,
             "sets": [
                 {
@@ -6779,6 +6840,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "performance",
             "typeAware": true,
             "messageIds": [
                 "independentAwaitInLoop"
@@ -6819,6 +6881,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "security",
             "typeAware": true,
             "messageIds": [
                 "interpolatedShellCommand"
@@ -6859,6 +6922,7 @@
             "language": "TypeScript",
             "namespace": "nexus",
             "origin": "house",
+            "category": "security",
             "typeAware": true,
             "messageIds": [
                 "interpolatedSqlString"
@@ -12933,6 +12997,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "boundary",
             "typeAware": false,
             "messageIds": [
                 "forbiddenThemeValue"
@@ -12952,6 +13017,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "messageIds": [
                 "noPropertyAlias"
@@ -12971,6 +13037,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "messageIds": [
                 "requireMatchingFileName"
@@ -12991,6 +13058,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "consistency",
             "typeAware": false,
             "messageIds": [
                 "importsNotOrganized"
@@ -13011,6 +13079,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "import",
             "typeAware": false,
             "messageIds": [
                 "noCallWithoutPrefix",
@@ -13033,6 +13102,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "network",
             "typeAware": false,
             "messageIds": [
                 "noDirectFetch"
@@ -13052,6 +13122,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "network",
             "typeAware": false,
             "messageIds": [
                 "noDirectApollo",
@@ -13073,6 +13144,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "network",
             "typeAware": false,
             "messageIds": [
                 "noInvalidateCacheInOnSuccess"
@@ -13092,6 +13164,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "network",
             "typeAware": false,
             "messageIds": [
                 "noArrayWithStringLiteralInvalidateCache",
@@ -13113,6 +13186,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "network",
             "typeAware": false,
             "messageIds": [
                 "noStringLiteralGraphQlQuery"
@@ -13132,6 +13206,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "network",
             "typeAware": false,
             "messageIds": [
                 "incorrectOptionsParameterType",
@@ -13153,6 +13228,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "network",
             "typeAware": false,
             "messageIds": [
                 "fileShouldEndWithRequest",
@@ -13173,6 +13249,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "network",
             "typeAware": false,
             "messageIds": [
                 "inlineVariablesType",
@@ -13193,6 +13270,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "next",
             "typeAware": false,
             "messageIds": [
                 "nearMissRouteExport",
@@ -13213,6 +13291,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "next",
             "typeAware": false,
             "messageIds": [
                 "pageStateRemounts"
@@ -13232,6 +13311,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "next",
             "typeAware": false,
             "messageIds": [
                 "useParamsNotParameters",
@@ -13253,6 +13333,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "next",
             "typeAware": false,
             "messageIds": [
                 "pageDefaultExportInline",
@@ -13274,6 +13355,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "react-component",
             "typeAware": false,
             "messageIds": [
                 "noConstAssignment"
@@ -13293,6 +13375,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "react-component",
             "typeAware": false,
             "messageIds": [
                 "noDestructuring",
@@ -13316,6 +13399,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "react-component",
             "typeAware": false,
             "messageIds": [
                 "noDisplayNameAssignment"
@@ -13335,6 +13419,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "react-component",
             "typeAware": false,
             "messageIds": [
                 "noForwardRefCall",
@@ -13355,6 +13440,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "react-component",
             "typeAware": false,
             "messageIds": [
                 "noSeparateNamedExport"
@@ -13375,6 +13461,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "react-component",
             "typeAware": false,
             "messageIds": [
                 "componentRequiresNamedExport"
@@ -13394,6 +13481,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "react-component",
             "typeAware": false,
             "messageIds": [
                 "usePropertiesNotProps"
@@ -13414,6 +13502,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "react-component",
             "typeAware": false,
             "messageIds": [
                 "useComponentPropertyTypeSuffix",
@@ -13436,6 +13525,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "react-element",
             "typeAware": false,
             "sets": [
                 {
@@ -13452,6 +13542,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "react-element",
             "typeAware": false,
             "messageIds": [
                 "noHrElement"
@@ -13471,6 +13562,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "react-hook",
             "typeAware": true,
             "messageIds": [
                 "reactHookNoAnyType"
@@ -13490,6 +13582,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "react-hook",
             "typeAware": false,
             "messageIds": [
                 "noDestructuringInHook"
@@ -13509,6 +13602,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "react-hook",
             "typeAware": false,
             "messageIds": [
                 "extractPropertiesFirst"
@@ -13528,6 +13622,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "react-hook",
             "typeAware": false,
             "messageIds": [
                 "missingEffectComment"
@@ -13547,6 +13642,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "react-hook",
             "typeAware": false,
             "messageIds": [
                 "hookResultNamingBadSuffix",
@@ -13568,6 +13664,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "storage",
             "typeAware": false,
             "messageIds": [
                 "directLocalStorage",
@@ -13588,6 +13685,7 @@
             "language": "TypeScript",
             "namespace": "structure",
             "origin": "house",
+            "category": "tailwind",
             "typeAware": false,
             "messageIds": [
                 "useLogicalClass"

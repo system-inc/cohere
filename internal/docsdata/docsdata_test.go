@@ -73,7 +73,7 @@ func TestCheckSeesARegistryChange(t *testing.T) {
 
 	added := inputs
 	added.Registrations = append(slices.Clone(inputs.Registrations), rule.Registration{
-		Rule: rule.Rule{Name: "nexus/docsdata-test-rule", Run: func(rule.Context, any) rule.Listeners { return nil }},
+		Rule: rule.Rule{Name: "nexus/consistency-no-docsdata-test-rule", Run: func(rule.Context, any) rule.Listeners { return nil }},
 	})
 	if stale := staleAgainstCommitted(t, built(t, added)); !slices.Contains(stale, RulesPath) {
 		t.Errorf("adding a rule to the registry left rules.json current: %v", stale)
@@ -144,6 +144,39 @@ func TestEveryRegisteredRuleHasOneRow(t *testing.T) {
 	}
 }
 
+// TestEveryHouseRuleFollowsTheNamingScheme: every house rule builds with a category and no port carries
+// one, and a house rule registered under a name outside the scheme refuses the build.
+func TestEveryHouseRuleFollowsTheNamingScheme(t *testing.T) {
+	inputs := sourceInputs(t)
+	var rules Rules
+	if err := json.Unmarshal(built(t, inputs)[RulesPath], &rules); err != nil {
+		t.Fatal(err)
+	}
+	house := 0
+	for _, row := range rules.Rules {
+		switch {
+		case row.Origin == houseOrigin && row.Category == "":
+			t.Errorf("%s is a house rule with no category", row.Name)
+		case row.Origin != houseOrigin && row.Category != "":
+			t.Errorf("%s is a port and carries the category %q", row.Name, row.Category)
+		}
+		if row.Origin == houseOrigin {
+			house++
+		}
+	}
+	if house == 0 {
+		t.Fatal("no house rule was built, so the scheme was checked against nothing")
+	}
+
+	misnamed := inputs
+	misnamed.Registrations = append(slices.Clone(inputs.Registrations), rule.Registration{
+		Rule: rule.Rule{Name: "nexus/docsdata-test-rule", Run: func(rule.Context, any) rule.Listeners { return nil }},
+	})
+	if _, err := Build(misnamed); err == nil || !strings.Contains(err.Error(), "nexus/docsdata-test-rule") {
+		t.Errorf("a house rule named outside the scheme built: %v", err)
+	}
+}
+
 // TestBuildIsDeterministic: two builds give the same bytes, so a regeneration diffs to nothing.
 func TestBuildIsDeterministic(t *testing.T) {
 	inputs := sourceInputs(t)
@@ -162,7 +195,7 @@ func TestBuildIsDeterministic(t *testing.T) {
 // a row does not have.
 func TestEveryFieldHasASourceNote(t *testing.T) {
 	encoded, err := json.Marshal(RuleRow{Options: &RuleOptions{}, Swift: &SwiftVerdict{}, Sets: []RuleSetSeverity{{}}, MessageIds: []string{""},
-		Namespace: "-", UpstreamName: "-", FixKind: "-"})
+		Namespace: "-", UpstreamName: "-", Category: "-", FixKind: "-"})
 	if err != nil {
 		t.Fatal(err)
 	}
