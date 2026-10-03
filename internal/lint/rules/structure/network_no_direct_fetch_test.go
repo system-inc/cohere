@@ -30,6 +30,12 @@ func TestNetworkNoDirectFetchFires(t *testing.T) {
 				"noDirectFetch")
 		})
 	}
+
+	// NetworkService is exempt by where it lives, so a file elsewhere named after it is not.
+	t.Run("in a file merely named after NetworkService", func(t *testing.T) {
+		rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkNoDirectFetch, "/repository/app/_services/MyNetworkService.ts",
+			"export async function load(url: string) {\n    return fetch(url);\n}\n"), "noDirectFetch")
+	})
 }
 
 func TestNetworkNoDirectFetchStaysSilent(t *testing.T) {
@@ -43,8 +49,14 @@ func TestNetworkNoDirectFetchStaysSilent(t *testing.T) {
 		// The implementation is the one place the raw primitive is allowed, and a rule that
 		// forbids the thing it asks people to use is a rule people learn to disable.
 		{
-			"inside NetworkService.ts", "/repository/source/services/NetworkService.ts",
+			"inside NetworkService.ts", "/repository/source/services/network/NetworkService.ts",
 			"export async function load(url: string) {\n    return fetch(url);\n}\n",
+		},
+		// The module spans internal/: the device id request must use the raw primitive, because
+		// NetworkService's request() waits on the very device id it is fetching.
+		{
+			"inside NetworkService's internal device id", "/repository/libraries/structure/source/services/network/internal/NetworkServiceDeviceId.ts",
+			"export async function requestDeviceId(url: string) {\n    return fetch(url);\n}\n",
 		},
 		// The decision boundary is "is this the global primitive", and the way to get it wrong is
 		// to match the method name. Both of these are somebody's own method.

@@ -14,8 +14,8 @@ var messageNoDirectTanStackQuery = rule.Message{
 		"wrapper is where the query client, the cache keys, the retry policy and the error " +
 		"shaping live. A component holding its own useQuery gets a different client and a " +
 		"different cache, so its data goes stale independently of everything else on the page. " +
-		"NetworkService.ts and Providers.tsx are exempt, since those are where TanStack is " +
-		"configured.",
+		"NetworkService's own module, source/services/network/, is exempt, since that is where " +
+		"TanStack is configured.",
 }
 
 var messageNoDirectApollo = rule.Message{
@@ -36,7 +36,7 @@ var messageNoDirectGraphqlImport = rule.Message{
 // NetworkNoForbiddenImport flags a direct import of a library NetworkService wraps or replaces.
 //
 //	valid:   import { useGraphQlQuery } from '@structure/source/services/network/NetworkService'
-//	valid:   import { QueryClient } from '@tanstack/react-query'   (in Providers.tsx only)
+//	valid:   import { QueryClient } from '@tanstack/react-query'   (inside source/services/network/ only)
 //	invalid: import { useQuery } from '@tanstack/react-query'
 //	invalid: import { gql } from '@apollo/client'
 //	invalid: import { graphql } from '../generated/graphql'
@@ -46,7 +46,7 @@ var messageNoDirectGraphqlImport = rule.Message{
 // replaced, and the generated `graphql` is a type-information problem rather than a client problem.
 //
 // The three tests are deliberately different shapes, matching the original. TanStack is an exact
-// match with two exempt files, Apollo is a prefix match so every package under the scope is caught,
+// match with NetworkService's module exempt, Apollo is a prefix match so every package under the scope is caught,
 // and the generated import only reports when the `graphql` specifier is actually named, since a
 // generated path is a normal thing to import types from.
 //
@@ -59,11 +59,11 @@ var NetworkNoForbiddenImport = rule.Rule{
 			return nil
 		}
 
-		// TanStack is allowed where it is configured. Both files are named rather than pattern
-		// matched, since the exemption is a fixed pair of places rather than a judgment.
+		// TanStack is allowed where it is configured: NetworkService's module, by where it lives. It
+		// once also exempted any Providers.tsx, after Structure's providers stopped importing
+		// TanStack, which left a hole the ban was meant to close.
 		fileContext := FileContextFor(ctx.SourceFile.FileName())
-		isTanStackExempt := fileContext.IsNetworkServiceFile ||
-			strings.Contains(strings.ReplaceAll(ctx.SourceFile.FileName(), `\`, "/"), "Providers.tsx")
+		isTanStackExempt := fileContext.IsNetworkServiceFile
 
 		return rule.Listeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {

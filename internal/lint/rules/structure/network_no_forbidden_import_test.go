@@ -45,9 +45,21 @@ func TestNetworkNoForbiddenImportFires(t *testing.T) {
 			"import { graphql as query } from '../generated/graphql';\nexport const Use = query;\n",
 			[]string{"noDirectGraphqlImport"},
 		},
-		// A tsx that is not Providers.tsx gets no tanstack exemption.
 		{
 			"tanstack in an ordinary component", "/repository/app/_components/Panel.tsx",
+			"import { useQuery } from '@tanstack/react-query';\nexport const Use = useQuery;\n",
+			[]string{"noDirectTanStackQuery"},
+		},
+		// Providers.tsx was once exempt by name; Structure's providers no longer configure TanStack,
+		// so it is an ordinary file.
+		{
+			"tanstack inside a Providers.tsx", "/repository/app/Providers.tsx",
+			"import { QueryClient } from '@tanstack/react-query';\nexport const Use = QueryClient;\n",
+			[]string{"noDirectTanStackQuery"},
+		},
+		// A file named after NetworkService outside its module is not NetworkService.
+		{
+			"tanstack in a file merely named after NetworkService", "/repository/app/_services/MyNetworkService.ts",
 			"import { useQuery } from '@tanstack/react-query';\nexport const Use = useQuery;\n",
 			[]string{"noDirectTanStackQuery"},
 		},
@@ -72,14 +84,18 @@ func TestNetworkNoForbiddenImportStaysSilent(t *testing.T) {
 			"the wrapper being used as intended", forbiddenImportFile,
 			"import { useGraphQlQuery } from '@structure/source/services/network/NetworkService';\nexport const Use = useGraphQlQuery;\n",
 		},
-		// The two configuration sites, which are where TanStack is set up. A rule that forbade it
-		// here would forbid the thing it asks people to use.
+		// NetworkService's module, which is where TanStack is set up. A rule that forbade it here
+		// would forbid the thing it asks people to use. The module spans internal/ too.
 		{
-			"tanstack inside Providers.tsx", "/repository/app/Providers.tsx",
+			"tanstack inside NetworkService.ts", "/repository/source/services/network/NetworkService.ts",
 			"import { QueryClient } from '@tanstack/react-query';\nexport const Use = QueryClient;\n",
 		},
 		{
-			"tanstack inside NetworkService.ts", "/repository/source/services/network/NetworkService.ts",
+			"tanstack inside NetworkService's provider", "/repository/source/services/network/NetworkServiceProvider.tsx",
+			"import { QueryClientProvider } from '@tanstack/react-query';\nexport const Use = QueryClientProvider;\n",
+		},
+		{
+			"tanstack inside NetworkService's internal cache", "/repository/libraries/structure/source/services/network/internal/NetworkServiceCache.ts",
 			"import { QueryClient } from '@tanstack/react-query';\nexport const Use = QueryClient;\n",
 		},
 		// The apollo exemption is deliberately absent, so this is the boundary: the prefix must be

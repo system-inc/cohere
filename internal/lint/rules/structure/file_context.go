@@ -88,10 +88,14 @@ func FileContextFor(fileName string) FileContext {
 	}
 
 	return FileContext{
-		IsReactFile:          isReactFile,
-		IsSpecialNextJsFile:  isSpecialNextJsFile,
-		IsGeneratedFile:      strings.Contains(normalizedPath, "/generated/"),
-		IsNetworkServiceFile: strings.Contains(normalizedPath, "NetworkService.ts"),
+		IsReactFile:         isReactFile,
+		IsSpecialNextJsFile: isSpecialNextJsFile,
+		IsGeneratedFile:     strings.Contains(normalizedPath, "/generated/"),
+		// Every file of the NetworkService module, by where it lives rather than by name, the same way
+		// Link's exemption is matched: the module is split across an internal/ directory whose files
+		// each own part of what the rules forbid elsewhere, and a file elsewhere named after
+		// NetworkService must not exempt itself.
+		IsNetworkServiceFile: strings.Contains(normalizedPath, "/source/services/network/"),
 
 		// Matched on the full path rather than the base name, which is the original's choice and
 		// the load-bearing half: any file named Link.tsx would otherwise exempt itself from a rule
