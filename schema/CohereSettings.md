@@ -51,6 +51,7 @@ never something it silently ignores.
 | [`jsPlugins`](#jsplugins) | array | any settings file |
 | [`overrides`](#overrides) | array of blocks | any settings file |
 | [`plugins`](#plugins) | array of strings | any settings file |
+| [`reasons`](#reasons) | object of reasons | any settings file |
 | [`rules`](#rules) | object of rule settings | any settings file |
 | [`settings`](#settings) | object | the file cohere reads first |
 
@@ -160,9 +161,17 @@ Rule namespaces whose rules apply without a rules entry naming them, at warn, as
 { "plugins": ["react"] }
 ```
 
+### `reasons`
+
+For each rule this file turns off in its own rules, why, in a sentence. cohere prints the reason beside the rule wherever coverage names it, so an off reads as a decision rather than an allowance. An off that departs from the file it extends says why under departures instead. An entry for a rule this file does not turn off is refused.
+
+```json
+{ "reasons": { "no-continue": "Style, with no bug class behind it." } }
+```
+
 ### `rules`
 
-Each rule's severity, or [severity, ...options] for a rule that takes options. A rule this file sets differently from the file it extends must be named under departures with the reason.
+Each rule's severity, or [severity, ...options] for a rule that takes options. A rule this file sets differently from the file it extends must be named under departures with the reason, and a rule it turns off otherwise says why under reasons.
 
 ```json
 { "rules": { "no-debugger": "error", "eqeqeq": ["error", "always", { "null": "ignore" }] } }

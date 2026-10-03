@@ -116,6 +116,11 @@ type Config struct {
 	// visible and never becomes a quiet allowance.
 	Departures map[string]Departure
 
+	// OffReasons are why each rule the chain turns off at top level is off, keyed by rule name: the
+	// sentence a file gave under `reasons`, or its departure's reason when the off departs from an
+	// inherited ruling. Coverage prints each beside the rule. An off with no entry here is an allowance.
+	OffReasons map[string]OffReason
+
 	// CohereVersion is the range of cohere releases the project's own file accepts, or nil when it
 	// pins none. Only the project's own file may pin: a set is read by every project that extends it,
 	// and a range there would decide for all of them which release they run.
@@ -127,6 +132,51 @@ type Departure struct {
 	// File is the configuration that departs, and Reason is the sentence it gave under `departures`.
 	File   string
 	Reason string
+}
+
+// OffReason is why a rule is off, and the configuration that said so.
+type OffReason struct {
+	File   string
+	Reason string
+}
+
+// OffReasonFor returns why the rule named ruleName is off, found by its own key or by a key that reaches
+// it, the way the resolver lets a key spelled differently configure a rule.
+func (c *Config) OffReasonFor(ruleName string) (OffReason, bool) {
+	if c == nil {
+		return OffReason{}, false
+	}
+	if offReason, found := c.OffReasons[ruleName]; found {
+		return offReason, true
+	}
+	keys := make([]string, 0, len(c.OffReasons))
+	for key := range c.OffReasons {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if KeyReachesRule(key, ruleName) {
+			return c.OffReasons[key], true
+		}
+	}
+	return OffReason{}, false
+}
+
+// TurnsOffAtTopLevel reports whether the chain's top-level rules turn the rule named ruleName off, by its
+// own key or, when no key names it exactly, by a key that reaches it.
+func (c *Config) TurnsOffAtTopLevel(ruleName string) bool {
+	if c == nil {
+		return false
+	}
+	if setting, found := c.Rules[ruleName]; found {
+		return setting.Severity == SeverityOff
+	}
+	for key, setting := range c.Rules {
+		if setting.Severity == SeverityOff && KeyReachesRule(key, ruleName) {
+			return true
+		}
+	}
+	return false
 }
 
 // RuleKeys returns every rule name the config mentions, in the base block or any override, at any
@@ -271,6 +321,10 @@ func RulesFromPlugins(plugins []string, named map[string]RuleSetting) map[string
 //     does not follow the chain and a value there would be ignored silently.
 //   - A rule set differently from the file it extends must be named under `departures` with a reason,
 //     and a `departures` entry that departs from nothing is refused, so the list cannot rot.
+//   - A rule a file turns off at top level says why under `reasons`, unless the off departs from an
+//     inherited ruling, where the departure's reason already does. A `reasons` entry for a rule the file
+//     does not turn off at top level is refused, so that list cannot rot either. The reason follows the
+//     rule up the chain until a later file turns it back on.
 //
 // Load matches inherited rulings by exact key. LoadFor, which the command uses, also knows which rules
 // are registered, and that is what lets it tell a respelling from a twin; see sameRuling.
@@ -295,6 +349,7 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 		Rules:      map[string]RuleSetting{},
 		Root:       root,
 		Departures: map[string]Departure{},
+		OffReasons: map[string]OffReason{},
 	}
 	declaredPlugins := map[string]bool{}
 	reach := newRuleReach(registeredNames)
@@ -321,6 +376,9 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 		// whichever order Go's map iteration happened to yield them.
 		fromBases := maps.Clone(loaded.Rules)
 		departed := map[string]bool{}
+		if err := checkReasons(layer); err != nil {
+			return nil, err
+		}
 		for name, value := range layer.raw.Rules {
 			setting, err := parseRuleSetting(value)
 			if err != nil {
@@ -328,6 +386,7 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 			}
 
 			inheritedName, inherited, isInherited, replacesInherited := inheritedRuleSetting(fromBases, name, reach)
+			inheritedOffReason, inheritedIsReasoned := loaded.OffReasons[inheritedName]
 			// Layers that do not extend one another are composed side by side, `cohere:react` beside
 			// `cohere:next`. Each rule belongs to one of them: if both wrote it, which one wins would be
 			// decided by the order of a list rather than by anyone's ruling, and neither file says so.
@@ -356,10 +415,25 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 				// unconfigured and silently stop running.
 				if replacesInherited {
 					delete(loaded.Rules, inheritedName)
+					delete(loaded.OffReasons, inheritedName)
 				}
 			}
 			loaded.Rules[name] = setting
 			writtenBy[name] = layer.path
+
+			switch {
+			case setting.Severity != SeverityOff:
+				delete(loaded.OffReasons, name)
+			case strings.TrimSpace(layer.raw.Reasons[name]) != "":
+				loaded.OffReasons[name] = OffReason{File: layer.path, Reason: strings.TrimSpace(layer.raw.Reasons[name])}
+			case departed[name]:
+				loaded.OffReasons[name] = OffReason{File: layer.path, Reason: loaded.Departures[name].Reason}
+			case isInherited && inheritedIsReasoned:
+				// Restating an inherited off keeps the reason the file that ruled it gave.
+				loaded.OffReasons[name] = inheritedOffReason
+			default:
+				delete(loaded.OffReasons, name)
+			}
 		}
 
 		loaded.IgnorePatterns = append(loaded.IgnorePatterns, layer.raw.IgnorePatterns...)
@@ -727,9 +801,47 @@ func compactJson(raw json.RawMessage) string {
 	return buffer.String()
 }
 
+// checkReasons refuses a `reasons` entry that explains nothing: one with no sentence, one for a rule the
+// file does not turn off at top level, and one for an off the file already explains under `departures`.
+//
+// The second is the guard that keeps the list from rotting. A reason left behind after its rule was
+// turned back on, or written for a rule another file turns off, reads as a decision while deciding
+// nothing, exactly as a departure that departs from nothing would.
+func checkReasons(layer configLayer) error {
+	names := make([]string, 0, len(layer.raw.Reasons))
+	for name := range layer.raw.Reasons {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if strings.TrimSpace(layer.raw.Reasons[name]) == "" {
+			return fmt.Errorf("lint config %s names %q under \"reasons\" and gives no reason: say why the "+
+				"rule is off, in a sentence", layer.path, name)
+		}
+		value, written := layer.raw.Rules[name]
+		turnsOff := false
+		if written {
+			setting, err := parseRuleSetting(value)
+			turnsOff = err == nil && setting.Severity == SeverityOff
+		}
+		if !turnsOff {
+			return fmt.Errorf("lint config %s names %q under \"reasons\", but it does not turn that rule "+
+				"off in its own top-level rules: a reason belongs to the file whose off it explains, so "+
+				"remove the entry", layer.path, name)
+		}
+		if _, departs := layer.raw.Departures[name]; departs {
+			return fmt.Errorf("lint config %s names %q under both \"reasons\" and \"departures\": the "+
+				"departure's reason already says why this file turns it off, so remove the \"reasons\" entry",
+				layer.path, name)
+		}
+	}
+	return nil
+}
+
 type rawConfig struct {
 	Extends        extendsList                `json:"extends"`
 	Departures     map[string]string          `json:"departures"`
+	Reasons        map[string]string          `json:"reasons"`
 	Plugins        []string                   `json:"plugins"`
 	Rules          map[string]json.RawMessage `json:"rules"`
 	IgnorePatterns []string                   `json:"ignorePatterns"`
@@ -741,6 +853,7 @@ type rawConfig struct {
 var parsedTopLevelKeys = map[string]bool{
 	"extends":        true,
 	"departures":     true,
+	"reasons":        true,
 	"plugins":        true,
 	"rules":          true,
 	"ignorePatterns": true,

@@ -15,11 +15,17 @@ var topLevelDescriptions = map[string]string{
 		"outermost.",
 
 	"rules": "Each rule's severity, or [severity, ...options] for a rule that takes options. A rule this file " +
-		"sets differently from the file it extends must be named under departures with the reason.",
+		"sets differently from the file it extends must be named under departures with the reason, and a rule " +
+		"it turns off otherwise says why under reasons.",
 
 	"departures": "For each rule this file sets differently from the file it extends, the reason why, in a " +
 		"sentence. cohere reports every departure on every run, so it stays visible rather than becoming a " +
 		"quiet exception. An entry that departs from nothing is refused.",
+
+	"reasons": "For each rule this file turns off in its own rules, why, in a sentence. cohere prints the reason " +
+		"beside the rule wherever coverage names it, so an off reads as a decision rather than an allowance. An " +
+		"off that departs from the file it extends says why under departures instead. An entry for a rule this " +
+		"file does not turn off is refused.",
 
 	"overrides": "Blocks that change rules for the paths their globs match, applied in order after the base " +
 		"rules, a later block winning.",

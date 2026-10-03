@@ -120,6 +120,10 @@ type ruleCoverageEntry struct {
 	// (rule.NoListenerKind). That is the dead-rule signal these notes were invented for, so it prints in
 	// full by default.
 	NeedsAction bool
+	// OffWithoutReason marks a rule the config turns off at top level with no file saying why. An off
+	// with no reason is an allowance, so it prints by default while the configs carrying one are given
+	// their reasons.
+	OffWithoutReason bool
 }
 
 // coverageCrash is one file a rule could not finish, in either engine's terms.
@@ -269,6 +273,16 @@ func classifyTypeScriptCoverage(
 			entry.Details = append(entry.Details, fmt.Sprintf("not in the config for %d more", unconfigured))
 		}
 
+		// Why it is off, from the file that said so, so a reader judging an off reads the decision
+		// beside it rather than in a file the run never names.
+		if entry.Category == coverageOffByTheConfig {
+			if offReason, reasoned := lintConfig.OffReasonFor(name); reasoned {
+				entry.Details = append(entry.Details, "off because "+offReason.Reason)
+			} else if lintConfig.TurnsOffAtTopLevel(name) {
+				entry.OffWithoutReason = true
+			}
+		}
+
 		summary.Entries = append(summary.Entries, entry)
 	}
 
@@ -408,6 +422,9 @@ func writeCoverageDetails(out io.Writer, summary coverageSummary) {
 			details := entry.Details
 			if entry.NeedsAction {
 				details = append(append([]string(nil), details...), "declares no reason to register none, so it checked nothing")
+			}
+			if entry.OffWithoutReason {
+				details = append(append([]string(nil), details...), "off with no reason, so it reads as an allowance")
 			}
 			if len(details) > 0 {
 				line += " (" + strings.Join(details, ", ") + ")"
@@ -636,6 +653,10 @@ func writeCoverageNotes(out io.Writer, summary coverageSummary, details bool) {
 		return
 	}
 	for _, entry := range summary.Entries {
+		if entry.OffWithoutReason {
+			fmt.Fprintf(out, "  off with no reason: rule %s is turned off and no settings file says why, so it reads as an allowance; give the file that turns it off a \"reasons\" entry\n",
+				entry.Name)
+		}
 		if !entry.NeedsAction {
 			continue
 		}

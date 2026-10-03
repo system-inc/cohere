@@ -16,6 +16,7 @@ var examples = map[string]string{
 	"extends":        `["cohere:typescript", "./NexusCohereSettings.json"]`,
 	"rules":          `{ "no-debugger": "error", "eqeqeq": ["error", "always", { "null": "ignore" }] }`,
 	"departures":     `{ "no-console": "This command-line tool writes to the console by design." }`,
+	"reasons":        `{ "no-continue": "Style, with no bug class behind it." }`,
 	"overrides":      `[{ "files": ["**/*.test.ts"], "rules": { "no-console": "off" }, "reason": "Tests print their fixtures." }]`,
 	"ignorePatterns": `["dist/**", "data/**", "modules/*/data/**"]`,
 	"cohere":         `"^1.0.0"`,

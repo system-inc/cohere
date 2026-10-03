@@ -68,6 +68,7 @@ var keyFixtures = map[string]map[string]string{
 	"extends":        {"Base.json": `{"rules": {}}`, "CohereSettings.json": `{"extends": ["cohere:typescript", "./Base.json"]}`},
 	"rules":          {"CohereSettings.json": `{"rules": {"no-debugger": "error", "eqeqeq": ["error", "always"]}}`},
 	"departures":     {"Base.json": `{"rules": {"no-debugger": "warn"}}`, "CohereSettings.json": `{"extends": "./Base.json", "rules": {"no-debugger": "error"}, "departures": {"no-debugger": "A debugger statement never ships here."}}`},
+	"reasons":        {"CohereSettings.json": `{"rules": {"no-continue": "off"}, "reasons": {"no-continue": "Style, with no bug class behind it."}}`},
 	"overrides":      {"CohereSettings.json": `{"overrides": [{"files": ["**/*.test.ts"], "rules": {"no-debugger": "off"}, "reason": "fixtures"}]}`},
 	"ignorePatterns": {"CohereSettings.json": `{"ignorePatterns": ["dist/**"]}`},
 	"cohere":         {"CohereSettings.json": `{"cohere": "^1.0.0"}`},

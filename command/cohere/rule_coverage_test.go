@@ -514,3 +514,41 @@ func TestAnOverrideWithAReasonPrintsByDefault(t *testing.T) {
 		t.Errorf("only the override with a reason should print, got:\n%s", output)
 	}
 }
+
+// An off says why beside the rule wherever coverage names it, so whoever reads `--coverage` judges the
+// decision with its reason in front of them (#2qq4yr7). An off no file explains is an allowance, so it
+// prints on a default run; the reasoned one beside it does not.
+func TestAnOffPrintsItsReasonAndAnUnreasonedOffPrintsByDefault(t *testing.T) {
+	root := "/repository"
+	rules := []rule.Rule{{Name: "prefer-arrow-callback"}, {Name: "no-continue"}}
+	coverage := program.Coverage{
+		RulesOffered:      map[string]int{},
+		RulesListening:    map[string]int{},
+		RulesReporting:    map[string]int{},
+		RulesScopedOff:    map[string]int{"prefer-arrow-callback": 40, "no-continue": 40},
+		RulesUnconfigured: map[string]int{},
+	}
+	config := &configuration.Config{
+		Root: root,
+		Rules: map[string]configuration.RuleSetting{
+			"prefer-arrow-callback": {Severity: configuration.SeverityOff},
+			"no-continue":           {Severity: configuration.SeverityOff},
+		},
+		OffReasons: map[string]configuration.OffReason{
+			"prefer-arrow-callback": {File: root + "/CohereSettings.json", Reason: "we write function callbacks on purpose"},
+		},
+	}
+	report := lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, LintConfig: config, WalkCost: "in 1s"}
+
+	output := renderLintReport(report)
+	requireLines(t, output,
+		"  off with no reason: rule no-continue is turned off and no settings file says why",
+	)
+	forbidLines(t, output, "off with no reason: rule prefer-arrow-callback")
+
+	report.Details = true
+	requireLines(t, renderLintReport(report),
+		"    prefer-arrow-callback (40 files, off because we write function callbacks on purpose)\n",
+		"    no-continue (40 files, off with no reason, so it reads as an allowance)\n",
+	)
+}
