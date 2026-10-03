@@ -1,6 +1,7 @@
 package release
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -141,12 +142,17 @@ func contractPair(t *testing.T, cohereVersion string, engineScript string) (cohe
 	return coherePath, enginePath
 }
 
-// speaksContract is an engine that answers `--contract <its> --version` with its provenance record and
-// refuses any other contract the way the real one does: a sentence on stderr and exit 2.
+// stampedCommit is the commit the stand-in engines below say they were built from, and the one the
+// release is told it stamped.
+const stampedCommit = "0123456789abcdef0123456789abcdef01234567"
+
+// speaksContract is an engine stamped with stampedCommit that answers `--contract <its> --version` with its
+// provenance record and refuses any other contract the way the real one does: a sentence on stderr and
+// exit 2.
 func speaksContract(contract string) string {
 	return `if [ "$1" != --contract ] || [ "$3" != --version ]; then exit 9; fi
 if [ "$2" != ` + contract + ` ]; then echo "cohere-swift speaks contract ` + contract + `, and the front door asked for $2" >&2; exit 2; fi
-echo '{"kind":"provenance","contract":` + contract + `,"engine":"cohere-swift","version":"0.1.0","commit":"dev"}'`
+echo '{"kind":"provenance","contract":` + contract + `,"engine":"cohere-swift","version":"0.1.0","commit":"` + stampedCommit + `"}'`
 }
 
 // TestSwiftContractAcceptsAMatchingPair is the positive half. Without it, a check that refused every pair
@@ -155,7 +161,7 @@ func TestSwiftContractAcceptsAMatchingPair(t *testing.T) {
 	t.Parallel()
 
 	coherePath, enginePath := contractPair(t, "cohere 1.0.0\n  swift contract: 3", speaksContract("3"))
-	if err := requireSwiftContract(coherePath, enginePath); err != nil {
+	if err := requireSwiftContract(coherePath, enginePath, stampedCommit); err != nil {
 		t.Fatalf("a pair speaking the same contract was refused: %v", err)
 	}
 }
@@ -179,12 +185,14 @@ func TestSwiftContractRefusesAMismatchedPair(t *testing.T) {
 		{"the engine's record names no contract", "cohere 1.0.0\n  swift contract: 3",
 			`echo '{"kind":"provenance"}'`, "not a provenance record"},
 		{"cohere names no contract", "cohere 1.0.0", speaksContract("3"), "names no Swift contract"},
+		{"the engine was not stamped", "cohere 1.0.0\n  swift contract: 3",
+			`echo '{"kind":"provenance","contract":3,"commit":"dev"}'`, `built from "dev"`},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
 			coherePath, enginePath := contractPair(t, testCase.cohereVersion, testCase.engineScript)
-			err := requireSwiftContract(coherePath, enginePath)
+			err := requireSwiftContract(coherePath, enginePath, stampedCommit)
 			if err == nil {
 				t.Fatal("a mismatched pair was staged")
 			}
@@ -196,10 +204,14 @@ func TestSwiftContractRefusesAMismatchedPair(t *testing.T) {
 }
 
 // TestSwiftEngineBuildReadsTheTreeAsItIsNow builds a stand-in engine through buildSwiftEngine twice in one
-// repository: clean, then with a tracked file edited. Its manifest defines a flag from
-// `Context.gitInformation.hasUncommittedChanges`, as cohere-swift's does, and the product prints it.
+// repository: clean, then with a tracked file edited. It is laid out as cohere-swift is, a CohereSwift
+// target with the stamp gitignored under Command/, its manifest defines a flag from
+// `Context.gitInformation.hasUncommittedChanges` as cohere-swift's does, and the product prints that flag
+// and the commit it was stamped with.
+//
 // SwiftPM's shared manifest cache would answer the second build from the first evaluation and stamp a
-// modified tree as clean; the release turns that cache off, and this fails if it stops.
+// modified tree as clean; the release turns that cache off. The first build also proves the stamp: it
+// reaches the binary, it does not count as a modification, and it is gone afterwards.
 func TestSwiftEngineBuildReadsTheTreeAsItIsNow(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("NOT MEASURED: the Swift engine is only built on macOS")
@@ -212,22 +224,30 @@ func TestSwiftEngineBuildReadsTheTreeAsItIsNow(t *testing.T) {
 	writeFile(t, filepath.Join(module, "swift", "Package.swift"), `// swift-tools-version:6.2
 import PackageDescription
 let modified = Context.gitInformation?.hasUncommittedChanges ?? true
-let package = Package(name: "Stand", products: [.executable(name: "cohere-swift", targets: ["Stand"])],
-    targets: [.executableTarget(name: "Stand", swiftSettings: modified ? [.define("TREE_MODIFIED")] : [])])
+let package = Package(name: "Stand", products: [.executable(name: "cohere-swift", targets: ["CohereSwift"])],
+    targets: [.executableTarget(name: "CohereSwift", swiftSettings: modified ? [.define("TREE_MODIFIED")] : [])])
 `)
-	source := filepath.Join(module, "swift", "Sources", "Stand", "main.swift")
-	writeFile(t, source, "#if TREE_MODIFIED\nprint(\"modified\")\n#else\nprint(\"clean\")\n#endif\n")
+	source := filepath.Join(module, "swift", "Sources", "CohereSwift", "main.swift")
+	program := "#if TREE_MODIFIED\nlet tree = \"modified\"\n#else\nlet tree = \"clean\"\n#endif\n" +
+		"#if COHERE_RELEASE_STAMP\nprint(tree, EngineReleaseStamp.commit)\n#else\nprint(tree, \"dev\")\n#endif\n"
+	writeFile(t, source, program)
+	writeFile(t, filepath.Join(module, "swift", "Sources", "CohereSwift", "Command", "Placeholder.swift"), "enum Placeholder {}\n")
+	writeFile(t, filepath.Join(module, "swift", ".gitignore"), "/Sources/CohereSwift/Command/"+SwiftEngineStampFileName+"\n")
 	writeFile(t, filepath.Join(module, ".gitignore"), ".scratch/\n")
 	gitIn(t, module, "init", "--quiet")
 	gitIn(t, module, "add", ".")
 	gitIn(t, module, "commit", "--quiet", "-m", "stand-in engine")
+	commit, err := readReleaseCommit(module)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	target := Target{GoOperatingSystem: "darwin", GoArchitecture: runtime.GOARCH}
 	scratch := filepath.Join(module, ".scratch")
 	says := func() string {
 		t.Helper()
 		destination := filepath.Join(t.TempDir(), SwiftEngineFileName)
-		if err := buildSwiftEngine(module, scratch, target, destination); err != nil {
+		if err := buildSwiftEngine(module, scratch, target, destination, commit); err != nil {
 			t.Fatal(err)
 		}
 		output, err := exec.Command(destination).Output()
@@ -237,11 +257,14 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 		return strings.TrimSpace(string(output))
 	}
 
-	if got := says(); got != "clean" {
-		t.Fatalf("an engine built from a clean tree says %q", got)
+	if got := says(); got != "clean "+commit {
+		t.Fatalf("an engine built from a clean tree says %q, and should say clean and its commit %s", got, commit)
 	}
-	writeFile(t, source, "#if TREE_MODIFIED\nprint(\"modified\")\n#else\nprint(\"clean\")\n#endif\n// edited\n")
-	if got := says(); got != "modified" {
+	if _, err := os.Stat(filepath.Join(module, "swift", "Sources", "CohereSwift", "Command", SwiftEngineStampFileName)); err == nil {
+		t.Fatal("the stamp was left in the checkout after the build")
+	}
+	writeFile(t, source, program+"// edited\n")
+	if got := says(); got != "modified "+commit {
 		t.Fatalf("an engine built after a tracked file was edited says %q, so its provenance would call the tree clean", got)
 	}
 }

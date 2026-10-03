@@ -234,8 +234,13 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 	// one: the build fails rather than staging without it.
 	executables := []string{binaryPath}
 	enginePath := filepath.Join(directory, "bin", SwiftEngineFileName)
+	engineCommit := ""
 	if ShipsSwiftEngine(target.GoOperatingSystem) {
-		if err := buildSwiftEngine(options.ModuleDirectory, filepath.Join(options.OutputDirectory, ".swift-build"), target, enginePath); err != nil {
+		engineCommit, err = readReleaseCommit(options.ModuleDirectory)
+		if err != nil {
+			return StagedPackage{}, err
+		}
+		if err := buildSwiftEngine(options.ModuleDirectory, filepath.Join(options.OutputDirectory, ".swift-build"), target, enginePath, engineCommit); err != nil {
 			return StagedPackage{}, err
 		}
 		executables = append(executables, enginePath)
@@ -254,7 +259,7 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 
 	// After signing, so the pair checked is the pair that ships.
 	if ShipsSwiftEngine(target.GoOperatingSystem) {
-		if err := requireSwiftContract(binaryPath, enginePath); err != nil {
+		if err := requireSwiftContract(binaryPath, enginePath, engineCommit); err != nil {
 			return StagedPackage{}, err
 		}
 	}

@@ -37,7 +37,14 @@ func swiftArchitecture(goArchitecture string) (string, error) {
 // It resolves first and then builds with automatic resolution off, so the engine is built from exactly
 // the dependency versions Package.resolved records. It asks SwiftPM where the product went rather than
 // assuming a path, because Swift 6.3 and 6.4 put it in different places.
-func buildSwiftEngine(moduleDirectory string, scratchRoot string, target Target, destination string) error {
+//
+// The engine names commit as what it was built from. Swift has no `-ldflags -X`, so the commit goes
+// into EngineReleaseStamp.generated.swift beside EngineVersion, which reads it only under
+// COHERE_RELEASE_STAMP, and the file is removed after the build. It is gitignored, so writing it
+// leaves the manifest's `hasUncommittedChanges` as it was (measured by @system_cohere_swift and here).
+// The build runs in the checkout rather than an export because outside git the manifest reads no
+// git information and calls the tree modified.
+func buildSwiftEngine(moduleDirectory string, scratchRoot string, target Target, destination string, commit string) error {
 	architecture, err := swiftArchitecture(target.GoArchitecture)
 	if err != nil {
 		return err
@@ -51,6 +58,13 @@ func buildSwiftEngine(moduleDirectory string, scratchRoot string, target Target,
 	// cache off the same build said modified.
 	location := []string{"--package-path", packageDirectory, "--scratch-path", filepath.Join(scratchRoot, architecture), "--manifest-cache", "none"}
 
+	stamp := filepath.Join(packageDirectory, "Sources", "CohereSwift", "Command", SwiftEngineStampFileName)
+	stampSource := "#if COHERE_RELEASE_STAMP\n    enum EngineReleaseStamp { static let commit = \"" + commit + "\" }\n#endif\n"
+	if err := os.WriteFile(stamp, []byte(stampSource), 0o644); err != nil {
+		return fmt.Errorf("writing the Swift engine's commit stamp: %w", err)
+	}
+	defer os.Remove(stamp)
+
 	resolve := exec.Command("swift", append([]string{"package", "resolve"}, location...)...)
 	resolve.Stdout = os.Stderr
 	resolve.Stderr = os.Stderr
@@ -58,7 +72,8 @@ func buildSwiftEngine(moduleDirectory string, scratchRoot string, target Target,
 		return fmt.Errorf("resolving the Swift engine's dependencies: %w", err)
 	}
 
-	arguments := append([]string{"build", "-c", "release", "--arch", architecture, "--product", SwiftEngineFileName, "--disable-automatic-resolution"}, location...)
+	arguments := append([]string{"build", "-c", "release", "--arch", architecture, "--product", SwiftEngineFileName,
+		"--disable-automatic-resolution", "-Xswiftc", "-DCOHERE_RELEASE_STAMP"}, location...)
 	build := exec.Command("swift", arguments...)
 	build.Stdout = os.Stderr
 	build.Stderr = os.Stderr
@@ -100,7 +115,10 @@ func buildSwiftEngine(moduleDirectory string, scratchRoot string, target Target,
 //
 // Both binaries are run, so the darwin-amd64 package is checked under Rosetta on Apple silicon. A host
 // that cannot run one fails here by name rather than skipping the check.
-func requireSwiftContract(coherePath string, enginePath string) error {
+//
+// The record's commit must be the one the engine was stamped with, so an engine built without the
+// stamp, which says `dev`, is never staged.
+func requireSwiftContract(coherePath string, enginePath string, commit string) error {
 	var cohereError bytes.Buffer
 	versionCommand := exec.Command(coherePath, "--version")
 	versionCommand.Stderr = &cohereError
@@ -134,6 +152,7 @@ func requireSwiftContract(coherePath string, enginePath string) error {
 	var record struct {
 		Kind     string `json:"kind"`
 		Contract *int   `json:"contract"`
+		Commit   string `json:"commit"`
 	}
 	if err := json.Unmarshal([]byte(firstLine), &record); err != nil || record.Kind != "provenance" || record.Contract == nil {
 		return fmt.Errorf("the staged %s answered --version with %q, not a provenance record naming its contract", enginePath, firstLine)
@@ -141,7 +160,23 @@ func requireSwiftContract(coherePath string, enginePath string) error {
 	if *record.Contract != expected {
 		return fmt.Errorf("the staged %s speaks contract %d, and the cohere beside it speaks contract %d", enginePath, *record.Contract, expected)
 	}
+	if record.Commit != commit {
+		return fmt.Errorf("the staged %s says it was built from %q, and this release builds commit %s", enginePath, record.Commit, commit)
+	}
 	return nil
+}
+
+// readReleaseCommit is the full commit the release builds from, which the Swift engine is stamped with.
+func readReleaseCommit(moduleDirectory string) (string, error) {
+	output, err := exec.Command("git", "-C", moduleDirectory, "rev-parse", "HEAD").Output()
+	if err != nil {
+		return "", fmt.Errorf("reading the commit this release builds from: %w", err)
+	}
+	commit := strings.TrimSpace(string(output))
+	if len(commit) != 40 || strings.Trim(commit, "0123456789abcdef") != "" {
+		return "", fmt.Errorf("the commit this release builds from came back as %q, not a 40-hex commit", commit)
+	}
+	return commit, nil
 }
 
 // requireArchitecture refuses a binary that is not built for exactly architecture.

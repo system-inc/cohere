@@ -5,6 +5,10 @@ package release
 // this one spelling.
 const SwiftEngineFileName = "cohere-swift"
 
+// SwiftEngineStampFileName is the generated file that carries the release's commit into the Swift engine,
+// beside EngineVersion.swift, which reads it under COHERE_RELEASE_STAMP. swift/.gitignore names it.
+const SwiftEngineStampFileName = "EngineReleaseStamp.generated.swift"
+
 // ShipsSwiftEngine reports whether a platform's package carries the Swift engine.
 //
 // macOS only. The engine links the toolchain's libraries and reads its compiler's serialized
