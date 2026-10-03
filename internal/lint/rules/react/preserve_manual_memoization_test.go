@@ -435,7 +435,7 @@ return <div>{value}</div>;
 
 // TestPreserveManualMemoizationGateSeesEscapedNames pins the backslash half of the text gate.
 //
-// `mayNameManualMemoization` skips a file or function whose text never spells `useMemo` or
+// `hir.MayNameManualMemoization` skips a file or function whose text never spells `useMemo` or
 // `useCallback`, which is safe only because the pipeline recognises those names by cooked
 // `node.Text()`. An escape cooks to the name without spelling it, so each source below reaches the
 // pipeline, is recognised, and reports the same missing seed dependency as the plain spelling. None

@@ -241,3 +241,77 @@ func TestForFunctionRecordsOneFillPerFunction(t *testing.T) {
 			askedKey, matching, fillKeys)
 	}
 }
+
+// TestForFunctionWithoutManualMemoizationSeesEscapedSpellings pins the gate in front of the erasure.
+//
+// The gate hands a function the memo-intact graph when its span cannot name a memo hook, and a
+// wrong "cannot" is silent: the erasure never runs and every rule reading the graph judges a call
+// upstream has already removed. A plain substring search made that mistake for every escaped
+// spelling below, which reaches `DropManualMemoization` through the cooked identifier or string
+// text while the span never holds the name's letters in a row.
+//
+// Each case is first proven to matter: an independent erasure over a fresh lowering must recognise
+// a call, or the case would assert nothing about the gate. The memo-free control is the other
+// direction, since a gate that always answered "yes" would pass every escaped case and must still
+// share the cached graph here.
+func TestForFunctionWithoutManualMemoizationSeesEscapedSpellings(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		source     string
+		recognised bool
+	}{
+		{"plain", "import {useMemo} from 'react';\nexport function Component({value}: {value: number}) {\n\treturn useMemo(() => value * 2, [value]);\n}\n", true},
+		{"identifierFourDigitEscape", "import {use\\u004Demo} from 'react';\nexport function Component({value}: {value: number}) {\n\treturn use\\u004Demo(() => value * 2, [value]);\n}\n", true},
+		{"identifierCodePointEscape", "import {use\\u{43}allback} from 'react';\nexport function Component({value}: {value: number}) {\n\treturn use\\u{43}allback(() => value, [value]);\n}\n", true},
+		{"computedHexEscape", "import * as React from 'react';\nexport function Component({value}: {value: number}) {\n\treturn React['use\\x4Demo'](() => value * 2, [value]);\n}\n", true},
+		{"propertyNameEscape", "import * as React from 'react';\nexport function Component({value}: {value: number}) {\n\treturn React.use\\u0043allback(() => value, [value]);\n}\n", true},
+		{"memoFreeWithBackslash", "export function Component({value}: {value: number}) {\n\treturn 'a\\tb' + value;\n}\n", false},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var shared, erased *Function
+			recognised := 0
+			probe := rule.Rule{
+				Name:             "hir-cache-escaped-memo-probe",
+				NeedsTypeChecker: true,
+				Run: func(ctx rule.Context, options any) rule.Listeners {
+					return rule.Listeners{
+						ast.KindSourceFile: func(node *ast.Node) {
+							done := false
+							forEachFunctionLike(node, func(function *ast.Node) {
+								if done {
+									return
+								}
+								done = true
+								independent := Lower(function, ctx.TypeChecker)
+								Construct(independent)
+								recognised = DropManualMemoization(independent).Recognised
+								shared = ForFunction(ctx, function)
+								erased = ForFunctionWithoutManualMemoization(ctx, function)
+							})
+						},
+					}
+				},
+			}
+			rule_testing.RunTyped(t, probe, "probe.tsx", testCase.source)
+
+			if shared == nil || erased == nil {
+				t.Fatal("the probe function did not lower, so this case proves nothing")
+			}
+			if (recognised > 0) != testCase.recognised {
+				t.Fatalf("an independent erasure recognised %d calls, so this case does not test what it names", recognised)
+			}
+			if testCase.recognised && erased == shared {
+				t.Error("the erasure recognises a memo call here, but the gate handed back the memo-intact graph")
+			}
+			if !testCase.recognised && erased != shared {
+				t.Error("nothing here can be erased, but the gate lowered a second graph instead of sharing the first")
+			}
+		})
+	}
+}

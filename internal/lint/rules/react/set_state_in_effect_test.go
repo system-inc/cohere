@@ -614,6 +614,18 @@ func TestSetStateInEffectGatesTheSecondLoweringWithoutLosingFindings(t *testing.
 	// pass recognises it through its `react` sidemap rather than a bare identifier.
 	rule_testing.ExpectFindings(t, runSetStateInEffect(t, "import * as React from \"./react\";\n\nfunction Component() {\n  const [state, setState] = React.useState(0);\n  const bump = React.useCallback(() => {\n    setState(1);\n  }, []);\n  React.useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"), setStateInEffect)
 
+	// Escaped spellings: each reaches the erasure through cooked identifier or string text while
+	// the span never holds the name's letters in a row, so a substring-only gate handed this rule
+	// the memo-intact graph and every one of these was silent where the plain spelling reports.
+	for _, source := range []string{
+		"import {use\\u0043allback, useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = use\\u0043allback(() => {\n    setState(1);\n  }, []);\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n",
+		"import {use\\u{43}allback, useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = use\\u{43}allback(() => {\n    setState(1);\n  }, []);\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n",
+		"import * as React from \"./react\";\n\nfunction Component() {\n  const [state, setState] = React.useState(0);\n  const bump = React.use\\u0043allback(() => {\n    setState(1);\n  }, []);\n  React.useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n",
+		"import * as React from \"./react\";\n\nfunction Component() {\n  const [state, setState] = React.useState(0);\n  const bump = React['use\\x43allback'](() => {\n    setState(1);\n  }, []);\n  React.useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n",
+	} {
+		rule_testing.ExpectFindings(t, runSetStateInEffect(t, source), setStateInEffect)
+	}
+
 	// The control: no memo call at all, so this takes the gate's fast path and must still report
 	// through the shared lowering. Without this, a gate that returned `nil` on its fast path would
 	// look correct from the case above alone.

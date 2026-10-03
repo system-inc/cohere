@@ -3,7 +3,6 @@ package high_level_intermediate_representation
 
 import (
 	"strconv"
-	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -149,9 +148,9 @@ func ForFunctionWithoutManualMemoization(ctx rule.Context, node *ast.Node) *Func
 	// change, so it shares the entry every other rule already paid for. This is the whole
 	// optimisation and it is worth stating why it is safe rather than merely fast:
 	// `DropManualMemoization` only ever rewrites a `CallExpression` or `MethodCall` whose callee
-	// resolves to one of the two names, so a function whose source contains neither name has
-	// nothing for it to find. The check is over the function's own span including its nested
-	// functions, which is the same subtree the lowering covers.
+	// resolves to one of the two names, so a function whose source cannot spell either name, plainly
+	// or through an escape, has nothing for it to find. The check is over the function's own span
+	// including its nested functions, which is the same subtree the lowering covers.
 	//
 	// The numbers this buys are in the header above rather than repeated here, so there is one
 	// place to correct when they go stale.
@@ -179,15 +178,17 @@ func ForFunctionWithoutManualMemoization(ctx rule.Context, node *ast.Node) *Func
 	})
 }
 
-// mentionsManualMemoization reports whether this function's source text names either memo hook.
+// mentionsManualMemoization reports whether this function could hold a memo call the erasure
+// recognises, which is `MayNameManualMemoization` over the function's own span.
 //
-// Deliberately textual rather than a walk over the syntax tree. What it must never do is answer
-// "no" for a function the erasure would have changed, and a substring search over the span cannot:
-// every spelling that reaches `DropManualMemoization` -- a bare `useCallback`, a `React.useMemo`
-// member access, a renamed import whose call site still reads `useMemo` -- contains one of the two
-// literal names somewhere in the span. Answering "yes" for a function that merely mentions the name
-// in a comment or a string costs one extra lowering and nothing else, which is the direction that
-// is allowed to be wrong.
+// What it must never do is answer "no" for a function the erasure would have changed, because that
+// function is then handed the memo-intact graph and the rules reading it go silent with no error
+// anywhere. A plain substring search was not enough for that: an escaped spelling such as
+// `use\u0043allback` reaches the erasure through the cooked identifier text without the name's letters
+// appearing in a row, and `MayNameManualMemoization`'s own comment has the measurement. Answering
+// "yes" for a function that merely mentions the name in a comment or a string costs one extra
+// lowering and nothing else, which is the direction that is allowed to be wrong, and an unreadable
+// span answers "yes" for the same reason.
 //
 // The one spelling this does not catch is an import renamed to something else entirely
 // (`import {useCallback as memo}` called as `memo(...)`), and that is already outside what the pass
@@ -203,8 +204,7 @@ func mentionsManualMemoization(node *ast.Node) bool {
 	if start < 0 || end > len(text) || start >= end {
 		return true
 	}
-	span := text[start:end]
-	return strings.Contains(span, "useCallback") || strings.Contains(span, "useMemo")
+	return MayNameManualMemoization(node, text[start:end])
 }
 
 // cacheKeyFor names one function node within one file.
