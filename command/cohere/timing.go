@@ -316,3 +316,61 @@ func printCoverage(out io.Writer, attributed time.Duration, lintDuration time.Du
 		100-coverage,
 	)
 }
+
+// printGraphTiming says what the graph phase was made of, under the line that says how long it took.
+//
+// The phase was a single number for weeks, and every lever proposed for it was a guess about which part
+// was large (#cazsft3). The wall parts come first because they add up to the phase. The summed parts
+// come after and say so, because the compiler loads files on many goroutines and their summed time runs
+// well past the wall: read as wall, it would look like a measurement that disagrees with itself.
+//
+// Parse and import resolution are not split. Both happen inside one load, behind the compiler's own
+// loader, and a number for either would be a guess presented as a measurement. What the loads and the
+// disk leave of the program's wall is resolution and the loader's bookkeeping together, and the last
+// line says so.
+func printGraphTiming(out io.Writer, timing *program.GraphTiming, buildDuration time.Duration, contentPackOpened time.Duration) {
+	accounted := contentPackOpened + timing.Config + timing.Program + timing.Verify
+	builds := ""
+	if timing.Builds > 1 {
+		builds = fmt.Sprintf(" (%d builds: the first one's files moved under it)", timing.Builds)
+	}
+	fmt.Fprintf(out, "graph timing: %s wall = content pack %s + tsconfig %s + program %s + verify %s + %s elsewhere%s\n",
+		formatMilliseconds(buildDuration), formatMilliseconds(contentPackOpened), formatMilliseconds(timing.Config),
+		formatMilliseconds(timing.Program), formatMilliseconds(timing.Verify),
+		formatMilliseconds(max(buildDuration-accounted, 0)), builds)
+	fmt.Fprintf(out, "  tsconfig, its include patterns enumerated: disk %s summed over %s\n",
+		formatMilliseconds(timing.ConfigDisk.Summed()), describeDiskCalls(timing.ConfigDisk))
+	fmt.Fprintf(out, "  program, summed over the compiler's parallel loaders: %d files loaded (each a read and a parse) in %s; "+
+		"disk %s over %s\n",
+		timing.SourceFileLoads, formatMilliseconds(timing.SourceFileSummed),
+		formatMilliseconds(timing.ProgramDisk.Summed()), describeDiskCalls(timing.ProgramDisk))
+	fmt.Fprintf(out, "  (summed times run past the program's %s wall because the loaders run at once; parse and import "+
+		"resolution happen inside one load and are not split, so what the loads leave of the wall is resolution "+
+		"and the loader's own work together)\n", formatMilliseconds(timing.Program))
+}
+
+// describeDiskCalls lists each kind of filesystem call that happened, with its count and summed time.
+func describeDiskCalls(disk program.DiskTiming) string {
+	parts := []string{}
+	for _, kind := range []struct {
+		name  string
+		calls program.DiskCalls
+	}{
+		{"reads", disk.Reads},
+		{"existence checks", disk.Existence},
+		{"stats", disk.Stats},
+		{"directory listings", disk.Listings},
+		{"realpaths", disk.Realpaths},
+	} {
+		if kind.calls.Count == 0 {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%d %s %s", kind.calls.Count, kind.name, formatMilliseconds(kind.calls.Summed)))
+	}
+	if len(parts) == 0 {
+		// Said, rather than printing an empty list that reads like a sentence cut off: a build answered
+		// entirely by the cache above the disk made no call that reached it.
+		return "no calls (the stat and listing cache answered all of them)"
+	}
+	return strings.Join(parts, ", ")
+}
