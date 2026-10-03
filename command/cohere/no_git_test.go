@@ -83,6 +83,9 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 	// Gigabytes too: the memory line reads available memory live, so two runs a second apart differ there.
 	durations := regexp.MustCompile(`\d+(\.\d+)?(ms|s|µs| GB)\b`)
 	clock := regexp.MustCompile(`\d\d:\d\d:\d\d`)
+	// The total line's shape depends on timing as well as its numbers: the types phase's check runs alongside
+	// the fix walk, so whether the phases overlap is a property of the invocation, never of git's presence.
+	totalLine := regexp.MustCompile(`(?m)^ *total .*\n`)
 	run := func(arguments ...string) (string, int) {
 		t.Helper()
 		command := exec.Command(binary, arguments...)
@@ -105,6 +108,7 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 		normalized = strings.ReplaceAll(normalized, root, "ROOT")
 		normalized = durations.ReplaceAllString(normalized, "D")
 		normalized = clock.ReplaceAllString(normalized, "T")
+		normalized = totalLine.ReplaceAllString(normalized, "")
 		return normalized, code
 	}
 	wouldChange := func(output string) []string {
