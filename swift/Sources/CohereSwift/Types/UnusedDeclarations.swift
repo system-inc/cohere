@@ -4,13 +4,20 @@ import SwiftSyntax
 /*
  `unused-declaration`: a declaration of ours that nothing refers to, read from the build's index store.
 
- The first kinds judged are the ones a single file can prove: a declaration `private` or `fileprivate`, or
- inside a type or extension that is, can be named only in its own file, so the file's own index record holds
- every reference it will ever have. A declaration is used when that record holds a reference to it from outside
- its own text (a function calling itself, or a type naming itself in its body, is not a use), or when another
- declaration in the file overrides or witnesses it, which removing it would break. A property wrapped by an
- attribute is also used when its `$name` or `_name` is, since `$flag` passed as a binding names the projection
- and never the property.
+ A declaration `private` or `fileprivate`, or inside a type or extension that is, can be named only in its own
+ file, so the file's own index record holds every reference it will ever have. Any other declaration is judged
+ against every record of the package, its tests included, and one public in a library product (or in a target
+ a product re-exports) is API that someone this build never sees may use. A declaration is used when a record
+ holds a reference to it from outside its own text (a function calling itself, or a type naming itself in its
+ body, is not a use), or when another declaration overrides or witnesses it, which removing it would break. A
+ property wrapped by an attribute is also used when its `$name` or `_name` is, since `$flag` passed as a binding
+ names the projection and never the property. A stored property is used when a call of its struct's
+ synthesized memberwise initializer passes it: on ahraos-macos the index records `KingdomSidebar(...)` as a
+ call of that initializer and records no reference to the `livePaneProfileIds:` it passes.
+
+ The package's records do not hold everything: an inactive `#if` branch was never compiled, and a file the
+ build has not compiled as it stands has no record that describes it. A declaration whose name appears in either
+ is never reported, whatever the records say.
 
  What the index cannot see is treated as used, and counted by reason rather than reported, after Periphery's
  list: protocol witnesses and overrides; anything the Objective-C runtime reaches (`@objc`, `@IBAction`,
@@ -27,6 +34,14 @@ import SwiftSyntax
  padding that holds the layout (found on Presence, where LockerBloom's `unused: Int32` pads the constants its
  Metal shader reads); a case of an enum that may be reached through its conformances or raw values
  (`CaseIterable`, `init(rawValue:)`).
+
+ Reading every finding on both proving grounds added three more the build would never catch. A SwiftUI view's
+ stored properties are compared by SwiftUI to decide when to draw again, so one nothing reads by name still
+ does work (KingdomSidebar's `livePaneProfileIds` exists only for that). Swift Testing runs a type's `@Test`
+ functions without a `@Suite`, so a type holding a registered declaration is registered too. And a stored
+ property of a type that descends from another package's (MLX's `Module`) may be read by reflection. A class
+ that descends from an Objective-C class can be found by name, from a nib, a plist or `NSClassFromString`, and an
+ XCTest method is run by name, so neither is reported.
 
  A file is left unchecked, and counted, when the index cannot vouch for it: no unit newer than the file, or any
  `#if` in it, since an inactive branch may be the only user of a declaration. Only the outermost declaration
@@ -60,19 +75,112 @@ struct UnusedDeclarations {
     static let reachableCase = "a case of an enum with raw values or conformances that may reach it (CaseIterable, Codable, init(rawValue:))"
     static let sharedDeclaration = "declared together with others (`let a = 1, b = 2`, `case a, b`), which the report cannot remove apart"
     static let unplaced = "the index records no definition at its name"
+    static let publicAPI = "public API of a library product, used by whoever depends on the package"
+    static let hiddenName = "its name appears where the index cannot see (inside #if, or in a file the build has not compiled as it stands)"
+    static let objectiveCClass = "a class the Objective-C runtime can find by name (a nib, a plist, NSClassFromString)"
+    static let testMethod = "an XCTest method, which XCTest finds and runs by name"
+    static let viewStorage = "a stored property of a SwiftUI view or one of its kin, which SwiftUI compares to decide when to draw again"
+    static let foreignStorage = "a stored property of a type that inherits from or conforms to another package's type, which may read it by reflection (MLX's Module does)"
 
     let stores: [IndexStore]
+    /* The library products' targets, as `packageRoot|target`: their public declarations are API. */
+    let apiTargets: Set<String>
+    /* The modules this package owns, vendored packages left out. */
+    let ownedModules: Set<String>
+
+    init(stores: [IndexStore], package: PackageModel? = nil) {
+        self.stores = stores
+        self.apiTargets = Set((package?.allPackages ?? []).flatMap { member in
+            member.libraryProductTargets.map { Self.targetKey(root: member.root, target: $0) }
+        })
+        self.ownedModules = package.map(Pipeline.ownedModules) ?? []
+    }
+
+    /* A target's name as the compiler spells its module: anything that is not an identifier character made `_`. */
+    static func moduleName(of target: String) -> String {
+        String(target.map { $0.isLetter || $0.isNumber || $0 == "_" ? $0 : "_" })
+    }
+
+    static func targetKey(root: URL?, target: String) -> String {
+        "\(root?.standardizedFileURL.path ?? "")|\(target)"
+    }
+
+    /* Every reference in the package's records, by what it refers to and by name, and every declaration something overrides. */
+    struct References {
+        var bySymbol: [String: [(file: String, place: Place)]] = [:]
+        var byName: [String: [(file: String, place: Place)]] = [:]
+        var overridden: Set<String> = []
+        /* Each struct's synthesized initializers, by the struct: their symbols and their labels (`init(kept:neverRead:)`). */
+        var synthesizedInitializers: [String: [(symbol: String, labels: [String])]] = [:]
+
+        mutating func add(_ occurrences: [IndexStore.RecordOccurrence], file: String) {
+            for occurrence in occurrences {
+                let place = Place(line: occurrence.line, column: occurrence.column)
+                if occurrence.isDeclaration, occurrence.isImplicit, occurrence.kind == IndexStore.constructorKind,
+                    let holder = occurrence.relations.first(where: { $0.roles & IndexStore.childOfRole != 0 })?.symbol
+                {
+                    let labels = occurrence.name.dropFirst("init(".count).dropLast().split(separator: ":").map(String.init)
+                    synthesizedInitializers[holder, default: []].append((occurrence.symbol, labels))
+                }
+                if occurrence.isReference {
+                    bySymbol[occurrence.symbol, default: []].append((file, place))
+                    /* Reading a property records its getter too; either names the property. */
+                    if let base = UnusedImports.ModuleResolver.accessorBase(occurrence.symbol) {
+                        bySymbol[base, default: []].append((file, place))
+                    }
+                    byName[occurrence.name, default: []].append((file, place))
+                }
+                overridden.formUnion(occurrence.overridden)
+            }
+        }
+    }
 
     func run(files: [ParsedFile]) -> Result {
         var result = Result()
+        /*
+         A library product's API is also every target its targets re-export with `@_exported import`: VRMKit's
+         VRMRealityKit product hands on VRMKitRuntime whole, so what VRMKitRuntime declares public is the product's.
+         */
+        var targetsByModule: [String: String] = [:]
+        for file in files {
+            targetsByModule[Self.targetKey(root: file.packageRoot, target: Self.moduleName(of: file.targetName))] = file.targetName
+        }
+        var apiTargets = self.apiTargets
+        var grew = true
+        while grew {
+            grew = false
+            for file in files where apiTargets.contains(Self.targetKey(root: file.packageRoot, target: file.targetName)) {
+                for declaration in UnusedImports.imports(in: file.tree) where declaration.isExported {
+                    guard let target = targetsByModule[Self.targetKey(root: file.packageRoot, target: declaration.module)] else { continue }
+                    grew = apiTargets.insert(Self.targetKey(root: file.packageRoot, target: target)).inserted || grew
+                }
+            }
+        }
         let fresh = IndexStore.freshUnits(of: files, in: stores)
         /* Every record of ours, read once with its relations: the files judged, and every extension a conformance may come from. */
         var graph = ConformanceGraph(stores: stores)
         var occurrencesByFile: [String: [IndexStore.RecordOccurrence]] = [:]
+        var references = References()
         for (path, described) in IndexStore.newestUnits(in: stores) {
             let occurrences = described.unit.ownRecords.flatMap { described.store.occurrences(inRecord: $0, relations: true) ?? [] }
             occurrencesByFile[path] = occurrences
             graph.add(occurrences)
+            references.add(occurrences, file: path)
+        }
+        /*
+         Names used where the index cannot look: every name inside `#if`, whose inactive branches it never saw, and
+         every name in a file the build has not compiled as it stands. A declaration the package can name is never
+         reported under one of them.
+         */
+        var hiddenNames: Set<String> = []
+        for file in files {
+            if fresh[file.url.path] == nil {
+                hiddenNames.formUnion(Self.names(in: Syntax(file.tree)))
+            } else if UnusedImports.hasConditionalCompilation(file.tree) {
+                for conditional in Self.conditionals(in: file.tree) {
+                    hiddenNames.formUnion(Self.names(in: Syntax(conditional)))
+                }
+            }
         }
         for file in files {
             guard let described = fresh[file.url.path] else {
@@ -85,32 +193,39 @@ struct UnusedDeclarations {
             }
             let occurrences = occurrencesByFile[described.unit.mainFile] ?? []
             result.filesChecked += 1
-            judge(file, occurrences: occurrences, graph: &graph, into: &result)
+            judge(
+                file,
+                path: described.unit.mainFile,
+                occurrences: occurrences,
+                references: references,
+                hiddenNames: hiddenNames,
+                apiTargets: apiTargets,
+                graph: &graph,
+                into: &result
+            )
         }
         return result
     }
 
-    /* One file's declarations against its own record. */
-    private func judge(_ file: ParsedFile, occurrences: [IndexStore.RecordOccurrence], graph: inout ConformanceGraph, into result: inout Result) {
+    /*
+     One file's declarations against the package's records. `path` is the file as the index names it, which is
+     how a reference is told to be in this file.
+     */
+    private func judge(
+        _ file: ParsedFile,
+        path: String,
+        occurrences: [IndexStore.RecordOccurrence],
+        references: References,
+        hiddenNames: Set<String>,
+        apiTargets: Set<String>,
+        graph: inout ConformanceGraph,
+        into result: inout Result
+    ) {
         var definitions: [Place: [IndexStore.RecordOccurrence]] = [:]
-        var references: [String: [Place]] = [:]
-        var referencesByName: [String: [Place]] = [:]
-        var overridden: Set<String> = []
-        for occurrence in occurrences {
-            let place = Place(line: occurrence.line, column: occurrence.column)
-            if occurrence.isDeclaration && !occurrence.isImplicit {
-                definitions[place, default: []].append(occurrence)
-            }
-            if occurrence.isReference {
-                references[occurrence.symbol, default: []].append(place)
-                /* Reading a property records its getter too; either names the property. */
-                if let base = UnusedImports.ModuleResolver.accessorBase(occurrence.symbol) {
-                    references[base, default: []].append(place)
-                }
-                referencesByName[occurrence.name, default: []].append(place)
-            }
-            overridden.formUnion(occurrence.overridden)
+        for occurrence in occurrences where occurrence.isDeclaration && !occurrence.isImplicit {
+            definitions[Place(line: occurrence.line, column: occurrence.column), default: []].append(occurrence)
         }
+        let isAPITarget = apiTargets.contains(Self.targetKey(root: file.packageRoot, target: file.targetName))
 
         var collector = Collector(tree: file.tree)
         collector.collect()
@@ -126,13 +241,27 @@ struct UnusedDeclarations {
                 result.skipped[Self.unplaced, default: 0] += 1
                 continue
             }
+            if candidate.reach == .api && isAPITarget {
+                result.skipped[Self.publicAPI, default: 0] += 1
+                continue
+            }
             if placed.contains(where: { $0.roles & IndexStore.overrideOfRole != 0 }) || candidate.isOverride {
                 result.skipped[Self.overrides, default: 0] += 1
                 continue
             }
+            /* The type holding it, by the index's child-of relation, and what that type descends from. */
+            let holder = definition.relations.first { $0.roles & IndexStore.childOfRole != 0 }?.symbol
+            let holderAncestors = holder.map { graph.ancestors(of: $0) } ?? []
+            if candidate.isType, graph.ancestors(of: definition.symbol).contains(where: { $0.hasPrefix("c:objc(cs)") }) {
+                result.skipped[Self.objectiveCClass, default: 0] += 1
+                continue
+            }
+            if candidate.keyword == "func", candidate.name.text.hasPrefix("test"), holderAncestors.contains("c:objc(cs)XCTestCase") {
+                result.skipped[Self.testMethod, default: 0] += 1
+                continue
+            }
             if candidate.isInstanceStorage {
-                /* The type holding it, by the index's child-of relation: what its conformances reach decides whether a conformance reads it. */
-                let holder = definition.relations.first { $0.roles & IndexStore.childOfRole != 0 }?.symbol
+                /* What the holding type's conformances reach decides whether a conformance reads it. */
                 switch holder.map({ graph.reach(of: $0) }) ?? .unseen {
                 case .codable:
                     result.skipped[Self.reflectedStorage, default: 0] += 1
@@ -141,25 +270,53 @@ struct UnusedDeclarations {
                     result.skipped[Self.unseenConformance, default: 0] += 1
                     continue
                 case .clear:
+                    if holderAncestors.contains(where: { ["SwiftUI", "SwiftUICore"].contains(ConformanceGraph.swiftModule(of: $0) ?? "") }) {
+                        result.skipped[Self.viewStorage, default: 0] += 1
+                        continue
+                    }
+                    let foreign = holderAncestors.contains { ancestor in
+                        ConformanceGraph.swiftModule(of: ancestor).map { graph.compiledModules.contains($0) && !ownedModules.contains($0) } ?? false
+                    }
+                    if foreign {
+                        result.skipped[Self.foreignStorage, default: 0] += 1
+                        continue
+                    }
                     if let exemption = candidate.storageExemption {
                         result.skipped[exemption, default: 0] += 1
                         continue
                     }
                 }
             }
+            let name = candidate.name.text.trimmingCharacters(in: CharacterSet(charactersIn: "`"))
+            if candidate.reach != .file && hiddenNames.contains(name) {
+                result.skipped[Self.hiddenName, default: 0] += 1
+                continue
+            }
             result.declarationsChecked += 1
             let start = file.locations.location(for: candidate.node.positionAfterSkippingLeadingTrivia)
             let end = file.locations.location(for: candidate.node.endPositionBeforeTrailingTrivia)
             let range = Place(line: start.line, column: start.column)...Place(line: end.line, column: end.column)
             let symbols = Set(placed.map(\.symbol))
-            if !symbols.isDisjoint(with: overridden) {
+            if !symbols.isDisjoint(with: references.overridden) {
                 continue
             }
-            var places = symbols.flatMap { references[$0] ?? [] }
-            if candidate.isWrapped {
-                places += (referencesByName["$" + candidate.name.text] ?? []) + (referencesByName["_" + candidate.name.text] ?? [])
+            var places = symbols.flatMap { references.bySymbol[$0] ?? [] }
+            if candidate.isInstanceStorage, let holder {
+                /*
+                 A memberwise initializer names the property by its label, and the index does not always record that as a
+                 reference to the property: KingdomSidebar(livePaneProfileIds:) on ahraos-macos has none. A call of the
+                 synthesized initializer that takes it is a use.
+                 */
+                for initializer in references.synthesizedInitializers[holder] ?? [] where initializer.labels.contains(name) || initializer.labels.contains("_" + name) {
+                    places += references.bySymbol[initializer.symbol] ?? []
+                }
             }
-            if places.contains(where: { !range.contains($0) }) {
+            if candidate.isWrapped {
+                /* A private property's projection can be named only in its file; an internal one's anywhere in the package. */
+                let projections = (references.byName["$" + name] ?? []) + (references.byName["_" + name] ?? [])
+                places += candidate.reach == .file ? projections.filter { $0.file == path } : projections
+            }
+            if places.contains(where: { $0.file != path || !range.contains($0.place) }) {
                 continue
             }
             unused.append((candidate, definition, range))
@@ -172,11 +329,14 @@ struct UnusedDeclarations {
         for entry in outermost {
             let name = entry.candidate.keyword == "func" || entry.candidate.keyword == "subscript" ? entry.symbol.name : entry.candidate.name.text
             let subject = "\(entry.candidate.keyword) \(name)"
+            let message = entry.candidate.reach == .file
+                ? "Nothing refers to \(name), and it is private to this file, so nothing outside the file can. Remove it."
+                : "Nothing in the package refers to \(name), its tests included. Remove it."
             let finding = file.finding(
                 at: entry.candidate.name,
                 rule: Self.ruleName,
                 messageId: "unusedDeclaration",
-                message: "Nothing refers to \(name), and it is private to this file, so nothing outside the file can. Remove it.",
+                message: message,
                 suggestions: [FindingRecord.Suggestion(message: "Remove `\(subject)`", fixes: [Self.removal(of: entry.candidate.node, in: file)])]
             )
             result.findings.append((finding, subject))
@@ -193,7 +353,14 @@ struct UnusedDeclarations {
         }
     }
 
-    /* One declaration the file alone can judge, or one it could but never reports, with why. */
+    /* Who can name a declaration: only its own file, the package, or, public in a library product, anyone who depends on it. */
+    enum Reach {
+        case file
+        case package
+        case api
+    }
+
+    /* One declaration to judge, or one never reported, with why. */
     struct Candidate {
         /* The whole declaration, attributes and body, which a removal takes. */
         var node: Syntax
@@ -201,6 +368,8 @@ struct UnusedDeclarations {
         var name: TokenSyntax
         var keyword: String
         var exemption: String?
+        var reach = Reach.file
+        var isType = false
         /* A property with an attribute, whose projection (`$name`) and storage (`_name`) are its uses too. */
         var isWrapped = false
         var isOverride = false
@@ -219,6 +388,12 @@ struct UnusedDeclarations {
         /* What a declaration sits inside: whether that keeps it in this file, and the type it belongs to. */
         struct Scope {
             var fileScoped = false
+            /* Whether anything declared here can be public: false inside a type that is not, or an extension marked lower. */
+            var canBePublic = true
+            /* Members public without saying so: a public protocol's requirements, a `public extension`'s members. */
+            var membersPublic = false
+            /* A public enum, whose cases are public without saying so. */
+            var casesPublic = false
             var typeName: String?
             /* A struct whose stored properties are all plain numbers or SIMD vectors: its bytes may be its meaning. */
             var isLayout = false
@@ -278,11 +453,17 @@ struct UnusedDeclarations {
                 || scope.attributes.contains("objcMembers")
             let entry = scope.attributes.contains("main") || scope.conformances.contains("PreviewProvider")
             let isOverride = modifiers.contains { $0.name.text == "override" }
+            let saysPublic = modifiers.contains { ["public", "open"].contains($0.name.text) } || attributes.contains("_spi")
+            let saysLower = modifiers.contains { ["internal", "package", "fileprivate", "private"].contains($0.name.text) && $0.detail == nil }
+            let isPublic = scope.canBePublic && (saysPublic || (!saysLower && (scope.membersPublic || (scope.casesPublic && declaration.is(EnumCaseDeclSyntax.self)))))
+            let reach: Reach = fileScoped ? .file : isPublic ? .api : .package
 
             if let extended = declaration.as(ExtensionDeclSyntax.self) {
                 let name = extended.extendedType.trimmedDescription
                 let inner = Scope(
                     fileScoped: Self.isFileScoped(extended.modifiers) || fileScopedTypes[name] == true,
+                    canBePublic: !saysLower,
+                    membersPublic: saysPublic,
                     typeName: name,
                     conformances: conformances[name] ?? [],
                     attributes: []
@@ -296,7 +477,7 @@ struct UnusedDeclarations {
             if let group = declaration.asProtocol((any DeclGroupSyntax).self), let named = declaration.asProtocol((any NamedDeclSyntax).self) {
                 let name = scope.typeName.map { "\($0).\(named.name.text)" } ?? named.name.text
                 let typeConformances = conformances[name] ?? []
-                if fileScoped {
+                do {
                     var exemption: String?
                     if runtime {
                         exemption = UnusedDeclarations.objectiveC
@@ -307,22 +488,30 @@ struct UnusedDeclarations {
                     } else if named.name.text == "CodingKeys" {
                         exemption = UnusedDeclarations.codingKeys
                     }
-                    candidates.append(Candidate(node: Syntax(declaration), name: named.name, keyword: group.introducer.text, exemption: exemption))
+                    candidates.append(Candidate(node: Syntax(declaration), name: named.name, keyword: group.introducer.text, exemption: exemption, reach: reach, isType: true))
                 }
+                let typeIndex = candidates.count - 1
                 let inner = Scope(
                     fileScoped: fileScoped,
+                    canBePublic: isPublic,
+                    membersPublic: isPublic && declaration.is(ProtocolDeclSyntax.self),
+                    casesPublic: isPublic && declaration.is(EnumDeclSyntax.self),
                     typeName: name,
                     isLayout: declaration.as(StructDeclSyntax.self).map(Self.isLayout) ?? false,
                     conformances: typeConformances,
                     attributes: attributes.union(entry ? ["main"] : [])
                 )
+                let membersStart = candidates.count
                 for member in group.memberBlock.members {
                     visit(member.decl, in: inner)
+                }
+                /* A type that holds a declaration something registers is found through it: Swift Testing runs a type's `@Test` functions without a `@Suite`. */
+                if candidates[typeIndex].exemption == nil, candidates[membersStart...].contains(where: { $0.exemption == UnusedDeclarations.registered }) {
+                    candidates[typeIndex].exemption = UnusedDeclarations.registered
                 }
                 return
             }
 
-            guard fileScoped else { return }
             var exemption: String?
             if runtime {
                 exemption = UnusedDeclarations.objectiveC
@@ -341,11 +530,11 @@ struct UnusedDeclarations {
                         exemption = UnusedDeclarations.compilerCalled
                     }
                 }
-                candidates.append(Candidate(node: Syntax(function), name: function.name, keyword: "func", exemption: exemption, isOverride: isOverride))
+                candidates.append(Candidate(node: Syntax(function), name: function.name, keyword: "func", exemption: exemption, reach: reach, isOverride: isOverride))
             } else if let variable = declaration.as(VariableDeclSyntax.self) {
                 guard variable.bindings.count == 1, let binding = variable.bindings.first, let pattern = binding.pattern.as(IdentifierPatternSyntax.self) else {
                     if let first = variable.bindings.first?.pattern.firstToken(viewMode: .sourceAccurate) {
-                        candidates.append(Candidate(node: Syntax(variable), name: first, keyword: variable.bindingSpecifier.text, exemption: UnusedDeclarations.sharedDeclaration))
+                        candidates.append(Candidate(node: Syntax(variable), name: first, keyword: variable.bindingSpecifier.text, exemption: UnusedDeclarations.sharedDeclaration, reach: reach))
                     }
                     return
                 }
@@ -373,13 +562,14 @@ struct UnusedDeclarations {
                     name: pattern.identifier,
                     keyword: variable.bindingSpecifier.text,
                     exemption: exemption,
+                    reach: reach,
                     isWrapped: !attributes.subtracting(Self.knownAttributes).isEmpty,
                     isOverride: isOverride,
                     isInstanceStorage: isInstanceStorage,
                     storageExemption: storageExemption
                 ))
             } else if let alias = declaration.as(TypeAliasDeclSyntax.self) {
-                candidates.append(Candidate(node: Syntax(alias), name: alias.name, keyword: "typealias", exemption: exemption))
+                candidates.append(Candidate(node: Syntax(alias), name: alias.name, keyword: "typealias", exemption: exemption, reach: reach))
             } else if let cases = declaration.as(EnumCaseDeclSyntax.self) {
                 guard let element = cases.elements.first else { return }
                 if exemption == nil {
@@ -391,7 +581,7 @@ struct UnusedDeclarations {
                         exemption = UnusedDeclarations.reachableCase
                     }
                 }
-                candidates.append(Candidate(node: Syntax(cases), name: element.name, keyword: "case", exemption: exemption))
+                candidates.append(Candidate(node: Syntax(cases), name: element.name, keyword: "case", exemption: exemption, reach: reach))
             } else if let subscriptDeclaration = declaration.as(SubscriptDeclSyntax.self) {
                 let dynamicMember = subscriptDeclaration.parameterClause.parameters.first?.firstName.text == "dynamicMember"
                 if exemption == nil && dynamicMember {
@@ -402,10 +592,11 @@ struct UnusedDeclarations {
                     name: subscriptDeclaration.subscriptKeyword,
                     keyword: "subscript",
                     exemption: exemption,
+                    reach: reach,
                     isOverride: isOverride
                 ))
             } else if let initializer = declaration.as(InitializerDeclSyntax.self) {
-                candidates.append(Candidate(node: Syntax(initializer), name: initializer.initKeyword, keyword: "init", exemption: exemption ?? UnusedDeclarations.initializer))
+                candidates.append(Candidate(node: Syntax(initializer), name: initializer.initKeyword, keyword: "init", exemption: exemption ?? UnusedDeclarations.initializer, reach: reach))
             }
         }
 
@@ -519,6 +710,36 @@ struct UnusedDeclarations {
         static let caseBlindConformances: Set<String> = [
             "Equatable", "Hashable", "Comparable", "Sendable", "Error", "LocalizedError", "CustomStringConvertible", "CustomDebugStringConvertible",
         ]
+    }
+
+    /* Every name a piece of syntax spells, backticks and a projection's `$` taken off. */
+    static func names(in syntax: Syntax) -> Set<String> {
+        var names: Set<String> = []
+        for token in syntax.tokens(viewMode: .sourceAccurate) {
+            switch token.tokenKind {
+            case .identifier(let text):
+                names.insert(text.trimmingCharacters(in: CharacterSet(charactersIn: "`")))
+            case .dollarIdentifier(let text):
+                names.insert(String(text.dropFirst()))
+            default:
+                break
+            }
+        }
+        return names
+    }
+
+    /* Every `#if` in the file, outermost ones only, each with all its branches. */
+    static func conditionals(in tree: SourceFileSyntax) -> [IfConfigDeclSyntax] {
+        final class Finder: SyntaxVisitor {
+            var found: [IfConfigDeclSyntax] = []
+            override func visit(_ node: IfConfigDeclSyntax) -> SyntaxVisitorContinueKind {
+                found.append(node)
+                return .skipChildren
+            }
+        }
+        let finder = Finder(viewMode: .sourceAccurate)
+        finder.walk(tree)
+        return finder.found
     }
 
     /*

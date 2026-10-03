@@ -38,10 +38,15 @@ struct ConformanceGraph {
     private var moduleRecords: [String: [(store: IndexStore, record: String)]] = [:]
     private var moduleImports: [String: Set<String>] = [:]
     private var loadedModules: Set<String> = []
+    /* Modules the build compiled from source: ours and our dependency packages', never the SDK's. */
+    private(set) var compiledModules: Set<String> = []
 
     init(stores: [IndexStore]) {
         var seen: Set<String> = []
         for store in stores {
+            for unit in store.units() where !unit.isSystem && !unit.module.isEmpty {
+                compiledModules.insert(unit.module)
+            }
             for unit in store.units() where unit.isSystem && !unit.module.isEmpty && unit.outputFile.hasSuffix(".swiftinterface") {
                 moduleImports[unit.module, default: []].formUnion(unit.importedModules)
                 for record in unit.allRecords where seen.insert(record).inserted {
@@ -91,6 +96,22 @@ struct ConformanceGraph {
             }
         }
         return unseen ? .unseen : .clear
+    }
+
+    /*
+     Everything the type inherits from or conforms to through what the build compiled, its extensions' conformances
+     included, without reading any imported module: a superclass of ours, a dependency package's protocol, and the
+     first Objective-C class on the way up (`c:objc(cs)NSView`), whose own ancestors live in headers.
+     */
+    func ancestors(of type: String) -> Set<String> {
+        var found: Set<String> = []
+        var queue = [type]
+        while let node = queue.popLast() {
+            for parent in (parents[node] ?? []).union((extensions[node] ?? []).flatMap { parents[$0] ?? [] }) where found.insert(parent).inserted {
+                queue.append(parent)
+            }
+        }
+        return found
     }
 
     /* The symbol's kind, reading the Swift module that declares it if no record read so far does. Nil for a C or Objective-C symbol, or one no record declares. */

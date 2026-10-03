@@ -347,7 +347,7 @@ public struct Pipeline {
             since: start
         )
         let declarationsStart = Date()
-        let declarations = UnusedDeclarations(stores: stores).run(files: files)
+        let declarations = UnusedDeclarations(stores: stores, package: package).run(files: files)
         try writeReport(
             rule: UnusedDeclarations.ruleName,
             findings: declarations.findings,

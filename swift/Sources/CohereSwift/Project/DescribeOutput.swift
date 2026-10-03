@@ -22,6 +22,24 @@ struct DescribeOutput: Decodable {
     struct Product: Decodable {
         var name: String
         var targets: [String]
+        /* What kind of product, as `describe` writes it: an object with one key, `{"library": ["automatic"]}` or `{"executable": null}`. */
+        var type: Kind?
+    }
+
+    /* A product's kind, read from the one key of the object `describe` writes, whatever its value holds. */
+    struct Kind: Decodable {
+        var name: String
+
+        private struct Key: CodingKey {
+            var stringValue: String
+            var intValue: Int? { nil }
+            init(stringValue: String) { self.stringValue = stringValue }
+            init?(intValue: Int) { nil }
+        }
+
+        init(from decoder: any Decoder) throws {
+            name = try decoder.container(keyedBy: Key.self).allKeys.first?.stringValue ?? ""
+        }
     }
 
     var name: String

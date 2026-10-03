@@ -217,20 +217,27 @@ not compiled as it stands, one with `#if` (the index describes the configuration
 one with a reference no module claims. `@_exported` imports are API and never reported.
 
 `unused-declaration` reads the same index, after `unused-import`, and writes its own `unusedCoverage`
-record. It judges only what one file can prove: a declaration `private` or `fileprivate`, or inside a
-type or extension that is, which nothing outside its file can name. Such a declaration is used when the
-file's own record holds a reference to it from outside its own text (a function that only calls itself
-is not used), when another declaration overrides or witnesses it, or, for a property wrapped by an
-attribute, when its `$name` or `_name` is referenced. `subject` is the keyword and the name
-(`func after(_:_:)`, `var stopping`), and the suggested removal takes the declaration's lines with the
-comments written above and trailing it. Only the outermost of nested unused declarations is reported, so
-every one reported can go together. What the index cannot see, or what removing would change without
-breaking the build, is counted under `skipped` by reason and never reported: overrides and witnesses,
-what the Objective-C runtime reaches, entry points and previews, members the compiler calls by name,
-declarations an attribute may register, Codable's coding keys, initializers, stored properties a
-conformance may read, an instance's stored property whose initializer runs code, a field of a struct of
-plain numbers (its bytes may be a shader's constants), and cases an enum's conformances or raw values may
-reach. Files are left unchecked for the reasons `unused-import` gives.
+record. A declaration `private` or `fileprivate`, or inside a type or extension that is, is judged
+against its own file's record, since nothing outside the file can name it. Any other declaration is
+judged against every record of the package, its tests included; one declared public in a library
+product's target, or in a target a library product re-exports, is API and never reported. A declaration
+is used when a record holds a reference to it from outside its own text (a function that only calls
+itself is not used), when another declaration overrides or witnesses it, when a call of its struct's
+synthesized memberwise initializer passes it, or, for a property wrapped by an attribute, when its
+`$name` or `_name` is referenced. `subject` is the keyword and the name (`func after(_:_:)`,
+`var stopping`), and the suggested removal takes the declaration's lines with the comments written above
+and trailing it. Only the outermost of nested unused declarations is reported, so every one reported can
+go together. What the index cannot see, or what removing would change without breaking the build, is
+counted under `skipped` by reason and never reported: overrides and witnesses, what the Objective-C
+runtime reaches or can find by name, XCTest's test methods, entry points and previews, members the
+compiler calls by name, declarations an attribute may register and the types that hold them, Codable's
+coding keys, initializers, a stored property of a type whose conformances reach `Encodable` or
+`Decodable` or what the index cannot see into, of a SwiftUI view (SwiftUI compares them to decide when to
+draw), or of a type descending from another package's (which may read it by reflection), an instance's
+stored property whose initializer runs code, a field of a struct of plain numbers (its bytes may be a
+shader's constants), cases an enum's conformances or raw values may reach, and a name that appears inside
+`#if` or in a file the build has not compiled as it stands. Files are left unchecked for the reasons
+`unused-import` gives.
 
 ### `fix`, the fix and format phase's summary
 

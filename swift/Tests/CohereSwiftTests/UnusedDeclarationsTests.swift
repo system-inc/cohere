@@ -14,8 +14,10 @@ import Testing
  that holds a plain value; a struct of plain numbers whose padding is never named; stored properties of types
  whose conformances reach Codable through a protocol of ours, a type alias or an extension in another file, of
  a type inheriting from NSObject, and of a Hashable type, the one that is reported; a protocol witness; an
- `@objc` method; a file with `#if`; and an internal function, which this stage never judges. The records are a
- report, so the summary counts no findings.
+ `@objc` method; a file with `#if`; an internal function nothing calls; and, judged across the package, public
+ API of a library product, a function only a test calls, one named only in a `#if` branch the build never
+ compiled, and a wrapped property read only through its projection. The records are a report, so the summary
+ counts no findings.
  */
 @Suite(.serialized)
 struct UnusedDeclarationsTests {
@@ -26,8 +28,10 @@ struct UnusedDeclarationsTests {
         let package = Package(
             name: "Control",
             platforms: [.macOS(.v14)],
+            products: [.library(name: "Control", targets: ["Control"])],
             targets: [
                 .target(name: "Control", swiftSettings: [.enableUpcomingFeature("ExistentialAny"), .enableUpcomingFeature("MemberImportVisibility")]),
+                .testTarget(name: "ControlTests", dependencies: ["Control"]),
             ]
         )
 
@@ -179,6 +183,52 @@ struct UnusedDeclarationsTests {
             func debugStamp() -> Int { stamp() }
             #endif
 
+            #if CONTROL_NEVER_SET
+            func unbuilt() -> Int { onlyInConditional() }
+            #endif
+
+            """,
+        "Control/Entry.swift": """
+            /* The library's API: public in a library product, so whoever depends on it may call it. */
+            public func run() -> Int {
+                talk()
+                _ = encoded()
+                _ = makeHolder()
+                _ = describe()
+                _ = conformances()
+                _ = Panel()
+                _ = Target()
+                return entry() + constantsSize() + Meter().report().count
+            }
+
+            public func neverCalledButPublic() {}
+
+            func onlyTests() -> Int { 1 }
+
+            func onlyInConditional() -> Int { 1 }
+
+            @propertyWrapper
+            struct Logged {
+                var wrappedValue: Int
+                var projectedValue: String { "logged" }
+            }
+
+            final class Meter {
+                @Logged private var level = 1
+
+                func report() -> String { $level }
+            }
+
+            """,
+        "Tests/ControlTests/UsesTests.swift": """
+            import Testing
+
+            @testable import Control
+
+            @Test func callsTheFunctionOnlyTestsUse() {
+                #expect(onlyTests() == 1)
+            }
+
             """,
     ]
 
@@ -189,7 +239,7 @@ struct UnusedDeclarationsTests {
         try manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
         try PipelineControlTests.configuration.write(to: root.appendingPathComponent(".swift-format"), atomically: true, encoding: .utf8)
         for (path, source) in files {
-            let url = root.appendingPathComponent("Sources/\(path)")
+            let url = root.appendingPathComponent(path.hasPrefix("Tests/") ? path : "Sources/\(path)")
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try source.write(to: url, atomically: true, encoding: .utf8)
         }
@@ -228,6 +278,7 @@ struct UnusedDeclarationsTests {
          the two removals never overlap. `Base.speak` is reached only through the override that `talk` calls, and
          removing it breaks the override. `onlyProjected` is read only as `$onlyProjected`. `token` holds an
          observer for as long as a `Holder` lives, so it is never reported; `plain` holds a number nobody reads.
+         `internalUnused` is internal, and nothing in the package or its tests calls it.
          `Constants.padding` is never named, but a struct of plain numbers is read by its bytes, and the padding
          holds the layout. `Tag.unusedField` is reported: Tag conforms to Hashable and to a protocol of ours that
          refines nothing, so no conformance reads it.
@@ -238,13 +289,14 @@ struct UnusedDeclarationsTests {
                 "Control/Helpers.swift:1 func unusedHelper()",
                 "Control/Helpers.swift:2 let unusedConstant",
                 "Control/Helpers.swift:3 func countdown(_:)",
+                "Control/Helpers.swift:7 func internalUnused()",
                 "Control/Holder.swift:5 var plain",
                 "Control/Panel.swift:12 func extensionHelper()",
                 "Control/Types.swift:2 struct Lonely",
             ],
             "\(run.items)"
         )
-        #expect(run.coverage["found"] as? Int == 7)
+        #expect(run.coverage["found"] as? Int == 8)
         let notChecked = run.coverage["filesNotChecked"] as? [String: Int] ?? [:]
         #expect(notChecked == [UnusedImports.conditional: 1], "only the #if file is left unchecked: \(notChecked)")
         let skipped = run.coverage["skipped"] as? [String: Int] ?? [:]
@@ -260,7 +312,17 @@ struct UnusedDeclarationsTests {
         #expect(skipped[UnusedDeclarations.lifetime] == 1, "Holder's token: \(skipped)")
         #expect(skipped[UnusedDeclarations.objectiveC] == 1, "Target's @objc method: \(skipped)")
         #expect(skipped[UnusedDeclarations.layout] == 2, "Constants' two fields: \(skipped)")
-        #expect(skipped[UnusedDeclarations.overrides] == 2, "Derived's override and Described's witness: \(skipped)")
+        #expect(skipped[UnusedDeclarations.overrides] == 4, "Derived's override and the witnesses Described.description, Panel.body and Later.encode(to:): \(skipped)")
+        /*
+         The package-wide kinds. `run` and `neverCalledButPublic` are public in a library product. `onlyInConditional`
+         is named only in a `#if` branch the build never compiled. Target and Watcher descend from NSObject, which the
+         Objective-C runtime can find by name. Panel's `@State` is a view's, which SwiftUI compares. `onlyTests` is
+         called only from the test target, and `Meter.level` is read only as `$level`: neither is reported.
+         */
+        #expect(skipped[UnusedDeclarations.publicAPI] == 2, "\(skipped)")
+        #expect(skipped[UnusedDeclarations.hiddenName] == 1, "\(skipped)")
+        #expect(skipped[UnusedDeclarations.objectiveCClass] == 2, "\(skipped)")
+        #expect(skipped[UnusedDeclarations.viewStorage] == 1, "\(skipped)")
         /* A report, not a gate: nothing it found is a finding. */
         #expect(run.findings == 0, "unused-declaration findings must be unused records, never finding records")
     }

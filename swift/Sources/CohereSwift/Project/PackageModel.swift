@@ -69,6 +69,8 @@ public struct PackageModel: Equatable, Sendable {
      product (`cohere-swift-p.build` for target `CohereSwiftCommand`), so this is how its records are found.
      */
     public var productTargets: [String: String] = [:]
+    /* The targets a library product is built from: the package's API to whoever depends on it, so what they declare public is used by someone this build never sees. */
+    public var libraryProductTargets: Set<String> = []
 
     public init(name: String, root: URL, toolsVersion: String, targets: [Target], localDependencyRoots: [URL] = [], localPackages: [PackageModel] = []) {
         self.name = name
@@ -221,6 +223,7 @@ public struct PackageModel: Equatable, Sendable {
             (description.products ?? []).compactMap { product in product.targets.count == 1 ? product.targets.first.map { (product.name, $0) } : nil },
             uniquingKeysWith: { first, _ in first }
         )
+        self.libraryProductTargets = Set((description.products ?? []).filter { $0.type?.name == "library" }.flatMap(\.targets))
     }
 
     /*

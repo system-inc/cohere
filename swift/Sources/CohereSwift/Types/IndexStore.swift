@@ -50,6 +50,8 @@ import IndexStoreShim
     static let classKind: Int32 = 7
     static let protocolKind: Int32 = 8
     static let typeAliasKind: Int32 = 11
+    /* `INDEXSTORE_SYMBOL_KIND_CONSTRUCTOR`. */
+    static let constructorKind: Int32 = 22
     /* `INDEXSTORE_SYMBOL_KIND_MODULE`: a module's own name, as an `import` line or a qualified name spells it. */
     static let moduleKind: Int32 = 1
 
