@@ -176,9 +176,9 @@ func TestBothPathsAgreeOnEveryPluginDefault(t *testing.T) {
 // Separate from `Load` on purpose. `Load` returns the resolved result, which is the right answer for
 // every consumer and the wrong one for a test asking which of two paths a rule arrived by.
 //
-// The whole chain rather than the one file, since ahra's config became an overlay on the Structure and
-// Nexus tiers (#rkm5a31): the forty lines moved into Nexus's tier, so reading ahra's file alone
-// reported all forty dropped to warn while every one still ran at error.
+// The whole chain rather than the one file, since ahra's config became an overlay on the house tiers
+// (#rkm5a31), now the sets cohere carries (#njhfftt): the forty lines moved into the Nexus tier, so
+// reading ahra's file alone reported all forty dropped to warn while every one still ran at error.
 func ruleNamesInChain(path string) (map[string]RuleSetting, error) {
 	sources, err := SourcesOf(path)
 	if err != nil {
@@ -186,7 +186,7 @@ func ruleNamesInChain(path string) (map[string]RuleSetting, error) {
 	}
 	named := map[string]RuleSetting{}
 	for index := len(sources) - 1; index >= 0; index-- {
-		contents, err := os.ReadFile(sources[index])
+		contents, err := SourceContents(sources[index])
 		if err != nil {
 			return nil, err
 		}
