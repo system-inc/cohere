@@ -666,10 +666,13 @@ func findingsCacheKey(graph *program.Graph, location projectLocation) ([sha256.S
 	if err != nil {
 		return [sha256.Size]byte{}, err
 	}
+	// An embedded set is hashed by its text, read the way the loader reads it, as a file is.
 	for _, lintConfigFile := range lintConfigFiles {
-		if err := fileFact("lint-config", lintConfigFile); err != nil {
+		contents, err := configuration.SourceContents(lintConfigFile)
+		if err != nil {
 			return [sha256.Size]byte{}, err
 		}
+		facts = append(facts, fmt.Sprintf("lint-config %s=%x", lintConfigFile, sha256.Sum256(contents)))
 	}
 	if err := fileFact("tsconfig", location.ConfigFileName); err != nil {
 		return [sha256.Size]byte{}, err

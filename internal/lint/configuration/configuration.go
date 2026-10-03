@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -294,6 +293,9 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 	}
 	declaredPlugins := map[string]bool{}
 	reach := newRuleReach(registeredNames)
+	ancestors := ancestorsByLayer(layers)
+	// Which layer last wrote each top-level rule, so a rule two unrelated sets both configure is caught.
+	writtenBy := map[string]string{}
 
 	for index, layer := range layers {
 		isBase := index < len(layers)-1
@@ -316,6 +318,14 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 			}
 
 			inheritedName, inherited, isInherited, replacesInherited := inheritedRuleSetting(fromBases, name, reach)
+			// Layers that do not extend one another are composed side by side, `cohere:react` beside
+			// `cohere:next`. Each rule belongs to one of them: if both wrote it, which one wins would be
+			// decided by the order of a list rather than by anyone's ruling, and neither file says so.
+			if isInherited && !ancestors[layer.path][writtenBy[inheritedName]] {
+				return nil, fmt.Errorf("rule %q is configured by both %s and %s, and neither extends the other: "+
+					"a rule belongs to one set, so configure it in one of them or in a file that extends both",
+					name, writtenBy[inheritedName], layer.path)
+			}
 			if isInherited {
 				if setting.Options == nil {
 					setting.Options = inherited.Options
@@ -339,6 +349,7 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 				}
 			}
 			loaded.Rules[name] = setting
+			writtenBy[name] = layer.path
 		}
 
 		loaded.IgnorePatterns = append(loaded.IgnorePatterns, layer.raw.IgnorePatterns...)
@@ -456,21 +467,30 @@ func IgnorePatternsOf(path string) ([]string, error) {
 	return patterns, nil
 }
 
-// configLayer is one file in an `extends` chain: what it says, and which top-level keys it wrote.
+// configLayer is one file in an `extends` chain: what it says, which top-level keys it wrote, and the
+// layers it names in `extends`, by path.
 type configLayer struct {
-	path    string
-	raw     rawConfig
-	present map[string]bool
+	path     string
+	raw      rawConfig
+	present  map[string]bool
+	extended []string
 }
 
 // readConfigLayers reads path and everything it extends, outermost base first.
 //
 // chain is the files already being read, so a file that extends itself, directly or through others,
 // is refused by naming the loop rather than overflowing the stack.
+//
+// path is a file or an embedded set (`cohere:typescript`). A set is its own name, never a path, and it
+// may extend only other sets: it has no directory for a relative path to resolve against.
 func readConfigLayers(path string, chain []string) ([]configLayer, error) {
-	absolute, err := filepath.Abs(path)
-	if err != nil {
-		return nil, fmt.Errorf("resolving lint config %s: %w", path, err)
+	absolute := path
+	if !IsSet(path) {
+		resolved, err := filepath.Abs(path)
+		if err != nil {
+			return nil, fmt.Errorf("resolving lint config %s: %w", path, err)
+		}
+		absolute = resolved
 	}
 	for _, seen := range chain {
 		if seen == absolute {
@@ -479,7 +499,7 @@ func readConfigLayers(path string, chain []string) ([]configLayer, error) {
 		}
 	}
 
-	contents, err := os.ReadFile(absolute)
+	contents, err := SourceContents(absolute)
 	if err != nil {
 		return nil, fmt.Errorf("reading lint config %s: %w", absolute, err)
 	}
@@ -504,19 +524,57 @@ func readConfigLayers(path string, chain []string) ([]configLayer, error) {
 	}
 
 	layer := configLayer{path: absolute, raw: raw, present: present}
-	if raw.Extends == "" {
-		return []configLayer{layer}, nil
-	}
 
-	base := raw.Extends
-	if !filepath.IsAbs(base) {
-		base = filepath.Join(filepath.Dir(absolute), base)
-	}
-	layers, err := readConfigLayers(base, append(chain, absolute))
-	if err != nil {
-		return nil, fmt.Errorf("lint config %s extends %s: %w", absolute, raw.Extends, err)
+	// Each entry's chain in order, a layer already read keeping its first place: two sets that sit on
+	// one base share it, and it applies once, outermost.
+	var layers []configLayer
+	read := map[string]bool{}
+	for _, extended := range raw.Extends {
+		base := extended
+		if !IsSet(base) {
+			if IsSet(absolute) {
+				return nil, fmt.Errorf("rule set %s extends %s, which is a path: a set may extend only other sets", absolute, extended)
+			}
+			if !filepath.IsAbs(base) {
+				base = filepath.Join(filepath.Dir(absolute), base)
+			}
+		}
+		baseLayers, err := readConfigLayers(base, append(chain, absolute))
+		if err != nil {
+			return nil, fmt.Errorf("lint config %s extends %s: %w", absolute, extended, err)
+		}
+		for _, baseLayer := range baseLayers {
+			if !read[baseLayer.path] {
+				read[baseLayer.path] = true
+				layers = append(layers, baseLayer)
+			}
+		}
+		layer.extended = append(layer.extended, baseLayers[len(baseLayers)-1].path)
 	}
 	return append(layers, layer), nil
+}
+
+// ancestorsByLayer is every layer each layer extends, directly or through others, keyed by path.
+func ancestorsByLayer(layers []configLayer) map[string]map[string]bool {
+	extendedByPath := make(map[string][]string, len(layers))
+	for _, layer := range layers {
+		extendedByPath[layer.path] = layer.extended
+	}
+	ancestors := make(map[string]map[string]bool, len(layers))
+	var collect func(path string, into map[string]bool)
+	collect = func(path string, into map[string]bool) {
+		for _, extended := range extendedByPath[path] {
+			if !into[extended] {
+				into[extended] = true
+				collect(extended, into)
+			}
+		}
+	}
+	for _, layer := range layers {
+		ancestors[layer.path] = map[string]bool{}
+		collect(layer.path, ancestors[layer.path])
+	}
+	return ancestors
 }
 
 // inheritedRuleSetting finds the entry an earlier layer wrote for the same ruling as name, and says
@@ -649,7 +707,7 @@ func compactJson(raw json.RawMessage) string {
 }
 
 type rawConfig struct {
-	Extends        string                     `json:"extends"`
+	Extends        extendsList                `json:"extends"`
 	Departures     map[string]string          `json:"departures"`
 	Plugins        []string                   `json:"plugins"`
 	Rules          map[string]json.RawMessage `json:"rules"`

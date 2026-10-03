@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/system-inc/cohere/internal/replace"
 )
 
 // Parses reports whether text parses cleanly as the script kind implied by its file name.
@@ -170,7 +171,9 @@ func WriteAtomically(fileName string, text string) error {
 		os.Remove(temporaryName)
 		return fmt.Errorf("setting the mode on %s: %w", temporaryName, err)
 	}
-	if err := os.Rename(temporaryName, fileName); err != nil {
+	// replace.File rather than os.Rename: on Windows a rename over a file another process is reading is
+	// refused for as long as the read takes, and is retried through that.
+	if err := replace.File(temporaryName, fileName); err != nil {
 		os.Remove(temporaryName)
 		return fmt.Errorf("renaming %s over %s: %w", temporaryName, fileName, err)
 	}

@@ -1,0 +1,164 @@
+package configuration
+
+import (
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+	"testing/fstest"
+)
+
+// The rule sets cohere carries (#njhfftt): a configuration names one as `cohere:<name>`, and `extends`
+// takes a list, so a project composes sets that each sit on the same base.
+
+// withSetFiles replaces the embedded sets with files for one test.
+func withSetFiles(t *testing.T, files map[string]string) {
+	t.Helper()
+	replacement := fstest.MapFS{}
+	for name, contents := range files {
+		replacement["sets/"+name+".json"] = &fstest.MapFile{Data: []byte(contents)}
+	}
+	original := setFiles
+	setFiles = replacement
+	t.Cleanup(func() { setFiles = original })
+}
+
+func TestEverySetCohereCarriesLoads(t *testing.T) {
+	names := SetNames()
+	if len(names) < 3 {
+		t.Fatalf("cohere carries %d sets (%v); the embedded tree did not load", len(names), names)
+	}
+	for _, name := range names {
+		directory := writeConfigs(t, map[string]string{"CohereSettings.json": `{"extends": "` + name + `"}`})
+		loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
+		if len(loaded.Rules) == 0 {
+			t.Errorf("%s loaded with no rules", name)
+		}
+		if loaded.Sources[len(loaded.Sources)-1] != SetPrefix+"typescript" {
+			t.Errorf("%s does not sit on cohere:typescript: its sources are %v", name, loaded.Sources)
+		}
+	}
+}
+
+func TestASetIsReadFromTheBinaryAndNamedAsASet(t *testing.T) {
+	withSetFiles(t, map[string]string{
+		"typescript": `{"rules": {"no-var": "error"}}`,
+		"react":      `{"extends": "cohere:typescript", "rules": {"react/no-danger": "error"}}`,
+	})
+	directory := writeConfigs(t, map[string]string{"CohereSettings.json": `{"extends": "cohere:react"}`})
+	loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
+
+	for _, name := range []string{"no-var", "react/no-danger"} {
+		if loaded.Rules[name].Severity != SeverityError {
+			t.Errorf("%s is %v; the set chain must reach it", name, loaded.Rules[name].Severity)
+		}
+	}
+	want := []string{filepath.Join(directory, "CohereSettings.json"), "cohere:react", "cohere:typescript"}
+	if !reflect.DeepEqual(loaded.Sources, want) {
+		t.Errorf("sources are %v, want %v", loaded.Sources, want)
+	}
+	if onDisk := SourcesOnDisk(loaded.Sources); !reflect.DeepEqual(onDisk, want[:1]) {
+		t.Errorf("sources on disk are %v, want only the project's file", onDisk)
+	}
+}
+
+func TestAListReadsASharedBaseOnceAsTheOutermostLayer(t *testing.T) {
+	directory := writeConfigs(t, map[string]string{
+		"base.json":           `{"rules": {"no-var": "error"}}`,
+		"react.json":          `{"extends": "./base.json", "rules": {"react/no-danger": "error"}}`,
+		"next.json":           `{"extends": "./base.json", "rules": {"next/no-img-element": "error"}}`,
+		"CohereSettings.json": `{"extends": ["./react.json", "./next.json"]}`,
+	})
+	loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
+
+	for _, name := range []string{"no-var", "react/no-danger", "next/no-img-element"} {
+		if loaded.Rules[name].Severity != SeverityError {
+			t.Errorf("%s is %v; every listed chain must reach the project", name, loaded.Rules[name].Severity)
+		}
+	}
+	// Outermost last: the project, then the list in reverse of how it applies, then the shared base,
+	// once. A base read twice would apply again after react and silently undo anything react set.
+	want := []string{"CohereSettings.json", "next.json", "react.json", "base.json"}
+	if len(loaded.Sources) != len(want) {
+		t.Fatalf("sources are %v, want %v", loaded.Sources, want)
+	}
+	for index, source := range loaded.Sources {
+		if filepath.Base(source) != want[index] {
+			t.Fatalf("sources are %v, want %v", loaded.Sources, want)
+		}
+	}
+}
+
+func TestARuleTwoUnrelatedLayersConfigureIsRefused(t *testing.T) {
+	// Baseline first: the same composition, each rule in one set, loads. Without it the refusal
+	// below could be coming from anything about the shape.
+	disjoint := writeConfigs(t, map[string]string{
+		"base.json":           `{"rules": {"no-var": "error"}}`,
+		"react.json":          `{"extends": "./base.json", "rules": {"eqeqeq": "error"}}`,
+		"next.json":           `{"extends": "./base.json", "rules": {"no-eval": "error"}}`,
+		"CohereSettings.json": `{"extends": ["./react.json", "./next.json"]}`,
+	})
+	loadOrFail(t, filepath.Join(disjoint, "CohereSettings.json"))
+
+	// Both orders, so the refusal is not an accident of which set the list names first.
+	for _, order := range []string{`["./react.json", "./next.json"]`, `["./next.json", "./react.json"]`} {
+		directory := writeConfigs(t, map[string]string{
+			"base.json":           `{"rules": {"no-var": "error"}}`,
+			"react.json":          `{"extends": "./base.json", "rules": {"eqeqeq": "error"}}`,
+			"next.json":           `{"extends": "./base.json", "rules": {"eqeqeq": "warn"}}`,
+			"CohereSettings.json": `{"extends": ` + order + `}`,
+		})
+		refusedWith(t, filepath.Join(directory, "CohereSettings.json"), `"eqeqeq" is configured by both`)
+	}
+
+	// A file that extends both may still set the rule: it extends each of them, so it departs as any
+	// project does, with a reason.
+	departing := writeConfigs(t, map[string]string{
+		"base.json":  `{"rules": {"no-var": "error"}}`,
+		"react.json": `{"extends": "./base.json", "rules": {"eqeqeq": "error"}}`,
+		"next.json":  `{"extends": "./base.json", "rules": {"no-eval": "error"}}`,
+		"CohereSettings.json": `{"extends": ["./react.json", "./next.json"], "rules": {"eqeqeq": "off"},
+			"departures": {"eqeqeq": "this project compares loosely on purpose"}}`,
+	})
+	loaded := loadOrFail(t, filepath.Join(departing, "CohereSettings.json"))
+	if loaded.Rules["eqeqeq"].Severity != SeverityOff {
+		t.Errorf("eqeqeq is %v; the project extending both sets may set it", loaded.Rules["eqeqeq"].Severity)
+	}
+}
+
+func TestAnUnknownSetIsRefusedNamingTheSetsThereAre(t *testing.T) {
+	directory := writeConfigs(t, map[string]string{"CohereSettings.json": `{"extends": "cohere:typescirpt"}`})
+	refusedWith(t, filepath.Join(directory, "CohereSettings.json"), "the sets are cohere:")
+	_, err := Load(filepath.Join(directory, "CohereSettings.json"))
+	if err == nil || !strings.Contains(err.Error(), "cohere:typescript") {
+		t.Errorf("the refusal must name the set that was meant: %v", err)
+	}
+}
+
+func TestASetMayExtendOnlySets(t *testing.T) {
+	withSetFiles(t, map[string]string{
+		"typescript": `{"rules": {"no-var": "error"}}`,
+		"react":      `{"extends": "./typescript.json", "rules": {"eqeqeq": "error"}}`,
+	})
+	directory := writeConfigs(t, map[string]string{"CohereSettings.json": `{"extends": "cohere:react"}`})
+	refusedWith(t, filepath.Join(directory, "CohereSettings.json"), "a set may extend only other sets")
+}
+
+func TestExtendsTakesOneSourceOrAListOfThem(t *testing.T) {
+	for _, extends := range []string{`""`, `[]`} {
+		directory := writeConfigs(t, map[string]string{"CohereSettings.json": `{"extends": ` + extends + `, "rules": {"no-var": "error"}}`})
+		loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
+		if len(loaded.Sources) != 1 {
+			t.Errorf("extends %s read %v; it names nothing", extends, loaded.Sources)
+		}
+	}
+	for extends, want := range map[string]string{
+		`[""]`:     "lists an empty entry",
+		`3`:        "names a path or a rule set, or a list of them",
+		`{"a": 1}`: "names a path or a rule set, or a list of them",
+		`["a", 2]`: "names a path or a rule set, or a list of them",
+	} {
+		directory := writeConfigs(t, map[string]string{"CohereSettings.json": `{"extends": ` + extends + `}`})
+		refusedWith(t, filepath.Join(directory, "CohereSettings.json"), want)
+	}
+}

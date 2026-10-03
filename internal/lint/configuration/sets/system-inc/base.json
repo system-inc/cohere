@@ -1,0 +1,68 @@
+{
+    "extends": "cohere:typescript",
+    "ignorePatterns": ["**/wasm/photon/core/photon_rs_bg.js", "**/wasm/photon/core/photon_rs_bg.d.ts"],
+    "departures": {
+        "@typescript-eslint/no-require-imports": "off for every .cjs: CommonJS has no import statement and import() is async, so require is the only module form a .cjs can use (#na0hgjz)",
+        "@typescript-eslint/no-extraneous-class": "a decorated class is a registration, not a namespace: DI tokens and RPC and GraphQL services are empty by design (allowWithDecorator, ruled by @system_cohere in 17199, api b9d02dbc)",
+        "@typescript-eslint/unified-signatures": "ignoreDifferentlyNamedParameters, ruled by @system_cohere in 17339 and corrected in 17361, mirrored in Base ESLint defaults c4d3916 (api 3f87fa5e)"
+    },
+    "rules": {
+        "base/context-requires-access": [
+            "error",
+            {
+                "requirements": [
+                    {
+                        "contextKey": "AccountRequestContextKey",
+                        "requiresAny": ["RequireSessionAccess", "WithSessionAccess"]
+                    },
+                    {
+                        "contextKey": "AuthenticationRequestContextKey",
+                        "requiresAny": ["RequireAuthenticationSession", "RequireSessionAccess", "WithSessionAccess"]
+                    },
+                    {
+                        "contextKey": "DeviceIdRequestContextKey",
+                        "requiresAny": ["RequireDeviceId", "RequireSessionAccess", "WithSessionAccess"]
+                    }
+                ]
+            }
+        ],
+        "base/graphql-nullable-parity": "error",
+        "base/graphql-operation-context-matches-return": "error",
+        "base/inject-type-matches-parameter": "error",
+        "base/no-bare-throw": "error",
+        "base/no-console": "error",
+        "base/no-hand-built-declared-error": "error",
+        "base/no-global-container": "error",
+        "base/orm-column-nullable-parity": "error",
+        "base/orm-column-requires-declare": "error",
+        "base/pagination-decorator": "error",
+        "base/provider-return-matches-token": "error",
+        "base/relation-must-be-optional": "warn",
+        "base/serializable-nullable-parity": "error",
+        "base/verify-array-parity": "error",
+        "base/verify-optional-parity": "error",
+        "nexus/consistency-no-abbreviated-identifier": "error",
+        "nexus/consistency-require-constant-casing": "error",
+        "@typescript-eslint/no-extraneous-class": [
+            "error",
+            {
+                "allowWithDecorator": true
+            }
+        ],
+        "@typescript-eslint/unified-signatures": [
+            "error",
+            {
+                "ignoreDifferentlyNamedParameters": true
+            }
+        ]
+    },
+    "overrides": [
+        {
+            "files": ["**/*.cjs"],
+            "rules": {
+                "@typescript-eslint/no-require-imports": "off"
+            },
+            "reason": "CommonJS has no import statement and import() is async, so require is the only module form a .cjs can use."
+        }
+    ]
+}

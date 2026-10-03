@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/system-inc/cohere/internal/replace"
 )
 
 // The cache table: everything cohere keeps between runs for one project root, in one file.
@@ -413,7 +415,8 @@ func WriteCacheTable(path string, table *CacheTable, identity CacheTableIdentity
 	if beforeCacheTableRename != nil {
 		beforeCacheTableRename(temporaryName)
 	}
-	if err := os.Rename(temporaryName, path); err != nil {
+	// replace.File, which retries through Windows refusing the rename while another run reads the table.
+	if err := replace.File(temporaryName, path); err != nil {
 		return fmt.Errorf("renaming the cache table into place: %w", err)
 	}
 	temporaryName = ""

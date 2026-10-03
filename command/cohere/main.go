@@ -382,7 +382,7 @@ func run() error {
 
 	// The build saw every file the compiler read. The lint config is read by the command, not the
 	// compiler, so it is named here, with every file it extends: a base edited alone changes what runs.
-	declareRunCacheInputs(append(lintConfigSources(location.LintConfigFileName), location.ConfigFileName)...)
+	declareRunCacheInputs(append(configuration.SourcesOnDisk(lintConfigSources(location.LintConfigFileName)), location.ConfigFileName)...)
 
 	projectFiles := graph.ProjectFiles()
 	wholeProgramCount := len(projectFiles)
@@ -1249,7 +1249,7 @@ func changedConfiguration(scope formatScope, graph *program.Graph, lintConfigFil
 		currentDirectory = filepath.Dir(graph.ConfigFileName)
 	}
 
-	candidates := append(lintConfigSources(resolveLintConfigPath(lintConfigFileName, currentDirectory)), graph.ConfigFileName)
+	candidates := append(configuration.SourcesOnDisk(lintConfigSources(resolveLintConfigPath(lintConfigFileName, currentDirectory))), graph.ConfigFileName)
 	if graph.Config != nil {
 		candidates = append(candidates, graph.Config.ExtendedSourceFiles()...)
 	}
@@ -1309,8 +1309,9 @@ func registeredRuleNames() []string {
 	return names
 }
 
-// lintConfigSources is the lint config and every file it extends, or the config alone when the chain
-// cannot be read.
+// lintConfigSources is the lint config and every source it extends, or the config alone when the chain
+// cannot be read. An embedded set is named as `cohere:<name>`, which no file is; a caller that stats
+// what it is handed takes configuration.SourcesOnDisk of it.
 //
 // The fallback is not a way past a broken chain: configureLint loads the same chain and fails the run,
 // so a run with an unreadable base is never recorded or replayed. It only keeps the callers here,

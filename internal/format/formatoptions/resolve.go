@@ -152,6 +152,9 @@ func Resolve(directory string) (Resolution, error) {
 // through Base).
 const NexusTierFileName = "NexusCohereSettings.json"
 
+// NexusTierSetName is the Nexus tier as the rule set cohere carries, which a chain names in `extends`.
+const NexusTierSetName = configuration.SetPrefix + "typescript"
+
 // resolveChain reads the format block from the Nexus tier of path's `extends` chain, and only from
 // there.
 //
@@ -173,7 +176,7 @@ func resolveChain(path string) (Resolution, error) {
 	var nexusTier string
 	var block json.RawMessage
 	for _, source := range sources {
-		contents, err := os.ReadFile(source)
+		contents, err := configuration.SourceContents(source)
 		if err != nil {
 			return Resolution{}, err
 		}
@@ -182,7 +185,7 @@ func resolveChain(path string) (Resolution, error) {
 			return Resolution{}, fmt.Errorf("%s is not valid JSON: %w", source, err)
 		}
 		sourceBlock, present := settings["format"]
-		if filepath.Base(source) != NexusTierFileName {
+		if source != NexusTierSetName && filepath.Base(source) != NexusTierFileName {
 			if present {
 				return Resolution{}, fmt.Errorf("%s has a \"format\" block; formatting is unified, and only the Nexus tier (%s) holds the format block, so remove it here", source, NexusTierFileName)
 			}
