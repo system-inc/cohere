@@ -281,11 +281,15 @@ func markPrivateKeywordUses(ctx rule.Context, classNode *ast.Node, declared []*p
 			name := node.AsPropertyAccessExpression().Name()
 			switch {
 			case name == nil:
-			case name.Kind == ast.KindIdentifier && !insideNestedClass:
-				// A `private` use is only legal in the declaring class body, and a nested class is
-				// a different body: `class C { private a; m() { return class { x = this.a; } } }`
-				// does not compile. Bounding the keyword search this way is what keeps a nested
-				// class from crediting the outer declaration.
+			case name.Kind == ast.KindIdentifier:
+				// A nested class is still inside the declaring class's body, so a receiver of the
+				// outer type reads the member from there: `class Outer { private secret; make() {
+				// return class { read(o: Outer) { return o.secret; } } } }` compiles, and
+				// typescript-eslint counts it as a use. This arm was bounded at a nested class once,
+				// on the reasoning that `this.secret` there does not compile, and it reported that
+				// read (#yfkhkvy). The checker's resolution is the bound that matters: `this.secret`
+				// inside the nested class names the nested class's own member or nothing, never the
+				// outer declaration, so no bound on nesting is needed to keep it from crediting one.
 				markPrivateKeywordAccess(ctx, node, name, byName)
 			case name.Kind == ast.KindPrivateIdentifier:
 				// A `#name` reaches its declaring class from any depth, so this arm is not bounded

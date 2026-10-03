@@ -529,16 +529,11 @@ func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
 			},
 		},
 		{
-			// Measured, not imported. A nested class never keeps an OUTER `private` alive, because
-			// a `private` member is legal only inside the body that declares it and a nested class
-			// is a different body. The corpus writes this shape only for `#private`, where the rule
-			// is the opposite: a hash name does reach its class from any depth.
-			//
-			// The third row is the one that separates a bounded search from an unbounded one. The
-			// first two are declined by resolution anyway, since `this` inside the nested class is
-			// the nested class; capturing `const outer = this` first makes the reference resolve to
-			// the outer member, and only the bound stops it counting. Measured on the installed
-			// 8.67.0 build: all three report there.
+			// Measured, not imported. `this` inside a nested class is the nested class, so neither
+			// row reaches the outer member: the first reads the nested class's own `a`, the second
+			// reads nothing the checker resolves. Both report, here and on the installed 8.67.0 build.
+			// A receiver of the OUTER type does reach it from the nested class, which
+			// TestNoUnusedPrivateClassMembersDivergesOnReceiverReach pins (#yfkhkvy).
 			sourceText: "class C {\n  private a = 1;\n  m() {\n    return class D {\n      private a = 2;\n      n() { return this.a; }\n    };\n  }\n}\n",
 			wantFindings: []noUnusedPrivateClassMembersFinding{
 				{
@@ -549,15 +544,6 @@ func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
 		},
 		{
 			sourceText: "class C {\n  private a = 1;\n  m() {\n    return class D {\n      n() { return this.a; }\n    };\n  }\n}\n",
-			wantFindings: []noUnusedPrivateClassMembersFinding{
-				{
-					wantSpan:    "a",
-					wantMessage: "Private class member 'a' is defined but never used.",
-				},
-			},
-		},
-		{
-			sourceText: "class C {\n  private a = 1;\n  m() {\n    const outer = this;\n    return class D {\n      n() { return outer.a; }\n    };\n  }\n}\n",
 			wantFindings: []noUnusedPrivateClassMembersFinding{
 				{
 					wantSpan:    "a",
@@ -638,6 +624,11 @@ func TestNoUnusedPrivateClassMembersDivergesOnReceiverReach(t *testing.T) {
 		// The foreign-receiver face of the same divergence, reduced from the real finding on
 		// `Decimal.ts` that upstream reports and this rule does not.
 		"class Foo {\n  private helper(): number {\n    return 1;\n  }\n  clone(): Foo {\n    return this;\n  }\n  method() {\n    const other = this.clone();\n    return other.helper();\n  }\n}\n",
+		// A nested class is still inside the declaring body, so a receiver of the outer type reads
+		// the member from there. Upstream reports the captured `this` and is silent on the
+		// annotated parameter, since it reads a receiver's class from syntax; both are reads.
+		"class C {\n  private a = 1;\n  m() {\n    const outer = this;\n    return class D {\n      n() { return outer.a; }\n    };\n  }\n}\n",
+		"class Outer {\n  private secret = 1;\n  make() {\n    return class {\n      read(outer: Outer) { return outer.secret; }\n    };\n  }\n}\n",
 	)
 	for index, sourceText := range cases {
 		t.Run(noUnusedPrivateClassMembersCaseName(index), func(t *testing.T) {
