@@ -26,6 +26,12 @@
 # A mode with no quiet runs gets no quiet number, only the loaded ones labelled as loaded, because a
 # best-of-3 taken on a busy machine and one taken on a quiet one look the same afterwards.
 #
+# The ending load counts the run's own work, and that is deliberate. A two-second cold run on every core
+# lifts the one-minute load by about one on its own, so a cold run that starts just under the ceiling can
+# end over it and be labelled loaded: on 2026-10-03 two of five cold runs were excluded this way. Loosening
+# the check would also stop it catching a build that starts mid-run. A strict check only costs samples
+# and never flatters a number, so it stays strict; for cold, give it a machine that starts lower.
+#
 # Two times per run. `verdict` is what a developer waits for: the launcher returns when the engine has
 # its exit code, and the engine writes its cache afterwards. `settled` is when every process the run
 # started has exited, cache write included. The next run starts only after that.
