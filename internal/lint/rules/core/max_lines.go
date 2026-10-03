@@ -98,7 +98,8 @@ func DecodeMaxLinesOptions(raw []byte) (any, error) {
 // From the first line past the maximum to the end of the file, upstream's location, so a
 // suppression or a reader lands where the excess begins.
 var MaxLines = rule.Rule{
-	Name: "max-lines",
+	Name:       "max-lines",
+	NoListener: rule.NoListenerAnswersInRun,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil
