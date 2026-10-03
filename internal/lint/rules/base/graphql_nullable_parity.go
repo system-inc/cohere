@@ -3,6 +3,7 @@ package base
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/decorators"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -28,6 +29,12 @@ var graphQlNullableParityRelationDecorators = map[string]struct{}{
 	"OrmManyToOne": {},
 	"OrmOneToMany": {},
 	"OrmOneToOne":  {},
+}
+
+// graphQlNullableParityInputClassDecorators mark a class whose fields a client sends rather than
+// receives, which is where a nullable field must admit null itself.
+var graphQlNullableParityInputClassDecorators = map[string]struct{}{
+	"GraphQlInputType": {},
 }
 
 // GraphQlNullableParity holds a GraphQL decorator's `nullable` flag to the type it decorates.
@@ -75,6 +82,21 @@ var graphQlNullableParityRelationDecorators = map[string]struct{}{
 // not a shape anybody writes. That is the original's `unwrapPromise` rather than the recursive
 // `unwrapToElementType` its sibling rule uses, and the two are deliberately different.
 //
+// # A nullable input must admit null itself, not just undefined
+//
+//	invalid: @GraphQlInputType() class I { @GraphQlField({ nullable: true }) name?: string; }
+//	valid:   @GraphQlInputType() class I { @GraphQlField({ nullable: true }) name?: string | null; }
+//
+// On an input, `nullable: true` means a client may send an explicit null, and the value arrives as
+// null. A type of `T | undefined` passes the parity check above, since undefined counts as nullable,
+// and then tells every reader the null cannot happen: a `!== undefined` guard lets the client's null
+// into whatever is downstream. So on the two input positions, an argument's parameter and a field of
+// a `@GraphQlInputType` class, the type must admit null specifically.
+//
+// Outputs stay out, ruled by system_cohere (#twm9k22): a resolver returning undefined serializes as
+// null, so `?: T` on an object type's field says nothing false about the wire, and requiring `| null`
+// there would be style rather than a bug.
+//
 // # The report points at the name, not the decorator
 //
 // A property or method reports on its key and a parameter reports on itself, which is what the
@@ -95,13 +117,19 @@ var GraphQlNullableParity = rule.Rule{
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// checkNullability is the shared comparison: report when the declared flag and the type
-		// disagree, in whichever direction.
-		checkNullability := func(reportNode *ast.Node, declaredNullable bool, actualType *checker.Type) {
+		// disagree, in whichever direction, and on an input, when a nullable type admits undefined
+		// but not the null a client can send.
+		checkNullability := func(reportNode *ast.Node, declaredNullable bool, actualType *checker.Type,
+			isInput bool) {
 			if actualType == nil {
 				return
 			}
 			typeIsNullable := decorators.IsNullableType(actualType)
 			if declaredNullable == typeIsNullable {
+				if isInput && declaredNullable && !typeIncludesNull(actualType) {
+					ctx.ReportNode(reportNode, buildDecoratorNullableButInputExcludesNullMessage(
+						ctx.TypeChecker.TypeToString(actualType)))
+				}
 				return
 			}
 
@@ -168,7 +196,7 @@ var GraphQlNullableParity = rule.Rule{
 					// the checker answers the same type at both locations for all three, so a
 					// mutant swapping them survives every fixture and no input can separate them.
 					checkNullability(owner, declaredNullable,
-						ctx.TypeChecker.GetTypeAtLocation(owner))
+						ctx.TypeChecker.GetTypeAtLocation(owner), true)
 					return
 				}
 
@@ -181,8 +209,12 @@ var GraphQlNullableParity = rule.Rule{
 
 					switch owner.Kind {
 					case ast.KindPropertyDeclaration:
+						// A property's class decides whether a client sends it. A field on a
+						// method or getter is computed for output, so only this arm asks.
 						checkNullability(owner.Name(), declaredNullable,
-							ctx.TypeChecker.GetTypeAtLocation(owner.Name()))
+							ctx.TypeChecker.GetTypeAtLocation(owner.Name()),
+							decorators.HasDecoratorInSet(owner.Parent,
+								graphQlNullableParityInputClassDecorators))
 					case ast.KindMethodDeclaration, ast.KindGetAccessor:
 						// The field decorator is valid on a method or a getter as well as a
 						// property, so a port handling only the property shape goes silent on
@@ -200,7 +232,7 @@ var GraphQlNullableParity = rule.Rule{
 						// getter beside an equivalent method: the method reports, the getter does
 						// not. The arm is kept naming the kind rather than dropped, so the next
 						// reader sees the shape was considered rather than missed.
-						checkNullability(owner.Name(), declaredNullable, returnTypeOf(owner))
+						checkNullability(owner.Name(), declaredNullable, returnTypeOf(owner), false)
 					}
 					return
 				}
@@ -209,7 +241,7 @@ var GraphQlNullableParity = rule.Rule{
 				if owner.Kind != ast.KindMethodDeclaration {
 					return
 				}
-				checkNullability(owner.Name(), declaredNullable, returnTypeOf(owner))
+				checkNullability(owner.Name(), declaredNullable, returnTypeOf(owner), false)
 			},
 		}
 	},
@@ -234,6 +266,36 @@ func unwrapPromiseOnce(ctx rule.Context, subject *checker.Type) *checker.Type {
 		return subject
 	}
 	return typeArguments[0]
+}
+
+// typeIncludesNull is the source library's `typeIncludesNull`.
+//
+// Null itself, or `any` and `unknown`, which admit it. Narrower than `decorators.IsNullableType`,
+// whose mask also counts undefined and void, because the question here is whether a client's
+// explicit null fits the type. Recursive across a union, because a union admits null when any
+// member does.
+func typeIncludesNull(subjectType *checker.Type) bool {
+	if type_checking.IsTypeFlagSet(subjectType,
+		checker.TypeFlagsNull|checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
+		return true
+	}
+	if subjectType.IsUnion() {
+		for _, part := range subjectType.AsUnionType().Types() {
+			if typeIncludesNull(part) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func buildDecoratorNullableButInputExcludesNullMessage(typeText string) rule.Message {
+	return rule.Message{
+		Id: "decoratorNullableButInputExcludesNull",
+		Description: "Decorator declares 'nullable: true' on an input, so a client can send null, " +
+			"but the type '" + typeText + "' does not admit null. Add '| null' so the code's " +
+			"checks follow what can arrive",
+	}
 }
 
 func buildDecoratorNullableButTypeNotMessage(typeText string) rule.Message {

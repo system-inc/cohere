@@ -25,6 +25,8 @@ const graphQlNullableParityPreamble = "declare function GraphQlArgument(n?: unkn
 	"declare function GraphQlFieldResolver(f?: unknown, o?: unknown): MethodDecorator;\n" +
 	"declare function OrmManyToOne(f?: unknown, o?: unknown): PropertyDecorator;\n" +
 	"declare function SomethingElse(f?: unknown, o?: unknown): PropertyDecorator;\n" +
+	"declare function GraphQlInputType(n?: unknown, o?: unknown): ClassDecorator;\n" +
+	"declare function GraphQlObjectType(n?: unknown, o?: unknown): ClassDecorator;\n" +
 	"declare const String: unknown;\n" +
 	"class Thing { value!: string; }\n"
 
@@ -91,8 +93,38 @@ func TestGraphQlNullableParityStaysSilent(t *testing.T) {
 		"class C {\n  @GraphQlMutation(() => Thing, { nullable: false })\n  async save(): Promise<Thing> {\n    return new Thing();\n  }\n}\n",
 		"class C {\n  @GraphQlFieldResolver(() => Thing, { nullable: true })\n  resolve(): Thing | undefined {\n    return undefined;\n  }\n}\n",
 
-		// An argument in agreement.
-		"class C {\n  @GraphQlQuery(() => Thing)\n  find(@GraphQlArgument('id', () => String, { nullable: true }) id?: string): Thing {\n    void id;\n    return new Thing();\n  }\n}\n",
+		// An argument in agreement, which on an input means admitting null itself: a client can send
+		// one. `id?: string` was silent here before #twm9k22 and now fires, so it moved to the fires
+		// list. Both the optional and the required spelling admit null, so neither reports.
+		"class C {\n  @GraphQlQuery(() => Thing)\n  find(@GraphQlArgument('id', () => String, { nullable: true }) id?: string | null): Thing {\n    void id;\n    return new Thing();\n  }\n}\n",
+		"class C {\n  @GraphQlQuery(() => Thing)\n  find(@GraphQlArgument('id', () => String, { nullable: true }) id: string | null): Thing {\n    void id;\n    return new Thing();\n  }\n}\n",
+
+		// An input class's nullable field admitting null, optional or not.
+		"@GraphQlInputType()\nclass I {\n  @GraphQlField(() => String, { nullable: true })\n  a?: string | null;\n}\n",
+		"@GraphQlInputType()\nclass I {\n  @GraphQlField(() => String, { nullable: true })\n  a!: string | null;\n}\n",
+
+		// A NON-nullable input, the common shape, is not asked for null: only `nullable: true`
+		// promises a client may send one. Without this pair, the input check dropping its
+		// `declaredNullable` condition survives, since every other input fixture is nullable.
+		"@GraphQlInputType()\nclass I {\n  @GraphQlField(() => String)\n  a!: string;\n}\n",
+		"class C {\n  @GraphQlQuery(() => Thing)\n  find(@GraphQlArgument('id', () => String) id: string): Thing {\n    void id;\n    return new Thing();\n  }\n}\n",
+
+		// `any` and `unknown` admit null, so an input typed with either is not asked for `| null`.
+		// The same width as the parity mask, for the same reason: neither type claims anything to
+		// contradict. Each pins its own flag in typeIncludesNull's mask.
+		"@GraphQlInputType()\nclass I {\n  @GraphQlField(() => String, { nullable: true })\n  a?: any;\n}\n",
+		"@GraphQlInputType()\nclass I {\n  @GraphQlField(() => String, { nullable: true })\n  a?: unknown;\n}\n",
+
+		// OUTPUTS keep `?: T`, ruled for #twm9k22: a resolver's undefined serializes as null, so the
+		// type says nothing false about the wire. A field outside any input class, a field of an
+		// object type (which pins the input set as a set rather than as "any class decorator"),
+		// and a field resolver's return (above) all stay silent.
+		"class C {\n  @GraphQlField(() => String, { nullable: true })\n  a?: string;\n}\n",
+		"@GraphQlObjectType()\nclass O {\n  @GraphQlField(() => String, { nullable: true })\n  a?: string;\n}\n",
+
+		// A field on a METHOD inside an input class is not asked: a client sends properties, and a
+		// computed field is output whatever class holds it.
+		"@GraphQlInputType()\nclass I {\n  @GraphQlField(() => String, { nullable: true })\n  computed(): string | undefined {\n    return undefined;\n  }\n}\n",
 
 		// The field decorator on a METHOD and on a GETTER, in agreement. The property arm alone
 		// would go silent on both rather than report them, so these pin that the arm exists at all.
@@ -207,6 +239,36 @@ func TestGraphQlNullableParityFires(t *testing.T) {
 			wantId:      "decoratorNullableButTypeNot",
 			wantMessage: "Decorator declares 'nullable: true' but the type 'string' is not nullable",
 			wantSpan:    "@GraphQlArgument('id', () => String, { nullable: true }) id: string",
+		},
+
+		// A nullable INPUT that admits undefined but not null: the client's null is what the type
+		// says cannot happen. On an argument, reported on the parameter as the parity messages are.
+		{
+			sourceText:  "class C {\n  @GraphQlQuery(() => Thing)\n  find(@GraphQlArgument('id', () => String, { nullable: true }) id?: string): Thing {\n    void id;\n    return new Thing();\n  }\n}\n",
+			wantId:      "decoratorNullableButInputExcludesNull",
+			wantMessage: "Decorator declares 'nullable: true' on an input, so a client can send null, but the type 'string | undefined' does not admit null. Add '| null' so the code's checks follow what can arrive",
+			wantSpan:    "@GraphQlArgument('id', () => String, { nullable: true }) id?: string",
+		},
+		// On an input class's field, optional and explicitly undefined alike.
+		{
+			sourceText:  "@GraphQlInputType()\nclass I {\n  @GraphQlField(() => String, { nullable: true })\n  a?: string;\n}\n",
+			wantId:      "decoratorNullableButInputExcludesNull",
+			wantMessage: "Decorator declares 'nullable: true' on an input, so a client can send null, but the type 'string | undefined' does not admit null. Add '| null' so the code's checks follow what can arrive",
+			wantSpan:    "a",
+		},
+		{
+			sourceText:  "@GraphQlInputType()\nclass I {\n  @GraphQlField(() => Thing, { nullable: true })\n  a!: Thing | undefined;\n}\n",
+			wantId:      "decoratorNullableButInputExcludesNull",
+			wantMessage: "Decorator declares 'nullable: true' on an input, so a client can send null, but the type 'Thing | undefined' does not admit null. Add '| null' so the code's checks follow what can arrive",
+			wantSpan:    "a",
+		},
+		// An input that is not nullable at all gets the parity message, not this one: the flag and
+		// the type disagree outright, which is the first question asked.
+		{
+			sourceText:  "@GraphQlInputType()\nclass I {\n  @GraphQlField(() => String, { nullable: true })\n  a!: string;\n}\n",
+			wantId:      "decoratorNullableButTypeNot",
+			wantMessage: "Decorator declares 'nullable: true' but the type 'string' is not nullable",
+			wantSpan:    "a",
 		},
 
 		// The field decorator on a METHOD and on a GETTER, disagreeing. Their agreeing siblings are
