@@ -206,6 +206,13 @@ func applyProposedFixes(
 		return proposalsForText(fileName, text, graph, rules)
 	}
 
+	// Counted on the way into the formatter, so a checkout git wrote with CRLF is named once below rather
+	// than left to read as a tree of unformatted files.
+	var lineEndings crlfFiles
+	if transform != nil {
+		transform = lineEndings.observing(transform)
+	}
+
 	attempts := formatInParallel(fileNames, byFileName, func(fileName string) (edit.FileResult, error) {
 		return process(fileName, propose(fileName, refuseToRelint), transform, maxPasses)
 	})
@@ -232,6 +239,8 @@ func applyProposedFixes(
 		}
 		results = append(results, fileResult)
 	}
+
+	lineEndings.report(os.Stderr, write)
 
 	summary := edit.Summarize(results)
 	summary.Checked = !write
