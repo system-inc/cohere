@@ -405,6 +405,12 @@ func run() error {
 	// named. A caller who names paths has said which files the run is about, and a fixable finding
 	// outside them is reported, not repaired. With nothing named the whole project is the caller's.
 	writeScope := formatScope{Everything: true}
+
+	// And the repository it may write: the project's, or, for a run started inside a library that is a
+	// repository of its own (libraries/structure in ahra), that library's. Writes stay inside one
+	// repository (@system_cohere, 2026-10-03), so the run there formats and fixes the library, and its
+	// check still reads the whole program. See nested_repository.go.
+	repositoryRoot := writeRepositoryRoot(location.ArgumentBase, location.Root)
 	if len(flag.Args()) > 0 && !*listRules && !*listRulesEnabled {
 		scope, err := namedPathsScope(location.ArgumentBase, location.Root, flag.Args())
 		if err != nil {
@@ -514,7 +520,10 @@ func run() error {
 		case formatter != nil && cacheOff:
 			record = formatRecordOff("the cache is off (--no-cache)")
 		case formatter != nil:
-			record = loadFormatRecord(location.Root)
+			// The record lives with the repository the run writes, because saving it prunes every entry
+			// outside the universe it was saved with: a run inside a library keeping ahra's record would
+			// drop all of ahra's entries.
+			record = loadFormatRecord(repositoryRoot)
 		}
 		// Every file the default scope was drawn from, so the record can drop entries outside it. Nil for a
 		// narrower scope, which says nothing about the files it did not look at.
@@ -571,8 +580,8 @@ func run() error {
 			}
 			declineRunCache("a formatter enumerated the tree")
 			enumeration, enumerateError := formatter.Enumerate(
-				graph.Config.GetCurrentDirectory(),
-				resolveStructureIgnorePath(location.Root),
+				repositoryRoot,
+				resolveRepositoryIgnorePath(repositoryRoot),
 			)
 			if enumerateError != nil {
 				// A failed walk withholds formatting and says why, rather than falling back to a universe
@@ -590,8 +599,8 @@ func run() error {
 			declineRunCache("a formatter enumerated the tree")
 			scope, recordUniverse = unformattedScope(
 				formatter, record,
-				graph.Config.GetCurrentDirectory(),
-				resolveStructureIgnorePath(location.Root),
+				repositoryRoot,
+				resolveRepositoryIgnorePath(repositoryRoot),
 			)
 		}
 
@@ -601,6 +610,7 @@ func run() error {
 			scopedTransform(record.observe(formatTransform(formatter), optionsFingerprintOf(formatter)), scope),
 			scope.formatCandidates(),
 			writeScope,
+			repositoryRoot,
 			*maxFixPasses,
 			mutate,
 		)
@@ -641,6 +651,23 @@ func run() error {
 			// `--no-fix` run over a tree `--fix` would rewrite is not clean.
 			printWouldChange(os.Stdout, fixSummary.ChangedFiles)
 			findings += len(fixSummary.ChangedFiles)
+
+			// The submodules this repository declares are read, never written: each file a run inside
+			// one would rewrite is a finding here, so a library's drift fails the project's check until
+			// that library's own run formats it. Only on a whole-tree check with a formatter, since a
+			// run that named paths has said which files it is about.
+			if formatter != nil && writeScope.Everything {
+				nestedStart := time.Now()
+				nested, err := checkNestedRepositories(formatter, repositoryRoot)
+				if err != nil {
+					return fmt.Errorf("reading the nested repositories: %w", err)
+				}
+				fixDuration += time.Since(nestedStart)
+				printNestedDrift(os.Stdout, nested)
+				findings += len(nested.Drift)
+				fmt.Printf("nested repositories: %d read, %d files, %d would change under their own run\n",
+					nested.Repositories, nested.Files, len(nested.Drift))
+			}
 			report.recordChecked(phaseFix, fixDuration, len(fixSummary.ChangedFiles))
 		}
 

@@ -112,16 +112,20 @@ func assertScope(t *testing.T, got []string, want ...string) {
 	}
 }
 
-func TestWithNoRecordEveryFileIsInScopeAndOnlyDeclaredSubmodulesAreWalked(t *testing.T) {
+// TestWithNoRecordEveryFileOfTheRepositoryIsInScopeAndNoSubmoduleIs: the universe stops at the
+// repository's own boundary. Writes stay inside one repository (@system_cohere, 2026-10-03), so the
+// declared submodule is formatted by a run inside it and only read from here, by the check (see
+// checkNestedRepositories); it used to be walked into and written.
+func TestWithNoRecordEveryFileOfTheRepositoryIsInScopeAndNoSubmoduleIs(t *testing.T) {
 	fixture := newRecordFixture(t)
 	files, universe, _, description := fixture.scope(t)
 
-	// The ignored file and the undeclared clone are not in the universe; the declared submodule is.
-	assertScope(t, files, "A.ts", "B.ts", "library/Inner.ts")
-	if len(universe) != 3 {
-		t.Fatalf("universe %v, expected the three files in scope", fixture.relative(t, universe))
+	// The ignored file, the undeclared clone and the declared submodule are all outside the universe.
+	assertScope(t, files, "A.ts", "B.ts")
+	if len(universe) != 2 {
+		t.Fatalf("universe %v, expected the two files in scope", fixture.relative(t, universe))
 	}
-	for _, want := range []string{"all 3 files, because no earlier check is on record", "submodule library", "skipped nested repositories projects/clone"} {
+	for _, want := range []string{"all 2 files, because no earlier check is on record", "skipped nested repositories library, projects/clone"} {
 		if !strings.Contains(description, want) {
 			t.Errorf("the scope line does not say %q:\n%s", want, description)
 		}
@@ -134,7 +138,7 @@ func TestTheRecordScopesWhatChangedSinceCohereLastLooked(t *testing.T) {
 
 	files, _, _, description := fixture.scope(t)
 	assertScope(t, files)
-	if !strings.Contains(description, "0 of 3 files not on record as formatted") {
+	if !strings.Contains(description, "0 of 2 files not on record as formatted") {
 		t.Errorf("an unchanged tree's scope line: %s", description)
 	}
 
@@ -150,10 +154,11 @@ func TestTheRecordScopesWhatChangedSinceCohereLastLooked(t *testing.T) {
 
 	// A new file nobody has formatted is in scope, untracked or not: nothing here asks git.
 	writeTree(t, fixture.root, map[string]string{"New.ts": "export const fresh = 6;\n"})
-	// An edit inside the submodule is an edit too.
+	// An edit inside the submodule is the submodule's run's to format, not this one's: the project's
+	// check reports it as the submodule's drift instead.
 	writeTree(t, fixture.root, map[string]string{"library/Inner.ts": "export const inner = 40;\n"})
 	files, _, _, _ = fixture.scope(t)
-	assertScope(t, files, "New.ts", "library/Inner.ts")
+	assertScope(t, files, "New.ts")
 }
 
 func TestADeletedFileLeavesTheScopeAndTheRecord(t *testing.T) {
@@ -175,8 +180,8 @@ func TestADeletedFileLeavesTheScopeAndTheRecord(t *testing.T) {
 	if _, kept := stored.Entries[fixture.path("B.ts")]; kept {
 		t.Fatal("the record kept an entry for a deleted file")
 	}
-	if len(stored.Entries) != 2 {
-		t.Fatalf("the record holds %d entries, expected the two files that remain", len(stored.Entries))
+	if len(stored.Entries) != 1 {
+		t.Fatalf("the record holds %d entries, expected the one file that remains", len(stored.Entries))
 	}
 }
 
@@ -203,14 +208,14 @@ func TestAnOptionsChangeSendsItsFilesBackThroughTheFormatter(t *testing.T) {
 	fixture := newRecordFixture(t)
 	fixture.formatEverything(t)
 	fixture.engine.options = func(fileName string) (string, error) {
-		if strings.Contains(fileName, "library") {
+		if strings.HasSuffix(fileName, "B.ts") {
 			return "printWidth 80", nil
 		}
 		return "fake options", nil
 	}
 
 	files, _, _, _ := fixture.scope(t)
-	assertScope(t, files, "library/Inner.ts")
+	assertScope(t, files, "B.ts")
 }
 
 func TestARecordFromAnotherCohereSaysNothing(t *testing.T) {
@@ -224,7 +229,7 @@ func TestARecordFromAnotherCohereSaysNothing(t *testing.T) {
 	}
 
 	files, _, _, description := fixture.scope(t)
-	assertScope(t, files, "A.ts", "B.ts", "library/Inner.ts")
+	assertScope(t, files, "A.ts", "B.ts")
 	if !strings.Contains(description, "the formatter changed since the last check") {
 		t.Errorf("the scope line does not say why every file is in scope: %s", description)
 	}
@@ -234,7 +239,7 @@ func TestARecordFromAnotherCohereSaysNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	files, _, _, _ = fixture.scope(t)
-	assertScope(t, files, "A.ts", "B.ts", "library/Inner.ts")
+	assertScope(t, files, "A.ts", "B.ts")
 }
 
 // The stat shortcut is only taken once the bytes were read and matched, and a file whose bytes change
@@ -242,7 +247,7 @@ func TestARecordFromAnotherCohereSaysNothing(t *testing.T) {
 func TestAVerifiedFileIsAnsweredByStatAndAnEditIsStillSeen(t *testing.T) {
 	fixture := newRecordFixture(t)
 	fixture.formatEverything(t)
-	for _, name := range []string{"A.ts", "B.ts", "library/Inner.ts"} {
+	for _, name := range []string{"A.ts", "B.ts"} {
 		aged(t, fixture.path(name))
 	}
 

@@ -245,21 +245,18 @@ func formatRecordSum(contents []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// formatUniverse is every file the default format scope is drawn from: what the formatter handles
-// under the root, and under each submodule the root declares, at every depth.
+// formatUniverse is every file the default format scope is drawn from: what the formatter handles in
+// the repository the run writes, and nowhere else.
 //
-// Submodules are walked because an edit inside one is an edit the person running cohere made, and
-// git's scope reached them the same way, one repository at a time. Only declared ones, read from each
-// repository's own `.gitmodules`: the walk also finds repositories cloned into ignored directories
-// (ahra holds six under `projects/`), and those belong to nobody running here. A repository the root
-// never declared is still skipped and still named, as the whole-tree walk names it.
+// It stops at the repository's own boundary. Writes stay inside one repository (@system_cohere,
+// 2026-10-03): a submodule is formatted by a run inside it, which leaves the commit in the submodule,
+// and a run here reads the submodules it declares and reports their drift instead of writing it (see
+// checkNestedRepositories). The universe used to descend into every declared submodule, so a default
+// run in ahra rewrote Structure and Nexus whenever their files were not on record, and the change
+// landed in repositories nobody running here was committing to.
 type formatUniverse struct {
-	// root is the root's own walk, its nested repositories less the submodules walked below.
+	// root is the repository's own walk; its nested repositories are named and not walked.
 	root formatfiles.Enumeration
-
-	// submodules is each submodule's walk, outermost first, and submoduleNames its path from the root.
-	submodules     []formatfiles.Enumeration
-	submoduleNames []string
 
 	files []string
 }
@@ -269,54 +266,7 @@ func enumerateFormatUniverse(engine formatEngine, root string, structureIgnorePa
 	if err != nil {
 		return formatUniverse{}, err
 	}
-	universe := formatUniverse{root: rootEnumeration, files: append([]string(nil), rootEnumeration.Files...)}
-	skipped, err := universe.descend(engine, root, root, rootEnumeration, structureIgnorePath)
-	if err != nil {
-		return formatUniverse{}, err
-	}
-	universe.root.NestedRepositories = skipped
-	return universe, nil
-}
-
-// descend walks the submodules a repository declares among the nested repositories its walk found,
-// and returns the nested repositories it did not walk.
-//
-// Structure's ignore defaults apply inside a submodule too: they are the run's layer, not the
-// repository's, and for Structure itself they are its own file.
-func (universe *formatUniverse) descend(
-	engine formatEngine,
-	root string,
-	directory string,
-	enumeration formatfiles.Enumeration,
-	structureIgnorePath string,
-) ([]string, error) {
-	declared, err := declaredSubmodules(directory)
-	if err != nil {
-		return nil, err
-	}
-	skipped := []string{}
-	for _, nested := range enumeration.NestedRepositories {
-		if _, isSubmodule := declared[filepath.ToSlash(nested)]; !isSubmodule {
-			skipped = append(skipped, nested)
-			continue
-		}
-		submodule := filepath.Join(directory, nested)
-		inner, err := engine.Enumerate(submodule, structureIgnorePath)
-		if err != nil {
-			return nil, err
-		}
-		name, _ := filepath.Rel(root, submodule)
-		index := len(universe.submodules)
-		universe.submodules = append(universe.submodules, inner)
-		universe.submoduleNames = append(universe.submoduleNames, name)
-		universe.files = append(universe.files, inner.Files...)
-		innerSkipped, err := universe.descend(engine, root, submodule, inner, structureIgnorePath)
-		if err != nil {
-			return nil, err
-		}
-		universe.submodules[index].NestedRepositories = innerSkipped
-	}
-	return skipped, nil
+	return formatUniverse{root: rootEnumeration, files: append([]string(nil), rootEnumeration.Files...)}, nil
 }
 
 // declaredSubmodules reads the submodule paths a repository's `.gitmodules` declares. A repository with
@@ -324,8 +274,7 @@ func (universe *formatUniverse) descend(
 // silently drop every submodule from the scope.
 //
 // Only the `path` key is read. The file is git's config format, and a value can be quoted; anything
-// stranger than that names a path no walk would find, which costs a submodule its formatting and is
-// visible in the scope line as a skipped repository.
+// stranger than that names a path no read would find, which costs a submodule its drift check.
 func declaredSubmodules(directory string) (map[string]struct{}, error) {
 	declared := map[string]struct{}{}
 	file, err := os.Open(filepath.Join(directory, ".gitmodules"))
@@ -354,15 +303,9 @@ func declaredSubmodules(directory string) (map[string]struct{}, error) {
 	return declared, nil
 }
 
-// describe says what the universe walked, in the words describeEnumeration uses for one walk, with each
-// submodule after the root.
+// describe says what the universe walked, in the words describeEnumeration uses for one walk.
 func (universe formatUniverse) describe() string {
-	description := describeEnumeration(universe.root, len(universe.root.Files))
-	for index, submodule := range universe.submodules {
-		description += fmt.Sprintf("; submodule %s: %s",
-			universe.submoduleNames[index], describeEnumeration(submodule, len(submodule.Files)))
-	}
-	return description
+	return describeEnumeration(universe.root, len(universe.root.Files))
 }
 
 // unformattedScope is the default format scope: every file in the universe whose bytes are not on record

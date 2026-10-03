@@ -143,22 +143,24 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 	}
 	expectWouldChange("a bare check", output, "Producer.ts")
 
-	// With no record, every file the formatter handles is checked, the configs among them: the declared
-	// submodule's too, never the ignored file or the clone nobody declared.
+	// With no record, every file the formatter handles is checked, the configs among them, never the
+	// ignored file or the clone nobody declared. The declared submodule is read and not written: its
+	// file is reported as its own run's drift (@system_cohere's ruling, writes stay inside one repository).
 	output = step("--no-fix", "--format")
 	if !strings.Contains(output, "because no earlier check is on record") {
 		t.Fatalf("the first run did not say why it checks every file:\n%s", output)
 	}
 	expectWouldChange("the first format check", output,
-		"CohereSettings.json", "NexusCohereSettings.json", "Producer.ts", "Ugly.ts", "library/Inner.ts", "tsconfig.json")
+		"CohereSettings.json", "NexusCohereSettings.json", "Producer.ts", "Ugly.ts", "tsconfig.json")
 
-	if !strings.Contains(output, "library/Inner.ts:1:1 - --fix would rewrite this file: format [fix/would-change]") {
-		t.Fatalf("a file in the submodule was to be fixed as well as formatted:\n%s", output)
+	if !strings.Contains(output, "library/Inner.ts:1:1 - the formatter would rewrite this file in nested repository library, which a run here never writes: run cohere there [format/nested-drift]") ||
+		!strings.Contains(output, "nested repositories: 1 read, 1 files, 1 would change under their own run") {
+		t.Fatalf("the submodule's drift was not reported as its own:\n%s", output)
 	}
 
 	step("--fix", "--format")
-	if inner := readForTest(t, filepath.Join(root, "library/Inner.ts")); inner != "export function inner(): number {\n  debugger;\n  return 1;\n}\n" {
-		t.Fatalf("the submodule's file was not formatted, or was fixed:\n%s", inner)
+	if inner := readForTest(t, filepath.Join(root, "library/Inner.ts")); inner != "export function inner(): number {\n    debugger;\n    return 1;\n}\n" {
+		t.Fatalf("a run in the project wrote into the submodule:\n%s", inner)
 	}
 	for name, want := range map[string]string{
 		"ignored/Kept.ts":         "export const kept   =   1\n",
@@ -171,7 +173,7 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 
 	// Everything on record now, so nothing is in scope.
 	output = step("--no-fix", "--format")
-	if !strings.Contains(output, "0 of 7 files not on record as formatted") {
+	if !strings.Contains(output, "0 of 6 files not on record as formatted") {
 		t.Fatalf("a formatted tree's scope:\n%s", output)
 	}
 	expectWouldChange("a formatted tree", output)
@@ -189,7 +191,7 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 	writeTree(t, root, map[string]string{"Fresh.ts": "export const fresh   =   1\n"})
 	output = step("--no-fix", "--format")
 	expectWouldChange("a deletion and a new file", output, "Fresh.ts")
-	if !strings.Contains(output, "1 of 7 files not on record as formatted") {
+	if !strings.Contains(output, "1 of 6 files not on record as formatted") {
 		t.Fatalf("the scope did not count the deletion and the new file:\n%s", output)
 	}
 

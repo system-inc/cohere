@@ -17,7 +17,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/format/formatfiles"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/suppression"
 	"github.com/system-inc/cohere/internal/types/program"
@@ -46,6 +45,7 @@ func applyProposedFixes(
 	transform edit.Transform,
 	formatCandidates []string,
 	writable formatScope,
+	repositoryRoot string,
 	maxPasses int,
 	write bool,
 ) (edit.Summary, program.Result, error) {
@@ -88,17 +88,14 @@ func applyProposedFixes(
 	// reaches the lint phase, so a withheld repair is reported rather than lost.
 	//
 	// A whole-tree run has no stated set to filter against, so it is bounded the way the format walk is:
-	// nothing is written inside a repository of its own below the root (a submodule, or any directory
-	// with its own `.git`). The files are still checked and their findings still reported; only the
-	// write is withheld, and counted per repository so the run says what it did not apply. A run that
-	// names a path inside one has asked for it, and its stated scope admits the file as before.
+	// it writes only repositoryRoot, the repository the run is in. Nothing is written inside a repository
+	// of its own below it (a submodule, or any directory with its own `.git`), nor, for a run started
+	// inside a library, in the project outside it. The files are still checked and their findings still
+	// reported; only the write is withheld, and counted per repository so the run says what it did not
+	// apply. A run that names a path has asked for it, and its stated scope admits the file as before.
 	byFileName := map[string][]edit.Proposal{}
 	withheld := map[string]struct{}{}
 	inNestedRepository := map[string]int{}
-	root := ""
-	if graph.Config != nil {
-		root = graph.Config.GetCurrentDirectory()
-	}
 	for _, diagnostic := range result.Diagnostics {
 		if diagnostic.SourceFile == nil || len(diagnostic.Fixes) == 0 {
 			continue
@@ -108,9 +105,9 @@ func applyProposedFixes(
 			withheld[fileName] = struct{}{}
 			continue
 		}
-		if writable.Everything && root != "" {
-			if nested := formatfiles.NestedRepositoryContaining(root, fileName); nested != "" {
-				inNestedRepository[nested] += len(diagnostic.Fixes)
+		if writable.Everything && repositoryRoot != "" {
+			if elsewhere := unwritableRepository(repositoryRoot, fileName); elsewhere != "" {
+				inNestedRepository[elsewhere] += len(diagnostic.Fixes)
 				continue
 			}
 		}
@@ -188,7 +185,7 @@ func applyProposedFixes(
 		// the formatted text and applied them anyway: formatting one file in nexus rewrote it under
 		// nexus/consistency-no-multiline-arrow-function on a run that reported the repository's fixes as
 		// not applied.
-		fixesWithheld := writable.Everything && root != "" && formatfiles.NestedRepositoryContaining(root, fileName) != ""
+		fixesWithheld := writable.Everything && repositoryRoot != "" && unwritableRepository(repositoryRoot, fileName) != ""
 
 		return func(_ string, text string) ([]edit.Proposal, error) {
 			if !used {
@@ -354,7 +351,8 @@ func reportWithheld(withheld map[string]struct{}, writable formatScope) {
 }
 
 // reportInNestedRepositories says, per repository, how many fixes a whole-tree run did not apply
-// because they sit in a repository of its own below the root.
+// because they sit outside the repository the run writes: in a repository of its own below it, or in the
+// project outside a library the run started in.
 //
 // Said every time there are any, because the alternative is the defect this replaces in reverse: a
 // run that quietly leaves fixable findings in place reads as a run that fixed everything it could.
@@ -370,7 +368,7 @@ func reportInNestedRepositories(out io.Writer, fixesByRepository map[string]int)
 		if count == 1 {
 			noun = "fix"
 		}
-		fmt.Fprintf(out, "note: %d %s not applied: in nested repository %s, which a run here does not write unless it is named\n",
+		fmt.Fprintf(out, "note: %d %s not applied: in %s, which a run here does not write unless it is named\n",
 			count, noun, repository)
 	}
 }
