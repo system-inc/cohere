@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"go/types"
@@ -487,13 +488,19 @@ func main() {
 		}
 		shimHeaderBuilder.WriteString("\n")
 
+		// The shim is printed through gofmt's own printer before it is written, so what lands in the tree is
+		// what gofmt would leave it as. The builders above emit declarations one per line with no grouping,
+		// and the files they wrote went unformatted into the tree, where a gofmt guard over it would fail on
+		// output nobody may edit by hand. A source that does not parse is refused rather than written: the
+		// printer cannot format it, and a shim that does not compile is worse than the stale one it replaces.
 		shimGoPath := path.Join(shimDirPath, "shim.go")
-		file, err := os.Create(shimGoPath)
+		formatted, err := format.Source([]byte(shimHeaderBuilder.String() + shimBuilder.String()))
 		if err != nil {
-			log.Fatalf("error opening shim file for writing: %v", err)
+			log.Fatalf("error formatting %v, so it was not written: %v", shimGoPath, err)
 		}
-		file.WriteString(shimHeaderBuilder.String())
-		file.WriteString(shimBuilder.String())
+		if err := os.WriteFile(shimGoPath, formatted, 0o644); err != nil {
+			log.Fatalf("error writing %v: %v", shimGoPath, err)
+		}
 
 		shimHeaderBuilder.Reset()
 		shimBuilder.Reset()
