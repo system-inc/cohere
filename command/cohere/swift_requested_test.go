@@ -97,7 +97,7 @@ func TestALintRunThatSkipsWhatItWasNotAskedForIsComplete(t *testing.T) {
 		t.Fatalf("a --lint run with two findings: exit %d, err %v\n%s", exitCode, err, output)
 	}
 	requireLines(t, output,
-		"[cohere-swift/require-upcoming-features/upcomingFeatureMissing]",
+		"[cohere-swift/toolchain-require-upcoming-features/upcomingFeatureMissing]",
 		"phases: fix skipped (not requested) · types skipped (not requested) · lint ran",
 	)
 
