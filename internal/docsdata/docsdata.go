@@ -3,7 +3,7 @@
 //
 // Nothing here is typed in. Each output reads one source the build already trusts: the rule registry
 // and what each registration declares, the rule sets cohere carries as the loader resolves them, the
-// Swift verdict catalog, the settings schemas internal/settingsschema renders, CHANGELOG.md, the flag
+// Swift registry and verdict catalog, the settings schemas internal/settingsschema renders, CHANGELOG.md, the flag
 // set as the binary prints it, and the cases the rule tests assert, recorded by the capture hook in
 // internal/lint/testing. A field no source holds yet is left out rather than guessed, and the
 // sourceNotes in rules.json say where each field comes from.
@@ -51,6 +51,10 @@ type Inputs struct {
 
 	// SwiftVerdicts is swift/HouseRuleVerdicts.json.
 	SwiftVerdicts []byte
+
+	// SwiftRules is swift/Rules.json, the Swift engine's registry as data, which a Swift test holds to
+	// the registry in both directions.
+	SwiftRules []byte
 
 	// SettingsSchemas is what internal/settingsschema renders, keyed by its path relative to the module
 	// root. The *.schema.json files are copied beside the rest, so the site reads one directory.

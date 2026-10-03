@@ -113,7 +113,9 @@ func TestCheckSeesATierChange(t *testing.T) {
 	}
 }
 
-// TestEveryRegisteredRuleHasOneRow: rules.json names every registered rule exactly once, and nothing else.
+// TestEveryRegisteredRuleHasOneRow: rules.json names every rule each engine registers exactly once, under
+// that engine's language, and nothing else. The Swift registry is read from swift/Rules.json, which a
+// Swift test holds to the Swift engine's registry.
 func TestEveryRegisteredRuleHasOneRow(t *testing.T) {
 	committed, err := os.ReadFile(filepath.Join(moduleRoot, RulesPath))
 	if err != nil {
@@ -123,24 +125,121 @@ func TestEveryRegisteredRuleHasOneRow(t *testing.T) {
 	if err := json.Unmarshal(committed, &rules); err != nil {
 		t.Fatal(err)
 	}
-	rows := map[string]int{}
-	for _, row := range rules.Rules {
-		rows[row.Name]++
+	swiftRegistry, err := os.ReadFile(filepath.Join(moduleRoot, "swift", "Rules.json"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	registered := map[string]bool{}
-	for _, name := range registry.Names() {
-		registered[name] = true
-		if rows[name] != 1 {
-			t.Errorf("%s is registered and has %d rows in rules.json", name, rows[name])
+	var swiftEntries []struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(swiftRegistry, &swiftEntries); err != nil {
+		t.Fatal(err)
+	}
+	registered := map[string][]string{"TypeScript": registry.Names()}
+	for _, entry := range swiftEntries {
+		registered["Swift"] = append(registered["Swift"], entry.Name)
+	}
+
+	rows := map[string]map[string]int{}
+	for _, row := range rules.Rules {
+		if rows[row.Language] == nil {
+			rows[row.Language] = map[string]int{}
+		}
+		rows[row.Language][row.Name]++
+	}
+	for _, language := range []string{"TypeScript", "Swift"} {
+		if len(registered[language]) == 0 {
+			t.Fatalf("no %s rule is registered, so the rows were checked against nothing", language)
+		}
+		names := map[string]bool{}
+		for _, name := range registered[language] {
+			names[name] = true
+			if rows[language][name] != 1 {
+				t.Errorf("%s is a registered %s rule and has %d %s rows in rules.json", name, language, rows[language][name], language)
+			}
+		}
+		for name := range rows[language] {
+			if !names[name] {
+				t.Errorf("rules.json has a %s row for %s, which that engine does not register", language, name)
+			}
 		}
 	}
-	for name := range rows {
-		if !registered[name] {
-			t.Errorf("rules.json has a row for %s, which is not registered", name)
+	for language := range rows {
+		if registered[language] == nil {
+			t.Errorf("rules.json has rows in %s, which no engine registers", language)
 		}
 	}
 	if rules.Count != len(rules.Rules) {
 		t.Errorf("rules.json says count %d over %d rows", rules.Count, len(rules.Rules))
+	}
+}
+
+// TestCheckSeesASwiftRegistryChange: a Swift rule removed from swift/Rules.json makes rules.json stale, and
+// a Swift rule with an unknown origin, a misnamed house rule, or a verdict naming a missing Swift rule
+// refuses the build.
+func TestCheckSeesASwiftRegistryChange(t *testing.T) {
+	inputs := sourceInputs(t)
+	if stale := staleAgainstCommitted(t, built(t, inputs)); len(stale) > 0 {
+		t.Fatalf("the committed files are already stale (%v), so a change could not be told apart", stale)
+	}
+	var entries []map[string]any
+	if err := json.Unmarshal(inputs.SwiftRules, &entries); err != nil {
+		t.Fatal(err)
+	}
+	withEntries := func(change func([]map[string]any) []map[string]any) Inputs {
+		copied := make([]map[string]any, 0, len(entries))
+		for _, entry := range entries {
+			clone := map[string]any{}
+			for key, value := range entry {
+				clone[key] = value
+			}
+			copied = append(copied, clone)
+		}
+		encoded, err := json.Marshal(change(copied))
+		if err != nil {
+			t.Fatal(err)
+		}
+		changed := inputs
+		changed.SwiftRules = encoded
+		return changed
+	}
+
+	removed := withEntries(func(entries []map[string]any) []map[string]any {
+		// The last row, so a rule no verdict needs is the likelier one removed; a verdict-carrying rule
+		// would refuse the build instead, which is the case below.
+		for index := len(entries) - 1; index >= 0; index-- {
+			if entries[index]["origin"] != houseOrigin {
+				return append(entries[:index], entries[index+1:]...)
+			}
+		}
+		t.Fatal("no ported Swift rule to remove")
+		return nil
+	})
+	if stale := staleAgainstCommitted(t, built(t, removed)); !slices.Contains(stale, RulesPath) {
+		t.Errorf("removing a Swift rule left rules.json current: %v", stale)
+	}
+
+	for name, change := range map[string]func([]map[string]any) []map[string]any{
+		"an unknown origin": func(entries []map[string]any) []map[string]any {
+			entries[0]["origin"] = "swiftlint-ish"
+			return entries
+		},
+		"a house rule outside the scheme": func(entries []map[string]any) []map[string]any {
+			return append(entries, map[string]any{"name": swiftNamespace + "/docsdata-test-rule", "origin": houseOrigin, "typeAware": false})
+		},
+		"a verdict naming a missing Swift rule": func(entries []map[string]any) []map[string]any {
+			for index, entry := range entries {
+				if entry["name"] == swiftNamespace+"/consistency-no-bare-throw" {
+					return append(entries[:index], entries[index+1:]...)
+				}
+			}
+			t.Fatal("the bare-throw rule, which a verdict names, is not in swift/Rules.json")
+			return nil
+		},
+	} {
+		if _, err := Build(withEntries(change)); err == nil {
+			t.Errorf("%s built", name)
+		}
 	}
 }
 
@@ -195,7 +294,7 @@ func TestBuildIsDeterministic(t *testing.T) {
 // a row does not have.
 func TestEveryFieldHasASourceNote(t *testing.T) {
 	encoded, err := json.Marshal(RuleRow{Options: &RuleOptions{}, Swift: &SwiftVerdict{}, Sets: []RuleSetSeverity{{}}, MessageIds: []string{""},
-		Namespace: "-", UpstreamName: "-", Category: "-", FixKind: "-"})
+		Namespace: "-", UpstreamName: "-", Category: "-", FixKind: "-", TypeScriptRules: []string{""}})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -42,6 +42,9 @@ type RuleRow struct {
 	FixKind    string            `json:"fixKind,omitempty"`
 	Sets       []RuleSetSeverity `json:"sets,omitempty"`
 	Swift      *SwiftVerdict     `json:"swift,omitempty"`
+	// TypeScriptRules is, for a Swift rule, every TypeScript house rule the Swift verdict catalog says it
+	// carries. Empty for a Swift rule no verdict names.
+	TypeScriptRules []string `json:"typeScriptRules,omitempty"`
 }
 
 // RuleOptions is what a rule's registration declares about its options.
@@ -68,19 +71,27 @@ type SwiftVerdict struct {
 }
 
 var ruleSourceNotes = map[string]string{
-	"name":         "the rule registry (internal/lint/registry), as `cohere --rules` lists it",
-	"language":     "the registry the row comes from; only the TypeScript registry is exported today",
-	"namespace":    "the registered name, before its last slash",
-	"origin":       "the registered namespace, and for a bare name the Go package that registers it",
-	"upstreamName": "the registered name, for a rule ported from a plugin or ESLint core",
-	"category":     "a house rule's name, split by the naming scheme's closed lists (policy/RuleNaming.json)",
-	"typeAware":    "the rule's NeedsTypeChecker declaration",
-	"options":      "the rule's registration: which decoder it carries and whether it requires options",
-	"messageIds":   "the message ids the rule's own tests assert (examples/<rule>.json)",
-	"fixKind":      "whether the rule's own tests show a fix, a suggestion, or both (examples/<rule>.json)",
-	"sets":         "each carried rule set as the loader resolves it, at warn or error, top-level rules only",
-	"swift":        "swift/HouseRuleVerdicts.json",
+	"name":            "the rule registry (internal/lint/registry), as `cohere --rules` lists it",
+	"language":        "the registry the row comes from: the Go engine's for TypeScript, swift/Rules.json for Swift",
+	"namespace":       "the registered name, before its last slash",
+	"origin":          "for TypeScript, the registered namespace, and for a bare name the Go package that registers it; for Swift, the origin each rule declares (swift/Rules.json)",
+	"upstreamName":    "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json)",
+	"category":        "a house rule's name, split by the naming scheme's closed lists (policy/RuleNaming.json)",
+	"typeAware":       "the rule's NeedsTypeChecker declaration, or for Swift the typeAware swift/Rules.json declares",
+	"options":         "the rule's registration: which decoder it carries and whether it requires options",
+	"messageIds":      "the message ids the rule's own tests assert (examples/<rule>.json)",
+	"fixKind":         "whether the rule's own tests show a fix, a suggestion, or both (examples/<rule>.json)",
+	"sets":            "each carried rule set as the loader resolves it, at warn or error, top-level rules only",
+	"swift":           "swift/HouseRuleVerdicts.json",
+	"typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
 }
+
+// swiftOrigins are the origins a Swift rule may declare. One outside them refuses the build, so a new
+// upstream tool cannot publish without being named here.
+var swiftOrigins = map[string]bool{houseOrigin: true, "swiftlint": true, "swift-format": true}
+
+// swiftNamespace is the namespace every Swift rule registers under.
+const swiftNamespace = "cohere-swift"
 
 // namespaceOrigins names where each registered namespace's rules come from. A namespace missing here
 // fails the build, so a new plugin's rules cannot publish with no origin.
@@ -157,8 +168,72 @@ func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
 		}
 		rows = append(rows, row)
 	}
+	swiftRows, err := buildSwiftRows(inputs.SwiftRules, verdicts)
+	if err != nil {
+		return Rules{}, err
+	}
+	rows = append(rows, swiftRows...)
 	sort.Slice(rows, func(left, right int) bool { return rows[left].Name < rows[right].Name })
 	return Rules{SourceNotes: ruleSourceNotes, Count: len(rows), Rules: rows}, nil
+}
+
+// buildSwiftRows renders one row per Swift rule. A row naming no known origin, a house rule outside the
+// naming scheme, and a verdict naming a Swift rule the registry does not hold each refuse the build.
+func buildSwiftRows(registry []byte, verdicts map[string]SwiftVerdict) ([]RuleRow, error) {
+	var entries []struct {
+		Name         string `json:"name"`
+		Origin       string `json:"origin"`
+		UpstreamName string `json:"upstreamName"`
+		TypeAware    bool   `json:"typeAware"`
+	}
+	if err := rule.UnmarshalOptions(registry, &entries); err != nil {
+		return nil, fmt.Errorf("docsdata: reading swift/Rules.json: %w", err)
+	}
+	carries := map[string][]string{}
+	for typeScriptRule, verdict := range verdicts {
+		if verdict.SwiftRule != "" {
+			carries[verdict.SwiftRule] = append(carries[verdict.SwiftRule], typeScriptRule)
+		}
+	}
+
+	rows := make([]RuleRow, 0, len(entries))
+	for _, entry := range entries {
+		leaf, found := strings.CutPrefix(entry.Name, swiftNamespace+"/")
+		if !found {
+			return nil, fmt.Errorf("docsdata: the Swift rule %s is not under %s/", entry.Name, swiftNamespace)
+		}
+		if !swiftOrigins[entry.Origin] {
+			return nil, fmt.Errorf("docsdata: %s: the origin %q is not one of house, swiftlint, swift-format", entry.Name, entry.Origin)
+		}
+		row := RuleRow{
+			Name:         entry.Name,
+			Language:     "Swift",
+			Namespace:    swiftNamespace,
+			Origin:       entry.Origin,
+			UpstreamName: entry.UpstreamName,
+			TypeAware:    entry.TypeAware,
+		}
+		if entry.Origin == houseOrigin {
+			parsed, err := policy.Naming.ParseHouseRuleName(leaf)
+			if err != nil {
+				return nil, fmt.Errorf("docsdata: %s: %w", entry.Name, err)
+			}
+			row.Category = parsed.Category
+		}
+		row.TypeScriptRules = carries[entry.Name]
+		sort.Strings(row.TypeScriptRules)
+		delete(carries, entry.Name)
+		rows = append(rows, row)
+	}
+	if len(carries) > 0 {
+		dangling := make([]string, 0, len(carries))
+		for swiftRule := range carries {
+			dangling = append(dangling, swiftRule)
+		}
+		sort.Strings(dangling)
+		return nil, fmt.Errorf("docsdata: the Swift verdicts name %v, which swift/Rules.json does not hold", dangling)
+	}
+	return rows, nil
 }
 
 // originOf is where a rule comes from, by its namespace, or for a bare name by the package registering it.

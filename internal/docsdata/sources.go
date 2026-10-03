@@ -25,6 +25,9 @@ func SourceInputs(root string) (Inputs, error) {
 	if inputs.SwiftVerdicts, err = os.ReadFile(filepath.Join(root, "swift", "HouseRuleVerdicts.json")); err != nil {
 		return inputs, err
 	}
+	if inputs.SwiftRules, err = os.ReadFile(filepath.Join(root, "swift", "Rules.json")); err != nil {
+		return inputs, err
+	}
 	if inputs.Changelog, err = os.ReadFile(filepath.Join(root, "CHANGELOG.md")); err != nil {
 		return inputs, err
 	}

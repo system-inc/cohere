@@ -1,18 +1,20 @@
 {
     "sourceNotes": {
+        "category": "a house rule's name, split by the naming scheme's closed lists (policy/RuleNaming.json)",
         "fixKind": "whether the rule's own tests show a fix, a suggestion, or both (examples/<rule>.json)",
-        "language": "the registry the row comes from; only the TypeScript registry is exported today",
+        "language": "the registry the row comes from: the Go engine's for TypeScript, swift/Rules.json for Swift",
         "messageIds": "the message ids the rule's own tests assert (examples/<rule>.json)",
         "name": "the rule registry (internal/lint/registry), as `cohere --rules` lists it",
         "namespace": "the registered name, before its last slash",
         "options": "the rule's registration: which decoder it carries and whether it requires options",
-        "origin": "the registered namespace, and for a bare name the Go package that registers it",
+        "origin": "for TypeScript, the registered namespace, and for a bare name the Go package that registers it; for Swift, the origin each rule declares (swift/Rules.json)",
         "sets": "each carried rule set as the loader resolves it, at warn or error, top-level rules only",
         "swift": "swift/HouseRuleVerdicts.json",
-        "typeAware": "the rule's NeedsTypeChecker declaration",
-        "upstreamName": "the registered name, for a rule ported from a plugin or ESLint core"
+        "typeAware": "the rule's NeedsTypeChecker declaration, or for Swift the typeAware swift/Rules.json declares",
+        "typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
+        "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json)"
     },
-    "count": 482,
+    "count": 536,
     "rules": [
         {
             "name": "@eslint-community/eslint-comments/require-description",
@@ -4614,6 +4616,504 @@
             "messageIds": [
                 "missingThis"
             ]
+        },
+        {
+            "name": "cohere-swift/always-use-lower-camel-case",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swift-format",
+            "upstreamName": "AlwaysUseLowerCamelCase",
+            "typeAware": false,
+            "typeScriptRules": [
+                "nexus/consistency-no-screaming-snake-case"
+            ]
+        },
+        {
+            "name": "cohere-swift/concurrency-no-check-then-write",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "concurrency",
+            "typeAware": true,
+            "typeScriptRules": [
+                "nexus/concurrency-no-check-then-write"
+            ]
+        },
+        {
+            "name": "cohere-swift/concurrency-no-lost-update",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "concurrency",
+            "typeAware": false,
+            "typeScriptRules": [
+                "nexus/concurrency-no-lost-update"
+            ]
+        },
+        {
+            "name": "cohere-swift/concurrency-require-escape-hatch-reason",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "concurrency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/consistency-no-abbreviated-identifier",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "typeScriptRules": [
+                "nexus/consistency-no-abbreviated-identifier"
+            ]
+        },
+        {
+            "name": "cohere-swift/consistency-no-ambiguous-identifier",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "typeScriptRules": [
+                "nexus/consistency-no-ambiguous-identifier"
+            ]
+        },
+        {
+            "name": "cohere-swift/consistency-no-bare-throw",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "typeScriptRules": [
+                "base/consistency-no-bare-throw"
+            ]
+        },
+        {
+            "name": "cohere-swift/consistency-no-boolean-outcome",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "typeScriptRules": [
+                "nexus/consistency-no-boolean-outcome"
+            ]
+        },
+        {
+            "name": "cohere-swift/consistency-no-hand-rolled-delay",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "typeScriptRules": [
+                "nexus/consistency-no-hand-rolled-delay"
+            ]
+        },
+        {
+            "name": "cohere-swift/consistency-no-iso-string-date-cut",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true,
+            "typeScriptRules": [
+                "nexus/consistency-no-iso-string-date-cut"
+            ]
+        },
+        {
+            "name": "cohere-swift/consistency-no-print",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "typeScriptRules": [
+                "base/consistency-no-console"
+            ]
+        },
+        {
+            "name": "cohere-swift/consistency-no-property-alias",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "typeScriptRules": [
+                "structure/consistency-no-property-alias"
+            ]
+        },
+        {
+            "name": "cohere-swift/consistency-no-stuttering-name",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "typeScriptRules": [
+                "nexus/consistency-no-stuttering-name"
+            ]
+        },
+        {
+            "name": "cohere-swift/consistency-no-utils-folder",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "typeScriptRules": [
+                "nexus/consistency-no-utils-folder"
+            ]
+        },
+        {
+            "name": "cohere-swift/consistency-require-matching-file-name",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "typeScriptRules": [
+                "structure/consistency-require-matching-file-name"
+            ]
+        },
+        {
+            "name": "cohere-swift/contains-over-filter",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "contains_over_filter_count",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-swift/contains-over-first-not-nil",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "contains_over_first_not_nil",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-swift/correctness-no-default-for-owned-enum",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-swift/correctness-no-discarded-try-optional",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-swift/correctness-no-identical-branches",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": false,
+            "typeScriptRules": [
+                "nexus/correctness-no-identical-branches"
+            ]
+        },
+        {
+            "name": "cohere-swift/correctness-no-uncleared-race-timeout",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": false,
+            "typeScriptRules": [
+                "nexus/correctness-no-uncleared-race-timeout"
+            ]
+        },
+        {
+            "name": "cohere-swift/correctness-no-write-only-collection",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true,
+            "typeScriptRules": [
+                "nexus/correctness-no-write-only-collection"
+            ]
+        },
+        {
+            "name": "cohere-swift/correctness-require-response-status-check",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true,
+            "typeScriptRules": [
+                "nexus/correctness-require-response-status-check"
+            ]
+        },
+        {
+            "name": "cohere-swift/duplicate-conditions",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "duplicate_conditions",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/duplicate-imports",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "duplicate_imports",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/duplicated-key-in-dictionary-literal",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "duplicated_key_in_dictionary_literal",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/empty-count",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "empty_count",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-swift/fatal-error-message",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "fatal_error_message",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/file-length",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "file_length",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/first-where",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "first_where",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-swift/force-cast",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "force_cast",
+            "typeAware": false,
+            "typeScriptRules": [
+                "nexus/correctness-no-nullish-stripping-assertion"
+            ]
+        },
+        {
+            "name": "cohere-swift/force-try",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "force_try",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/force-unwrapping",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "force_unwrapping",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/identical-operands",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "identical_operands",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/implicitly-unwrapped-optional",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "implicitly_unwrapped_optional",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/is-disjoint",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "is_disjoint",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-swift/last-where",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "last_where",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-swift/legacy-constructors",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "legacy_constructor",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/no-leading-underscores",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swift-format",
+            "upstreamName": "NoLeadingUnderscores",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/performance-no-independent-await-in-loop",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "performance",
+            "typeAware": false,
+            "typeScriptRules": [
+                "nexus/performance-no-independent-await-in-loop"
+            ]
+        },
+        {
+            "name": "cohere-swift/private-over-fileprivate",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "private_over_fileprivate",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/reduce-into",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "reduce_into",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-swift/redundant-type-annotation",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "redundant_type_annotation",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-swift/security-no-interpolated-shell-command",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "security",
+            "typeAware": true,
+            "typeScriptRules": [
+                "nexus/security-no-interpolated-shell-command"
+            ]
+        },
+        {
+            "name": "cohere-swift/security-no-interpolated-sql-string",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "security",
+            "typeAware": true,
+            "typeScriptRules": [
+                "nexus/security-no-interpolated-sql-string"
+            ]
+        },
+        {
+            "name": "cohere-swift/sorted-first-last",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "sorted_first_last",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-swift/todo",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "todo",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/toolchain-require-strict-memory-safety",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "toolchain",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/toolchain-require-swift-6-language-mode",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "toolchain",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/toolchain-require-upcoming-features",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "toolchain",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/unhandled-throwing-task",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "unhandled_throwing_task",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-swift/unowned-variable-capture",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "unowned_variable_capture",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/unused-closure-parameter",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "unused_closure_parameter",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-swift/unused-optional-binding",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "swiftlint",
+            "upstreamName": "unused_optional_binding",
+            "typeAware": false
         },
         {
             "name": "complexity",
@@ -13037,7 +13537,8 @@
                 }
             ],
             "swift": {
-                "verdict": "Port"
+                "verdict": "Ported",
+                "swiftRule": "cohere-swift/consistency-no-property-alias"
             }
         },
         {
