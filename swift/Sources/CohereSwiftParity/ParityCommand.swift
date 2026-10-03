@@ -78,7 +78,7 @@ struct ParityCommand {
 
         let runner = ProcessRunner()
         let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: runner)
-        let files = try FileSet.build(package: package, runner: runner).owned.map(\.url)
+        let files = try FileSet.build(package: package).owned.map(\.url)
         guard !files.isEmpty else {
             throw UsageFailure(description: "the engine owns no files in \(root.path), so there is nothing to compare")
         }

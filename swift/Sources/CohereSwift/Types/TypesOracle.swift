@@ -69,7 +69,7 @@ public struct TypesOracle {
         let toolchain = EngineVersion.toolchain(runner: runner)
         let scratchPath = Pipeline.scratchPath(for: root)
         let package = try PackageModel.load(root: root, scratchPath: scratchPath, runner: runner, toolchain: toolchain)
-        let files = try FileSet.build(package: package, runner: runner).owned
+        let files = try FileSet.build(package: package).owned
 
         let buildStart = Date()
         let types = try TypesPhase(package: package, files: files, scratchPath: scratchPath, resolutionAllowed: false, toolchain: toolchain, runner: runner).run()

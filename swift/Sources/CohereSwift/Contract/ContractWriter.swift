@@ -56,11 +56,12 @@ public final class ContractWriter {
      follows from it: 0 only for a complete run with no findings. Returns the exit code so the command
      exits with exactly what the summary claims.
      */
-    public func finish(complete: Bool, nothingToCheck: String = "") throws -> Int32 {
+    public func finish(complete: Bool) throws -> Int32 {
         let missing = PhaseRecord.Name.allCases.filter { !phasesWritten.contains($0) }
         precondition(missing.isEmpty, "phases never recorded: \(missing.map(\.rawValue))")
         let exitCode: Int32 = findingsWritten == 0 && complete ? 0 : 1
-        try send(SummaryRecord(findings: findingsWritten, complete: complete, nothingToCheck: nothingToCheck, exitCode: Int(exitCode)))
+        /* Always empty from this engine: every run describes the package, so none finishes with nothing to look at. */
+        try send(SummaryRecord(findings: findingsWritten, complete: complete, nothingToCheck: "", exitCode: Int(exitCode)))
         summaryWritten = true
         return exitCode
     }

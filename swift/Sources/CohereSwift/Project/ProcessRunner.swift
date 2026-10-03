@@ -1,7 +1,7 @@
 import Foundation
 
 /*
- Runs a tool (`swift`, `git`) and hands back everything it said.
+ Runs a tool (`swift`, `xcrun`) and hands back everything it said.
 
  Output goes to temporary files rather than pipes. A pipe holds about 64 KB, and a process that fills it
  blocks until someone reads; reading only after the process exits then waits forever. `swift package
@@ -54,8 +54,8 @@ public struct ProcessRunner: Sendable {
         process.waitUntilExit()
 
         /*
-         A file that cannot be read back is an error rather than an empty answer: empty output from `git
-         ls-files` means "no files", and reading it that way would check nothing and say so cleanly.
+         A file that cannot be read back is an error rather than an empty answer: empty output from `swift
+         package describe` would read as a package with nothing in it, which would check nothing and say so cleanly.
          */
         let output = try Data(contentsOf: outputFile)
         let errorText = String(decoding: try Data(contentsOf: errorFile), as: UTF8.self)

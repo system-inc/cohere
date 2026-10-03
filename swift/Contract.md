@@ -15,7 +15,7 @@ encoder's tests both read them, so neither side can drift without the other's te
 | `Findings.jsonl` | A compiler warning with its group, and a rule finding whose message has a newline. Lint still runs after a warning. The binary was built from a modified tree. Exit 1. |
 | `TypesBail.jsonl` | Under `--no-fix`, a compiler error cuts lint off as `notReached`. The run is incomplete. Exit 1. |
 | `CrashWithoutSummary.jsonl` | The stream stops after the fix phase. The front door must say nothing was checked and exit 1. |
-| `NothingChanged.jsonl` | `--changed` with nothing changed: no package described, every phase skipped, `0 files checked`, exit 0. |
+| `NothingChanged.jsonl` | A summary carrying `nothingToCheck`: no package described, every phase skipped, `0 files checked`, exit 0. The front door renders it; this engine never writes one (see `summary`). |
 | `Unreadable.jsonl` | One file the engine could not read: named beside the excluded files, every phase ran, nothing found, and still incomplete with exit 1. |
 | `Unused.jsonl` | `--unused`: two `unused` records and the `unusedCoverage` record after lint, the unused phase ran, and the summary counts no findings and exits 0, because the report is not a gate. |
 
@@ -85,16 +85,14 @@ nothing else.
 ```
 
 - `filesInPackage` is every `.swift` file in a root target. `filesOurs` is the subset that is
-  tracked by git and not excluded. Dependencies, including local ones like `Vendor/SwiftTerm`, are
+  not ignored by git and not excluded. Dependencies, including local ones like `Vendor/SwiftTerm`, are
   never counted, because they are not root targets.
-- `filesInScope` equals `filesOurs` on a whole-package run. A run narrowed by named paths or
-  `--changed` sets it lower and describes the request in `scopeDescription`, which the front door
-  prints in the parenthesis of `N in scope (…)`.
+- `filesInScope` equals `filesOurs` on a whole-package run. A run narrowed by named paths sets it
+  lower and describes the request in `scopeDescription`, which the front door prints in the
+  parenthesis of `N in scope (…)`.
 - `elapsedMilliseconds` is the time spent describing the package. The accounting line bills it as
   the graph, because it is the step nothing can skip.
-- Written on every run except one that finished before the package was described, which today is
-  only `--changed` with nothing changed. That run's summary carries `nothingToCheck`, and the
-  accounting line says no package was described, as it says `no graph was built` for TypeScript.
+- Written on every run that checks anything, since every such run describes the package first.
 
 Rendered (whole package, then scoped):
 
@@ -218,7 +216,7 @@ one with a reference no module claims. `@_exported` imports are API and never re
 ```json
 {"kind":"fix","filesConsidered":149,"filesRewritten":2,"fixesApplied":5,"fixesRefused":1,
  "refusalsByReason":{"overlaps another fix":1},"filesReformatted":2,"filesNotFormatted":0,
- "notFormattedReasons":{},"formatScope":"changed files (working tree against HEAD): 2"}
+ "notFormattedReasons":{},"formatScope":"Sources/AhraOsCore"}
 ```
 
 The front door fills an `edit.Summary` from it and prints that summary's `String()`, then
@@ -301,8 +299,9 @@ note goes to stderr, as it does for TypeScript.
   calling the run complete over a gap its records show (a phase not run, a file without a compiler
   record, a rule crash, an `unreadable` file) is a protocol error. The other direction is believed: an
   engine that says it fell short where no record shows it is taken at its word.
-- `nothingToCheck` is the reason when the run had nothing to look at, such as `--changed` with
-  nothing changed. That is a clean answer over zero files, printed as `<reason>: 0 files checked`.
+- `nothingToCheck` is the reason when the run had nothing to look at, a clean answer over zero files,
+  printed as `<reason>: 0 files checked`. This engine always writes it empty: every run describes the
+  package and checks it.
 - `exitCode` is what the engine will exit with.
 
 ## Exit codes
@@ -326,8 +325,8 @@ it where a run that did not finish prints green.
 | `--fix` | Fix and format only. |
 | `--types`, `--lint` | That phase alone, as for TypeScript. |
 | `--format` | Formatting is on by default for Swift, unlike TypeScript, where it waits on parity with the existing gate. For Swift that parity is measured: swift-format 604.0.0 as a library is byte-identical to `xcrun swift-format` on 952 of our files. The flag is accepted and changes nothing. |
-| `--format-all` | Accepted and changes nothing. Swift formats every file in scope by default, because formatting all of Presence costs a few seconds, not the minutes that made TypeScript format only changed files. Named paths and `--changed` still narrow the scope. |
-| `--changed`, `[paths]` | Narrow fix, format and lint to the scope. Types still reports the whole package (see `types`). |
+| `--format-all` | Accepted and changes nothing. Swift formats every file in scope by default, because formatting all of Presence costs a few seconds, not the minutes that made TypeScript format only changed files. Named paths still narrow the scope. |
+| `[paths]` | Narrow fix, format and lint to the scope. Types still reports the whole package (see `types`). |
 | `--lint-config <file>` | The `CohereSettings.json` whose `swift` block configures rules. |
 | `--abbreviations <file>` | The abbreviation vocabulary the naming rules judge with, nexus's `abbreviations.json`. Optional: without it the engine reads the file beside its own source checkout, so the front door passes it only for a binary shipped without one. A vocabulary that is missing, unreadable or malformed refuses the run with exit 2, naming the path, before anything is checked. |
 | `--fix-passes <n>`, `--single-threaded` | As for TypeScript. |

@@ -23,7 +23,6 @@ public struct CommandOptions: Equatable, Sendable {
     public var typesOnly = false
     public var lintOnly = false
     public var formatAll = false
-    public var changedOnly = false
     public var lintConfiguration: URL?
     /* The abbreviation vocabulary's file, which the front door passes to a binary with no source checkout beside it. */
     public var abbreviations: URL?
@@ -76,7 +75,6 @@ public struct CommandOptions: Equatable, Sendable {
             /* Formatting is on by default for Swift (the contract says why), so the flag is accepted and changes nothing. */
             case "--format": break
             case "--format-all": options.formatAll = true
-            case "--changed": options.changedOnly = true
             case "--lint-config":
                 options.lintConfiguration = URL(fileURLWithPath: try value(for: flag), relativeTo: workingDirectory).standardizedFileURL
             case "--abbreviations":

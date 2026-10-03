@@ -78,18 +78,10 @@ public struct Pipeline {
         }
         let fileRules = RuleRegistry.fileRules(vocabulary: vocabulary)
 
-        /*
-         Unlike TypeScript, `--changed` cannot answer before the package is described: a changed `.swift` file
-         counts only if a target compiles it, and only the description says which do. Describing costs about a
-         second, cold.
-         */
         let describeStart = Date()
         let package = try PackageModel.load(root: root, scratchPath: Self.scratchPath(for: root), runner: runner, toolchain: toolchain)
-        let fileSet = try FileSet.build(package: package, runner: runner)
-        let scope = try FileScope.resolve(options: options, fileSet: fileSet, root: root, workingDirectory: workingDirectory, runner: runner)
-        if !scope.nothingToCheck.isEmpty {
-            return try finishWithNothingToCheck(scope.nothingToCheck)
-        }
+        let fileSet = try FileSet.build(package: package)
+        let scope = try FileScope.resolve(options: options, fileSet: fileSet, workingDirectory: workingDirectory)
         if !fileSet.note.isEmpty {
             FileHandle.standardError.write(Data("note: \(fileSet.note)\n".utf8))
         }
@@ -128,7 +120,7 @@ public struct Pipeline {
             ))
             try writer.write(PhaseRecord(name: .fix, outcome: .ran, elapsedMilliseconds: Self.milliseconds(since: fixStart)))
         } else {
-            let boundary = try repositoryRoot(of: root)
+            let boundary = repositoryRoot(of: root)
             /*
              Fixers first, then the formatter over the fixed text, so the formatter has the last word on layout
              and a fixer's output is always formatted. Under `--no-fix` nothing is fixed: the fixable findings
@@ -322,14 +314,6 @@ public struct Pipeline {
         return try writer.finish(complete: complete)
     }
 
-    private func finishWithNothingToCheck(_ reason: String) throws -> Int32 {
-        for name in [PhaseRecord.Name.fix, .types, .lint] {
-            try writer.write(PhaseRecord(name: name, outcome: .skipped, detail: reason))
-        }
-        try writer.write(PhaseRecord(name: .unused, outcome: .skipped, detail: options.unused ? reason : Self.unusedNotRequested))
-        return try writer.finish(complete: true, nothingToCheck: reason)
-    }
-
     static let unusedNotRequested = "not requested — this is a report, ask for it with --unused"
 
     /* The unused phase of a run cut off before it: not reached when it was asked for, not requested otherwise. */
@@ -434,12 +418,12 @@ public struct Pipeline {
         )
     }
 
-    /* The top of the git repository holding the package, or the package itself outside git: the highest directory a `.swift-format` may apply from. */
-    private func repositoryRoot(of root: URL) throws -> URL {
-        let result = try runner.run("git", ["rev-parse", "--show-toplevel"], in: root)
-        guard result.succeeded else { return root }
-        let path = String(decoding: result.standardOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-        return URL(fileURLWithPath: path, isDirectory: true)
+    /*
+     The top of the git repository holding the package, or the package itself outside git: the highest
+     directory a `.swift-format` may apply from. Found by the `.git` on disk, the same walk the file set uses.
+     */
+    private func repositoryRoot(of root: URL) -> URL {
+        IgnoreRules.Repository.containing(root)?.root ?? root
     }
 
     /* The modules of every target this package owns, vendored packages left out, spelled as the compiler spells a module: non-identifier characters made `_`. */
