@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -26,9 +28,9 @@ var swiftPassThroughSwitches = []string{
 
 // runSwiftEngine checks a Swift package by running cohere-swift on it and rendering its records.
 //
-// The engine is resolved the way the launcher resolves cohere: from this module's `swift/` sources,
-// rebuilt when they or the toolchain change. An installed cohere with no source checkout has no Swift
-// engine yet, and says so rather than checking nothing.
+// A released cohere runs the engine its package ships beside it. A development cohere resolves one the
+// way the launcher resolves cohere: from this module's `swift/` sources, rebuilt when they or the
+// toolchain change. See resolveSwiftEngineBinary for the order.
 func runSwiftEngine(location projectLocation, given map[string]bool, positionals []string) (int, error) {
 	if given["tsconfig"] {
 		return 1, fmt.Errorf(
@@ -52,7 +54,23 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 	return runEngineBinary(binaryPath, arguments, run, os.Stderr)
 }
 
-// resolveSwiftEngineBinary picks the engine: the one the caller named, or the one this module builds.
+// swiftEnginePlatform is the platform this cohere runs on. A variable so a test can run as a platform
+// the machine running it is not.
+var swiftEnginePlatform = release.Target{GoOperatingSystem: runtime.GOOS, GoArchitecture: runtime.GOARCH}
+
+// resolveSwiftEngineBinary picks the engine, in this order:
+//
+//  1. The one the caller named with COHERE_SWIFT_ENGINE, on any platform and any build.
+//  2. None, on a platform the engine does not ship for, refused by name before anything is looked for.
+//     A Linux checkout would otherwise try to build the engine and bury the reason in a toolchain error.
+//  3. For a released cohere, the engine its package ships beside it, and nothing else: see
+//     shippedSwiftEngine.
+//  4. For a development cohere, one built from this module's checkout, below.
+//
+// A development cohere never takes an engine from beside itself. A `go build -o` next to a stale
+// cohere-swift would run that engine silently, and the contract version cannot catch rules that drifted
+// inside one version. So each kind of build has one source: a release runs its sibling, development runs
+// the checkout.
 //
 // A cohere binary that names its commit and has nothing uncommitted in it, which is what the launcher
 // builds for every gate, gets an engine built from that same commit. Any other cohere, a `--dev` build
@@ -73,6 +91,16 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 		return named, "", nil
 	}
 
+	if !release.ShipsSwiftEngine(swiftEnginePlatform.GoOperatingSystem) {
+		return "", "", fmt.Errorf("Swift is not available on this platform (%s): %s ships only for macOS, so nothing in %s was checked",
+			swiftEnginePlatform, release.SwiftEngineFileName, location.Root)
+	}
+
+	if !provenance.IsDevelopment() {
+		binaryPath, err := shippedSwiftEngine(provenance)
+		return binaryPath, "", err
+	}
+
 	moduleDirectory, err := dispatch.FindModuleDirectory()
 	if err != nil {
 		return "", "", fmt.Errorf("%s is a Swift package, and the Swift engine is built from a cohere checkout: %w", location.Root, err)
@@ -83,6 +111,30 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 		return "", "", err
 	}
 	return binaryPath, commit, nil
+}
+
+// shippedSwiftEngine is the engine a released cohere's package ships beside it: release.SwiftEngineFileName
+// in the directory of this executable, symlinks resolved, which is the package's `bin/`, since the npm
+// launcher execs the platform binary directly.
+//
+// It never falls back to a checkout. A release run inside a cohere clone would otherwise build whatever
+// rules were on disk there and report them under the release's version. A missing sibling is a broken
+// install, and it says so rather than checking nothing. It vouches for no commit: the release stamps
+// none into cohere, and the engine's own provenance record names what it was built from.
+func shippedSwiftEngine(provenance release.Provenance) (string, error) {
+	executable, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("finding this cohere's own executable, beside which its Swift engine ships: %w", err)
+	}
+	if resolved, err := filepath.EvalSymlinks(executable); err == nil {
+		executable = resolved
+	}
+	binaryPath := filepath.Join(filepath.Dir(executable), release.SwiftEngineFileName)
+	if !isRegularFile(binaryPath) {
+		return "", fmt.Errorf("this cohere %s install has no Swift engine: expected %s, which the macOS package ships beside cohere, so nothing was checked; reinstall cohere",
+			provenance.Version, binaryPath)
+	}
+	return binaryPath, nil
 }
 
 // committedSwiftSource is the commit the Swift engine is built from, or empty for the working tree.

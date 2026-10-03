@@ -124,7 +124,7 @@ func run() error {
 	// across everything that was alive only through it. Keeping both means the two numbers can be
 	// read against each other before the bigger one is trusted.
 	unusedDeep := flag.Bool("unused-deep", false, "also compute the transitive closure of unused code and group it into islands (implies --unused)")
-	showVersion := flag.Bool("version", false, "print the version and what this binary was built from, and exit")
+	showVersion := flag.Bool("version", false, "print the version, what this binary was built from, and the Swift contract it speaks, and exit")
 	cacheDump := flag.Bool("cache-dump", false, "print what the cache table for this project holds, and exit")
 	// The editor's save: the buffer arrives on stdin and what --fix (and --format) would write for this
 	// path leaves on stdout, with nothing written to disk. See stdin.go.
@@ -285,7 +285,7 @@ func run() error {
 		// The full provenance rather than a bare number, because the number alone does not identify
 		// what ran: the pinned typescript-go commit is most of the code in this binary and moves
 		// independently of the version. A bug report that names all of it is reproducible.
-		fmt.Println(release.Current())
+		fmt.Println(versionReport())
 		return nil
 	}
 

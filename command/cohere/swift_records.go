@@ -14,6 +14,14 @@ import (
 // swiftContractVersion is the version of swift/Contract.md this front door speaks.
 const swiftContractVersion = 3
 
+// versionReport is what `cohere --version` prints about cohere itself: its provenance, then the Swift
+// contract it speaks, on every platform and every build, since it is true of each. The release reads
+// that line from the cohere it stages and refuses a cohere-swift that will not speak the same version,
+// so the number comes from the binary that ships rather than from a copy that could drift.
+func versionReport() string {
+	return fmt.Sprintf("%s\n  swift contract: %d", release.Current(), swiftContractVersion)
+}
+
 // swiftMode is which question a Swift run answers, and so which records it may carry.
 //
 // The listing modes end without a summary by design: `--version` prints one provenance record and
@@ -784,7 +792,7 @@ func (r *swiftRun) finish(engineExit int, ended string) (int, error) {
 		if engineExit != 0 || r.provenance == nil {
 			return 1, fmt.Errorf("the Swift engine %s without stating its version", ended)
 		}
-		fmt.Fprintln(r.out, release.Current())
+		fmt.Fprintln(r.out, versionReport())
 		fmt.Fprintf(r.out, "swift engine: %s %s (commit %s, %s, swift-syntax %s, swift-format %s)\n",
 			r.provenance.Engine, r.provenance.Version, r.provenance.Commit,
 			r.provenance.Toolchain, r.provenance.SwiftSyntax, r.provenance.SwiftFormat)

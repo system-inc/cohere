@@ -89,7 +89,7 @@ your settings actually turn on.
 | `--single-threaded` | use one type checker instead of several |
 | `--profile FILE` | write a Go CPU profile of the run to FILE |
 | `--cache-dump` | print what this project's cache holds, and exit |
-| `--version` | print the version and exit |
+| `--version` | print the version, what this binary was built from, and the Swift contract it speaks, and exit |
 
 ## Exit codes
 
