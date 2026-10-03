@@ -179,7 +179,8 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 
 	// Built to a temporary name and renamed only once proven, so a concurrent run never finds, and
 	// execs, a binary that is half-written or that failed its proof.
-	temporary := binaryPath + fmt.Sprintf(".partial-%d", os.Getpid())
+	// The suffix stays last, so Windows runs the proof against the temporary name as it runs the binary.
+	temporary := strings.TrimSuffix(binaryPath, executableSuffix) + fmt.Sprintf(".partial-%d", os.Getpid()) + executableSuffix
 	defer os.Remove(temporary)
 
 	if err := goBuildSnapshot(paths, snapshot, packagePath, build, temporary); err != nil {

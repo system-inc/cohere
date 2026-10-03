@@ -47,11 +47,11 @@ const pruneInFlightWindow = time.Hour
 
 // prunedByName are the files in the binary directory that are never removed.
 var prunedByName = map[string]string{
-	"cohere-dev":               "the --dev binary",
-	"cohere-dev.hash":          "the --dev binary's recorded inputs",
-	"cohere-dispatch":          "the launcher",
-	"cohere-swift-current":     "@system_cohere_swift's proving-ground engine",
-	"cohere-swift-current.tmp": "@system_cohere_swift's engine mid-install",
+	developmentBinaryName:           "the --dev binary",
+	developmentBinaryName + ".hash": "the --dev binary's recorded inputs",
+	"cohere-dispatch":               "the launcher",
+	"cohere-swift-current":          "@system_cohere_swift's proving-ground engine",
+	"cohere-swift-current.tmp":      "@system_cohere_swift's engine mid-install",
 }
 
 // PrunePlan is what a prune would do, decided without touching anything.

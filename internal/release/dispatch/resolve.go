@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -52,8 +53,20 @@ func (paths Paths) GoCacheDirectory() string {
 // The name carries the platform as well as the hash. A cache directory can outlive a change of
 // machine, and a binary for the wrong architecture fails in a far more confusing way than a miss.
 func (paths Paths) BinaryPath(hash string) string {
-	return filepath.Join(paths.BinaryDirectory(), platformBinaryPrefix()+hash)
+	return filepath.Join(paths.BinaryDirectory(), platformBinaryPrefix()+hash+executableSuffix)
 }
+
+// executableSuffix ends every binary the launcher builds, `.exe` on Windows and nothing elsewhere.
+// Windows runs a file by its extension, and Go's exec there will not run a path that has none.
+var executableSuffix = func() string {
+	if runtime.GOOS == "windows" {
+		return ".exe"
+	}
+	return ""
+}()
+
+// developmentBinaryName is the `--dev` binary's file name.
+var developmentBinaryName = "cohere-dev" + executableSuffix
 
 // DevelopmentBinaryPath is the stable path used by `--dev`.
 //
@@ -62,7 +75,7 @@ func (paths Paths) BinaryPath(hash string) string {
 // nothing changed. The stable path is what makes the no-op reachable, so the authoring loop gets
 // the cheap case whenever the tree has not actually moved.
 func (paths Paths) DevelopmentBinaryPath() string {
-	return filepath.Join(paths.BinaryDirectory(), "cohere-dev")
+	return filepath.Join(paths.BinaryDirectory(), developmentBinaryName)
 }
 
 // ResolveWorkingTree returns the `--dev` binary, built from the working tree as it is on disk.

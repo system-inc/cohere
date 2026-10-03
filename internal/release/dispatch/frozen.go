@@ -121,7 +121,7 @@ func isCohereBinaryName(name string) bool {
 	if strings.Contains(name, ".partial-") || strings.HasSuffix(name, ".hash") {
 		return false
 	}
-	return name == "cohere-dev" || strings.HasPrefix(name, platformBinaryPrefix())
+	return name == developmentBinaryName || strings.HasPrefix(name, platformBinaryPrefix())
 }
 
 // hashFromBinaryName reads the input hash back out of a cached binary's filename.
@@ -131,7 +131,7 @@ func isCohereBinaryName(name string) bool {
 // string, because the caller prints this and a blank would read as a missing value rather than as
 // a binary that never had a hash in its name.
 func hashFromBinaryName(name string) string {
-	segments := strings.Split(name, "-")
+	segments := strings.Split(strings.TrimSuffix(name, executableSuffix), "-")
 	if len(segments) < 4 {
 		return "unnamed (a development build)"
 	}

@@ -14,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"syscall"
 
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
@@ -98,10 +97,7 @@ func waitIsRequested() bool {
 // that exits without a verdict, crashing or killed, hands back its exit status as exec would have.
 func execute(binaryPath string, arguments []string, wait bool) error {
 	if wait || runtime.GOOS == "windows" {
-		if err := syscall.Exec(binaryPath, append([]string{binaryPath}, arguments...), os.Environ()); err != nil {
-			return fmt.Errorf("running %s: %w", binaryPath, err)
-		}
-		return nil
+		return replaceProcess(binaryPath, arguments)
 	}
 
 	return returnEarly(binaryPath, arguments)
