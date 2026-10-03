@@ -4,7 +4,7 @@ import Testing
 
 @testable import CohereSwift
 
-/* Fixture pairs for one-type-per-file and file-named-for-type, under Kirk's strict ruling. */
+/* Fixture pairs for one-type-per-file (a main type plus small helpers, Kirk's ruling of 2026-10-03) and file-named-for-type. */
 struct FileShapeRuleTests {
     static func file(_ name: String, _ source: String) -> ParsedFile {
         ParsedFile(url: URL(fileURLWithPath: "/fixture/\(name)"), targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
@@ -22,16 +22,69 @@ struct FileShapeRuleTests {
         #expect(Self.messages(FileNamedForType(), "Pane.swift", source).isEmpty)
     }
 
-    /* Strict: a private helper beside the type is still a second type. */
-    @Test func aPrivateHelperIsASecondType() {
-        let source = "struct Pane {}\nprivate struct Helper {}\nprotocol Drawable {}\n"
-        let findings = OneTypePerFile().findings(in: Self.file("Pane.swift", source))
-        #expect(findings.map { "\($0.line):\($0.column)" } == ["2:16", "3:10"])
+    /* A struct of `lines` lines, braces included, so a fixture can sit exactly at the limit or one past it. */
+    static func structSource(_ name: String, lines: Int) -> String {
+        "struct \(name) {\n" + (0..<(lines - 2)).map { "    var field\($0) = 0\n" }.joined() + "}\n"
+    }
+
+    static func positions(_ name: String, _ source: String) -> [String] {
+        OneTypePerFile().findings(in: Self.file(name, source)).map { "\($0.line):\($0.column)" }
+    }
+
+    /* A private or fileprivate helper stays, of any kind and size; the protocol beside it is not a helper. */
+    @Test func aPrivateHelperStaysAndAPublicProtocolMoves() {
+        let source = "struct Pane {}\nprivate final class Helper {}\nfileprivate actor Worker {}\nprotocol Drawable {}\n"
+        #expect(Self.positions("Pane.swift", source) == ["4:10"])
+    }
+
+    @Test func aLargePrivateHelperStillStays() {
+        let source = "struct Pane {}\nprivate " + Self.structSource("Layout", lines: 200)
+        #expect(Self.positions("Pane.swift", source).isEmpty)
+    }
+
+    /* Small means at most 30 lines: 30 stays, 31 moves. */
+    @Test func aSmallValueTypeStaysAtTheLimitAndMovesPastIt() {
+        #expect(Self.positions("Pane.swift", "struct Pane {}\n" + Self.structSource("Row", lines: 30)).isEmpty)
+        #expect(Self.positions("Pane.swift", "struct Pane {}\n" + Self.structSource("Row", lines: 31)) == ["2:8"])
+        #expect(Self.positions("Pane.swift", "struct Pane {}\nenum Mode { case idle, busy }\n").isEmpty)
+    }
+
+    /* A class, actor or protocol is never a small value type, however short. */
+    @Test func aSmallReferenceTypeOrProtocolMoves() {
+        let source = "struct Pane {}\nfinal class Box {}\nactor Worker {}\nprotocol Drawable {}\n"
+        #expect(Self.positions("Pane.swift", source) == ["2:13", "3:7", "4:10"])
+    }
+
+    /* The comment directly above and the attributes count toward the 30; a comment a blank line away does not. */
+    @Test func theAttachedCommentAndAttributesAreCounted() {
+        let body = Self.structSource("Row", lines: 28)
+        #expect(Self.positions("Pane.swift", "struct Pane {}\n\n/* Why. */\n@frozen\n" + body).isEmpty)
+        #expect(Self.positions("Pane.swift", "struct Pane {}\n\n/*\n Why.\n */\n@frozen\n" + body) == ["7:8"])
+        #expect(Self.positions("Pane.swift", "struct Pane {}\n\n/// Why.\n/// More.\n@frozen\n" + body) == ["6:8"])
+        #expect(Self.positions("Pane.swift", "struct Pane {}\n\n/*\n Header.\n */\n\n@frozen\n" + body).isEmpty)
+    }
+
+    /* An extension of the small type in the same file is part of its size. */
+    @Test func anExtensionOfTheSmallTypeCountsTowardIt() {
+        let small = "struct Pane {}\n" + Self.structSource("Row", lines: 20)
+        #expect(Self.positions("Pane.swift", small + "extension Row {\n    var total: Int { 0 }\n}\n").isEmpty)
+        /* Twenty lines of struct and eleven of extension: thirty-one in all. */
+        let extensionSource = "extension Row {\n" + (0..<9).map { "    var extra\($0): Int { 0 }\n" }.joined() + "}\n"
+        #expect(Self.positions("Pane.swift", small + extensionSource) == ["2:8"])
+    }
+
+    /* The message names both remedies and never asks for a type to be nested only to pass. */
+    @Test func theMessageNamesBothRemediesAndNeverNesting() throws {
+        let finding = try #require(OneTypePerFile().findings(in: Self.file("Pane.swift", "struct Pane {}\nfinal class Box {}\n")).first)
+        #expect(finding.message.contains("Move it to Box.swift"))
+        #expect(finding.message.contains("mark it private"))
+        #expect(finding.message.contains("small value type"))
+        #expect(!finding.message.lowercased().contains("nest"))
     }
 
     /* The helper declared first is the one told to move; the file is not told to be renamed after it. */
     @Test func theTypeNamedLikeTheFileIsTheFilesOwn() {
-        let source = "struct Helper {}\nstruct Pane {}\n"
+        let source = "final class Helper {}\nstruct Pane {}\n"
         let findings = OneTypePerFile().findings(in: Self.file("Pane.swift", source))
         #expect(findings.map(\.message).first?.hasPrefix("Helper is a second top-level type") == true)
         #expect(Self.messages(FileNamedForType(), "Pane.swift", source).isEmpty)

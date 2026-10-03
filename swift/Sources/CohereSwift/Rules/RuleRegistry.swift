@@ -15,6 +15,7 @@ public enum RuleRegistry {
         NoImplicitlyUnwrappedOptional(),
         OneTypePerFile(),
         FileNamedForType(),
+        MaxFileLines(),
         NoPrint(),
         RequireEscapeHatchReason(),
         FatalErrorMessage(),

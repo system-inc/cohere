@@ -39,7 +39,9 @@ struct SwiftLintRun {
     func findings() throws -> [RuleFinding] {
         let rules = Set(RuleMapping.incumbentRules(of: .swiftLint))
         let configuration = TemporaryFile.url(extension: "yml")
-        try ("only_rules:\n" + rules.sorted().map { "  - \($0)\n" }.joined()).write(to: configuration, atomically: true, encoding: .utf8)
+        /* `file_length` runs at cohere's threshold, not SwiftLint's 400, so the two rules answer the same question. */
+        let thresholds = rules.contains("file_length") ? "file_length:\n  warning: \(MaxFileLines.maximumLines)\n  error: \(MaxFileLines.maximumLines)\n" : ""
+        try ("only_rules:\n" + rules.sorted().map { "  - \($0)\n" }.joined() + thresholds).write(to: configuration, atomically: true, encoding: .utf8)
         defer { TemporaryFile.remove(configuration) }
 
         let result = try runner.run(
