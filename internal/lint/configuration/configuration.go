@@ -76,6 +76,13 @@ type RuleSetting struct {
 type Override struct {
 	Files []string
 	Rules map[string]RuleSetting
+
+	// Reason is why the block exists, when its author gave one, and File is the configuration that
+	// wrote it. Coverage prints every reason on every run, so an override standing in for unfinished
+	// work stays visible until that work lands. A scoped override needs no reason (#25benkk); one that
+	// matches every file is a top-level rule and answers under `departures` instead.
+	Reason string
+	File   string
 }
 
 // Config is a resolved lint configuration: what runs everywhere, what never runs, and what changes
@@ -343,7 +350,12 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 		}
 
 		for overrideIndex, rawOverride := range layer.raw.Overrides {
-			override := Override{Files: rawOverride.Files, Rules: map[string]RuleSetting{}}
+			override := Override{
+				Files:  rawOverride.Files,
+				Rules:  map[string]RuleSetting{},
+				Reason: strings.TrimSpace(rawOverride.Reason),
+				File:   layer.path,
+			}
 			coversEverything := coversEveryFileOfItsKind(rawOverride.Files)
 			for name, value := range rawOverride.Rules {
 				setting, err := parseRuleSetting(value)
@@ -472,6 +484,9 @@ func readConfigLayers(path string, chain []string) ([]configLayer, error) {
 		return nil, fmt.Errorf("reading lint config %s: %w", absolute, err)
 	}
 	if err := checkTopLevelKeys(contents, absolute); err != nil {
+		return nil, err
+	}
+	if err := checkOverrideKeys(contents, absolute); err != nil {
 		return nil, err
 	}
 
@@ -754,8 +769,43 @@ func quoteEach(names []string) []string {
 }
 
 type rawOverride struct {
-	Files []string                   `json:"files"`
-	Rules map[string]json.RawMessage `json:"rules"`
+	Files  []string                   `json:"files"`
+	Rules  map[string]json.RawMessage `json:"rules"`
+	Reason string                     `json:"reason"`
+}
+
+// overrideKeys are the keys an override block may carry. Anything else is refused for the reason
+// checkTopLevelKeys gives, one level down: `encoding/json` drops an unknown key without a word. The
+// likeliest one is ESLint's `excludedFiles`, and dropping it widens the block to files its author
+// meant to leave out.
+var overrideKeys = map[string]bool{"files": true, "rules": true, "reason": true}
+
+// checkOverrideKeys refuses an override block carrying a key the loader does not read.
+func checkOverrideKeys(contents []byte, path string) error {
+	var shaped struct {
+		Overrides []map[string]json.RawMessage `json:"overrides"`
+	}
+	if err := json.Unmarshal(contents, &shaped); err != nil {
+		// The caller's own Unmarshal reports a malformed file with the better message.
+		return nil
+	}
+	for index, override := range shaped.Overrides {
+		var unknown []string
+		for key := range override {
+			if !overrideKeys[key] {
+				unknown = append(unknown, key)
+			}
+		}
+		if len(unknown) == 0 {
+			continue
+		}
+		sort.Strings(unknown)
+		return fmt.Errorf(
+			"lint config %s: override %d declares %s, which this loader does not read: the key would be "+
+				"discarded silently. An override takes \"files\", \"rules\" and \"reason\"",
+			path, index, strings.Join(quoteEach(unknown), ", "))
+	}
+	return nil
 }
 
 // parseRuleSetting decodes the two shapes a rule value takes: a bare severity, or an array of the

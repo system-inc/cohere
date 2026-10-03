@@ -516,3 +516,27 @@ func TestWithoutTheRegistryOnlyTheSameKeyIsTheSameRuling(t *testing.T) {
 		t.Error("a key was removed on the strength of its spelling alone")
 	}
 }
+
+// An override block takes "files", "rules" and "reason", and nothing else loads. ESLint's
+// `excludedFiles` is the case that matters: dropped silently, it widens the block to the files its
+// author meant to leave out. The control is the same block with a reason, which loads and carries the
+// reason and the file that wrote it, so the refusal is about the unknown key and nothing else.
+func TestAnOverrideKeyTheLoaderDoesNotReadIsRefused(t *testing.T) {
+	directory := writeConfigs(t, map[string]string{
+		"excluded.json": `{"overrides": [{"files": ["**/*.ts"], "excludedFiles": ["**/keep.ts"], "rules": {"no-var": "off"}}]}`,
+		"reasoned.json": `{"overrides": [{"files": ["**/generated/*.ts"], "reason": "  until the generator is fixed ", "rules": {"no-var": "off"}}]}`,
+	})
+	refusedWith(t, filepath.Join(directory, "excluded.json"), `override 0 declares "excludedFiles"`)
+
+	reasoned := filepath.Join(directory, "reasoned.json")
+	loaded := loadOrFail(t, reasoned)
+	if len(loaded.Overrides) != 1 {
+		t.Fatalf("the reasoned override did not load as one block: %+v", loaded.Overrides)
+	}
+	if loaded.Overrides[0].Reason != "until the generator is fixed" {
+		t.Errorf("the reason was not carried, trimmed: %q", loaded.Overrides[0].Reason)
+	}
+	if want, _ := filepath.Abs(reasoned); loaded.Overrides[0].File != want {
+		t.Errorf("the override names %q as its file, want %q", loaded.Overrides[0].File, want)
+	}
+}

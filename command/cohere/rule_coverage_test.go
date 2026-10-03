@@ -454,3 +454,40 @@ func TestADepartureFromAHouseRulingPrintsByDefault(t *testing.T) {
 		t.Errorf("a config with no departures printed one:\n%s", output)
 	}
 }
+
+// An override that gives a reason prints it on every run, with its files, its file and the rules it
+// sets, so an override standing in for unfinished work stays in front of every reader until it goes.
+// The control is an override with no reason beside it, which prints nothing: a scoped override needs
+// no reason, and printing every one would bury the few that carry one.
+func TestAnOverrideWithAReasonPrintsByDefault(t *testing.T) {
+	root := "/repository"
+	config := &configuration.Config{
+		Root: root,
+		Overrides: []configuration.Override{
+			{
+				Files: []string{"**/*.test.ts"},
+				Rules: map[string]configuration.RuleSetting{"max-lines": {Severity: configuration.SeverityOff}},
+				File:  root + "/CohereSettings.json",
+			},
+			{
+				Files: []string{"**/api/graphql/*.generated.ts"},
+				Rules: map[string]configuration.RuleSetting{
+					"nexus/consistency-no-abbreviated-identifier": {Severity: configuration.SeverityOff},
+					"@typescript-eslint/no-explicit-any":          {Severity: configuration.SeverityOff},
+				},
+				Reason: "until the generator emits real scalar types",
+				File:   root + "/structure/StructureCohereSettings.json",
+			},
+		},
+	}
+	output := renderLintReport(lintReport{LintConfig: config})
+	want := "  override: **/api/graphql/*.generated.ts in structure/StructureCohereSettings.json sets " +
+		"@typescript-eslint/no-explicit-any off, nexus/consistency-no-abbreviated-identifier off: " +
+		"until the generator emits real scalar types"
+	if !strings.Contains(output, want+"\n") {
+		t.Errorf("the override did not print as\n%s\nin:\n%s", want, output)
+	}
+	if strings.Count(output, "override:") != 1 {
+		t.Errorf("only the override with a reason should print, got:\n%s", output)
+	}
+}

@@ -535,6 +535,7 @@ func writeLintReport(out io.Writer, report lintReport) {
 	writeParityCoverage(out, report.Rules, report.LintConfig)
 	writeOrphanedConfigKeys(out, report.Rules, report.LintConfig)
 	writeDepartures(out, report.LintConfig)
+	writeOverrideReasons(out, report.LintConfig)
 	writeCoverageNotes(out, summary, report.Details)
 }
 
@@ -561,6 +562,32 @@ func writeDepartures(out io.Writer, lintConfig *configuration.Config) {
 			file = relative
 		}
 		fmt.Fprintf(out, "  departure: %s is set differently from the house ruling in %s: %s\n", name, file, departure.Reason)
+	}
+}
+
+// writeOverrideReasons names every override that gave a reason, with the rules it sets and the reason,
+// on every run and by default. A scoped override needs no reason, so one that gives a reason is usually
+// standing in for unfinished work, and printing it keeps that work in front of whoever reads a run until
+// the override can go.
+func writeOverrideReasons(out io.Writer, lintConfig *configuration.Config) {
+	if lintConfig == nil {
+		return
+	}
+	for _, override := range lintConfig.Overrides {
+		if override.Reason == "" {
+			continue
+		}
+		file := override.File
+		if relative, err := filepath.Rel(lintConfig.Root, override.File); err == nil {
+			file = relative
+		}
+		names := make([]string, 0, len(override.Rules))
+		for name, setting := range override.Rules {
+			names = append(names, name+" "+setting.Severity.String())
+		}
+		sort.Strings(names)
+		fmt.Fprintf(out, "  override: %s in %s sets %s: %s\n",
+			strings.Join(override.Files, ", "), file, strings.Join(names, ", "), override.Reason)
 	}
 }
 
