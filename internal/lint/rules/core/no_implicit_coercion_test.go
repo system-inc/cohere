@@ -502,7 +502,10 @@ func TestNoImplicitCoercionMultilineOperand(t *testing.T) {
 		{"an operand closing on a later line", "var x = !!(\n\ta &&\n\tb\n);", "Boolean(a &&\n\tb)"},
 		{"a newline after the opening parenthesis only", "var x = !!(\n\ta && b);", "Boolean(a && b)"},
 		{"a newline before the closing parenthesis only", "var x = !!(a && b\n);", "Boolean(a && b)"},
-		{"the shape reported from the tree", "var x = a ?? !!(\n\tb === undefined &&\n\tc === undefined &&\n\t!d\n);", "Boolean(b === undefined &&\n\tc === undefined &&\n\t!d)"},
+		// The tree's shape at DialogRoot.tsx:175, with operands that are not already booleans. Its
+		// real operand, `b === undefined && c === undefined && !d`, IS a boolean, so the rule is now
+		// silent there (#vsy2eym) and that shape lives in the nothing-is-coerced table instead.
+		{"the shape reported from the tree", "var x = a ?? !!(\n\tb &&\n\tc &&\n\td\n);", "Boolean(b &&\n\tc &&\n\td)"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
@@ -636,6 +639,10 @@ func TestNoImplicitCoercionIsSilentWhenNothingIsCoerced(t *testing.T) {
 		"declare const loose: any;\n" +
 		"declare const opaque: unknown;\n" +
 		"declare const flag: boolean;\n" +
+		"declare const yes: true | false;\n" +
+		"declare const maybeFlag: boolean | null;\n" +
+		"declare const maybeText: string | undefined;\n" +
+		"declare const label: `item-${number}`;\n" +
 		"enum Size { Small = 1, Large = 2 }\n" +
 		"declare const size: Size;\n"
 
@@ -667,8 +674,24 @@ func TestNoImplicitCoercionIsSilentWhenNothingIsCoerced(t *testing.T) {
 		{name: "unary plus on a bigint", sourceText: "const n = +big;", wantIds: []string{"implicitCoercion"}},
 		{name: "one times a bigint", sourceText: "const n = 1 * big;", wantIds: []string{"implicitCoercion"}},
 		{name: "a bigint minus zero", sourceText: "const n = big - 0;", wantIds: []string{"implicitCoercion"}},
-		{name: "an empty string plus a string is a different arm", sourceText: "const s = '' + text;", wantIds: []string{"implicitCoercion"}},
-		{name: "double not on a boolean is a different arm", sourceText: "const b = !!flag;", wantIds: []string{"implicitCoercion"}},
+
+		// The string and boolean arms ask the same question (#vsy2eym). These four were reporting
+		// controls while only the number arms asked it.
+		{name: "an empty string plus a string", sourceText: "const s = '' + text;"},
+		{name: "a string plus an empty string", sourceText: "const s = text + '';"},
+		{name: "a string plus-equals an empty string", sourceText: "let s = text;\ns += '';"},
+		{name: "a template literal type plus an empty string", sourceText: "const s = '' + label;"},
+		{name: "double not on a boolean", sourceText: "const b = !!flag;"},
+		{name: "double not on a boolean literal union", sourceText: "const b = !!yes;"},
+		{name: "DialogRoot.tsx:175, double not on a boolean expression", sourceText: "const b = loose ?? !!(\n\ttext === undefined &&\n\tflag === undefined &&\n\t!flag\n);"},
+
+		{name: "an empty string plus a possibly undefined string", sourceText: "const s = '' + maybeText;", wantIds: []string{"implicitCoercion"}},
+		{name: "an empty string plus a number", sourceText: "const s = '' + zoom;", wantIds: []string{"implicitCoercion"}},
+		{name: "a number plus-equals an empty string", sourceText: "let n: number | string = zoom;\nn += '';", wantIds: []string{"implicitCoercion"}},
+		{name: "an empty string plus any", sourceText: "const s = '' + loose;", wantIds: []string{"implicitCoercion"}},
+		{name: "double not on a nullable boolean", sourceText: "const b = !!maybeFlag;", wantIds: []string{"implicitCoercion"}},
+		{name: "double not on a string", sourceText: "const b = !!text;", wantIds: []string{"implicitCoercion"}},
+		{name: "double not on unknown", sourceText: "const b = !!opaque;", wantIds: []string{"implicitCoercion"}},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,

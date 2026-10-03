@@ -142,7 +142,10 @@ func TestNoImplicitCoercionFixKeepsNarrowing(t *testing.T) {
 		source string
 	}{
 		{name: "a number that may be undefined", source: "const hasCount = !!count;\nexport const next = hasCount ? count + 1 : 0;\n"},
-		{name: "a boolean", source: "export const on = !!flag;\n"},
+		// A plain `boolean` is no longer here: it is already a boolean, so `!!flag` converts nothing
+		// and the rule is silent (#vsy2eym). Beside undefined, `false` is still a falsy value no
+		// comparison removes.
+		{name: "a boolean that may be undefined", source: "export const on = !!fallback;\n"},
 	} {
 		t.Run("declines: "+testCase.name, func(t *testing.T) {
 			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
