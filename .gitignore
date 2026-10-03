@@ -43,8 +43,9 @@
 /vendor_fixtures
 /dist/
 
-# Local caches — the graph snapshot and the rebuild cache both live here
-/.cache/
+# Local caches: the graph snapshot and the rebuild cache at the root, and the Swift engine's build
+# scratch in swift/.cache, written when the engine checks itself
+.cache/
 
 # Operating systems and editors
 #
