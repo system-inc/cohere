@@ -442,10 +442,12 @@ func readCompilerUpstream(submoduleDirectory string) string {
 		return "unknown"
 	}
 
-	return normalizeUpstream(string(output))
+	return NormalizeUpstream(string(output))
 }
 
-// normalizeUpstream reduces a git remote url to "owner/name".
+// NormalizeUpstream reduces a git remote url to "owner/name". Exported because the launcher names the
+// compiler's repository from the same kind of url, read from a committed `.gitmodules`, and two parsers
+// of one url would drift.
 //
 // The two url shapes git accepts — the ssh `git@github.com:owner/name.git` and the https
 // `https://github.com/owner/name.git` — have to produce the same label, because otherwise the same
@@ -454,7 +456,7 @@ func readCompilerUpstream(submoduleDirectory string) string {
 //
 // It is separate from the command that reads the remote so it can be tested without a git
 // repository: the parsing is where the bugs are, and it should not need a fixture clone to exercise.
-func normalizeUpstream(remoteUrl string) string {
+func NormalizeUpstream(remoteUrl string) string {
 	url := strings.TrimSpace(remoteUrl)
 	if url == "" {
 		return "unknown"

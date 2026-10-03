@@ -321,6 +321,11 @@ func goBuildSnapshot(paths Paths, snapshot string, packagePath string, build com
 		"-X", packagingPath+".compilerCommit="+build.CompilerCommit,
 		"-X", packagingPath+".formatterIdentity="+formatter,
 	)
+	// The repository the pin lives in, so `--version` names it beside the commit. Since ffaddb2 the pin is on
+	// a fork, and a bare commit sends a reader to microsoft/TypeScript, where it does not exist.
+	if upstream := committedCompilerUpstream(snapshot); upstream != "" {
+		linkerFlags = append(linkerFlags, "-X", packagingPath+".compilerUpstream="+upstream)
+	}
 	arguments = append(arguments, "-ldflags="+strings.Join(linkerFlags, " "), "-o", outputPath, packagePath)
 
 	command := exec.Command("go", arguments...)
@@ -489,4 +494,53 @@ func gitOutput(directory string, arguments ...string) (string, error) {
 // platformBinaryPrefix is how every hash-named cohere binary for this platform begins.
 func platformBinaryPrefix() string {
 	return fmt.Sprintf("cohere-%s-%s-", runtime.GOOS, runtime.GOARCH)
+}
+
+// committedCompilerUpstream names the vendored compiler's repository, as "owner/name", from the
+// snapshot's committed `.gitmodules`, or answers empty when it does not say.
+//
+// The committed file and not the submodule's `origin`. A remote re-pointed in one checkout is an
+// uncommitted change, read from no commit, by the same reasoning that reads the pin from the commit's
+// gitlink rather than from the submodule's checkout. A snapshot has no `.git` to ask anyway.
+func committedCompilerUpstream(snapshot string) string {
+	contents, err := os.ReadFile(filepath.Join(snapshot, ".gitmodules"))
+	if err != nil {
+		return ""
+	}
+	// Sections are `[submodule "<name>"]`, each with `path` and `url`. The one whose path is the
+	// compiler's directory is the compiler, whatever it is named.
+	path, url := "", ""
+	found := ""
+	flush := func() {
+		if path == "TypeScript" && url != "" {
+			found = url
+		}
+		path, url = "", ""
+	}
+	for line := range strings.SplitSeq(string(contents), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "[") {
+			flush()
+			continue
+		}
+		key, value, isSetting := strings.Cut(line, "=")
+		if !isSetting {
+			continue
+		}
+		value = strings.Trim(strings.TrimSpace(value), `"`)
+		switch strings.TrimSpace(key) {
+		case "path":
+			path = strings.TrimSuffix(value, "/")
+		case "url":
+			url = value
+		}
+	}
+	flush()
+	if found == "" {
+		return ""
+	}
+	if upstream := release.NormalizeUpstream(found); upstream != "unknown" {
+		return upstream
+	}
+	return ""
 }

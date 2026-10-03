@@ -123,7 +123,7 @@ func TestCompilerUpstreamNormalizesBothUrlShapes(t *testing.T) {
 		"git@github.com:microsoft/typescript-go.git":  "microsoft/typescript-go",
 	}
 	for remote, expected := range cases {
-		if got := normalizeUpstream(remote); got != expected {
+		if got := NormalizeUpstream(remote); got != expected {
 			t.Errorf("%s normalized to %q, wanted %q", remote, got, expected)
 		}
 	}
@@ -135,7 +135,7 @@ func TestCompilerUpstreamNormalizesBothUrlShapes(t *testing.T) {
 	// the last two join to "/github.com". That is not a repository, and `--version` printed it as
 	// though it were one. Both halves have to be non-empty, not merely present.
 	for _, unusable := range []string{"", "   ", "not-a-url", "https://github.com/", "https://github.com", "/"} {
-		if got := normalizeUpstream(unusable); got != "unknown" {
+		if got := NormalizeUpstream(unusable); got != "unknown" {
 			t.Errorf("%q normalized to %q rather than unknown", unusable, got)
 		}
 	}
@@ -146,7 +146,7 @@ func TestCompilerUpstreamNormalizesBothUrlShapes(t *testing.T) {
 		"ssh://git@github.com/microsoft/TypeScript.git": "microsoft/TypeScript",
 		"/Users/someone/local/prettier":                 "local/prettier",
 	} {
-		if got := normalizeUpstream(url); got != expected {
+		if got := NormalizeUpstream(url); got != expected {
 			t.Errorf("%s normalized to %q, wanted %q", url, got, expected)
 		}
 	}

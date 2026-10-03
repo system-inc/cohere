@@ -158,3 +158,35 @@ func TestSwiftEngineInputsAreAskedOncePerCommit(t *testing.T) {
 		t.Fatal("a kept answer with a missing object was trusted")
 	}
 }
+
+// The committed build names the compiler's repository from the snapshot's committed `.gitmodules`: the
+// entry whose path is the compiler's directory, whatever its name or position, in either url shape. A
+// snapshot has no `.git`, so a version that asked the submodule's origin instead would read nothing here
+// and fail every case that expects a name.
+func TestTheCompilerRepositoryIsReadFromTheCommittedGitmodules(t *testing.T) {
+	for _, testCase := range []struct {
+		name       string
+		gitmodules string
+		want       string
+	}{
+		{"the fork, after another submodule, over ssh",
+			"[submodule \"libraries/other\"]\n\tpath = libraries/other\n\turl = https://github.com/someone/other.git\n" +
+				"[submodule \"compiler\"]\n\tpath = TypeScript\n\turl = git@github.com:kirkouimet/TypeScript.git\n",
+			"kirkouimet/TypeScript"},
+		{"over https, quoted", "[submodule \"TypeScript\"]\n\tpath = \"TypeScript\"\n\turl = \"https://github.com/kirkouimet/TypeScript.git\"\n",
+			"kirkouimet/TypeScript"},
+		{"no entry for the compiler", "[submodule \"other\"]\n\tpath = other\n\turl = https://github.com/someone/other.git\n", ""},
+		{"a url that names no repository", "[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/\n", ""},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			snapshot := t.TempDir()
+			writeFile(t, filepath.Join(snapshot, ".gitmodules"), testCase.gitmodules)
+			if got := committedCompilerUpstream(snapshot); got != testCase.want {
+				t.Fatalf("named %q, want %q", got, testCase.want)
+			}
+		})
+	}
+	if got := committedCompilerUpstream(t.TempDir()); got != "" {
+		t.Fatalf("a snapshot with no .gitmodules named %q", got)
+	}
+}
