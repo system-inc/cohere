@@ -51,6 +51,26 @@ The real sites are `libraries/structure/libraries/nexus/source/types/UnionFromCl
 reporting controls for a value parameter, a `this` parameter, and a parameter that escapes the return
 type.
 
+### A phantom brand on a `declare` property
+
+A class type parameter whose use is the type of a `declare` property is silent here and reported by
+ESLint (measured on 8.67.0). `isPhantomBrandParameter`, by @system_cohere's ruling of 2026-10-02
+(#ye9s2jx), from Base:
+
+```ts
+export class WorkerQueueBinding<MessageType = unknown> extends TypedBinding {
+    declare private readonly __workerQueue: MessageType;
+}
+```
+
+A `declare` property emits nothing, so the parameter is not a value the class holds and hands back
+unchecked. It ties `new WorkerQueueBinding<StripeEvent>(name)` to its message type so a decorator can
+thread `WorkerQueue<StripeEvent>` through, and the brand is what makes it part of the class's
+structure at all; a second use would be invented to quiet the rule. `RpcClientBinding<RpcInterface>`
+is the same shape. An ordinary property, a member of an ambient `declare class` (which carries no
+`declare` modifier of its own), and a brand naming some other type still report, as fixtures in
+`TestNoUnnecessaryTypeParametersPhantomBrands`.
+
 ## Why this recommendation
 
 Stylistic. Small enough to adopt if we want the convention, not urgent if we do not.

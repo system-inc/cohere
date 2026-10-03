@@ -1173,3 +1173,45 @@ declare function f<T extends (A extends B ? C : D)>(): T | null;
 		})
 	}
 }
+
+// TestNoUnnecessaryTypeParametersPhantomBrands pins the phantom-brand exemption
+// (isPhantomBrandParameter): a class type parameter whose use is the type of a `declare` property is a
+// brand, since the property emits nothing. @system_cohere's ruling of 2026-10-02 (#ye9s2jx).
+//
+// typescript-eslint reports every row, silent and reporting alike (measured on the installed 8.67.0
+// build), so the silent rows are the divergence. The first two are Base's own classes. The reporting
+// rows are what keep the exemption from being "any class": an ordinary property is a real slot, an
+// ambient class's members carry no `declare` modifier of their own, and a brand that names something
+// else does not cover a parameter used once in a method.
+func TestNoUnnecessaryTypeParametersPhantomBrands(t *testing.T) {
+	t.Parallel()
+
+	const typedBinding = "abstract class TypedBinding {\n  constructor(public readonly name: string) {}\n}\n"
+	silent := []noUnnecessaryTypeParametersCase{
+		{name: "WorkerQueueBinding.ts", source: typedBinding + "export class WorkerQueueBinding<MessageType = unknown> extends TypedBinding {\n  declare private readonly __workerQueue: MessageType;\n}\n"},
+		{name: "RpcClientBinding.ts", source: typedBinding + "export class RpcClientBinding<RpcInterface extends object = object> extends TypedBinding {\n  declare private readonly __rpcClient: RpcInterface;\n}\n"},
+		{name: "a public brand", source: "export class PublicBrand<M> {\n  declare readonly brand: M;\n}\n"},
+		{name: "a brand under a union", source: "export class UnionBrand<M> {\n  declare readonly brand: M | undefined;\n}\n"},
+	}
+	for _, testCase := range silent {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			rule_testing.ExpectClean(t, result)
+		})
+	}
+
+	reporting := []noUnnecessaryTypeParametersCase{
+		{name: "an ordinary property", source: "export class Holder<M> {\n  readonly value: M | undefined = undefined;\n}\n", ids: []string{"sole"}},
+		{name: "a member of an ambient class", source: "export declare class Ambient<M> {\n  brand: M;\n}\n", ids: []string{"sole"}},
+		{name: "a brand naming something else", source: "export class BrandElsewhere<M> {\n  declare readonly brand: string;\n  take(message: M): void {\n    void message;\n  }\n}\n", ids: []string{"sole"}},
+		// The brand names a TYPE this time, so only resolving the identifier, not spotting one, tells it
+		// apart from a brand carrying M.
+		{name: "a brand naming another type", source: "export class BrandOther<M> {\n  declare readonly brand: Date;\n  take(message: M): void {\n    void message;\n  }\n}\n", ids: []string{"sole"}},
+	}
+	for _, testCase := range reporting {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		})
+	}
+}

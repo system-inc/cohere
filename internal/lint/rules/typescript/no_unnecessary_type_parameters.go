@@ -186,6 +186,11 @@ func checkTypeParameterOwner(ctx rule.Context, node *ast.Node, descriptor string
 			continue
 		}
 
+		// Deliberately quieter than upstream. See isPhantomBrandParameter.
+		if isPhantomBrandParameter(ctx, node, typeParameter) {
+			continue
+		}
+
 		uses := "used only once"
 		if count == 1 {
 			uses = "never used"
@@ -289,6 +294,66 @@ func isTypeWitnessParameter(ctx rule.Context, owner *ast.Node, typeParameter *as
 	// `[T]`, `Record<string, T>`, a template literal, `= T`; all silent with and without the clause).
 	// Kept because that is two other layers' arithmetic agreeing, not a property of this test.
 	return insideReturn && !outsideReturn
+}
+
+// isPhantomBrandParameter recognizes a class type parameter whose use is the type of a `declare`
+// property, which is the second place cohere is deliberately quieter than upstream.
+//
+//	valid here, reported upstream:  class WorkerQueueBinding<M> { declare private readonly __brand: M; }
+//	still reported:                 class Holder<M> { readonly value: M | undefined = undefined; }
+//
+// A `declare` property emits nothing, so a type parameter it carries is not a value the class holds
+// and hands back unchecked. It is a phantom brand: `new WorkerQueueBinding<StripeEvent>(name)` ties
+// the binding to its message type so a decorator can thread `WorkerQueue<StripeEvent>` through, and
+// the one `declare` member is what makes the parameter part of the class's structure at all. A second
+// use would be invented to quiet the rule. @system_cohere's ruling of 2026-10-02 (#ye9s2jx), from
+// Base's `WorkerQueueBinding<MessageType>` and `RpcClientBinding<RpcInterface>`, the same truth as
+// the private-member rule's: a `declare` field is never unused.
+//
+// The test is "referenced inside a `declare` property's type annotation", and that is the same as
+// "only used there" by the time this runs: a parameter reaches here only after the syntactic pass
+// found at most one relating use, so a use in the brand leaves no room for another. An ordinary
+// property, a method, or a member of an ambient `declare class` (whose members carry no `declare`
+// modifier of their own) still reports, since each is a real slot or a real signature.
+//
+// typescript-eslint reports every one of these (measured on the installed 8.67.0 build).
+func isPhantomBrandParameter(ctx rule.Context, owner *ast.Node, typeParameter *ast.Node) bool {
+	if !ast.IsClassLike(owner) {
+		return false
+	}
+	declarationSymbol := ctx.TypeChecker.GetSymbolAtLocation(typeParameter.Name())
+	if declarationSymbol == nil {
+		return false
+	}
+
+	referenced := false
+	var visit func(node *ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if referenced {
+			return true
+		}
+		if node.Kind == ast.KindIdentifier && isIdentifierInTypePosition(node) &&
+			ctx.TypeChecker.GetSymbolAtLocation(node) == declarationSymbol {
+			referenced = true
+			return true
+		}
+		node.ForEachChild(visit)
+		return referenced
+	}
+	for _, member := range owner.Members() {
+		if member.Kind != ast.KindPropertyDeclaration ||
+			!ast.HasSyntacticModifier(member, ast.ModifierFlagsAmbient) {
+			continue
+		}
+		annotation := member.Type()
+		if annotation == nil {
+			continue
+		}
+		if visit(annotation) {
+			return true
+		}
+	}
+	return false
 }
 
 // bodyNeverYieldsAValue reports whether a function's own body can only ever hand back null, undefined
