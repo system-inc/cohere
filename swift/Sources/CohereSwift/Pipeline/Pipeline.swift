@@ -324,8 +324,8 @@ public struct Pipeline {
     }
 
     /*
-     The unused report, over the whole package whatever the scope, since an import is used or not by the file
-     alone but the index that answers is the whole build's. It reads the index the types phase just refreshed,
+     The unused report, over the whole package whatever the scope, since an import or a private declaration is
+     used or not by its file alone but the index that answers is the whole build's. It reads the index the types phase just refreshed,
      or the last build's, and a file that index does not describe as it stands is counted as not checked
      rather than guessed at. Its records are a report, not findings: the writer does not count them, so they
      never fail a run, the way the TypeScript unused report never does.
@@ -352,26 +352,57 @@ public struct Pipeline {
         let parsedPaths = Set(parsed.map(\.url.path))
         let missing = fileSet.owned.filter { !parsedPaths.contains($0.url.path) }
         let files = missing.isEmpty ? parsed : parsed + (await SourceParser().parse(missing)).files
-        let result = UnusedImports(stores: stores, demangler: demangler).run(files: files)
-        let ordered = result.findings.sorted { ($0.finding.file, $0.finding.line, $0.finding.column) < ($1.finding.file, $1.finding.line, $1.finding.column) }
+        let imports = UnusedImports(stores: stores, demangler: demangler).run(files: files)
+        try writeReport(
+            rule: UnusedImports.ruleName,
+            findings: imports.findings,
+            filesChecked: imports.filesChecked,
+            filesUnchecked: imports.filesUnchecked,
+            checked: imports.importsChecked,
+            skipped: imports.importsExported > 0 ? ["re-exported with @_exported, which is API": imports.importsExported] : [:],
+            since: start
+        )
+        let declarationsStart = Date()
+        let declarations = UnusedDeclarations(stores: stores).run(files: files)
+        try writeReport(
+            rule: UnusedDeclarations.ruleName,
+            findings: declarations.findings,
+            filesChecked: declarations.filesChecked,
+            filesUnchecked: declarations.filesUnchecked,
+            checked: declarations.declarationsChecked,
+            skipped: declarations.skipped,
+            since: declarationsStart
+        )
+        try writer.write(PhaseRecord(name: .unused, outcome: .ran, elapsedMilliseconds: Self.milliseconds(since: start)))
+    }
+
+    /* One rule's part of the unused report: its records in file order, then the coverage record that counts them. */
+    private func writeReport(
+        rule: String,
+        findings: [(finding: FindingRecord, subject: String)],
+        filesChecked: Int,
+        filesUnchecked: [String: String],
+        checked: Int,
+        skipped: [String: Int],
+        since start: Date
+    ) throws {
+        let ordered = findings.sorted { ($0.finding.file, $0.finding.line, $0.finding.column) < ($1.finding.file, $1.finding.line, $1.finding.column) }
         for found in ordered {
             try writer.write(UnusedRecord(found.finding, subject: found.subject))
         }
         var notChecked: [String: Int] = [:]
-        for reason in result.filesUnchecked.values {
+        for reason in filesUnchecked.values {
             notChecked[reason, default: 0] += 1
         }
-        let elapsed = Self.milliseconds(since: start)
         try writer.write(UnusedCoverageRecord(
-            rule: UnusedImports.ruleName,
-            filesChecked: result.filesChecked,
+            rule: rule,
+            filesChecked: filesChecked,
             filesNotChecked: notChecked,
-            checked: result.importsChecked,
-            skipped: result.importsExported > 0 ? ["re-exported with @_exported, which is API": result.importsExported] : [:],
+            checked: checked,
+            skipped: skipped,
             found: ordered.count,
-            elapsedMilliseconds: elapsed
+            elapsedMilliseconds: Self.milliseconds(since: start)
         ))
-        try writer.write(PhaseRecord(name: .unused, outcome: .ran, elapsedMilliseconds: elapsed))
     }
 
     private func projectRecord(package: PackageModel, fileSet: FileSet, scope: FileScope, elapsed: Int) -> ProjectRecord {

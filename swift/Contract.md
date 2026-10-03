@@ -216,6 +216,22 @@ import reported can go together. A file the index cannot vouch for is not checke
 not compiled as it stands, one with `#if` (the index describes the configuration the build compiled),
 one with a reference no module claims. `@_exported` imports are API and never reported.
 
+`unused-declaration` reads the same index, after `unused-import`, and writes its own `unusedCoverage`
+record. It judges only what one file can prove: a declaration `private` or `fileprivate`, or inside a
+type or extension that is, which nothing outside its file can name. Such a declaration is used when the
+file's own record holds a reference to it from outside its own text (a function that only calls itself
+is not used), when another declaration overrides or witnesses it, or, for a property wrapped by an
+attribute, when its `$name` or `_name` is referenced. `subject` is the keyword and the name
+(`func after(_:_:)`, `var stopping`), and the suggested removal takes the declaration's lines with the
+comments written above and trailing it. Only the outermost of nested unused declarations is reported, so
+every one reported can go together. What the index cannot see, or what removing would change without
+breaking the build, is counted under `skipped` by reason and never reported: overrides and witnesses,
+what the Objective-C runtime reaches, entry points and previews, members the compiler calls by name,
+declarations an attribute may register, Codable's coding keys, initializers, stored properties a
+conformance may read, an instance's stored property whose initializer runs code, a field of a struct of
+plain numbers (its bytes may be a shader's constants), and cases an enum's conformances or raw values may
+reach. Files are left unchecked for the reasons `unused-import` gives.
+
 ### `fix`, the fix and format phase's summary
 
 ```json
@@ -333,7 +349,7 @@ it where a run that did not finish prints green.
 | `--abbreviations <file>` | The abbreviation vocabulary the naming rules judge with, nexus's `abbreviations.json`. Optional: without it the engine reads the file beside its own source checkout, so the front door passes it only for a binary shipped without one. A vocabulary that is missing, unreadable or malformed refuses the run with exit 2, naming the path, before anything is checked. |
 | `--fix-passes <n>`, `--single-threaded` | As for TypeScript. |
 | `--rules`, `--rules-enabled`, `--version` | `rule` and `provenance` records. |
-| `--unused`, `--unused-all`, `--unused-deep` | The `--unused` report: `unused` and `unusedCoverage` records after lint, never counted as findings (see those records). Today it holds `unused-import`. It reads the index the types phase writes, so on a run without types it reads the last build's and counts every file that build did not compile as it stands as not checked. A bail before it (a file that does not parse, a type error) records `unused` as `notReached`. `--unused-all` and `--unused-deep` ask for nothing more yet and run the same report. |
+| `--unused`, `--unused-all`, `--unused-deep` | The `--unused` report: `unused` and `unusedCoverage` records after lint, never counted as findings (see those records). Today it holds `unused-import` and `unused-declaration`, each with its own `unusedCoverage` record. It reads the index the types phase writes, so on a run without types it reads the last build's and counts every file that build did not compile as it stands as not checked. A bail before it (a file that does not parse, a type error) records `unused` as `notReached`. `--unused-all` and `--unused-deep` ask for nothing more yet and run the same report. |
 | `--timing`, `--explain <file>` | Not implemented for Swift yet. The engine refuses with exit 2 and names the flag. A flag that is accepted and ignored reads as a run that did what was asked. |
 | `--tsconfig` | Meaningless for Swift. The front door refuses it against a Swift root. |
 | `--directory` | Resolved by the front door into `--root`. |

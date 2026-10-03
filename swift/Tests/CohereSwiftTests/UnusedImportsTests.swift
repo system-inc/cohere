@@ -138,12 +138,12 @@ struct UnusedImportsTests {
         for line in stream.split(separator: UInt8(ascii: "\n")) {
             let record = try #require(try JSONSerialization.jsonObject(with: Data(line)) as? [String: Any])
             switch record["kind"] as? String {
-            case "unused":
+            case "unused" where record["rule"] as? String == UnusedImports.ruleName:
                 let file = (record["file"] as? String ?? "").components(separatedBy: "/Sources/").last ?? ""
                 let item = "\(file):\(record["line"] as? Int ?? 0) \(record["subject"] as? String ?? "")"
                 items.append(item)
                 messages[item] = record["message"] as? String ?? ""
-            case "unusedCoverage":
+            case "unusedCoverage" where record["rule"] as? String == UnusedImports.ruleName:
                 coverage = record
             case "phase" where record["name"] as? String == "unused":
                 phase = record["outcome"] as? String ?? ""

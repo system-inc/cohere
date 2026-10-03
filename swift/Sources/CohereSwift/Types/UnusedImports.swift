@@ -74,23 +74,14 @@ struct UnusedImports {
     func run(files: [ParsedFile]) -> Result {
         var result = Result()
         let units = stores.flatMap { store in store.units().map { Source(store: store, unit: $0) } }
-
-        /* The unit that describes each file as it stands: the newest one written after the file was. */
-        var fresh: [String: Source] = [:]
-        for source in units where !source.unit.isSystem && !source.unit.mainFile.isEmpty && !source.unit.ownRecords.isEmpty {
-            if let held = fresh[source.unit.mainFile], held.unit.written >= source.unit.written {
-                continue
-            }
-            fresh[source.unit.mainFile] = source
-        }
+        let fresh = IndexStore.freshUnits(of: files, in: stores)
         var checked: [(file: ParsedFile, source: Source, references: [IndexStore.RecordOccurrence])] = []
         for file in files {
-            let path = file.url.resolvingSymlinksInPath().path
-            let modified = (try? file.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantFuture
-            guard let source = fresh[path], source.unit.written >= modified else {
+            guard let described = fresh[file.url.path] else {
                 result.filesUnchecked[file.url.path] = Self.notCompiled
                 continue
             }
+            let source = Source(store: described.store, unit: described.unit)
             if Self.hasConditionalCompilation(file.tree) {
                 result.filesUnchecked[file.url.path] = Self.conditional
                 continue

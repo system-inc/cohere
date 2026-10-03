@@ -27,6 +27,7 @@ typedef void *CohereIndexUnitDependency;
 typedef void *CohereIndexRecordReader;
 typedef void *CohereIndexOccurrence;
 typedef void *CohereIndexSymbol;
+typedef void *CohereIndexSymbolRelation;
 
 typedef CohereIndexStore (*CohereIndexStoreCreate)(const char *path, CohereIndexError *error);
 typedef void (*CohereIndexStoreDispose)(CohereIndexStore store);
@@ -48,6 +49,9 @@ typedef bool (*CohereIndexRecordReaderOccurrencesApply)(CohereIndexRecordReader 
 typedef CohereIndexSymbol (*CohereIndexOccurrenceGetSymbol)(CohereIndexOccurrence occurrence);
 typedef uint64_t (*CohereIndexOccurrenceGetRoles)(CohereIndexOccurrence occurrence);
 typedef void (*CohereIndexOccurrenceGetLineColumn)(CohereIndexOccurrence occurrence, unsigned *line, unsigned *column);
+typedef bool (*CohereIndexOccurrenceRelationsApply)(CohereIndexOccurrence occurrence, void *context, bool (*applier)(void *context, CohereIndexSymbolRelation relation));
+typedef uint64_t (*CohereIndexSymbolRelationGetRoles)(CohereIndexSymbolRelation relation);
+typedef CohereIndexSymbol (*CohereIndexSymbolRelationGetSymbol)(CohereIndexSymbolRelation relation);
 typedef CohereIndexString (*CohereIndexSymbolGetString)(CohereIndexSymbol symbol);
 typedef int (*CohereIndexSymbolGetKind)(CohereIndexSymbol symbol);
 

@@ -36,6 +36,8 @@ import IndexStoreShim
     static let referenceRole: UInt64 = 1 << 2
     /* `INDEXSTORE_SYMBOL_ROLE_IMPLICIT`. */
     static let implicitRole: UInt64 = 1 << 8
+    /* `INDEXSTORE_SYMBOL_ROLE_REL_OVERRIDEOF`: a declaration that overrides a superclass member or witnesses a protocol requirement, related to what it overrides. */
+    static let overrideOfRole: UInt64 = 1 << 11
     /* `INDEXSTORE_SYMBOL_KIND_MODULE`: a module's own name, as an `import` line or a qualified name spells it. */
     static let moduleKind: Int32 = 1
 
@@ -72,6 +74,8 @@ import IndexStoreShim
         var name: String
         var roles: UInt64
         var kind: Int32
+        /* What the occurrence overrides or witnesses, when the record was read with its relations. */
+        var overridden: [String] = []
 
         var isReference: Bool { roles & IndexStore.referenceRole != 0 }
         var isDeclaration: Bool { roles & IndexStore.declarationRoles != 0 }
@@ -127,6 +131,9 @@ import IndexStoreShim
     private let occurrenceSymbol: CohereIndexOccurrenceGetSymbol
     private let occurrenceRoles: CohereIndexOccurrenceGetRoles
     private let occurrenceLineColumn: CohereIndexOccurrenceGetLineColumn
+    private let relationsApply: CohereIndexOccurrenceRelationsApply
+    private let relationRoles: CohereIndexSymbolRelationGetRoles
+    private let relationSymbol: CohereIndexSymbolRelationGetSymbol
     private let symbolName: CohereIndexSymbolGetString
     private let symbolIdentifier: CohereIndexSymbolGetString
     private let symbolKind: CohereIndexSymbolGetKind
@@ -170,6 +177,9 @@ import IndexStoreShim
         unsafe occurrenceSymbol = try symbol("indexstore_occurrence_get_symbol", as: CohereIndexOccurrenceGetSymbol.self)
         unsafe occurrenceRoles = try symbol("indexstore_occurrence_get_roles", as: CohereIndexOccurrenceGetRoles.self)
         unsafe occurrenceLineColumn = try symbol("indexstore_occurrence_get_line_col", as: CohereIndexOccurrenceGetLineColumn.self)
+        unsafe relationsApply = try symbol("indexstore_occurrence_relations_apply_f", as: CohereIndexOccurrenceRelationsApply.self)
+        unsafe relationRoles = try symbol("indexstore_symbol_relation_get_roles", as: CohereIndexSymbolRelationGetRoles.self)
+        unsafe relationSymbol = try symbol("indexstore_symbol_relation_get_symbol", as: CohereIndexSymbolRelationGetSymbol.self)
         unsafe symbolName = try symbol("indexstore_symbol_get_name", as: CohereIndexSymbolGetString.self)
         unsafe symbolIdentifier = try symbol("indexstore_symbol_get_usr", as: CohereIndexSymbolGetString.self)
         unsafe symbolKind = try symbol("indexstore_symbol_get_kind", as: CohereIndexSymbolGetKind.self)
@@ -211,6 +221,31 @@ import IndexStoreShim
                 isImplicit: occurrence.isImplicit
             )
         })
+    }
+
+    /*
+     The unit that describes each file as it stands, by the file's path as given: the newest unit of ours, across
+     the stores, that names the file and was written after the file was. A file with none is absent: the build has
+     not compiled it as it stands, so its record describes text that is no longer there.
+     */
+    static func freshUnits(of files: [ParsedFile], in stores: [IndexStore]) -> [String: (store: IndexStore, unit: Unit)] {
+        var newest: [String: (store: IndexStore, unit: Unit)] = [:]
+        for store in stores {
+            for unit in store.units() where !unit.isSystem && !unit.mainFile.isEmpty && !unit.ownRecords.isEmpty {
+                if let held = newest[unit.mainFile], held.unit.written >= unit.written {
+                    continue
+                }
+                newest[unit.mainFile] = (store, unit)
+            }
+        }
+        var fresh: [String: (store: IndexStore, unit: Unit)] = [:]
+        for file in files {
+            let modified = (try? file.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantFuture
+            if let described = newest[file.url.resolvingSymlinksInPath().path], described.unit.written >= modified {
+                fresh[file.url.path] = described
+            }
+        }
+        return fresh
     }
 
     /* Each file's records, by resolved path, with when the unit naming them was written. */
@@ -293,9 +328,10 @@ import IndexStoreShim
     /*
      Every occurrence one record holds, or nil when the record cannot be read. A reader: each call into the library
      is handed the open reader or an occurrence it yielded, and `text` copies every string before the `defer`
-     disposes the reader.
+     disposes the reader. With `relations`, each occurrence also says what it overrides, read through the same
+     iterator `forEach` drives, whose relation handles live as long as the occurrence that yields them.
      */
-    func occurrences(inRecord record: String) -> [RecordOccurrence]? {
+    func occurrences(inRecord record: String, relations: Bool = false) -> [RecordOccurrence]? {
         guard let reader = unsafe recordReaderCreate(store, record, nil) else { return nil }
         defer { unsafe recordReaderDispose(reader) }
         var occurrences: [RecordOccurrence] = []
@@ -304,13 +340,23 @@ import IndexStoreShim
             var column: UInt32 = 0
             unsafe occurrenceLineColumn(occurrence, &line, &column)
             let symbol = unsafe occurrenceSymbol(occurrence)
+            let roles = unsafe occurrenceRoles(occurrence)
+            var overridden: [String] = []
+            if relations && roles & Self.overrideOfRole != 0 {
+                unsafe Self.forEach(in: occurrence, relationsApply) { relation in
+                    if unsafe relationRoles(relation) & Self.overrideOfRole != 0 {
+                        overridden.append(unsafe Self.text(symbolIdentifier(relationSymbol(relation))))
+                    }
+                }
+            }
             unsafe occurrences.append(RecordOccurrence(
                 line: Int(line),
                 column: Int(column),
                 symbol: Self.text(symbolIdentifier(symbol)),
                 name: Self.text(symbolName(symbol)),
-                roles: occurrenceRoles(occurrence),
-                kind: Int32(symbolKind(symbol))
+                roles: roles,
+                kind: Int32(symbolKind(symbol)),
+                overridden: overridden
             ))
         }
         return occurrences
@@ -366,8 +412,8 @@ import IndexStoreShim
     }
 
     /*
-     Hands `visit` each handle a reader's iterator yields: a unit's dependencies or a record's occurrences, whose
-     iterators share one C type. A C applier can capture nothing, so `visit` crosses as the context pointer, boxed
+     Hands `visit` each handle an iterator yields: a unit's dependencies, a record's occurrences or an occurrence's
+     relations, whose iterators share one C type. A C applier can capture nothing, so `visit` crosses as the context pointer, boxed
      and unretained. Unsafe because nothing in that pointer says what it points at or keeps it alive; correct
      because only this function's applier reads it back, as the type it boxed, and the iterator is synchronous,
      calling the applier only before it returns, while `withExtendedLifetime` holds the box.
