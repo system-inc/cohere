@@ -181,10 +181,16 @@ func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory stri
 	fmt.Fprintf(os.Stderr, "cohere: building the Swift engine from %s (its sources or the toolchain changed; a cold build takes minutes)\n",
 		packageDirectory)
 
+	// `--manifest-cache none`, because the manifest reads the tree's git state into the engine's
+	// `sourceTreeModified`, and SwiftPM's shared manifest cache answers it from an earlier evaluation of
+	// the same commit, whatever the scratch path. An engine rebuilt after an edit to a tracked file would
+	// then say it was built from a clean tree. Measured by @system_cohere_release, whose release build
+	// passes the same flag.
 	arguments := []string{
 		"build", "-c", "release",
 		"--package-path", packageDirectory,
 		"--scratch-path", scratchDirectory,
+		"--manifest-cache", "none",
 		"--product", "cohere-swift",
 	}
 	build := exec.Command("swift", arguments...)
