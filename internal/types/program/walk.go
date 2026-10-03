@@ -223,9 +223,8 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 		timings = NewTimings(ruleNames)
 	}
 
-	// Files are handed out by index stride rather than by a queue: the compiler assigns a file to a
-	// checker by its position in the program's file list, so striding keeps each worker mostly on one
-	// checker instead of contending across all of them.
+	// Each worker walks the files of one checker. See assignFilesToWorkers.
+	assignments := g.assignFilesToWorkers(ctx, files, workers, anyRuleNeedsTypeChecker(rules))
 	var waitGroup sync.WaitGroup
 	for worker := range workers {
 		waitGroup.Add(1)
@@ -253,7 +252,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				localTimings = NewTimings(nil)
 			}
 
-			for index := worker; index < len(files); index += workers {
+			for _, index := range assignments[worker] {
 				sourceFile := files[index]
 
 				// Configuration is consulted before a checker is acquired, because an ignored file
@@ -1087,4 +1086,42 @@ func (g *Graph) rulesFor(
 		applicable = append(applicable, subject)
 	}
 	return applicable, options, resolution, nil
+}
+
+// assignFilesToWorkers gives each worker the files of one checker, so no two workers ever want the same
+// checker and the exclusive lock each file is walked under is never contended.
+//
+// Files used to be handed out by index stride, on the belief that the compiler assigns a file to a checker
+// by its position in the file list, which would keep each worker mostly on one checker. It does not: the
+// checker pool partitions files by import affinity, a balanced graph partition, so a stride sent every
+// worker across every checker. Traced on a cold ahra run, 2026-10-03 (#zqsdzbq): workers spent 34.4s,
+// summed, blocked acquiring a checker, about half of all their time in a walk of about 4.4s. Interleaved
+// against the stride on the same tree, three rounds, the walk ran about 25% faster in wall time on the same
+// CPU, with identical findings.
+//
+// Groups are as balanced as the compiler made them for type checking, by files and imports rather than by
+// what the rules cost, so the slowest group sets the walk's end.
+//
+// A walk with no rule that reads a checker strides instead: asking which checker owns a file creates every
+// checker, which such a walk never needs.
+func (g *Graph) assignFilesToWorkers(ctx context.Context, files []*ast.SourceFile, workers int, needsCheckers bool) [][]int {
+	assignments := make([][]int, workers)
+	if !needsCheckers {
+		for index := range files {
+			assignments[index%workers] = append(assignments[index%workers], index)
+		}
+		return assignments
+	}
+	slots := map[*checker.Checker]int{}
+	for index, sourceFile := range files {
+		owner, release := g.Program.GetTypeCheckerForFile(ctx, sourceFile)
+		release()
+		slot, seen := slots[owner]
+		if !seen {
+			slot = len(slots) % workers
+			slots[owner] = slot
+		}
+		assignments[slot] = append(assignments[slot], index)
+	}
+	return assignments
 }
