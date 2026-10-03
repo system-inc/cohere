@@ -36,7 +36,7 @@ var widthCases = []string{
 	"skin 👍🏽",                     // a modifier sequence
 	"lone \xed\xa0\x80 surrogate", // invalid UTF-8, which both sides decode to U+FFFD
 	"ｱｲｳ halfwidth katakana",      // halfwidth counts 1
-	" nbsp",
+	"\u00a0nbsp",
 	"️ stray selector",
 }
 
