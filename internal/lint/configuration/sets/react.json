@@ -90,6 +90,13 @@
         "structure/react-hook-no-any-type": "error",
         "structure/react-hook-no-destructuring": "error",
         "structure/react-hook-no-properties-in-dependencies": "error",
-        "structure/react-hook-require-effect-comment": "error"
+        "structure/react-hook-require-effect-comment": "error",
+        "react/boolean-prop-naming": "off",
+        "react/sort-comp": "off"
+    },
+    "reasons": {
+        "react/jsx-key": "Off until its fix wave reads 0 (#7hx7g79).",
+        "react/boolean-prop-naming": "Upstream's pattern flags open, disabled, active and enabled, which are the DOM's own names (#e4cn6wq Block 4).",
+        "react/sort-comp": "We write no class components (#e4cn6wq Block 4)."
     }
 }

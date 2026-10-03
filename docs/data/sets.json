@@ -134,6 +134,10 @@
                 "severity": "error"
             },
             {
+                "name": "@typescript-eslint/consistent-return",
+                "severity": "off"
+            },
+            {
                 "name": "@typescript-eslint/consistent-type-assertions",
                 "severity": "error"
             },
@@ -488,6 +492,14 @@
                 "severity": "error"
             },
             {
+                "name": "class-methods-use-this",
+                "severity": "off"
+            },
+            {
+                "name": "complexity",
+                "severity": "off"
+            },
+            {
                 "name": "consistent-return",
                 "severity": "off"
             },
@@ -498,6 +510,10 @@
             {
                 "name": "constructor-super",
                 "severity": "error"
+            },
+            {
+                "name": "default-case",
+                "severity": "off"
             },
             {
                 "name": "default-case-last",
@@ -516,6 +532,10 @@
                 "severity": "error"
             },
             {
+                "name": "func-name-matching",
+                "severity": "off"
+            },
+            {
                 "name": "getter-return",
                 "severity": "error"
             },
@@ -525,6 +545,18 @@
             },
             {
                 "name": "guard-for-in",
+                "severity": "off"
+            },
+            {
+                "name": "id-denylist",
+                "severity": "off"
+            },
+            {
+                "name": "id-length",
+                "severity": "off"
+            },
+            {
+                "name": "id-match",
                 "severity": "off"
             },
             {
@@ -545,6 +577,10 @@
                         "ignoreExpressions": true
                     }
                 ]
+            },
+            {
+                "name": "max-depth",
+                "severity": "off"
             },
             {
                 "name": "max-lines",
@@ -708,6 +744,10 @@
                 "severity": "off"
             },
             {
+                "name": "no-bitwise",
+                "severity": "off"
+            },
+            {
                 "name": "no-caller",
                 "severity": "error"
             },
@@ -747,6 +787,10 @@
             {
                 "name": "no-constructor-return",
                 "severity": "error"
+            },
+            {
+                "name": "no-continue",
+                "severity": "off"
             },
             {
                 "name": "no-control-regex",
@@ -857,6 +901,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-inline-comments",
+                "severity": "off"
+            },
+            {
                 "name": "no-inner-declarations",
                 "severity": "error"
             },
@@ -913,6 +961,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-negated-condition",
+                "severity": "off"
+            },
+            {
                 "name": "no-new",
                 "severity": "error"
             },
@@ -953,6 +1005,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-plusplus",
+                "severity": "off"
+            },
+            {
                 "name": "no-promise-executor-return",
                 "severity": "error"
             },
@@ -967,6 +1023,10 @@
             {
                 "name": "no-regex-spaces",
                 "severity": "error"
+            },
+            {
+                "name": "no-restricted-exports",
+                "severity": "off"
             },
             {
                 "name": "no-restricted-globals",
@@ -1037,6 +1097,10 @@
                 ]
             },
             {
+                "name": "no-restricted-imports",
+                "severity": "off"
+            },
+            {
                 "name": "no-restricted-properties",
                 "severity": "error",
                 "options": [
@@ -1098,6 +1162,10 @@
             {
                 "name": "no-undef-init",
                 "severity": "error"
+            },
+            {
+                "name": "no-underscore-dangle",
+                "severity": "off"
             },
             {
                 "name": "no-unexpected-multiline",
@@ -1203,6 +1271,10 @@
                 "severity": "error"
             },
             {
+                "name": "prefer-arrow-callback",
+                "severity": "off"
+            },
+            {
                 "name": "prefer-const",
                 "severity": "error",
                 "options": [
@@ -1210,6 +1282,10 @@
                         "ignoreReadBeforeAssign": true
                     }
                 ]
+            },
+            {
+                "name": "prefer-destructuring",
+                "severity": "off"
             },
             {
                 "name": "prefer-exponentiation-operator",
@@ -1262,6 +1338,10 @@
             {
                 "name": "require-yield",
                 "severity": "error"
+            },
+            {
+                "name": "sort-vars",
+                "severity": "off"
             },
             {
                 "name": "strict",
@@ -1356,6 +1436,10 @@
                 "severity": "error"
             },
             {
+                "name": "@typescript-eslint/consistent-return",
+                "severity": "off"
+            },
+            {
                 "name": "@typescript-eslint/consistent-type-assertions",
                 "severity": "error"
             },
@@ -1710,6 +1794,14 @@
                 "severity": "error"
             },
             {
+                "name": "class-methods-use-this",
+                "severity": "off"
+            },
+            {
+                "name": "complexity",
+                "severity": "off"
+            },
+            {
                 "name": "consistent-return",
                 "severity": "off"
             },
@@ -1720,6 +1812,10 @@
             {
                 "name": "constructor-super",
                 "severity": "error"
+            },
+            {
+                "name": "default-case",
+                "severity": "off"
             },
             {
                 "name": "default-case-last",
@@ -1738,6 +1834,10 @@
                 "severity": "error"
             },
             {
+                "name": "func-name-matching",
+                "severity": "off"
+            },
+            {
                 "name": "getter-return",
                 "severity": "error"
             },
@@ -1747,6 +1847,18 @@
             },
             {
                 "name": "guard-for-in",
+                "severity": "off"
+            },
+            {
+                "name": "id-denylist",
+                "severity": "off"
+            },
+            {
+                "name": "id-length",
+                "severity": "off"
+            },
+            {
+                "name": "id-match",
                 "severity": "off"
             },
             {
@@ -1767,6 +1879,10 @@
                         "ignoreExpressions": true
                     }
                 ]
+            },
+            {
+                "name": "max-depth",
+                "severity": "off"
             },
             {
                 "name": "max-lines",
@@ -1930,6 +2046,10 @@
                 "severity": "off"
             },
             {
+                "name": "no-bitwise",
+                "severity": "off"
+            },
+            {
                 "name": "no-caller",
                 "severity": "error"
             },
@@ -1969,6 +2089,10 @@
             {
                 "name": "no-constructor-return",
                 "severity": "error"
+            },
+            {
+                "name": "no-continue",
+                "severity": "off"
             },
             {
                 "name": "no-control-regex",
@@ -2079,6 +2203,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-inline-comments",
+                "severity": "off"
+            },
+            {
                 "name": "no-inner-declarations",
                 "severity": "error"
             },
@@ -2135,6 +2263,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-negated-condition",
+                "severity": "off"
+            },
+            {
                 "name": "no-new",
                 "severity": "error"
             },
@@ -2175,6 +2307,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-plusplus",
+                "severity": "off"
+            },
+            {
                 "name": "no-promise-executor-return",
                 "severity": "error"
             },
@@ -2189,6 +2325,10 @@
             {
                 "name": "no-regex-spaces",
                 "severity": "error"
+            },
+            {
+                "name": "no-restricted-exports",
+                "severity": "off"
             },
             {
                 "name": "no-restricted-globals",
@@ -2259,6 +2399,10 @@
                 ]
             },
             {
+                "name": "no-restricted-imports",
+                "severity": "off"
+            },
+            {
                 "name": "no-restricted-properties",
                 "severity": "error",
                 "options": [
@@ -2320,6 +2464,10 @@
             {
                 "name": "no-undef-init",
                 "severity": "error"
+            },
+            {
+                "name": "no-underscore-dangle",
+                "severity": "off"
             },
             {
                 "name": "no-unexpected-multiline",
@@ -2425,6 +2573,10 @@
                 "severity": "error"
             },
             {
+                "name": "prefer-arrow-callback",
+                "severity": "off"
+            },
+            {
                 "name": "prefer-const",
                 "severity": "error",
                 "options": [
@@ -2432,6 +2584,10 @@
                         "ignoreReadBeforeAssign": true
                     }
                 ]
+            },
+            {
+                "name": "prefer-destructuring",
+                "severity": "off"
             },
             {
                 "name": "prefer-exponentiation-operator",
@@ -2544,6 +2700,10 @@
             {
                 "name": "react-hooks/void-use-memo",
                 "severity": "error"
+            },
+            {
+                "name": "react/boolean-prop-naming",
+                "severity": "off"
             },
             {
                 "name": "react/button-has-type",
@@ -2766,6 +2926,10 @@
                 "severity": "error"
             },
             {
+                "name": "react/sort-comp",
+                "severity": "off"
+            },
+            {
                 "name": "react/sort-default-props",
                 "severity": "error"
             },
@@ -2796,6 +2960,10 @@
             {
                 "name": "require-yield",
                 "severity": "error"
+            },
+            {
+                "name": "sort-vars",
+                "severity": "off"
             },
             {
                 "name": "strict",
@@ -2886,6 +3054,94 @@
                 "severity": "error"
             },
             {
+                "name": "@next/next/google-font-display",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/google-font-preconnect",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/inline-script-id",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/next-script-for-ga",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-assign-module-variable",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-async-client-component",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-before-interactive-script-outside-document",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-css-tags",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-document-import-in-page",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-duplicate-head",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-head-element",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-head-import-in-document",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-html-link-for-pages",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-img-element",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-location-assign-relative-destination",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-page-custom-font",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-script-component-in-head",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-styled-jsx-in-document",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-sync-scripts",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-title-in-document-head",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-typos",
+                "severity": "off"
+            },
+            {
+                "name": "@next/next/no-unwanted-polyfillio",
+                "severity": "off"
+            },
+            {
                 "name": "@typescript-eslint/adjacent-overload-signatures",
                 "severity": "error"
             },
@@ -2916,6 +3172,10 @@
             {
                 "name": "@typescript-eslint/consistent-indexed-object-style",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/consistent-return",
+                "severity": "off"
             },
             {
                 "name": "@typescript-eslint/consistent-type-assertions",
@@ -3371,8 +3631,64 @@
                 ]
             },
             {
+                "name": "better-tailwindcss/enforce-canonical-classes",
+                "severity": "off"
+            },
+            {
+                "name": "better-tailwindcss/enforce-consistent-class-order",
+                "severity": "off"
+            },
+            {
+                "name": "better-tailwindcss/enforce-consistent-important-position",
+                "severity": "off"
+            },
+            {
+                "name": "better-tailwindcss/enforce-consistent-variable-syntax",
+                "severity": "off"
+            },
+            {
+                "name": "better-tailwindcss/enforce-consistent-variant-order",
+                "severity": "off"
+            },
+            {
+                "name": "better-tailwindcss/enforce-shorthand-classes",
+                "severity": "off"
+            },
+            {
+                "name": "better-tailwindcss/no-concatenated-classes",
+                "severity": "off"
+            },
+            {
+                "name": "better-tailwindcss/no-conflicting-classes",
+                "severity": "off"
+            },
+            {
+                "name": "better-tailwindcss/no-deprecated-classes",
+                "severity": "off"
+            },
+            {
+                "name": "better-tailwindcss/no-duplicate-classes",
+                "severity": "off"
+            },
+            {
+                "name": "better-tailwindcss/no-unknown-classes",
+                "severity": "off"
+            },
+            {
+                "name": "better-tailwindcss/no-unnecessary-whitespace",
+                "severity": "off"
+            },
+            {
                 "name": "block-scoped-var",
                 "severity": "error"
+            },
+            {
+                "name": "class-methods-use-this",
+                "severity": "off"
+            },
+            {
+                "name": "complexity",
+                "severity": "off"
             },
             {
                 "name": "consistent-return",
@@ -3385,6 +3701,10 @@
             {
                 "name": "constructor-super",
                 "severity": "error"
+            },
+            {
+                "name": "default-case",
+                "severity": "off"
             },
             {
                 "name": "default-case-last",
@@ -3403,6 +3723,10 @@
                 "severity": "error"
             },
             {
+                "name": "func-name-matching",
+                "severity": "off"
+            },
+            {
                 "name": "getter-return",
                 "severity": "error"
             },
@@ -3412,6 +3736,18 @@
             },
             {
                 "name": "guard-for-in",
+                "severity": "off"
+            },
+            {
+                "name": "id-denylist",
+                "severity": "off"
+            },
+            {
+                "name": "id-length",
+                "severity": "off"
+            },
+            {
+                "name": "id-match",
                 "severity": "off"
             },
             {
@@ -3432,6 +3768,10 @@
                         "ignoreExpressions": true
                     }
                 ]
+            },
+            {
+                "name": "max-depth",
+                "severity": "off"
             },
             {
                 "name": "max-lines",
@@ -3603,6 +3943,10 @@
                 "severity": "off"
             },
             {
+                "name": "no-bitwise",
+                "severity": "off"
+            },
+            {
                 "name": "no-caller",
                 "severity": "error"
             },
@@ -3642,6 +3986,10 @@
             {
                 "name": "no-constructor-return",
                 "severity": "error"
+            },
+            {
+                "name": "no-continue",
+                "severity": "off"
             },
             {
                 "name": "no-control-regex",
@@ -3752,6 +4100,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-inline-comments",
+                "severity": "off"
+            },
+            {
                 "name": "no-inner-declarations",
                 "severity": "error"
             },
@@ -3808,6 +4160,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-negated-condition",
+                "severity": "off"
+            },
+            {
                 "name": "no-new",
                 "severity": "error"
             },
@@ -3848,6 +4204,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-plusplus",
+                "severity": "off"
+            },
+            {
                 "name": "no-promise-executor-return",
                 "severity": "error"
             },
@@ -3862,6 +4222,10 @@
             {
                 "name": "no-regex-spaces",
                 "severity": "error"
+            },
+            {
+                "name": "no-restricted-exports",
+                "severity": "off"
             },
             {
                 "name": "no-restricted-globals",
@@ -3932,6 +4296,10 @@
                 ]
             },
             {
+                "name": "no-restricted-imports",
+                "severity": "off"
+            },
+            {
                 "name": "no-restricted-properties",
                 "severity": "error",
                 "options": [
@@ -3993,6 +4361,10 @@
             {
                 "name": "no-undef-init",
                 "severity": "error"
+            },
+            {
+                "name": "no-underscore-dangle",
+                "severity": "off"
             },
             {
                 "name": "no-unexpected-multiline",
@@ -4098,6 +4470,10 @@
                 "severity": "error"
             },
             {
+                "name": "prefer-arrow-callback",
+                "severity": "off"
+            },
+            {
                 "name": "prefer-const",
                 "severity": "error",
                 "options": [
@@ -4105,6 +4481,10 @@
                         "ignoreReadBeforeAssign": true
                     }
                 ]
+            },
+            {
+                "name": "prefer-destructuring",
+                "severity": "off"
             },
             {
                 "name": "prefer-exponentiation-operator",
@@ -4159,7 +4539,83 @@
                 "severity": "error"
             },
             {
+                "name": "sort-vars",
+                "severity": "off"
+            },
+            {
                 "name": "strict",
+                "severity": "off"
+            },
+            {
+                "name": "structure/boundary-no-project-theme-value",
+                "severity": "off"
+            },
+            {
+                "name": "structure/network-no-direct-fetch",
+                "severity": "off"
+            },
+            {
+                "name": "structure/network-no-forbidden-import",
+                "severity": "off"
+            },
+            {
+                "name": "structure/network-no-invalidate-cache-in-on-success",
+                "severity": "off"
+            },
+            {
+                "name": "structure/network-no-invalidate-cache-literal-key",
+                "severity": "off"
+            },
+            {
+                "name": "structure/network-no-string-literal-query",
+                "severity": "off"
+            },
+            {
+                "name": "structure/network-require-hook-options-parameter",
+                "severity": "off"
+            },
+            {
+                "name": "structure/network-require-hook-request-suffix",
+                "severity": "off"
+            },
+            {
+                "name": "structure/network-require-hook-variables-type",
+                "severity": "off"
+            },
+            {
+                "name": "structure/next-no-near-miss-route-export",
+                "severity": "off"
+            },
+            {
+                "name": "structure/next-no-page-state",
+                "severity": "off"
+            },
+            {
+                "name": "structure/next-require-api-parameter-name",
+                "severity": "off"
+            },
+            {
+                "name": "structure/next-require-page-default-export",
+                "severity": "off"
+            },
+            {
+                "name": "structure/react-component-no-display-name",
+                "severity": "off"
+            },
+            {
+                "name": "structure/react-element-no-anchor",
+                "severity": "off"
+            },
+            {
+                "name": "structure/react-element-no-horizontal-rule",
+                "severity": "off"
+            },
+            {
+                "name": "structure/storage-no-direct-local-storage",
+                "severity": "off"
+            },
+            {
+                "name": "structure/tailwind-no-physical-direction",
                 "severity": "off"
             },
             {
@@ -4279,6 +4735,10 @@
             {
                 "name": "@typescript-eslint/consistent-indexed-object-style",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/consistent-return",
+                "severity": "off"
             },
             {
                 "name": "@typescript-eslint/consistent-type-assertions",
@@ -4631,8 +5091,84 @@
                 "severity": "error"
             },
             {
+                "name": "base/boundary-no-global-container",
+                "severity": "off"
+            },
+            {
+                "name": "base/consistency-no-bare-throw",
+                "severity": "off"
+            },
+            {
+                "name": "base/consistency-no-console",
+                "severity": "off"
+            },
+            {
+                "name": "base/consistency-no-hand-built-declared-error",
+                "severity": "off"
+            },
+            {
+                "name": "base/consistency-require-pagination-argument-name",
+                "severity": "off"
+            },
+            {
+                "name": "base/correctness-require-graphql-nullable-parity",
+                "severity": "off"
+            },
+            {
+                "name": "base/correctness-require-matching-inject-type",
+                "severity": "off"
+            },
+            {
+                "name": "base/correctness-require-matching-operation-context",
+                "severity": "off"
+            },
+            {
+                "name": "base/correctness-require-matching-provider-return",
+                "severity": "off"
+            },
+            {
+                "name": "base/correctness-require-optional-relation",
+                "severity": "off"
+            },
+            {
+                "name": "base/correctness-require-orm-column-declare",
+                "severity": "off"
+            },
+            {
+                "name": "base/correctness-require-orm-column-nullable-parity",
+                "severity": "off"
+            },
+            {
+                "name": "base/correctness-require-serializable-nullable-parity",
+                "severity": "off"
+            },
+            {
+                "name": "base/correctness-require-verify-array-parity",
+                "severity": "off"
+            },
+            {
+                "name": "base/correctness-require-verify-optional-parity",
+                "severity": "off"
+            },
+            {
+                "name": "base/security-require-context-access",
+                "severity": "off"
+            },
+            {
                 "name": "block-scoped-var",
                 "severity": "error"
+            },
+            {
+                "name": "boundaries/dependencies",
+                "severity": "off"
+            },
+            {
+                "name": "class-methods-use-this",
+                "severity": "off"
+            },
+            {
+                "name": "complexity",
+                "severity": "off"
             },
             {
                 "name": "consistent-return",
@@ -4645,6 +5181,10 @@
             {
                 "name": "constructor-super",
                 "severity": "error"
+            },
+            {
+                "name": "default-case",
+                "severity": "off"
             },
             {
                 "name": "default-case-last",
@@ -4663,6 +5203,10 @@
                 "severity": "error"
             },
             {
+                "name": "func-name-matching",
+                "severity": "off"
+            },
+            {
                 "name": "getter-return",
                 "severity": "error"
             },
@@ -4672,6 +5216,18 @@
             },
             {
                 "name": "guard-for-in",
+                "severity": "off"
+            },
+            {
+                "name": "id-denylist",
+                "severity": "off"
+            },
+            {
+                "name": "id-length",
+                "severity": "off"
+            },
+            {
+                "name": "id-match",
                 "severity": "off"
             },
             {
@@ -4692,6 +5248,10 @@
                         "ignoreExpressions": true
                     }
                 ]
+            },
+            {
+                "name": "max-depth",
+                "severity": "off"
             },
             {
                 "name": "max-lines",
@@ -4908,6 +5468,10 @@
                 "severity": "off"
             },
             {
+                "name": "no-bitwise",
+                "severity": "off"
+            },
+            {
                 "name": "no-caller",
                 "severity": "error"
             },
@@ -4947,6 +5511,10 @@
             {
                 "name": "no-constructor-return",
                 "severity": "error"
+            },
+            {
+                "name": "no-continue",
+                "severity": "off"
             },
             {
                 "name": "no-control-regex",
@@ -5057,6 +5625,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-inline-comments",
+                "severity": "off"
+            },
+            {
                 "name": "no-inner-declarations",
                 "severity": "error"
             },
@@ -5113,6 +5685,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-negated-condition",
+                "severity": "off"
+            },
+            {
                 "name": "no-new",
                 "severity": "error"
             },
@@ -5153,6 +5729,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-plusplus",
+                "severity": "off"
+            },
+            {
                 "name": "no-promise-executor-return",
                 "severity": "error"
             },
@@ -5167,6 +5747,10 @@
             {
                 "name": "no-regex-spaces",
                 "severity": "error"
+            },
+            {
+                "name": "no-restricted-exports",
+                "severity": "off"
             },
             {
                 "name": "no-restricted-globals",
@@ -5237,6 +5821,10 @@
                 ]
             },
             {
+                "name": "no-restricted-imports",
+                "severity": "off"
+            },
+            {
                 "name": "no-restricted-properties",
                 "severity": "error",
                 "options": [
@@ -5298,6 +5886,10 @@
             {
                 "name": "no-undef-init",
                 "severity": "error"
+            },
+            {
+                "name": "no-underscore-dangle",
+                "severity": "off"
             },
             {
                 "name": "no-unexpected-multiline",
@@ -5403,6 +5995,10 @@
                 "severity": "error"
             },
             {
+                "name": "prefer-arrow-callback",
+                "severity": "off"
+            },
+            {
                 "name": "prefer-const",
                 "severity": "error",
                 "options": [
@@ -5410,6 +6006,10 @@
                         "ignoreReadBeforeAssign": true
                     }
                 ]
+            },
+            {
+                "name": "prefer-destructuring",
+                "severity": "off"
             },
             {
                 "name": "prefer-exponentiation-operator",
@@ -5462,6 +6062,10 @@
             {
                 "name": "require-yield",
                 "severity": "error"
+            },
+            {
+                "name": "sort-vars",
+                "severity": "off"
             },
             {
                 "name": "strict",
@@ -5683,6 +6287,10 @@
             {
                 "name": "@typescript-eslint/consistent-indexed-object-style",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/consistent-return",
+                "severity": "off"
             },
             {
                 "name": "@typescript-eslint/consistent-type-assertions",
@@ -6087,6 +6695,14 @@
                 "severity": "error"
             },
             {
+                "name": "class-methods-use-this",
+                "severity": "off"
+            },
+            {
+                "name": "complexity",
+                "severity": "off"
+            },
+            {
                 "name": "consistent-return",
                 "severity": "off"
             },
@@ -6097,6 +6713,10 @@
             {
                 "name": "constructor-super",
                 "severity": "error"
+            },
+            {
+                "name": "default-case",
+                "severity": "off"
             },
             {
                 "name": "default-case-last",
@@ -6115,6 +6735,10 @@
                 "severity": "error"
             },
             {
+                "name": "func-name-matching",
+                "severity": "off"
+            },
+            {
                 "name": "getter-return",
                 "severity": "error"
             },
@@ -6124,6 +6748,18 @@
             },
             {
                 "name": "guard-for-in",
+                "severity": "off"
+            },
+            {
+                "name": "id-denylist",
+                "severity": "off"
+            },
+            {
+                "name": "id-length",
+                "severity": "off"
+            },
+            {
+                "name": "id-match",
                 "severity": "off"
             },
             {
@@ -6144,6 +6780,10 @@
                         "ignoreExpressions": true
                     }
                 ]
+            },
+            {
+                "name": "max-depth",
+                "severity": "off"
             },
             {
                 "name": "max-lines",
@@ -6307,6 +6947,10 @@
                 "severity": "off"
             },
             {
+                "name": "no-bitwise",
+                "severity": "off"
+            },
+            {
                 "name": "no-caller",
                 "severity": "error"
             },
@@ -6346,6 +6990,10 @@
             {
                 "name": "no-constructor-return",
                 "severity": "error"
+            },
+            {
+                "name": "no-continue",
+                "severity": "off"
             },
             {
                 "name": "no-control-regex",
@@ -6456,6 +7104,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-inline-comments",
+                "severity": "off"
+            },
+            {
                 "name": "no-inner-declarations",
                 "severity": "error"
             },
@@ -6512,6 +7164,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-negated-condition",
+                "severity": "off"
+            },
+            {
                 "name": "no-new",
                 "severity": "error"
             },
@@ -6552,6 +7208,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-plusplus",
+                "severity": "off"
+            },
+            {
                 "name": "no-promise-executor-return",
                 "severity": "error"
             },
@@ -6566,6 +7226,10 @@
             {
                 "name": "no-regex-spaces",
                 "severity": "error"
+            },
+            {
+                "name": "no-restricted-exports",
+                "severity": "off"
             },
             {
                 "name": "no-restricted-globals",
@@ -6636,6 +7300,10 @@
                 ]
             },
             {
+                "name": "no-restricted-imports",
+                "severity": "off"
+            },
+            {
                 "name": "no-restricted-properties",
                 "severity": "error",
                 "options": [
@@ -6697,6 +7365,10 @@
             {
                 "name": "no-undef-init",
                 "severity": "error"
+            },
+            {
+                "name": "no-underscore-dangle",
+                "severity": "off"
             },
             {
                 "name": "no-unexpected-multiline",
@@ -6802,6 +7474,10 @@
                 "severity": "error"
             },
             {
+                "name": "prefer-arrow-callback",
+                "severity": "off"
+            },
+            {
                 "name": "prefer-const",
                 "severity": "error",
                 "options": [
@@ -6809,6 +7485,10 @@
                         "ignoreReadBeforeAssign": true
                     }
                 ]
+            },
+            {
+                "name": "prefer-destructuring",
+                "severity": "off"
             },
             {
                 "name": "prefer-exponentiation-operator",
@@ -6861,6 +7541,10 @@
             {
                 "name": "require-yield",
                 "severity": "error"
+            },
+            {
+                "name": "sort-vars",
+                "severity": "off"
             },
             {
                 "name": "strict",
@@ -6946,6 +7630,10 @@
             {
                 "name": "@typescript-eslint/consistent-indexed-object-style",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/consistent-return",
+                "severity": "off"
             },
             {
                 "name": "@typescript-eslint/consistent-type-assertions",
@@ -7302,6 +7990,14 @@
                 "severity": "error"
             },
             {
+                "name": "class-methods-use-this",
+                "severity": "off"
+            },
+            {
+                "name": "complexity",
+                "severity": "off"
+            },
+            {
                 "name": "consistent-return",
                 "severity": "off"
             },
@@ -7312,6 +8008,10 @@
             {
                 "name": "constructor-super",
                 "severity": "error"
+            },
+            {
+                "name": "default-case",
+                "severity": "off"
             },
             {
                 "name": "default-case-last",
@@ -7330,6 +8030,10 @@
                 "severity": "error"
             },
             {
+                "name": "func-name-matching",
+                "severity": "off"
+            },
+            {
                 "name": "getter-return",
                 "severity": "error"
             },
@@ -7339,6 +8043,18 @@
             },
             {
                 "name": "guard-for-in",
+                "severity": "off"
+            },
+            {
+                "name": "id-denylist",
+                "severity": "off"
+            },
+            {
+                "name": "id-length",
+                "severity": "off"
+            },
+            {
+                "name": "id-match",
                 "severity": "off"
             },
             {
@@ -7359,6 +8075,10 @@
                         "ignoreExpressions": true
                     }
                 ]
+            },
+            {
+                "name": "max-depth",
+                "severity": "off"
             },
             {
                 "name": "max-lines",
@@ -7522,6 +8242,10 @@
                 "severity": "off"
             },
             {
+                "name": "no-bitwise",
+                "severity": "off"
+            },
+            {
                 "name": "no-caller",
                 "severity": "error"
             },
@@ -7561,6 +8285,10 @@
             {
                 "name": "no-constructor-return",
                 "severity": "error"
+            },
+            {
+                "name": "no-continue",
+                "severity": "off"
             },
             {
                 "name": "no-control-regex",
@@ -7671,6 +8399,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-inline-comments",
+                "severity": "off"
+            },
+            {
                 "name": "no-inner-declarations",
                 "severity": "error"
             },
@@ -7727,6 +8459,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-negated-condition",
+                "severity": "off"
+            },
+            {
                 "name": "no-new",
                 "severity": "error"
             },
@@ -7767,6 +8503,10 @@
                 "severity": "error"
             },
             {
+                "name": "no-plusplus",
+                "severity": "off"
+            },
+            {
                 "name": "no-promise-executor-return",
                 "severity": "error"
             },
@@ -7781,6 +8521,10 @@
             {
                 "name": "no-regex-spaces",
                 "severity": "error"
+            },
+            {
+                "name": "no-restricted-exports",
+                "severity": "off"
             },
             {
                 "name": "no-restricted-globals",
@@ -7851,6 +8595,10 @@
                 ]
             },
             {
+                "name": "no-restricted-imports",
+                "severity": "off"
+            },
+            {
                 "name": "no-restricted-properties",
                 "severity": "error",
                 "options": [
@@ -7912,6 +8660,10 @@
             {
                 "name": "no-undef-init",
                 "severity": "error"
+            },
+            {
+                "name": "no-underscore-dangle",
+                "severity": "off"
             },
             {
                 "name": "no-unexpected-multiline",
@@ -8017,6 +8769,10 @@
                 "severity": "error"
             },
             {
+                "name": "prefer-arrow-callback",
+                "severity": "off"
+            },
+            {
                 "name": "prefer-const",
                 "severity": "error",
                 "options": [
@@ -8024,6 +8780,10 @@
                         "ignoreReadBeforeAssign": true
                     }
                 ]
+            },
+            {
+                "name": "prefer-destructuring",
+                "severity": "off"
             },
             {
                 "name": "prefer-exponentiation-operator",
@@ -8076,6 +8836,10 @@
             {
                 "name": "require-yield",
                 "severity": "error"
+            },
+            {
+                "name": "sort-vars",
+                "severity": "off"
             },
             {
                 "name": "strict",
