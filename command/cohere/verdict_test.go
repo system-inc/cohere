@@ -84,8 +84,19 @@ func TestAVerdictDescriptorThatIsNotAPipeIsLeftAlone(t *testing.T) {
 	}
 	defer reader.Close()
 	defer writer.Close()
-	t.Setenv(VerdictVariable, strconv.Itoa(int(writer.Fd())))
-	if file := takeVerdictFile(); file == nil {
-		t.Error("a pipe was not taken as the verdict descriptor")
+	// A descriptor of its own for takeVerdictFile to own and close. Handed the writer's, it would make a
+	// second *os.File around one descriptor, whose finalizer closes that number again after the writer
+	// has, by then most likely another test's pipe: a command's output read end closed out from under the
+	// poller hangs its Wait forever (#zqsdzbq, reproduced at round 145 of a stress loop).
+	descriptor, err := syscall.Dup(int(writer.Fd()))
+	if err != nil {
+		t.Fatal(err)
 	}
+	t.Setenv(VerdictVariable, strconv.Itoa(descriptor))
+	file := takeVerdictFile()
+	if file == nil {
+		syscall.Close(descriptor)
+		t.Fatal("a pipe was not taken as the verdict descriptor")
+	}
+	file.Close()
 }

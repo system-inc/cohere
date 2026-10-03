@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestMain gives every binary this package's tests launch a user cache of its own.
@@ -22,7 +23,11 @@ func TestMain(m *testing.M) {
 	}
 	os.Setenv("HOME", home)
 	os.Setenv("XDG_CACHE_HOME", "")
+	// See held_output_guard_test.go: a command whose output never closes fails the binary with its holder
+	// named, rather than at -timeout with nothing said.
+	stopWatching := watchForHeldOutput(heldOutputDeadline, 10*time.Second, failHeldOutput)
 	code := m.Run()
+	stopWatching()
 	os.RemoveAll(home)
 	os.Exit(code)
 }
