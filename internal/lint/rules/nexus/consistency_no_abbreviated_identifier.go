@@ -23,21 +23,21 @@ type ConsistencyNoAbbreviatedIdentifierOptions struct {
 	// parameter names verbatim (`params`, `searchParams`). Next.js demands these spellings in page,
 	// layout, and route files, and a rename there breaks the framework contract rather than
 	// improving the name.
-	FrameworkParameterFilePatterns []string
+	FrameworkParameterFilePatterns []string `json:"frameworkParameterFilePatterns"`
 
 	// FrameworkConstantFilePatterns are path substrings whose files may declare a framework-mandated
 	// `config` constant. Next.js middleware requires `export const config` by that exact name.
-	FrameworkConstantFilePatterns []string
+	FrameworkConstantFilePatterns []string `json:"frameworkConstantFilePatterns"`
 
 	// FrameworkParameterScopeNames are exact names of functions, interfaces, or type aliases inside
 	// which framework-mandated parameter names are allowed, wherever the file lives. Next.js reads
 	// `generateMetadata` and `generateStaticParams` by name.
-	FrameworkParameterScopeNames []string
+	FrameworkParameterScopeNames []string `json:"frameworkParameterScopeNames"`
 
 	// FrameworkParameterScopeSuffixes have the same effect, matched against the declaration name and
 	// against that name with role suffixes stripped, so `PageRoute` also covers
 	// `SomethingPageRouteProperties`.
-	FrameworkParameterScopeSuffixes []string
+	FrameworkParameterScopeSuffixes []string `json:"frameworkParameterScopeSuffixes"`
 }
 
 // millisecondSegmentPattern matches a millisecond unit written as a camelCase word.
@@ -122,6 +122,8 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 		routeContract := nextjs.RouteContractExports(fileName)
 		// Built on the first candidate identifier, so a file with no abbreviated name never walks.
 		var importedNames map[string]bool
+		// Answered on the first `args`, so no other file walks for it.
+		argumentsNameRestOnly, argumentsBindingsRead := false, false
 
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
@@ -228,7 +230,23 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 				case "whole args":
 					// A rest parameter in a variadic or framework function keeps the conventional
 					// spelling: `...args` is the shape everyone reads.
+					//
+					// Its uses have to agree with it. The name was chosen once, at the exempt rest,
+					// so reporting `target(...args)` put the finding away from where anyone could act
+					// on it, and only there (#e000k8d). Without scope analysis a use cannot be traced
+					// to its binding, so the question is asked of the file, the same way imported
+					// names are: when every `args` the file binds is a rest, every `args` is exempt.
+					// A file that also binds a plain parameter or catch binding named `args` keeps
+					// reporting all of them, erring toward a finding. The ESLint twin asks the file
+					// the same question, so the two engines agree.
 					if isRestElement(node) {
+						return
+					}
+					if !argumentsBindingsRead {
+						argumentsNameRestOnly = nameBoundOnlyAsRest(ctx.SourceFile, "args")
+						argumentsBindingsRead = true
+					}
+					if argumentsNameRestOnly {
 						return
 					}
 				}
@@ -522,6 +540,41 @@ func declaresNestedBinding(node *ast.Node) bool {
 		return statement.Parent == nil || statement.Parent.Kind != ast.KindSourceFile
 	}
 	return false
+}
+
+// nameBoundOnlyAsRest reports whether a file binds a name at least once and only ever as a rest:
+// `...args` in a parameter list or `[first, ...args]` in a destructuring pattern.
+//
+// A binding is counted by the same test importedNamesNeverRedeclared uses, an identifier that is its
+// parent's name, less the members and keys that bind nothing in scope. An import counts as a binding
+// that is not a rest, though the import skip has already answered for an imported name.
+func nameBoundOnlyAsRest(sourceFile *ast.SourceFile, name string) bool {
+	bound, onlyRest := false, true
+	var visit func(node *ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if !onlyRest {
+			return true
+		}
+		if node.Kind == ast.KindIdentifier && node.Text() == name && node.Parent != nil && node.Parent.Name() == node {
+			switch node.Parent.Kind {
+			case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment, ast.KindPropertyAccessExpression,
+				ast.KindPropertySignature, ast.KindPropertyDeclaration, ast.KindMethodDeclaration,
+				ast.KindMethodSignature, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindExportSpecifier,
+				ast.KindEnumMember, ast.KindJsxAttribute:
+				// Members and keys bind no name in scope.
+			default:
+				bound = true
+				if !isRestElement(node) {
+					onlyRest = false
+					return true
+				}
+			}
+		}
+		node.ForEachChild(visit)
+		return !onlyRest
+	}
+	sourceFile.AsNode().ForEachChild(visit)
+	return bound && onlyRest
 }
 
 // importedNamesNeverRedeclared returns the names an import in this file binds, less any name the

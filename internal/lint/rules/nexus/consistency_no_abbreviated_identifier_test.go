@@ -132,10 +132,15 @@ func TestConsistencyNoAbbreviatedIdentifierFires(t *testing.T) {
 		// prefix, which is a different branch with a different message.
 		{"msgText is the msg prefix, not the Ms unit", "const msgText = 1;\n", []string{"noMsg"}},
 
-		// The rest-parameter exemption covers the declaration, not every later reference to it.
-		// The original draws the line the same place: its guard tests the parent node, which only
-		// the declaration has.
-		{"a use of a rest parameter", "function run(...args: string[]) {\n    use(args);\n}\n", []string{"noArgs"}},
+		// A plain parameter or catch binding named `args` reports where it is declared and at every
+		// use. Once the file binds one, the rest-only exemption is off for the whole file, since
+		// without scope analysis a use cannot be traced to its binding (#e000k8d): the rest's own
+		// declaration stays exempt and its use reports.
+		{"a plain args parameter", "function run(args: string[]) {\n    use(args);\n}\n", []string{"noArgs", "noArgs"}},
+		{"a catch binding named args", "try {\n    run();\n} catch (args) {\n    use(args);\n}\n", []string{"noArgs", "noArgs"}},
+		// A file that binds no `args` at all has no rest to agree with, so a free reference reports.
+		{"an args the file never binds", "use(args);\n", []string{"noArgs"}},
+		{"a rest beside a plain args", "function run(...args: string[]) {\n    use(args);\n}\nfunction other(args: string[]) {\n    return args;\n}\n", []string{"noArgs", "noArgs", "noArgs"}},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -216,6 +221,13 @@ func TestConsistencyNoAbbreviatedIdentifierStaysSilent(t *testing.T) {
 		// The conventional shapes.
 		{"a rest parameter declaration", "function run(...args: string[]) {\n    return 1;\n}\n"},
 		{"a rest binding element", "const { first, ...args } = source;\n"},
+		// The uses agree with the rest that named them, when every `args` the file binds is a rest
+		// (#e000k8d): the finding would otherwise land on the spread, away from where the name was
+		// chosen.
+		{"a use of a rest parameter", "function run(...args: string[]) {\n    use(args);\n}\n"},
+		{"a spread of a rest parameter", "function forward(...args: unknown[]) {\n    return target(...args);\n}\n"},
+		{"a use of a destructured rest", "const [first, ...args] = source;\nuse(first, args);\n"},
+		{"two rests in one file", "function run(...args: string[]) {\n    use(args);\n}\nconst other = (...args: number[]) => args.length;\n"},
 		{"queryFn as an object key", "const query = { queryFn: load, mutationFn: save };\n"},
 
 		// React 19 made `ref` a regular property, so the canonical spelling is load-bearing.
