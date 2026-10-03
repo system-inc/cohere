@@ -518,3 +518,51 @@ func TestDecodeNoRestrictedGlobalsOptions(t *testing.T) {
 		}
 	}
 }
+
+// TestNoRestrictedGlobalsJudgesOnlyValueReferences pins the names that spell a restricted global
+// without reading it (#g5b8q7e), found when the confusing-browser-globals list was run over ahra.
+//
+// An intrinsic JSX tag is named by HTML, an attribute by the component, and a destructuring or
+// object-literal key by the object's type. None reads the global. They reported because the key's
+// symbol, when the object's type lives in a declaration file, is that file's property: `open:` in
+// Collapsible.tsx:43 destructures Radix's props, declared in its `.d.ts`, so the shadow check saw a
+// name not declared in source. `length`, declared in the standard library, reproduces it in one line.
+//
+// The firing rows are the controls: a component tag and a shorthand both read a binding, and
+// WisdomGateItems.ts:304 before #war4qsy read a bare `status`, which is `window.status` and rendered
+// empty every time.
+func TestNoRestrictedGlobalsJudgesOnlyValueReferences(t *testing.T) {
+	t.Parallel()
+
+	const file = "/repository/source/NoRestrictedGlobals.tsx"
+	const confusing = `["status", "name", "open", "stop", "length", "event", "Option"]`
+	silent := []struct{ name, source string }{
+		{"an intrinsic tag, the svg gradient stop", "export const Gradient = () => <linearGradient><stop offset=\"0\" /><stop offset=\"1\"></stop></linearGradient>;\n"},
+		{"an attribute name", "declare const Dialog: (properties: { open: boolean }) => null;\nexport const Shown = () => <Dialog open={true} />;\n"},
+		{"a destructuring key over a standard-library type", "declare const text: string;\nconst { length: size } = text;\nexport { size };\n"},
+		{"an object-literal key typed by a standard-library type", "export const descriptor: PropertyDescriptor & { length?: number } = { length: 1 };\n"},
+		{"an object-literal method typed by a standard-library type", "export const lengthy: { length(): number } = { length() { return 1; } };\n"},
+	}
+	for _, testCase := range silent {
+		t.Run(testCase.name, func(t *testing.T) {
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoRestrictedGlobals, file,
+				testCase.source, decodeNoRestrictedGlobalsOptionsForTest(t, confusing)))
+		})
+	}
+
+	firing := []struct {
+		name, source string
+		ids          []string
+	}{
+		{"WisdomGateItems.ts:304 before #war4qsy, a bare status", "declare const intent: { task: { routedTo: string | null } };\nexport const text = `${status.toLowerCase()}${intent.task.routedTo ? ` · @${intent.task.routedTo}` : ''}`;\n", []string{"defaultMessage"}},
+		{"a component tag reads its binding", "export const Shown = () => <Option />;\n", []string{"defaultMessage"}},
+		{"a shorthand reads the global", "export const values = { status };\n", []string{"defaultMessage"}},
+		{"a destructuring default reads the global", "declare const source: { label?: string };\nconst { label = name } = source;\nexport { label };\n", []string{"defaultMessage"}},
+	}
+	for _, testCase := range firing {
+		t.Run(testCase.name, func(t *testing.T) {
+			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoRestrictedGlobals, file,
+				testCase.source, decodeNoRestrictedGlobalsOptionsForTest(t, confusing)), testCase.ids...)
+		})
+	}
+}

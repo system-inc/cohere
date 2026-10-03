@@ -493,9 +493,6 @@ func noRestrictedGlobalsIsShadowed(ctx rule.Context, node *ast.Node) bool {
 	if parent == nil || parent.Kind != ast.KindShorthandPropertyAssignment || parent.Name() != node {
 		return identifierIsShadowed(ctx, node)
 	}
-	if true {
-		return identifierIsShadowed(ctx, node)
-	}
 	symbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent)
 	if symbol == nil {
 		return false
