@@ -187,6 +187,7 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	tablePath := cacheTablePath(location.Root)
 	// Statted before it is read, never after: a table replaced between the two then reads as replaced at the
 	// end, and is read again, where the other order could keep a stale copy.
+	printPreviousNotes(tablePath)
 	tableSignature := signatureOfFile(tablePath)
 	table, err := program.ReadCacheTable(tablePath, cacheTableIdentity())
 	if errors.Is(err, program.ErrCacheTableUnreadable) || errors.Is(err, program.ErrCacheTablePartlyKept) {
@@ -367,6 +368,8 @@ func finishRunCache(exitCode int) {
 		activeRunCache = nil
 		session.stdout.stop(&os.Stdout)
 		session.stderr.stop(&os.Stderr)
+		// The report is out, so the caller can have its answer while the run is recorded. See sendVerdict.
+		sendVerdict(exitCode)
 		var recorded *program.RunCache
 		if session.declared && session.declined == "" {
 			recorded = session.record(exitCode)
@@ -385,7 +388,7 @@ func (session *runCacheSession) record(exitCode int) *program.RunCache {
 	if err != nil {
 		// Not recording is always safe. Said on stderr because a cache that silently never records is
 		// a saving that quietly never appears.
-		fmt.Fprintf(os.Stderr, "note: the run cache did not record this run: %v\n", firstLine(err.Error()))
+		session.note(fmt.Sprintf("the run cache did not record this run: %v", firstLine(err.Error())))
 		return nil
 	}
 	cache.Errors = session.stderr.buffer.Bytes()
@@ -425,7 +428,7 @@ func (session *runCacheSession) write(recorded *program.RunCache) {
 		table.Signatures = session.shapes
 	}
 	if err := program.WriteCacheTable(session.tablePath, table, identity); err != nil {
-		fmt.Fprintf(os.Stderr, "note: the cache table could not be written: %v\n", firstLine(err.Error()))
+		session.note(fmt.Sprintf("the cache table could not be written: %v", firstLine(err.Error())))
 	}
 }
 
@@ -442,6 +445,43 @@ func signatureOfFile(path string) fileSignature {
 		return fileSignature{}
 	}
 	return fileSignature{exists: true, size: information.Size(), modifiedNanoseconds: information.ModTime().UnixNano()}
+}
+
+// note says something about recording this run. Before the caller has its verdict it goes to stderr, as
+// it always did; after, the caller has moved on and its terminal may hold someone else's prompt, so it is
+// kept beside the table for the next run to say instead (printPreviousNotes).
+func (session *runCacheSession) note(text string) {
+	if !verdictSent {
+		fmt.Fprintf(os.Stderr, "note: %s\n", text)
+		return
+	}
+	file, err := os.OpenFile(previousNotesPath(session.tablePath), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	fmt.Fprintln(file, text)
+	file.Close()
+}
+
+// previousNotesPath is where a run that answered its caller early keeps what it had to say afterward.
+func previousNotesPath(tablePath string) string {
+	return filepath.Join(filepath.Dir(tablePath), "notes-after-return.txt")
+}
+
+// printPreviousNotes says, once, what the last run recorded after it had already returned, and clears it.
+// A cache write that failed in the background otherwise fails silently forever, the saving quietly gone.
+func printPreviousNotes(tablePath string) {
+	path := previousNotesPath(tablePath)
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	os.Remove(path)
+	for line := range strings.SplitSeq(strings.TrimSpace(string(contents)), "\n") {
+		if line != "" {
+			fmt.Fprintf(os.Stderr, "note: after the last run returned, %s\n", line)
+		}
+	}
 }
 
 func firstLine(text string) string {

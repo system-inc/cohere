@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"syscall"
 
 	"github.com/system-inc/cohere/internal/release/dispatch"
@@ -27,16 +28,20 @@ func main() {
 }
 
 func run() error {
-	// The dispatcher owns exactly three flags and forwards everything else. They are matched
+	// The dispatcher owns exactly four flags and forwards everything else. They are matched
 	// positionally at the front rather than with the flag package, because flag.Parse would stop at
 	// the first argument it does not recognize and swallow flags meant for the real binary.
 	arguments := os.Args[1:]
 	development := false
 	verbose := false
 	frozen := false
+	wait := waitIsRequested()
 
 	for len(arguments) > 0 {
 		switch arguments[0] {
+		case "--wait":
+			wait = true
+			arguments = arguments[1:]
 		case "--dev":
 			development = true
 			arguments = arguments[1:]
@@ -57,7 +62,7 @@ parsed:
 		if err != nil {
 			return err
 		}
-		return execute(binaryPath, arguments)
+		return execute(binaryPath, arguments, wait)
 	}
 
 	binaryPath, err := resolveBinary(development, verbose)
@@ -65,20 +70,41 @@ parsed:
 		return err
 	}
 
-	return execute(binaryPath, arguments)
+	return execute(binaryPath, arguments, wait)
 }
 
-// execute replaces this process with the cohere binary.
-//
-// exec rather than spawn-and-wait: the real binary takes over, so it inherits the terminal directly
-// and its exit code is the one the caller sees. A wrapper that forwarded the status would be one
-// more layer able to lose a non-zero exit, and losing a non-zero exit is how a gate goes quietly
-// green.
-func execute(binaryPath string, arguments []string) error {
-	if err := syscall.Exec(binaryPath, append([]string{binaryPath}, arguments...), os.Environ()); err != nil {
-		return fmt.Errorf("running %s: %w", binaryPath, err)
+// waitIsRequested reports whether the environment asks the dispatcher to wait for the engine to finish
+// everything, its cache write included, rather than return when the verdict is out. CI always waits: a job
+// that ends while its cache is still being written can lose the write to the runner tearing down.
+func waitIsRequested() bool {
+	if value := os.Getenv("COHERE_WAIT"); value != "" && value != "0" && value != "false" {
+		return true
 	}
-	return nil
+	return os.Getenv("CI") == "true"
+}
+
+// execute runs the cohere binary and returns its exit code to the caller.
+//
+// Waiting, it replaces this process with the binary, as it always did: the real binary takes over, so it
+// inherits the terminal directly and its exit code is the one the caller sees. A wrapper that forwarded
+// the status would be one more layer able to lose a non-zero exit, and losing a non-zero exit is how a
+// gate goes quietly green.
+//
+// Otherwise it returns early. The engine's report is the caller's answer, and after printing it the engine
+// still records the run, writes its cache table and gives back a heap of several gigabytes, about 85ms on
+// ahra that nobody needs to wait for (#zqsdzbq). So the binary runs as a child holding one more descriptor,
+// and the moment it writes its exit code there, this process exits with that code while the child finishes
+// alone. Every byte the caller reads still comes from the child's own inherited stdout and stderr. A child
+// that exits without a verdict, crashing or killed, hands back its exit status as exec would have.
+func execute(binaryPath string, arguments []string, wait bool) error {
+	if wait || runtime.GOOS == "windows" {
+		if err := syscall.Exec(binaryPath, append([]string{binaryPath}, arguments...), os.Environ()); err != nil {
+			return fmt.Errorf("running %s: %w", binaryPath, err)
+		}
+		return nil
+	}
+
+	return returnEarly(binaryPath, arguments)
 }
 
 // resolveFrozenBinary picks the newest cached binary and announces that it did.

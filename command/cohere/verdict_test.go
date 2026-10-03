@@ -1,0 +1,53 @@
+//go:build !windows
+
+package main
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
+	"syscall"
+	"testing"
+)
+
+// The verdict descriptor the dispatcher hands the engine is the engine's alone. A process it starts, the
+// Swift engine or any other, neither holds the descriptor nor finds the variable naming it, since a
+// grandchild writing a byte to "descriptor 3" would write it into whatever 3 is there (#zqsdzbq).
+//
+// The descriptor arrives the way the dispatcher passes it, without close-on-exec, so a child would hold
+// it: the first spawn proves that, which is what makes the second one's answer mean something.
+func TestTheVerdictDescriptorIsNotInheritedByAChild(t *testing.T) {
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	defer writer.Close()
+	descriptor, err := syscall.Dup(int(writer.Fd()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	probe := func() string {
+		script := fmt.Sprintf("if [ -e /dev/fd/%d ]; then echo open; else echo closed; fi; echo ${%s:-unset}", descriptor, VerdictVariable)
+		output, err := exec.Command("/bin/sh", "-c", script).Output()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return strings.Join(strings.Fields(string(output)), " ")
+	}
+
+	t.Setenv(VerdictVariable, strconv.Itoa(descriptor))
+	if before := probe(); !strings.HasPrefix(before, "open") {
+		t.Fatalf("a child did not see the descriptor even before it was taken (%s), so this proves nothing", before)
+	}
+	file := takeVerdictFile()
+	if file == nil {
+		t.Fatal("the verdict descriptor was not taken")
+	}
+	defer file.Close()
+	if after := probe(); after != "closed unset" {
+		t.Errorf("a child started after the verdict descriptor was taken sees %q, want the descriptor closed and the variable unset", after)
+	}
+}

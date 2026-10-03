@@ -374,8 +374,14 @@ func ReadCacheTable(path string, identity CacheTableIdentity) (*CacheTable, erro
 	return table, nil
 }
 
+// beforeCacheTableRename, when set, runs between writing the temporary and renaming it into place. Only a
+// test sets it, to stop a writer at the one moment a kill could matter.
+var beforeCacheTableRename func(temporaryName string)
+
 // WriteCacheTable persists a table atomically: a temporary in the destination directory, then a rename.
-// Two runs can share a tree, and a reader must never see half a table.
+// Two runs can share a tree, and a reader must never see half a table. A run that returned to its caller
+// early writes after the caller has moved on, where nothing stops a kill landing mid-write; the rename is
+// what keeps the old table whole if one does (TestAWriterKilledBeforeItsRenameLeavesTheOldTable).
 func WriteCacheTable(path string, table *CacheTable, identity CacheTableIdentity) error {
 	encoded, err := EncodeCacheTable(table, identity)
 	if err != nil {
@@ -401,6 +407,9 @@ func WriteCacheTable(path string, table *CacheTable, identity CacheTableIdentity
 	}
 	if err := temporary.Close(); err != nil {
 		return fmt.Errorf("closing %s: %w", temporaryName, err)
+	}
+	if beforeCacheTableRename != nil {
+		beforeCacheTableRename(temporaryName)
 	}
 	if err := os.Rename(temporaryName, path); err != nil {
 		return fmt.Errorf("renaming the cache table into place: %w", err)
