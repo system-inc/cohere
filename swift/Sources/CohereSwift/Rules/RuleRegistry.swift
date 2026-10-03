@@ -62,6 +62,7 @@ public enum RuleRegistry {
         ConcurrencyNoCheckThenWrite(),
         ConsistencyNoIsoStringDateCut(),
         CorrectnessRequireResponseStatusCheck(),
+        CorrectnessNoWriteOnlyCollection(),
     ]
 
     public static let packageRules: [any PackageRule] = [

@@ -313,9 +313,9 @@
   },
   {
     "typeScriptRule": "nexus/correctness-no-write-only-collection",
-    "verdict": "Port",
-    "swiftRule": null,
-    "reason": "swiftc gives no warning for a local array, set or dictionary that is only appended to (probed), though both proving grounds are clean today."
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/correctness-no-write-only-collection",
+    "reason": null
   },
   {
     "typeScriptRule": "nexus/correctness-require-blocking-standard-streams",
