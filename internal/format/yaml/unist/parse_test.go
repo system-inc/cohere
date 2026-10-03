@@ -2,6 +2,8 @@ package unist
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"math/rand/v2"
 	"os"
 	"os/exec"
@@ -228,6 +230,8 @@ func TestCorpusParseMatchesUpstream(t *testing.T) {
 	yamlFiles, frontMatters, tooLarge := 0, 0, 0
 	pending := strings.Split(roots, ":")
 	seen := map[string]bool{}
+	// Every corpus walked, logged once the loop ends, so a run that reaches fewer repositories says so.
+	var measured []string
 	for len(pending) > 0 {
 		root := strings.TrimSpace(pending[0])
 		pending = pending[1:]
@@ -239,16 +243,25 @@ func TestCorpusParseMatchesUpstream(t *testing.T) {
 			continue
 		}
 		seen[root] = true
+		// Nested repositories regardless of root's own ignore lists, as the differential finds them
+		// (#k6vebep): a repository under a path root never formats is still a corpus.
+		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
+		if err != nil {
+			t.Fatalf("finding the repositories nested in %s: %v", root, err)
+		}
+		for _, nested := range nestedRepositories {
+			pending = append(pending, filepath.Join(root, nested))
+		}
+
 		enumeration, err := enumerator.Enumerate(root, formatfiles.StructureIgnorePath(root))
+		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
+			t.Logf("skipping %s, not yet adopted: %v", root, err)
+			continue
+		}
 		if err != nil {
 			t.Fatalf("enumerating %s: %v", root, err)
 		}
-		for _, nested := range enumeration.NestedRepositories {
-			if !filepath.IsAbs(nested) {
-				nested = filepath.Join(root, nested)
-			}
-			pending = append(pending, nested)
-		}
+		measured = append(measured, fmt.Sprintf("%s (%d)", root, len(enumeration.Files)))
 		for _, file := range enumeration.Files {
 			if !filepath.IsAbs(file) {
 				file = filepath.Join(root, file)
@@ -287,6 +300,7 @@ func TestCorpusParseMatchesUpstream(t *testing.T) {
 			texts = append(texts, text)
 		}
 	}
+	t.Logf("corpora walked: %d\n  %s", len(measured), strings.Join(measured, "\n  "))
 	failures, errored := compareAll(t, "corpus", names, texts, 30)
 	t.Logf("%d of %d inputs match upstream (%d yaml files, %d front matter values; %d of them errors); %d files over %d bytes not measured",
 		len(texts)-failures, len(texts), yamlFiles, frontMatters, errored, tooLarge, corpusSizeLimit)

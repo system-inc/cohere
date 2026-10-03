@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -144,19 +146,30 @@ func nonASCIILines(t *testing.T, root string, seen map[string]bool) []string {
 	}
 	var lines []string
 	pending := []string{root}
+	// Every corpus walked, logged once the loop ends, so a run that reaches fewer repositories says so.
+	var measured []string
 	for len(pending) > 0 {
 		current := pending[0]
 		pending = pending[1:]
+		// Nested repositories regardless of current's own ignore lists, as the differential finds them
+		// (#k6vebep): a repository under a path current never formats is still a corpus.
+		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(current)
+		if err != nil {
+			t.Fatalf("finding the repositories nested in %s: %v", current, err)
+		}
+		for _, nested := range nestedRepositories {
+			pending = append(pending, filepath.Join(current, nested))
+		}
+
 		enumeration, err := engine.Enumerate(current, formatfiles.StructureIgnorePath(current))
+		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
+			t.Logf("skipping %s, not yet adopted: %v", current, err)
+			continue
+		}
 		if err != nil {
 			t.Fatalf("enumerating %s: %v", current, err)
 		}
-		for _, nested := range enumeration.NestedRepositories {
-			if !filepath.IsAbs(nested) {
-				nested = filepath.Join(current, nested)
-			}
-			pending = append(pending, nested)
-		}
+		measured = append(measured, fmt.Sprintf("%s (%d)", current, len(enumeration.Files)))
 		for _, path := range enumeration.Files {
 			file, err := os.Open(path)
 			if err != nil {
@@ -175,5 +188,6 @@ func nonASCIILines(t *testing.T, root string, seen map[string]bool) []string {
 			file.Close()
 		}
 	}
+	t.Logf("corpora walked: %d\n  %s", len(measured), strings.Join(measured, "\n  "))
 	return lines
 }

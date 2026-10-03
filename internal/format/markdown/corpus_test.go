@@ -107,16 +107,24 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 		}
 		seen[root] = true
 
+		// Nested repositories regardless of root's own ignore lists, as the differential finds them
+		// (#k6vebep): a repository under a path root never formats is still a corpus.
+		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
+		if err != nil {
+			t.Fatalf("finding the repositories nested in %s: %v", root, err)
+		}
+		for _, nested := range nestedRepositories {
+			pending = append(pending, filepath.Join(root, nested))
+		}
+
 		structureIgnore := formatfiles.StructureIgnorePath(root)
 		enumeration, err := enumerator.Enumerate(root, structureIgnore)
+		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
+			t.Logf("skipping %s, not yet adopted: %v", root, err)
+			continue
+		}
 		if err != nil {
 			t.Fatalf("enumerating %s: %v", root, err)
-		}
-		for _, nested := range enumeration.NestedRepositories {
-			if !filepath.IsAbs(nested) {
-				nested = filepath.Join(root, nested)
-			}
-			pending = append(pending, nested)
 		}
 		var files []string
 		for _, file := range enumeration.Files {
@@ -140,6 +148,12 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 		}
 		corpora = append(corpora, markdownCorpus{root: root, files: files, options: resolution.Options})
 	}
+	// Every corpus measured, in one line, so a run that reaches fewer repositories says so.
+	var measured []string
+	for _, corpus := range corpora {
+		measured = append(measured, fmt.Sprintf("%s (%d .md)", corpus.root, len(corpus.files)))
+	}
+	t.Logf("markdown corpora: %d\n  %s", len(corpora), strings.Join(measured, "\n  "))
 	return corpora
 }
 
