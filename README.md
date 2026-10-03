@@ -75,6 +75,12 @@ The keys:
   `--format` refuses to run when your settings do not extend a `NexusCohereSettings.json` holding a
   `format` block. Linting and fixing need no such file.
 
+The full reference, every key with an example, is [schema/CohereSettings.md](schema/CohereSettings.md).
+It is generated from the loader itself, along with two JSON schemas an editor can validate against
+through a `"$schema"` key: [schema/CohereSettings.schema.json](schema/CohereSettings.schema.json) for a
+project's file and [schema/NexusCohereSettings.schema.json](schema/NexusCohereSettings.schema.json) for
+the Nexus tier.
+
 `cohere --rules` lists every rule cohere implements for your project's language, and
 `cohere --rules-enabled` lists the ones your settings turn on for one file (`index.ts` at the project
 root unless you name another).

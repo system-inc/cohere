@@ -286,6 +286,46 @@ func prettierConfigIn(directory string) (leftoverConfig, bool, error) {
 	return leftoverConfig{}, false, nil
 }
 
+// BlockKey is one key the format block accepts. The table is the decoder itself, and the settings
+// schema (internal/settingsschema) is generated from it, so neither can learn a key the other lacks.
+type BlockKey struct {
+	Name string
+
+	// Type is the key's JSON type: "integer", "boolean", "string", or "array" of patterns.
+	Type string
+
+	// Enum is the values a string key takes, when they are fixed. endOfLine's is enforced here; the
+	// others are Prettier's, which the printers implement and nothing else.
+	Enum []string
+
+	// Option points at the field the value decodes into, nil for a key resolveChain reads itself.
+	Option func(options *Options) any
+}
+
+// BlockKeys is every key of the format block, in the order the reference documents them.
+var BlockKeys = []BlockKey{
+	{Name: "printWidth", Type: "integer", Option: func(options *Options) any { return &options.PrintWidth }},
+	{Name: "tabWidth", Type: "integer", Option: func(options *Options) any { return &options.TabWidth }},
+	{Name: "useTabs", Type: "boolean", Option: func(options *Options) any { return &options.UseTabs }},
+	{Name: "semi", Type: "boolean", Option: func(options *Options) any { return &options.Semi }},
+	{Name: "singleQuote", Type: "boolean", Option: func(options *Options) any { return &options.SingleQuote }},
+	{Name: "trailingComma", Type: "string", Enum: []string{"all", "es5", "none"}, Option: func(options *Options) any { return &options.TrailingComma }},
+	{Name: "bracketSpacing", Type: "boolean", Option: func(options *Options) any { return &options.BracketSpacing }},
+	{Name: "bracketSameLine", Type: "boolean", Option: func(options *Options) any { return &options.BracketSameLine }},
+	{Name: "arrowParens", Type: "string", Enum: []string{"always", "avoid"}, Option: func(options *Options) any { return &options.ArrowParens }},
+	{Name: "endOfLine", Type: "string", Enum: []string{"lf"}, Option: func(options *Options) any { return &options.EndOfLine }},
+	{Name: "ignore", Type: "array"},
+}
+
+func blockKeyNamed(name string) (BlockKey, bool) {
+	for _, key := range BlockKeys {
+		if key.Name == name {
+			return key, true
+		}
+	}
+	return BlockKey{}, false
+}
+
 // applyFormatBlock decodes one format block over the options given, refusing any key it would have to
 // ignore. ignorePluginKeys lets a leftover Prettier config through with its Tailwind plugin settings
 // (plugins, tailwind*), which were never format options, so it can be compared with the format block;
@@ -307,42 +347,22 @@ func applyFormatBlock(path string, raw json.RawMessage, over Options, ignorePlug
 
 	for _, key := range keys {
 		value := block[key]
-		var err error
-		switch key {
-		case "tabWidth":
-			err = json.Unmarshal(value, &options.TabWidth)
-		case "useTabs":
-			err = json.Unmarshal(value, &options.UseTabs)
-		case "semi":
-			err = json.Unmarshal(value, &options.Semi)
-		case "singleQuote":
-			err = json.Unmarshal(value, &options.SingleQuote)
-		case "printWidth":
-			err = json.Unmarshal(value, &options.PrintWidth)
-		case "trailingComma":
-			err = json.Unmarshal(value, &options.TrailingComma)
-		case "bracketSpacing":
-			err = json.Unmarshal(value, &options.BracketSpacing)
-		case "bracketSameLine":
-			err = json.Unmarshal(value, &options.BracketSameLine)
-		case "arrowParens":
-			err = json.Unmarshal(value, &options.ArrowParens)
-		case "endOfLine":
-			err = json.Unmarshal(value, &options.EndOfLine)
-		case "ignore":
+		blockKey, known := blockKeyNamed(key)
+		if known && blockKey.Option == nil {
 			// The house ignore list rides in the format block but is no printing option: resolveChain
 			// reads it. Prettier config never had the key, so a leftover carrying it is refused.
 			if ignorePluginKeys {
 				return Options{}, fmt.Errorf("%s: format option %q is not one cohere applies; add it to Options rather than formatting without it", path, key)
 			}
 			continue
-		default:
+		}
+		if !known {
 			if ignorePluginKeys && (key == "plugins" || strings.HasPrefix(key, "tailwind")) {
 				continue
 			}
 			return Options{}, fmt.Errorf("%s: format option %q is not one cohere applies; add it to Options rather than formatting without it", path, key)
 		}
-		if err != nil {
+		if err := json.Unmarshal(value, blockKey.Option(options)); err != nil {
 			return Options{}, fmt.Errorf("%s: format option %q: %w", path, key, err)
 		}
 	}
