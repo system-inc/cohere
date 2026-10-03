@@ -1,6 +1,7 @@
 package configuration
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -156,6 +157,33 @@ func TestLaterOverridesWin(t *testing.T) {
 	}
 	if !configuration.Resolve("modules/finance/File.ts").Enabled("a-rule") {
 		t.Fatal("the later override should have re-enabled the rule under modules/finance/")
+	}
+}
+
+// An override that re-states a rule with a bare severity keeps the options already in force for the
+// file, as ESLint does and as a bare severity across `extends` already did. Found on api: its TS-file
+// override `"prefer-const": "error"` dropped the Nexus tier's ignoreReadBeforeAssign in cohere only, so
+// the two engines judged prefer-const differently on every TS file (#na0hgjz). An override that writes
+// its own options still replaces them.
+func TestABareSeverityInAnOverrideKeepsTheOptionsInForce(t *testing.T) {
+	inherited := []json.RawMessage{json.RawMessage(`{"ignoreReadBeforeAssign":true}`)}
+	written := []json.RawMessage{json.RawMessage(`{"destructuring":"all"}`)}
+	configuration := &Config{
+		Rules: map[string]RuleSetting{"prefer-const": {Severity: SeverityError, Options: inherited}},
+		Overrides: []Override{
+			{Files: []string{"**/*.ts"}, Rules: map[string]RuleSetting{"prefer-const": {Severity: SeverityError}}},
+			{Files: []string{"modules/written/**"}, Rules: map[string]RuleSetting{"prefer-const": {Severity: SeverityError, Options: written}}},
+		},
+	}
+
+	if options := configuration.Resolve("modules/File.ts").RawOptionsFor("prefer-const"); len(options) != 1 || string(options[0]) != string(inherited[0]) {
+		t.Errorf("a bare severity in an override dropped the options in force: got %s", options)
+	}
+	if options := configuration.Resolve("modules/written/File.ts").RawOptionsFor("prefer-const"); len(options) != 1 || string(options[0]) != string(written[0]) {
+		t.Errorf("an override's own options did not replace the ones in force: got %s", options)
+	}
+	if options := configuration.Resolve("modules/File.js").RawOptionsFor("prefer-const"); len(options) != 1 || string(options[0]) != string(inherited[0]) {
+		t.Errorf("a file no override matches lost its options: got %s", options)
 	}
 }
 

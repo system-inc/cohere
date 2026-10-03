@@ -189,6 +189,14 @@ func (c *Config) Resolve(path string) Resolved {
 			continue
 		}
 		for name, setting := range override.Rules {
+			// A bare severity re-states the rule's level and keeps its options, as ESLint does and as a
+			// bare severity across `extends` already does. Dropping them changed what a rule checked on
+			// every file the override matched (#na0hgjz).
+			if setting.Options == nil {
+				if inForce, configured := effective[name]; configured {
+					setting.Options = inForce.Options
+				}
+			}
 			effective[name] = setting
 		}
 	}
