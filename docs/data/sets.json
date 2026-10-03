@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 255,
+        "rulesOn": 267,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -568,6 +568,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/concurrency-no-check-then-write",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/concurrency-no-lost-update",
                 "severity": "error"
             },
@@ -632,6 +636,42 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-no-callback-in-parse-try",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-collection-misuse",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-discarded-outcome",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-discarded-pure-result",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-global-listener-target-assertion",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-mock-on-module-namespace",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-test-on-global-regex",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-uncleared-race-timeout",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-child-process-error-listener",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
@@ -649,6 +689,10 @@
             },
             {
                 "name": "nexus/performance-no-independent-await-in-loop",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/security-no-interpolated-shell-command",
                 "severity": "error"
             },
             {
@@ -1228,6 +1272,10 @@
                 "severity": "error"
             },
             {
+                "name": "unicode-bom",
+                "severity": "error"
+            },
+            {
                 "name": "use-isnan",
                 "severity": "error"
             },
@@ -1269,7 +1317,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 309,
+        "rulesOn": 330,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -1742,6 +1790,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/concurrency-no-check-then-write",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/concurrency-no-lost-update",
                 "severity": "error"
             },
@@ -1806,6 +1858,42 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-no-callback-in-parse-try",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-collection-misuse",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-discarded-outcome",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-discarded-pure-result",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-global-listener-target-assertion",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-mock-on-module-namespace",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-test-on-global-regex",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-uncleared-race-timeout",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-child-process-error-listener",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
@@ -1823,6 +1911,10 @@
             },
             {
                 "name": "nexus/performance-no-independent-await-in-loop",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/security-no-interpolated-shell-command",
                 "severity": "error"
             },
             {
@@ -2582,6 +2674,10 @@
                 "severity": "error"
             },
             {
+                "name": "react/no-invalid-html-attribute",
+                "severity": "error"
+            },
+            {
                 "name": "react/no-is-mounted",
                 "severity": "error"
             },
@@ -2706,7 +2802,43 @@
                 "severity": "off"
             },
             {
+                "name": "structure/consistency-require-matching-file-name",
+                "severity": "error"
+            },
+            {
+                "name": "structure/react-component-no-separate-named-export",
+                "severity": "error"
+            },
+            {
+                "name": "structure/react-component-require-named-export",
+                "severity": "error"
+            },
+            {
+                "name": "structure/react-component-require-properties-parameter",
+                "severity": "error"
+            },
+            {
+                "name": "structure/react-hook-no-any-type",
+                "severity": "error"
+            },
+            {
+                "name": "structure/react-hook-no-destructuring",
+                "severity": "error"
+            },
+            {
+                "name": "structure/react-hook-no-properties-in-dependencies",
+                "severity": "error"
+            },
+            {
+                "name": "structure/react-hook-require-effect-comment",
+                "severity": "error"
+            },
+            {
                 "name": "symbol-description",
+                "severity": "error"
+            },
+            {
+                "name": "unicode-bom",
                 "severity": "error"
             },
             {
@@ -2747,7 +2879,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 251,
+        "rulesOn": 263,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -3323,6 +3455,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/concurrency-no-check-then-write",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/concurrency-no-lost-update",
                 "severity": "error"
             },
@@ -3395,6 +3531,42 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-no-callback-in-parse-try",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-collection-misuse",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-discarded-outcome",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-discarded-pure-result",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-global-listener-target-assertion",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-mock-on-module-namespace",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-test-on-global-regex",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-uncleared-race-timeout",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-child-process-error-listener",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
@@ -3412,6 +3584,10 @@
             },
             {
                 "name": "nexus/performance-no-independent-await-in-loop",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/security-no-interpolated-shell-command",
                 "severity": "error"
             },
             {
@@ -3991,6 +4167,10 @@
                 "severity": "error"
             },
             {
+                "name": "unicode-bom",
+                "severity": "error"
+            },
+            {
                 "name": "use-isnan",
                 "severity": "error"
             },
@@ -4062,7 +4242,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 269,
+        "rulesOn": 273,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -4535,6 +4715,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/concurrency-no-check-then-write",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/concurrency-no-lost-update",
                 "severity": "error"
             },
@@ -4652,6 +4836,42 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-no-callback-in-parse-try",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-collection-misuse",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-discarded-outcome",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-discarded-pure-result",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-global-listener-target-assertion",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-mock-on-module-namespace",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-test-on-global-regex",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-uncleared-race-timeout",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-child-process-error-listener",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
@@ -4669,6 +4889,10 @@
             },
             {
                 "name": "nexus/performance-no-independent-await-in-loop",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/security-no-interpolated-shell-command",
                 "severity": "error"
             },
             {
@@ -5252,10 +5476,6 @@
                 "severity": "error"
             },
             {
-                "name": "structure/consistency-require-matching-file-name",
-                "severity": "error"
-            },
-            {
                 "name": "structure/consistency-require-organized-imports",
                 "severity": "error"
             },
@@ -5328,18 +5548,6 @@
                 "severity": "error"
             },
             {
-                "name": "structure/react-component-no-separate-named-export",
-                "severity": "error"
-            },
-            {
-                "name": "structure/react-component-require-named-export",
-                "severity": "error"
-            },
-            {
-                "name": "structure/react-component-require-properties-parameter",
-                "severity": "error"
-            },
-            {
                 "name": "structure/react-component-require-properties-type-suffix",
                 "severity": "error"
             },
@@ -5349,22 +5557,6 @@
             },
             {
                 "name": "structure/react-element-no-horizontal-rule",
-                "severity": "error"
-            },
-            {
-                "name": "structure/react-hook-no-any-type",
-                "severity": "error"
-            },
-            {
-                "name": "structure/react-hook-no-destructuring",
-                "severity": "error"
-            },
-            {
-                "name": "structure/react-hook-no-properties-in-dependencies",
-                "severity": "error"
-            },
-            {
-                "name": "structure/react-hook-require-effect-comment",
                 "severity": "error"
             },
             {
@@ -5381,6 +5573,10 @@
             },
             {
                 "name": "symbol-description",
+                "severity": "error"
+            },
+            {
+                "name": "unicode-bom",
                 "severity": "error"
             },
             {
@@ -5450,7 +5646,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 245,
+        "rulesOn": 257,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5971,6 +6167,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/concurrency-no-check-then-write",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/concurrency-no-lost-update",
                 "severity": "error"
             },
@@ -6035,6 +6235,42 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-no-callback-in-parse-try",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-collection-misuse",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-discarded-outcome",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-discarded-pure-result",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-global-listener-target-assertion",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-mock-on-module-namespace",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-test-on-global-regex",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-uncleared-race-timeout",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-child-process-error-listener",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
@@ -6052,6 +6288,10 @@
             },
             {
                 "name": "nexus/performance-no-independent-await-in-loop",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/security-no-interpolated-shell-command",
                 "severity": "error"
             },
             {
@@ -6631,6 +6871,10 @@
                 "severity": "error"
             },
             {
+                "name": "unicode-bom",
+                "severity": "error"
+            },
+            {
                 "name": "use-isnan",
                 "severity": "error"
             },
@@ -6665,7 +6909,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 233,
+        "rulesOn": 245,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -7138,6 +7382,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/concurrency-no-check-then-write",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/concurrency-no-lost-update",
                 "severity": "error"
             },
@@ -7202,6 +7450,42 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-no-callback-in-parse-try",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-collection-misuse",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-discarded-outcome",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-discarded-pure-result",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-global-listener-target-assertion",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-mock-on-module-namespace",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-test-on-global-regex",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-uncleared-race-timeout",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-child-process-error-listener",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
@@ -7219,6 +7503,10 @@
             },
             {
                 "name": "nexus/performance-no-independent-await-in-loop",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/security-no-interpolated-shell-command",
                 "severity": "error"
             },
             {
@@ -7795,6 +8083,10 @@
             },
             {
                 "name": "symbol-description",
+                "severity": "error"
+            },
+            {
+                "name": "unicode-bom",
                 "severity": "error"
             },
             {

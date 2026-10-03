@@ -5309,6 +5309,32 @@
             "messageIds": [
                 "checkThenWrite"
             ],
+            "sets": [
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ],
             "swift": {
                 "verdict": "Ported",
                 "swiftRule": "cohere-swift/concurrency-no-check-then-write"
@@ -6108,6 +6134,32 @@
             "messageIds": [
                 "callbackInParseTry"
             ],
+            "sets": [
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ],
             "swift": {
                 "verdict": "Compiler"
             }
@@ -6124,6 +6176,32 @@
                 "inOnArray",
                 "objectMethodOnCollection"
             ],
+            "sets": [
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ],
             "swift": {
                 "verdict": "Compiler"
             }
@@ -6136,6 +6214,32 @@
             "typeAware": true,
             "messageIds": [
                 "outcomeDiscarded"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
             ],
             "swift": {
                 "verdict": "Compiler"
@@ -6150,6 +6254,32 @@
             "messageIds": [
                 "discardedPureResult"
             ],
+            "sets": [
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ],
             "swift": {
                 "verdict": "Compiler"
             }
@@ -6162,6 +6292,32 @@
             "typeAware": true,
             "messageIds": [
                 "globalListenerTargetAssertion"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
             ],
             "swift": {
                 "verdict": "NotApplicable"
@@ -6216,6 +6372,32 @@
             "messageIds": [
                 "mockOnModuleNamespace"
             ],
+            "sets": [
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ],
             "swift": {
                 "verdict": "NotApplicable"
             }
@@ -6256,6 +6438,32 @@
             "messageIds": [
                 "globalRegexTest"
             ],
+            "sets": [
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ],
             "swift": {
                 "verdict": "NotApplicable"
             }
@@ -6268,6 +6476,32 @@
             "typeAware": true,
             "messageIds": [
                 "unclearedRaceTimeout"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
             ],
             "swift": {
                 "verdict": "Ported",
@@ -6309,6 +6543,32 @@
             "typeAware": true,
             "messageIds": [
                 "childProcessWithoutErrorListener"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
             ],
             "swift": {
                 "verdict": "Compiler"
@@ -6562,6 +6822,32 @@
             "typeAware": true,
             "messageIds": [
                 "interpolatedShellCommand"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
             ],
             "swift": {
                 "verdict": "Ported",
@@ -11971,6 +12257,12 @@
                 "onlyMeaningfulFor",
                 "onlyStrings",
                 "spaceDelimited"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                }
             ]
         },
         {
@@ -12685,7 +12977,7 @@
             ],
             "sets": [
                 {
-                    "set": "cohere:system-inc/structure",
+                    "set": "cohere:react",
                     "severity": "error"
                 }
             ],
@@ -13070,7 +13362,7 @@
             "fixKind": "fix",
             "sets": [
                 {
-                    "set": "cohere:system-inc/structure",
+                    "set": "cohere:react",
                     "severity": "error"
                 }
             ],
@@ -13089,7 +13381,7 @@
             ],
             "sets": [
                 {
-                    "set": "cohere:system-inc/structure",
+                    "set": "cohere:react",
                     "severity": "error"
                 }
             ],
@@ -13109,7 +13401,7 @@
             "fixKind": "suggestion",
             "sets": [
                 {
-                    "set": "cohere:system-inc/structure",
+                    "set": "cohere:react",
                     "severity": "error"
                 }
             ],
@@ -13185,7 +13477,7 @@
             ],
             "sets": [
                 {
-                    "set": "cohere:system-inc/structure",
+                    "set": "cohere:react",
                     "severity": "error"
                 }
             ],
@@ -13204,7 +13496,7 @@
             ],
             "sets": [
                 {
-                    "set": "cohere:system-inc/structure",
+                    "set": "cohere:react",
                     "severity": "error"
                 }
             ],
@@ -13223,7 +13515,7 @@
             ],
             "sets": [
                 {
-                    "set": "cohere:system-inc/structure",
+                    "set": "cohere:react",
                     "severity": "error"
                 }
             ],
@@ -13242,7 +13534,7 @@
             ],
             "sets": [
                 {
-                    "set": "cohere:system-inc/structure",
+                    "set": "cohere:react",
                     "severity": "error"
                 }
             ],
@@ -13359,7 +13651,33 @@
                 "expected",
                 "unexpected"
             ],
-            "fixKind": "fix"
+            "fixKind": "fix",
+            "sets": [
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ]
         },
         {
             "name": "use-isnan",
