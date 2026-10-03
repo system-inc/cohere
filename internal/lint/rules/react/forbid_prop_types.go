@@ -43,6 +43,8 @@ func DecodeForbidPropTypesOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
+	// Lenient on purpose: eslint-plugin-react 7.37.5's schema sets `additionalProperties: true` on
+	// this object, so ESLint loads an extra key and so must this.
 	if err := json.Unmarshal(raw, &options); err != nil {
 		return options, err
 	}

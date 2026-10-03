@@ -21,9 +21,9 @@ func messageInconsistentClassOrder(ordered string) rule.Message {
 
 // EnforceConsistentClassOrderOptions lets a project name the surfaces that carry class strings.
 type EnforceConsistentClassOrderOptions struct {
-	Attributes []string
-	Callees    []string
-	Variables  []string
+	Attributes []string `json:"attributes"`
+	Callees    []string `json:"callees"`
+	Variables  []string `json:"variables"`
 }
 
 // EnforceConsistentClassOrder reports class lists written in an order other than Tailwind's.

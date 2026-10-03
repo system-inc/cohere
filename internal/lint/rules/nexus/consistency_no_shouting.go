@@ -23,7 +23,7 @@ func messageShoutingInComment(tokens []string) rule.Message {
 // ConsistencyNoShoutingOptions lets a project name uppercase tokens it legitimately writes, beyond
 // the shared allowlist.
 type ConsistencyNoShoutingOptions struct {
-	Allow []string
+	Allow []string `json:"allow"`
 }
 
 // ConsistencyNoShouting bans all-caps words in comments.

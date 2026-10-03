@@ -1,8 +1,6 @@
 package typescript
 
 import (
-	"encoding/json"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
@@ -43,7 +41,7 @@ func DecodeNoConfusingVoidExpressionOptions(raw []byte) (any, error) {
 		return settings, nil
 	}
 	var wire noConfusingVoidExpressionWire
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return settings, err
 	}
 	if wire.IgnoreArrowShorthand != nil {

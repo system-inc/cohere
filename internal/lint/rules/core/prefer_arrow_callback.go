@@ -1,8 +1,6 @@
 package core
 
 import (
-	"encoding/json"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
@@ -47,7 +45,7 @@ func DecodePreferArrowCallbackOptions(raw []byte) (any, error) {
 		return settings, nil
 	}
 	var wire preferArrowCallbackRawOptions
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return settings, err
 	}
 	settings.AllowNamedFunctions = wire.AllowNamedFunctions

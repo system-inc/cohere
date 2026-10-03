@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -92,10 +91,8 @@ func DecodeIdMatchOptions(list []byte) (any, error) {
 	}
 
 	if len(elements) > 1 {
-		decoder := json.NewDecoder(bytes.NewReader(elements[1]))
-		decoder.DisallowUnknownFields()
 		var flags idMatchRawOptions
-		if err := decoder.Decode(&flags); err != nil {
+		if err := rule.UnmarshalOptions(elements[1], &flags); err != nil {
 			return settings, fmt.Errorf("id-match element 2: %w", err)
 		}
 		settings.CheckProperties = flags.Properties

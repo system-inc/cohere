@@ -48,7 +48,7 @@ var roleSuffixes = regexp.MustCompile(`(Interface|Type|Result|Response|Propertie
 
 // ConsistencyNoBooleanOutcomeOptions exempts declarations by exact name.
 type ConsistencyNoBooleanOutcomeOptions struct {
-	AllowedTypeNames []string
+	AllowedTypeNames []string `json:"allowedTypeNames"`
 }
 
 func messageBooleanOutcome(flagName string, declaration string, suggested string) rule.Message {

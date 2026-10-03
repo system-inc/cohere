@@ -3141,9 +3141,15 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(t *testing.T
 			},
 		},
 		{
-			name:   "the nested sub-flag object binds onto ChecksVoidReturnOpts",
-			config: `{"checksVoidReturnOpts": {"arguments": false, "attributes": true}}`,
+			// Upstream's spelling: the object form under checksVoidReturn itself. Until #4a4yse4 this
+			// row wrote tsgolint's `checksVoidReturnOpts`, a key upstream does not have, and upstream's
+			// own spelling failed to decode into a boolean.
+			name:   "the sub-flag object under checksVoidReturn turns the check on and binds onto ChecksVoidReturnOpts",
+			config: `{"checksVoidReturn": {"arguments": false, "attributes": true}}`,
 			assert: func(t *testing.T, decoded NoMisusedPromisesOptions) {
+				if decoded.ChecksVoidReturn == nil || !*decoded.ChecksVoidReturn {
+					t.Fatal("the object form should turn checksVoidReturn on, as upstream's parseChecksVoidReturn does")
+				}
 				if decoded.ChecksVoidReturnOpts == nil {
 					t.Fatal("the nested object did not bind at all")
 				}
@@ -3155,6 +3161,18 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(t *testing.T
 				}
 				if decoded.ChecksVoidReturnOpts.Properties != nil {
 					t.Fatal("an omitted sub-flag should stay nil for Run to default")
+				}
+			},
+		},
+		{
+			name:   "the boolean form of checksVoidReturn binds onto ChecksVoidReturn alone",
+			config: `{"checksVoidReturn": false}`,
+			assert: func(t *testing.T, decoded NoMisusedPromisesOptions) {
+				if decoded.ChecksVoidReturn == nil || *decoded.ChecksVoidReturn {
+					t.Fatal("checksVoidReturn should have decoded to an explicit false")
+				}
+				if decoded.ChecksVoidReturnOpts != nil {
+					t.Fatal("the boolean form carries no sub-flags, so ChecksVoidReturnOpts should stay nil")
 				}
 			},
 		},

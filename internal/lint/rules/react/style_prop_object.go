@@ -42,6 +42,8 @@ func DecodeStylePropObjectOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
+	// Lenient on purpose: eslint-plugin-react 7.37.5's schema leaves this object open (no
+	// `additionalProperties`), so ESLint loads an extra key and so must this.
 	var wire stylePropObjectWireOptions
 	if err := json.Unmarshal(raw, &wire); err != nil {
 		return options, err

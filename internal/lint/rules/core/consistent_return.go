@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -36,7 +35,7 @@ func DecodeConsistentReturnOptions(raw []byte) (any, error) {
 		return DefaultConsistentReturnSettings(), nil
 	}
 	var wire consistentReturnWire
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return DefaultConsistentReturnSettings(), err
 	}
 	settings := DefaultConsistentReturnSettings()

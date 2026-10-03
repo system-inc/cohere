@@ -98,7 +98,7 @@ func DecodeForbidElementsOptions(raw []byte) (any, error) {
 	}
 
 	var wire forbidElementsWireOptions
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return options, err
 	}
 
@@ -109,7 +109,7 @@ func DecodeForbidElementsOptions(raw []byte) (any, error) {
 			continue
 		}
 		var asObject forbidElementsWireEntry
-		if err := json.Unmarshal(item, &asObject); err != nil {
+		if err := rule.UnmarshalOptions(item, &asObject); err != nil {
 			return options, fmt.Errorf("decoding a forbid entry: %w", err)
 		}
 		options.Forbid = append(options.Forbid, ForbidElementsEntry{

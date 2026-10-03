@@ -1483,6 +1483,17 @@ variadic `type: "array"` schema, is `DecodeOptionList`, and the decoder reads up
 written. A key or element your port cannot honour is refused by name rather than accepted and
 ignored.
 
+**Decode every option object with `rule.UnmarshalOptions`, and tag every field with upstream's
+key.** `json.Unmarshal` drops an unknown key and matches a key case-insensitively, so a config with
+`ignorePatern` loads clean and the option does nothing. `rule.DecodeOptionsInto` already uses it; a
+hand-written decoder must too, including inside a custom `UnmarshalJSON` and inside the object arm
+of a value that may also be a string or a boolean. There, do not fall back to the default when the
+object is refused: that drops the whole setting where the lenient decode dropped one key, so return
+the error. Where upstream's schema leaves an object open (no `additionalProperties: false`), keep
+`json.Unmarshal`, say so at the site, and name the site in `lenientOptionDecodes`.
+`internal/lint/registry/option_decoding_test.go` refuses the rest by reading the tree with types,
+and `option_refusal_test.go` hands every registered decoder an unknown key (#4a4yse4).
+
 ### A presence check followed by a truthiness fallback is a family, and a written zero splits it
 
 Not one rule's quirk. Found in `max-depth` and `complexity`, and the shape is common

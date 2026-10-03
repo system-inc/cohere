@@ -15,7 +15,7 @@ var defaultGenericNames = []string{
 
 // ConsistencyNoStutteringNameOptions replaces the set of names that count as generic.
 type ConsistencyNoStutteringNameOptions struct {
-	GenericNames []string
+	GenericNames []string `json:"genericNames"`
 }
 
 // messageStutteringName names the word that stuttered, because the repair is to pick a different

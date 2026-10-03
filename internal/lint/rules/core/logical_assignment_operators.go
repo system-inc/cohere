@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -183,13 +182,11 @@ func DecodeLogicalAssignmentOperatorsOptions(list []byte) (any, error) {
 			fmt.Errorf("logical-assignment-operators takes no options beside \"never\"")
 	}
 
-	decoder := json.NewDecoder(bytes.NewReader(positional[1]))
-	decoder.DisallowUnknownFields()
 	var extra struct {
 		EnforceForIfStatements *bool `json:"enforceForIfStatements"`
 		ReactCompiler          *bool `json:"reactCompiler"`
 	}
-	if err := decoder.Decode(&extra); err != nil {
+	if err := rule.UnmarshalOptions(positional[1], &extra); err != nil {
 		return DefaultLogicalAssignmentOperatorsSettings(),
 			fmt.Errorf("logical-assignment-operators element 2: %w", err)
 	}

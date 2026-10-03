@@ -23,9 +23,9 @@ func messageConcatenatedClass(fragment string) rule.Message {
 
 // NoConcatenatedClassesOptions lets a project name the surfaces that carry class strings.
 type NoConcatenatedClassesOptions struct {
-	Attributes []string
-	Callees    []string
-	Variables  []string
+	Attributes []string `json:"attributes"`
+	Callees    []string `json:"callees"`
+	Variables  []string `json:"variables"`
 }
 
 // NoConcatenatedClasses reports a class fragment glued to an interpolated value.

@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"unicode"
@@ -619,10 +618,8 @@ func DecodeFuncNameMatchingOptions(list []byte) (any, error) {
 				"never be read", elements[1])
 	}
 
-	decoder := json.NewDecoder(bytes.NewReader(objectElement))
-	decoder.DisallowUnknownFields()
 	var object FuncNameMatchingOptions
-	if err := decoder.Decode(&object); err != nil {
+	if err := rule.UnmarshalOptions(objectElement, &object); err != nil {
 		return options, fmt.Errorf("func-name-matching options object: %w", err)
 	}
 	options.ConsiderPropertyDescriptor = object.ConsiderPropertyDescriptor

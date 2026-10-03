@@ -540,7 +540,6 @@ func TestButtonHasTypeDecodesItsOptions(t *testing.T) {
 		{"reset off", `{"reset":false}`, true, true, false},
 		{"all off", `{"button":false,"submit":false,"reset":false}`, false, false, false},
 		{"explicit true is still true", `{"button":true}`, true, true, true},
-		{"an unknown key leaves the defaults", `{"somethingElse":false}`, true, true, true},
 	}
 
 	for _, testCase := range cases {

@@ -13,7 +13,7 @@ type NoEmptyOptions struct {
 	// Off by default, matching ESLint. The rule's usual escape hatch is a comment saying why the
 	// error is being dropped, and this option is for a codebase that has decided the empty catch is
 	// idiomatic enough not to need one each time.
-	AllowEmptyCatch bool
+	AllowEmptyCatch bool `json:"allowEmptyCatch"`
 }
 
 var messageEmptyBlock = rule.Message{

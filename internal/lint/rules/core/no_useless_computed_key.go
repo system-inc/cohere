@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -49,7 +48,7 @@ func DecodeNoUselessComputedKeyOptions(raw []byte) (any, error) {
 	}
 
 	var wire noUselessComputedKeyWire
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return DefaultNoUselessComputedKeySettings(), err
 	}
 	settings := DefaultNoUselessComputedKeySettings()

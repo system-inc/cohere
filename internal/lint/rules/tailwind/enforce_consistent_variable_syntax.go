@@ -30,10 +30,10 @@ func messageVariableSyntax(written string, corrected string) rule.Message {
 // "variable" is the bracketed `var()` form. Named rather than inferred, so a repository can pick a
 // target instead of having one read off its node_modules.
 type EnforceConsistentVariableSyntaxOptions struct {
-	Attributes []string
-	Callees    []string
-	Variables  []string
-	Syntax     string
+	Attributes []string `json:"attributes"`
+	Callees    []string `json:"callees"`
+	Variables  []string `json:"variables"`
+	Syntax     string   `json:"syntax"`
 }
 
 // EnforceConsistentVariableSyntax reports a custom property written as an arbitrary value.

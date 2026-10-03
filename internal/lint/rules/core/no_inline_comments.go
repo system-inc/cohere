@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/json"
 	"regexp"
 	"strings"
 
@@ -272,7 +271,7 @@ func DecodeNoInlineCommentsOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := json.Unmarshal(raw, &options); err != nil {
+	if err := rule.UnmarshalOptions(raw, &options); err != nil {
 		return options, err
 	}
 	return options, nil

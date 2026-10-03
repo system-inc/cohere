@@ -1,7 +1,6 @@
 package react
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -660,20 +659,19 @@ func TestNoStringRefsMessagesReadCorrectly(t *testing.T) {
 // The wire type accepts exactly upstream's key set plus the one this port adds.
 //
 // `meta.schema` declares `additionalProperties: false`, which ESLint enforces by refusing the whole
-// configuration by name; there is no error channel for that here, so an unknown key is ignored
-// rather than refused. Asserted so the difference is recorded rather than assumed.
-func TestNoStringRefsIgnoresUnknownOptionKeys(t *testing.T) {
+// configuration by name, and so does this now (#4a4yse4); an unknown key used to be ignored.
+func TestNoStringRefsRefusesUnknownOptionKeys(t *testing.T) {
 	t.Parallel()
 
-	decoded, err := DecodeNoStringRefsOptions([]byte(`{"bogus":true,"noTemplateLiterals":true}`))
+	decoded, err := DecodeNoStringRefsOptions([]byte(`{"noTemplateLiterals":true}`))
 	if err != nil {
-		t.Fatalf("decoding: %v", err)
+		t.Fatalf("baseline: %v", err)
 	}
 	if got := decoded.(NoStringRefsOptions); got != (NoStringRefsOptions{NoTemplateLiterals: true}) {
 		t.Errorf("decoded to %+v", got)
 	}
-	// A control, so the assertion above cannot pass by the decoder ignoring everything.
-	if _, err := json.Marshal(NoStringRefsOptions{}); err != nil {
-		t.Fatalf("marshalling: %v", err)
+	_, err = DecodeNoStringRefsOptions([]byte(`{"bogus":true,"noTemplateLiterals":true}`))
+	if err == nil || !strings.Contains(err.Error(), "bogus") {
+		t.Fatalf("want a refusal naming the unknown key, got %v", err)
 	}
 }

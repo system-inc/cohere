@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"unicode"
@@ -66,7 +65,7 @@ func DecodeIdLengthOptions(raw []byte) (any, error) {
 	}
 
 	var wire idLengthRawOptions
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return settings, err
 	}
 

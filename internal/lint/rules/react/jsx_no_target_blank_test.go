@@ -446,9 +446,6 @@ func TestDecodeJsxNoTargetBlankOptions(t *testing.T) {
 			JsxNoTargetBlankOptions{AllowReferrer: true, WarnOnSpreadAttributes: true, Forms: true,
 				EnforceDynamicLinksNever: true, Links: false}},
 
-		// An unknown key is ignored rather than refused, which is what `encoding/json` does and
-		// what a schema-validated config upstream would never send anyway.
-		{"unknown keys are ignored", "{\"bogus\":true}", JsxNoTargetBlankOptions{Links: true}},
 	}
 
 	for _, testCase := range cases {

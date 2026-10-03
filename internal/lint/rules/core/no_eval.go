@@ -15,7 +15,7 @@ type NoEvalOptions struct {
 	// global scope rather than the calling one, so it cannot read or write the local bindings around
 	// the call. That is a materially smaller hazard than the direct form, and a codebase that has
 	// deliberately routed its one dynamic evaluation through the indirect spelling turns this on.
-	AllowIndirect bool
+	AllowIndirect bool `json:"allowIndirect"`
 }
 
 // globalObjectNames are the identifiers that can name the global object, whose `eval` property is

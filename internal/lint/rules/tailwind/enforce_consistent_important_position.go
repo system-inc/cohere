@@ -26,10 +26,10 @@ func messageImportantPosition(written string, corrected string) rule.Message {
 // because a repository mid-migration wants to pick a target rather than have one read off its
 // node_modules.
 type EnforceConsistentImportantPositionOptions struct {
-	Attributes []string
-	Callees    []string
-	Variables  []string
-	Position   string
+	Attributes []string `json:"attributes"`
+	Callees    []string `json:"callees"`
+	Variables  []string `json:"variables"`
+	Position   string   `json:"position"`
 }
 
 // EnforceConsistentImportantPosition reports an important marker on the wrong side of a utility.

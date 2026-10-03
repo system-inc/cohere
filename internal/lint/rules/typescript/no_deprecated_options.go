@@ -57,7 +57,7 @@ func (s *noDeprecatedRawSpecifier) UnmarshalJSON(raw []byte) error {
 		Path    string          `json:"path"`
 		Package string          `json:"package"`
 	}
-	if err := json.Unmarshal(raw, &object); err != nil {
+	if err := rule.UnmarshalOptions(raw, &object); err != nil {
 		return err
 	}
 

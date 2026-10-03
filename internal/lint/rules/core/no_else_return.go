@@ -1,8 +1,6 @@
 package core
 
 import (
-	"encoding/json"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -47,7 +45,7 @@ func DecodeNoElseReturnOptions(raw []byte) (any, error) {
 	}
 
 	var wire noElseReturnWireShape
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return DefaultNoElseReturnSettings(), err
 	}
 

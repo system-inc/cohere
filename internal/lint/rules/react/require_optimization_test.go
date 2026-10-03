@@ -414,7 +414,6 @@ func TestRequireOptimizationDecodesItsOptions(t *testing.T) {
 		{"one decorator", `{"allowDecorators":["pure"]}`, []string{"pure"}},
 		{"several decorators", `{"allowDecorators":["renderPure","pureRender"]}`, []string{"renderPure", "pureRender"}},
 		{"an explicit empty list", `{"allowDecorators":[]}`, []string{}},
-		{"an unknown key is ignored", `{"somethingElse":true}`, nil},
 	}
 
 	for _, testCase := range cases {

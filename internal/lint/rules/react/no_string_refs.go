@@ -1,8 +1,6 @@
 package react
 
 import (
-	"encoding/json"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
 	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
@@ -536,7 +534,7 @@ func DecodeNoStringRefsOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return NoStringRefsOptions{}, nil
 	}
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return NoStringRefsOptions{}, err
 	}
 

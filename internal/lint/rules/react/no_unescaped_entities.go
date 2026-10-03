@@ -348,7 +348,7 @@ func DecodeNoUnescapedEntitiesOptions(raw []byte) (any, error) {
 	}
 
 	var wire noUnescapedEntitiesWireOptions
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return NoUnescapedEntitiesOptions{}, err
 	}
 	if wire.Forbid == nil {
@@ -377,6 +377,9 @@ func decodeForbiddenEntity(element json.RawMessage) (forbiddenEntity, bool) {
 		return forbiddenEntity{character: asString}, true
 	}
 
+	// Lenient on purpose: eslint-plugin-react 7.37.5's schema leaves a forbid entry object open (no
+	// `additionalProperties`), so ESLint loads `{"char": ">", "alternatives": [], "extra": 1}` and so
+	// must this.
 	var asObject noUnescapedEntitiesWireEntry
 	if err := json.Unmarshal(element, &asObject); err != nil {
 		return forbiddenEntity{}, false

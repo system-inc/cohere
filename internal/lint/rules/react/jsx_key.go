@@ -1,8 +1,6 @@
 package react
 
 import (
-	"encoding/json"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -81,7 +79,7 @@ type JsxKeyOptions struct {
 // DecodeJsxKeyOptions turns the configured JSON into the struct the rule reads.
 //
 // Exported so fixtures can drive the same path the config drives. Every default is false, so this
-// is a thin wrapper over `json.Unmarshal` plus a nil path: `rule.DecodeOptionsInto` ERRORS on empty
+// is a thin wrapper over `rule.UnmarshalOptions` plus a nil path: `rule.DecodeOptionsInto` ERRORS on empty
 // input, and a rule configured as a bare `"error"` is handed exactly that, so the generic decoder
 // would refuse a configuration upstream accepts.
 func DecodeJsxKeyOptions(raw []byte) (any, error) {
@@ -89,7 +87,7 @@ func DecodeJsxKeyOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := json.Unmarshal(raw, &options); err != nil {
+	if err := rule.UnmarshalOptions(raw, &options); err != nil {
 		return options, err
 	}
 	return options, nil

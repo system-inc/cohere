@@ -1,7 +1,6 @@
 package typescript
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -47,7 +46,7 @@ func DecodeNoInferrableTypesOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := json.Unmarshal(raw, &options); err != nil {
+	if err := rule.UnmarshalOptions(raw, &options); err != nil {
 		return options, fmt.Errorf("no-inferrable-types takes an options object: %w", err)
 	}
 	return options, nil

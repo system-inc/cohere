@@ -35,7 +35,7 @@ const (
 
 // UnmarshalJSON decodes the option's two spellings from a configuration file.
 //
-// The option arrives as the JSON string "any" or "all" and the decoder is a plain json.Unmarshal
+// The option arrives as the JSON string "any" or "all" and the decoder is rule.UnmarshalOptions
 // into this struct, so without this the string lands on an int field and the whole option object
 // fails to decode. That failure is quiet in the direction that matters: the rule then runs on its
 // zero value, which is "any", and a project that asked for "all" silently gets the other answer.
@@ -70,14 +70,14 @@ func (destructuring *PreferConstDestructuring) UnmarshalJSON(raw []byte) error {
 // oxc's `PreferConstConfig` carries the same two under camelCase serde renaming, so the two sources
 // agree here and there is nothing to reconcile.
 type PreferConstOptions struct {
-	Destructuring PreferConstDestructuring
+	Destructuring PreferConstDestructuring `json:"destructuring"`
 
 	// IgnoreReadBeforeAssign suppresses a finding when the binding is read at a source position
 	// before its first assignment: before the declaration when it has an initializer, and before its
 	// one later write when it has none. Upstream's stated purpose is avoiding a conflict with
 	// `no-use-before-define`: turning such a `let` into a `const` moves the temporal dead zone in a
 	// way the author may not want, so the option exists to leave those alone.
-	IgnoreReadBeforeAssign bool
+	IgnoreReadBeforeAssign bool `json:"ignoreReadBeforeAssign"`
 }
 
 // PreferConst flags a `let` binding that is never reassigned after it is initialized.

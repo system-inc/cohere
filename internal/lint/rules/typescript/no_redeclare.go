@@ -1,8 +1,6 @@
 package typescript
 
 import (
-	"encoding/json"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -50,7 +48,7 @@ func DecodeNoRedeclareOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var wire noRedeclareWire
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return options, err
 	}
 	if wire.IgnoreDeclarationMerge != nil {

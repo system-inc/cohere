@@ -21,16 +21,16 @@ type NoFallthroughOptions struct {
 	// caller wrote. An unparseable pattern falls back to the default set rather than matching
 	// everything, because a rule that silently stops reporting is worse than one that ignores a
 	// misconfiguration.
-	CommentPattern string
+	CommentPattern string `json:"commentPattern"`
 
 	// AllowEmptyCase lets a clause with no statements at all fall through even when a blank line
 	// separates it from the next one. Off by default: a clause followed by a blank line reads as a
 	// body somebody forgot to write rather than as a deliberate grouping.
-	AllowEmptyCase bool
+	AllowEmptyCase bool `json:"allowEmptyCase"`
 
 	// ReportUnusedFallthroughComment reports a fallthrough comment on a clause that cannot fall
 	// through, which is a comment describing behavior the code no longer has.
-	ReportUnusedFallthroughComment bool
+	ReportUnusedFallthroughComment bool `json:"reportUnusedFallthroughComment"`
 }
 
 // NoFallthrough reports a switch clause whose body runs on into the next clause.

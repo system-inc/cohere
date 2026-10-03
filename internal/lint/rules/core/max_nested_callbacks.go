@@ -118,7 +118,7 @@ func DecodeMaxNestedCallbacksOptions(raw []byte) (any, error) {
 	}
 
 	var object maxNestedCallbacksObjectShape
-	if err := json.Unmarshal(raw, &object); err != nil {
+	if err := rule.UnmarshalOptions(raw, &object); err != nil {
 		return DefaultMaxNestedCallbacksSettings(), err
 	}
 	// `option.maximum || option.max`, truthiness and all. A zero `maximum` is falsy in JavaScript

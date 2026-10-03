@@ -85,7 +85,7 @@ func DecodeMaxDepthOptions(raw []byte) (any, error) {
 		Maximum *int `json:"maximum"`
 		Max     *int `json:"max"`
 	}
-	if err := json.Unmarshal(raw, &object); err != nil {
+	if err := rule.UnmarshalOptions(raw, &object); err != nil {
 		return settings, err
 	}
 

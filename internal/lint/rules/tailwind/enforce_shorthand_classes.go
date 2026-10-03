@@ -23,9 +23,9 @@ func messageShorthandClasses(longhands string, shorthands string) rule.Message {
 
 // EnforceShorthandClassesOptions lets a project name the surfaces that carry class strings.
 type EnforceShorthandClassesOptions struct {
-	Attributes []string
-	Callees    []string
-	Variables  []string
+	Attributes []string `json:"attributes"`
+	Callees    []string `json:"callees"`
+	Variables  []string `json:"variables"`
 }
 
 // shorthandRule is one collapse: a set of longhand patterns and the classes they become.

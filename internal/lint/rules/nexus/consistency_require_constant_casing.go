@@ -18,7 +18,7 @@ import (
 // Next.js reads "runtime" and "dynamic" off a route module; graphql-codegen requires a plugin module
 // to export "plugin". The rule cannot know which of these apply, so the consumer names them.
 type ConsistencyRequireConstantCasingOptions struct {
-	FrameworkConstantNames []string
+	FrameworkConstantNames []string `json:"frameworkConstantNames"`
 }
 
 // The reasoning behind each message is the part that ports. A rule that says only what is wrong gets

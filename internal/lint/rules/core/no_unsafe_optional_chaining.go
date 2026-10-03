@@ -33,7 +33,7 @@ var messageUnsafeArithmetic = rule.Message{
 // one, because arithmetic on a missing value is a weaker signal than reaching into it: `?? 0` is
 // often already implied by the surrounding code.
 type NoUnsafeOptionalChainingOptions struct {
-	DisallowArithmeticOperators bool
+	DisallowArithmeticOperators bool `json:"disallowArithmeticOperators"`
 }
 
 // arithmeticOperators are the binary operators for which an `undefined` operand yields NaN.

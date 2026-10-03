@@ -1,7 +1,6 @@
 package react
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -942,7 +941,7 @@ func DecodeNoUnknownPropertyOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var wire noUnknownPropertyWireOptions
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return options, err
 	}
 	options.Ignore = wire.Ignore

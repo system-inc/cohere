@@ -25,13 +25,13 @@ const (
 // it looks: it would pin the name while permitting both shapes, which is the drift the rule exists
 // to stop.
 type ModuleAlias struct {
-	Name  string
-	Style ImportStyle
+	Name  string      `json:"name"`
+	Style ImportStyle `json:"style"`
 }
 
 // ImportRequireModuleAliasOptions names extra packages to pin, merged over the built-in defaults.
 type ImportRequireModuleAliasOptions struct {
-	Modules map[string]ModuleAlias
+	Modules map[string]ModuleAlias `json:"modules"`
 }
 
 // defaultModuleAliases are the packages every consumer gets without asking.

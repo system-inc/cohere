@@ -1,7 +1,6 @@
 package typescript
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -99,12 +98,10 @@ func DecodeInitDeclarationsOptions(list []byte) (any, error) {
 				"\"never\" reads ignoreForLoopInit", mode, elements[1])
 	}
 
-	decoder := json.NewDecoder(bytes.NewReader(elements[1]))
-	decoder.DisallowUnknownFields()
 	var second struct {
 		IgnoreForLoopInit *bool `json:"ignoreForLoopInit"`
 	}
-	if err := decoder.Decode(&second); err != nil {
+	if err := rule.UnmarshalOptions(elements[1], &second); err != nil {
 		return DefaultInitDeclarationsSettings(), fmt.Errorf("init-declarations element 2: %w", err)
 	}
 	if second.IgnoreForLoopInit != nil {

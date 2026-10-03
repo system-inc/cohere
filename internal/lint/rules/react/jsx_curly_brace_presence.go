@@ -97,7 +97,7 @@ func DecodeJsxCurlyBracePresenceOptions(raw []byte) (any, error) {
 		Children          *string `json:"children"`
 		PropElementValues *string `json:"propElementValues"`
 	}
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return settings, err
 	}
 	for _, field := range []struct {

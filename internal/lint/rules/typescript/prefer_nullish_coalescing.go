@@ -1,7 +1,6 @@
 package typescript
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"sort"
@@ -111,7 +110,7 @@ func DecodePreferNullishCoalescingOptions(raw []byte) (any, error) {
 	}
 
 	var wire preferNullishCoalescingWire
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return options, err
 	}
 
@@ -180,9 +179,7 @@ func decodePreferNullishCoalescingPrimitives(raw json.RawMessage) (
 		Number  *bool `json:"number"`
 		String  *bool `json:"string"`
 	}
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&asObject); err != nil {
+	if err := rule.UnmarshalOptions(raw, &asObject); err != nil {
 		return primitives, err
 	}
 	primitives.Bigint = asObject.Bigint != nil && *asObject.Bigint

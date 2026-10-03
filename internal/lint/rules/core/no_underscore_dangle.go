@@ -1,8 +1,6 @@
 package core
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -72,9 +70,7 @@ func DecodeNoUnderscoreDangleOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&options); err != nil {
+	if err := rule.UnmarshalOptions(raw, &options); err != nil {
 		return options, fmt.Errorf("no-underscore-dangle: %w", err)
 	}
 	return options, nil

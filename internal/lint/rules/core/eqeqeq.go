@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -126,12 +125,10 @@ func DecodeEqeqeqOptions(list []byte) (any, error) {
 				"reads a null policy", mode, elements[1])
 	}
 
-	decoder := json.NewDecoder(bytes.NewReader(elements[1]))
-	decoder.DisallowUnknownFields()
 	var second struct {
 		Null *string `json:"null"`
 	}
-	if err := decoder.Decode(&second); err != nil {
+	if err := rule.UnmarshalOptions(elements[1], &second); err != nil {
 		return options, fmt.Errorf("eqeqeq element 2: %w", err)
 	}
 	if second.Null == nil {

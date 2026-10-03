@@ -1,8 +1,6 @@
 package react
 
 import (
-	"encoding/json"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -48,7 +46,7 @@ func DecodePreferEs6ClassOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := json.Unmarshal(raw, &options); err != nil {
+	if err := rule.UnmarshalOptions(raw, &options); err != nil {
 		return options, err
 	}
 	if options.Mode == "" {

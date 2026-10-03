@@ -1,8 +1,6 @@
 package react
 
 import (
-	"encoding/json"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -43,7 +41,7 @@ func DecodePreferStatelessFunctionOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var wire preferStatelessFunctionWireOptions
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return options, err
 	}
 	options.IgnorePureComponents = wire.IgnorePureComponents

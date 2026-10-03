@@ -24,14 +24,14 @@ func messageCanonicalCollapse(inputs []string, output string) rule.Message {
 // EnforceCanonicalClassesOptions lets a project name the surfaces that carry class strings, and
 // exempt classes it does not want rewritten.
 type EnforceCanonicalClassesOptions struct {
-	Attributes []string
-	Callees    []string
-	Variables  []string
+	Attributes []string `json:"attributes"`
+	Callees    []string `json:"callees"`
+	Variables  []string `json:"variables"`
 	// Ignore lists regular expressions for classes to leave alone, matching the option upstream
 	// takes. The oxlint configuration supplies one, and a rule that declared no options at all made
 	// oxlint refuse the whole plugin with "does not accept options", which failed as a silent
 	// zero-finding run rather than a crash.
-	Ignore []string
+	Ignore []string `json:"ignore"`
 }
 
 // EnforceCanonicalClasses reports class sets that collapse into a shorter, equivalent set.

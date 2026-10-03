@@ -30,9 +30,9 @@ func propertyWord(properties []string) string {
 
 // NoConflictingClassesOptions lets a project name the surfaces that carry class strings.
 type NoConflictingClassesOptions struct {
-	Attributes []string
-	Callees    []string
-	Variables  []string
+	Attributes []string `json:"attributes"`
+	Callees    []string `json:"callees"`
+	Variables  []string `json:"variables"`
 }
 
 // NoConflictingClasses reports two classes in one literal that set the same CSS property.

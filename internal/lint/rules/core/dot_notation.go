@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -479,7 +478,7 @@ func DecodeDotNotationOptions(raw []byte) (any, error) {
 	// Decode into a fresh value rather than over the default, so an explicit `false` is
 	// distinguishable from an absent field by the pointer being non-nil.
 	var decoded DotNotationOptions
-	if err := json.Unmarshal(raw, &decoded); err != nil {
+	if err := rule.UnmarshalOptions(raw, &decoded); err != nil {
 		return options, err
 	}
 	if decoded.AllowKeywords == nil {

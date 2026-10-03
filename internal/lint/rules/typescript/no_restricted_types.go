@@ -2,6 +2,7 @@ package typescript
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"unicode"
 
@@ -314,12 +315,15 @@ func DecodeNoRestrictedTypesOptions(raw []byte) (any, error) {
 	}
 
 	var wire noRestrictedTypesRawOptions
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return nil, err
 	}
 
 	for spelling, entry := range wire.Types {
-		ban, include := decodeNoRestrictedTypesBan(entry)
+		ban, include, err := decodeNoRestrictedTypesBan(entry)
+		if err != nil {
+			return nil, fmt.Errorf("types[%q]: %w", spelling, err)
+		}
 		if !include {
 			continue
 		}
@@ -335,22 +339,27 @@ func DecodeNoRestrictedTypesOptions(raw []byte) (any, error) {
 // The second return says whether to record the entry at all. A malformed value is dropped rather
 // than failing the whole decode, which matches upstream: its schema rejects such a value before the
 // rule ever runs, so the rule itself has no behavior for one.
-func decodeNoRestrictedTypesBan(entry json.RawMessage) (NoRestrictedTypesBan, bool) {
+//
+// An object is the exception, and it fails the decode. The object's schema is closed
+// (`additionalProperties: false`), and strict decoding means a misspelled `mesage` refuses the
+// object; dropping the entry for that would silently stop banning the type, where the lenient decode
+// before it dropped only the key (#4a4yse4).
+func decodeNoRestrictedTypesBan(entry json.RawMessage) (NoRestrictedTypesBan, bool, error) {
 	trimmed := strings.TrimSpace(string(entry))
 	if trimmed == "null" {
 		// Upstream's `bannedType == null` test treats a null entry as not banned.
-		return NoRestrictedTypesBan{Allowed: true}, true
+		return NoRestrictedTypesBan{Allowed: true}, true, nil
 	}
 
 	var asBoolean bool
 	if err := json.Unmarshal(entry, &asBoolean); err == nil {
 		// `true` bans with the standard message; `false` explicitly does not ban.
-		return NoRestrictedTypesBan{Allowed: !asBoolean}, true
+		return NoRestrictedTypesBan{Allowed: !asBoolean}, true, nil
 	}
 
 	var asString string
 	if err := json.Unmarshal(entry, &asString); err == nil {
-		return NoRestrictedTypesBan{Message: asString}, true
+		return NoRestrictedTypesBan{Message: asString}, true, nil
 	}
 
 	var asObject struct {
@@ -358,12 +367,15 @@ func decodeNoRestrictedTypesBan(entry json.RawMessage) (NoRestrictedTypesBan, bo
 		Message string   `json:"message"`
 		Suggest []string `json:"suggest"`
 	}
-	if err := json.Unmarshal(entry, &asObject); err == nil {
+	if strings.HasPrefix(trimmed, "{") {
+		if err := rule.UnmarshalOptions(entry, &asObject); err != nil {
+			return NoRestrictedTypesBan{}, false, err
+		}
 		return NoRestrictedTypesBan{
 			Message: asObject.Message,
 			FixWith: asObject.FixWith,
 			Suggest: asObject.Suggest,
-		}, true
+		}, true, nil
 	}
-	return NoRestrictedTypesBan{}, false
+	return NoRestrictedTypesBan{}, false, nil
 }

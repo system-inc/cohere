@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -84,12 +83,10 @@ func DecodeArrowBodyStyleOptions(list []byte) (any, error) {
 				"\"as-needed\" reads requireReturnForObjectLiteral", mode, elements[1])
 	}
 
-	decoder := json.NewDecoder(bytes.NewReader(elements[1]))
-	decoder.DisallowUnknownFields()
 	var second struct {
 		RequireReturnForObjectLiteral bool `json:"requireReturnForObjectLiteral"`
 	}
-	if err := decoder.Decode(&second); err != nil {
+	if err := rule.UnmarshalOptions(elements[1], &second); err != nil {
 		return options, fmt.Errorf("arrow-body-style element 2: %w", err)
 	}
 	options.RequireReturnForObjectLiteral = second.RequireReturnForObjectLiteral

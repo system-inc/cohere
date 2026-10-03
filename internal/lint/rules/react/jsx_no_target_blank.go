@@ -1,7 +1,6 @@
 package react
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -109,7 +108,7 @@ func DecodeJsxNoTargetBlankOptions(raw []byte) (any, error) {
 	}
 
 	var wire jsxNoTargetBlankWireOptions
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return options, err
 	}
 

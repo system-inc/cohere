@@ -20,7 +20,24 @@ type NoShadowRestrictedNamesOptions struct {
 	// `globalThis` arrived in ES2020, so a codebase predating it can hold a `globalThis` binding
 	// that was legal when written, and shadowing it costs less than shadowing `undefined` does.
 	// The other five are not configurable, upstream or here.
-	AllowGlobalThis bool
+	AllowGlobalThis bool `json:"-"`
+}
+
+// UnmarshalJSON reads upstream's key, `reportGlobalThis`, and stores its inverse.
+//
+// The field is spelled as an allowance for the reason above, and the config is spelled as upstream
+// spells it, so a config written for ESLint means the same thing here. Before this the field had no
+// tag, so only the non-upstream `allowGlobalThis` reached it and `{"reportGlobalThis": false}` was
+// refused as an unknown key (#4a4yse4).
+func (options *NoShadowRestrictedNamesOptions) UnmarshalJSON(raw []byte) error {
+	var wire struct {
+		ReportGlobalThis *bool `json:"reportGlobalThis"`
+	}
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
+		return err
+	}
+	options.AllowGlobalThis = wire.ReportGlobalThis != nil && !*wire.ReportGlobalThis
+	return nil
 }
 
 // restrictedNames are the five names a binding may never take, whatever the options say.

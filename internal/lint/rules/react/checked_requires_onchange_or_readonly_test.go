@@ -515,7 +515,6 @@ func TestCheckedRequiresDecodesItsOptions(t *testing.T) {
 		{"exclusive attribute ignored", `{"ignoreExclusiveCheckedAttribute":true}`, false, true},
 		{"both ignored", `{"ignoreMissingProperties":true,"ignoreExclusiveCheckedAttribute":true}`, true, true},
 		{"explicit false is still false", `{"ignoreMissingProperties":false}`, false, false},
-		{"an unknown key is ignored", `{"somethingElse":true}`, false, false},
 	}
 
 	for _, testCase := range cases {

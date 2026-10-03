@@ -79,15 +79,15 @@ var irregularWhitespaceCodepoints = map[rune]bool{
 // tree actually runs. The imported fixtures pass oxc's values explicitly, so upstream's counts still
 // reproduce exactly rather than being quietly reinterpreted.
 type NoIrregularWhitespaceOptions struct {
-	SkipComments  *bool
-	SkipStrings   *bool
-	SkipTemplates *bool
-	SkipRegExps   *bool
+	SkipComments  *bool `json:"skipComments"`
+	SkipStrings   *bool `json:"skipStrings"`
+	SkipTemplates *bool `json:"skipTemplates"`
+	SkipRegExps   *bool `json:"skipRegExps"`
 
-	// SkipJSXText carries a json tag because the option is spelled skipJSXText rather than
-	// skipJsxText. Go's decoder matches field names case-insensitively so this happens to resolve
-	// without the tag, but the upstream Rust needs an explicit rename for the same reason, and a
-	// reader comparing the two should not have to discover that our decoder is the lenient one.
+	// SkipJSXText's tag is worth a note because the option is spelled skipJSXText rather than
+	// skipJsxText. Every option field is tagged, and rule.UnmarshalOptions matches a tagged key
+	// exactly, so `skipJsxText` is refused rather than resolved; the upstream Rust needs an explicit
+	// rename for the same reason.
 	SkipJSXText *bool `json:"skipJSXText"`
 }
 

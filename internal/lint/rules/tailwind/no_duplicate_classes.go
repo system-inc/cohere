@@ -27,9 +27,9 @@ func messageDuplicateClass(className string) rule.Message {
 // rule that declines every file when unconfigured reports a clean tree and is indistinguishable
 // from one with nothing to say.
 type NoDuplicateClassesOptions struct {
-	Attributes []string
-	Callees    []string
-	Variables  []string
+	Attributes []string `json:"attributes"`
+	Callees    []string `json:"callees"`
+	Variables  []string `json:"variables"`
 }
 
 // NoDuplicateClasses reports a class name written twice in the same string.

@@ -168,7 +168,7 @@ func DecodeOneVarOptions(raw []byte) (any, error) {
 	}
 
 	var object oneVarObjectOptions
-	if err := json.Unmarshal(raw, &object); err != nil {
+	if err := rule.UnmarshalOptions(raw, &object); err != nil {
 		return DefaultOneVarSettings(),
 			fmt.Errorf("one-var takes a string or an object, %q: %w", string(raw), err)
 	}

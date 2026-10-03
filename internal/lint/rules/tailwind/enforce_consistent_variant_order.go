@@ -26,9 +26,9 @@ func messageVariantOrder(written string, sorted string) rule.Message {
 
 // EnforceConsistentVariantOrderOptions lets a project name the surfaces that carry class strings.
 type EnforceConsistentVariantOrderOptions struct {
-	Attributes []string
-	Callees    []string
-	Variables  []string
+	Attributes []string `json:"attributes"`
+	Callees    []string `json:"callees"`
+	Variables  []string `json:"variables"`
 }
 
 // EnforceConsistentVariantOrder reports stacked variants written in an order Tailwind would not.

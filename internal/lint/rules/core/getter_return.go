@@ -31,7 +31,7 @@ type GetterReturnOptions struct {
 	// AllowImplicit lets a getter satisfy the rule with a `return` carrying no expression, which
 	// yields `undefined`. Off by default, because a getter returning nothing is usually the bug
 	// this rule exists to find rather than a deliberate choice.
-	AllowImplicit bool
+	AllowImplicit bool `json:"allowImplicit"`
 }
 
 // GetterReturn requires a getter to return a value on every path out of it.

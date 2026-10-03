@@ -1,7 +1,6 @@
 package react
 
 import (
-	"encoding/json"
 	"regexp"
 	"strings"
 
@@ -66,7 +65,7 @@ func DecodeNoUnstableNestedComponentsOptions(raw []byte) (any, error) {
 	// Decoded into a fresh value so an absent key is distinguishable from an explicit empty string,
 	// then folded onto the defaults the way upstream's `||` folds a falsy value.
 	var wire NoUnstableNestedComponentsOptions
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return options, err
 	}
 	options.AllowAsProps = wire.AllowAsProps

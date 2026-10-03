@@ -96,18 +96,6 @@ type typesQuery struct {
 	AnyOf []string `json:"anyOf"`
 }
 
-// strictUnmarshal decodes one JSON value into target, refusing a key target does not declare.
-//
-// Every level goes through here rather than through json.Unmarshal, because a custom UnmarshalJSON
-// that calls json.Unmarshal drops the decoder's DisallowUnknownFields for everything beneath it. A
-// selector key this port does not implement, `captured` or `file` or `parent`, would then load
-// clean and be ignored, which is a policy narrower than the one written with nothing saying so.
-func strictUnmarshal(raw []byte, target any) error {
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	return decoder.Decode(target)
-}
-
 // stringSet is upstream's string-or-array-of-strings.
 type stringSet []string
 
@@ -139,6 +127,12 @@ func (selectors *dependencySelectors) UnmarshalJSON(raw []byte) error {
 	return decodeOneOrMany(raw, (*[]dependencySelector)(selectors), "a dependency selector such as {\"to\": {\"element\": {\"type\": \"api\"}}}")
 }
 
+// decodeOneOrMany reads one selector or an array of them, each through rule.UnmarshalOptions.
+//
+// Every level is decoded strictly here rather than through json.Unmarshal, because a custom
+// UnmarshalJSON that calls json.Unmarshal drops the outer decoder's strictness for everything beneath
+// it. A selector key this port does not implement, `captured` or `file` or `parent`, would then load
+// clean and be ignored, which is a policy narrower than the one written with nothing saying so.
 func decodeOneOrMany[Item any](raw []byte, into *[]Item, shape string) error {
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) > 0 && trimmed[0] == '[' {
@@ -148,7 +142,7 @@ func decodeOneOrMany[Item any](raw []byte, into *[]Item, shape string) error {
 		}
 		for _, element := range many {
 			var item Item
-			if err := strictUnmarshal(element, &item); err != nil {
+			if err := rule.UnmarshalOptions(element, &item); err != nil {
 				return fmt.Errorf("%w; this port reads %s, and upstream's legacy string selectors are not ported", err, shape)
 			}
 			*into = append(*into, item)
@@ -156,7 +150,7 @@ func decodeOneOrMany[Item any](raw []byte, into *[]Item, shape string) error {
 		return nil
 	}
 	var item Item
-	if err := strictUnmarshal(trimmed, &item); err != nil {
+	if err := rule.UnmarshalOptions(trimmed, &item); err != nil {
 		return fmt.Errorf("%w; this port reads %s, and upstream's legacy string selectors are not ported", err, shape)
 	}
 	*into = append(*into, item)
@@ -175,7 +169,7 @@ func decodeDependenciesOptions(raw []byte, base rule.OptionsBase) (any, error) {
 	}
 
 	var settings DependenciesOptions
-	if err := strictUnmarshal(raw, &settings); err != nil {
+	if err := rule.UnmarshalOptions(raw, &settings); err != nil {
 		return nil, fmt.Errorf("boundaries/dependencies: %w", err)
 	}
 

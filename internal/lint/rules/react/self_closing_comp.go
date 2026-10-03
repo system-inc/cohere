@@ -1,7 +1,6 @@
 package react
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -54,7 +53,7 @@ func DecodeSelfClosingCompOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var wire selfClosingCompWire
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return options, err
 	}
 	if wire.Component != nil {

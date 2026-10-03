@@ -12,7 +12,7 @@ import (
 // ConsistencyNoScreamingSnakeCaseOptions names constants that may keep the shouting form because
 // they mirror an external system's grammar. Exact match, never a prefix.
 type ConsistencyNoScreamingSnakeCaseOptions struct {
-	Allow []string
+	Allow []string `json:"allow"`
 }
 
 func messageScreamingSnakeCaseExported(name string, suggestion string) rule.Message {

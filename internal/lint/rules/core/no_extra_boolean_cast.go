@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/json"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -54,7 +53,7 @@ func (options *NoExtraBooleanCastOptions) UnmarshalJSON(raw []byte) error {
 		EnforceForInnerExpressions *bool `json:"enforceForInnerExpressions"`
 		EnforceForLogicalOperands  *bool `json:"enforceForLogicalOperands"`
 	}
-	if err := json.Unmarshal(raw, &decoded); err != nil {
+	if err := rule.UnmarshalOptions(raw, &decoded); err != nil {
 		return err
 	}
 	// The newer name wins when both are written, matching serde's alias resolution, where the

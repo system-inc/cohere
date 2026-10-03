@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -86,10 +85,8 @@ func DecodeNoInnerDeclarationsOptions(list []byte) (any, error) {
 		settings = applied.(NoInnerDeclarationsOptions)
 	}
 	if len(positional) > 1 {
-		decoder := json.NewDecoder(bytes.NewReader(positional[1]))
-		decoder.DisallowUnknownFields()
 		var second noInnerDeclarationsSecondOption
-		if err := decoder.Decode(&second); err != nil {
+		if err := rule.UnmarshalOptions(positional[1], &second); err != nil {
 			return DefaultNoInnerDeclarationsSettings(),
 				fmt.Errorf("no-inner-declarations element 2: %w", err)
 		}

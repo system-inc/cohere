@@ -1,8 +1,6 @@
 package core
 
 import (
-	"encoding/json"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -55,7 +53,7 @@ func DecodeNoImplicitGlobalsOptions(raw []byte) (any, error) {
 	}
 
 	var wire noImplicitGlobalsWireShape
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return DefaultNoImplicitGlobalsSettings(), err
 	}
 

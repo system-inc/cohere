@@ -20,12 +20,12 @@ import (
 // SkipCompoundAssignments is the one option that defaults to FALSE, so it binds through as a plain
 // bool: absent and explicitly false mean the same thing for it.
 type RestrictPlusOperandsOptions struct {
-	AllowAny                *bool
-	AllowBoolean            *bool
-	AllowNullish            *bool
-	AllowNumberAndString    *bool
-	AllowRegExp             *bool
-	SkipCompoundAssignments bool
+	AllowAny                *bool `json:"allowAny"`
+	AllowBoolean            *bool `json:"allowBoolean"`
+	AllowNullish            *bool `json:"allowNullish"`
+	AllowNumberAndString    *bool `json:"allowNumberAndString"`
+	AllowRegExp             *bool `json:"allowRegExp"`
+	SkipCompoundAssignments bool  `json:"skipCompoundAssignments"`
 }
 
 // restrictPlusOperandsSettings is the resolved form, with every default already applied, so the rule

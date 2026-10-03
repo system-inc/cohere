@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -62,10 +61,8 @@ func DecodeYodaOptions(list []byte) (any, error) {
 		return settings, nil
 	}
 
-	decoder := json.NewDecoder(bytes.NewReader(elements[1]))
-	decoder.DisallowUnknownFields()
 	var object yodaObjectWire
-	if err := decoder.Decode(&object); err != nil {
+	if err := rule.UnmarshalOptions(elements[1], &object); err != nil {
 		return DefaultYodaSettings(), fmt.Errorf("yoda element 2: %w", err)
 	}
 	applyYodaFlags(&settings, object)

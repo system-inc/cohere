@@ -40,8 +40,8 @@ var comparisonOperators = map[ast.Kind]bool{
 // vanishes is worse than one that is read: `list.indexOf(NaN)` always returns -1, since indexOf uses
 // strict equality. It is false here, matching the configuration.
 type UseIsNaNOptions struct {
-	EnforceForSwitchCase *bool
-	EnforceForIndexOf    bool
+	EnforceForSwitchCase *bool `json:"enforceForSwitchCase"`
+	EnforceForIndexOf    bool  `json:"enforceForIndexOf"`
 }
 
 var messageCaseWithNaN = rule.Message{

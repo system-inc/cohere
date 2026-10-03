@@ -20,9 +20,9 @@ func messageUnnecessaryWhitespace() rule.Message {
 
 // NoUnnecessaryWhitespaceOptions lets a project name the surfaces that carry class strings.
 type NoUnnecessaryWhitespaceOptions struct {
-	Attributes []string
-	Callees    []string
-	Variables  []string
+	Attributes []string `json:"attributes"`
+	Callees    []string `json:"callees"`
+	Variables  []string `json:"variables"`
 }
 
 // NoUnnecessaryWhitespace reports padding and doubled spaces inside a class string.

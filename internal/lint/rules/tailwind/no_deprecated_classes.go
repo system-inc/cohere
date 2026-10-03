@@ -31,9 +31,9 @@ func messageDeprecatedClassIrreplaceable(className string) rule.Message {
 
 // NoDeprecatedClassesOptions lets a project name the surfaces that carry class strings.
 type NoDeprecatedClassesOptions struct {
-	Attributes []string
-	Callees    []string
-	Variables  []string
+	Attributes []string `json:"attributes"`
+	Callees    []string `json:"callees"`
+	Variables  []string `json:"variables"`
 }
 
 // deprecation is one renamed or removed utility.

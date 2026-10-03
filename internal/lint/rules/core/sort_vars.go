@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/json"
 	"sort"
 	"strings"
 
@@ -37,7 +36,7 @@ func DecodeSortVarsOptions(raw []byte) (any, error) {
 	var wire struct {
 		IgnoreCase bool `json:"ignoreCase"`
 	}
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return settings, err
 	}
 	settings.IgnoreCase = wire.IgnoreCase

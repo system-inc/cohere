@@ -1,7 +1,6 @@
 package react
 
 import (
-	"encoding/json"
 	"errors"
 	"regexp"
 
@@ -79,7 +78,7 @@ func DecodeBooleanPropNamingOptions(raw []byte) (any, error) {
 	// reads `config.propTypeNames || ['bool']`, so an explicitly empty array ALSO falls back, which
 	// this reproduces by testing length rather than nil.
 	var wire BooleanPropNamingOptions
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return options, err
 	}
 	if wire.Rule != "" {

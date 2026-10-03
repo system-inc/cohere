@@ -3,7 +3,6 @@ package nexus
 import (
 	"bytes"
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -148,10 +147,8 @@ func mustLoadAbbreviationVocabulary(data []byte) *abbreviationVocabulary {
 }
 
 func loadAbbreviationVocabulary(data []byte) (*abbreviationVocabulary, error) {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
 	var file abbreviationVocabularyFile
-	if err := decoder.Decode(&file); err != nil {
+	if err := rule.UnmarshalOptions(data, &file); err != nil {
 		return nil, err
 	}
 

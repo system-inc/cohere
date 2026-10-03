@@ -1,8 +1,10 @@
 package typescript
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
@@ -66,18 +68,55 @@ func buildVoidReturnVariableMessage() rule.Message {
 }
 
 type NoMisusedPromisesChecksVoidReturnOptions struct {
-	Arguments        *bool
-	Attributes       *bool
-	InheritedMethods *bool
-	Properties       *bool
-	Returns          *bool
-	Variables        *bool
+	Arguments        *bool `json:"arguments"`
+	Attributes       *bool `json:"attributes"`
+	InheritedMethods *bool `json:"inheritedMethods"`
+	Properties       *bool `json:"properties"`
+	Returns          *bool `json:"returns"`
+	Variables        *bool `json:"variables"`
 }
 type NoMisusedPromisesOptions struct {
-	ChecksConditionals   *bool
-	ChecksSpreads        *bool
-	ChecksVoidReturn     *bool
-	ChecksVoidReturnOpts *NoMisusedPromisesChecksVoidReturnOptions
+	ChecksConditionals   *bool                                     `json:"checksConditionals"`
+	ChecksSpreads        *bool                                     `json:"checksSpreads"`
+	ChecksVoidReturn     *bool                                     `json:"checksVoidReturn"`
+	ChecksVoidReturnOpts *NoMisusedPromisesChecksVoidReturnOptions `json:"-"`
+}
+
+// UnmarshalJSON reads upstream's `checksVoidReturn`, which is a boolean or an object of six booleans.
+//
+// tsgolint split the two spellings into `ChecksVoidReturn` and `ChecksVoidReturnOpts`, and with no
+// tags the object form could only be written under a key upstream does not have,
+// `checksVoidReturnOpts`, while upstream's own `{"checksVoidReturn": {"arguments": false}}` failed
+// to decode into a boolean. The two fields stay, because `Run` reads them; this fills them from
+// upstream's one key. An object turns the check on with those sub-flags, as upstream's
+// `parseChecksVoidReturn` does, and the sub-flags it leaves out default to true in `Run`.
+func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
+	var wire struct {
+		ChecksConditionals *bool           `json:"checksConditionals"`
+		ChecksSpreads      *bool           `json:"checksSpreads"`
+		ChecksVoidReturn   json.RawMessage `json:"checksVoidReturn"`
+	}
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
+		return err
+	}
+	*options = NoMisusedPromisesOptions{ChecksConditionals: wire.ChecksConditionals, ChecksSpreads: wire.ChecksSpreads}
+	trimmed := strings.TrimSpace(string(wire.ChecksVoidReturn))
+	switch {
+	case trimmed == "":
+		return nil
+	case trimmed == "true" || trimmed == "false":
+		options.ChecksVoidReturn = type_checking.Ref(trimmed == "true")
+		return nil
+	case strings.HasPrefix(trimmed, "{"):
+		var each NoMisusedPromisesChecksVoidReturnOptions
+		if err := rule.UnmarshalOptions(wire.ChecksVoidReturn, &each); err != nil {
+			return fmt.Errorf("checksVoidReturn: %w", err)
+		}
+		options.ChecksVoidReturn = type_checking.Ref(true)
+		options.ChecksVoidReturnOpts = &each
+		return nil
+	}
+	return fmt.Errorf("checksVoidReturn takes a boolean or an object of booleans, got %s", trimmed)
 }
 
 // NoMisusedPromises flags a Promise used where the surrounding code cannot handle one: as a boolean

@@ -21,13 +21,13 @@ func messageUnknownClass(className string) rule.Message {
 // NoUnknownClassesOptions lets a project name the surfaces that carry class strings, and exempt
 // classes that are real but come from somewhere Tailwind cannot see.
 type NoUnknownClassesOptions struct {
-	Attributes []string
-	Callees    []string
-	Variables  []string
+	Attributes []string `json:"attributes"`
+	Callees    []string `json:"callees"`
+	Variables  []string `json:"variables"`
 	// Ignore lists regular expressions for classes to leave alone. Required in practice rather than
 	// optional: a project with any hand-written CSS has class names Tailwind does not define, and
 	// without exempting them the rule reports correct code.
-	Ignore []string
+	Ignore []string `json:"ignore"`
 }
 
 // NoUnknownClasses reports class names Tailwind does not define.

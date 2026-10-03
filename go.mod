@@ -43,6 +43,11 @@ require (
 	// 21.8% of tracked files diverge from our fork after every settings-reachable fix. The only thing
 	// that reproduces our formatter is our formatter, and goja is what runs it in-process.
 	github.com/dop251/goja v0.0.0-20260822123354-58e940e0d230
+
+	// Tests only: the registry's option-decoding guard loads the rules tree with type information,
+	// because whether a decode is strict depends on the type it decodes into, which a regex over the
+	// source cannot see. It was already in the graph through stringer.
+	golang.org/x/tools v0.49.0
 )
 
 require (
@@ -52,5 +57,4 @@ require (
 	golang.org/x/mod v0.39.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
-	golang.org/x/tools v0.49.0 // indirect
 )

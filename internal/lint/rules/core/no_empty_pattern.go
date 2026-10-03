@@ -14,7 +14,7 @@ type NoEmptyPatternOptions struct {
 	// position. An empty array pattern parameter still reports, because `[]` there destructures an
 	// iterable and throws on a non-iterable argument, so it does real work and getting it wrong is
 	// a runtime error rather than a no-op.
-	AllowObjectPatternsAsParameters bool
+	AllowObjectPatternsAsParameters bool `json:"allowObjectPatternsAsParameters"`
 }
 
 var messageEmptyObjectPattern = rule.Message{

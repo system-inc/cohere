@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -67,10 +66,8 @@ func DecodeNoRestrictedPropertiesOptions(list []byte) (any, error) {
 			"no-restricted-properties: the option list is not a JSON array: %w", err)
 	}
 	for index, element := range elements {
-		decoder := json.NewDecoder(bytes.NewReader(element))
-		decoder.DisallowUnknownFields()
 		var restriction NoRestrictedPropertiesRestriction
-		if err := decoder.Decode(&restriction); err != nil {
+		if err := rule.UnmarshalOptions(element, &restriction); err != nil {
 			return NoRestrictedPropertiesOptions{}, fmt.Errorf(
 				"no-restricted-properties element %d: %w", index+1, err)
 		}

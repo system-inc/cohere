@@ -178,7 +178,7 @@ func noRestrictedImportsDecodeObjectForm(
 			}
 		} else {
 			var asObjects []noRestrictedImportsRawPattern
-			if err := json.Unmarshal(rawPatterns, &asObjects); err != nil {
+			if err := rule.UnmarshalOptions(rawPatterns, &asObjects); err != nil {
 				return options, err
 			}
 			options.Patterns = asObjects
@@ -217,7 +217,7 @@ func noRestrictedImportsDecodePaths(raw json.RawMessage) ([]NoRestrictedImportsP
 			continue
 		}
 		var object NoRestrictedImportsPath
-		if err := json.Unmarshal(entry, &object); err != nil {
+		if err := rule.UnmarshalOptions(entry, &object); err != nil {
 			return nil, err
 		}
 		paths = append(paths, object)

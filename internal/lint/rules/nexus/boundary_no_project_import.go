@@ -22,10 +22,10 @@ var messageForbiddenProjectImport = rule.Message{
 type BoundaryNoProjectImportOptions struct {
 	// LibraryDirectory is the path fragment identifying the guarded library, matched against the
 	// normalized filename. "/libraries/base/", say. Files outside it are never visited.
-	LibraryDirectory string
+	LibraryDirectory string `json:"libraryDirectory"`
 
 	// Allowed are the exact '@project/...' specifiers this library may import.
-	Allowed []string
+	Allowed []string `json:"allowed"`
 }
 
 // BoundaryNoProjectImport blocks '@project/*' imports inside a framework library.

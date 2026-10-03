@@ -16,17 +16,17 @@ import (
 
 // PathAlias maps a repository-relative directory to the alias that names it.
 type PathAlias struct {
-	Directory string
-	Alias     string
+	Directory string `json:"directory"`
+	Alias     string `json:"alias"`
 }
 
 // ImportRequirePathAliasOptions configures which directories map to which alias.
 type ImportRequirePathAliasOptions struct {
 	// Aliases are matched longest directory first, so a nested root is not shadowed by its parent.
-	Aliases []PathAlias
+	Aliases []PathAlias `json:"aliases"`
 
 	// StrictRoots are directories where every relative import is reported, not only the deep ones.
-	StrictRoots []string
+	StrictRoots []string `json:"strictRoots"`
 
 	// RepositoryRoot is the directory the aliases are relative to, absolute by the time the rule runs.
 	//
@@ -37,7 +37,7 @@ type ImportRequirePathAliasOptions struct {
 	//
 	// In a config it may be relative, resolving against the config file's directory, or absent,
 	// defaulting to the project root cohere discovered. See decodeImportRequirePathAliasOptions.
-	RepositoryRoot string
+	RepositoryRoot string `json:"repositoryRoot"`
 }
 
 // decodeImportRequirePathAliasOptions decodes the options and settles the root before any file runs.

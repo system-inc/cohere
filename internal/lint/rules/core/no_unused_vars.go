@@ -1939,7 +1939,7 @@ func DecodeNoUnusedVarsOptions(raw json.RawMessage) (NoUnusedVarsOptions, error)
 	if len(raw) == 0 {
 		return resolveNoUnusedVarsOptions(nil), nil
 	}
-	if err := json.Unmarshal(raw, &decoded); err != nil {
+	if err := rule.UnmarshalOptions(raw, &decoded); err != nil {
 		return resolveNoUnusedVarsOptions(nil), err
 	}
 	return resolveNoUnusedVarsOptions(decoded), nil

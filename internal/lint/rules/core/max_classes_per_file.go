@@ -100,7 +100,7 @@ func DecodeMaxClassesPerFileOptions(raw []byte) (any, error) {
 	}
 
 	var object maxClassesPerFileObjectShape
-	if err := json.Unmarshal(raw, &object); err != nil {
+	if err := rule.UnmarshalOptions(raw, &object); err != nil {
 		return DefaultMaxClassesPerFileSettings(), err
 	}
 	// A nil Max is upstream's `option.max || 1` and stays at the default rather than becoming zero.

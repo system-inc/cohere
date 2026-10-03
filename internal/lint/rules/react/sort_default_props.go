@@ -1,7 +1,6 @@
 package react
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -35,7 +34,7 @@ func DecodeSortDefaultPropsOptions(raw []byte) (any, error) {
 	var wire struct {
 		IgnoreCase bool `json:"ignoreCase"`
 	}
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return options, err
 	}
 	options.IgnoreCase = wire.IgnoreCase

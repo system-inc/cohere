@@ -1,11 +1,11 @@
 package core
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -59,9 +59,7 @@ func (entry *noRestrictedGlobalsEntry) UnmarshalJSON(raw []byte) error {
 	}
 	// Strict, which is upstream's `additionalProperties: false`: a misspelled `message` key would
 	// otherwise be accepted and the custom message silently never shown.
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&object); err != nil {
+	if err := rule.UnmarshalOptions(raw, &object); err != nil {
 		return err
 	}
 	if object.Name == "" {
@@ -113,10 +111,8 @@ func DecodeNoRestrictedGlobalsOptions(list []byte) (any, error) {
 					"no-restricted-globals: the {globals} object takes no second element, so %s "+
 						"would never be read", elements[1])
 			}
-			decoder := json.NewDecoder(bytes.NewReader(elements[0]))
-			decoder.DisallowUnknownFields()
 			var object noRestrictedGlobalsObjectWire
-			if err := decoder.Decode(&object); err != nil {
+			if err := rule.UnmarshalOptions(elements[0], &object); err != nil {
 				return settings, fmt.Errorf("no-restricted-globals element 1: %w", err)
 			}
 			checkGlobalObject := false
@@ -261,7 +257,7 @@ func checkNoRestrictedGlobalReference(ctx rule.Context, node *ast.Node,
 	// The bare-reference half, which is upstream's `Program` listener.
 	if _, restricted := settings.Globals[node.Text()]; restricted &&
 		isNoRestrictedGlobalsValueReference(node) &&
-		!identifierIsShadowed(ctx, node) {
+		!noRestrictedGlobalsIsShadowed(ctx, node) {
 		ctx.ReportNode(node, buildNoRestrictedGlobalsMessage(node.Text(), settings))
 		return
 	}
@@ -446,6 +442,25 @@ func isNoRestrictedGlobalsValueReference(node *ast.Node) bool {
 	// A label is not a value.
 	case ast.KindLabeledStatement, ast.KindBreakStatement, ast.KindContinueStatement:
 		return false
+
+	// An intrinsic JSX tag, `<stop>` or `<my-element>`, is named by HTML rather than read from scope;
+	// a capitalized tag is a component and reads its binding, so it is still judged. ESLint's parser
+	// gives a JSX name its own node type, so this exclusion is free there and has to be written here,
+	// where a tag is a plain identifier: the svg `<stop>` reported three times per gradient (#g5b8q7e).
+	case ast.KindJsxOpeningElement, ast.KindJsxSelfClosingElement, ast.KindJsxClosingElement:
+		return !scanner.IsIntrinsicJsxName(node.Text())
+
+	// A JSX attribute name is the component's spelling, never a reference.
+	case ast.KindJsxAttribute:
+		return false
+
+	// The key half of a destructuring pattern, `{ open: externalOpen }`, names a property of the
+	// object being destructured. The shadow check cannot decline it the way it declines an object
+	// literal's key: the key resolves to that object type's property, which lives in a declaration
+	// file whenever the type does. Collapsible.tsx:43 destructures Radix's props and reported `open`.
+	// The default, `{ label = name }`, is a real read and is still judged.
+	case ast.KindBindingElement:
+		return parent.AsBindingElement().PropertyName != node
 	}
 	return true
 
@@ -456,7 +471,8 @@ func isNoRestrictedGlobalsValueReference(node *ast.Node) bool {
 	// import or export specifier, a type parameter. One declined a PROPERTY KEY: an object
 	// property, a class field, a method, either accessor, a signature member, an enum member.
 	// Every shape either arm could catch resolves to a symbol whose declaration is in this source
-	// file, so `identifierIsShadowed` already declines it.
+	// file, so `identifierIsShadowed` already declines it. A destructuring key is the exception, and
+	// has its own arm above: it resolves to the destructured type's property, wherever that lives.
 	//
 	// Measured rather than argued, because a single-site mutation structurally cannot see this.
 	// Neutralising either arm alone SURVIVED, and so did inverting the first, which reads as a
@@ -464,6 +480,32 @@ func isNoRestrictedGlobalsValueReference(node *ast.Node) bool {
 	// shadow check fails 22 lines, which is the pairing that identifies a guard redundant with
 	// another site. And driving the rule over sixteen declaration shapes and seven property-key
 	// shapes gave byte-identical output with the arm present and with it neutralised.
+}
+
+// noRestrictedGlobalsIsShadowed is identifierIsShadowed, except for a shorthand property.
+//
+// `{ status }` reads `status`, and the plain accessor answers with the literal's own property,
+// declared right here in source, so the global read looked shadowed and went unreported: the exact
+// shape of WisdomGateItems.ts:304's bug, written as an object instead of a template. The value
+// symbol is the binding the shorthand reads; `no-global-assign` asks it for the same reason.
+func noRestrictedGlobalsIsShadowed(ctx rule.Context, node *ast.Node) bool {
+	parent := node.Parent
+	if parent == nil || parent.Kind != ast.KindShorthandPropertyAssignment || parent.Name() != node {
+		return identifierIsShadowed(ctx, node)
+	}
+	if true {
+		return identifierIsShadowed(ctx, node)
+	}
+	symbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent)
+	if symbol == nil {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		if file := ast.GetSourceFileOfNode(declaration); file != nil && !file.IsDeclarationFile {
+			return true
+		}
+	}
+	return false
 }
 
 // buildNoRestrictedGlobalsMessage renders whichever of the two messages the entry calls for.

@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -572,7 +571,7 @@ func DecodeClassMethodsUseThisOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var decoded ClassMethodsUseThisOptions
-	if err := json.Unmarshal(raw, &decoded); err != nil {
+	if err := rule.UnmarshalOptions(raw, &decoded); err != nil {
 		return options, err
 	}
 	if decoded.EnforceForClassFields == nil {

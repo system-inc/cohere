@@ -2,6 +2,7 @@ package core
 
 import (
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -366,19 +367,16 @@ func TestNoSequencesMessage(t *testing.T) {
 }
 
 // A guard against the decoder growing a second spelling of the same option, which is how a serde
-// alias silently widens a rule. Upstream's schema names exactly one property and forbids the rest.
-func TestNoSequencesDecoderIgnoresUnknownKeys(t *testing.T) {
+// alias silently widens a rule. Upstream's schema names exactly one property and forbids the rest,
+// so a misspelling is refused by name, as ESLint refuses it (#4a4yse4); it used to be ignored.
+func TestNoSequencesDecoderRefusesAMisspelledKey(t *testing.T) {
 	t.Parallel()
 
-	decoded, err := DecodeNoSequencesOptions([]byte(`{"allowInParenthesis": false}`))
-	if err != nil {
-		t.Fatalf("decoding: %v", err)
+	if _, err := DecodeNoSequencesOptions([]byte(`{"allowInParentheses": false}`)); err != nil {
+		t.Fatalf("baseline: upstream's spelling was refused: %v", err)
 	}
-	options, ok := decoded.(NoSequencesOptions)
-	if !ok {
-		t.Fatalf("decoded to %T", decoded)
-	}
-	if !options.allowInParentheses() {
-		t.Error("a misspelled key changed the option, so the decoder is matching more than it should")
+	_, err := DecodeNoSequencesOptions([]byte(`{"allowInParenthesis": false}`))
+	if err == nil || !strings.Contains(err.Error(), "allowInParenthesis") {
+		t.Fatalf("want a refusal naming the misspelled key, got %v", err)
 	}
 }

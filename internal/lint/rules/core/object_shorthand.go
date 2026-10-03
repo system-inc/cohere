@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -103,15 +102,13 @@ func DecodeObjectShorthandOptions(list []byte) (any, error) {
 		return settings, nil
 	}
 
-	decoder := json.NewDecoder(bytes.NewReader(elements[1]))
-	decoder.DisallowUnknownFields()
 	var wire struct {
 		AvoidQuotes               *bool   `json:"avoidQuotes"`
 		IgnoreConstructors        *bool   `json:"ignoreConstructors"`
 		MethodsIgnorePattern      *string `json:"methodsIgnorePattern"`
 		AvoidExplicitReturnArrows *bool   `json:"avoidExplicitReturnArrows"`
 	}
-	if err := decoder.Decode(&wire); err != nil {
+	if err := rule.UnmarshalOptions(elements[1], &wire); err != nil {
 		return settings, fmt.Errorf("object-shorthand element 2: %w", err)
 	}
 

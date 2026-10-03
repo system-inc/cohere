@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -65,7 +64,7 @@ func DecodeNoBitwiseOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := json.Unmarshal(raw, &options); err != nil {
+	if err := rule.UnmarshalOptions(raw, &options); err != nil {
 		return options, err
 	}
 	for _, spelling := range options.Allow {

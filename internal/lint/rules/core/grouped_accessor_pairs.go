@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -74,12 +73,10 @@ func DecodeGroupedAccessorPairsOptions(list []byte) (any, error) {
 	// The second element's only key is `enforceForTSTypes`, which this port does not implement. Its
 	// default, false, is what the rule already does, so false is accepted; true is refused, because
 	// accepting it would be the option-read-and-ignored shape this decoder exists to refuse.
-	decoder := json.NewDecoder(bytes.NewReader(configured[1]))
-	decoder.DisallowUnknownFields()
 	var second struct {
 		EnforceForTSTypes bool `json:"enforceForTSTypes"`
 	}
-	if err := decoder.Decode(&second); err != nil {
+	if err := rule.UnmarshalOptions(configured[1], &second); err != nil {
 		return options, fmt.Errorf("grouped-accessor-pairs element 2: %w", err)
 	}
 	if second.EnforceForTSTypes {

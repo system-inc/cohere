@@ -1,7 +1,6 @@
 package react
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -126,7 +125,7 @@ func DecodeButtonHasTypeOptions(raw []byte) (any, error) {
 	}
 
 	var wire buttonHasTypeWireOptions
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return options, err
 	}
 	if wire.Button != nil {

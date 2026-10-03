@@ -1,8 +1,6 @@
 package core
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -56,9 +54,7 @@ func DecodeRequireDescriptionOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&options); err != nil {
+	if err := rule.UnmarshalOptions(raw, &options); err != nil {
 		return options, fmt.Errorf("%s: %w", RequireDescription.Name, err)
 	}
 	seen := map[string]bool{}

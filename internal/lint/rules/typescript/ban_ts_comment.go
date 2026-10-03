@@ -2,6 +2,7 @@ package typescript
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -537,7 +538,8 @@ type banTsCommentRawOptions struct {
 // polymorphic and none of the five defaults is a Go zero value. An unrecognized shape falls back to
 // the default rather than disabling the key: upstream refuses such a configuration outright, and
 // there is no error channel reaching a user here, so keeping the documented behavior beats going
-// quiet on a typo.
+// quiet on a typo. The one exception is a key inside the object form that upstream's schema does
+// not declare, which is refused like an unknown key anywhere else in a rule's options (#4a4yse4).
 func DecodeBanTsCommentOptions(raw []byte) (any, error) {
 	decoded, err := rule.DecodeOptionsInto[banTsCommentRawOptions]()(raw)
 	if err != nil {
@@ -547,10 +549,22 @@ func DecodeBanTsCommentOptions(raw []byte) (any, error) {
 	wire, _ := decoded.(banTsCommentRawOptions)
 	options := DefaultBanTsCommentOptions()
 
-	options.TsExpectError = settingOrDefaultBanTsComment(wire.TsExpectError, options.TsExpectError)
-	options.TsIgnore = settingOrDefaultBanTsComment(wire.TsIgnore, options.TsIgnore)
-	options.TsNoCheck = settingOrDefaultBanTsComment(wire.TsNoCheck, options.TsNoCheck)
-	options.TsCheck = settingOrDefaultBanTsComment(wire.TsCheck, options.TsCheck)
+	for _, directive := range []struct {
+		key     string
+		raw     json.RawMessage
+		setting *BanTsCommentSetting
+	}{
+		{"ts-expect-error", wire.TsExpectError, &options.TsExpectError},
+		{"ts-ignore", wire.TsIgnore, &options.TsIgnore},
+		{"ts-nocheck", wire.TsNoCheck, &options.TsNoCheck},
+		{"ts-check", wire.TsCheck, &options.TsCheck},
+	} {
+		setting, err := settingOrDefaultBanTsComment(directive.raw, *directive.setting)
+		if err != nil {
+			return DefaultBanTsCommentOptions(), fmt.Errorf("%s: %w", directive.key, err)
+		}
+		*directive.setting = setting
+	}
 
 	if wire.MinimumDescriptionLength != nil {
 		options.MinimumDescriptionLength = *wire.MinimumDescriptionLength
@@ -569,40 +583,49 @@ func DecodeBanTsCommentOptions(raw []byte) (any, error) {
 // An unparseable regex is also the default rather than a panic. Upstream refuses the whole config
 // at load time, which it can because it has an error channel to a user; the honest equivalent here
 // is to keep the documented behavior rather than to compile a pattern that would match nothing.
-func settingOrDefaultBanTsComment(raw json.RawMessage, fallback BanTsCommentSetting) BanTsCommentSetting {
+//
+// An object that does not decode is the error: a key other than `descriptionFormat`, which
+// typescript-eslint's schema refuses (`additionalProperties: false`), or a value that is not a
+// string. Strict decoding cannot fall back here
+// the way the other shapes do: an object refused for a misspelled key would silently become the
+// default, which drops the whole setting where the old lenient decode dropped only the key.
+func settingOrDefaultBanTsComment(raw json.RawMessage, fallback BanTsCommentSetting) (BanTsCommentSetting, error) {
 	if len(raw) == 0 {
-		return fallback
+		return fallback, nil
 	}
 
 	var asBool bool
 	if json.Unmarshal(raw, &asBool) == nil {
-		return BanTsCommentSetting{Kind: BanTsCommentBoolean, Banned: asBool}
+		return BanTsCommentSetting{Kind: BanTsCommentBoolean, Banned: asBool}, nil
 	}
 
 	var asString string
 	if json.Unmarshal(raw, &asString) == nil {
 		if asString == "allow-with-description" {
-			return BanTsCommentSetting{Kind: BanTsCommentRequireDescription}
+			return BanTsCommentSetting{Kind: BanTsCommentRequireDescription}, nil
 		}
-		return fallback
+		return fallback, nil
 	}
 
 	var asObject struct {
 		DescriptionFormat *string `json:"descriptionFormat"`
 	}
-	if json.Unmarshal(raw, &asObject) == nil {
+	if trimmed := strings.TrimSpace(string(raw)); strings.HasPrefix(trimmed, "{") {
+		if err := rule.UnmarshalOptions(raw, &asObject); err != nil {
+			return fallback, err
+		}
 		if asObject.DescriptionFormat == nil {
-			return BanTsCommentSetting{Kind: BanTsCommentDescriptionFormat}
+			return BanTsCommentSetting{Kind: BanTsCommentDescriptionFormat}, nil
 		}
 		compiled, compileError := regexp.Compile(*asObject.DescriptionFormat)
 		if compileError != nil {
-			return fallback
+			return fallback, nil
 		}
 		return BanTsCommentSetting{
 			Kind:              BanTsCommentDescriptionFormat,
 			DescriptionFormat: compiled,
-		}
+		}, nil
 	}
 
-	return fallback
+	return fallback, nil
 }

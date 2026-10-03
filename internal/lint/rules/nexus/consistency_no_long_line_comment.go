@@ -77,7 +77,7 @@ var ConsistencyNoLongLineComment = rule.Rule{
 // ConsistencyNoLongLineCommentOptions lets a project pick its own threshold.
 type ConsistencyNoLongLineCommentOptions struct {
 	// MaximumLineCount is the longest run of line comments left alone. Zero means the default.
-	MaximumLineCount int
+	MaximumLineCount int `json:"maximumLineCount"`
 }
 
 // isFoldableLineComment reports whether a comment can join a run at all.
