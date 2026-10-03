@@ -15,6 +15,8 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"sort"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
@@ -89,6 +91,11 @@ type Graph struct {
 	// Shapes is every project file's shape for this run (Graph.Signatures), when the caller computed them.
 	// Walk keys shape-keyed rules on them; without them it keys those rules on the type fingerprint.
 	Shapes map[string]SignatureEntry
+
+	// projectFiles is the program's files that the tsconfig named, matched once by Build and verified
+	// complete there. ProjectFiles returns it rather than recomputing, so the check that every named
+	// file made it into the program happens where a failure can be returned instead of panicked.
+	projectFiles []*ast.SourceFile
 }
 
 // configHost adapts a filesystem and a working directory to what tsconfig parsing wants.
@@ -151,6 +158,144 @@ type Options struct {
 // four flavors of an empty result, because the whole point of this package is that a run which
 // checked nothing must not be able to look like a run that found nothing.
 func Build(options Options) (*Graph, error) {
+	graph, err := buildOnce(options)
+	if err != nil {
+		return nil, err
+	}
+
+	// The config's file list and the program's loaded files are two reads of the tree, a moment
+	// apart. A file deleted or replaced between them is listed but cannot be loaded, which is routine
+	// when many writers share the tree: an atomic save, a throwaway probe. That is a moved tree, not a
+	// broken config, so it gets one fresh build, from a fresh filesystem cache, before anything is
+	// reported. Measured on 2026-10-03: with a root listed and unloadable, the guard this replaced
+	// panicked and blamed path casing.
+	verdict, missing := graph.verifyProjectFiles(inspectRootOnDisk)
+	if verdict == rootsMoved {
+		graph, err = buildOnce(options)
+		if err != nil {
+			return nil, err
+		}
+		verdict, missing = graph.verifyProjectFiles(inspectRootOnDisk)
+		if verdict == rootsMoved {
+			return nil, fmt.Errorf("program: files %s named disappeared before they could be read, in two "+
+				"builds in a row: %s. Something is rewriting the tree faster than a build; run again once "+
+				"it settles", graph.ConfigFileName, describeRoots(missing))
+		}
+	}
+
+	switch verdict {
+	case rootsUnreadable:
+		return nil, fmt.Errorf("program: %d of the files %s named exist but could not be read, so the "+
+			"program left them out: %s. Linting the rest would silently skip them",
+			len(missing), graph.ConfigFileName, describeRoots(missing))
+	case rootsUnmatched:
+		return nil, errors.New(projectFilesMismatchMessage(len(graph.Config.FileNames()), len(graph.projectFiles)))
+	}
+	return graph, nil
+}
+
+// rootState is what the disk says about a file the config named, read now rather than from the build's
+// cache, which still remembers the tree as it was when the config was globbed.
+type rootState int
+
+const (
+	rootAbsent rootState = iota
+	rootUnreadable
+	rootReadable
+)
+
+// rootsVerdict is what a build's unloaded roots mean.
+type rootsVerdict int
+
+const (
+	// rootsComplete: every file the config named is in the program.
+	rootsComplete rootsVerdict = iota
+
+	// rootsMoved: every missing root is gone from disk, so the tree changed between the two reads.
+	rootsMoved
+
+	// rootsUnreadable: a missing root exists but cannot be read.
+	rootsUnreadable
+
+	// rootsUnmatched: a missing root exists and is readable, so the program loaded it under a path the
+	// config's name does not canonicalize to. This is the casing defect the original guard was for.
+	rootsUnmatched
+)
+
+// classifyMissingRoots decides what a set of named-but-unloaded roots means.
+//
+// A pure function of what the disk says, so every verdict is tested directly. The order is the order
+// of seriousness: one readable root that did not match is a real defect however many others vanished,
+// so it wins over a moved tree, and an unreadable root wins over one that vanished.
+func classifyMissingRoots(missing []string, inspect func(string) rootState) rootsVerdict {
+	if len(missing) == 0 {
+		return rootsComplete
+	}
+	verdict := rootsMoved
+	for _, fileName := range missing {
+		switch inspect(fileName) {
+		case rootReadable:
+			return rootsUnmatched
+		case rootUnreadable:
+			verdict = rootsUnreadable
+		}
+	}
+	return verdict
+}
+
+// verifyProjectFiles matches the config's files to the program's, keeps the matches for ProjectFiles,
+// and says what any missing ones mean.
+func (g *Graph) verifyProjectFiles(inspect func(string) rootState) (rootsVerdict, []string) {
+	rootPaths := make(map[tspath.Path]string, len(g.Config.FileNames()))
+	for _, fileName := range g.Config.FileNames() {
+		rootPaths[toPath(fileName, g.Config.GetCurrentDirectory(), g.Config.UseCaseSensitiveFileNames())] = fileName
+	}
+
+	files := make([]*ast.SourceFile, 0, len(rootPaths))
+	loaded := make(map[tspath.Path]struct{}, len(rootPaths))
+	for _, sourceFile := range g.Program.GetSourceFiles() {
+		if _, isRoot := rootPaths[sourceFile.Path()]; isRoot {
+			files = append(files, sourceFile)
+			loaded[sourceFile.Path()] = struct{}{}
+		}
+	}
+	g.projectFiles = files
+
+	missing := []string{}
+	for path, fileName := range rootPaths {
+		if _, isLoaded := loaded[path]; !isLoaded {
+			missing = append(missing, fileName)
+		}
+	}
+	sort.Strings(missing)
+	return classifyMissingRoots(missing, inspect), missing
+}
+
+// inspectRootOnDisk asks the real disk, past every cache, what is at a path now.
+func inspectRootOnDisk(fileName string) rootState {
+	if _, err := os.Stat(fileName); err != nil {
+		return rootAbsent
+	}
+	file, err := os.Open(fileName)
+	if err != nil {
+		return rootUnreadable
+	}
+	file.Close()
+	return rootReadable
+}
+
+// describeRoots names the first few missing roots, so an error points at files rather than a count.
+func describeRoots(fileNames []string) string {
+	const shown = 3
+	if len(fileNames) <= shown {
+		return strings.Join(fileNames, ", ")
+	}
+	return fmt.Sprintf("%s and %d more", strings.Join(fileNames[:shown], ", "), len(fileNames)-shown)
+}
+
+// buildOnce resolves the config and builds the program from it, once, without checking that every
+// named file was loaded. Build does that, because only it can decide to build again.
+func buildOnce(options Options) (*Graph, error) {
 	currentDirectory := options.CurrentDirectory
 	if currentDirectory == "" {
 		workingDirectory, err := os.Getwd()
@@ -283,31 +428,13 @@ func (g *Graph) SourceFiles() []*ast.SourceFile {
 // `.d.ts` that the checker needs in order to answer questions and that no rule should visit: a rule
 // walking them would cost most of the run to report findings against code nobody here can edit.
 func (g *Graph) ProjectFiles() []*ast.SourceFile {
-	rootPaths := make(map[tspath.Path]struct{}, len(g.Config.FileNames()))
-	for _, fileName := range g.Config.FileNames() {
-		rootPaths[toPath(fileName, g.Config.GetCurrentDirectory(), g.Config.UseCaseSensitiveFileNames())] = struct{}{}
-	}
-
-	files := make([]*ast.SourceFile, 0, len(rootPaths))
-	for _, sourceFile := range g.Program.GetSourceFiles() {
-		if _, isRoot := rootPaths[sourceFile.Path()]; isRoot {
-			files = append(files, sourceFile)
-		}
-	}
-
-	// A lookup that misses reports the same empty result as a config that named nothing, and this one
-	// has already missed once: the compiler lowercases Path() on a case-insensitive filesystem while
-	// the config keeps its original casing, so comparing them without canonicalizing matched zero of
-	// 3,407 files. Measured, not imagined — the uncanonicalized form still yields 0 today.
-	//
-	// Build's zero-file guard does not cover it, because it sits upstream and passes: the config did
-	// name its files. The failure is between naming and matching, and it is silent by construction.
-	// So the count is asserted here rather than trusted, and a partial miss is as loud as a total one.
-	if len(files) != len(rootPaths) {
-		panic(projectFilesMismatchMessage(len(rootPaths), len(files)))
-	}
-
-	return files
+	// Matched and verified once, by Build. A lookup that misses reports the same empty result as a
+	// config that named nothing, and this one has missed twice: the compiler lowercases Path() on a
+	// case-insensitive filesystem while the config keeps its casing (matched zero of 3,407), and a file
+	// can be deleted between the config's glob and the program's read (matched 3,789 of 3,790, with many
+	// writers sharing the tree). Build tells the two apart and fails on the first, so nothing here can
+	// return a silently partial list.
+	return g.projectFiles
 }
 
 // projectFilesMismatchMessage says what went wrong and where to look.
