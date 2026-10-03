@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -298,12 +299,18 @@ func TestDeclaredSubmodulesReadsTheGitmodulesPaths(t *testing.T) {
 // lint-only cohere commit from reformatting the tree, and the one that must not keep a record across a
 // printer change.
 func TestTheRecordFollowsTheFormatterNotTheBinary(t *testing.T) {
+	// Every build compiles one snapshot of the source, taken once, so the three binaries differ only in
+	// the two stamps the test sets. Built from the shared working tree, they could carry different trees
+	// whenever another node edited it between builds, and the second build then discarded the record:
+	// the test failed about one run in three, measuring the tree's churn rather than the record's rule.
+	snapshot := sourceSnapshot(t)
 	stamped := func(selfCommit string, formatter string) string {
 		t.Helper()
 		binary := filepath.Join(t.TempDir(), "cohere")
 		const packaging = "github.com/system-inc/cohere/internal/release/packaging"
-		build := exec.Command("go", "build", "-o", binary,
-			"-ldflags=-X "+packaging+".selfCommit="+selfCommit+" -X "+packaging+".formatterIdentity="+formatter, ".")
+		build := exec.Command("go", "build", "-buildvcs=false", "-o", binary,
+			"-ldflags=-X "+packaging+".selfCommit="+selfCommit+" -X "+packaging+".formatterIdentity="+formatter, "./command/cohere")
+		build.Dir = snapshot
 		if output, err := build.CombinedOutput(); err != nil {
 			t.Fatalf("cannot build cohere: %v\n%s", err, output)
 		}
@@ -337,5 +344,63 @@ func TestTheRecordFollowsTheFormatterNotTheBinary(t *testing.T) {
 	}
 	if output := run(printerChanged, "--no-fix", "--format"); !strings.Contains(output, "all 5 files, because the formatter changed since the last check") {
 		t.Fatalf("a build with another formatter trusted the record:\n%s", output)
+	}
+}
+
+// sourceSnapshot copies the module's source, as it is on disk now, into a directory of the test's own,
+// and returns the copy's root. Builds from it cannot see an edit anyone makes to the working tree
+// afterward. The compiler pin (TypeScript, a submodule nobody edits in passing) is linked rather than
+// copied. It is a copy of the working tree rather than of a commit, so the test still builds the code
+// someone is changing: an export of HEAD would quietly test the old record logic instead.
+func sourceSnapshot(t *testing.T) string {
+	t.Helper()
+	moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := t.TempDir()
+	for _, name := range []string{"go.mod", "go.sum", "go.work", "go.work.sum"} {
+		copySnapshotFile(t, filepath.Join(moduleRoot, name), filepath.Join(snapshot, name))
+	}
+	for _, directory := range []string{"command", "internal", "TypeScript-shim"} {
+		source := filepath.Join(moduleRoot, directory)
+		err := filepath.WalkDir(source, func(path string, entry fs.DirEntry, walkError error) error {
+			if walkError != nil {
+				return walkError
+			}
+			relative, err := filepath.Rel(moduleRoot, path)
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() {
+				return os.MkdirAll(filepath.Join(snapshot, relative), 0o755)
+			}
+			if !entry.Type().IsRegular() {
+				return nil
+			}
+			copySnapshotFile(t, path, filepath.Join(snapshot, relative))
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("snapshotting %s: %v", directory, err)
+		}
+	}
+	if err := os.Symlink(filepath.Join(moduleRoot, "TypeScript"), filepath.Join(snapshot, "TypeScript")); err != nil {
+		t.Fatal(err)
+	}
+	return snapshot
+}
+
+func copySnapshotFile(t *testing.T, source string, destination string) {
+	t.Helper()
+	contents, err := os.ReadFile(source)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(destination, contents, 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
