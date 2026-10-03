@@ -1,0 +1,35 @@
+{
+    "rule": "strict",
+    "firing": {
+        "file": "/repository/source/Strict.ts",
+        "source": "'use strict'; export function f(a: string): void {}",
+        "findings": [
+            {
+                "line": 1,
+                "column": 1,
+                "endLine": 1,
+                "endColumn": 14,
+                "messageId": "module",
+                "message": "This file is a module, and every module is already strict. The directive does nothing here, so a reader has to check the file's imports to learn that it is redundant rather than load-bearing. Delete it.",
+                "fix": true
+            }
+        ],
+        "fixedSource": " export function f(a: string): void {}"
+    },
+    "clean": {
+        "file": "/repository/source/Strict.ts",
+        "source": "export const a = 1;"
+    },
+    "assertedMessageIds": [
+        "function",
+        "global",
+        "module",
+        "multiple",
+        "never",
+        "nonSimpleParameterList",
+        "unnecessary",
+        "unnecessaryInClasses",
+        "wrap"
+    ],
+    "assertsFix": true
+}

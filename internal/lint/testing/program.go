@@ -246,7 +246,11 @@ func runTypedFiles(
 		walk(sourceFile.AsNode(), listeners)
 	}
 
-	return Result{Diagnostics: diagnostics, SourceFile: sourceFile}
+	return Result{
+		Diagnostics: diagnostics,
+		SourceFile:  sourceFile,
+		capture:     newCapturedRun(subject, subjectFileName, len(files)-1, options),
+	}
 }
 
 // findSourceFile locates the subject file in the built program by normalized path.

@@ -21,6 +21,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/system-inc/cohere/internal/docsdata/capture"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -28,6 +29,10 @@ import (
 type Result struct {
 	Diagnostics []rule.Diagnostic
 	SourceFile  *ast.SourceFile
+
+	// capture is the case the docs capture records when an assertion passes on this result; see
+	// docs_capture.go. Nil unless COHERE_DOCS_CAPTURE is set.
+	capture *capturedRun
 }
 
 // MessageIds returns the ids of every finding, in the order they were reported.
@@ -57,6 +62,7 @@ func Run(t *testing.T, subject rule.Rule, fileName string, sourceText string) Re
 // as deliberately as it hands it good ones.
 func RunWithOptions(t *testing.T, subject rule.Rule, fileName string, sourceText string, options any) Result {
 	t.Helper()
+	captured := newCapturedRun(subject, fileName, 0, options)
 
 	// A `.jsx` fixture has to parse as JSX too, and it did not until a fixture asked it to.
 	//
@@ -109,7 +115,7 @@ func RunWithOptions(t *testing.T, subject rule.Rule, fileName string, sourceText
 		walk(sourceFile.AsNode(), listeners)
 	}
 
-	return Result{Diagnostics: diagnostics, SourceFile: sourceFile}
+	return Result{Diagnostics: diagnostics, SourceFile: sourceFile, capture: captured}
 }
 
 // walk visits every node, calling any listener registered for its kind.
@@ -145,6 +151,7 @@ func ExpectFindings(t *testing.T, result Result, wantIds ...string) {
 			t.Fatalf("finding %d: expected %q, got %q (all: %v)", index, want, gotIds[index], gotIds)
 		}
 	}
+	recordCase(t, result, capture.OutcomeFindings, "")
 }
 
 // ExpectClean asserts that a rule stayed silent.
@@ -157,6 +164,7 @@ func ExpectClean(t *testing.T, result Result) {
 	if len(result.Diagnostics) != 0 {
 		t.Fatalf("expected no findings, got %d: %v", len(result.Diagnostics), result.MessageIds())
 	}
+	recordCase(t, result, capture.OutcomeClean, "")
 }
 
 // ExpectFixedSource applies every fix the rule proposed and asserts the resulting source text.
@@ -216,5 +224,7 @@ func ExpectFixedSource(t *testing.T, result Result, wantSource string) {
 
 	if source != wantSource {
 		t.Errorf("the applied fixes produced:\n  %q\nwant:\n  %q", source, wantSource)
+		return
 	}
+	recordCase(t, result, capture.OutcomeFixed, source)
 }

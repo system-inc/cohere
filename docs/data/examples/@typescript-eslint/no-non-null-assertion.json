@@ -1,0 +1,25 @@
+{
+    "rule": "@typescript-eslint/no-non-null-assertion",
+    "firing": {
+        "file": "/repository/source/Thing.ts",
+        "source": "declare const foo: any;\nexport const r = foo!;\n",
+        "findings": [
+            {
+                "line": 2,
+                "column": 18,
+                "endLine": 2,
+                "endColumn": 22,
+                "messageId": "noNonNull",
+                "message": "A non-null assertion tells the compiler to stop checking, and it is erased before the code runs, so it changes what the type system will let you write without changing what actually arrives at runtime. When the value is nullish anyway the failure lands somewhere else, as a property access on `undefined` in code the types promised was safe. Narrow the value with a check, use `?.` to keep the runtime guard, or fix the type if it is wrong about being nullable."
+            }
+        ]
+    },
+    "clean": {
+        "file": "/repository/source/Thing.ts",
+        "source": "export const r = 'hello!';\n"
+    },
+    "assertedMessageIds": [
+        "noNonNull"
+    ],
+    "assertsSuggestion": true
+}

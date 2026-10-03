@@ -1,0 +1,24 @@
+{
+    "rule": "valid-typeof",
+    "firing": {
+        "file": "/repository/source/Thing.ts",
+        "source": "declare const value: unknown;\nexport const Bad = typeof value === 'null';\n",
+        "findings": [
+            {
+                "line": 2,
+                "column": 37,
+                "endLine": 2,
+                "endColumn": 43,
+                "messageId": "invalidTypeofValue",
+                "message": "A typeof expression can only produce one of eight strings, and \"null\" is not among them, so this comparison is always false and the branch behind it is dead. The eight are undefined, object, boolean, number, string, function, symbol and bigint. Almost every finding here is a typo or a guess at a type name that the language does not report: typeof null is \"object\", an array is \"object\", and there is no \"array\", \"null\" or \"date\"."
+            }
+        ]
+    },
+    "clean": {
+        "file": "/repository/source/Thing.ts",
+        "source": "declare const value: string;\nexport const Ok = value === 'array';\n"
+    },
+    "assertedMessageIds": [
+        "invalidTypeofValue"
+    ]
+}

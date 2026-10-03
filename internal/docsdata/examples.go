@@ -27,11 +27,17 @@ type Examples struct {
 	AssertsSuggestion bool `json:"assertsSuggestion,omitempty"`
 }
 
-// Example is one asserted case.
+// Example is one asserted case, run with no options.
+//
+// It has no options field on purpose. A test hands a rule its decoded options value, never the JSON a
+// settings file writes, and for most rules the two differ: a list decoder's struct has no settings-file
+// shape at all, and many decoders normalize what they read ("type-annotation" decodes to TypeAnnotation,
+// an untagged field encodes under its Go name). Measured 2026-10-03: of 96 shown cases that ran with
+// options, 157 option keys were Go field names. So a case run with options is never shown, and the field
+// that could carry them does not exist.
 type Example struct {
 	File        string            `json:"file"`
 	Source      string            `json:"source"`
-	Options     json.RawMessage   `json:"options,omitempty"`
 	Findings    []capture.Finding `json:"findings,omitempty"`
 	FixedSource string            `json:"fixedSource,omitempty"`
 }
@@ -86,17 +92,32 @@ func ReadCaptures(directory string) ([]capture.Record, error) {
 	return records, nil
 }
 
-// PickExamples chooses each rule's examples from its captured records.
+// PickExamples chooses each rule's examples from its captured records, and returns how many distinct
+// cases ran with options, which count toward a rule's message ids and fix kind and are never shown.
 //
-// The shortest case wins, among those a reader can run as shown: a case with no options before one
-// with, a case standing alone before one whose program held other files. A rule whose tests assert a
-// fix shows a case with its fixed source. Ties break on the text, so the choice never depends on the
-// order the tests ran in.
-func PickExamples(records []capture.Record) map[string]Examples {
+// The shortest case wins, among those a reader can run as shown: run with no options (see Example), and
+// a case standing alone before one whose program held other files. A rule whose tests assert a fix shows
+// a case with its fixed source. Ties break on the text, so the choice never depends on the order the
+// tests ran in.
+//
+// One case asserted twice, or run by two tests, is one case: records are deduplicated by rule, file,
+// source, options and outcome before anything is counted or picked.
+func PickExamples(records []capture.Record) (map[string]Examples, int) {
+	type caseKey struct{ rule, file, source, options, outcome string }
+	seen := map[caseKey]bool{}
 	byRule := map[string][]capture.Record{}
+	withOptions := 0
 	for _, record := range records {
 		if record.Rule == "" {
 			continue
+		}
+		key := caseKey{record.Rule, record.File, record.Source, string(record.Options), record.Outcome}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		if len(record.Options) > 0 {
+			withOptions++
 		}
 		byRule[record.Rule] = append(byRule[record.Rule], record)
 	}
@@ -111,6 +132,9 @@ func PickExamples(records []capture.Record) map[string]Examples {
 				messageIds[finding.MessageId] = true
 				examples.AssertsFix = examples.AssertsFix || finding.Fix
 				examples.AssertsSuggestion = examples.AssertsSuggestion || finding.Suggestions > 0
+			}
+			if len(record.Options) > 0 {
+				continue
 			}
 			switch record.Outcome {
 			case capture.OutcomeClean:
@@ -132,7 +156,7 @@ func PickExamples(records []capture.Record) map[string]Examples {
 		examples.Clean = shortest(clean)
 		picked[name] = examples
 	}
-	return picked
+	return picked, withOptions
 }
 
 // shortest is the case PickExamples prefers among candidates, or nil when there are none.
@@ -142,9 +166,6 @@ func shortest(candidates []capture.Record) *Example {
 	}
 	sort.Slice(candidates, func(left, right int) bool {
 		a, b := candidates[left], candidates[right]
-		if (len(a.Options) > 0) != (len(b.Options) > 0) {
-			return len(a.Options) == 0
-		}
 		if (a.OtherFiles > 0) != (b.OtherFiles > 0) {
 			return a.OtherFiles == 0
 		}
@@ -154,16 +175,12 @@ func shortest(candidates []capture.Record) *Example {
 		if a.Source != b.Source {
 			return a.Source < b.Source
 		}
-		if a.File != b.File {
-			return a.File < b.File
-		}
-		return string(a.Options) < string(b.Options)
+		return a.File < b.File
 	})
 	best := candidates[0]
 	return &Example{
 		File:        best.File,
 		Source:      best.Source,
-		Options:     best.Options,
 		Findings:    best.Findings,
 		FixedSource: best.FixedSource,
 	}

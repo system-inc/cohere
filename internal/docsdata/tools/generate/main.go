@@ -127,7 +127,9 @@ func gather(scratch string, recapture bool) (docsdata.Inputs, error) {
 	if err != nil {
 		return inputs, err
 	}
-	inputs.Examples = docsdata.PickExamples(records)
+	var withOptions int
+	inputs.Examples, withOptions = docsdata.PickExamples(records)
+	fmt.Printf("captured %d records; %d distinct cases ran with options, counted for message ids and never shown\n", len(records), withOptions)
 	return inputs, nil
 }
 

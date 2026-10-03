@@ -1,0 +1,26 @@
+{
+    "rule": "nexus/consistency-no-single-line-jsdoc",
+    "firing": {
+        "file": "/repository/source/Thing.ts",
+        "source": "/** Does the thing. */\nexport const value = 1;\n",
+        "findings": [
+            {
+                "line": 1,
+                "column": 1,
+                "endLine": 1,
+                "endColumn": 23,
+                "messageId": "useSimpleComment",
+                "message": "A JSDoc comment carrying one line of description should be a line comment. JSDoc's delimiters exist to hold structure, so spending three lines of them on a sentence tells a reader to look for tags that are not there.",
+                "fix": true
+            }
+        ]
+    },
+    "clean": {
+        "file": "/repository/source/Thing.ts",
+        "source": "export const value = 1;\n"
+    },
+    "assertedMessageIds": [
+        "useSimpleComment"
+    ],
+    "assertsFix": true
+}

@@ -271,37 +271,74 @@ func TestTheChangelogParsesEveryRelease(t *testing.T) {
 	}
 }
 
-// TestPickExamplesPrefersWhatAReaderCanRun: the shortest case without options and without other files
-// wins, a rule with an asserted fix shows its fixed source, and the message ids and fix kind cover
-// every asserted case.
+// TestPickExamplesPrefersWhatAReaderCanRun: the shortest case run without options and without other
+// files wins, a rule with an asserted fix shows its fixed source, and the message ids and fix kind cover
+// every asserted case, those run with options included.
 func TestPickExamplesPrefersWhatAReaderCanRun(t *testing.T) {
 	finding := func(id string, fix bool) []capture.Finding {
 		return []capture.Finding{{Line: 1, Column: 1, MessageId: id, Fix: fix}}
 	}
-	picked := PickExamples([]capture.Record{
+	picked, _ := PickExamples([]capture.Record{
 		{Rule: "r", File: "a.ts", Source: "x", Options: json.RawMessage(`{}`), Outcome: capture.OutcomeFindings, Findings: finding("withOptions", false)},
 		{Rule: "r", File: "a.ts", Source: "xx", OtherFiles: 1, Outcome: capture.OutcomeFindings, Findings: finding("other", false)},
 		{Rule: "r", File: "a.ts", Source: "longer one", Outcome: capture.OutcomeFixed, Findings: finding("fixed", true), FixedSource: "fixed"},
 		{Rule: "r", File: "a.ts", Source: "xyz", Outcome: capture.OutcomeFindings, Findings: finding("plain", false)},
 		{Rule: "r", File: "b.ts", Source: "clean, longer", Outcome: capture.OutcomeClean},
 		{Rule: "r", File: "a.ts", Source: "clean", Outcome: capture.OutcomeClean},
-	})["r"]
-	if picked.Firing == nil || picked.Firing.FixedSource != "fixed" {
-		t.Errorf("a rule with an asserted fix should show it: %+v", picked.Firing)
+	})
+	examples := picked["r"]
+	if examples.Firing == nil || examples.Firing.FixedSource != "fixed" {
+		t.Errorf("a rule with an asserted fix should show it: %+v", examples.Firing)
 	}
-	if picked.Clean == nil || picked.Clean.Source != "clean" {
-		t.Errorf("clean %+v", picked.Clean)
+	if examples.Clean == nil || examples.Clean.Source != "clean" {
+		t.Errorf("clean %+v", examples.Clean)
 	}
-	if strings.Join(picked.MessageIds(), ",") != "fixed,other,plain,withOptions" || picked.FixKind() != "fix" {
-		t.Errorf("ids %v, fix kind %q", picked.MessageIds(), picked.FixKind())
+	if strings.Join(examples.MessageIds(), ",") != "fixed,other,plain,withOptions" || examples.FixKind() != "fix" {
+		t.Errorf("ids %v, fix kind %q", examples.MessageIds(), examples.FixKind())
 	}
 
-	unfixed := PickExamples([]capture.Record{
+	unfixed, _ := PickExamples([]capture.Record{
 		{Rule: "r", File: "a.ts", Source: "x", Options: json.RawMessage(`{}`), Outcome: capture.OutcomeFindings},
 		{Rule: "r", File: "a.ts", Source: "xx", OtherFiles: 1, Outcome: capture.OutcomeFindings},
 		{Rule: "r", File: "a.ts", Source: "xyz", Outcome: capture.OutcomeFindings},
-	})["r"]
-	if unfixed.Firing.Source != "xyz" {
-		t.Errorf("the case a reader can run as shown should win: %+v", unfixed.Firing)
+	})
+	if unfixed["r"].Firing.Source != "xyz" {
+		t.Errorf("the case a reader can run as shown should win: %+v", unfixed["r"].Firing)
+	}
+}
+
+// TestACaseRunWithOptionsIsNeverShown: a rule whose only asserted cases ran with options has no example,
+// and its message ids still count.
+func TestACaseRunWithOptionsIsNeverShown(t *testing.T) {
+	picked, withOptions := PickExamples([]capture.Record{
+		{Rule: "r", File: "a.ts", Source: "x", Options: json.RawMessage(`{"Mode": "TypeAnnotation"}`), Outcome: capture.OutcomeFindings,
+			Findings: []capture.Finding{{MessageId: "only"}}},
+		{Rule: "r", File: "a.ts", Source: "y", Options: json.RawMessage(`{"Mode": "TypeAnnotation"}`), Outcome: capture.OutcomeClean},
+	})
+	examples := picked["r"]
+	if examples.Firing != nil || examples.Clean != nil {
+		t.Errorf("a case run with options was shown: %+v", examples)
+	}
+	if strings.Join(examples.MessageIds(), ",") != "only" || withOptions != 2 {
+		t.Errorf("ids %v, %d with options", examples.MessageIds(), withOptions)
+	}
+}
+
+// TestPickExamplesCountsACaseOnce: one case asserted twice, as findings and then as its fixed source, or
+// as findings by two tests, is counted once per outcome, and the fixed record is the one shown.
+func TestPickExamplesCountsACaseOnce(t *testing.T) {
+	findings := capture.Record{Rule: "r", File: "a.ts", Source: "x", Options: json.RawMessage(`{"a":1}`), Outcome: capture.OutcomeFindings}
+	_, withOptions := PickExamples([]capture.Record{findings, findings})
+	if withOptions != 1 {
+		t.Errorf("one case asserted twice counted %d times", withOptions)
+	}
+
+	asserted := capture.Record{Rule: "r", File: "a.ts", Source: "debugger;", Outcome: capture.OutcomeFindings,
+		Findings: []capture.Finding{{MessageId: "debugger", Fix: true}}}
+	fixed := asserted
+	fixed.Outcome, fixed.FixedSource = capture.OutcomeFixed, "\n"
+	picked, _ := PickExamples([]capture.Record{asserted, fixed, asserted})
+	if picked["r"].Firing == nil || picked["r"].Firing.FixedSource != "\n" {
+		t.Errorf("the fixed record should be the one shown: %+v", picked["r"].Firing)
 	}
 }

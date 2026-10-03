@@ -1,0 +1,30 @@
+{
+    "rule": "@typescript-eslint/ban-ts-comment",
+    "firing": {
+        "file": "/repository/source/Thing.ts",
+        "source": "// @ts-ignore",
+        "findings": [
+            {
+                "line": 1,
+                "column": 3,
+                "endLine": 1,
+                "endColumn": 14,
+                "messageId": "banTsCommentPreferExpectError",
+                "message": "This suppression uses `@ts-ignore`, which keeps silencing the line even after the underlying error is gone, so a stale suppression is invisible forever. `@ts-expect-error` reports when the line it guards has stopped failing, which is what makes the suppression removable.",
+                "fix": true
+            }
+        ],
+        "fixedSource": "// @ts-expect-error"
+    },
+    "clean": {
+        "file": "/repository/source/Thing.js",
+        "source": "// @ts-ignore\n"
+    },
+    "assertedMessageIds": [
+        "banTsComment",
+        "banTsCommentDescriptionFormat",
+        "banTsCommentPreferExpectError",
+        "banTsCommentRequiresDescription"
+    ],
+    "assertsFix": true
+}
