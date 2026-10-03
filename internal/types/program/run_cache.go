@@ -278,7 +278,7 @@ func signatureOf(path string) (RunCacheInput, error) {
 	if err != nil {
 		return RunCacheInput{}, fmt.Errorf("recording %s: %w", path, err)
 	}
-	changed, inode := changeTimeAndInode(information)
+	changed, inode := changeTimeAndInode(path, information)
 	return RunCacheInput{
 		Path:                path,
 		Directory:           information.IsDir(),
@@ -364,7 +364,7 @@ func (input RunCacheInput) stillMatches() error {
 	if information.ModTime().UnixNano() != input.ModifiedNanoseconds {
 		return fmt.Errorf("%w: %s was modified", ErrRunCacheMiss, input.Path)
 	}
-	if changed, inode := changeTimeAndInode(information); changed != input.ChangedNanoseconds || inode != input.Inode {
+	if changed, inode := changeTimeAndInode(input.Path, information); changed != input.ChangedNanoseconds || inode != input.Inode {
 		return fmt.Errorf("%w: %s was changed or replaced under its modification time", ErrRunCacheMiss, input.Path)
 	}
 	return nil

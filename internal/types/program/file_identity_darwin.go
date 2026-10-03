@@ -21,7 +21,7 @@ func statIdentity(path string) (fileIdentity, bool) {
 }
 
 // changeTimeAndInode reads a stat's change time and inode, which os.FileInfo does not carry itself.
-func changeTimeAndInode(information os.FileInfo) (changedNanoseconds int64, inode uint64) {
+func changeTimeAndInode(path string, information os.FileInfo) (changedNanoseconds int64, inode uint64) {
 	status, ok := information.Sys().(*syscall.Stat_t)
 	if !ok {
 		return 0, 0

@@ -1,4 +1,4 @@
-//go:build !darwin && !linux
+//go:build !darwin && !linux && !windows
 
 package program
 
@@ -13,6 +13,6 @@ func statIdentity(path string) (fileIdentity, bool) {
 
 // changeTimeAndInode reports neither here, so a run cache input is signed by its size and modification time
 // alone, as it was before either was added.
-func changeTimeAndInode(information os.FileInfo) (changedNanoseconds int64, inode uint64) {
+func changeTimeAndInode(path string, information os.FileInfo) (changedNanoseconds int64, inode uint64) {
 	return 0, 0
 }
