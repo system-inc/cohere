@@ -73,7 +73,8 @@ type PreferConstOptions struct {
 	Destructuring PreferConstDestructuring
 
 	// IgnoreReadBeforeAssign suppresses a finding when the binding is read at a source position
-	// before its declaration. Upstream's stated purpose is avoiding a conflict with
+	// before its first assignment: before the declaration when it has an initializer, and before its
+	// one later write when it has none. Upstream's stated purpose is avoiding a conflict with
 	// `no-use-before-define`: turning such a `let` into a `const` moves the temporal dead zone in a
 	// way the author may not want, so the option exists to leave those alone.
 	IgnoreReadBeforeAssign bool

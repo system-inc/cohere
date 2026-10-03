@@ -431,6 +431,79 @@ func TestPreferConstIgnoreReadBeforeAssignOption(t *testing.T) {
 	})
 }
 
+// The Nexus tier runs prefer-const with ignoreReadBeforeAssign because of two values that reference
+// each other: a timer whose callback settles a promise, and a settle function that clears the timer.
+// Every spelling of that pair breaks one of prefer-const and no-use-before-define at their defaults.
+// These are the two sites in ahra that held a disable for it (CodexAppServerClient.ts), reduced, so
+// the tier's option is shown to clear exactly them while a plain never-reassigned let still reports.
+func TestPreferConstIgnoreReadBeforeAssignClearsMutuallyReferencingTimers(t *testing.T) {
+	t.Parallel()
+
+	ignoring := PreferConstOptions{IgnoreReadBeforeAssign: true}
+	sites := []struct {
+		name       string
+		sourceText string
+	}{
+		{"a finish function that clears the timer declared above it",
+			"declare function connect(): Promise<void>;\n" +
+				"export function open(milliseconds: number): Promise<void> {\n" +
+				"    return new Promise((resolve, reject) => {\n" +
+				"        let settled = false;\n" +
+				"        let timeout: ReturnType<typeof setTimeout>;\n" +
+				"        function finish(error?: Error): void {\n" +
+				"            if(settled) return;\n" +
+				"            settled = true;\n" +
+				"            clearTimeout(timeout);\n" +
+				"            if(error) reject(error);\n" +
+				"            else resolve();\n" +
+				"        }\n" +
+				"        connect().then(() => finish(), finish);\n" +
+				"        timeout = setTimeout(() => finish(new Error('timed out')), milliseconds);\n" +
+				"    });\n" +
+				"}\n"},
+		{"a waiter whose methods clear the timer that filters it out",
+			"export function waitFor(waiters: object[], milliseconds: number): Promise<string> {\n" +
+				"    return new Promise((resolve, reject) => {\n" +
+				"        let timeout: ReturnType<typeof setTimeout>;\n" +
+				"        const waiter = {\n" +
+				"            resolve(value: string) {\n" +
+				"                clearTimeout(timeout);\n" +
+				"                resolve(value);\n" +
+				"            },\n" +
+				"        };\n" +
+				"        timeout = setTimeout(() => {\n" +
+				"            waiters.splice(waiters.indexOf(waiter), 1);\n" +
+				"            reject(new Error('timed out'));\n" +
+				"        }, milliseconds);\n" +
+				"        waiters.push(waiter);\n" +
+				"    });\n" +
+				"}\n"},
+	}
+	for _, site := range sites {
+		t.Run(site.name+", ignoring", func(t *testing.T) {
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+				site.sourceText, ignoring))
+		})
+		t.Run(site.name+", not ignoring", func(t *testing.T) {
+			result := rule_testing.RunTyped(t, PreferConst, preferConstFile, site.sourceText)
+			rule_testing.ExpectFindings(t, result, "preferConst")
+			if reported := reportedTextOf(t, result, 0); reported != "timeout" {
+				t.Errorf("reported %q, want the timer binding", reported)
+			}
+		})
+	}
+
+	// The option clears a read before the first write, not every let a closure reads.
+	t.Run("a never-reassigned let still reports", func(t *testing.T) {
+		source := "export function delay(milliseconds: number): Promise<void> {\n" +
+			"    let timeout = milliseconds * 2;\n" +
+			"    return new Promise((resolve) => { setTimeout(resolve, timeout); });\n" +
+			"}\n"
+		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+			source, ignoring), "preferConst")
+	})
+}
+
 // reportedTextOf slices the source with a finding's own range.
 //
 // Brief step 8: ExpectFindings asserts message ids and count and nothing else, so a rule whose
