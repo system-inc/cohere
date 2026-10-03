@@ -46,18 +46,11 @@ public struct OneTypePerFile: FileRule {
         guard let primary = declarations.primary(stem: file.url.deletingPathExtension().lastPathComponent) else { return [] }
         return declarations.types.filter { $0.name != primary.name }.compactMap { extra in
             guard let declaration = extra.token.parent.flatMap({ DeclSyntax($0) }) else { return nil }
-            if Self.isFilePrivate(declaration) {
+            if Self.isHelper(extra, declarations: declarations, in: file) {
                 return nil
             }
             let isValueType = declaration.is(StructDeclSyntax.self) || declaration.is(EnumDeclSyntax.self)
-            let lines = Self.lineCount(of: declaration, in: file) + declarations.extensions
-                .filter { $0.name == extra.name }
-                .compactMap(\.extensionDeclaration)
-                .map { Self.lineCount(of: DeclSyntax($0), in: file) }
-                .reduce(0, +)
-            if isValueType, lines <= Self.smallValueTypeLines {
-                return nil
-            }
+            let lines = Self.lines(of: extra, declaration: declaration, declarations: declarations, in: file)
             let why = isValueType
                 ? "it is \(lines) lines, over the \(Self.smallValueTypeLines) a small value type may have"
                 : "it is \(Self.kindPhrase(of: declaration)) that is not private"
@@ -68,6 +61,29 @@ public struct OneTypePerFile: FileRule {
                 message: "\(extra.name) is a second top-level type in the file for \(primary.name), and \(why). Move it to \(extra.name).swift, or keep it here only if it is a helper this file alone uses (mark it private) or a small value type (a struct or enum of at most \(Self.smallValueTypeLines) lines)."
             )
         }
+    }
+
+    /*
+     A type that may sit beside a file's own type, or, in a `Type+Purpose.swift` file, beside the extension the
+     file is named for (FileNamedForType asks the same question): private or fileprivate of any size, or a struct
+     or enum of at most `smallValueTypeLines`.
+     */
+    static func isHelper(_ type: TopLevelDeclarations.Entry, declarations: TopLevelDeclarations, in file: ParsedFile) -> Bool {
+        guard let declaration = type.token.parent.flatMap({ DeclSyntax($0) }) else { return false }
+        if isFilePrivate(declaration) {
+            return true
+        }
+        let isValueType = declaration.is(StructDeclSyntax.self) || declaration.is(EnumDeclSyntax.self)
+        return isValueType && lines(of: type, declaration: declaration, declarations: declarations, in: file) <= smallValueTypeLines
+    }
+
+    /* The type's own lines plus those of every extension of it in this file. */
+    static func lines(of type: TopLevelDeclarations.Entry, declaration: DeclSyntax, declarations: TopLevelDeclarations, in file: ParsedFile) -> Int {
+        lineCount(of: declaration, in: file) + declarations.extensions
+            .filter { $0.name == type.name }
+            .compactMap(\.extensionDeclaration)
+            .map { lineCount(of: DeclSyntax($0), in: file) }
+            .reduce(0, +)
     }
 
     /* What a type that can never be small is called in the message: a class, an actor or a protocol. */

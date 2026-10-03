@@ -24,6 +24,12 @@ import SwiftSyntax
    - An extension whose every member names the file's type. `extension View { func delayWidthUntilIdle()
      }` beside `struct DelayWidthUntilIdle: ViewModifier` is the modifier's public face, and putting it in
      `View+Something.swift` separates the modifier from its only entry point, the opposite of findability.
+ - A `Type+Purpose.swift` file may hold helper types beside the visible extension it is named for: private or
+   fileprivate of any size, or a struct or enum of at most 30 lines, the same helpers one-type-per-file lets
+   sit beside a file's own type (Kirk's ruling of 2026-10-03, #r3hfpe8). Found by
+   @system_cohere_swift_ahraos_presence un-nesting a probe file's helpers and Prune's `BinarySlice`: the
+   ruling said they need not nest, and this rule then told the file to be renamed after the helper. A file
+   whose only face is a helper still answers to the plain naming rule.
  - A file with no types and no extensions (free functions, a script) has no name to match.
  */
 public struct FileNamedForType: FileRule {
@@ -41,7 +47,14 @@ public struct FileNamedForType: FileRule {
         var findings: [FindingRecord] = []
 
         let primary = declarations.primary(stem: stem)
-        if let declared = primary, declared.name != stem {
+        /* A visible extension the file is named for: the face of a `Type+Purpose.swift` file. */
+        let hasPurposeFace = declarations.extensions.contains { other in
+            Self.isPurposeFile(stem: stem, for: other.name) && !(other.extensionDeclaration.map(Self.isFilePrivate) ?? false)
+        }
+        /* Every type here is a helper to that face, so the file is named for the face, not for a helper. */
+        let helpersOnly = hasPurposeFace && !declarations.types.isEmpty
+            && declarations.types.allSatisfy { OneTypePerFile.isHelper($0, declarations: declarations, in: file) }
+        if let declared = primary, declared.name != stem, !helpersOnly {
             findings.append(file.finding(
                 at: declared.token,
                 rule: name,
@@ -50,12 +63,11 @@ public struct FileNamedForType: FileRule {
             ))
         }
 
-        let declaredName = primary?.name
+        let declaredName = helpersOnly ? nil : primary?.name
+        let helperNames = helpersOnly ? Set(declarations.types.map(\.name)) : []
         /* The file has a public face: a type it declares, or a visible extension it is named for. A file-private helper may sit beside either. */
-        let anchored = declaredName != nil || declarations.extensions.contains { other in
-            Self.isPurposeFile(stem: stem, for: other.name) && !(other.extensionDeclaration.map(Self.isFilePrivate) ?? false)
-        }
-        for extended in declarations.extensions where extended.name != declaredName {
+        let anchored = declaredName != nil || hasPurposeFace
+        for extended in declarations.extensions where extended.name != declaredName && !helperNames.contains(extended.name) {
             if Self.isPurposeFile(stem: stem, for: extended.name) {
                 continue
             }

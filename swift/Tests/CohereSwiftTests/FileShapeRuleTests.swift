@@ -144,6 +144,20 @@ struct FileShapeRuleTests {
         #expect(Self.messages(FileNamedForType(), "Outer.Inner+Codable.swift", "extension Outer.Inner: Codable {}\n").isEmpty)
     }
 
+    /* A purpose file's helpers stay beside the extension it is named for, under both rules; a bigger internal type, or a file whose only face is the helper, still answers. */
+    @Test func aPurposeFileMayHoldHelperTypes() {
+        let privateHelper = "extension Prune {\n    func run() {}\n}\nprivate struct BinarySlice {\n    var low: Int\n}\nextension BinarySlice { var isEmpty: Bool { low == 0 } }\n"
+        #expect(Self.messages(FileNamedForType(), "Prune+Search.swift", privateHelper).isEmpty)
+        #expect(Self.messages(OneTypePerFile(), "Prune+Search.swift", privateHelper).isEmpty)
+        let smallValues = "extension StagePane {\n    func probe() {}\n}\nstruct ProbeResult {\n    var score: Double\n}\nenum ProbeStage { case warm, run }\n"
+        #expect(Self.messages(FileNamedForType(), "StagePane+Probe.swift", smallValues).isEmpty)
+        #expect(Self.messages(OneTypePerFile(), "StagePane+Probe.swift", smallValues).isEmpty)
+        let internalClass = "extension StagePane {\n    func probe() {}\n}\nfinal class ProbeRunner {}\n"
+        #expect(Self.messages(FileNamedForType(), "StagePane+Probe.swift", internalClass).count == 1)
+        let helperAsTheOnlyFace = "private extension StagePane {\n    func probe() {}\n}\nprivate struct ProbeResult {}\n"
+        #expect(Self.messages(FileNamedForType(), "StagePane+Probe.swift", helperAsTheOnlyFace).count == 1)
+    }
+
     @Test func anExtensionOnlyFileNamedForSomethingElseIsReported() {
         #expect(Self.messages(FileNamedForType(), "Helpers.swift", "extension String {}\n") == ["extensionOutsideItsFile"])
     }
