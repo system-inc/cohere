@@ -461,6 +461,11 @@ func buildOnce(options Options) (*Graph, error) {
 		options.Timing.SourceFileLoads += timedHost.loads.Load()
 		options.Timing.SourceFileSummed += time.Duration(timedHost.summed.Load())
 		options.Timing.ProgramDisk = options.Timing.ProgramDisk.plus(programDisk.snapshot())
+		if options.ContentPack != nil {
+			// The pack's counts are cumulative over its life, which is this build and any rebuild before it,
+			// so they are read rather than added.
+			options.Timing.PackServed, options.Timing.PackRead, _ = options.ContentPack.Counts()
+		}
 	}
 	if builtProgram == nil {
 		return nil, fmt.Errorf("building a program from %s produced nothing", configFileName)

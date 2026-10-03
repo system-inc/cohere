@@ -340,10 +340,14 @@ func printGraphTiming(out io.Writer, timing *program.GraphTiming, buildDuration 
 		formatMilliseconds(max(buildDuration-accounted, 0)), builds)
 	fmt.Fprintf(out, "  tsconfig, its include patterns enumerated: disk %s summed over %s\n",
 		formatMilliseconds(timing.ConfigDisk.Summed()), describeDiskCalls(timing.ConfigDisk))
+	pack := "no content pack"
+	if timing.PackServed+timing.PackRead > 0 {
+		pack = fmt.Sprintf("the content pack served %d of the reads and %d were read from disk", timing.PackServed, timing.PackRead)
+	}
 	fmt.Fprintf(out, "  program, summed over the compiler's parallel loaders: %d files loaded (each a read and a parse) in %s; "+
-		"disk %s over %s\n",
+		"disk %s over %s; %s\n",
 		timing.SourceFileLoads, formatMilliseconds(timing.SourceFileSummed),
-		formatMilliseconds(timing.ProgramDisk.Summed()), describeDiskCalls(timing.ProgramDisk))
+		formatMilliseconds(timing.ProgramDisk.Summed()), describeDiskCalls(timing.ProgramDisk), pack)
 	fmt.Fprintf(out, "  (summed times run past the program's %s wall because the loaders run at once; parse and import "+
 		"resolution happen inside one load and are not split, so what the loads leave of the wall is resolution "+
 		"and the loader's own work together)\n", formatMilliseconds(timing.Program))

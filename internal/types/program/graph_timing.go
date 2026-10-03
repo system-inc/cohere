@@ -53,6 +53,12 @@ type GraphTiming struct {
 	// here, and above the content pack, so a file the pack served is here at the cost of serving it.
 	ConfigDisk  DiskTiming
 	ProgramDisk DiskTiming
+
+	// PackServed and PackRead are the content pack's own count of the reads above: files it served from
+	// its mapping, and files it had to read from disk. Both zero when the build had no pack. A read the
+	// pack served costs a copy, not an open, so the two must be told apart to read Reads' time.
+	PackServed int
+	PackRead   int
 }
 
 // DiskTiming is filesystem calls by kind, each a count and the time summed across every goroutine
