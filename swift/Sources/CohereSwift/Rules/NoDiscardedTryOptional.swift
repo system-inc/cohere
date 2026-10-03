@@ -12,6 +12,10 @@ import SwiftSyntax
  Only the discarded form is matched. Of the 1,428 `try?` the design doc counted, most use their value,
  and those are not the rule's business.
 
+ A discarded `try? await Task.sleep(for:)` (or `nanoseconds:`) is consistency-no-hand-rolled-delay's to
+ report, so one site gets one finding with the right repair: that rule names the house's
+ `Task.sleepUnlessCancelled`, where this rule's do/catch would be the same pause written out by hand.
+
  A `try?` that is the only statement of a body is often that body's value, not a discard, and syntax says
  so in most places: a function or getter with a return type, a computed property, an `if` or `switch` used
  as an expression. Those are skipped.
@@ -98,6 +102,9 @@ public struct NoDiscardedTryOptional: TypedFileRule {
                 return .visitChildren
             }
             if Self.isStatement(node) || Self.isDiscardAssignment(node) {
+                if ConsistencyNoHandRolledDelay.Visitor.sleepCall(awaitedBy: node.expression) != nil {
+                    return .visitChildren
+                }
                 found.append(mark)
             } else if let item = node.parent?.as(CodeBlockItemSyntax.self), let closure = Self.soleClosure(of: item) {
                 closureValues.append((mark, closure))

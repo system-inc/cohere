@@ -34,6 +34,7 @@ public enum RuleRegistry {
         NoStutteringName(),
         NoUtilsFolder(),
         NoBareThrow(),
+        ConsistencyNoHandRolledDelay(),
         ConcurrencyNoLostUpdate(),
         SwiftFormatRule.requireLowerCamelCase,
         SwiftFormatRule.noLeadingUnderscores,

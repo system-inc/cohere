@@ -71,6 +71,20 @@ struct EscapeHatchRuleTests {
         #expect(Self.lines(NoDiscardedTryOptional(), source) == [2, 3])
     }
 
+    /* A discarded sleep is consistency-no-hand-rolled-delay's, which names the house primitive, so this rule leaves it and every other try? on the same lines is still found. */
+    @Test func aDiscardedSleepIsTheDelayRulesNotThisOnes() {
+        let source = """
+            func pause() async {
+                try? await Task.sleep(for: .seconds(1))
+                _ = try? await Task.sleep(nanoseconds: 500)
+                try? await Task.sleep(until: .now + .seconds(1), clock: .continuous)
+                try? await save()
+            }
+            """
+        #expect(Self.lines(NoDiscardedTryOptional(), source) == [4, 5])
+        #expect(Self.lines(ConsistencyNoHandRolledDelay(), source) == [2, 3])
+    }
+
     /* A sole `try?` is its body's value wherever the body returns one (the shapes @system_cohere_swift_ahraos_presence found on Presence), and a discard wherever it does not. */
     @Test func aSoleTryOptionalThatIsItsBodysValueIsNotADiscard() {
         let values = """
