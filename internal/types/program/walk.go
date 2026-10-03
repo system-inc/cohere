@@ -166,7 +166,7 @@ type Result struct {
 // One traversal serves every rule. This is the arrangement the whole tool exists to make possible:
 // a rule that wanted its own pass would multiply the only unavoidable cost in the system by the
 // number of rules, which is exactly how 53 rules of ordinary shape came to cost 1.81s. Here the
-// five-hundredth rule costs a map lookup per node it asked about, and nothing at all for the nodes
+// five-hundredth rule costs a function call per node it asked about, and nothing at all for the nodes
 // it did not.
 //
 // Files are walked in parallel, one goroutine per checker, because a file must be visited by the
@@ -762,7 +762,7 @@ func dispatchFileSafely(
 // one dispatch table, and walks the tree once against it. It returns how many nodes it visited.
 //
 // Merging before walking is what makes the cost per node independent of the rule count: the walk
-// does one map lookup per node regardless of whether one rule or five hundred registered for that
+// does one table read per node regardless of whether one rule or five hundred registered for that
 // kind.
 
 func dispatchFile(
@@ -778,9 +778,11 @@ func dispatchFile(
 	catalog *ruleNameCatalog,
 	resolution configuration.Resolved,
 ) (visitedNodes int, silenced suppressionTally, ruleCrashes []RuleCrash) {
-	// A kind may have listeners from several rules, so the merged table maps a kind to a slice rather
-	// than to one function.
-	merged := map[ast.Kind][]func(node *ast.Node){}
+	// A kind may have listeners from several rules, so the merged table holds a slice per kind rather
+	// than one function. Indexed by kind rather than keyed by it: the walk reads it once per node, and a
+	// slice index is cheaper than a map lookup, about 100ms of CPU across a cold ahra walk (#zqsdzbq).
+	merged := make([][]func(node *ast.Node), ast.KindCount)
+	listened := false
 
 	// Directives are read once per file, before any rule runs, because every rule's findings filter
 	// through the same index. Scanning is proportional to the file rather than to the rule count, so
@@ -879,10 +881,11 @@ func dispatchFile(
 		}
 		for kind, listener := range listeners {
 			merged[kind] = append(merged[kind], containment.listener(attributingListener(timing, listener, ruleName, fileCache, seenFills, fillPayer)))
+			listened = true
 		}
 	}
 
-	if len(merged) > 0 {
+	if listened {
 		visitedNodes = walk(sourceFile.AsNode(), merged)
 	}
 
@@ -1012,8 +1015,9 @@ func tally(directives *suppression.Index, ranRule map[string]bool, resolution co
 	return counted
 }
 
-// walk visits every node once, calling whatever listeners registered for its kind.
-func walk(node *ast.Node, listeners map[ast.Kind][]func(node *ast.Node)) int {
+// walk visits every node once, calling whatever listeners registered for its kind. listeners is indexed
+// by kind and holds ast.KindCount entries.
+func walk(node *ast.Node, listeners [][]func(node *ast.Node)) int {
 	if node == nil {
 		return 0
 	}

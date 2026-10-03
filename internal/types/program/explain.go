@@ -163,7 +163,7 @@ func (g *Graph) Explain(ctx context.Context, sourceFile *ast.SourceFile, rules [
 		account.NodeKinds = kindNames(listeners)
 
 		offered := 0
-		merged := map[ast.Kind][]func(node *ast.Node){}
+		merged := make([][]func(node *ast.Node), ast.KindCount)
 		for kind, listener := range listeners {
 			counting := listener
 			merged[kind] = append(merged[kind], func(node *ast.Node) {
