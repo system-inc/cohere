@@ -11,9 +11,10 @@
 # more seam. And the two macOS packages carry cohere-swift beside cohere, which only Swift on a Mac
 # builds. Everything else about the build is platform-independent.
 #
-# Two jobs follow the build, and neither builds anything. `swift-on-intel` runs the x64 Mac package
-# on an Intel Mac, the one proof the release runner cannot give, and `publish` runs only after both,
-# so the registry never receives a package a proof refused.
+# Proofs follow the build, and none of them builds anything. `swift-on-intel` runs the x64 Mac package
+# on an Intel Mac and `windows` runs the Windows package on Windows, the proofs the release runner
+# cannot give. `publish` runs only after all of them, so the registry never receives a package a proof
+# refused, and the VS Code extension publishes after that.
 name: release
 
 on:
@@ -275,9 +276,50 @@ jobs:
                   cp .github/scripts/check-swift-packages.sh "$script"
                   bash "$script" "$GITHUB_WORKSPACE" darwin-x64:--no-fix
 
+    # The Windows x64 package, run on Windows: installed with npm, then checked, fixed and formatted
+    # through npm's shim, the Node launcher and cohere.exe. Then the tests written for what differs on
+    # Windows: the rename retry, the ignore walk, and the run cache's file identity (#0kfa508). The
+    # whole go test suite is not run, since much of it uses /bin/sh, symlinks and `/`-absolute fixtures.
+    # win32-arm64 is built and not run, since there is no runner for it here.
+    windows:
+        needs: release
+        runs-on: windows-latest
+        timeout-minutes: 30
+        defaults:
+            run:
+                shell: bash
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  # The tests build against the compiler, which is the submodule.
+                  submodules: true
+
+            - uses: actions/setup-go@v5
+              with:
+                  go-version-file: go.mod
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+
+            - uses: actions/download-artifact@v4
+              with:
+                  name: cohere-${{ inputs.version }}-tar
+
+            - name: Prove the Windows package checks, fixes and formats a project
+              run: |
+                  tar -xf cohere-dist.tar
+                  bash .github/scripts/check-platform-package.sh win32-x64
+
+            - name: Run the tests written for what differs on Windows
+              run: |
+                  go test ./internal/replace/ ./internal/format/formatfiles/ ./internal/types/program/ -count=1 \
+                      -run 'TestFileReplacesAFileHeldOpenBriefly|TestIgnorePatternsCoverNestedPaths|TestASameSizeEditUnderARestoredModificationTimeIsAMiss'
+
     publish:
         # After every proof, so a package one of them refused is never on the registry.
-        needs: [release, swift-on-intel]
+        needs: [release, swift-on-intel, windows]
         if: ${{ inputs.publish }}
         runs-on: ubuntu-latest
         timeout-minutes: 15
