@@ -1,6 +1,7 @@
 package nexus
 
 import (
+	"bytes"
 	"slices"
 	"strings"
 	"testing"
@@ -151,6 +152,22 @@ func TestAbbreviationVocabularyRefusesAMalformedFile(t *testing.T) {
 	}
 	if _, err := loadAbbreviationVocabulary(abbreviationsFile); err != nil {
 		t.Fatalf("the embedded file itself is refused: %v", err)
+	}
+}
+
+// TestAbbreviationsFileHandsOutACopy writes into what AbbreviationsFile returns and asks again. Handing
+// out the embedded slice itself would let one caller change the vocabulary every later Swift run gets,
+// while the Go rule kept the words it parsed at init, and the two engines would disagree with nothing
+// failing.
+func TestAbbreviationsFileHandsOutACopy(t *testing.T) {
+	t.Parallel()
+	handedOut := AbbreviationsFile()
+	if len(handedOut) == 0 || !bytes.Equal(handedOut, abbreviationsFile) {
+		t.Fatalf("AbbreviationsFile is not the embedded file (%d bytes, embedded %d)", len(handedOut), len(abbreviationsFile))
+	}
+	handedOut[0] ^= 0xff
+	if !bytes.Equal(AbbreviationsFile(), abbreviationsFile) || handedOut[0] == abbreviationsFile[0] {
+		t.Errorf("a write into one caller's bytes reached the embedded file")
 	}
 }
 

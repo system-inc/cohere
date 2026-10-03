@@ -46,7 +46,8 @@ var abbreviationsFile []byte
 
 // AbbreviationsFile is the vocabulary exactly as embedded, for the front door to hand the Swift engine.
 // A released engine has no checkout to read the file from, and handing it this copy keeps one list for
-// both engines. A copy, so no caller can change the words this rule judges by.
+// both engines. A copy, so a caller that writes into it cannot change what the next caller hands Swift.
+// The Go rule is not what the copy protects: it parsed its own words at package init.
 func AbbreviationsFile() []byte {
 	return bytes.Clone(abbreviationsFile)
 }
