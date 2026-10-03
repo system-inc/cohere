@@ -185,6 +185,9 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 
 	prepareCacheDirectory(location.Root)
 	tablePath := cacheTablePath(location.Root)
+	// The run before this one may still be writing the table after answering its caller, and reading
+	// before its rename would miss what it recorded. See table_lock.go.
+	waitForTableWriter(tablePath, tableWriterWait)
 	// Statted before it is read, never after: a table replaced between the two then reads as replaced at the
 	// end, and is read again, where the other order could keep a stale copy.
 	printPreviousNotes(tablePath)
@@ -267,6 +270,7 @@ func readFormatSection(root string) *program.FormatSection {
 	if cacheOff {
 		return nil
 	}
+	waitForTableWriter(cacheTablePath(root), tableWriterWait)
 	table, _ := program.ReadCacheTable(cacheTablePath(root), cacheTableIdentity())
 	return table.Formatted
 }
@@ -280,6 +284,10 @@ func writeFormatSection(root string, section *program.FormatSection) error {
 	prepareCacheDirectory(root)
 	path := cacheTablePath(root)
 	identity := cacheTableIdentity()
+	// Held across the read and the write, so a run still writing in the background after answering its
+	// caller cannot land its table between the two and have this write drop what it recorded.
+	release := holdTableLock(path)
+	defer release()
 	table, _ := program.ReadCacheTable(path, identity)
 	table.Formatted = section
 	return program.WriteCacheTable(path, table, identity)
@@ -289,6 +297,7 @@ func writeFormatSection(root string, section *program.FormatSection) error {
 // it, so a table this binary would discard says so rather than printing as though it were in use.
 func dumpCacheTable(location projectLocation) error {
 	path := cacheTablePath(location.Root)
+	waitForTableWriter(path, tableWriterWait)
 	table, err := program.ReadCacheTable(path, cacheTableIdentity())
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -369,12 +378,16 @@ func finishRunCache(exitCode int) {
 		session.stdout.stop(&os.Stdout)
 		session.stderr.stop(&os.Stderr)
 		// The report is out, so the caller can have its answer while the run is recorded. See sendVerdict.
+		// The table's lock is taken first and held until the table is in place, so a run the caller starts
+		// next waits for this write rather than reading around it. See table_lock.go.
+		release := holdTableLock(session.tablePath)
 		sendVerdict(exitCode)
 		var recorded *program.RunCache
 		if session.declared && session.declined == "" {
 			recorded = session.record(exitCode)
 		}
 		session.write(recorded)
+		release()
 	}
 	exitProcess(exitCode)
 }

@@ -42,6 +42,15 @@ func sendVerdict(exitCode int) bool {
 	return true
 }
 
+// dropVerdict closes the verdict descriptor unanswered, so the dispatcher waits for this process to end
+// and exits with its status, as it would have under exec.
+func dropVerdict() {
+	if verdictFile != nil {
+		verdictFile.Close()
+		verdictFile = nil
+	}
+}
+
 // verdictSent is whether the caller has already been answered, so whatever this process says afterward
 // must go to the next run instead of to a terminal it no longer owns.
 var verdictSent bool

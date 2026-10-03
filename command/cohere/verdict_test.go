@@ -51,3 +51,41 @@ func TestTheVerdictDescriptorIsNotInheritedByAChild(t *testing.T) {
 		t.Errorf("a child started after the verdict descriptor was taken sees %q, want the descriptor closed and the variable unset", after)
 	}
 }
+
+// A verdict variable naming a descriptor that is not a pipe is not the dispatcher's, and nothing is written
+// to it. A script that opened a log on 3 (`3>log`) and inherited the variable from somewhere would
+// otherwise find a stray byte in its log. A pipe in the same place is taken, which is what makes the
+// refusal mean something.
+func TestAVerdictDescriptorThatIsNotAPipeIsLeftAlone(t *testing.T) {
+	logPath := t.TempDir() + "/log"
+	log, err := os.Create(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer log.Close()
+	t.Setenv(VerdictVariable, strconv.Itoa(int(log.Fd())))
+	verdictFile = takeVerdictFile()
+	if verdictFile != nil {
+		t.Fatal("a regular file was taken as the verdict descriptor")
+	}
+	if sendVerdict(1) {
+		t.Fatal("a verdict was sent with no pipe to send it to")
+	}
+	if _, err := log.Write([]byte("still open\n")); err != nil {
+		t.Fatalf("the regular file was closed: %v", err)
+	}
+	if contents, _ := os.ReadFile(logPath); string(contents) != "still open\n" {
+		t.Errorf("the regular file holds %q, want only what its owner wrote", contents)
+	}
+
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	defer writer.Close()
+	t.Setenv(VerdictVariable, strconv.Itoa(int(writer.Fd())))
+	if file := takeVerdictFile(); file == nil {
+		t.Error("a pipe was not taken as the verdict descriptor")
+	}
+}

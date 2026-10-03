@@ -4,10 +4,13 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -17,19 +20,7 @@ import (
 // fixes rewrite a file. Only what the caller does not wait for moves: the engine's cache write, which this
 // also waits for and reads back (#zqsdzbq, early return).
 func TestReturningEarlyChangesNothingTheCallerSees(t *testing.T) {
-	binaries := t.TempDir()
-	build := func(output string, packagePath string) string {
-		binary := filepath.Join(binaries, output)
-		if combined, err := exec.Command("go", "build", "-o", binary, packagePath).CombinedOutput(); err != nil {
-			t.Fatalf("building %s: %v\n%s", packagePath, err, combined)
-		}
-		return binary
-	}
-	dispatcher := build("cohere-dispatch", ".")
-	engine := build("cohere", "../cohere")
-
-	settings := `{"extends":"./NexusCohereSettings.json","rules":{"no-debugger":"error"}}`
-	tsconfig := `{"compilerOptions":{"target":"ES2022","module":"esnext","moduleResolution":"bundler","strict":true,"noEmit":true},"include":["**/*.ts"]}`
+	dispatcher, engine := buildDispatcherAndEngine(t)
 	scenarios := []struct {
 		name      string
 		files     map[string]string
@@ -52,19 +43,8 @@ func TestReturningEarlyChangesNothingTheCallerSees(t *testing.T) {
 				root           string
 			}
 			run := func(wait bool) outcome {
-				root := t.TempDir()
-				files := map[string]string{"tsconfig.json": tsconfig, "CohereSettings.json": settings, "NexusCohereSettings.json": `{"format":{}}`}
-				for name, contents := range scenario.files {
-					files[name] = contents
-				}
-				for name, contents := range files {
-					if err := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); err != nil {
-						t.Fatal(err)
-					}
-				}
-				command := exec.Command(dispatcher, scenario.arguments...)
-				command.Dir = root
-				command.Env = append(os.Environ(), "COHERE_BINARY="+engine, "CI=", "COHERE_WAIT=")
+				root := writeEarlyReturnProject(t, scenario.files)
+				command := earlyReturnCommand(dispatcher, engine, root, scenario.arguments...)
 				if wait {
 					command.Env = append(command.Env, "COHERE_WAIT=1")
 				}
@@ -112,5 +92,150 @@ func TestReturningEarlyChangesNothingTheCallerSees(t *testing.T) {
 				t.Error("the engine left a note after returning, so something it did in the background failed")
 			}
 		})
+	}
+}
+
+// buildDispatcherAndEngine builds this dispatcher and the engine it runs, from the working tree.
+func buildDispatcherAndEngine(t *testing.T) (dispatcher string, engine string) {
+	binaries := t.TempDir()
+	build := func(output string, packagePath string) string {
+		binary := filepath.Join(binaries, output)
+		if combined, err := exec.Command("go", "build", "-o", binary, packagePath).CombinedOutput(); err != nil {
+			t.Fatalf("building %s: %v\n%s", packagePath, err, combined)
+		}
+		return binary
+	}
+	return build("cohere-dispatch", "."), build("cohere", "../cohere")
+}
+
+// writeEarlyReturnProject writes a small project with one lint rule on, plus the given files, and returns
+// its root.
+func writeEarlyReturnProject(t *testing.T, extra map[string]string) string {
+	root := t.TempDir()
+	files := map[string]string{
+		"tsconfig.json":            `{"compilerOptions":{"target":"ES2022","module":"esnext","moduleResolution":"bundler","strict":true,"noEmit":true},"include":["**/*.ts"]}`,
+		"CohereSettings.json":      `{"extends":"./NexusCohereSettings.json","rules":{"no-debugger":"error"}}`,
+		"NexusCohereSettings.json": `{"format":{}}`,
+	}
+	for name, contents := range extra {
+		files[name] = contents
+	}
+	for name, contents := range files {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return root
+}
+
+// earlyReturnCommand runs the dispatcher on root the way a terminal would, returning early unless the
+// caller adds COHERE_WAIT.
+func earlyReturnCommand(dispatcher string, engine string, root string, arguments ...string) *exec.Cmd {
+	command := exec.Command(dispatcher, arguments...)
+	command.Dir = root
+	command.Env = append(os.Environ(), "COHERE_BINARY="+engine, "CI=", "COHERE_WAIT=")
+	return command
+}
+
+// A profiled run does not return early. The profile is something the caller reads, so the moment the
+// dispatcher returns it must be whole: a gzip stream that reads to its end. Stopped after the verdict, it
+// could be read half-written, or empty, with a failure to close it swallowed.
+func TestAProfiledRunIsWholeWhenTheCallerHasItsAnswer(t *testing.T) {
+	dispatcher, engine := buildDispatcherAndEngine(t)
+	for round := range 5 {
+		root := writeEarlyReturnProject(t, map[string]string{"Clean.ts": "export const clean = 1;\n"})
+		profilePath := filepath.Join(root, "cpu.pprof")
+		// Output to a file rather than a buffer, as a terminal takes it: a buffer is fed through a pipe the
+		// engine holds open, so the test would wait for the engine to exit and see a whole profile whenever
+		// it was written.
+		output, err := os.Create(filepath.Join(t.TempDir(), "output"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		command := earlyReturnCommand(dispatcher, engine, root, "--no-fix", "--profile", profilePath)
+		command.Stdout, command.Stderr = output, output
+		err = command.Run()
+		output.Close()
+		if err != nil {
+			written, _ := os.ReadFile(output.Name())
+			t.Fatalf("round %d: the profiled run failed: %v\n%s", round, err, written)
+		}
+		file, err := os.Open(profilePath)
+		if err != nil {
+			t.Fatalf("round %d: no profile when the caller had its answer: %v", round, err)
+		}
+		reader, err := gzip.NewReader(file)
+		if err != nil {
+			file.Close()
+			t.Fatalf("round %d: the profile is not a whole gzip stream when the caller had its answer: %v", round, err)
+		}
+		read, err := io.Copy(io.Discard, reader)
+		file.Close()
+		if err != nil || read == 0 {
+			t.Fatalf("round %d: the profile read %d bytes and then %v when the caller had its answer", round, read, err)
+		}
+	}
+}
+
+// writeRepositoryProject writes a project that records its runs: a repository with its cache ignored.
+func writeRepositoryProject(t *testing.T) string {
+	root := writeEarlyReturnProject(t, map[string]string{"Clean.ts": "export const clean = 1;\n", ".gitignore": ".cache/\n"})
+	for _, arguments := range [][]string{{"init", "--quiet"}, {"add", "-A"}, {"-c", "user.email=fixture@example.com", "-c", "user.name=fixture", "commit", "--quiet", "-m", "initial"}} {
+		git := exec.Command("git", arguments...)
+		git.Dir = root
+		if output, err := git.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", arguments, err, output)
+		}
+	}
+	return root
+}
+
+// A run holds off reading the table while another run holds the table's lock, and goes ahead the moment
+// the lock is released. `s c` runs its fix step and then its check back to back, and the first of a pair
+// like that writes the table after its caller has its answer, so without the wait the second would read
+// around the write and miss what it recorded. The test stands in for a writer still finishing in the
+// background, which makes the wait certain rather than a race the writer usually wins on a fixture this
+// small.
+//
+// Whether the second run then replays is deliberately not asserted: the run cache records the project's
+// ancestor directories, and the shared temporary directory above a test's moves under other processes.
+func TestARunWaitsForAWriterStillHoldingTheTable(t *testing.T) {
+	dispatcher, engine := buildDispatcherAndEngine(t)
+	root := writeRepositoryProject(t)
+	if output, err := earlyReturnCommand(dispatcher, engine, root, "--no-fix").CombinedOutput(); err != nil {
+		t.Fatalf("the first run failed: %v\n%s", err, output)
+	}
+
+	// The first run's engine may still be finishing; taking the lock waits for it.
+	lock, err := os.OpenFile(filepath.Join(root, ".cache", "cohere", "table.lock"), os.O_RDWR, 0)
+	if err != nil {
+		t.Fatalf("the first run left no table lock: %v", err)
+	}
+	defer lock.Close()
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		t.Fatal(err)
+	}
+
+	second := earlyReturnCommand(dispatcher, engine, root, "--no-fix")
+	var output bytes.Buffer
+	second.Stdout, second.Stderr = &output, &output
+	if err := second.Start(); err != nil {
+		t.Fatal(err)
+	}
+	finished := make(chan error, 1)
+	go func() { finished <- second.Wait() }()
+	select {
+	case err := <-finished:
+		t.Fatalf("the second run finished while the table's lock was held (%v):\n%s", err, output.String())
+	case <-time.After(1500 * time.Millisecond):
+	}
+	syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+	select {
+	case err := <-finished:
+		if err != nil {
+			t.Fatalf("the second run failed: %v\n%s", err, output.String())
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("the second run did not finish after the lock was released")
 	}
 }
