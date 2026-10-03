@@ -89,11 +89,14 @@ var noBareThrowDeclarationTimePaths = []string{
 // of nexus sits under everything: they are the floor both repositories stand on, so they cannot
 // import a tier to raise through, and reaching the framework object would invert the layering rather
 // than fix a name. What they throw is a primitive refusing its own input, and the layer above
-// catches and names it, which is where the caller and the status live.
+// catches and names it, which is where the caller and the status live. Nexus has two code folders,
+// `source/` and `code-quality/`, and both are named, because the whole library is the floor: its
+// lint tooling sits under base as much as its source does.
 var noBareThrowBelowVocabularyPaths = []string{
 	"/base/source/client/",
 	"/base/source/api/",
 	"/nexus/source/",
+	"/nexus/code-quality/",
 }
 
 // noBareThrowTestPaths is the original's `testPaths`.

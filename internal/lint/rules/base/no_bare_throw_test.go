@@ -47,6 +47,13 @@ func TestNoBareThrowFires(t *testing.T) {
 			reason:     "the Error constructor is banned",
 		},
 		{
+			fileName:   "/repository/libraries/base/code-quality/lint/BaseLintEngineParity.ts",
+			sourceText: "export function f(): void { throw new Error('x'); }",
+			wantSpans:  []string{"new Error('x')"},
+			wantNames:  []string{"Error"},
+			reason:     "base's own lint tooling is not below the vocabulary; only nexus's is",
+		},
+		{
 			fileName:   "/repository/source/modules/thing/Service.ts",
 			sourceText: "export function f(): void { throw new TypeError('x'); }",
 			wantSpans:  []string{"new TypeError('x')"},
@@ -259,6 +266,11 @@ func TestNoBareThrowStaysSilent(t *testing.T) {
 			fileName:   "/repository/libraries/base/libraries/nexus/source/numbers/Money.ts",
 			sourceText: "export function f(): void { throw new Error('x'); }",
 			reason:     "below the vocabulary: nexus",
+		},
+		{
+			fileName:   "/repository/libraries/base/libraries/nexus/code-quality/lint/LintEngineParity.ts",
+			sourceText: "export function f(): void { throw new Error('x'); }",
+			reason:     "below the vocabulary: nexus's lint tooling",
 		},
 		{
 			fileName:   "/repository/source/modules/thing/Service.test.ts",
