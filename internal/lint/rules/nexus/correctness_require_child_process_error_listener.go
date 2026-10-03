@@ -106,9 +106,9 @@ var CorrectnessRequireChildProcessErrorListener = rule.Rule{
 	Name:             "nexus/correctness-require-child-process-error-listener",
 	NeedsTypeChecker: true,
 
-	// The producer test reads `node:child_process`'s declarations, never a body, and every binding it
-	// follows is declared in the file itself.
-	TypeReach: rule.TypeReachShapes,
+	// Left on the default, Contents. The producer test resolves an import through to its declaration,
+	// and the dispatch scan cannot prove that read stops short of a body, so a shape-keyed replay is not
+	// claimed (TestRulesClaimShapesOnlyWhereTheScanAllowsIt).
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {
