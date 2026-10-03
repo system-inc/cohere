@@ -68,6 +68,17 @@ type Resolution struct {
 	// Source is the CohereSettings.json the options were resolved from, or empty when none was found and
 	// Prettier's own defaults apply. The files it extends may have written some of them.
 	Source string
+
+	// HouseIgnore is the format block's `ignore` list: paths no repository formats, written once in the
+	// Nexus tier beside the options. Each pattern reads as a line of an ignore file does. Declared says
+	// the block has the key at all, which is what retires Structure's PrettierIgnoreDefaults and a
+	// project's .prettierignore: once the house list exists, the old files may only agree with it.
+	HouseIgnore         []string
+	HouseIgnoreDeclared bool
+
+	// IgnorePatterns is the chain's `ignorePatterns`, the base's first, the one list lint and the format
+	// walk share. Its globs are relative to Source's directory, as lint reads them.
+	IgnorePatterns []string
 }
 
 // PrettierDefaults are Prettier 3's own defaults, what a directory with no options anywhere formats
@@ -193,7 +204,24 @@ func resolveChain(path string) (Resolution, error) {
 	if err != nil {
 		return Resolution{}, err
 	}
-	return Resolution{Options: options, Source: path}, nil
+	resolution := Resolution{Options: options, Source: path}
+
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(block, &keys); err != nil {
+		return Resolution{}, fmt.Errorf("%s: the \"format\" block is not a JSON object: %w", nexusTier, err)
+	}
+	if raw, present := keys["ignore"]; present {
+		if err := json.Unmarshal(raw, &resolution.HouseIgnore); err != nil {
+			return Resolution{}, fmt.Errorf("%s: the format block's \"ignore\" is not a list of patterns: %w", nexusTier, err)
+		}
+		resolution.HouseIgnoreDeclared = true
+	}
+
+	resolution.IgnorePatterns, err = configuration.IgnorePatternsOf(path)
+	if err != nil {
+		return Resolution{}, err
+	}
+	return resolution, nil
 }
 
 // leftoverConfig is Prettier config found where cohere no longer reads it.
@@ -298,6 +326,13 @@ func applyFormatBlock(path string, raw json.RawMessage, over Options, ignorePlug
 			err = json.Unmarshal(value, &options.ArrowParens)
 		case "endOfLine":
 			err = json.Unmarshal(value, &options.EndOfLine)
+		case "ignore":
+			// The house ignore list rides in the format block but is no printing option: resolveChain
+			// reads it. Prettier config never had the key, so a leftover carrying it is refused.
+			if ignorePluginKeys {
+				return Options{}, fmt.Errorf("%s: format option %q is not one cohere applies; add it to Options rather than formatting without it", path, key)
+			}
+			continue
 		default:
 			if ignorePluginKeys && (key == "plugins" || strings.HasPrefix(key, "tailwind")) {
 				continue

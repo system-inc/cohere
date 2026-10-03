@@ -266,6 +266,56 @@ func TestALeftoverThatAgreesIsTolerated(t *testing.T) {
 	}
 }
 
+// TestTheHouseIgnoreListRidesInTheFormatBlock: the block's `ignore` is the house list, not a printing
+// option. It is read beside the options, declared only when written, and a value that is not a list of
+// patterns is refused naming the Nexus tier. Prettier config never had the key, so a leftover carrying
+// it cannot agree with anything.
+func TestTheHouseIgnoreListRidesInTheFormatBlock(t *testing.T) {
+	declared := t.TempDir()
+	project(t, declared, `{"tabWidth": 4, "ignore": ["pnpm-lock.yaml", "*.sqlite"]}`)
+	resolution, err := Resolve(declared)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !resolution.HouseIgnoreDeclared || strings.Join(resolution.HouseIgnore, ",") != "pnpm-lock.yaml,*.sqlite" || resolution.Options.TabWidth != 4 {
+		t.Fatalf("resolved %+v, want the house list beside tab width 4", resolution)
+	}
+
+	undeclared := t.TempDir()
+	project(t, undeclared, `{"tabWidth": 4}`)
+	if resolution, err := Resolve(undeclared); err != nil || resolution.HouseIgnoreDeclared {
+		t.Fatalf("a block without the key declared a house list: %+v, %v", resolution, err)
+	}
+
+	malformed := t.TempDir()
+	project(t, malformed, `{"tabWidth": 4, "ignore": "pnpm-lock.yaml"}`)
+	if _, err := Resolve(malformed); err == nil || !strings.Contains(err.Error(), NexusTierFileName) {
+		t.Fatalf("an ignore that is not a list was accepted or not named: %v", err)
+	}
+
+	leftover := t.TempDir()
+	project(t, leftover, `{"tabWidth": 4}`)
+	writeFile(t, filepath.Join(leftover, ".prettierrc"), `{"tabWidth": 4, "ignore": ["x"]}`)
+	if _, err := Resolve(leftover); err == nil {
+		t.Fatal("a leftover Prettier config carrying \"ignore\" was tolerated")
+	}
+}
+
+// TestIgnorePatternsResolveWithTheOptions: the walk takes the chain's ignorePatterns from the same
+// resolution as its options, base first, so it reads the list lint reads.
+func TestIgnorePatternsResolveWithTheOptions(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "nexus", NexusTierFileName), `{"rules": {}, "ignorePatterns": ["**/generated/**"], "format": `+houseBlock+`}`)
+	writeFile(t, filepath.Join(root, SettingsFileName), `{"extends": "./nexus/`+NexusTierFileName+`", "rules": {}, "ignorePatterns": ["data/**"]}`)
+	resolution, err := Resolve(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(resolution.IgnorePatterns, ",") != "**/generated/**,data/**" {
+		t.Fatalf("ignorePatterns %v, want the base's first", resolution.IgnorePatterns)
+	}
+}
+
 // TestADroppedKeyCanNeverReachPrettiersDefaults: the move's failure is a repository whose prettier key
 // went and whose options never arrived, formatting at width 80 with nothing said. Both ways it could
 // happen are refusals: settings that do not say how to format, and old config with no settings above it.

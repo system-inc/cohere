@@ -1,5 +1,6 @@
-// Package formatfiles decides which files a tree offers the formatter: the walk, its three ignore layers
-// in the order `s pnc` applies them, and an account of every file it did not offer.
+// Package formatfiles decides which files a tree offers the formatter: the walk, its ignore layers
+// (`.gitignore`, the house list, the project's ignorePatterns), and an account of every file it did
+// not offer.
 package formatfiles
 
 import (
@@ -7,6 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/lint/configuration"
 )
 
 // Enumeration is what a walk found, and why each file did not survive it.
@@ -52,16 +56,50 @@ type Enumeration struct {
 }
 
 // StructureIgnorePath is where a Structure-using project keeps the ignore defaults `s pnc` applies,
-// the second of the three layers Enumerate reads. One home, because six copies of the old path kept
-// pointing where the file used to be.
+// which the Nexus tier's house list replaces (see Enumerate for how it retires). One home, because six
+// copies of the old path kept pointing where the file used to be.
 func StructureIgnorePath(root string) string {
 	return filepath.Join(root, "libraries", "structure", "code-quality", "prettier", "PrettierIgnoreDefaults")
 }
 
-// ignoreLayer is one ignore file and the patterns it contributed.
+// ignoreLayer is one ignore list and how its patterns are read.
 type ignoreLayer struct {
 	name     string
 	patterns []string
+
+	// globsFrom, when set, reads the patterns as lint's globs, relative to this directory: the
+	// `ignorePatterns` layer. Otherwise they read as lines of an ignore file, relative to the walk root.
+	globsFrom string
+}
+
+// covers reports the pattern in the layer that covers a path, given relative to the walk root. A
+// directory is covered when the layer prunes it whole.
+func (layer ignoreLayer) covers(root string, relative string, directory bool) (string, bool) {
+	if layer.globsFrom == "" {
+		for _, pattern := range layer.patterns {
+			if matchesIgnore(relative, pattern) || (directory && matchesIgnore(relative+"/", pattern)) {
+				return pattern, true
+			}
+		}
+		return "", false
+	}
+
+	fromSettings, err := filepath.Rel(layer.globsFrom, filepath.Join(root, relative))
+	if err != nil || fromSettings == ".." || strings.HasPrefix(fromSettings, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	fromSettings = filepath.ToSlash(fromSettings)
+	for _, pattern := range layer.patterns {
+		// A glob prunes a directory only when it takes everything below it, `name/**` or `**`: lint
+		// matches files, and `*.code.js` matching a directory's name says nothing about its contents.
+		if directory && pattern != "**" && !strings.HasSuffix(pattern, "/**") {
+			continue
+		}
+		if configuration.Match(pattern, fromSettings) {
+			return pattern, true
+		}
+	}
+	return "", false
 }
 
 // readIgnoreFile reads one ignore file into patterns, dropping comments and blanks.
@@ -175,15 +213,30 @@ func pathDirectory(path string) string {
 	return path[:slash]
 }
 
+// The names the walk's layers are counted under.
+const (
+	HouseIgnoreLayer    = "format.ignore"
+	IgnorePatternsLayer = "ignorePatterns"
+)
+
 // Enumerate walks a project root and returns the files handles accepts.
 //
 // The walk is a function of the ignore layers and a file-type predicate, not of any engine, so the
 // native formatter enumerates without building a goja runtime it would never run.
 //
-// The layers are applied in the order `s pnc` applies them, and each is counted separately so a
-// misconfigured layer shows as a suspicious zero rather than as a slightly smaller total. That
-// ordering is not cosmetic: it is the difference between a corpus that measures the tree and one
-// that measures a smaller subject while looking complete.
+// The layers, in order: the repository's `.gitignore`; the house list, the `ignore` key of the format
+// block in the Nexus tier; and the `ignorePatterns` of the CohereSettings.json governing root, the one
+// list lint and the format walk share, read as lint reads it. Each is counted separately so a
+// misconfigured layer shows as a suspicious zero rather than as a slightly smaller total. That is the
+// difference between a corpus that measures the tree and one that measures a smaller subject while
+// looking complete.
+//
+// structureIgnorePath (Structure's PrettierIgnoreDefaults) and root's `.prettierignore` are the two
+// files those lists replace. Until the Nexus tier declares the house list they are still read as
+// layers, after `.gitignore`, so a repository pinned to an older Nexus keeps its walk. Once it is
+// declared they are read only to compare: a file either would skip that the lists offer is refused,
+// naming the file, the pattern and the path, so an old file cannot quietly keep a rule the lists
+// dropped. Deleting them is #dv5ng7g.
 func Enumerate(root string, structureIgnorePath string, handles func(fileName string) bool) (Enumeration, error) {
 	enumeration := Enumeration{
 		Root:               root,
@@ -191,18 +244,29 @@ func Enumerate(root string, structureIgnorePath string, handles func(fileName st
 		DeclinedExtensions: map[string]int{},
 	}
 
-	layers := []ignoreLayer{}
+	resolution, err := formatoptions.Resolve(root)
+	if err != nil {
+		return enumeration, err
+	}
+
+	gitignore, err := readIgnoreFile(filepath.Join(root, ".gitignore"))
+	if err != nil {
+		return enumeration, err
+	}
+	layers := []ignoreLayer{{name: ".gitignore", patterns: gitignore}}
+
+	// The retiring files, read as layers or only compared.
+	var retiring []ignoreLayer
 	for _, candidate := range []struct{ name, path string }{
-		{".gitignore", filepath.Join(root, ".gitignore")},
 		{"PrettierIgnoreDefaults", structureIgnorePath},
 		{".prettierignore", filepath.Join(root, ".prettierignore")},
 	} {
 		if candidate.path == "" {
 			continue
 		}
-		// The repository's own ignore files are optional, so only the layer a caller named can be
-		// missing: naming it says the project has one.
-		if candidate.name == "PrettierIgnoreDefaults" {
+		// A project's .prettierignore is optional, so only the file a caller named can be missing:
+		// naming it says the project has one. Once the house list is declared, its absence is the goal.
+		if candidate.name == "PrettierIgnoreDefaults" && !resolution.HouseIgnoreDeclared {
 			if _, statError := os.Stat(candidate.path); os.IsNotExist(statError) {
 				enumeration.MissingLayers = append(enumeration.MissingLayers, candidate.path)
 			}
@@ -211,9 +275,28 @@ func Enumerate(root string, structureIgnorePath string, handles func(fileName st
 		if err != nil {
 			return enumeration, err
 		}
-		layers = append(layers, ignoreLayer{name: candidate.name, patterns: patterns})
-		enumeration.IgnoredByLayer[candidate.name] = 0
+		retiring = append(retiring, ignoreLayer{name: candidate.path, patterns: patterns})
+		if !resolution.HouseIgnoreDeclared {
+			layers = append(layers, ignoreLayer{name: candidate.name, patterns: patterns})
+		}
 	}
+	if resolution.HouseIgnoreDeclared {
+		layers = append(layers, ignoreLayer{name: HouseIgnoreLayer, patterns: resolution.HouseIgnore})
+	} else {
+		retiring = nil
+	}
+	if resolution.Source != "" {
+		layers = append(layers, ignoreLayer{
+			name:      IgnorePatternsLayer,
+			patterns:  resolution.IgnorePatterns,
+			globsFrom: filepath.Dir(resolution.Source),
+		})
+	}
+	for _, layer := range layers {
+		enumeration.IgnoredByLayer[layer.name] = 0
+	}
+
+	var disagreement error
 
 	walkError := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -242,12 +325,13 @@ func Enumerate(root string, structureIgnorePath string, handles func(fileName st
 			// the difference between walking the tree and walking node_modules: measured on the real
 			// repository, filtering after the fact walked 317,258 files in 8.7s, of which .gitignore
 			// removed 148,279 that had already been stat'd. Pruning never enters them.
+			if relative == "." {
+				return nil
+			}
 			for _, layer := range layers {
-				for _, pattern := range layer.patterns {
-					if matchesIgnore(relative, pattern) || matchesIgnore(relative+"/", pattern) {
-						enumeration.IgnoredByLayer[layer.name]++
-						return filepath.SkipDir
-					}
+				if _, covered := layer.covers(root, relative, true); covered {
+					enumeration.IgnoredByLayer[layer.name]++
+					return filepath.SkipDir
 				}
 			}
 			return nil
@@ -256,11 +340,18 @@ func Enumerate(root string, structureIgnorePath string, handles func(fileName st
 		enumeration.Walked++
 
 		for _, layer := range layers {
-			for _, pattern := range layer.patterns {
-				if matchesIgnore(relative, pattern) {
-					enumeration.IgnoredByLayer[layer.name]++
-					return nil
-				}
+			if _, covered := layer.covers(root, relative, false); covered {
+				enumeration.IgnoredByLayer[layer.name]++
+				return nil
+			}
+		}
+
+		// The lists offer this file. A retiring file that would skip it disagrees with them.
+		for _, old := range retiring {
+			if pattern, covered := old.covers(root, relative, false); covered {
+				disagreement = fmt.Errorf("%s skips %s (pattern %q), but neither the format block's \"ignore\" in the Nexus tier nor the ignorePatterns of %s does; put it in one of those lists and delete %s, which cohere no longer reads",
+					old.name, filepath.ToSlash(relative), pattern, resolution.Source, old.name)
+				return filepath.SkipAll
 			}
 		}
 
@@ -279,6 +370,9 @@ func Enumerate(root string, structureIgnorePath string, handles func(fileName st
 	})
 	if walkError != nil {
 		return enumeration, fmt.Errorf("walking %s: %w", root, walkError)
+	}
+	if disagreement != nil {
+		return enumeration, disagreement
 	}
 
 	return enumeration, nil

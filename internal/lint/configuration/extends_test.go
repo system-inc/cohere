@@ -287,6 +287,10 @@ func TestOverridesAndIgnorePatternsConcatenateBaseFirst(t *testing.T) {
 	if strings.Join(loaded.IgnorePatterns, ",") != "**/generated/**,data/**" {
 		t.Errorf("ignorePatterns are %v, want the base's first", loaded.IgnorePatterns)
 	}
+	// The format walk reads the same list without decoding rules, and must read it identically.
+	if shared, err := IgnorePatternsOf(filepath.Join(directory, "CohereSettings.json")); err != nil || strings.Join(shared, ",") != strings.Join(loaded.IgnorePatterns, ",") {
+		t.Errorf("IgnorePatternsOf = %v (%v), want Load's %v", shared, err, loaded.IgnorePatterns)
+	}
 	if loaded.Root != directory {
 		t.Errorf("root is %s, want the project directory %s", loaded.Root, directory)
 	}

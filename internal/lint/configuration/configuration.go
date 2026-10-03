@@ -425,6 +425,25 @@ func SourcesOf(path string) ([]string, error) {
 	return sources, nil
 }
 
+// IgnorePatternsOf returns the ignorePatterns of the configuration at path, the base's first, exactly as
+// Load concatenates them, without decoding a single rule.
+//
+// The format walk shares this list with lint: a path the project excludes from checking is excluded
+// from formatting too, from one list. It reads the list here rather than through Load because the walk
+// has no opinion on rules, and a rule key Load would refuse must not stop the formatter from knowing
+// which files it may touch.
+func IgnorePatternsOf(path string) ([]string, error) {
+	layers, err := readConfigLayers(path, nil)
+	if err != nil {
+		return nil, err
+	}
+	var patterns []string
+	for _, layer := range layers {
+		patterns = append(patterns, layer.raw.IgnorePatterns...)
+	}
+	return patterns, nil
+}
+
 // configLayer is one file in an `extends` chain: what it says, and which top-level keys it wrote.
 type configLayer struct {
 	path    string

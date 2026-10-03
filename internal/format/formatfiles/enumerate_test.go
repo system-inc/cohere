@@ -3,6 +3,8 @@ package formatfiles
 import (
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"testing"
 )
 
@@ -95,7 +97,8 @@ func TestEnumerateNamesWhatItDeclined(t *testing.T) {
 	}
 }
 
-// TestEnumerateAppliesEveryIgnoreLayer proves each layer is read and counted separately.
+// TestEnumerateAppliesEveryIgnoreLayer proves each layer is read and counted separately, as the walk
+// reads them before a Nexus tier declares the house list: the two old files are still layers then.
 //
 // Counted separately because a layer that silently fails to load removes nothing, and a slightly
 // smaller total is not a detectable signal. A zero next to a layer name is.
@@ -189,6 +192,117 @@ func TestAMissingStructureLayerIsNamed(t *testing.T) {
 	}
 	if len(enumeration.MissingLayers) != 0 {
 		t.Fatalf("a present layer was named missing: %v", enumeration.MissingLayers)
+	}
+}
+
+// settingsTree writes a repository whose CohereSettings.json extends a Nexus tier, with the format
+// block's `ignore` (omitted when house is empty) and the project's own ignorePatterns.
+func settingsTree(t *testing.T, house string, ignorePatterns string, files map[string]string) string {
+	t.Helper()
+	block := `{"tabWidth": 4}`
+	if house != "" {
+		block = `{"tabWidth": 4, "ignore": ` + house + `}`
+	}
+	files["nexus/NexusCohereSettings.json"] = `{"rules": {}, "format": ` + block + `}`
+	files["CohereSettings.json"] = `{"extends": "./nexus/NexusCohereSettings.json", "rules": {}, "ignorePatterns": ` + ignorePatterns + `}`
+	return writeTree(t, files)
+}
+
+// TestTheHouseListRetiresTheOldFiles is the walk once the Nexus tier declares its list: `.gitignore`,
+// then the format block's `ignore`, then the project's ignorePatterns, each counted under its own name,
+// and the two old files counted nowhere because they no longer remove anything themselves.
+func TestTheHouseListRetiresTheOldFiles(t *testing.T) {
+	root := settingsTree(t, `["pnpm-lock.yaml"]`, `["archived/**"]`, map[string]string{
+		".gitignore":      "built.ts\n",
+		".prettierignore": "archived/\n",
+		"a.ts":            "export const a = 1;\n",
+		"built.ts":        "export const built = 1;\n",
+		"archived/old.md": "# old\n",
+		"pnpm-lock.yaml":  "lockfileVersion: 1\n",
+		"defaults":        "pnpm-lock.yaml\n",
+	})
+
+	enumeration, err := Enumerate(root, filepath.Join(root, "defaults"), handlesEveryLanguage)
+	if err != nil {
+		t.Fatalf("enumerate: %v", err)
+	}
+	for layer, want := range map[string]int{".gitignore": 1, HouseIgnoreLayer: 1, IgnorePatternsLayer: 1} {
+		if enumeration.IgnoredByLayer[layer] != want {
+			t.Errorf("layer %s removed %d, want %d", layer, enumeration.IgnoredByLayer[layer], want)
+		}
+	}
+	for _, retired := range []string{"PrettierIgnoreDefaults", ".prettierignore"} {
+		if _, counted := enumeration.IgnoredByLayer[retired]; counted {
+			t.Errorf("%s is still a layer once the house list is declared", retired)
+		}
+	}
+	survivors := map[string]bool{}
+	for _, file := range enumeration.Files {
+		relative, _ := filepath.Rel(root, file)
+		survivors[filepath.ToSlash(relative)] = true
+	}
+	if !survivors["a.ts"] || survivors["archived/old.md"] || survivors["pnpm-lock.yaml"] || survivors["built.ts"] {
+		t.Errorf("survivors = %v, want a.ts and the settings files only", enumeration.Files)
+	}
+}
+
+// TestARetiringFileThatDisagreesIsRefused: once the house list is declared, an old file that would skip
+// a file the lists offer is refused, naming the file, its pattern and the path, rather than read as a
+// layer that quietly keeps a rule nobody moved. Both old files, one at a time.
+func TestARetiringFileThatDisagreesIsRefused(t *testing.T) {
+	for _, testCase := range []struct {
+		name, house, ignorePatterns, oldFile, pattern, path string
+	}{
+		{"the project's .prettierignore", `["pnpm-lock.yaml"]`, `[]`, ".prettierignore", "archived/", "archived/old.md"},
+		{"Structure's defaults", `[]`, `["archived/**"]`, "defaults", "pnpm-lock.yaml", "pnpm-lock.yaml"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			root := settingsTree(t, testCase.house, testCase.ignorePatterns, map[string]string{
+				".prettierignore": "archived/\n",
+				"defaults":        "pnpm-lock.yaml\n",
+				"a.ts":            "export const a = 1;\n",
+				"archived/old.md": "# old\n",
+				"pnpm-lock.yaml":  "lockfileVersion: 1\n",
+			})
+			_, err := Enumerate(root, filepath.Join(root, "defaults"), handlesEveryLanguage)
+			if err == nil {
+				t.Fatal("a retiring file that skips more than the lists was accepted")
+			}
+			for _, want := range []string{filepath.Join(root, testCase.oldFile), `"` + testCase.pattern + `"`, testCase.path} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("refusal %q does not name %s", err, want)
+				}
+			}
+		})
+	}
+}
+
+// TestIgnorePatternsReadAsLintReadsThem: the shared list is lint's globs, relative to the settings
+// file's directory even when the walk starts below it, and a glob prunes a directory only when it
+// takes everything under it. `**/*.code.js` must not prune a directory that happens to match it.
+func TestIgnorePatternsReadAsLintReadsThem(t *testing.T) {
+	root := settingsTree(t, `[]`, `["source/generated/**", "**/*.code.js"]`, map[string]string{
+		"source/a.ts":                "export const a = 1;\n",
+		"source/generated/schema.ts": "export const schema = 1;\n",
+		"source/bundle.code.js":      "export const bundle = 1;\n",
+		"source/odd.code.js/keep.ts": "export const keep = 1;\n",
+	})
+
+	enumeration, err := Enumerate(filepath.Join(root, "source"), "", handlesEveryLanguage)
+	if err != nil {
+		t.Fatalf("enumerate: %v", err)
+	}
+	var offered []string
+	for _, file := range enumeration.Files {
+		relative, _ := filepath.Rel(root, file)
+		offered = append(offered, filepath.ToSlash(relative))
+	}
+	sort.Strings(offered)
+	if strings.Join(offered, ",") != "source/a.ts,source/odd.code.js/keep.ts" {
+		t.Errorf("offered %v, want source/a.ts and source/odd.code.js/keep.ts", offered)
+	}
+	if enumeration.IgnoredByLayer[IgnorePatternsLayer] != 2 {
+		t.Errorf("ignorePatterns removed %d, want 2 (the generated directory, pruned whole, and the bundle)", enumeration.IgnoredByLayer[IgnorePatternsLayer])
 	}
 }
 
