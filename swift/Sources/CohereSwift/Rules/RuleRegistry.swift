@@ -27,6 +27,7 @@ public enum RuleRegistry {
         DuplicatedDictionaryKey(),
         IdenticalOperands(),
         DuplicateConditions(),
+        CorrectnessNoIdenticalBranches(),
         UnusedOptionalBinding(),
         UnusedClosureParameter(),
         LegacyConstructors(),

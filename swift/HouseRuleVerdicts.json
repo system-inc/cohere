@@ -265,9 +265,9 @@
   },
   {
     "typeScriptRule": "nexus/correctness-no-identical-branches",
-    "verdict": "Port",
-    "swiftRule": null,
-    "reason": "`cond ? a : a` and identical if/else bodies are writable in Swift and no cohere-swift rule compares branch bodies, although both proving grounds are clean today."
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/correctness-no-identical-branches",
+    "reason": null
   },
   {
     "typeScriptRule": "nexus/correctness-no-import-cycle-load-time-read",
