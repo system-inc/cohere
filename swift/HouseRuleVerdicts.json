@@ -367,9 +367,9 @@
   },
   {
     "typeScriptRule": "nexus/performance-no-independent-await-in-loop",
-    "verdict": "Port",
-    "swiftRule": null,
-    "reason": "A `for` loop that awaits independent work one item at a time (`results.append(await lane.snapshot())`) should be a task group, and macos has 2 real sites."
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/performance-no-independent-await-in-loop",
+    "reason": null
   },
   {
     "typeScriptRule": "nexus/security-no-interpolated-shell-command",

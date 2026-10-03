@@ -11,6 +11,7 @@ public enum RuleRegistry {
     public static func fileRules(vocabulary: AbbreviationVocabulary) -> [any FileRule] { [
         NoForceUnwrap(),
         NoForceTry(),
+        PerformanceNoIndependentAwaitInLoop(),
         NoForceCast(),
         NoImplicitlyUnwrappedOptional(),
         FileNamedForType(),
