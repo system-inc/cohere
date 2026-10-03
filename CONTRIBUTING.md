@@ -261,7 +261,7 @@ installs correctly and is never found, which on the machine is indistinguishable
 never shipped.
 
 ```sh
-go run ./command/cohere-release --version 0.1.0 --output dist
+go run ./command/cohere-release --version 1.0.0 --output dist
 ```
 
 One command builds all six from one machine, in about two minutes, and it stages rather than

@@ -29,7 +29,7 @@ func main() {
 }
 
 func run() error {
-	version := flag.String("version", "", "the version to stamp and publish, like 0.3.1")
+	version := flag.String("version", "", "the version to stamp and publish, like 1.0.0; anything below 1.0.0, or not semver, is refused")
 	outputDirectory := flag.String("output", "dist", "where to stage the packages")
 	moduleDirectory := flag.String("module", ".", "the root of the cohere module")
 	only := flag.String("only", "", "build just these platforms, comma separated, as os/arch")

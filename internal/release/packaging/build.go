@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -97,6 +98,10 @@ func Build(options Options) (Result, error) {
 		return Result{}, fmt.Errorf("a release needs a version")
 	}
 
+	if err := requireReleaseVersion(options.Version); err != nil {
+		return Result{}, err
+	}
+
 	if err := requireAncestor(options.ModuleDirectory, MinimumReleaseCommit, minimumReleaseReason); err != nil {
 		return Result{}, err
 	}
@@ -133,6 +138,28 @@ func Build(options Options) (Result, error) {
 	result.Packages = append(result.Packages, dispatcher)
 
 	return result, nil
+}
+
+// releaseVersionPattern is a semantic version: three numbers with no leading zeros, and an
+// optional pre-release such as `-rc.1`. Build metadata (`+...`) is refused, because npm ignores it
+// when comparing versions, so two releases differing only there would collide.
+var releaseVersionPattern = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
+
+// requireReleaseVersion refuses a version that is not semver, or whose major version is below 1.
+//
+// cohere's versions start at 1.0.0, by Kirk's ruling on #ed2dp27. The version is typed by hand into
+// the release workflow, so the floor is enforced here rather than left to an example someone has to
+// remember: a `0.x` publish would tell every consumer the API is unstable, and npm cannot take a
+// published version back.
+func requireReleaseVersion(version string) error {
+	match := releaseVersionPattern.FindStringSubmatch(version)
+	if match == nil {
+		return fmt.Errorf("%q is not a semantic version like 1.0.0 or 1.0.0-rc.1, so it cannot be published", version)
+	}
+	if match[1] == "0" {
+		return fmt.Errorf("%q is below 1.0.0, and cohere's versions start at 1.0.0", version)
+	}
+	return nil
 }
 
 // MinimumReleaseCommit is the oldest cohere commit a release may be built from.

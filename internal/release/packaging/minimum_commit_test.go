@@ -94,7 +94,7 @@ func TestBuildRefusesBeforeTheMinimum(t *testing.T) {
 
 	directory, _, _ := repositoryWithSideCommit(t)
 
-	_, err := Build(Options{Version: "0.0.0", ModuleDirectory: directory, OutputDirectory: t.TempDir()})
+	_, err := Build(Options{Version: "1.0.0", ModuleDirectory: directory, OutputDirectory: t.TempDir()})
 	if err == nil {
 		t.Fatal("Build released from a repository that never contained the minimum commit")
 	}

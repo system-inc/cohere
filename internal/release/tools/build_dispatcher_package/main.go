@@ -38,7 +38,7 @@ func main() {
 		panic(err)
 	}
 
-	manifest, err := release.DispatcherManifest("0.1.0")
+	manifest, err := release.DispatcherManifest("1.0.0")
 	if err != nil {
 		panic(err)
 	}
