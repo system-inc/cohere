@@ -210,5 +210,6 @@ func build(paths Paths, packagePath string, binaryPath string, goVersion string)
 		return fmt.Errorf("go build reported success but produced no binary at %s: %w", binaryPath, err)
 	}
 
+	boundGoCacheAfterBuild(paths)
 	return nil
 }

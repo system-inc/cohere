@@ -225,6 +225,7 @@ func pruneAfterBuild(paths Paths, keep string, currentCompiler string) {
 	if applyErr != nil {
 		fmt.Fprintf(os.Stderr, "cohere: the prune stopped part way: %v\n", applyErr)
 	}
+	boundGoCacheAfterBuild(paths)
 }
 
 // ensureCompiler returns an extraction of the compiler at compilerCommit, creating it once.
