@@ -284,6 +284,35 @@ the pin was against `microsoft/typescript-go` until that repository was archived
 `microsoft/TypeScript`. Both spellings are forty hex characters and resolve in different places, so a
 hardcoded label would have survived the migration while quietly becoming false.
 
+### Versioning and the changelog
+
+cohere is semver, starting at 1.0.0, and `release.Build` refuses any version below that or not semver
+(a prerelease like `1.0.0-rc.1` is allowed). What each part means, as Kirk set it:
+
+- **Major** breaks a configuration or a command line that worked: a key, a flag or a set name removed or
+  reinterpreted, so an existing `CohereSettings.json` or script no longer means what it did.
+- **Minor** can fail a project that passed: a rule turned on in a set, a severity raised, a rule's
+  options changed, a setting like an ignore pattern changed. A project takes that by taking the minor.
+- **Patch** can only relax or fix: a rule turned off, a severity lowered, a bug fixed.
+
+The rule sets are where most of a release's visible change lives, and they can be read exactly, so their
+part of `CHANGELOG.md` is generated:
+
+```sh
+go run ./internal/release/tools/changelog --version 1.1.0 --previous 1.0.0
+```
+
+That diffs every set between the tag `v1.0.0` and `HEAD` and prints the release's section, with one
+heading per changed set listing each rule turned on or off, each severity and option change, and each
+other setting that moved. It also refuses a version smaller than the diff allows: a set that turned a
+rule on can't ship as a patch, and a set that was removed can't ship without a major. The section goes
+above the last one in `CHANGELOG.md`, and what changed in cohere outside the sets is written under the
+same heading by hand. Each release is tagged `v<version>`, which is what the next one diffs against.
+
+The Swift engine's contract is not a compatibility surface. The front door and `cohere-swift` ship in
+one package, and the release refuses to stage a pair that speak different contract versions, so a
+contract change needs no version of its own.
+
 ### The formatter carries no JavaScript
 
 A released binary formats with cohere's native Go printers and embeds none of the Prettier fork's
