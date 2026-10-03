@@ -1517,8 +1517,11 @@
             "oneOf": [
                 {
                     "examples": [
+                        "cohere:next",
+                        "cohere:react",
                         "cohere:system-inc/base",
                         "cohere:system-inc/structure",
+                        "cohere:tailwind",
                         "cohere:typescript"
                     ],
                     "minLength": 1,
@@ -1527,8 +1530,11 @@
                 {
                     "items": {
                         "examples": [
+                            "cohere:next",
+                            "cohere:react",
                             "cohere:system-inc/base",
                             "cohere:system-inc/structure",
+                            "cohere:tailwind",
                             "cohere:typescript"
                         ],
                         "minLength": 1,
