@@ -1,0 +1,386 @@
+package nexus
+
+import (
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/internal/lint/checking"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
+	"github.com/system-inc/cohere/internal/lint/rule"
+)
+
+const correctnessNoCallerDataMutationId = "callerDataMutation"
+
+var correctnessNoCallerDataMutationMessage = rule.Message{
+	Id: correctnessNoCallerDataMutationId,
+	Description: "This writes into data the caller passed in. The change reaches the caller, and nothing at " +
+		"the call site says it will: the call reads like it hands data over, and the caller's data comes " +
+		"back different. Return what changed and let the caller write it, or build a new value from the " +
+		"parameter.",
+}
+
+// CorrectnessNoCallerDataMutation reports a write through a parameter into data declared in project
+// code: a property assignment, an update, a `delete`, or a call of a mutating collection method.
+//
+//	invalid: function addUsage(into: UsageInterface, from: UsageInterface) { into.inputTokens += from.inputTokens; }
+//	invalid: function check(diffs: DiffInterface[]) { diffs.push({ path }); }
+//	invalid: function merge(messages: MessageInterface[]) { return messages.sort(byDate); }
+//	invalid: function sign(request: { headers: Record<string, string> }) { request.headers['host'] = host; }
+//	valid:   function paint(context: CanvasRenderingContext2D) { context.fillStyle = 'red'; }
+//	valid:   function listen(port: MessagePort) { port.onmessage = handle; }
+//	valid:   rows.forEach(function(row) { row.seen = true; });
+//
+// # Where it came from
+//
+// Kirk's ruling on `#e3yxyx7`, 2026-10-01. Upstream's `no-param-reassign` with `props: true` adds 143
+// findings on ahra, and they are two different things. About 80 are writes into a caller's data object
+// (`into.cacheWriteTokens +=`, `hub.lastEmittedHadTeam =`, `entry.position =`,
+// `opsNavigationLink.active =`, `packageJson.*`), which are hidden side effects. About 55 are writes to
+// host objects whose API is setting properties (a canvas context's `fillStyle`, a DOM event or element,
+// `messagePort.onmessage`), which are how those APIs work. Upstream can only tell them apart with an
+// allowance list of parameter names (`ignorePropertyModificationsFor`), which the doctrine forbids, so
+// this rule draws the line where the type does.
+//
+// # The shape, exactly
+//
+//  1. A write. The left side of any assignment operator, the operand of `++` or `--`, the operand of
+//     `delete`, or the receiver of a call of a mutating collection method: for an array `push`,
+//     `unshift`, `pop`, `shift`, `splice`, `sort`, `reverse`, `fill`, `copyWithin`; for a Map or
+//     WeakMap `set`, `delete`, and a Map's `clear`; for a Set or WeakSet `add`, `delete`, and a Set's
+//     `clear`. Each method is resolved to the default library's declaration, so a project type with a
+//     `push` of its own is not read as one. `sort` and `reverse` count although they return the array:
+//     they sort it in place, and `return messages.sort(...)` hands the caller back its own list
+//     reordered.
+//  2. Reached from a parameter. The written expression is a chain of property accesses, element
+//     accesses and non-null assertions whose root is an identifier resolving, by symbol, to a parameter
+//     of a function in this file, or to a name destructured from one (`function f({ entry })`).
+//  3. Into project data. The written property is declared in a source file of this program rather
+//     than in a declaration file (`lib.*.d.ts`, `lib.dom.d.ts`, `@types/*`, a package's own types). A
+//     write with no declared property (an element of an array or tuple, or an index-signature key)
+//     counts when the receiver is the caller's data by this same test and its type is an array or
+//     tuple, one of the default library's data-shaped mapped types (`Record`, `Partial`, `Required`,
+//     `Pick`, `Omit`), or a type a source file declares. Only a property name or a literal key is
+//     resolved as a property: `buffer[offset]` resolves `offset` to the variable, which a source file
+//     declares. For a collection call, the collection is either the parameter itself or a property
+//     reached from it that passes the same test. `param.canvas.width = 10` is silent: `width` is the
+//     DOM's, and so is `element.dataset['x']`, a Record the DOM declares.
+//
+// # What it declines
+//
+// Each is a missed finding at worst, never a false one.
+//
+//   - A callback's parameter: a function expression or arrow passed straight to a call or `new`, or
+//     invoked on the spot.
+//     `reduce`'s accumulator is the reduce's own value, made at the call, and an element `forEach`
+//     hands over belongs to the code iterating it, right there on the page. Measured on ahra
+//     2026-10-03: 31 of 175 findings were callback parameters, every one a reduce accumulator, a
+//     `forEach`/`map` element, or a syntax-tree visitor's node. The cost is the case where the iterated
+//     data is itself the caller's: `Object.entries(byGroup).map(function([group, items]) { return
+//     items.sort(...); })` reorders the caller's arrays, and is not reported.
+//   - A setter. `param.value = x` through a project class's `set value()` calls code the class wrote to
+//     be called that way, which is an API rather than a write into data.
+//   - A parameter the function reassigns anywhere (`options = { ...options }`): a write may land in the
+//     copy, and telling which is flow analysis this rule does not do.
+//   - A write through `this`, through a call's result, or through an `as` cast: the chain must reach the
+//     parameter by plain access.
+//   - A write whose target type is `any`: no declaration, and no receiver type to read.
+//
+// # No fix
+//
+// The repair is a contract change: return the new value, build a copy, or rename the parameter to say
+// it is an out-parameter and suppress with that reason. Which one is the author's call.
+var CorrectnessNoCallerDataMutation = rule.Rule{
+	Name: "nexus/correctness-no-caller-data-mutation",
+
+	// Symbol identity ties the chain's root to a parameter through shadowing, and says where each
+	// written property and each mutating method is declared.
+	NeedsTypeChecker: true,
+
+	// Whether `Record` and its kin and the mutating methods are the default library's, through
+	// type_checking.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
+
+	Run: func(ctx rule.Context, options any) rule.Listeners {
+		if ctx.TypeChecker == nil {
+			return nil
+		}
+		return rule.Listeners{
+			ast.KindBinaryExpression: func(node *ast.Node) {
+				binary := node.AsBinaryExpression()
+				if !ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
+					return
+				}
+				correctnessNoCallerDataMutationCheckTarget(ctx, binary.Left)
+			},
+			ast.KindPrefixUnaryExpression: func(node *ast.Node) {
+				prefix := node.AsPrefixUnaryExpression()
+				if prefix.Operator != ast.KindPlusPlusToken && prefix.Operator != ast.KindMinusMinusToken {
+					return
+				}
+				correctnessNoCallerDataMutationCheckTarget(ctx, prefix.Operand)
+			},
+			ast.KindPostfixUnaryExpression: func(node *ast.Node) {
+				correctnessNoCallerDataMutationCheckTarget(ctx, node.AsPostfixUnaryExpression().Operand)
+			},
+			ast.KindDeleteExpression: func(node *ast.Node) {
+				correctnessNoCallerDataMutationCheckTarget(ctx, node.AsDeleteExpression().Expression)
+			},
+			ast.KindCallExpression: func(node *ast.Node) {
+				correctnessNoCallerDataMutationCheckCall(ctx, node)
+			},
+		}
+	},
+}
+
+// correctnessNoCallerDataMutationWriters are the mutating methods of the default library's
+// collections, by the interface that declares them.
+var correctnessNoCallerDataMutationWriters = map[string]map[string]bool{
+	"Array": {"push": true, "unshift": true, "pop": true, "shift": true, "splice": true, "sort": true,
+		"reverse": true, "fill": true, "copyWithin": true},
+	"Map":     {"set": true, "delete": true, "clear": true},
+	"Set":     {"add": true, "delete": true, "clear": true},
+	"WeakMap": {"set": true, "delete": true},
+	"WeakSet": {"add": true, "delete": true},
+}
+
+// correctnessNoCallerDataMutationDataShapes are the default library's mapped types that only reshape
+// data: an object typed through one of them is a record of keys and values, never a host object.
+// `Readonly` is not here, since nothing can be written through it.
+var correctnessNoCallerDataMutationDataShapes = map[string]bool{
+	"Record": true, "Partial": true, "Required": true, "Pick": true, "Omit": true,
+}
+
+// correctnessNoCallerDataMutationWriterNames is every writer's name, the cheap gate a call passes
+// before any checker question.
+var correctnessNoCallerDataMutationWriterNames = func() map[string]bool {
+	names := map[string]bool{}
+	for _, writers := range correctnessNoCallerDataMutationWriters {
+		for name := range writers {
+			names[name] = true
+		}
+	}
+	return names
+}()
+
+// correctnessNoCallerDataMutationCheckTarget judges the target of an assignment, an update or a
+// `delete`.
+func correctnessNoCallerDataMutationCheckTarget(ctx rule.Context, target *ast.Node) {
+	target = ast.SkipParentheses(target)
+	if target.Kind != ast.KindPropertyAccessExpression && target.Kind != ast.KindElementAccessExpression {
+		return
+	}
+	if !correctnessNoCallerDataMutationReachesParameter(ctx, target) {
+		return
+	}
+	if !correctnessNoCallerDataMutationWritesData(ctx, target) {
+		return
+	}
+	ctx.ReportNode(target, correctnessNoCallerDataMutationMessage)
+}
+
+// correctnessNoCallerDataMutationCheckCall judges a call of a mutating collection method.
+func correctnessNoCallerDataMutationCheckCall(ctx rule.Context, call *ast.Node) {
+	callee := ast.SkipParentheses(call.AsCallExpression().Expression)
+	if callee.Kind != ast.KindPropertyAccessExpression {
+		return
+	}
+	access := callee.AsPropertyAccessExpression()
+	method := access.Name()
+	if method.Kind != ast.KindIdentifier || !correctnessNoCallerDataMutationWriterNames[method.Text()] {
+		return
+	}
+	receiver := ast.SkipParentheses(access.Expression)
+	if !correctnessNoCallerDataMutationReachesParameter(ctx, receiver) {
+		return
+	}
+	if !correctnessNoCallerDataMutationIsWriter(ctx, method) {
+		return
+	}
+	// The collection is the parameter itself, or data reached from it.
+	if receiver.Kind != ast.KindIdentifier && !correctnessNoCallerDataMutationWritesData(ctx, receiver) {
+		return
+	}
+	ctx.ReportNode(callee, correctnessNoCallerDataMutationMessage)
+}
+
+// correctnessNoCallerDataMutationReachesParameter walks an access chain to its root and says whether
+// the root is a parameter this rule judges: not a callback's, and never reassigned.
+func correctnessNoCallerDataMutationReachesParameter(ctx rule.Context, expression *ast.Node) bool {
+	root := expression
+	for {
+		root = ast.SkipParentheses(root)
+		switch root.Kind {
+		case ast.KindPropertyAccessExpression:
+			root = root.AsPropertyAccessExpression().Expression
+			continue
+		case ast.KindElementAccessExpression:
+			root = root.AsElementAccessExpression().Expression
+			continue
+		case ast.KindNonNullExpression:
+			root = root.AsNonNullExpression().Expression
+			continue
+		}
+		break
+	}
+	if root.Kind != ast.KindIdentifier {
+		return false
+	}
+	symbol := ctx.TypeChecker.GetSymbolAtLocation(root)
+	parameter := correctnessNoCallerDataMutationParameterOf(ctx, symbol)
+	if parameter == nil {
+		return false
+	}
+	function := parameter.Parent
+	if function == nil || correctnessNoCallerDataMutationIsCallback(function) {
+		return false
+	}
+	return !correctnessNoCallerDataMutationIsReassigned(ctx, function, symbol)
+}
+
+// correctnessNoCallerDataMutationParameterOf returns the parameter a symbol is declared by, directly or
+// through a destructuring pattern, or nil.
+func correctnessNoCallerDataMutationParameterOf(ctx rule.Context, symbol *ast.Symbol) *ast.Node {
+	for _, declaration := range rule.DeclarationsIn(ctx.SourceFile, symbol) {
+		switch declaration.Kind {
+		case ast.KindParameter:
+			return declaration
+		case ast.KindBindingElement:
+			ancestor := declaration.Parent
+			for ancestor != nil && (ancestor.Kind == ast.KindObjectBindingPattern ||
+				ancestor.Kind == ast.KindArrayBindingPattern || ancestor.Kind == ast.KindBindingElement) {
+				ancestor = ancestor.Parent
+			}
+			if ancestor != nil && ancestor.Kind == ast.KindParameter {
+				return ancestor
+			}
+		}
+	}
+	return nil
+}
+
+// correctnessNoCallerDataMutationIsCallback says whether a function is a function expression or arrow
+// handed straight to a call or `new`. An immediately invoked one counts too: its argument is written
+// at the same place, as visible as a callback's.
+func correctnessNoCallerDataMutationIsCallback(function *ast.Node) bool {
+	if function.Kind != ast.KindFunctionExpression && function.Kind != ast.KindArrowFunction {
+		return false
+	}
+	outer := function.Parent
+	for outer != nil && outer.Kind == ast.KindParenthesizedExpression {
+		outer = outer.Parent
+	}
+	return outer != nil && (outer.Kind == ast.KindCallExpression || outer.Kind == ast.KindNewExpression)
+}
+
+// correctnessNoCallerDataMutationIsReassigned says whether any reference to the parameter, in its
+// function's parameter list or body, writes the binding itself.
+func correctnessNoCallerDataMutationIsReassigned(ctx rule.Context, function *ast.Node, symbol *ast.Symbol) bool {
+	name := symbol.Name
+	reassigned := false
+	var visit func(node *ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if reassigned {
+			return true
+		}
+		if node.Kind == ast.KindIdentifier && node.Text() == name && reference.WritesToBinding(node) {
+			resolved := ctx.TypeChecker.GetSymbolAtLocation(node)
+			if parent := node.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
+				if valueSymbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent); valueSymbol != nil {
+					resolved = valueSymbol
+				}
+			}
+			if resolved == symbol {
+				reassigned = true
+				return true
+			}
+		}
+		node.ForEachChild(visit)
+		return false
+	}
+	for _, parameter := range function.Parameters() {
+		if initializer := parameter.Initializer(); initializer != nil {
+			visit(initializer)
+		}
+	}
+	if body := function.Body(); body != nil {
+		visit(body)
+	}
+	return reassigned
+}
+
+// correctnessNoCallerDataMutationWritesData says whether a written access lands in data project code
+// declares: a property declared in a source file and not a setter, or an element of an array, a tuple,
+// a `Record` or its kin, or a type a source file declares.
+func correctnessNoCallerDataMutationWritesData(ctx rule.Context, target *ast.Node) bool {
+	var key *ast.Node
+	var receiver *ast.Node
+	switch target.Kind {
+	case ast.KindPropertyAccessExpression:
+		access := target.AsPropertyAccessExpression()
+		key = access.Name()
+		receiver = access.Expression
+	case ast.KindElementAccessExpression:
+		access := target.AsElementAccessExpression()
+		key = access.ArgumentExpression
+		receiver = access.Expression
+	default:
+		return false
+	}
+	// Only a name or a literal key names a property. `buffer[offset]` asked about `offset` answers with
+	// the variable, which a source file declares, and would make every element write look like data.
+	if target.Kind == ast.KindPropertyAccessExpression || ast.IsStringOrNumericLiteralLike(key) {
+		if symbol := ctx.TypeChecker.GetSymbolAtLocation(key); symbol != nil && len(symbol.Declarations) > 0 {
+			return symbol.Flags&ast.SymbolFlagsSetAccessor == 0 && rule.IsDeclaredInASourceFile(symbol)
+		}
+	}
+	// No declared property, so the receiver's type decides, and only for a receiver that is itself the
+	// caller's data: the parameter, or a property of it that passes this test. `element.dataset['x']` is
+	// a Record the host declares.
+	owner := receiver
+	for {
+		owner = ast.SkipParentheses(owner)
+		if owner.Kind != ast.KindNonNullExpression {
+			break
+		}
+		owner = owner.AsNonNullExpression().Expression
+	}
+	if owner.Kind != ast.KindIdentifier && !correctnessNoCallerDataMutationWritesData(ctx, owner) {
+		return false
+	}
+	receiverType := ctx.TypeChecker.GetTypeAtLocation(receiver)
+	if receiverType == nil {
+		return false
+	}
+	receiverType = checker.Checker_getApparentType(ctx.TypeChecker, receiverType)
+	if checker.Checker_isArrayOrTupleType(ctx.TypeChecker, receiverType) {
+		return true
+	}
+	if alias := checker.Type_alias(receiverType); alias != nil && alias.Symbol() != nil &&
+		correctnessNoCallerDataMutationDataShapes[alias.Symbol().Name] &&
+		type_checking.IsSymbolFromDefaultLibrary(ctx.Program, alias.Symbol()) {
+		return true
+	}
+	return rule.IsDeclaredInASourceFile(checker.Type_symbol(receiverType))
+}
+
+// correctnessNoCallerDataMutationIsWriter says whether a method name resolves to a mutating method of
+// a default-library collection, with every declaration there.
+func correctnessNoCallerDataMutationIsWriter(ctx rule.Context, name *ast.Node) bool {
+	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	if symbol == nil || len(symbol.Declarations) == 0 {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		owner := declaration.Parent
+		if owner == nil || owner.Kind != ast.KindInterfaceDeclaration || owner.Name() == nil {
+			return false
+		}
+		if !correctnessNoCallerDataMutationWriters[owner.Name().Text()][name.Text()] {
+			return false
+		}
+		file := ast.GetSourceFileOfNode(declaration)
+		if file == nil || !type_checking.IsSourceFileDefaultLibrary(ctx.Program, file) {
+			return false
+		}
+	}
+	return true
+}

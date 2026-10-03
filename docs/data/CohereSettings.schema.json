@@ -647,6 +647,9 @@
                 "nexus/correctness-no-callback-in-parse-try": {
                     "$ref": "#/$defs/ruleSetting"
                 },
+                "nexus/correctness-no-caller-data-mutation": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
                 "nexus/correctness-no-collection-misuse": {
                     "$ref": "#/$defs/ruleSetting"
                 },
