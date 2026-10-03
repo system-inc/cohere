@@ -44,7 +44,12 @@ func buildSwiftEngine(moduleDirectory string, scratchRoot string, target Target,
 	}
 
 	packageDirectory := filepath.Join(moduleDirectory, "swift")
-	location := []string{"--package-path", packageDirectory, "--scratch-path", filepath.Join(scratchRoot, architecture)}
+	// The manifest evaluated now, never a cached evaluation. The manifest reads
+	// `Context.gitInformation.hasUncommittedChanges` into the engine's provenance, and SwiftPM's shared
+	// manifest cache answers from an earlier evaluation of the same commit. Measured: a tracked file
+	// edited after a clean build still built an engine that said its tree was clean, and with the
+	// cache off the same build said modified.
+	location := []string{"--package-path", packageDirectory, "--scratch-path", filepath.Join(scratchRoot, architecture), "--manifest-cache", "none"}
 
 	resolve := exec.Command("swift", append([]string{"package", "resolve"}, location...)...)
 	resolve.Stdout = os.Stderr

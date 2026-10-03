@@ -194,3 +194,54 @@ func TestSwiftContractRefusesAMismatchedPair(t *testing.T) {
 		})
 	}
 }
+
+// TestSwiftEngineBuildReadsTheTreeAsItIsNow builds a stand-in engine through buildSwiftEngine twice in one
+// repository: clean, then with a tracked file edited. Its manifest defines a flag from
+// `Context.gitInformation.hasUncommittedChanges`, as cohere-swift's does, and the product prints it.
+// SwiftPM's shared manifest cache would answer the second build from the first evaluation and stamp a
+// modified tree as clean; the release turns that cache off, and this fails if it stops.
+func TestSwiftEngineBuildReadsTheTreeAsItIsNow(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("NOT MEASURED: the Swift engine is only built on macOS")
+	}
+	if _, err := exec.LookPath("swift"); err != nil {
+		t.Skip("NOT MEASURED: no swift toolchain on PATH")
+	}
+
+	module := t.TempDir()
+	writeFile(t, filepath.Join(module, "swift", "Package.swift"), `// swift-tools-version:6.2
+import PackageDescription
+let modified = Context.gitInformation?.hasUncommittedChanges ?? true
+let package = Package(name: "Stand", products: [.executable(name: "cohere-swift", targets: ["Stand"])],
+    targets: [.executableTarget(name: "Stand", swiftSettings: modified ? [.define("TREE_MODIFIED")] : [])])
+`)
+	source := filepath.Join(module, "swift", "Sources", "Stand", "main.swift")
+	writeFile(t, source, "#if TREE_MODIFIED\nprint(\"modified\")\n#else\nprint(\"clean\")\n#endif\n")
+	writeFile(t, filepath.Join(module, ".gitignore"), ".scratch/\n")
+	gitIn(t, module, "init", "--quiet")
+	gitIn(t, module, "add", ".")
+	gitIn(t, module, "commit", "--quiet", "-m", "stand-in engine")
+
+	target := Target{GoOperatingSystem: "darwin", GoArchitecture: runtime.GOARCH}
+	scratch := filepath.Join(module, ".scratch")
+	says := func() string {
+		t.Helper()
+		destination := filepath.Join(t.TempDir(), SwiftEngineFileName)
+		if err := buildSwiftEngine(module, scratch, target, destination); err != nil {
+			t.Fatal(err)
+		}
+		output, err := exec.Command(destination).Output()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return strings.TrimSpace(string(output))
+	}
+
+	if got := says(); got != "clean" {
+		t.Fatalf("an engine built from a clean tree says %q", got)
+	}
+	writeFile(t, source, "#if TREE_MODIFIED\nprint(\"modified\")\n#else\nprint(\"clean\")\n#endif\n// edited\n")
+	if got := says(); got != "modified" {
+		t.Fatalf("an engine built after a tracked file was edited says %q, so its provenance would call the tree clean", got)
+	}
+}
