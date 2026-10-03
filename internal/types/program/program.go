@@ -509,13 +509,16 @@ func (g *Graph) Diagnostics(ctx context.Context, sourceFile *ast.SourceFile) []*
 // The findings are identical either way. Only the wall clock differs, which is exactly what makes
 // this the kind of mistake that survives review.
 func (g *Graph) AllDiagnostics(ctx context.Context) []*ast.Diagnostic {
+	return g.AllDiagnosticParts(ctx).All()
+}
+
+// AllDiagnosticParts is AllDiagnostics with its parts kept apart. See TypeDiagnosticParts.
+func (g *Graph) AllDiagnosticParts(ctx context.Context) TypeDiagnosticParts {
 	syntactic := g.Program.GetSyntacticDiagnostics(ctx, nil)
 	if len(syntactic) > 0 {
-		return syntactic
+		return TypeDiagnosticParts{Syntactic: syntactic}
 	}
-
-	diagnostics := g.Program.GetBindDiagnostics(ctx, nil)
-	return append(diagnostics, g.Program.GetSemanticDiagnostics(ctx, nil)...)
+	return TypeDiagnosticParts{Bind: g.Program.GetBindDiagnostics(ctx, nil), Semantic: g.Program.GetSemanticDiagnostics(ctx, nil)}
 }
 
 // ConfigDiagnostics returns findings about the configuration itself rather than about any file —

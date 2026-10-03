@@ -752,9 +752,13 @@ func run() error {
 		}
 		findings += len(typeDiagnostics)
 
+		replayedClause := ""
+		if check.replayed > 0 {
+			replayedClause = fmt.Sprintf("; %d of %d files' semantic diagnostics replayed from cache", check.replayed, len(projectFiles))
+		}
 		fmt.Fprintf(invocationOutput(os.Stdout),
-			"types: %d diagnostics over %d files in %s\n",
-			len(typeDiagnostics), len(projectFiles), round(typesDuration),
+			"types: %d diagnostics over %d files in %s%s\n",
+			len(typeDiagnostics), len(projectFiles), round(typesDuration), replayedClause,
 		)
 		report.record(phaseTypes, outcomeRan, typesDuration, "")
 
@@ -1058,6 +1062,11 @@ type typeCheck struct {
 	done    chan struct{}
 	cancel  context.CancelFunc
 
+	// reuse is the types section of the run cache's table, nil when this run is not recorded. replayed is
+	// how many files' semantic diagnostics the check took from it rather than checking.
+	reuse    *program.TypeDiagnosticsReuse
+	replayed int
+
 	// elapsed is how long the checking itself took, and finished when it ended, both set as it finishes. The
 	// phase reports these rather than its wait, which is nothing when the check ran alongside the walk.
 	elapsed  time.Duration
@@ -1076,7 +1085,7 @@ type typeCheck struct {
 // diagnostics, waits for finishTypeCheck, when the walk has let go of them.
 func startTypeCheck(ctx context.Context, graph *program.Graph, incremental bool) *typeCheck {
 	checkContext, cancel := context.WithCancel(ctx)
-	check := &typeCheck{graph: graph, done: make(chan struct{}), cancel: cancel}
+	check := &typeCheck{graph: graph, done: make(chan struct{}), cancel: cancel, reuse: activeTypesReuse()}
 	// One session across check-then-write. The build info has to be emitted from the same
 	// incremental program that did the checking: that program's snapshot is what records which
 	// files were checked, and emitting from a second one writes a build info that skips nothing
@@ -1087,13 +1096,26 @@ func startTypeCheck(ctx context.Context, graph *program.Graph, incremental bool)
 		defer func() { check.elapsed, check.finished = time.Since(start), time.Now() }()
 		// Begun here rather than before, since reading the build info and snapshotting the program is work
 		// too, and it overlaps the walk as well as the check does.
+		// Files whose shape fingerprint has not moved replay their semantic diagnostics, and only the rest are
+		// checked. See program.TypeDiagnosticsReuse.
+		if check.reuse != nil {
+			if parts, reused := graph.CheckReusing(checkContext, check.reuse); reused {
+				check.checked, check.replayed = parts.All(), check.reuse.Replayed()
+				return
+			}
+		}
 		if incremental {
 			check.session = graph.NewIncrementalSession()
 		}
+		var parts program.TypeDiagnosticParts
 		if check.session != nil {
-			check.checked = check.session.Diagnostics(checkContext)
+			parts = check.session.DiagnosticParts(checkContext)
 		} else {
-			check.checked = graph.AllDiagnostics(checkContext)
+			parts = graph.AllDiagnosticParts(checkContext)
+		}
+		check.checked = parts.All()
+		if check.reuse != nil {
+			graph.RecordFull(checkContext, check.reuse, parts)
 		}
 	}()
 	return check
@@ -1122,6 +1144,9 @@ func finishTypeCheck(ctx context.Context, check *typeCheck, files []*ast.SourceF
 		ours[sourceFile] = struct{}{}
 	}
 	diagnostics := check.graph.ConfigDiagnostics(ctx)
+	if check.reuse != nil {
+		check.reuse.FinishGlobals(len(check.graph.Program.GetGlobalDiagnostics(ctx)) == 0)
+	}
 	for _, diagnostic := range check.checked {
 		// A diagnostic with no file is about the program rather than about any one file, so it is ours
 		// by default: dropping it would hide exactly the configuration errors that matter most.

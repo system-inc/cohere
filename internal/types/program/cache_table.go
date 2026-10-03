@@ -67,6 +67,10 @@ type CacheTable struct {
 	// what changed since cohere last looked. Nil until a run has formatted. Its meaning is the format
 	// phase's (command/cohere/format_record.go); this file only keeps it.
 	Formatted *FormatSection
+
+	// Types is each project file's semantic diagnostics under its shape fingerprint, for the types phase to
+	// replay. Nil until a run has recorded them. See TypesSection.
+	Types *TypesSection
 }
 
 // FormatSection is the format record's section of the table. Key names the binary and root its entries
@@ -100,13 +104,15 @@ type CacheTableIdentity struct {
 // half is enforced by TestCacheTableShapeIsPinnedToItsVersion; the meaning half is the reason each
 // section also keeps its own version.
 //
+// 5: the table holds the types phase's section.
+//
 // 4: run-cache inputs carry their change time and inode.
 //
 // 3: findings entries carry design-system rules and their fingerprint, and the findings section carries the
 // design system's key.
 //
 // 2: findings entries carry shape-keyed rules and their fingerprint, and the table holds Signatures.
-const cacheTableVersion = 4
+const cacheTableVersion = 5
 
 // cacheTableMagic opens every table, so a file that is not one is refused on its first field.
 const cacheTableMagic = "cohere cache table"
@@ -132,6 +138,7 @@ type cacheTableBody struct {
 	Findings   *lintCacheWire
 	Signatures map[string]SignatureEntry
 	Formatted  *FormatSection
+	Types      *TypesSection
 }
 
 // lintCacheWire is the findings section as encoded. Rule lists are stored once and referenced by index:
@@ -180,7 +187,7 @@ func EncodeCacheTable(table *CacheTable, identity CacheTableIdentity) ([]byte, e
 	if err := encoder.Encode(cacheTableHeader{Magic: cacheTableMagic, Version: cacheTableVersion, Identity: identity}); err != nil {
 		return nil, fmt.Errorf("encoding the cache table's header: %w", err)
 	}
-	body := cacheTableBody{Runs: table.Runs, Signatures: table.Signatures, Formatted: table.Formatted}
+	body := cacheTableBody{Runs: table.Runs, Signatures: table.Signatures, Formatted: table.Formatted, Types: table.Types}
 	if table.Findings != nil {
 		body.Findings = table.Findings.wire()
 	}
@@ -233,7 +240,7 @@ func DecodeCacheTable(buffer []byte, identity CacheTableIdentity) (*CacheTable, 
 			ErrCacheTablePartlyKept, orUnknown(header.Identity.SelfCommit), orUnknown(identity.SelfCommit))
 	}
 
-	table := &CacheTable{Runs: body.Runs, Signatures: body.Signatures, Formatted: body.Formatted}
+	table := &CacheTable{Runs: body.Runs, Signatures: body.Signatures, Formatted: body.Formatted, Types: body.Types}
 	if table.Runs == nil {
 		table.Runs = map[string]*RunCache{}
 	}

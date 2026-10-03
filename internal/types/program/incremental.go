@@ -76,15 +76,18 @@ func (g *Graph) NewIncrementalSession() *IncrementalSession {
 // The program is still built either way. A build info can skip checking the graph, never
 // constructing it, so the caller has already paid the graph phase before calling this.
 func (s *IncrementalSession) Diagnostics(ctx context.Context) []*ast.Diagnostic {
+	return s.DiagnosticParts(ctx).All()
+}
+
+// DiagnosticParts is Diagnostics with its parts kept apart. See TypeDiagnosticParts.
+func (s *IncrementalSession) DiagnosticParts(ctx context.Context) TypeDiagnosticParts {
 	// Syntactic first, and bail on failure, for the same reason AllDiagnostics does: a file
 	// that does not parse produces cascading nonsense from the later phases.
 	syntactic := s.graph.Program.GetSyntacticDiagnostics(ctx, nil)
 	if len(syntactic) > 0 {
-		return syntactic
+		return TypeDiagnosticParts{Syntactic: syntactic}
 	}
-
-	diagnostics := s.graph.Program.GetBindDiagnostics(ctx, nil)
-	return append(diagnostics, s.program.GetSemanticDiagnostics(ctx, nil)...)
+	return TypeDiagnosticParts{Bind: s.graph.Program.GetBindDiagnostics(ctx, nil), Semantic: s.program.GetSemanticDiagnostics(ctx, nil)}
 }
 
 // Write persists what the next run needs to tell changed files from unchanged ones.

@@ -85,6 +85,10 @@ type runCacheSession struct {
 	// when no rule is keyed on shapes, since then nothing reads them and computing them would be waste.
 	shapes map[string]program.SignatureEntry
 
+	// types is the types phase's section, what the table held and what this run records. Nil when the
+	// graph never reached a walk.
+	types *program.TypeDiagnosticsReuse
+
 	stdout, stderr teeStream
 }
 
@@ -447,6 +451,11 @@ func (session *runCacheSession) write(recorded *program.RunCache) {
 	if session.shapes != nil {
 		table.Signatures = session.shapes
 	}
+	if session.types != nil {
+		if recorded := session.types.Recorded(); recorded != nil {
+			table.Types = recorded
+		}
+	}
 	if err := program.WriteCacheTable(session.tablePath, table, identity); err != nil {
 		session.note(fmt.Sprintf("the cache table could not be written: %v", firstLine(err.Error())))
 	}
@@ -631,6 +640,16 @@ func attachFindingsCache(graph *program.Graph, location projectLocation) {
 		session.shapes = shapes
 	}
 	graph.FindingsReuse = session.findings
+	session.types = program.NewTypeDiagnosticsReuse(session.table.Types)
+}
+
+// activeTypesReuse is the types section a check in this run reads and records, nil when the run is not
+// recorded or never reached a walk.
+func activeTypesReuse() *program.TypeDiagnosticsReuse {
+	if activeRunCache == nil {
+		return nil
+	}
+	return activeRunCache.types
 }
 
 // anyRuleKeyedOnShapes reports whether any rule declares rule.TypeReachShapes.
