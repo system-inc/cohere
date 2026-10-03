@@ -139,6 +139,8 @@ var PreserveManualMemoization = rule.Rule{
 	// port brief's scope table rather than the flag half. It is also the binder declaration the
 	// brief describes: the locals tables the pipeline reads are only populated under a program.
 	NeedsTypeChecker: true,
+	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Declined once per file rather than once per node. `NeedsTypeChecker` governs the

@@ -162,6 +162,8 @@ import (
 var Refs = rule.Rule{
 	Name:             "react-hooks/refs",
 	NeedsTypeChecker: true,
+	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// Taken at the file level for the reason static_components.go gives: lowering already

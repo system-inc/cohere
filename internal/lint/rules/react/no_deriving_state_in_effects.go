@@ -115,6 +115,8 @@ var messageNoDerivingStateInEffects = rule.Message{
 var NoDerivingStateInEffects = rule.Rule{
 	Name:             "react-hooks/no-deriving-state-in-effects",
 	NeedsTypeChecker: true,
+	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 	// Same predicate as `set-state-in-effect`: the setter is recognised by its type alias, so a hook
 	// returning `any` takes every finding in the file with it. Declared so the tripwire can name it.
 	ResolvesReactValueTypes: true,

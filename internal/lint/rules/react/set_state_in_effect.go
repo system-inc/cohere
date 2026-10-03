@@ -236,6 +236,8 @@ var messageSetStateInEffect = rule.Message{
 var SetStateInEffect = rule.Rule{
 	Name:             "react-hooks/set-state-in-effect",
 	NeedsTypeChecker: true,
+	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 	// Same predicate as `set-state-in-render`: the setter is the type's alias, so an `any` hook
 	// return takes every finding in the file with it. Declared so the tripwire can name it.
 	ResolvesReactValueTypes: true,

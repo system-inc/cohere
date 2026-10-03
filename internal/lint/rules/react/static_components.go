@@ -98,6 +98,8 @@ import (
 var StaticComponents = rule.Rule{
 	Name:             "react-hooks/static-components",
 	NeedsTypeChecker: true,
+	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// The whole file is taken at once rather than listening on each function kind, because

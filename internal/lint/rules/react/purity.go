@@ -227,6 +227,8 @@ var purityGlobalContainers = map[string]bool{"globalThis": true, "global": true}
 var Purity = rule.Rule{
 	Name:             "react-hooks/purity",
 	NeedsTypeChecker: true,
+	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// The whole file at once, for the reason `static_components.go` gives: lowering already
