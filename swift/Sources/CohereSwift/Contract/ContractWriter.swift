@@ -61,7 +61,7 @@ public final class ContractWriter {
         precondition(missing.isEmpty, "phases never recorded: \(missing.map(\.rawValue))")
         let exitCode: Int32 = findingsWritten == 0 && complete ? 0 : 1
         /* Always empty from this engine: every run describes the package, so none finishes with nothing to look at. */
-        try send(SummaryRecord(findings: findingsWritten, complete: complete, nothingToCheck: "", exitCode: Int(exitCode)))
+        try send(SummaryRecord(findings: findingsWritten, complete: complete, exitCode: Int(exitCode)))
         summaryWritten = true
         return exitCode
     }

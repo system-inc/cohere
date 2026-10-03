@@ -7,13 +7,11 @@ public struct SummaryRecord: Codable, Equatable, Sendable {
     public var kind = "summary"
     public var findings: Int
     public var complete: Bool
-    public var nothingToCheck: String
     public var exitCode: Int
 
-    public init(findings: Int, complete: Bool, nothingToCheck: String, exitCode: Int) {
+    public init(findings: Int, complete: Bool, exitCode: Int) {
         self.findings = findings
         self.complete = complete
-        self.nothingToCheck = nothingToCheck
         self.exitCode = exitCode
     }
 }

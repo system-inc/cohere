@@ -12,7 +12,7 @@ import (
 )
 
 // swiftContractVersion is the version of swift/Contract.md this front door speaks.
-const swiftContractVersion = 2
+const swiftContractVersion = 3
 
 // swiftMode is which question a Swift run answers, and so which records it may carry.
 //
@@ -151,10 +151,9 @@ type swiftRuleRecord struct {
 }
 
 type swiftSummaryRecord struct {
-	Findings       *int   `json:"findings"`
-	Complete       *bool  `json:"complete"`
-	NothingToCheck string `json:"nothingToCheck"`
-	ExitCode       *int   `json:"exitCode"`
+	Findings *int  `json:"findings"`
+	Complete *bool `json:"complete"`
+	ExitCode *int  `json:"exitCode"`
 }
 
 // swiftOutcomes maps the contract's camelCase outcomes onto the ones phases.go prints.
@@ -738,11 +737,8 @@ func (r *swiftRun) acceptSummary(record *swiftSummaryRecord) error {
 	// and the summary claims none, the engine is printing green over work it did not do, which is the
 	// failure this tool exists to stop, and the run is refused. The other direction is allowed: an engine
 	// that says it fell short is believed, even where no record shows the gap.
-	//
-	// A run with nothing to check skipped every phase because there was nothing for any of them to
-	// look at, which the phase report treats as a clean answer over zero files, and so does this.
 	namedGaps := r.filesWithoutRecord > 0 || r.crashes > 0 || len(r.unreadable) > 0
-	gapInRecords := (record.NothingToCheck == "" && !r.report.checkedEverything()) || namedGaps
+	gapInRecords := !r.report.checkedEverything() || namedGaps
 	if gapInRecords && *record.Complete {
 		return fmt.Errorf("the summary calls the run complete, and its own records show what it did not check")
 	}
@@ -765,9 +761,6 @@ func (r *swiftRun) acceptSummary(record *swiftSummaryRecord) error {
 
 	r.summary = record
 	r.writeExcluded()
-	if record.NothingToCheck != "" {
-		r.report.nothingToCheck = record.NothingToCheck
-	}
 	if r.project == nil {
 		r.report.graphNotBuilt = true
 	}

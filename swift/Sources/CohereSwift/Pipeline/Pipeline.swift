@@ -95,7 +95,7 @@ public struct Pipeline {
         for error in parsed.parseErrors {
             try writer.write(error)
         }
-        /* After `project` and before the first `phase`, as contract 2 places them, so the front door can name every file nothing checked. */
+        /* After `project` and before the first `phase`, as the contract places them, so the front door can name every file nothing checked. */
         for crash in parsed.unreadable {
             complete = false
             try writer.write(UnreadableRecord(file: crash.file, error: crash.error))

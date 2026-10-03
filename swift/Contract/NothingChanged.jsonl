@@ -1,6 +1,0 @@
-{"kind":"provenance","contract":2,"engine":"cohere-swift","version":"0.1.0","commit":"dev","sourceTreeModified":false,"toolchain":"swiftlang-6.4.0.34.1","swiftSyntax":"604.0.0","swiftFormat":"604.0.0"}
-{"kind":"phase","name":"fix","outcome":"skipped","elapsedMilliseconds":0,"detail":"nothing changed against HEAD"}
-{"kind":"phase","name":"types","outcome":"skipped","elapsedMilliseconds":0,"detail":"nothing changed against HEAD"}
-{"kind":"phase","name":"lint","outcome":"skipped","elapsedMilliseconds":0,"detail":"nothing changed against HEAD"}
-{"kind":"phase","name":"unused","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested — this is a report, ask for it with --unused"}
-{"kind":"summary","findings":0,"complete":true,"nothingToCheck":"nothing changed against HEAD","exitCode":0}

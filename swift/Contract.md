@@ -15,13 +15,18 @@ encoder's tests both read them, so neither side can drift without the other's te
 | `Findings.jsonl` | A compiler warning with its group, and a rule finding whose message has a newline. Lint still runs after a warning. The binary was built from a modified tree. Exit 1. |
 | `TypesBail.jsonl` | Under `--no-fix`, a compiler error cuts lint off as `notReached`. The run is incomplete. Exit 1. |
 | `CrashWithoutSummary.jsonl` | The stream stops after the fix phase. The front door must say nothing was checked and exit 1. |
-| `NothingChanged.jsonl` | A summary carrying `nothingToCheck`: no package described, every phase skipped, `0 files checked`, exit 0. The front door renders it; this engine never writes one (see `summary`). |
 | `Unreadable.jsonl` | One file the engine could not read: named beside the excluded files, every phase ran, nothing found, and still incomplete with exit 1. |
 | `Unused.jsonl` | `--unused`: two `unused` records and the `unusedCoverage` record after lint, the unused phase ran, and the summary counts no findings and exits 0, because the report is not a gate. |
 
 **Version 2** (2026-10-02) added the `unreadable` record. Before it, a file the engine could not read was a
 note on stderr: the summary said the run fell short and the front door believed it, but could not say
 which files. Both sides moved to 2 in one commit, and each refuses the other version.
+
+**Version 3** (2026-10-03) removed the summary's `nothingToCheck`. It named why a run had nothing to look
+at, which only `--changed` over an unchanged tree ever produced, and `--changed` is gone from both
+engines (ff50e94, 68e37a8). This engine had written it empty since, so the field, its fixture
+(`NothingChanged.jsonl`) and the front door's `0 files checked` rendering went together. A summary over
+a run that skipped every phase is now the gap it is, and one that calls itself complete is refused.
 
 ## Why records and not text
 
@@ -68,7 +73,7 @@ TypeScript.
 ### `provenance`, always first
 
 ```json
-{"kind":"provenance","contract":2,"engine":"cohere-swift","version":"0.1.0","commit":"<40 hex or dev>","sourceTreeModified":false,"toolchain":"swiftlang-6.4.0.34.1","swiftSyntax":"604.0.0","swiftFormat":"604.0.0"}
+{"kind":"provenance","contract":3,"engine":"cohere-swift","version":"0.1.0","commit":"<40 hex or dev>","sourceTreeModified":false,"toolchain":"swiftlang-6.4.0.34.1","swiftSyntax":"604.0.0","swiftFormat":"604.0.0"}
 ```
 
 `sourceTreeModified` drives the same warning the TypeScript run prints: this binary was built from a
@@ -289,7 +294,7 @@ note goes to stderr, as it does for TypeScript.
 ### `summary`, always last
 
 ```json
-{"kind":"summary","findings":4,"complete":true,"nothingToCheck":"","exitCode":1}
+{"kind":"summary","findings":4,"complete":true,"exitCode":1}
 ```
 
 - `findings` is the sum of every `finding` record. The front door counts the findings it received
@@ -299,9 +304,6 @@ note goes to stderr, as it does for TypeScript.
   calling the run complete over a gap its records show (a phase not run, a file without a compiler
   record, a rule crash, an `unreadable` file) is a protocol error. The other direction is believed: an
   engine that says it fell short where no record shows it is taken at its word.
-- `nothingToCheck` is the reason when the run had nothing to look at, a clean answer over zero files,
-  printed as `<reason>: 0 files checked`. This engine always writes it empty: every run describes the
-  package and checks it.
 - `exitCode` is what the engine will exit with.
 
 ## Exit codes

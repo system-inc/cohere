@@ -203,18 +203,6 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 		forbidLines(t, output, "imports nothing uses", "declarations nothing uses")
 	})
 
-	t.Run("NothingChanged", func(t *testing.T) {
-		output, exitCode, err := renderRecords(t, swiftModeCheck, contractFixture(t, "NothingChanged.jsonl"), 0)
-		if err != nil || exitCode != 0 {
-			t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
-		}
-		requireLines(t, output,
-			"  nothing changed against HEAD: 0 files checked\n",
-			"— no package was described and no phase ran\n",
-		)
-		forbidLines(t, output, "did not check everything", "package described in")
-	})
-
 	// The contract's crash: the stream stops after the fix phase. Exit 0 or 1 without a summary is a
 	// crash whatever the code says, so both are asserted.
 	for _, engineExit := range []int{0, 1} {
@@ -263,8 +251,8 @@ func TestSwiftRunRefusesBrokenStreams(t *testing.T) {
 		{"a line that is not a record", replace(findings, 4, "warning: the build printed to stdout"), 1, "not a record"},
 		{"a record of unknown kind", replace(findings, 4, `{"kind":"telemetry"}`), 1, "unknown kind"},
 		{"provenance not first", without(findings, 0), 1, "provenance is always first"},
-		{"a contract the front door does not speak", replace(findings, 0, strings.Replace(findings[0], `"contract":2`, `"contract":3`, 1)), 1, "contract 3"},
-		{"a provenance with no contract", replace(findings, 0, strings.Replace(findings[0], `"contract":2,`, "", 1)), 1, "contract none"},
+		{"a contract the front door does not speak", replace(findings, 0, strings.Replace(findings[0], `"contract":3`, `"contract":2`, 1)), 1, "contract 2"},
+		{"a provenance with no contract", replace(findings, 0, strings.Replace(findings[0], `"contract":3,`, "", 1)), 1, "contract none"},
 		{"a finding the summary does not count", replace(findings, last, strings.Replace(findings[last], `"findings":2`, `"findings":1`, 1)), 1, "counts 1 findings and 2"},
 		{"a types record that disagrees with its findings", replace(findings, 5, strings.Replace(findings[5], `"diagnostics":1`, `"diagnostics":0`, 1)), 1, "types record counts 0"},
 		{"a lint record that disagrees with its findings", replace(findings, 8, strings.Replace(findings[8], `"findings":1`, `"findings":3`, 1)), 1, "lint record counts 3"},
@@ -278,7 +266,7 @@ func TestSwiftRunRefusesBrokenStreams(t *testing.T) {
 		{"an engine whose exit disagrees with its summary", findings, 0, "said it would exit 1"},
 		{"a summary missing its fields", replace(findings, last, `{"kind":"summary"}`), 1, "missing findings"},
 		// Contract 2's unreadable record: a summary may not call the run complete over one, and it has one place.
-		{"a summary claiming complete over an unreadable file", replace(unreadable, len(unreadable)-1, `{"kind":"summary","findings":0,"complete":true,"nothingToCheck":"","exitCode":0}`), 0, "calls the run complete"},
+		{"a summary claiming complete over an unreadable file", replace(unreadable, len(unreadable)-1, `{"kind":"summary","findings":0,"complete":true,"exitCode":0}`), 0, "calls the run complete"},
 		{"an unreadable record after a phase", append(append(append([]string(nil), unreadable[:5]...), unreadable[2]), unreadable[5:]...), 1, "after phase fix"},
 		{"an unreadable record before the project", append([]string{unreadable[0], unreadable[2]}, unreadable[1:]...), 1, "before the project record"},
 		// The --unused report: well-formed, in its place, and counted by its coverage record.
@@ -402,7 +390,7 @@ func TestSwiftEngineArguments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "--contract 2 --root /work/macos --no-fix --lint-config /work/macos/sub/Local.json --fix-passes 4 /work/macos/sub/Thing.swift /abs/Other.swift"
+	want := "--contract 3 --root /work/macos --no-fix --lint-config /work/macos/sub/Local.json --fix-passes 4 /work/macos/sub/Thing.swift /abs/Other.swift"
 	if strings.Join(arguments, " ") != want || mode != swiftModeCheck {
 		// `--single-threaded=false` was typed and is false, so it is not forwarded as a switch.
 		t.Errorf("arguments %q mode %s, want %q", strings.Join(arguments, " "), mode, want)

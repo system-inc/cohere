@@ -17,7 +17,7 @@ struct ContractFixtureTests {
         .deletingLastPathComponent()
         .appendingPathComponent("Contract", isDirectory: true)
 
-    static let fixtureNames = ["Clean", "Findings", "TypesBail", "CrashWithoutSummary", "NothingChanged", "Unreadable", "Unused"]
+    static let fixtureNames = ["Clean", "Findings", "TypesBail", "CrashWithoutSummary", "Unreadable", "Unused"]
 
     @Test(arguments: fixtureNames)
     func everyRecordRoundTrips(fixture: String) throws {
@@ -34,7 +34,7 @@ struct ContractFixtureTests {
 
     /* The control: a record with a field the contract does not define must fail the comparison, or the test above proves nothing. */
     @Test func anUnknownFieldIsCaught() throws {
-        let line = #"{"kind":"summary","findings":0,"complete":true,"nothingToCheck":"","exitCode":0,"extra":1}"#
+        let line = #"{"kind":"summary","findings":0,"complete":true,"exitCode":0,"extra":1}"#
         let original = try JSONSerialization.jsonObject(with: Data(line.utf8)) as? NSDictionary
         let reparsed = try JSONSerialization.jsonObject(with: Self.roundTrip(line, kind: "summary")) as? NSDictionary
         #expect(reparsed != original)

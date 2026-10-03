@@ -140,11 +140,6 @@ type pipelineReport struct {
 	// Empty otherwise. See projectLocation.rootNote.
 	rootNote string
 
-	// nothingToCheck is set when the Swift engine reports that its run had nothing to look at. It is the
-	// reason, in words, and it replaces the coverage warning rather than sitting beside it: every phase
-	// was skipped, and "did not check everything" would call a clean answer a gap.
-	nothingToCheck string
-
 	// graphNotBuilt is set when the run ended before the graph was needed, so the accounting line
 	// says so rather than reporting a graph that took 0s.
 	graphNotBuilt bool
@@ -344,14 +339,6 @@ func (r *pipelineReport) Write(out io.Writer) {
 	}
 	if r.cacheOff {
 		fmt.Fprintln(out, "  cache: off, by --no-cache: nothing was read from or written to this project's cache table or its incremental build info")
-	}
-
-	// A clean answer over zero files says exactly that, and nothing else about coverage. The scope
-	// line below would have nothing to compare, and the coverage warning would describe skipped
-	// phases as a gap when skipping them was the whole of the right answer.
-	if r.nothingToCheck != "" {
-		fmt.Fprintf(out, "  %s: 0 files checked\n", r.nothingToCheck)
-		return
 	}
 
 	// File scope is its own dimension and the phase lines cannot express it. A run narrowed to one
