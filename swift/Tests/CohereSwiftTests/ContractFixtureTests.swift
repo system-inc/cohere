@@ -17,7 +17,7 @@ struct ContractFixtureTests {
         .deletingLastPathComponent()
         .appendingPathComponent("Contract", isDirectory: true)
 
-    static let fixtureNames = ["Clean", "Findings", "TypesBail", "CrashWithoutSummary", "Unreadable", "Unused"]
+    static let fixtureNames = ["Clean", "Findings", "TypesBail", "CrashWithoutSummary", "Unreadable", "Unused", "LintOnly"]
 
     @Test(arguments: fixtureNames)
     func everyRecordRoundTrips(fixture: String) throws {

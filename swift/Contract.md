@@ -16,6 +16,7 @@ encoder's tests both read them, so neither side can drift without the other's te
 | `TypesBail.jsonl` | Under `--no-fix`, a compiler error cuts lint off as `notReached`. The run is incomplete. Exit 1. |
 | `CrashWithoutSummary.jsonl` | The stream stops after the fix phase. The front door must say nothing was checked and exit 1. |
 | `Unreadable.jsonl` | One file the engine could not read: named beside the excluded files, every phase ran, nothing found, and still incomplete with exit 1. |
+| `LintOnly.jsonl` | `--lint`, a real run: fix and types skipped as `not requested`, lint ran and found two, and the summary calls the run complete, which it is. Exit 1, for the findings. |
 | `Unused.jsonl` | `--unused`: after lint, each rule's `unused` records then its `unusedCoverage`, `unused-import` first and `unused-declaration` second (the declaration section is from a real run on ahraos-presence), the unused phase ran, and the summary counts no findings and exits 0, because the report is not a gate. |
 
 **Version 2** (2026-10-02) added the `unreadable` record. Before it, a file the engine could not read was a
@@ -305,6 +306,14 @@ the line then says so instead of printing a duration.
 missing phase record is a protocol error, for the reason `markRemainingNotReached` gives: a phase
 absent from the report reads the same as one the reporter forgot.
 
+A phase the caller did not ask for is `skipped` with the detail `not requested`, exactly, or for
+unused `not requested — ` and how to ask for it. That detail is the only one that means nobody
+asked, and it is not a gap: `--lint` asked for lint and got all of it. Any other `skipped` detail on
+a phase that reports findings is a gap. The front door reads the command line too, the way the
+TypeScript run does (no phase flag asks for fix, types and lint; `--fix`, `--types` or `--lint`
+only for those named; any `--unused` flag for unused as well). So a phase it asked for that comes
+back `not requested` is a protocol error, not a smaller run.
+
 ### `rule`, only under `--rules` and `--rules-enabled`
 
 ```json
@@ -322,9 +331,10 @@ note goes to stderr, as it does for TypeScript.
 
 - `findings` is the sum of every `finding` record. The front door counts the findings it received
   and refuses a summary that disagrees. Two counts that should agree and do not are a defect.
-- `complete` is false when any file or phase that could have produced a finding did not run. The
+- `complete` is false when any file, or any phase the caller asked for, that could have produced a
+  finding did not run. A phase skipped as `not requested` is not one of them. The
   front door prints `this run did not check everything` from its own phase records anyway. A summary
-  calling the run complete over a gap its records show (a phase not run, a file without a compiler
+  calling the run complete over a gap its records show (a requested phase not run, a file without a compiler
   record, a rule crash, an `unreadable` file) is a protocol error. The other direction is believed: an
   engine that says it fell short where no record shows it is taken at its word.
 - `exitCode` is what the engine will exit with.

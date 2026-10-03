@@ -272,6 +272,36 @@ func (r *pipelineReport) checkedEverything() bool {
 	return true
 }
 
+// detailNotRequested is the skip detail that means the caller did not ask for the phase, rather than that
+// something stopped it. The unused phase's spelling extends it with how to ask, after a dash.
+const detailNotRequested = "not requested"
+
+// skippedAsNotRequested reports whether a phase was skipped because nobody asked for it.
+func skippedAsNotRequested(record phaseRecord) bool {
+	return record.Outcome == outcomeSkipped &&
+		(record.Detail == detailNotRequested || strings.HasPrefix(record.Detail, detailNotRequested+" — "))
+}
+
+// checkedEveryRequestedPhase reports whether every phase the caller asked for ran, which is what an
+// external engine's `complete` claims (swift/Contract.md).
+//
+// It is checkedEverything with one difference: a phase skipped as not requested is not a gap, since
+// `--lint` asked for lint and got all of it. Every other skip of a reporting phase still is one, and so
+// is anything not reached. checkedEverything keeps its wider answer for the phase line, which says on a
+// narrowed run that the phases above did not check everything, true of `--lint` in either engine.
+func (r *pipelineReport) checkedEveryRequestedPhase() bool {
+	for _, record := range r.records {
+		if record.Outcome == outcomeNotReached {
+			return false
+		}
+		if record.Outcome == outcomeSkipped && record.Name != phaseFix && !optInPhases[record.Name] &&
+			!skippedAsNotRequested(record) {
+			return false
+		}
+	}
+	return true
+}
+
 // Write prints the phase line: which phases ran, which did not, and why.
 //
 // It prints on every run rather than only on failures. The whole argument of this project is that a

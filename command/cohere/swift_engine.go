@@ -62,6 +62,7 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 	run := newSwiftRun(os.Stdout, mode, location.rootNote(), processStart)
 	run.details = given["coverage"] && flagValue("coverage") == "true"
 	run.engineSourceCommit = sourceCommit
+	run.requested = swiftRequestedPhases(given, flagValue)
 	return runEngineBinary(binaryPath, arguments, run, os.Stderr)
 }
 

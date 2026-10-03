@@ -195,6 +195,12 @@ type swiftRun struct {
 	// the run. The front door knows the run.
 	engineSourceCommit string
 
+	// requested is which phases the caller asked for, by the flags the TypeScript run reads the same way
+	// (swiftRequestedPhases). An engine that reports one of them skipped as not requested is refused: it
+	// would turn a phase that was asked for and never ran into a run that looks complete. Nil, as in a test
+	// that renders a stream with no command line, checks nothing.
+	requested map[phaseName]bool
+
 	provenance *swiftProvenanceRecord
 	project    *swiftProjectRecord
 	summary    *swiftSummaryRecord
@@ -711,10 +717,29 @@ func (r *swiftRun) acceptPhase(record *swiftPhaseRecord) error {
 			return fmt.Errorf("the unused phase ran and no unusedCoverage record said what it looked at")
 		}
 	}
+	name := phaseOrder[r.nextPhase]
+	if r.requested[name] && skippedAsNotRequested(phaseRecord{Outcome: outcome, Detail: record.Detail}) {
+		return fmt.Errorf("the %s phase was asked for, and the engine skipped it as %q", name, record.Detail)
+	}
 	r.nextPhase++
 	r.findingsInPhase = 0
-	r.report.record(phaseOrder[r.nextPhase-1], outcome, time.Duration(record.ElapsedMilliseconds)*time.Millisecond, record.Detail)
+	r.report.record(name, outcome, time.Duration(record.ElapsedMilliseconds)*time.Millisecond, record.Detail)
 	return nil
+}
+
+// swiftRequestedPhases is which phases a command line asks for, read as the TypeScript run reads it: no
+// phase flag asks for fix, types and lint; `--fix`, `--types` or `--lint` asks for only the ones named;
+// and any `--unused` flag asks for unused as well. Takes the flag reader as a parameter so a test can
+// state its flags, as swiftEngineArguments does.
+func swiftRequestedPhases(given map[string]bool, value func(string) string) map[phaseName]bool {
+	named := func(flag string) bool { return given[flag] && value(flag) == "true" }
+	anyPhaseNamed := named("fix") || named("types") || named("lint")
+	return map[phaseName]bool{
+		phaseFix:    named("fix") || !anyPhaseNamed,
+		phaseTypes:  named("types") || !anyPhaseNamed,
+		phaseLint:   named("lint") || !anyPhaseNamed,
+		phaseUnused: named("unused") || named("unused-all") || named("unused-deep"),
+	}
 }
 
 func (r *swiftRun) acceptRule(record *swiftRuleRecord) error {
@@ -746,11 +771,13 @@ func (r *swiftRun) acceptSummary(record *swiftSummaryRecord) error {
 	// failure this tool exists to stop, and the run is refused. The other direction is allowed: an engine
 	// that says it fell short is believed, even where no record shows the gap.
 	namedGaps := r.filesWithoutRecord > 0 || r.crashes > 0 || len(r.unreadable) > 0
-	gapInRecords := !r.report.checkedEverything() || namedGaps
+	// Judged by the phases the caller asked for: `complete` means every requested phase ran, so `--lint`
+	// with fix and types skipped as not requested is complete. Any other skip is still a gap.
+	gapInRecords := !r.report.checkedEveryRequestedPhase() || namedGaps
 	if gapInRecords && *record.Complete {
 		return fmt.Errorf("the summary calls the run complete, and its own records show what it did not check")
 	}
-	if !*record.Complete && r.report.checkedEverything() {
+	if !*record.Complete && r.report.checkedEveryRequestedPhase() {
 		if namedGaps {
 			r.report.incompleteBeyondPhases = "the notes above name the files nothing checked"
 		} else {
