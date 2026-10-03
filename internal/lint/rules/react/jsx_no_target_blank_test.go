@@ -445,7 +445,6 @@ func TestDecodeJsxNoTargetBlankOptions(t *testing.T) {
 			"{\"allowReferrer\":true,\"warnOnSpreadAttributes\":true,\"forms\":true,\"enforceDynamicLinks\":\"never\",\"links\":false}",
 			JsxNoTargetBlankOptions{AllowReferrer: true, WarnOnSpreadAttributes: true, Forms: true,
 				EnforceDynamicLinksNever: true, Links: false}},
-
 	}
 
 	for _, testCase := range cases {
