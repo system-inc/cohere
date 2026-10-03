@@ -1,6 +1,4 @@
 import Foundation
-import SwiftFormat
-import SwiftSyntax
 
 /*
  One of swift-format's own lint rules, run inside this process over the tree the engine already parsed,
