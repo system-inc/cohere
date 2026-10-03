@@ -1,8 +1,8 @@
 package typescript
 
 import (
-	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
@@ -130,18 +130,14 @@ import (
 // to chase to discover it is unreachable. If a later change implements the suggestion, the builder
 // comes back with the call site that needs it.
 //
-// # The message text is also deliberately degraded upstream, and that is visible to a user
+// # The message names the missing branches, which tsgolint's did not
 //
-// `buildSwitchIsNotExhaustiveMessage` takes a `missingBranches` argument and THROWS IT AWAY: the
-// body is `fmt.Sprintf("Switch is not exhaustive")` with the interpolating half of the format
-// string commented out beside it. Every call site computes or passes a value that never appears.
-// `@typescript-eslint` renders "Switch is not exhaustive. Cases not matched: 'b' | 'c'", which is
-// most of what makes the diagnostic actionable, and we render the bare sentence.
-//
-// Reproduced rather than repaired, because oxlint runs tsgolint and the differential harness
-// compares against oxlint, so restoring the list would read as a difference the harness can see.
-// It is the single most user-visible drift in this family so far and the next sync should check
-// whether upstream has closed it.
+// tsgolint's `buildSwitchIsNotExhaustiveMessage` took the missing-branch list and threw it away,
+// rendering the bare sentence with the interpolating half of the format string commented out. That
+// was reproduced while the differential harness compared against oxlint, which runs tsgolint. Parity
+// is now measured against `@typescript-eslint` (`s l --linter both`), which renders
+// `Switch is not exhaustive. Cases not matched: "b" | "c"`, and the list is most of what makes the
+// finding actionable, so it is restored (#21011kd). See renderMissingBranches.
 //
 // # Where the two references disagree, counted rather than assumed
 //
@@ -152,8 +148,8 @@ import (
 // over a real program rather than by reading its source:
 //
 //	MESSAGE TEXT.  On `'a' | 'b' | 'c'` covering only 'a', it renders
-//	               `Switch is not exhaustive. Cases not matched: "b" | "c"`. We render the bare
-//	               sentence, because tsgolint's builder takes the list and discards it.
+//	               `Switch is not exhaustive. Cases not matched: "b" | "c"`. We now render the same
+//	               text (#21011kd); tsgolint's builder discarded the list.
 //
 //	SUGGESTIONS.   The same input carries one SUGGESTION and no fix there. We carry neither.
 //
@@ -161,11 +157,10 @@ import (
 //	               list there, because its default pattern is `/^no default$/i`. We report.
 //
 // The last one is the sharpest for a user: a codebase that adopted the `// no default` convention
-// under typescript-eslint lights up under oxlint. All three are reproduced rather than repaired,
-// because oxlint runs tsgolint and the differential harness compares against oxlint, so closing any
-// of them would read as a difference the harness can see. They are gaps rather than contradictions
-// — no input makes the two report a DIFFERENT id, only inputs where one reports and the other is
-// silent, plus every input where the rendered text differs.
+// under typescript-eslint lights up here. The suggestion and the comment pattern are still
+// reproduced from tsgolint rather than repaired; the message text is closed. They are gaps rather
+// than contradictions — no input makes the two report a DIFFERENT id, only inputs where one reports
+// and the other is silent.
 //
 // # The checker, and the nil guard that now lives here
 //
@@ -300,16 +295,8 @@ var SwitchExhaustivenessCheck = rule.Rule{
 			}
 
 			if len(metadata.MissingLiteralBranchTypes) > 0 {
-				// TODO(port): more verbose message
-				//   missingBranches: missingLiteralBranchTypes
-				// .map(missingType =>
-				//   tsutils.isTypeFlagSet(missingType, ts.TypeFlags.ESSymbolLike)
-				//     ? `typeof ${missingType.getSymbol()?.escapedName as string}`
-				//     : typeToString(missingType),
-				// )
-				// .join(' | '),
-
-				ctx.ReportNode(node.Expression, buildSwitchIsNotExhaustiveMessage("TODO"))
+				ctx.ReportNode(node.Expression, buildSwitchIsNotExhaustiveMessage(
+					renderMissingBranches(ctx.TypeChecker, metadata.MissingLiteralBranchTypes)))
 			}
 		}
 
@@ -375,20 +362,20 @@ type switchMetadata struct {
 //
 // It is upstream's struct field for field rather than a translation of it, which is what makes
 // `rule.DecodeOptionsInto` sufficient here where `no-this-alias` needed a hand-written decoder:
-// nothing is inverted and nothing is renamed, so `encoding/json`'s case-insensitive field matching
-// binds `allowDefaultCaseForExhaustiveSwitch` onto `AllowDefaultCaseForExhaustiveSwitch` directly.
-// Measured with a probe rather than assumed, because that matching is a property of the standard
-// library rather than of anything declared in this tree.
+// nothing is inverted and nothing is renamed, so each tag is upstream's key exactly. The fields were
+// untagged until #4a4yse4 and bound through `encoding/json`'s case-insensitive matching, which also
+// let any casing of a key through; the tags declare the spelling and rule.UnmarshalOptions holds a
+// config to it.
 //
 // The pointer fields are load-bearing and must not be flattened to plain bools. Two of the three
 // live options default to a value that is not the zero value — `allowDefaultCaseForExhaustiveSwitch`
 // defaults to TRUE — so a `bool` field could not tell "the user wrote false" from "the user wrote
 // nothing", and the defaulting block at the top of `Run` reads exactly that distinction.
 type SwitchExhaustivenessCheckOptions struct {
-	AllowDefaultCaseForExhaustiveSwitch *bool
-	ConsiderDefaultExhaustiveForUnions  *bool
-	DefaultCaseCommentPattern           *string
-	RequireDefaultForNonUnion           *bool
+	AllowDefaultCaseForExhaustiveSwitch *bool   `json:"allowDefaultCaseForExhaustiveSwitch"`
+	ConsiderDefaultExhaustiveForUnions  *bool   `json:"considerDefaultExhaustiveForUnions"`
+	DefaultCaseCommentPattern           *string `json:"defaultCaseCommentPattern"`
+	RequireDefaultForNonUnion           *bool   `json:"requireDefaultForNonUnion"`
 }
 
 // buildDangerousDefaultCaseMessage is upstream's message, text unchanged.
@@ -399,13 +386,29 @@ func buildDangerousDefaultCaseMessage() rule.Message {
 	}
 }
 
-// buildSwitchIsNotExhaustiveMessage takes the missing-branch list and DISCARDS it, which is
-// upstream's behavior rather than a defect introduced here. The interpolating half of the format
-// string is commented out in upstream's source and is carried across in that state deliberately;
-// see the note on degraded message text above.
+// buildSwitchIsNotExhaustiveMessage is typescript-eslint's message, naming the branches still missing.
 func buildSwitchIsNotExhaustiveMessage(missingBranches string) rule.Message {
 	return rule.Message{
 		Id:          "switchIsNotExhaustive",
-		Description: fmt.Sprintf("Switch is not exhaustive"), // . Cases not matched: %v", missingBranches),
+		Description: "Switch is not exhaustive. Cases not matched: " + missingBranches,
 	}
+}
+
+// renderMissingBranches is typescript-eslint's `missingBranches`: each missing member as the checker
+// prints it, joined with ` | ` in the order the rule found them. A unique symbol prints as
+// `typeof <name>`, the type a case would have to name, since the checker's own rendering of a unique
+// symbol type is not something a reader can write in a case clause. Measured against the installed
+// 8.67.0 build on seven kinds: `"b" | "c"`, `2 | 3`, `false`, `Color.Green | Color.Blue`,
+// `undefined | null`, `typeof second`, and an optional property's `undefined | "q"`.
+func renderMissingBranches(typeChecker *checker.Checker, missingTypes []*checker.Type) string {
+	rendered := make([]string, 0, len(missingTypes))
+	for _, missingType := range missingTypes {
+		if symbol := missingType.Symbol(); symbol != nil &&
+			checker.Type_flags(missingType)&checker.TypeFlagsESSymbolLike != 0 {
+			rendered = append(rendered, "typeof "+symbol.Name)
+			continue
+		}
+		rendered = append(rendered, typeChecker.TypeToString(missingType))
+	}
+	return strings.Join(rendered, " | ")
 }

@@ -1789,3 +1789,34 @@ function foo(x: string[], y: string | undefined) {
 }
 `, nil), "switchIsNotExhaustive")
 }
+
+// TestSwitchExhaustivenessCheckNamesTheMissingBranches pins the message text against
+// typescript-eslint's, measured on the installed 8.67.0 build for every kind of member a switch can
+// miss (#21011kd). tsgolint rendered the bare sentence for all seven; the list is what a reader acts on.
+func TestSwitchExhaustivenessCheckNamesTheMissingBranches(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		source string
+		want   string
+	}{
+		{"string literals", "declare const day: 'a' | 'b' | 'c';\nswitch (day) { case 'a': break; }\n", `"b" | "c"`},
+		{"number literals", "declare const count: 1 | 2 | 3;\nswitch (count) { case 1: break; }\n", `2 | 3`},
+		{"a boolean", "declare const flag: boolean;\nswitch (flag) { case true: break; }\n", `false`},
+		{"enum members", "enum Color { Red, Green, Blue }\ndeclare const color: Color;\nswitch (color) { case Color.Red: break; }\n", `Color.Green | Color.Blue`},
+		{"null and undefined", "declare const maybe: 'x' | null | undefined;\nswitch (maybe) { case 'x': break; }\n", `undefined | null`},
+		{"a unique symbol", "const first: unique symbol = Symbol('first');\nconst second: unique symbol = Symbol('second');\ndeclare const token: typeof first | typeof second;\nswitch (token) { case first: break; }\n", `typeof second`},
+		{"an optional property", "declare const optional: { kind?: 'p' | 'q' };\nswitch (optional.kind) { case 'p': break; }\n", `undefined | "q"`},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTyped(t, SwitchExhaustivenessCheck, switchExhaustivenessFile, testCase.source)
+			rule_testing.ExpectFindings(t, result, "switchIsNotExhaustive")
+			want := "Switch is not exhaustive. Cases not matched: " + testCase.want
+			if got := result.Diagnostics[0].Message.Description; got != want {
+				t.Fatalf("message: expected %q, got %q", want, got)
+			}
+		})
+	}
+}
