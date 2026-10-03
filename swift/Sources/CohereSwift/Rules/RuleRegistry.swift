@@ -51,6 +51,7 @@ public enum RuleRegistry {
         RedundantTypeAnnotation(),
         NoDiscardedTryOptional(),
         SecurityNoInterpolatedShellCommand(),
+        SecurityNoInterpolatedSqlString(),
     ]
 
     public static let packageRules: [any PackageRule] = [
