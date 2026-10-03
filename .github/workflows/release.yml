@@ -57,9 +57,9 @@ jobs:
                   # records which commit it was. Without the submodule the build fails outright,
                   # which is the correct outcome but a confusing one to debug from a clone error.
                   submodules: true
-                  # `--version` reports the pinned typescript-go commit, read with `git rev-parse`.
-                  # A shallow submodule still resolves HEAD, so depth is left at the default only
-                  # for the outer repository.
+                  # `--version` reports the pinned compiler commit, read from this commit's gitlink, and
+                  # the release refuses a submodule checked out anywhere else. A shallow submodule still
+                  # resolves HEAD, so depth is left at the default only for the outer repository.
                   fetch-depth: 0
 
             - uses: actions/setup-go@v5

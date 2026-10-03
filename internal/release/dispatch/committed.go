@@ -105,7 +105,7 @@ func ResolveCommitted(paths Paths, packagePath string) (binaryPath string, commi
 
 	// Asked only for a build. The commit already decides the binary's name, the pin included, so a run
 	// that finds its binary has no use for it, and reading a tree is the one question that needs git.
-	build.CompilerCommit, err = pinnedCompilerCommit(paths.ModuleDirectory, build.Commit)
+	build.CompilerCommit, err = release.PinnedCompilerCommit(paths.ModuleDirectory, build.Commit)
 	if err != nil {
 		return "", "", false, err
 	}
@@ -129,25 +129,6 @@ func readCommittedBuild(moduleDirectory string) (committedBuild, error) {
 	}
 
 	return committedBuild{Commit: commit, GoVersion: goVersion}, nil
-}
-
-// pinnedCompilerCommit reads the vendored compiler's commit from a commit's tree.
-//
-// The gitlink recorded in the commit is the pin. The submodule's own HEAD is what the working tree
-// has checked out, and it differs exactly when someone has moved it without committing.
-func pinnedCompilerCommit(moduleDirectory string, commit string) (string, error) {
-	output, err := gitOutput(moduleDirectory, "ls-tree", commit, "TypeScript")
-	if err != nil {
-		return "", fmt.Errorf("reading the compiler pin from %s: %w", release.ShortCommit(commit), err)
-	}
-	// "160000 commit <sha>\tTypeScript" for a submodule. Anything else means the commit does not pin
-	// a compiler at all, and building would pick one up from somewhere unnamed.
-	fields := strings.Fields(output)
-	if len(fields) < 3 || fields[0] != "160000" || fields[1] != "commit" {
-		return "", fmt.Errorf("commit %s does not pin the vendored compiler as a submodule at TypeScript (ls-tree printed %q)",
-			release.ShortCommit(commit), strings.TrimSpace(output))
-	}
-	return fields[2], nil
 }
 
 // buildCommitted extracts the snapshot, builds it, and proves the result before it can be found.
@@ -507,39 +488,7 @@ func committedCompilerUpstream(snapshot string) string {
 	if err != nil {
 		return ""
 	}
-	// Sections are `[submodule "<name>"]`, each with `path` and `url`. The one whose path is the
-	// compiler's directory is the compiler, whatever it is named.
-	path, url := "", ""
-	found := ""
-	flush := func() {
-		if path == "TypeScript" && url != "" {
-			found = url
-		}
-		path, url = "", ""
-	}
-	for line := range strings.SplitSeq(string(contents), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "[") {
-			flush()
-			continue
-		}
-		key, value, isSetting := strings.Cut(line, "=")
-		if !isSetting {
-			continue
-		}
-		value = strings.Trim(strings.TrimSpace(value), `"`)
-		switch strings.TrimSpace(key) {
-		case "path":
-			path = strings.TrimSuffix(value, "/")
-		case "url":
-			url = value
-		}
-	}
-	flush()
-	if found == "" {
-		return ""
-	}
-	if upstream := release.NormalizeUpstream(found); upstream != "unknown" {
+	if upstream := release.CompilerUpstreamFromGitmodules(string(contents)); upstream != "unknown" {
 		return upstream
 	}
 	return ""

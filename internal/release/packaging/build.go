@@ -102,6 +102,15 @@ func Build(options Options) (Result, error) {
 		return Result{}, err
 	}
 
+	// Read before the minimum is checked, though neither depends on the other, because a fixture can
+	// pin a compiler and cannot contain MinimumReleaseCommit. In the other order no test could reach
+	// this refusal through Build, and a test that drives readCompilerPin directly passes with the call
+	// deleted from here.
+	pin, err := readCompilerPin(options.ModuleDirectory)
+	if err != nil {
+		return Result{}, err
+	}
+
 	if err := requireAncestor(options.ModuleDirectory, MinimumReleaseCommit, minimumReleaseReason); err != nil {
 		return Result{}, err
 	}
@@ -109,11 +118,6 @@ func Build(options Options) (Result, error) {
 	targets := options.Targets
 	if len(targets) == 0 {
 		targets = Targets
-	}
-
-	pin, err := readCompilerPin(options.ModuleDirectory)
-	if err != nil {
-		return Result{}, err
 	}
 
 	goToolchain, err := readGoToolchain(options.ModuleDirectory)
@@ -423,53 +427,163 @@ func requireExecutableFormat(path string, target Target) error {
 
 // compilerPin is which commit of which repository the vendored compiler is pinned to.
 type compilerPin struct {
-	// Commit is the submodule's HEAD.
+	// Commit is the gitlink HEAD records for the submodule, which the submodule's checkout was
+	// required to match.
 	Commit string
 
 	// Upstream is the repository that commit lives in, as "owner/name".
 	Upstream string
 }
 
-// readCompilerPin reads the pinned commit of the vendored compiler and the repository it came from.
+// readCompilerPin reads the pinned commit of the vendored compiler and the repository it came from,
+// both from the commit being released rather than from the checkout around it.
 //
-// Both halves are read from the submodule rather than written down here, because the upstream has
-// already moved once: the compiler was vendored from `microsoft/typescript-go` until that
-// repository was archived, and the pin is now against `microsoft/TypeScript`. A hardcoded label
-// survives a migration like that while quietly becoming false, and a commit reported against the
-// wrong repository is worse than no commit at all — it resolves to nothing and gives a reader no
-// hint why.
+// Both halves are read rather than written down here, because the upstream has already moved: the
+// compiler was vendored from `microsoft/typescript-go` until that repository was archived, then from
+// `microsoft/TypeScript`, and is now the fork `kirkouimet/TypeScript`. A hardcoded label survives a
+// migration like that while quietly becoming false, and a commit reported against the wrong
+// repository is worse than no commit at all: it resolves to nothing and gives a reader no hint why.
 //
-// The directory is `TypeScript`, matching the repository it is a checkout of. It is a path rather
-// than a claim about the upstream, but the two now agree, which removes the one case where a
-// reader had to know the local name and the remote name had diverged.
+// The commit is the gitlink, and the submodule's checkout has to agree with it. The build compiles
+// whatever the checkout holds, so a checkout moved without a commit would ship a compiler that no
+// cohere commit names, and the release could not be rebuilt from history. `--version` would name it
+// accurately and still point at nothing. Commits are compared and trees are not: the compiler patches
+// change files in the checkout without moving its HEAD, so a tree comparison would refuse every
+// patched release, which is every correct one.
 func readCompilerPin(moduleDirectory string) (compilerPin, error) {
-	submoduleDirectory := filepath.Join(moduleDirectory, "TypeScript")
-
-	output, err := exec.Command("git", "-C", submoduleDirectory, "rev-parse", "HEAD").Output()
+	recorded, err := PinnedCompilerCommit(moduleDirectory, "HEAD")
 	if err != nil {
-		return compilerPin{}, fmt.Errorf("reading the pinned compiler commit: %w", err)
+		return compilerPin{}, err
 	}
 
-	commit := strings.TrimSpace(string(output))
-	if commit == "" {
-		return compilerPin{}, fmt.Errorf("the pinned compiler commit came back empty")
+	checkedOut, err := checkedOutCompilerCommit(moduleDirectory)
+	if err != nil {
+		return compilerPin{}, err
 	}
 
-	return compilerPin{Commit: commit, Upstream: readCompilerUpstream(submoduleDirectory)}, nil
+	if checkedOut != recorded {
+		return compilerPin{}, fmt.Errorf(
+			"the compiler at TypeScript is checked out at %s, and the commit being released pins %s.\nA release built this way ships a compiler no cohere commit names. Commit the new pin, or run `git submodule update TypeScript` to return to the recorded one",
+			checkedOut, recorded,
+		)
+	}
+
+	return compilerPin{Commit: recorded, Upstream: readCompilerUpstream(moduleDirectory)}, nil
 }
 
-// readCompilerUpstream names the repository the vendored compiler is checked out from.
+// PinnedCompilerCommit reads the vendored compiler's commit from a commit's tree. Exported because the
+// launcher builds from a commit too, and two readers of one gitlink would drift.
 //
-// A missing remote degrades to "unknown" rather than failing the release. The commit is the fact a
-// bug report needs most, and refusing to build because a submodule has no configured origin would
-// trade a complete release for a slightly better label.
-func readCompilerUpstream(submoduleDirectory string) string {
-	output, err := exec.Command("git", "-C", submoduleDirectory, "remote", "get-url", "origin").Output()
+// The gitlink recorded in the commit is the pin. The submodule's own HEAD is what the working tree
+// has checked out, and it differs exactly when someone has moved it without committing.
+func PinnedCompilerCommit(moduleDirectory string, commit string) (string, error) {
+	command := exec.Command("git", "-C", moduleDirectory, "ls-tree", commit, "TypeScript")
+	var standardError bytes.Buffer
+	command.Stderr = &standardError
+	output, err := command.Output()
+	if err != nil {
+		return "", fmt.Errorf("reading the compiler pin from %s: %w: %s", ShortCommit(commit), err, strings.TrimSpace(standardError.String()))
+	}
+	// "160000 commit <sha>\tTypeScript" for a submodule. Anything else means the commit does not pin
+	// a compiler at all, and building would pick one up from somewhere unnamed.
+	fields := strings.Fields(string(output))
+	if len(fields) < 3 || fields[0] != "160000" || fields[1] != "commit" {
+		return "", fmt.Errorf("commit %s does not pin the vendored compiler as a submodule at TypeScript (ls-tree printed %q)",
+			ShortCommit(commit), strings.TrimSpace(string(output)))
+	}
+	return fields[2], nil
+}
+
+// checkedOutCompilerCommit reads the commit the compiler's checkout is at.
+//
+// The checkout has to be a repository of its own first. A submodule that was never initialized is an
+// empty directory, and `git -C` from an empty directory walks up and answers with cohere's own HEAD,
+// which would be reported as a moved compiler naming a commit that is not a compiler at all.
+func checkedOutCompilerCommit(moduleDirectory string) (string, error) {
+	submoduleDirectory := filepath.Join(moduleDirectory, "TypeScript")
+
+	notCheckedOut := fmt.Errorf("the compiler at %s is not checked out. Run `git submodule update --init TypeScript`", submoduleDirectory)
+	output, err := exec.Command("git", "-C", submoduleDirectory, "rev-parse", "--show-toplevel").Output()
+	if err != nil {
+		return "", notCheckedOut
+	}
+	topLevel, err := filepath.EvalSymlinks(strings.TrimSpace(string(output)))
+	if err != nil {
+		return "", notCheckedOut
+	}
+	// Absolute before resolving, because git answers with an absolute path and EvalSymlinks keeps a
+	// relative one relative. Without it a module named as "." reads as never checked out.
+	expected, err := filepath.Abs(submoduleDirectory)
+	if err == nil {
+		expected, err = filepath.EvalSymlinks(expected)
+	}
+	if err != nil || topLevel != expected {
+		return "", notCheckedOut
+	}
+
+	output, err = exec.Command("git", "-C", submoduleDirectory, "rev-parse", "HEAD").Output()
+	if err != nil {
+		return "", fmt.Errorf("reading the checked-out compiler commit: %w", err)
+	}
+	commit := strings.TrimSpace(string(output))
+	if commit == "" {
+		return "", fmt.Errorf("the checked-out compiler commit came back empty")
+	}
+	return commit, nil
+}
+
+// readCompilerUpstream names the compiler's repository from the `.gitmodules` HEAD commits.
+//
+// The committed file and not the submodule's `origin` remote, which is local configuration no commit
+// records. The pin moved to the fork in a commit, and a checkout cloned before that still has an
+// origin pointing at Microsoft until someone runs `git submodule sync` by hand, so reading the remote
+// stamps a repository beside a commit that repository does not contain.
+//
+// A file that does not say degrades to "unknown" rather than failing the release. The commit is the
+// fact a bug report needs most, and it was already read from the commit and checked above.
+func readCompilerUpstream(moduleDirectory string) string {
+	output, err := exec.Command("git", "-C", moduleDirectory, "show", "HEAD:.gitmodules").Output()
 	if err != nil {
 		return "unknown"
 	}
+	return CompilerUpstreamFromGitmodules(string(output))
+}
 
-	return NormalizeUpstream(string(output))
+// CompilerUpstreamFromGitmodules names the compiler's repository, as "owner/name", from the contents of
+// a `.gitmodules`, or "unknown" when it does not say. Exported because the launcher reads the same file
+// from a snapshot, and two parsers of one file would drift.
+//
+// Sections are `[submodule "<name>"]`, each with `path` and `url`. The one whose path is the compiler's
+// directory is the compiler, whatever it is named.
+func CompilerUpstreamFromGitmodules(contents string) string {
+	path, url := "", ""
+	found := ""
+	flush := func() {
+		if path == "TypeScript" && url != "" {
+			found = url
+		}
+		path, url = "", ""
+	}
+	for line := range strings.SplitSeq(contents, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "[") {
+			flush()
+			continue
+		}
+		key, value, isSetting := strings.Cut(line, "=")
+		if !isSetting {
+			continue
+		}
+		value = strings.Trim(strings.TrimSpace(value), `"`)
+		switch strings.TrimSpace(key) {
+		case "path":
+			path = strings.TrimSuffix(value, "/")
+		case "url":
+			url = value
+		}
+	}
+	flush()
+	return NormalizeUpstream(found)
 }
 
 // NormalizeUpstream reduces a git remote url to "owner/name". Exported because the launcher names the

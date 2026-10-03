@@ -88,13 +88,14 @@ func TestReleaseRefusesWhenGitCannotTell(t *testing.T) {
 
 // TestBuildRefusesBeforeTheMinimum proves Build calls the check, which the tests above cannot: they
 // drive requireAncestor directly and would pass with the call deleted from Build. A repository that
-// never contained MinimumReleaseCommit must be refused before anything is compiled.
+// never contained MinimumReleaseCommit must be refused before anything is compiled. It pins a compiler
+// correctly, because Build reads the pin first and would otherwise refuse on that instead.
 func TestBuildRefusesBeforeTheMinimum(t *testing.T) {
 	t.Parallel()
 
-	directory, _, _ := repositoryWithSideCommit(t)
+	fixture := moduleWithCompiler(t)
 
-	_, err := Build(Options{Version: "1.0.0", ModuleDirectory: directory, OutputDirectory: t.TempDir()})
+	_, err := Build(Options{Version: "1.0.0", ModuleDirectory: fixture.Module, OutputDirectory: t.TempDir()})
 	if err == nil {
 		t.Fatal("Build released from a repository that never contained the minimum commit")
 	}
