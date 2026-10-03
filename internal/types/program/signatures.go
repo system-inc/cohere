@@ -5,12 +5,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/incremental"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/zeebo/xxh3"
 )
@@ -38,10 +40,16 @@ import (
 // declarations, and 128 of 164 type-aware rules can reach a declaration, measured 2026-10-02.
 //
 // So a file's shape is its signature and its Syntax: the hash of its text with every function body cut
-// out. Modifiers, annotations, initializers, parameters, decorators and comments outside bodies are all
-// in it, so a rule reading any of them off an imported declaration sees a change. What neither half
-// covers is a function body's own text, and only a rule that reads into an imported function's body
-// needs more than the shape. See SignatureFingerprints.
+// out. Modifiers, annotations, initializers, parameters, decorators, JSDoc and pragma comments outside
+// bodies are all in it, so a rule reading any of them off an imported declaration sees a change. What
+// neither half covers is a function body's own text, and only a rule that reads into an imported
+// function's body needs more than the shape. See SignatureFingerprints.
+//
+// Whitespace and plain comments are not in it. A rule can reach a plain comment in another file only by
+// reading that file's text, which the guard counts as reading into a body (TestRulesClaimShapesOnlyWhere
+// TheScanAllowsIt), and positions were never in the shape, since a body edit moves every declaration below
+// it. Keeping them made a comment appended to a file look like an export edit, and every type-aware rule
+// ran again on every importer (#zqsdzbq, found by @system_cohere).
 
 // SignatureEntry is one file's recorded shape, with the version of the bytes it was computed from.
 type SignatureEntry struct {
@@ -68,7 +76,10 @@ func (g *Graph) Signatures(ctx context.Context, previous map[string]SignatureEnt
 	for _, sourceFile := range projectFiles {
 		version := FileVersion(sourceFile.Text())
 		if recorded, found := previous[sourceFile.FileName()]; found && recorded.Version == version && recorded.Signature != "" {
-			if recorded.Syntax == "" {
+			// A syntax of another definition is recomputed rather than carried: kept, it would differ from the
+			// next edit's and move the shape once for nothing. A syntax that is the version stands for a file
+			// whose whole text is its shape, and stays.
+			if recorded.Syntax == "" || recorded.Syntax != recorded.Version && !strings.HasPrefix(recorded.Syntax, syntaxDefinition) {
 				recorded.Syntax = elidedBodiesVersion(sourceFile)
 			}
 			signatures[sourceFile.FileName()] = recorded
@@ -118,13 +129,38 @@ func (g *Graph) Signatures(ctx context.Context, previous map[string]SignatureEnt
 	return signatures, len(stale)
 }
 
+// syntaxDefinition prefixes every syntax elidedBodiesVersion computes, and moves when what it covers does.
+// 2: whitespace and plain comments outside bodies are left out.
+const syntaxDefinition = "syntax2:"
+
 // elidedBodiesVersion is the version of a file's text with the body of every function, method, accessor,
-// constructor, arrow function and class static block cut out, outermost first. An edit inside a body
+// constructor, arrow function and class static block cut out, outermost first, and with the whitespace and
+// plain comments between tokens left out. An edit inside a body, or to a plain comment or a blank line,
 // leaves it unchanged; an edit anywhere else changes it.
+//
+// Trivia is found from the parse, never by scanning the text on its own: each node's leading trivia runs
+// from its full start to its first token, which the parser fixed, so a regular expression or a string
+// holding "//" cannot be mistaken for a comment. Trivia between tokens that start no node, before a closing
+// brace say, is kept, which can only make the shape move more often.
 func elidedBodiesVersion(sourceFile *ast.SourceFile) string {
 	text := sourceFile.Text()
-	var elided strings.Builder
-	kept := 0
+	type cut struct {
+		start, end  int
+		replacement string
+	}
+	var cuts []cut
+	triviaAt := map[int]bool{}
+	noteTrivia := func(position int) {
+		if triviaAt[position] {
+			return
+		}
+		triviaAt[position] = true
+		tokenStart := scanner.SkipTrivia(text, position)
+		if tokenStart <= position || tokenStart > len(text) {
+			return
+		}
+		cuts = append(cuts, cut{position, tokenStart, keptTrivia(text, position, tokenStart)})
+	}
 	var visit func(node *ast.Node) bool
 	visit = func(node *ast.Node) bool {
 		if ast.IsFunctionLikeDeclaration(node) || ast.IsClassStaticBlockDeclaration(node) {
@@ -133,18 +169,109 @@ func elidedBodiesVersion(sourceFile *ast.SourceFile) string {
 				// brace is cut with the body, and an edit to it is as invisible to the shape as one inside.
 				// No rule reads such a comment off an imported declaration; one that did would need the
 				// content fingerprint anyway.
-				elided.WriteString(text[kept:body.Pos()])
-				elided.WriteString("{}")
-				kept = body.End()
+				noteTrivia(node.Pos())
+				cuts = append(cuts, cut{body.Pos(), body.End(), "{}"})
+				triviaAt[body.Pos()] = true
+				node.ForEachChild(func(child *ast.Node) bool {
+					if child.End() <= body.Pos() {
+						visit(child)
+					}
+					return false
+				})
 				return false
 			}
 		}
+		noteTrivia(node.Pos())
 		node.ForEachChild(visit)
 		return false
 	}
 	sourceFile.AsNode().ForEachChild(visit)
+
+	sort.Slice(cuts, func(first, second int) bool { return cuts[first].start < cuts[second].start })
+	var elided strings.Builder
+	kept := 0
+	for _, each := range cuts {
+		if each.start < kept {
+			// Inside a range already cut, which only a body can be: its trivia went with it.
+			continue
+		}
+		elided.WriteString(text[kept:each.start])
+		elided.WriteString(each.replacement)
+		kept = each.end
+	}
 	elided.WriteString(text[kept:])
-	return FileVersion(elided.String())
+	return syntaxDefinition + FileVersion(elided.String())
+}
+
+// keptTrivia is what a stretch of trivia contributes to the syntax: the comments a rule or the compiler can
+// read without the text, JSDoc and pragmas, and one separator so two tokens never run together. The
+// separator is a line break when the stretch held one, since a line break can decide how a statement ends,
+// and a space otherwise; at the start or the end of the file, with no token on one side, it is nothing. A
+// stretch holding anything but whitespace and comments, a conflict marker or a shebang, is kept whole.
+//
+// The stretch is walked here rather than through the scanner's comment ranges, which follow the language's
+// convention that a comment on the same line as the token before it belongs to that token, and so never
+// list it. The stretch is known to be trivia, from the parse, so walking it alone is safe.
+func keptTrivia(text string, start int, end int) string {
+	var comments strings.Builder
+	lineBreak := false
+	for position := start; position < end; {
+		rest := text[position:end]
+		switch {
+		case rest[0] == ' ' || rest[0] == '\t' || rest[0] == '\v' || rest[0] == '\f':
+			position++
+		case rest[0] == '\n' || rest[0] == '\r':
+			lineBreak = true
+			position++
+		case strings.HasPrefix(rest, "//"):
+			length := strings.IndexAny(rest, "\r\n")
+			if length < 0 {
+				length = len(rest)
+			}
+			if comment := rest[:length]; isReadableComment(comment) {
+				comments.WriteString(comment)
+				comments.WriteString("\n")
+			}
+			position += length
+		case strings.HasPrefix(rest, "/*"):
+			closing := strings.Index(rest[2:], "*/")
+			if closing < 0 {
+				return text[start:end]
+			}
+			comment := rest[:closing+4]
+			if isReadableComment(comment) {
+				comments.WriteString(comment)
+				comments.WriteString("\n")
+			}
+			if strings.ContainsAny(comment, "\r\n") {
+				lineBreak = true
+			}
+			position += len(comment)
+		default:
+			return text[start:end]
+		}
+	}
+	separator := " "
+	switch {
+	case start == 0 || end == len(text):
+		separator = ""
+	case lineBreak:
+		separator = "\n"
+	}
+	return separator + comments.String()
+}
+
+// isReadableComment reports a comment something reads without scanning text: JSDoc, which the parser attaches
+// to declarations, and the pragmas and directives the compiler acts on.
+func isReadableComment(comment string) bool {
+	switch {
+	case strings.HasPrefix(comment, "/**") && comment != "/**/":
+		return true
+	case strings.HasPrefix(comment, "///"):
+		return true
+	}
+	rest := strings.TrimLeft(strings.TrimPrefix(strings.TrimPrefix(comment, "//"), "/*"), " \t*")
+	return strings.HasPrefix(rest, "@") || strings.HasPrefix(rest, "#")
 }
 
 // SeedSignatures returns previous with an entry added for every project file it lacks, taken from the

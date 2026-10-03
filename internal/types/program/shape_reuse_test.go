@@ -187,3 +187,43 @@ func TestShapeKeyedRulesWithoutShapesFallBackToContents(t *testing.T) {
 		t.Error("without shapes, a shape-keyed rule replayed on an importer after its dependency's bytes changed")
 	}
 }
+
+// A comment or a blank line added to a dependency, anywhere outside a body, leaves its importers' shape-keyed
+// findings replayed: no rule can read a plain comment off an imported declaration without reading the file's
+// text, which keeps a rule on Contents (#zqsdzbq).
+func TestACommentEditReplaysShapeKeyedFindingsOnImporters(t *testing.T) {
+	for name, text := range map[string]string{
+		"appended":          "export function value(): string {\n  return \"1\";\n}\n// bench edit 1\n",
+		"before the export": "// a note\n\nexport function value(): string {\n  return \"1\";\n}\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := shapeFixture(t)
+			counter := &countingRule{ran: map[string]int{}}
+			typeAware := typeAwareRule(t)
+			typeAware.TypeReach = rule.TypeReachShapes
+			rules := append(findingsReuseRules(t), counter.wrap(typeAware))
+
+			before, recorded, shapes := shapeWalk(t, root, rules, nil, nil)
+			if len(before.Diagnostics) == 0 {
+				t.Fatal("consumer.ts produced no finding, so a replay of it would prove nothing")
+			}
+			if err := os.WriteFile(filepath.Join(root, "lib.ts"), []byte(text), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			counter.ran = map[string]int{}
+			after, _, _ := shapeWalk(t, root, rules, recorded, shapes)
+			ran := counter.snapshot()
+			truth := plainWalk(t, root, rules)
+			if !reflect.DeepEqual(diagnosticKeys(after.Diagnostics), diagnosticKeys(truth.Diagnostics)) {
+				t.Fatalf("findings after a comment edit differ from an uncached walk:\n cached %v\n truth  %v",
+					diagnosticKeys(after.Diagnostics), diagnosticKeys(truth.Diagnostics))
+			}
+			if ran["consumer.ts"] > 0 || after.ShapeKeyedRerun != 0 {
+				t.Errorf("a comment edit to lib.ts re-ran the shape-keyed rule on its importer (ShapeKeyedRerun %d)", after.ShapeKeyedRerun)
+			}
+			if ran["lib.ts"] == 0 {
+				t.Error("the edited file itself was not re-walked")
+			}
+		})
+	}
+}
