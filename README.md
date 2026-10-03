@@ -79,7 +79,13 @@ The full reference, every key with an example, is [schema/CohereSettings.md](sch
 It is generated from the loader itself, along with two JSON schemas an editor can validate against
 through a `"$schema"` key: [schema/CohereSettings.schema.json](schema/CohereSettings.schema.json) for a
 project's file and [schema/NexusCohereSettings.schema.json](schema/NexusCohereSettings.schema.json) for
-the Nexus tier.
+the Nexus tier. Both ship in the package, so the path works offline and matches the installed cohere:
+
+```json
+{
+    "$schema": "./node_modules/@system-inc/cohere/schema/CohereSettings.schema.json"
+}
+```
 
 `cohere --rules` lists every rule cohere implements for your project's language, and
 `cohere --rules-enabled` lists the ones your settings turn on for one file (`index.ts` at the project

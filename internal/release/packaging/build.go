@@ -2,6 +2,7 @@ package release
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -315,7 +316,47 @@ func buildDispatcherPackage(options Options) (StagedPackage, error) {
 		return StagedPackage{}, fmt.Errorf("making the dispatcher launcher executable: %w", err)
 	}
 
+	if err := stageSettingsSchemas(options.ModuleDirectory, directory); err != nil {
+		return StagedPackage{}, err
+	}
+
 	return StagedPackage{Name: DispatcherPackageName, Directory: directory}, nil
+}
+
+// SchemaDirectoryName is where the settings schemas sit, in the module and in the dispatcher package
+// alike, so a project names them as ./node_modules/@system-inc/cohere/schema/<file>.
+const SchemaDirectoryName = "schema"
+
+// SettingsSchemaFileNames are the JSON schemas the dispatcher package ships, one per settings tier.
+// They are generated from the loader (internal/settingsschema) and committed, and a test there fails when
+// they drift from it, so the release copies the committed files rather than generating its own.
+var SettingsSchemaFileNames = []string{"CohereSettings.schema.json", "NexusCohereSettings.schema.json"}
+
+// stageSettingsSchemas copies the settings schemas into the dispatcher package.
+//
+// The dispatcher and not a platform package, because the schema is the same on every platform and
+// every install has exactly one dispatcher. A schema that is missing, empty or not JSON stops the
+// release: a "$schema" path that resolves to nothing validates nothing, and an editor shows no error for
+// that, so it would read as a settings file with no mistakes in it.
+func stageSettingsSchemas(moduleDirectory string, packageDirectory string) error {
+	if err := os.MkdirAll(filepath.Join(packageDirectory, SchemaDirectoryName), 0o755); err != nil {
+		return fmt.Errorf("creating the dispatcher's schema directory: %w", err)
+	}
+	for _, name := range SettingsSchemaFileNames {
+		source := filepath.Join(moduleDirectory, SchemaDirectoryName, name)
+		contents, err := os.ReadFile(source)
+		if err != nil {
+			return fmt.Errorf("reading the settings schema the dispatcher ships: %w", err)
+		}
+		var schema map[string]any
+		if err := json.Unmarshal(contents, &schema); err != nil || len(schema) == 0 {
+			return fmt.Errorf("%s is not a JSON schema (%v), so the dispatcher would ship a $schema target that validates nothing", source, err)
+		}
+		if err := os.WriteFile(filepath.Join(packageDirectory, SchemaDirectoryName, name), contents, 0o644); err != nil {
+			return fmt.Errorf("staging the settings schema %s: %w", name, err)
+		}
+	}
+	return nil
 }
 
 // compile cross-compiles one target, stamping the provenance in.

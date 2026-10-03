@@ -2,8 +2,8 @@
 
 // The extension's gate in a real VS Code, from its .vsix, in a profile with nothing else in it.
 //
-//     node test-vscode/run.js <path.vsix> <project folder> <cohere binary>
-//     node test-vscode/run.js dist/cohere-1.0.0.vsix ~/Projects/ahra ~/.local/bin/cohere
+//     node test-vscode/run.js <path.vsix> <project folder> <cohere binary> [<project with cohere installed>]
+//     node test-vscode/run.js dist/cohere-1.0.0.vsix ~/Projects/ahra ~/.local/bin/cohere /tmp/installed
 //
 // Two cases, each in a fresh profile: the user data and extensions directories are new and empty, the
 // .vsix is installed with VS Code's own `--install-extension`, and the only settings are the two the
@@ -13,6 +13,8 @@
 //   present  in <project folder>, where cohere is found: a save must write what the gate writes.
 //   absent   in an empty directory, with PATH reduced to the system's and no COHERE_BINARY: the save
 //            must leave the file as typed.
+//   schema   when the fourth argument is given, a project with @system-inc/cohere installed from its npm
+//            package: a CohereSettings.json naming the installed schema must have a misspelled key flagged.
 //
 // macOS only, with VS Code in /Applications. It opens visible windows while it runs.
 
@@ -25,7 +27,7 @@ const application = '/Applications/Visual Studio Code.app';
 const cli = NodePath.join(application, 'Contents', 'Resources', 'app', 'bin', 'code');
 const electron = NodePath.join(application, 'Contents', 'MacOS', 'Code');
 
-const [vsix, projectFolder, cohereBinary] = process.argv.slice(2).map(function(argument) {
+const [vsix, projectFolder, cohereBinary, installedProject] = process.argv.slice(2).map(function(argument) {
     return NodePath.resolve(argument);
 });
 if(cohereBinary === undefined) {
@@ -100,4 +102,5 @@ const withoutCohere = {
 
 const present = runCase('present', projectFolder, withCohere);
 const absent = runCase('absent', empty, withoutCohere);
-process.exit(present && absent ? 0 : 1);
+const schema = installedProject === undefined ? true : runCase('schema', installedProject, withoutCohere);
+process.exit(present && absent && schema ? 0 : 1);
