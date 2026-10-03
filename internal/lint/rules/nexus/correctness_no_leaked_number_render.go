@@ -99,6 +99,8 @@ var CorrectnessNoLeakedNumberRender = rule.Rule{
 	// The whole rule is a question about the operand's type; without the checker it would be
 	// eslint-plugin-react's untyped rule, declined at 428.
 	NeedsTypeChecker: true,
+	// The rule asks only for the operand's type, never into an imported body.
+	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {

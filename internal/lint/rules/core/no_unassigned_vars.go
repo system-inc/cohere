@@ -97,6 +97,8 @@ var NoUnassignedVars = rule.Rule{
 	// See the doc above: the discrimination is which binding a write names, and the shape that
 	// needs it is a shadowed redeclaration of the same kind.
 	NeedsTypeChecker: true,
+	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

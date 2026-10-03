@@ -163,6 +163,8 @@ var NoLoopFunc = rule.Rule{
 	// The whole discrimination is name resolution. Four clean cases write a name spelled exactly
 	// like an unsafe one and differ only in what it binds to, so a syntactic port reports them.
 	NeedsTypeChecker: true,
+	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Recorded across the file, because a skipped immediately-invoked function has to stay

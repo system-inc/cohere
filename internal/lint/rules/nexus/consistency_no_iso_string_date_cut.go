@@ -93,6 +93,10 @@ var ConsistencyNoIsoStringDateCut = rule.Rule{
 	// Compiler options and the default library, through type_checking's default-library test.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
+	// The rule follows a `const` only in this file, and of an imported member reads only the interface
+	// it is declared on, which no function body holds, so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
+
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil || ctx.Program == nil {
 			return nil

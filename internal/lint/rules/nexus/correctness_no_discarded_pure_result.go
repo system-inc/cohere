@@ -83,6 +83,9 @@ var CorrectnessNoDiscardedPureResult = rule.Rule{
 	// Whether a declaration is in the default library, through type_checking.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
+	// The rule reads types and the default library's declarations, never an imported body.
+	TypeReach: rule.TypeReachShapes,
+
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {
 			return nil

@@ -131,6 +131,8 @@ var NoConstAssign = rule.Rule{
 	// See the doc above: upstream's shadow cases are textually identical to failing ones and differ
 	// only in what the name resolves to.
 	NeedsTypeChecker: true,
+	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

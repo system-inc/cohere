@@ -132,6 +132,8 @@ var NoShadowRestrictedNames = rule.Rule{
 	// See the doc above: the `undefined` carve-out has to know whether a later write binds to the
 	// declaration being judged, and no bounded walk answers that.
 	NeedsTypeChecker: true,
+	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings := NoShadowRestrictedNamesOptions{}

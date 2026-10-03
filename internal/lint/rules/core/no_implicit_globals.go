@@ -120,6 +120,9 @@ var NoImplicitGlobals = rule.Rule{
 	// The leak half asks resolution whether an assignment target was ever declared, which is a
 	// question about the whole program rather than about this file's syntax.
 	NeedsTypeChecker: true,
+	// Asks only whether a name resolves to any symbol, never reading a declaration, and no function
+	// body can declare a name another file sees, so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoImplicitGlobalsSettings](options)

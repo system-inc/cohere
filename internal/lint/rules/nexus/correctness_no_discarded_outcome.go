@@ -109,6 +109,10 @@ var CorrectnessNoDiscardedOutcome = rule.Rule{
 	// says whose outcome it is.
 	NeedsTypeChecker: true,
 
+	// The rule reads the call's type and the top-level type alias each arm is declared in, never a
+	// body, so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
+
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.TypeChecker == nil {
 			return nil
