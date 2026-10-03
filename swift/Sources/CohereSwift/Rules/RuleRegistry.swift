@@ -13,7 +13,6 @@ public enum RuleRegistry {
         NoForceTry(),
         NoForceCast(),
         NoImplicitlyUnwrappedOptional(),
-        NoLongLineComment(),
         OneTypePerFile(),
         FileNamedForType(),
         NoPrint(),

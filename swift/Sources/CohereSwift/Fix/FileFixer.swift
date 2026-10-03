@@ -5,8 +5,8 @@ import SwiftSyntax
  Runs every enabled rule that proposes fixes over one file, applies the fixes, parses the result, and goes
  again until nothing more is proposed or the pass limit is reached.
 
- Passes repeat because one fix can expose another: folding a comment run can bring the next run into
- the same column. The limit exists because two fixers that undo each other would otherwise loop forever.
+ Passes repeat because one fix can expose another: the rewritten text can match a rule the old text did
+ not. The limit exists because two fixers that undo each other would otherwise loop forever.
  A file that still has fixes at the limit is not hidden: its remaining findings surface in lint like any
  other finding.
 

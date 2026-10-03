@@ -129,7 +129,6 @@ public struct Pipeline {
             var refusals: [String: Int] = [:]
             var toFormat = parsed.files
             var fixerFindings: [String: [String: [FindingRecord]]] = [:]
-            var appliedByFile: [String: Int] = [:]
             if options.mutate {
                 let fixer = FileFixer(configuration: configuration, rules: fileRules, maximumPasses: options.fixPasses)
                 /* Each file is fixed on its own, so the files are fixed side by side; results are gathered back in input order. */
@@ -147,7 +146,6 @@ public struct Pipeline {
                 toFormat = zip(files, results).map { file, result in
                     guard let result else { return file }
                     fixesApplied += result.applied
-                    appliedByFile[file.url.path] = result.applied
                     refusals.merge(result.refusalsByReason, uniquingKeysWith: +)
                     if let found = result.findingsOfFinalText {
                         fixerFindings[file.url.path] = found
@@ -188,19 +186,6 @@ public struct Pipeline {
                 case let .failed(reason):
                     notFormatted["the formatter failed: \(reason)", default: 0] += 1
                     complete = false
-                }
-                /*
-                 A fix the formatter undid: the fixer changed the text and the formatter put it back. The rule and
-                 `.swift-format` disagree, so the file can never settle, and counting those fixes as applied would
-                 report progress on every run while nothing ever changes. Found on a copy of ahraos-macos under
-                 swift-format's default config, where `UseTripleSlashForDocumentationComments` turns the comment
-                 fixer's `/** */` back into `///`. They move to a refusal whose reason says why.
-                 */
-                if options.mutate, let original = originals[file.url.path], file.source != original, final == original,
-                    let undone = appliedByFile[file.url.path], undone > 0
-                {
-                    fixesApplied -= undone
-                    refusals[Self.undoneByFormatter, default: 0] += undone
                 }
                 /* The fixer walked exactly this text when the formatter left it as the fixer did, so its findings are lint's. */
                 if final == file.source, let found = fixerFindings[file.url.path] {
@@ -477,9 +462,6 @@ public struct Pipeline {
         let result = await SourceParser().parse(files)
         return Dictionary(result.files.map { ($0.targetName, $0) }, uniquingKeysWith: { first, _ in first })
     }
-
-    /* The refusal reason for fixes the formatter undid. */
-    public static let undoneByFormatter = "undone by the formatter: a rule and .swift-format disagree, so these files never settle"
 
     /*
      Where SwiftPM writes when the engine runs it: the project's own `.cache/cohere/swift`, beside the dispatcher's
