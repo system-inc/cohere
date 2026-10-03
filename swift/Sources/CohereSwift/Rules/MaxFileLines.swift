@@ -3,11 +3,11 @@ import Foundation
 /*
  A file holds at most 2,000 lines.
 
- Kirk's ruling (2026-10-03, #r3hfpe8), made with the loosening of one-type-per-file. Counting types never
- caught the file that is actually too big: a 2,426-line file passed, while a file with one type and a
- fifteen-line helper beside it failed. The size of the file is what a reader pays for, so it is checked on
- its own. A file past the limit has seams in it, and the repair is to split along them: an
- extension per concern (`Type+Purpose.swift`), or a helper type promoted to its own file.
+ Kirk's ruling (2026-10-03, #r3hfpe8). The size of a file is what a reader pays for, not how many types it
+ holds: a file with one type and a fifteen-line helper beside it is easy to hold, and a 2,426-line file with
+ one type is not. So size is checked on its own. A file past the limit has seams in it, and the repair is to
+ split along them: an extension per concern (`Type+Purpose.swift`), or a type of its own (the orbit camera
+ out of a 2,241-line viewport, for one).
 
  The threshold is Kirk's: 2,000. The line counts of every owned file in the two Swift repos on 2026-10-03
  (#r3hfpe8) put it in context. Of 1,469 files the median was about 100 lines; 141 were over 400 (SwiftLint's

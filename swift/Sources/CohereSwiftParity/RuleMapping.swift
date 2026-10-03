@@ -16,13 +16,10 @@ struct RuleMapping: Sendable {
     /*
      How two findings count as the same. Most rules point at a line. SwiftLint reports its whole-file rules
      once at line 1, so `file_name` can only be compared by which files it fires in; `file_length` reports at
-     the last line where max-file-lines reports at the first, so it too is compared by file. And
-     `one_declaration_per_file` flags every declaration after the first where cohere flags every one but the
-     file's own type, so the same file holds the same number of findings on different lines.
+     the last line where max-file-lines reports at the first, so it too is compared by file.
      */
     enum Comparison: Sendable {
         case line
-        case fileAndCount
         case file
     }
 
@@ -43,8 +40,6 @@ struct RuleMapping: Sendable {
         RuleMapping(incumbent: .swiftFormat, incumbentRule: "NeverUseImplicitlyUnwrappedOptionals", rules: ["cohere-swift/no-implicitly-unwrapped-optional"]),
         RuleMapping(incumbent: .swiftLint, incumbentRule: "fatal_error_message", rules: ["cohere-swift/fatal-error-message"]),
         RuleMapping(incumbent: .swiftLint, incumbentRule: "todo", rules: ["cohere-swift/no-todo-comment"]),
-        /* Since Kirk's ruling of 2026-10-03 (#r3hfpe8) cohere keeps a private helper or a struct or enum of at most 30 lines beside the file's type, so a SwiftLint-only file here is that ruling until shown otherwise. */
-        RuleMapping(incumbent: .swiftLint, incumbentRule: "one_declaration_per_file", rules: ["cohere-swift/one-type-per-file"], comparison: .fileAndCount),
         RuleMapping(incumbent: .swiftLint, incumbentRule: "file_name", rules: ["cohere-swift/file-named-for-type"], comparison: .file),
         RuleMapping(incumbent: .swiftLint, incumbentRule: "file_length", rules: ["cohere-swift/max-file-lines"], comparison: .file),
         RuleMapping(incumbent: .swiftFormat, incumbentRule: "AlwaysUseLowerCamelCase", rules: ["cohere-swift/require-lower-camel-case"]),

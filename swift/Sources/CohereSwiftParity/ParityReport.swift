@@ -11,13 +11,11 @@ struct ParityReport {
     var cohere: [RuleFinding]
     var other: [RuleFinding]
 
-    /* What the comparison keys on, per the mapping: a line, a file with its count, or only the file. */
+    /* What the comparison keys on, per the mapping: a line, or only the file. */
     private func keys(_ findings: [RuleFinding]) -> Set<String> {
         switch mapping.comparison {
         case .line:
             return Set(findings.map { "\($0.file):\($0.line)" })
-        case .fileAndCount:
-            return Set(Dictionary(grouping: findings, by: \.file).map { "\($0.key) (\($0.value.count))" })
         case .file:
             return Set(findings.map(\.file))
         }
