@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/types/program"
 )
 
 // designSystemRule reads the design system the way the Tailwind rules do, through DesignSystemFS: it flags
@@ -112,5 +113,55 @@ func TestDesignSystemRulesReplayUntilWhatTheDesignSystemReadChanges(t *testing.T
 				step.name, result.DesignSystemRerun)
 		}
 		recorded = next
+	}
+}
+
+// Another program loading its design system in the middle of this walk does not make this walk's read as
+// never loaded. If it did, this run's design-system findings would be recorded as independent of every
+// stylesheet, and the edit below would replay them stale (#35nqkwc, @system_cohere_lint's review).
+func TestAnotherProgramsDesignSystemDoesNotHideThisWalks(t *testing.T) {
+	root := writeProject(t, map[string]string{
+		"tsconfig.json": minimalConfig,
+		"theme.css":     "flag\n",
+		"a.ts":          "export const a = 1;\n",
+		"b.ts":          "export const b = 2;\n",
+	})
+	elsewhere := writeProject(t, map[string]string{"tsconfig.json": minimalConfig, "c.ts": "export const c = 3;\n"})
+	other, err := program.Build(program.Options{ConfigFileName: filepath.Join(elsewhere, "tsconfig.json")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	inner := designSystemRule(root)
+	interleaved := inner
+	interleaved.Run = func(ctx rule.Context, options any) rule.Listeners {
+		// A concurrent graph asking for its own design system after each time this walk asks for its own, so
+		// the last program to ask before the walk ends is never this one.
+		listeners := rule.Listeners{}
+		for kind, listener := range inner.Run(ctx, options) {
+			listeners[kind] = func(node *ast.Node) {
+				listener(node)
+				rule.ViewProgram(other.Program, nil, inner).DesignSystemFS()
+			}
+		}
+		return listeners
+	}
+	rules := []rule.Rule{interleaved}
+
+	_, recorded := walkAndRecord(t, root, rules, nil)
+	if recorded.DesignSystem == nil || len(recorded.DesignSystem.Reads) == 0 {
+		t.Fatalf("this walk's design system was recorded as never loaded: %+v", recorded.DesignSystem)
+	}
+	if err := os.WriteFile(filepath.Join(root, "theme.css"), []byte("plain\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result, _ := walkAndRecord(t, root, rules, recorded)
+	truth := plainWalk(t, root, rules)
+	if !reflect.DeepEqual(diagnosticKeys(result.Diagnostics), diagnosticKeys(truth.Diagnostics)) {
+		t.Errorf("a stylesheet edit replayed stale design-system findings:\n cached %v\n truth  %v",
+			diagnosticKeys(result.Diagnostics), diagnosticKeys(truth.Diagnostics))
+	}
+	if result.FilesReplayed == 0 || result.DesignSystemRerun != result.FilesReplayed {
+		t.Errorf("the design-system rules ran again on %d of %d replayed files after the stylesheet edit",
+			result.DesignSystemRerun, result.FilesReplayed)
 	}
 }
