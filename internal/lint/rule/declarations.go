@@ -36,14 +36,22 @@ func DeclarationsIn(sourceFile *ast.SourceFile, symbol *ast.Symbol) []*ast.Node 
 // declares. It answers about files and hands back no node, so a rule can ask it without reading another
 // file's syntax, which the type-reach guard trusts.
 func IsDeclaredOnlyInDeclarationFiles(symbol *ast.Symbol) bool {
-	if symbol == nil || len(symbol.Declarations) == 0 {
+	return symbol != nil && len(symbol.Declarations) > 0 && !IsDeclaredInASourceFile(symbol)
+}
+
+// IsDeclaredInASourceFile reports whether any declaration of symbol is in a source file rather than a
+// declaration file: something this program declares, where a symbol the checker made with no declaration
+// at all, like `undefined`, is not. It answers about files and hands back no node, which the type-reach
+// guard trusts.
+func IsDeclaredInASourceFile(symbol *ast.Symbol) bool {
+	if symbol == nil {
 		return false
 	}
 	for _, declaration := range symbol.Declarations {
 		sourceFile := ast.GetSourceFileOfNode(declaration)
 		if sourceFile == nil || !sourceFile.IsDeclarationFile {
-			return false
+			return true
 		}
 	}
-	return true
+	return false
 }

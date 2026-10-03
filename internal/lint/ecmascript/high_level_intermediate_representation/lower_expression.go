@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
 // lowerExpressionToPlace lowers an expression and returns the value it produces.
@@ -198,6 +199,15 @@ func (b *builder) lowerElementAccess(node *ast.Node) Place {
 	property := b.lowerExpressionToPlace(expression.ArgumentExpression)
 	optional := expression.QuestionDotToken != nil
 	return b.emit(&ComputedLoad{Object: object, Property: property, Optional: optional}, node)
+}
+
+// calleeModuleOrigin names the React export a callee is, through imports and re-exports in other files,
+// which rule.ExportNameIn reads within its imports' shapes.
+func (b *builder) calleeModuleOrigin(expression *ast.Node) ModuleExportOrigin {
+	if export := rule.ExportNameIn(b.typeChecker, expression, "react"); export != "" {
+		return ModuleExportOrigin{Module: "react", Export: export}
+	}
+	return ModuleExportOrigin{}
 }
 
 // lowerCallExpression lowers a call.

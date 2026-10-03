@@ -84,4 +84,10 @@ func TestIsDeclaredOnlyInDeclarationFilesTellsALibGlobalFromASourceBinding(t *te
 	if rule.IsDeclaredOnlyInDeclarationFiles(nil) {
 		t.Error("a nil symbol was taken for a global")
 	}
+	if !rule.IsDeclaredInASourceFile(shared) {
+		t.Error("an interface two source files declare was not recognised as declared in a source file")
+	}
+	if rule.IsDeclaredInASourceFile(global) || rule.IsDeclaredInASourceFile(nil) {
+		t.Error("parseInt, or a nil symbol, was taken for something a source file declares")
+	}
 }

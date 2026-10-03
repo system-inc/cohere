@@ -75,8 +75,93 @@ type typeReachScan struct {
 //
 //   - rule.DeclarationsIn filters to the file it is handed, and is trusted only when handed the rule's
 //     own ctx.SourceFile;
-//   - rule.IsDeclaredOnlyInDeclarationFiles answers a bool about which files declare a symbol.
-var ownFileDeclarationReaders = map[string]bool{"rule.DeclarationsIn": true, "rule.IsDeclaredOnlyInDeclarationFiles": true}
+//   - rule.IsDeclaredOnlyInDeclarationFiles and rule.IsDeclaredInASourceFile answer a bool about which
+//     files declare a symbol.
+var ownFileDeclarationReaders = map[string]bool{
+	"rule.DeclarationsIn":                   true,
+	"rule.IsDeclaredOnlyInDeclarationFiles": true,
+	"rule.IsDeclaredInASourceFile":          true,
+}
+
+// shapeReaders read other files' declarations, and only what a shape covers, and hand back no syntax at
+// all, so the scan does not follow into them either. Each holds that two ways, neither of them this scan's
+// trust: TestShapeReadersHandBackNoSyntax checks that no result can carry a node, a symbol or any other
+// compiler value a caller could descend from, and each reader panics if it reads into a function body in
+// another file, which its own tests drive both ways (#9bjjk4a):
+//
+//   - rule.ExportNameIn follows imports and re-exports through other files' export syntax to the export
+//     of a module an expression names, the React compiler lowering's callee origin;
+//   - rule.ImportBindingOf reads how a name is bound in its own file, the lowering's global loads.
+var shapeReaders = map[string]bool{"rule.ExportNameIn": true, "rule.ImportBindingOf": true}
+
+// A shape reader's answer is plain data. A result that could carry a compiler value would let a caller
+// take a node from another file and descend into its body, which is the read the scan exists to see, so
+// the trust in shapeReaders rests on this.
+func TestShapeReadersHandBackNoSyntax(t *testing.T) {
+	root, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := packages.Load(&packages.Config{Mode: packages.NeedName | packages.NeedTypes, Dir: root}, "./internal/lint/rule")
+	if err != nil || len(loaded) != 1 || len(loaded[0].Errors) > 0 {
+		t.Fatalf("loading the rule package: %v %v", err, loaded)
+	}
+	scope := loaded[0].Types.Scope()
+	for name := range shapeReaders {
+		function, ok := scope.Lookup(strings.TrimPrefix(name, "rule.")).(*types.Func)
+		if !ok {
+			t.Errorf("shapeReaders names %s, which is not a function in the rule package", name)
+			continue
+		}
+		results := function.Type().(*types.Signature).Results()
+		for index := range results.Len() {
+			if carried := carriesCompilerValue(results.At(index).Type(), map[types.Type]bool{}); carried != "" {
+				t.Errorf("%s hands back %s, which carries %s: a caller could descend from it into another file",
+					name, types.TypeString(results.At(index).Type(), nil), carried)
+			}
+		}
+	}
+}
+
+// carriesCompilerValue names the first compiler type subject can hold, through pointers, slices, arrays,
+// maps, channels, struct fields, functions and interfaces, or "" when it holds none.
+func carriesCompilerValue(subject types.Type, seen map[types.Type]bool) string {
+	// The shim's types are aliases of the compiler's, which only name their package once unaliased.
+	subject = types.Unalias(subject)
+	if seen[subject] {
+		return ""
+	}
+	seen[subject] = true
+	if named, ok := subject.(*types.Named); ok && named.Obj().Pkg() != nil &&
+		strings.Contains(named.Obj().Pkg().Path(), "TypeScript/tsc") {
+		return types.TypeString(subject, nil)
+	}
+	switch typed := subject.Underlying().(type) {
+	case *types.Pointer:
+		return carriesCompilerValue(typed.Elem(), seen)
+	case *types.Slice:
+		return carriesCompilerValue(typed.Elem(), seen)
+	case *types.Array:
+		return carriesCompilerValue(typed.Elem(), seen)
+	case *types.Chan:
+		return carriesCompilerValue(typed.Elem(), seen)
+	case *types.Map:
+		if carried := carriesCompilerValue(typed.Key(), seen); carried != "" {
+			return carried
+		}
+		return carriesCompilerValue(typed.Elem(), seen)
+	case *types.Struct:
+		for index := range typed.NumFields() {
+			if carried := carriesCompilerValue(typed.Field(index).Type(), seen); carried != "" {
+				return carried
+			}
+		}
+	case *types.Signature, *types.Interface:
+		// A function or an interface value can close over anything.
+		return types.TypeString(subject, nil)
+	}
+	return ""
+}
 
 // isImportedDeclarationField reports a symbol's own declaration fields, the nodes a symbol carries from
 // whichever file declared it. Matched on the receiver rather than the name: VariableDeclarationList and
@@ -252,7 +337,8 @@ func scanTypeReach(t *testing.T) typeReachScan {
 			case 3:
 				return true
 			}
-			if object.Pkg() != nil && ownFileDeclarationReaders[object.Pkg().Name()+"."+object.Name()] {
+			if object.Pkg() != nil && (ownFileDeclarationReaders[object.Pkg().Name()+"."+object.Name()] ||
+				shapeReaders[object.Pkg().Name()+"."+object.Name()]) {
 				return false
 			}
 			target, known := bodies[object]

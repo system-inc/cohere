@@ -564,17 +564,7 @@ func (unit *purityUnit) namesATrueGlobal(node *ast.Node) bool {
 	if !ast.IsIdentifier(identifier) {
 		return false
 	}
-	symbol := unit.ctx.TypeChecker.GetSymbolAtLocation(identifier)
-	if symbol == nil {
-		return true
-	}
-	for _, declaration := range symbol.Declarations {
-		declaringFile := ast.GetSourceFileOfNode(declaration)
-		if declaringFile == nil || !declaringFile.IsDeclarationFile {
-			return false
-		}
-	}
-	return true
+	return !rule.IsDeclaredInASourceFile(unit.ctx.TypeChecker.GetSymbolAtLocation(identifier))
 }
 
 // loadByName recovers a captured binding's state through its source name.
