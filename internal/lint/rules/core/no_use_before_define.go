@@ -341,6 +341,7 @@ var NoUseBeforeDefine = rule.Rule{
 // every identifier and resolve it. The set of (reference, binding) pairs considered is the same, and
 // ours is the only one available without a scope graph.
 func checkFileForUseBeforeDefine(ctx rule.Context, sourceFile *ast.Node, settings noUseBeforeDefineSettings) {
+	cycles := newUseBeforeDefineCycles(ctx)
 	var visit func(*ast.Node)
 	visit = func(current *ast.Node) {
 		if current == nil {
@@ -348,7 +349,7 @@ func checkFileForUseBeforeDefine(ctx rule.Context, sourceFile *ast.Node, setting
 		}
 
 		if current.Kind == ast.KindIdentifier {
-			checkIdentifierForUseBeforeDefine(ctx, current, settings)
+			checkIdentifierForUseBeforeDefine(ctx, current, settings, cycles)
 		}
 
 		current.ForEachChild(func(child *ast.Node) bool {
@@ -360,7 +361,9 @@ func checkFileForUseBeforeDefine(ctx rule.Context, sourceFile *ast.Node, setting
 }
 
 // checkIdentifierForUseBeforeDefine judges one identifier occurrence.
-func checkIdentifierForUseBeforeDefine(ctx rule.Context, identifier *ast.Node, settings noUseBeforeDefineSettings) {
+func checkIdentifierForUseBeforeDefine(
+	ctx rule.Context, identifier *ast.Node, settings noUseBeforeDefineSettings, cycles *useBeforeDefineCycles,
+) {
 	// A declaring name is not a reference to itself. Upstream gets this for free, because
 	// eslint-scope never puts a declaration into `scope.references` in the first place; walking
 	// identifiers instead means the exclusion has to be explicit, and without it every binding in
@@ -457,6 +460,12 @@ func checkIdentifierForUseBeforeDefine(ctx rule.Context, identifier *ast.Node, s
 	// type is erased, so it is never "evaluated during initialization" of anything, but it can still
 	// be written above its declaration.
 	if duringInitialization && !writtenAbove && isTypeReferencePosition(identifier) {
+		return
+	}
+
+	// A forward reference inside a cycle no ordering can remove, that cannot run before its target
+	// exists. See no_use_before_define_cycle.go.
+	if writtenAbove && !duringInitialization && cycles.exempts(identifier, declaration) {
 		return
 	}
 
