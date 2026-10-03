@@ -24,7 +24,7 @@ Run it from the project root, where `tsconfig.json` and `CohereSettings.json` li
 ```sh
 cohere                  # type-check and lint, and apply every available fix
 cohere --fix --format   # apply fixes and format, running no other phase
-cohere --lint           # run the lint rules only, without TypeScript's diagnostics
+cohere --lint           # report lint findings only: no fixes, no TypeScript diagnostics
 ```
 
 A bare `cohere` writes fixes to your files but does not format them; formatting runs only when you
@@ -32,13 +32,20 @@ pass `--format`. To see what would change without writing anything, add `--no-fi
 
 ## CohereSettings.json
 
-cohere reads `CohereSettings.json` at the project root. A minimal one:
+cohere reads `CohereSettings.json` at the project root. Formatting options live in a separate file
+the chain extends, `NexusCohereSettings.json`, so a minimal setup is two files:
 
 ```json
 {
-    "format": { "tabWidth": 4, "singleQuote": true, "printWidth": 120 },
+    "extends": "./NexusCohereSettings.json",
     "rules": { "no-debugger": "error" },
     "ignorePatterns": ["dist/**"]
+}
+```
+
+```json
+{
+    "format": { "tabWidth": 4, "singleQuote": true, "printWidth": 120 }
 }
 ```
 
@@ -53,13 +60,17 @@ The keys:
 - `ignorePatterns`: paths cohere never checks.
 - `departures`: for each rule this file sets differently from the file it extends, the reason why.
   cohere reports them, so a departure stays visible rather than becoming a quiet exception.
-- `format`: the formatter's options. It accepts `printWidth`, `tabWidth`, `useTabs`, `semi`,
+- `format`: the formatter's options. It belongs only in `NexusCohereSettings.json`, so every
+  project that extends it formats the same way; a `format` key in any other settings file is an
+  error that names the file. It accepts `printWidth`, `tabWidth`, `useTabs`, `semi`,
   `singleQuote`, `trailingComma`, `bracketSpacing`, `bracketSameLine`, `arrowParens` and
   `endOfLine`. An option outside that list is an error, not something silently ignored, and
-  `--format` refuses to run when neither this file nor anything it extends has a `format` block.
+  `--format` refuses to run when your settings do not extend a `NexusCohereSettings.json` holding a
+  `format` block. Linting and fixing need no such file.
 
-`cohere --rules` lists every rule the binary implements, and `cohere --rules-enabled` lists the ones
-your settings actually turn on.
+`cohere --rules` lists every rule cohere implements for your project's language, and
+`cohere --rules-enabled` lists the ones your settings turn on for one file (`index.ts` at the project
+root unless you name another).
 
 ## Flags
 
@@ -77,13 +88,13 @@ your settings actually turn on.
 | `--unused-deep` | also group the unused code into islands by what reaches what (implies `--unused`) |
 | `--directory PATH` | the project root (default: the nearest `tsconfig.json` or `Package.swift` above you) |
 | `--tsconfig PATH` | the tsconfig that defines the program (default: the nearest `tsconfig.json`) |
-| `--lint-config PATH` | the settings file (default: `CohereSettings.json` at the project root) |
+| `--lint-config PATH` | the settings file, relative to `--directory` if given, else to where you run it (default: `CohereSettings.json` at the project root) |
 | `--no-cache` | read and write no cache, so every phase computes from source |
 | `--stdin-filepath PATH` | with `--fix`, read one file from stdin and print the fixed text, writing nothing |
 | `--explain FILE` | report what every rule did on one file, and why it ran or did not |
-| `--print-config` | print each rule's resolved severity and options for a file, as JSON, and exit |
-| `--rules` | print the rules this binary implements, and exit |
-| `--rules-enabled` | print the rules your settings turn on, with severity, and exit |
+| `--print-config` | print each rule's resolved severity and options for one file (`index.ts` unless you name one), as JSON, and exit |
+| `--rules` | print the rules cohere implements for your project's language, and exit |
+| `--rules-enabled` | print the rules your settings turn on for one file (`index.ts` unless you name one), with severity, and exit |
 | `--coverage` | name every rule under the coverage fact that describes it, not only count them |
 | `--timing` | report what each rule cost, most expensive first |
 | `--single-threaded` | use one type checker instead of several |
