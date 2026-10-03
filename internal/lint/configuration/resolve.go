@@ -150,8 +150,16 @@ func (r Resolved) settingFor(ruleName string) (RuleSetting, bool) {
 // question: that report once tested the reverse direction, so after the 2026-10-02 rename it called
 // phi api's bare keys resolving while this function left all three rules unconfigured, and 152
 // findings disappeared with no warning.
+//
+// It is asked for every configured key against every rule not named exactly, for every file, so it
+// allocates nothing: building "/"+ruleName for each comparison was about 0.2s of CPU in a cold ahra run
+// (#zqsdzbq).
 func KeyReachesRule(key string, ruleName string) bool {
-	return key == ruleName || strings.HasSuffix(key, "/"+ruleName)
+	if key == ruleName {
+		return true
+	}
+	boundary := len(key) - len(ruleName) - 1
+	return boundary >= 0 && key[boundary] == '/' && key[boundary+1:] == ruleName
 }
 
 // Resolve computes the effective configuration for one file path.
