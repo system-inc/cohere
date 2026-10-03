@@ -73,6 +73,8 @@ import SwiftSyntax
  */
 public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
     public let name = "cohere-swift/consistency-no-iso-string-date-cut"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

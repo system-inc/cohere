@@ -38,6 +38,8 @@ import SwiftSyntax
  */
 public struct ConsistencyRequireMatchingFileName: FileRule {
     public let name = "cohere-swift/consistency-require-matching-file-name"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

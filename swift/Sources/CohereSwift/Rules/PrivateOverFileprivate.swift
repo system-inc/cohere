@@ -23,6 +23,8 @@ import SwiftSyntax
  */
 public struct PrivateOverFileprivate: FileRule {
     public let name = "cohere-swift/private-over-fileprivate"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "private_over_fileprivate"
 
     public init() {}
 

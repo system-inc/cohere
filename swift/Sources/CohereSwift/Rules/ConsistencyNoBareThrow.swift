@@ -62,6 +62,8 @@ import SwiftSyntax
  */
 public struct ConsistencyNoBareThrow: FileRule {
     public let name = "cohere-swift/consistency-no-bare-throw"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

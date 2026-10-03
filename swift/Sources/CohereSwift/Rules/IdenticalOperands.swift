@@ -36,6 +36,8 @@ import SwiftSyntax
  */
 public struct IdenticalOperands: FileRule {
     public let name = "cohere-swift/identical-operands"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "identical_operands"
 
     public init() {}
 

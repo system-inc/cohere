@@ -37,6 +37,8 @@ import Foundation
  */
 public struct ConsistencyNoUtilsFolder: FileRule {
     public let name = "cohere-swift/consistency-no-utils-folder"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

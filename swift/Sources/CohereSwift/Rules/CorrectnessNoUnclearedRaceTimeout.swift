@@ -72,6 +72,8 @@ import SwiftSyntax
  */
 public struct CorrectnessNoUnclearedRaceTimeout: FileRule {
     public let name = "cohere-swift/correctness-no-uncleared-race-timeout"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

@@ -38,6 +38,8 @@ import SwiftSyntax
  */
 public struct DuplicatedKeyInDictionaryLiteral: FileRule {
     public let name = "cohere-swift/duplicated-key-in-dictionary-literal"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "duplicated_key_in_dictionary_literal"
 
     public init() {}
 

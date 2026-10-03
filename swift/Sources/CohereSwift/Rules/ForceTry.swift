@@ -10,6 +10,8 @@ import SwiftSyntax
  */
 public struct ForceTry: FileRule {
     public let name = "cohere-swift/force-try"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "force_try"
 
     public init() {}
 

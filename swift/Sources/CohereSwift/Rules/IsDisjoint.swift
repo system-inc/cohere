@@ -35,6 +35,8 @@ import SwiftSyntax
  */
 public struct IsDisjoint: TypedFileRule {
     public let name = "cohere-swift/is-disjoint"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "is_disjoint"
 
     public init() {}
 

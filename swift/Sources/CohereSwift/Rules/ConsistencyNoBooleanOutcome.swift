@@ -57,6 +57,8 @@ import SwiftSyntax
  */
 public struct ConsistencyNoBooleanOutcome: FileRule {
     public let name = "cohere-swift/consistency-no-boolean-outcome"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

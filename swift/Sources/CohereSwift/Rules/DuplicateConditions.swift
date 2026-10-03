@@ -38,6 +38,8 @@ import SwiftSyntax
  */
 public struct DuplicateConditions: FileRule {
     public let name = "cohere-swift/duplicate-conditions"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "duplicate_conditions"
 
     public init() {}
 

@@ -23,6 +23,8 @@ import Foundation
  */
 public struct FileLength: FileRule {
     public let name = "cohere-swift/file-length"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "file_length"
 
     public static let maximumLines = 2_000
 

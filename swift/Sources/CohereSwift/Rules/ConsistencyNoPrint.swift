@@ -21,6 +21,8 @@ import SwiftSyntax
  */
 public struct ConsistencyNoPrint: FileRule {
     public let name = "cohere-swift/consistency-no-print"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

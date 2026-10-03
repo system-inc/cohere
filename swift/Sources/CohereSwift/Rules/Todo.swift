@@ -10,6 +10,8 @@ import SwiftSyntax
  */
 public struct Todo: FileRule {
     public let name = "cohere-swift/todo"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "todo"
 
     static let markers = ["TODO", "FIXME"]
 

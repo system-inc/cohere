@@ -11,6 +11,8 @@ import SwiftSyntax
  */
 public struct ImplicitlyUnwrappedOptional: FileRule {
     public let name = "cohere-swift/implicitly-unwrapped-optional"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "implicitly_unwrapped_optional"
 
     public init() {}
 

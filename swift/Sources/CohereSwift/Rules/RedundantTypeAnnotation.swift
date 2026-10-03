@@ -82,6 +82,8 @@ import SwiftSyntax
  */
 public struct RedundantTypeAnnotation: TypedFileRule {
     public let name = "cohere-swift/redundant-type-annotation"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "redundant_type_annotation"
 
     public init() {}
 

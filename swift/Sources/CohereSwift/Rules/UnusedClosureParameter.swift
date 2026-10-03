@@ -46,6 +46,8 @@ import SwiftSyntax
  */
 public struct UnusedClosureParameter: FileRule {
     public let name = "cohere-swift/unused-closure-parameter"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "unused_closure_parameter"
 
     public init() {}
 

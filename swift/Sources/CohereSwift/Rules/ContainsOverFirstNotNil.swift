@@ -39,6 +39,8 @@ import SwiftSyntax
  */
 public struct ContainsOverFirstNotNil: TypedFileRule {
     public let name = "cohere-swift/contains-over-first-not-nil"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "contains_over_first_not_nil"
 
     public init() {}
 

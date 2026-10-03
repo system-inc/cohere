@@ -23,6 +23,8 @@ import SwiftSyntax
  */
 public struct UnownedVariableCapture: FileRule {
     public let name = "cohere-swift/unowned-variable-capture"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "unowned_variable_capture"
 
     public init() {}
 

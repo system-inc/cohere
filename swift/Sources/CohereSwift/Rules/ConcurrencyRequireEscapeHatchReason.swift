@@ -14,6 +14,8 @@ import SwiftSyntax
  */
 public struct ConcurrencyRequireEscapeHatchReason: FileRule {
     public let name = "cohere-swift/concurrency-require-escape-hatch-reason"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

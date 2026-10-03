@@ -102,6 +102,8 @@ import SwiftSyntax
  */
 public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
     public let name = "cohere-swift/correctness-require-response-status-check"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

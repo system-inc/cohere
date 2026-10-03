@@ -65,6 +65,8 @@ import SwiftSyntax
  */
 public struct SortedFirstLast: TypedFileRule {
     public let name = "cohere-swift/sorted-first-last"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "sorted_first_last"
 
     public init() {}
 

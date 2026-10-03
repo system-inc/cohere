@@ -43,6 +43,8 @@ import SwiftSyntax
  */
 public struct ReduceInto: TypedFileRule {
     public let name = "cohere-swift/reduce-into"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "reduce_into"
 
     public init() {}
 

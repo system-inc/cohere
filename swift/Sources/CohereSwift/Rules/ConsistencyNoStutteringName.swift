@@ -51,6 +51,8 @@ import SwiftSyntax
  */
 public struct ConsistencyNoStutteringName: FileRule {
     public let name = "cohere-swift/consistency-no-stuttering-name"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     /*
      The words that count as saying nothing when they stutter: the Go rule's `defaultGenericNames`, kept short

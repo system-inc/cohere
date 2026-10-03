@@ -70,6 +70,8 @@ import SwiftSyntax
  */
 public struct ConsistencyNoHandRolledDelay: FileRule {
     public let name = "cohere-swift/consistency-no-hand-rolled-delay"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

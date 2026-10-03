@@ -14,6 +14,8 @@ import SwiftSyntax
  */
 public struct ForceCast: FileRule {
     public let name = "cohere-swift/force-cast"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "force_cast"
 
     public init() {}
 

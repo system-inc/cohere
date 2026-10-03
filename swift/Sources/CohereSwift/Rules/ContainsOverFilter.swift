@@ -40,6 +40,8 @@ import SwiftSyntax
  */
 public struct ContainsOverFilter: TypedFileRule {
     public let name = "cohere-swift/contains-over-filter"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "contains_over_filter_count"
 
     public init() {}
 

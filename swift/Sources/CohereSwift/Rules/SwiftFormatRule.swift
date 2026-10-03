@@ -17,17 +17,27 @@ import Foundation
  */
 public struct SwiftFormatRule: FileRule {
     public let name: String
+    /*
+     Declared per wrapped rule rather than implied by the wrapper: running swift-format's rule is how the
+     house checks a thing, and a house rule could be checked this way too.
+     */
+    public let origin: RuleOrigin
+    public let upstreamName: String?
     let incumbentRule: String
     let reason: String
 
-    public init(name: String, incumbentRule: String, reason: String) {
+    public init(name: String, origin: RuleOrigin, upstreamName: String?, incumbentRule: String, reason: String) {
         self.name = name
+        self.origin = origin
+        self.upstreamName = upstreamName
         self.incumbentRule = incumbentRule
         self.reason = reason
     }
 
     public static let requireLowerCamelCase = SwiftFormatRule(
         name: "cohere-swift/always-use-lower-camel-case",
+        origin: .swiftFormat,
+        upstreamName: "AlwaysUseLowerCamelCase",
         incumbentRule: "AlwaysUseLowerCamelCase",
         reason:
             "Swift spells values in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name is a word boundary camel case already marks.",
@@ -35,6 +45,8 @@ public struct SwiftFormatRule: FileRule {
 
     public static let noLeadingUnderscores = SwiftFormatRule(
         name: "cohere-swift/no-leading-underscores",
+        origin: .swiftFormat,
+        upstreamName: "NoLeadingUnderscores",
         incumbentRule: "NoLeadingUnderscores",
         reason:
             "A leading underscore is a convention for \"private\", and access control says that in a way the compiler checks.",

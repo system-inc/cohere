@@ -52,6 +52,8 @@ import SwiftSyntax
  */
 public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
     public let name = "cohere-swift/correctness-no-discarded-try-optional"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

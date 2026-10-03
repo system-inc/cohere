@@ -103,6 +103,8 @@ import SwiftSyntax
  */
 public struct ConcurrencyNoCheckThenWrite: TypedFileRule {
     public let name = "cohere-swift/concurrency-no-check-then-write"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

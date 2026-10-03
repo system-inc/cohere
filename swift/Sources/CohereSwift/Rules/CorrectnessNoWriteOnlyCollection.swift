@@ -93,6 +93,8 @@ import SwiftSyntax
  */
 public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
     public let name = "cohere-swift/correctness-no-write-only-collection"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

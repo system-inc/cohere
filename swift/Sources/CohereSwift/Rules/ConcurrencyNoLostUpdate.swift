@@ -103,6 +103,8 @@ import SwiftSyntax
  */
 public struct ConcurrencyNoLostUpdate: FileRule {
     public let name = "cohere-swift/concurrency-no-lost-update"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

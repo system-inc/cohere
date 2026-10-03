@@ -31,6 +31,8 @@ import SwiftSyntax
 public struct ConsistencyNoAbbreviatedIdentifier: FileRule {
     public static let ruleName = "cohere-swift/consistency-no-abbreviated-identifier"
     public let name = ruleName
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
     let vocabulary: AbbreviationVocabulary
 
     /* The vocabulary is handed in, loaded by the pipeline before anything is checked, never looked up here. */

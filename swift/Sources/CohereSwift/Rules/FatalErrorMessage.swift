@@ -10,6 +10,8 @@ import SwiftSyntax
  */
 public struct FatalErrorMessage: FileRule {
     public let name = "cohere-swift/fatal-error-message"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "fatal_error_message"
 
     static let failures: Set<String> = ["fatalError", "preconditionFailure", "assertionFailure"]
 

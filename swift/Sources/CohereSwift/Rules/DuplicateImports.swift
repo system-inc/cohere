@@ -30,6 +30,8 @@ import SwiftSyntax
  */
 public struct DuplicateImports: FileRule {
     public let name = "cohere-swift/duplicate-imports"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "duplicate_imports"
 
     public init() {}
 

@@ -57,6 +57,8 @@ import SwiftSyntax
  */
 public struct LegacyConstructors: FileRule {
     public let name = "cohere-swift/legacy-constructors"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "legacy_constructor"
 
     public init() {}
 

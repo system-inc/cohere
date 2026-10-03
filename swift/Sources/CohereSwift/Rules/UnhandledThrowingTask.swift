@@ -51,6 +51,8 @@ import SwiftSyntax
  */
 public struct UnhandledThrowingTask: TypedFileRule {
     public let name = "cohere-swift/unhandled-throwing-task"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "unhandled_throwing_task"
 
     public init() {}
 

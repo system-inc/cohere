@@ -82,6 +82,8 @@ import SwiftSyntax
  */
 public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
     public let name = "cohere-swift/security-no-interpolated-shell-command"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

@@ -21,6 +21,8 @@ import SwiftSyntax
  */
 public struct EmptyCount: TypedFileRule {
     public let name = "cohere-swift/empty-count"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "empty_count"
 
     public init() {}
 

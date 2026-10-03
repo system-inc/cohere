@@ -80,6 +80,8 @@ import SwiftSyntax
  */
 public struct ConsistencyNoPropertyAlias: FileRule {
     public let name = "cohere-swift/consistency-no-property-alias"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

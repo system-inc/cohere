@@ -43,6 +43,8 @@ import SwiftSyntax
  */
 public struct LastWhere: TypedFileRule {
     public let name = "cohere-swift/last-where"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "last_where"
 
     public init() {}
 

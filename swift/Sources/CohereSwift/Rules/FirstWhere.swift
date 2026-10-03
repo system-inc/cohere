@@ -43,6 +43,8 @@ import SwiftSyntax
  */
 public struct FirstWhere: TypedFileRule {
     public let name = "cohere-swift/first-where"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "first_where"
 
     public init() {}
 

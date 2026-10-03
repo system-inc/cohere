@@ -32,6 +32,8 @@ import SwiftSyntax
  */
 public struct UnusedOptionalBinding: FileRule {
     public let name = "cohere-swift/unused-optional-binding"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "unused_optional_binding"
 
     public init() {}
 

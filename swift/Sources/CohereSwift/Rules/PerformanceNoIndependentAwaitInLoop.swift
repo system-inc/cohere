@@ -107,6 +107,8 @@ import SwiftSyntax
  */
 public struct PerformanceNoIndependentAwaitInLoop: FileRule {
     public let name = "cohere-swift/performance-no-independent-await-in-loop"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

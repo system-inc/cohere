@@ -12,6 +12,12 @@ public protocol TypedFileRule: Sendable {
     /* `cohere-swift/<rule>`, the key a config uses and the tag a finding prints. */
     var name: String { get }
 
+    /* Whether the rule is our own or a port, and of which tool's check; see `RuleOrigin`. */
+    var origin: RuleOrigin { get }
+
+    /* The incumbent's own id for a port, spelled as that tool spells it, and nil for a house rule. */
+    var upstreamName: String? { get }
+
     /* Whether the file holds any syntax this rule could flag. False means the rule has nothing to say here, whatever the types. */
     func applies(to file: ParsedFile) -> Bool
 

@@ -13,6 +13,8 @@ import SwiftSyntax
  */
 public struct ToolchainRequireSwiftSixLanguageMode: PackageRule {
     public let name = "cohere-swift/toolchain-require-swift-6-language-mode"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

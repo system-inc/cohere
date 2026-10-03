@@ -61,6 +61,8 @@ import SwiftSyntax
  */
 public struct CorrectnessNoDefaultForOwnedEnum: TypedFileRule {
     public let name = "cohere-swift/correctness-no-default-for-owned-enum"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

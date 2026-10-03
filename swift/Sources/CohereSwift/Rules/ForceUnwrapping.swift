@@ -12,6 +12,8 @@ import SwiftSyntax
  */
 public struct ForceUnwrapping: FileRule {
     public let name = "cohere-swift/force-unwrapping"
+    public let origin = RuleOrigin.swiftLint
+    public let upstreamName: String? = "force_unwrapping"
 
     public init() {}
 

@@ -99,6 +99,8 @@ import SwiftSyntax
  */
 public struct SecurityNoInterpolatedSqlString: TypedFileRule {
     public let name = "cohere-swift/security-no-interpolated-sql-string"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 

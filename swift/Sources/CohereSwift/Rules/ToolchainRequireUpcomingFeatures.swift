@@ -24,6 +24,8 @@ import SwiftSyntax
  */
 public struct ToolchainRequireUpcomingFeatures: PackageRule {
     public let name = "cohere-swift/toolchain-require-upcoming-features"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     /* The features required, with why each matters, said in the finding. */
     static let required: [(feature: String, reason: String)] = [

@@ -17,6 +17,8 @@ import SwiftSyntax
  */
 public struct ToolchainRequireStrictMemorySafety: PackageRule {
     public let name = "cohere-swift/toolchain-require-strict-memory-safety"
+    public let origin = RuleOrigin.house
+    public let upstreamName: String? = nil
 
     public init() {}
 
