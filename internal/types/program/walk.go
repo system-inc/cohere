@@ -904,9 +904,13 @@ func dispatchFile(
 	// Built from `rules` rather than from listeningCounts: a rule that declined every file in this
 	// one still ran, and counting it as absent would call its directives unportable when they are
 	// simply satisfied.
+	//
+	// Keyed by the bare name, because that is what a directive is looked up by (see bareRuleName). A
+	// registered name carries its plugin (`@typescript-eslint/no-misused-spread`), so keying by it
+	// filed every dead directive for a prefixed rule as unported (#6dc4f7k).
 	ranRule := make(map[string]bool, len(rules))
 	for _, subject := range rules {
-		ranRule[subject.Name] = true
+		ranRule[bareRuleName(subject.Name)] = true
 	}
 
 	for _, containment := range containments {
@@ -981,9 +985,9 @@ func namesOnlyOffRules(directive *suppression.Directive, resolution configuratio
 
 // bareRuleName drops a plugin prefix, so `structure/no-x` and `no-x` compare equal.
 //
-// Directives are written against the gate's names, which carry the plugin that owns the rule, while
-// the registry holds the rule's own name. Comparing them raw would report every prefixed directive
-// as naming an unrun rule.
+// Directives and registered rules both may carry the plugin that owns the rule, and not always the same
+// way (`core/no-x` against a bare `no-x`), so both sides are compared bare. Comparing either raw files a
+// dead directive as naming an unrun rule.
 func bareRuleName(name string) string {
 	if slash := strings.LastIndexByte(name, '/'); slash >= 0 {
 		return name[slash+1:]
