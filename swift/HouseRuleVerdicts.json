@@ -163,9 +163,9 @@
   },
   {
     "typeScriptRule": "nexus/consistency-no-iso-string-date-cut",
-    "verdict": "Port",
-    "swiftRule": null,
-    "reason": "`Date.ISO8601FormatStyle` and `ISO8601DateFormatter` default to UTC, so `.formatted(.iso8601.year().month().day())` or a `.prefix(10)` cut gives the UTC day without saying so."
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/consistency-no-iso-string-date-cut",
+    "reason": null
   },
   {
     "typeScriptRule": "nexus/consistency-no-long-line-comment",

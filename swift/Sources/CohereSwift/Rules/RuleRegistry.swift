@@ -55,6 +55,7 @@ public enum RuleRegistry {
         SecurityNoInterpolatedShellCommand(),
         SecurityNoInterpolatedSqlString(),
         ConcurrencyNoCheckThenWrite(),
+        ConsistencyNoIsoStringDateCut(),
     ]
 
     public static let packageRules: [any PackageRule] = [
