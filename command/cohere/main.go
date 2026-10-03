@@ -379,6 +379,8 @@ func run() error {
 		return fmt.Errorf("building the type graph: %w", err)
 	}
 	buildDuration := time.Since(buildStart)
+	// A test instrument: every file walked on a checker other than its own. See program.walkQueue.
+	graph.WalkOnForeignCheckers = os.Getenv("COHERE_TEST_FOREIGN_CHECKERS") != ""
 
 	// The build saw every file the compiler read. The lint config is read by the command, not the
 	// compiler, so it is named here, with every file it extends: a base edited alone changes what runs.
@@ -823,6 +825,7 @@ func run() error {
 				return fmt.Errorf("running rules: %w", err)
 			}
 			result = walked
+			reportForeignCheckers(graph, walked, len(projectFiles))
 		}
 		lintDuration := time.Since(lintStart)
 
@@ -1518,4 +1521,13 @@ func narrowToClosure(
 
 	scope.DependentCount = len(closure) - len(seeds)
 	return scope, closure
+}
+
+// reportForeignCheckers says, under the COHERE_TEST_FOREIGN_CHECKERS instrument, how many files a walk put on
+// a checker other than their own, so a test comparing the two runs can tell the instrument took effect.
+func reportForeignCheckers(graph *program.Graph, walked program.Result, files int) {
+	if graph.WalkOnForeignCheckers {
+		fmt.Fprintf(os.Stderr, "foreign checkers: %d of %d files walked on a checker other than their own\n",
+			walked.FilesOnForeignCheckers, files)
+	}
 }

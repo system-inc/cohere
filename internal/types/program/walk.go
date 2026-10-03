@@ -166,6 +166,10 @@ type Result struct {
 	// DesignSystemRerun is how many of the replayed files ran their design-system rules again, because a
 	// stylesheet the design system read changed or the last run's could not be keyed.
 	DesignSystemRerun int
+
+	// FilesOnForeignCheckers is how many files were walked on a checker other than the one that owns them:
+	// taken by a worker whose own group was done, or every file under WalkOnForeignCheckers. See walkQueue.
+	FilesOnForeignCheckers int
 }
 
 // Walk visits every file in the given set once, dispatching every rule's listeners as it goes.
@@ -194,6 +198,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	var mutex sync.Mutex
 	diagnostics := []rule.Diagnostic{}
 	filesReplayed, typeAwareRerun, shapeKeyedRerun, designSystemRerun := 0, 0, 0, 0
+	filesOnForeignCheckers := 0
 
 	// Computed once per walk, before any worker runs, and only when the findings cache is in use: about
 	// 47ms on ahra, the one cost type-aware caching adds over the walk. Shape fingerprints need this run's
@@ -230,8 +235,18 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 		timings = NewTimings(ruleNames)
 	}
 
-	// Each worker walks the files of one checker. See assignFilesToWorkers.
-	assignments := g.assignFilesToWorkers(ctx, files, workers, anyRuleNeedsTypeChecker(rules))
+	// Each worker walks the files of one checker, and then helps finish the others. See assignFilesToWorkers
+	// and walkQueue.
+	needsCheckers := anyRuleNeedsTypeChecker(rules)
+	assignments := g.assignFilesToWorkers(ctx, files, workers, needsCheckers)
+	queues := make([]*walkQueue, workers)
+	homeFiles := make([]*ast.SourceFile, workers)
+	for worker, indices := range assignments {
+		queues[worker] = &walkQueue{indices: indices, back: len(indices)}
+		if len(indices) > 0 {
+			homeFiles[worker] = files[indices[0]]
+		}
+	}
 	var waitGroup sync.WaitGroup
 	for worker := range workers {
 		waitGroup.Add(1)
@@ -251,6 +266,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			localFailures := []error{}
 			localCrashes := []FileCrash{}
 			localRuleCrashes := []RuleCrash{}
+			localForeign := 0
 
 			// Each worker accumulates locally and merges once under the mutex. Timing through a
 			// shared lock would measure contention rather than rule cost.
@@ -259,7 +275,11 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				localTimings = NewTimings(nil)
 			}
 
-			for _, index := range assignments[worker] {
+			// walkFile walks one file on the checker that owns checkerFile.
+			walkFile := func(index int, checkerFile *ast.SourceFile) {
+				if checkerFile != files[index] {
+					localForeign++
+				}
 				sourceFile := files[index]
 
 				// Configuration is consulted before a checker is acquired, because an ignored file
@@ -270,14 +290,14 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					// quiet decline. Declining is indistinguishable from finding nothing, and that
 					// ambiguity kept a dead rule alive for months.
 					localFailures = append(localFailures, err)
-					continue
+					return
 				}
 				if resolution.Ignored {
 					localIgnored++
-					continue
+					return
 				}
 				if len(applicable) == 0 {
-					continue
+					return
 				}
 
 				// The findings cache. A file whose bytes, key and applied cacheable rules all match the
@@ -343,12 +363,14 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 						replayEntry(entry, hits, sourceFile, &localDiagnostics, localReporting, localOffered, localListening)
 						if len(walkRules) == 0 {
 							localNodes += entry.VisitedNodes
-							continue
+							return
 						}
 					}
 				}
 
-				// The checker is acquired only when an applicable rule declares it reads one.
+				// The checker is acquired only when an applicable rule declares it reads one. It is the checker that
+				// owns checkerFile: the file itself, or for a file taken from another worker's group, a file of this
+				// worker's own, so a stolen file is walked on this worker's checker. See walkQueue.
 				//
 				// CheckerForFile hands out an exclusive lock held until release, and it is held across
 				// the whole dispatch below rather than around a single query.
@@ -385,7 +407,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				var fileChecker *checker.Checker
 				release := func() {}
 				if anyRuleNeedsTypeChecker(walkRules) {
-					fileChecker, release = g.CheckerForFile(ctx, sourceFile)
+					fileChecker, release = g.CheckerForFile(ctx, checkerFile)
 				}
 
 				// A rule's Report closure captures the rule it belongs to, so a rule cannot report under
@@ -431,7 +453,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					// process is not a file with nothing to report, and the whole coverage line exists
 					// to keep those two apart.
 					localCrashes = append(localCrashes, FileCrash{FileName: sourceFile.FileName(), Cause: crashed})
-					continue
+					return
 				}
 
 				// A rule that crashed lost its verdict on this file and the rest of the file stands. The file
@@ -466,6 +488,30 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				}
 			}
 
+			// This worker's own group first, then files from the end of whichever group has the most left, walked
+			// on this worker's own checker. Without the second loop the walk ends when its heaviest group does:
+			// measured quiet on ahra (#zqsdzbq), workers ended between 0.89s and 1.59s, the last waiting 0.79s on
+			// a checker lock its own group's type check also wanted.
+			own := queues[worker]
+			if g.WalkOnForeignCheckers {
+				own = foreignQueue(queues, homeFiles, worker)
+			}
+			for index, ok := own.next(); ok; index, ok = own.next() {
+				if g.WalkOnForeignCheckers {
+					walkFile(index, homeFiles[worker])
+				} else {
+					walkFile(index, files[index])
+				}
+			}
+			// Off when every file is already on a foreign checker: stealing could hand a worker its own group.
+			if homeFiles[worker] != nil && !g.WalkOnForeignCheckers {
+				for victim := busiestQueue(queues); victim != nil; victim = busiestQueue(queues) {
+					if index, ok := victim.steal(); ok {
+						walkFile(index, homeFiles[worker])
+					}
+				}
+			}
+
 			// Appended in whichever order the workers finish. The order is fixed once, after the wait
 			// below, rather than here, where it would still depend on who took the lock first.
 			mutex.Lock()
@@ -496,6 +542,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			typeAwareRerun += localTypeAwareRerun
 			shapeKeyedRerun += localShapeKeyedRerun
 			designSystemRerun += localDesignSystemRerun
+			filesOnForeignCheckers += localForeign
 			mutex.Unlock()
 		}()
 	}
@@ -523,6 +570,8 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 		TypeAwareRerun:    typeAwareRerun,
 		ShapeKeyedRerun:   shapeKeyedRerun,
 		DesignSystemRerun: designSystemRerun,
+
+		FilesOnForeignCheckers: filesOnForeignCheckers,
 		Coverage: Coverage{
 			FilesInProgram: len(g.Program.GetSourceFiles()),
 			FilesWalked:    len(files),
@@ -1154,4 +1203,75 @@ func (g *Graph) assignFilesToWorkers(ctx context.Context, files []*ast.SourceFil
 		assignments[slot] = append(assignments[slot], index)
 	}
 	return assignments
+}
+
+// walkQueue is one worker's group of files. The owner takes from the front, and a worker whose own group
+// is done takes from the back of the busiest group, walking what it takes on its own checker.
+//
+// Any checker can type any file of the program; ownership decides which checker reports a file's type
+// diagnostics, not which may answer questions about it. What must not happen is one rule mixing answers
+// from two checkers, and that cannot: every query for a file comes from the one checker that file is
+// walked on. The cost is that the taking checker resolves the stolen file's imports for itself, on a core
+// that would otherwise be idle. TestEveryFileWalkedOnAForeignCheckerFindsTheSame holds the findings and the
+// type diagnostics identical whichever checker walks a file.
+type walkQueue struct {
+	mutex       sync.Mutex
+	indices     []int
+	front, back int
+}
+
+// next is the owner's next file.
+func (q *walkQueue) next() (int, bool) {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+	if q.front >= q.back {
+		return 0, false
+	}
+	q.front++
+	return q.indices[q.front-1], true
+}
+
+// steal is a file from the far end, for another worker.
+func (q *walkQueue) steal() (int, bool) {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+	if q.front >= q.back {
+		return 0, false
+	}
+	q.back--
+	return q.indices[q.back], true
+}
+
+func (q *walkQueue) remaining() int {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+	return q.back - q.front
+}
+
+// busiestQueue is the group with the most files left, nil when every group is done. Files left stand in for
+// work left: a group's files are of a kind, so its count tracks its cost closely enough to pick a victim.
+func busiestQueue(queues []*walkQueue) *walkQueue {
+	var busiest *walkQueue
+	most := 0
+	for _, queue := range queues {
+		if left := queue.remaining(); left > most {
+			busiest, most = queue, left
+		}
+	}
+	return busiest
+}
+
+// foreignQueue is the group a worker walks under WalkOnForeignCheckers: the next worker's that has a group,
+// so every file is walked on a checker that does not own it. A worker with no group of its own has no
+// checker to lend and walks nothing.
+func foreignQueue(queues []*walkQueue, homeFiles []*ast.SourceFile, worker int) *walkQueue {
+	if homeFiles[worker] == nil {
+		return &walkQueue{}
+	}
+	for step := 1; step < len(queues); step++ {
+		if next := (worker + step) % len(queues); homeFiles[next] != nil {
+			return queues[next]
+		}
+	}
+	return queues[worker]
 }

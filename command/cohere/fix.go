@@ -75,6 +75,7 @@ func applyProposedFixes(
 		if err != nil {
 			return edit.Summary{}, program.Result{}, fmt.Errorf("collecting proposals: %w", err)
 		}
+		reportForeignCheckers(graph, walked, len(projectFiles))
 		result = walked
 	}
 

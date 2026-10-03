@@ -102,6 +102,10 @@ type Graph struct {
 	// fingerprints both read it, and the program it describes never changes after Build.
 	typeGraphOnce  sync.Once
 	typeGraphParts typeGraphParts
+
+	// WalkOnForeignCheckers walks every file on a checker other than its own: a test instrument, for holding a
+	// stolen file's findings and type diagnostics to its home checker's. See walkQueue.
+	WalkOnForeignCheckers bool
 }
 
 // configHost adapts a filesystem and a working directory to what tsconfig parsing wants.

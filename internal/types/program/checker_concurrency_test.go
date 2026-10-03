@@ -3,6 +3,7 @@ package program_test
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -62,7 +63,8 @@ func TestCheckerSurvivesTheParallelWalk(t *testing.T) {
 		t.Skipf("this machine gave the walk %d worker, so nothing ran concurrently", graph.Workers())
 	}
 
-	queries := 0
+	// Counted atomically: the listeners run on every worker at once, which is the point of the test.
+	var queries atomic.Int64
 	probe := rule.Rule{
 		Name: "test-checker-under-concurrency",
 
@@ -81,7 +83,7 @@ func TestCheckerSurvivesTheParallelWalk(t *testing.T) {
 				// that is the point: it maximizes the chance of two workers reaching one checker.
 				ast.KindIdentifier: func(node *ast.Node) {
 					if ctx.TypeChecker.GetTypeAtLocation(node) != nil {
-						queries++
+						queries.Add(1)
 					}
 				},
 			}
@@ -97,7 +99,7 @@ func TestCheckerSurvivesTheParallelWalk(t *testing.T) {
 		t.Fatalf("walking with a type-querying rule: %v", err)
 	}
 
-	if queries == 0 {
+	if queries.Load() == 0 {
 		// Surviving a walk that asked nothing is exactly the vacuous pass this file exists to avoid.
 		t.Fatal("the probe rule completed without answering a single type query, so nothing was proven")
 	}
