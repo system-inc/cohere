@@ -131,7 +131,10 @@ var NoDeprecated = rule.Rule{
 		// file's comments and cannot change between two nodes in it. It also has to be read before
 		// the first node is judged, which is why the table is built here and not lazily.
 		pragma := reactPragmaFor(ctx)
-		deprecations := deprecationsForPragma(pragma)
+		deprecations := defaultPragmaDeprecations
+		if pragma != defaultPragma {
+			deprecations = deprecationsForPragma(pragma)
+		}
 
 		report := func(node *ast.Node, name string) {
 			entry, deprecated := deprecations[name]
@@ -241,6 +244,14 @@ const (
 // The rows and their order are upstream's, from `getDeprecated` at `no-deprecated.js:34`. The three
 // entries whose key does not begin with the pragma (`this.transferPropsTo`, and the `ReactPerf` and
 // `Perf` pairs) are upstream's too: those names are fixed and the pragma does not reach them.
+// defaultPragma is the pragma a file has when no comment names another, which is nearly every file.
+const defaultPragma = "React"
+
+// defaultPragmaDeprecations is the table for the default pragma, built once rather than per file.
+// Rebuilding it was most of this rule's time: 230ms of 296ms over ahra's 3,787 files. It is only
+// read, so every file's walk can share it.
+var defaultPragmaDeprecations = deprecationsForPragma(defaultPragma)
+
 func deprecationsForPragma(pragma string) map[string]deprecation {
 	return map[string]deprecation{
 		// 0.12.0
@@ -357,11 +368,11 @@ func reactPragmaFor(ctx rule.Context) string {
 		// Upstream falls back to React on a name that is not an identifier, after warning. The
 		// warning has no counterpart here; the fallback does.
 		if !isJavaScriptIdentifier(candidate) {
-			return "React"
+			return defaultPragma
 		}
 		return candidate
 	}
-	return "React"
+	return defaultPragma
 }
 
 // commentValueOf strips a comment's delimiters, which is what ESLint hands a rule as `.value`.
