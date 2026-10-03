@@ -104,7 +104,8 @@ func TestABareSeverityKeepsTheInheritedOptionsAndATupleReplacesThem(t *testing.T
 // The guard this whole change exists for. Each case is the drift #rkm5a31 measured, written as the
 // overlay that would have hidden it.
 func TestADepartureFromAnInheritedRulingMustSayWhy(t *testing.T) {
-	base := `{"rules": {"no-implied-eval": "error", "guard-for-in": "off", "eqeqeq": ["error", {"null": "ignore"}]}}`
+	base := `{"rules": {"no-implied-eval": "error", "guard-for-in": "off", "eqeqeq": ["error", {"null": "ignore"}]},
+		"reasons": {"guard-for-in": "nexus/consistency-no-for-in replaces it"}}`
 
 	// The positive case first, so every refusal below is shown to come from the guard under test
 	// rather than from a fixture that never loaded.
@@ -239,7 +240,7 @@ func TestTwoSpellingsInOneFileAreNeverADeparture(t *testing.T) {
 	directory := writeConfigs(t, map[string]string{
 		"base.json": `{"rules": {"eqeqeq": "error"}}`,
 		"CohereSettings.json": `{"extends": "./base.json",
-			"rules": {"no-shadow": "error", "nexus/no-shadow": "off"}}`,
+			"rules": {"no-shadow": "error", "nexus/no-shadow": "off"}, "reasons": {"nexus/no-shadow": "the twin spelling is off"}}`,
 	})
 	for attempt := 0; attempt < 50; attempt++ {
 		loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
@@ -251,7 +252,7 @@ func TestTwoSpellingsInOneFileAreNeverADeparture(t *testing.T) {
 
 func TestPluginsUnionAndTheirDefaultsAreComputedOverTheMergedRules(t *testing.T) {
 	directory := writeConfigs(t, map[string]string{
-		"structure.json": `{"plugins": ["react"], "rules": {"react/no-children-prop": "off"}}`,
+		"structure.json": `{"plugins": ["react"], "rules": {"react/no-children-prop": "off"}, "reasons": {"react/no-children-prop": "turned off on purpose"}}`,
 		"CohereSettings.json": `{"extends": "./structure.json", "plugins": ["react", "@typescript-eslint"],
 			"rules": {}}`,
 	})
@@ -307,7 +308,8 @@ func TestOverridesAndIgnorePatternsConcatenateBaseFirst(t *testing.T) {
 
 func TestAChainOfThreeMergesInOrderAndListsEverySource(t *testing.T) {
 	directory := writeConfigs(t, map[string]string{
-		"structure/nexus/CohereSettings.json": `{"rules": {"no-var": "error", "guard-for-in": "off"}}`,
+		"structure/nexus/CohereSettings.json": `{"rules": {"no-var": "error", "guard-for-in": "off"},
+			"reasons": {"guard-for-in": "nexus/consistency-no-for-in replaces it"}}`,
 		"structure/CohereSettings.json": `{"extends": "./nexus/CohereSettings.json",
 			"rules": {"react/no-danger": "error"}}`,
 		"CohereSettings.json": `{"extends": "./structure/CohereSettings.json",
@@ -509,7 +511,7 @@ func TestATwinRuleKeepsItsOwnKeyWhenAProjectWritesTheOther(t *testing.T) {
 func TestWithoutTheRegistryOnlyTheSameKeyIsTheSameRuling(t *testing.T) {
 	directory := writeConfigs(t, map[string]string{
 		"base.json":           `{"rules": {"nexus/consistency-no-enum": "error"}}`,
-		"CohereSettings.json": `{"extends": "./base.json", "rules": {"consistency-no-enum": "off"}}`,
+		"CohereSettings.json": `{"extends": "./base.json", "rules": {"consistency-no-enum": "off"}, "reasons": {"consistency-no-enum": "a second spelling, off"}}`,
 	})
 	loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
 	if _, kept := loaded.Rules["nexus/consistency-no-enum"]; !kept {

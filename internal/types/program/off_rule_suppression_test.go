@@ -46,6 +46,9 @@ func TestADirectiveNamingAnOffRuleIsDead(t *testing.T) {
 		"test-registered-off": "off",
 		"no-await-in-loop": "off",
 		"plugin/unported-on": "error"
+	}, "reasons": {
+		"test-registered-off": "off for this test",
+		"no-await-in-loop": "off for this test"
 	}}`
 
 	for _, shape := range []struct {

@@ -500,6 +500,10 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 		}
 	}
 
+	if err := refuseUnreasonedOffs(loaded, writtenBy); err != nil {
+		return nil, err
+	}
+
 	// Applied after every layer's rules, and reading them: an explicit line is a decision and a
 	// default is not, so `RulesFromPlugins` skips any rule already named. Seeding before would let a
 	// default overwrite a deliberate `off`.
@@ -836,6 +840,33 @@ func checkReasons(layer configLayer) error {
 		}
 	}
 	return nil
+}
+
+// refuseUnreasonedOffs refuses a chain that turns a rule off at top level with no file saying why.
+//
+// An off with no reason is an allowance: it reads as a decision while recording none, and the next
+// reader cannot tell a ruling from a rule somebody wanted quiet. Coverage printed each one while the sets
+// and repositories were given their reasons; once every one carried a reason, the standard became a
+// refusal so it cannot rot back (#2qq4yr7). The error names each rule and the file that turned it off, so
+// the fix is one entry under that file's "reasons".
+func refuseUnreasonedOffs(loaded *Config, writtenBy map[string]string) error {
+	var unreasoned []string
+	for name, setting := range loaded.Rules {
+		if setting.Severity != SeverityOff {
+			continue
+		}
+		if _, reasoned := loaded.OffReasons[name]; reasoned {
+			continue
+		}
+		unreasoned = append(unreasoned, fmt.Sprintf("%q in %s", name, writtenBy[name]))
+	}
+	if len(unreasoned) == 0 {
+		return nil
+	}
+	sort.Strings(unreasoned)
+	return fmt.Errorf("lint config turns off %s with no reason: an off that says nothing reads as an "+
+		"allowance, so name each under \"reasons\" in the file that turns it off, with why, in a sentence",
+		strings.Join(unreasoned, ", "))
 }
 
 type rawConfig struct {

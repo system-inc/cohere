@@ -244,6 +244,7 @@ func TestBothRuleShapesLoad(t *testing.T) {
 			"disabled-rule": "off",
 			"configured-rule": ["error", {"ignoreRestArgs": true}]
 		},
+		"reasons": {"disabled-rule": "a fixture's off"},
 		"ignorePatterns": ["dist/**"],
 		"overrides": [{"files": ["**/generated/**/*.{ts,tsx}"], "rules": {"plain-rule": "off"}}]
 	}`
@@ -499,7 +500,7 @@ func TestPluginDeclarationEnablesItsRules(t *testing.T) {
 func TestAnExplicitLineBeatsAPluginDefault(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "CohereSettings.json")
-	contents := `{"plugins": ["react"], "rules": {"react/no-children-prop": "off"}}`
+	contents := `{"plugins": ["react"], "rules": {"react/no-children-prop": "off"}, "reasons": {"react/no-children-prop": "turned off on purpose"}}`
 	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
 		t.Fatalf("writing the config: %v", err)
 	}

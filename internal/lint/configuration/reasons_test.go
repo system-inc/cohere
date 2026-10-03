@@ -97,15 +97,42 @@ func TestAReasonFollowsTheRuleUpTheChain(t *testing.T) {
 	}
 }
 
-// Until every set and repository carries its reasons, an unreasoned off loads and is simply not
-// recorded, which coverage reports as an allowance.
-func TestAnUnreasonedOffIsNotRecorded(t *testing.T) {
-	directory := writeConfigs(t, map[string]string{"CohereSettings.json": `{"rules": {"no-continue": "off"}}`})
-	loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
-	if offReason, recorded := loaded.OffReasons["no-continue"]; recorded {
-		t.Errorf("an off no file explains was recorded with %+v", offReason)
-	}
-	if !loaded.TurnsOffAtTopLevel("no-continue") {
-		t.Error("TurnsOffAtTopLevel did not see the off")
-	}
+// Once every set and repository carried its reasons, an off with no reason anywhere in its chain became
+// a refusal at load, so the standard cannot rot back. Both ways: the unreasoned off is refused, naming the
+// rule and the file that turned it off, wherever in the chain that file sits; the same off with a reason,
+// its own or its departure's, loads.
+func TestAnOffWithNoReasonIsRefusedAndAReasonedOneLoads(t *testing.T) {
+	t.Run("an unreasoned off in the project's own file is refused", func(t *testing.T) {
+		directory := writeConfigs(t, map[string]string{"CohereSettings.json": `{"rules": {"no-continue": "off"}}`})
+		refusedWith(t, filepath.Join(directory, "CohereSettings.json"),
+			`turns off "no-continue" in `+filepath.Join(directory, "CohereSettings.json")+` with no reason`)
+	})
+
+	t.Run("an unreasoned off in a base is refused, naming the base", func(t *testing.T) {
+		directory := writeConfigs(t, map[string]string{
+			"base.json":           `{"rules": {"no-continue": "off"}}`,
+			"CohereSettings.json": `{"extends": "./base.json"}`,
+		})
+		refusedWith(t, filepath.Join(directory, "CohereSettings.json"),
+			`turns off "no-continue" in `+filepath.Join(directory, "base.json")+` with no reason`)
+	})
+
+	t.Run("the same off with a reason loads", func(t *testing.T) {
+		directory := writeConfigs(t, map[string]string{
+			"CohereSettings.json": `{"rules": {"no-continue": "off"}, "reasons": {"no-continue": "style"}}`,
+		})
+		loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
+		if !loaded.TurnsOffAtTopLevel("no-continue") {
+			t.Error("TurnsOffAtTopLevel did not see the off")
+		}
+	})
+
+	t.Run("an off its departure explains loads", func(t *testing.T) {
+		directory := writeConfigs(t, map[string]string{
+			"base.json": `{"rules": {"no-var": "error"}}`,
+			"CohereSettings.json": `{"extends": "./base.json", "rules": {"no-var": "off"},
+				"departures": {"no-var": "a legacy script keeps var"}}`,
+		})
+		loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
+	})
 }

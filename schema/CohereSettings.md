@@ -163,7 +163,7 @@ Rule namespaces whose rules apply without a rules entry naming them, at warn, as
 
 ### `reasons`
 
-For each rule this file turns off in its own rules, why, in a sentence. cohere prints the reason beside the rule wherever coverage names it, so an off reads as a decision rather than an allowance. An off that departs from the file it extends says why under departures instead. An entry for a rule this file does not turn off is refused.
+For each rule this file turns off in its own rules, why, in a sentence. cohere prints the reason beside the rule wherever coverage names it, so an off reads as a decision rather than an allowance, and refuses to load an off no file explains. An off that departs from the file it extends says why under departures instead. An entry for a rule this file does not turn off is refused.
 
 ```json
 { "reasons": { "no-continue": "Style, with no bug class behind it." } }
@@ -192,7 +192,7 @@ A rule's value is a severity, or `[severity, ...options]` for a rule that takes 
 
 ## Rules
 
-cohere implements 481 rules. `cohere --rules` lists them for your project's language, and
+cohere implements 482 rules. `cohere --rules` lists them for your project's language, and
 `cohere --rules-enabled` lists the ones your settings turn on. A name cohere does not implement is accepted:
 it records a decision about a rule, and is reported as unported rather than refused.
 
@@ -549,7 +549,7 @@ it records a decision about a rule, and is reported as unported rather than refu
 
 </details>
 
-<details><summary><code>nexus</code>, 48 rules</summary>
+<details><summary><code>nexus</code>, 49 rules</summary>
 
 - `nexus/boundary-no-internal-import`
 - `nexus/boundary-no-nexus-outside-import`
@@ -575,6 +575,7 @@ it records a decision about a rule, and is reported as unported rather than refu
 - `nexus/consistency-require-matching-return-type`
 - `nexus/consistency-require-type-suffix`
 - `nexus/correctness-no-callback-in-parse-try`
+- `nexus/correctness-no-caller-data-mutation`
 - `nexus/correctness-no-collection-misuse`
 - `nexus/correctness-no-discarded-outcome`
 - `nexus/correctness-no-discarded-pure-result`
