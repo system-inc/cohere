@@ -36,6 +36,7 @@ public enum RuleRegistry {
             ConsistencyNoStutteringName(),
             ConsistencyNoUtilsFolder(),
             ConsistencyNoBareThrow(),
+            ConsistencyNoPropertyAlias(),
             ConsistencyNoHandRolledDelay(),
             ConcurrencyNoLostUpdate(),
             ConsistencyNoBooleanOutcome(),

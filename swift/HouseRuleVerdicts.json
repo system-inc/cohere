@@ -391,9 +391,9 @@
   },
   {
     "typeScriptRule": "structure/consistency-no-property-alias",
-    "verdict": "Port",
-    "swiftRule": null,
-    "reason": "Reach-over-alias is a house principle with large Swift demand (17 macos, 344 presence), but in Swift `let x = obj.x` is often a deliberate snapshot taken before an `await` or a value-type copy, so the port needs that exemption or it fights the lost-update fix."
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/consistency-no-property-alias",
+    "reason": null
   },
   {
     "typeScriptRule": "structure/consistency-require-matching-file-name",
