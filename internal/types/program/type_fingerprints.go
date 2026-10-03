@@ -49,14 +49,33 @@ func (g *Graph) TypeFingerprints() map[tspath.Path][sha256.Size]byte {
 	return fingerprintComponents(g.ProjectFiles(), edges, members, global)
 }
 
+// typeGraphParts is typeGraph's answer.
+type typeGraphParts struct {
+	global      [sha256.Size]byte
+	edges       map[tspath.Path][]tspath.Path
+	contents    map[tspath.Path][sha256.Size]byte
+	resolutions map[tspath.Path][sha256.Size]byte
+}
+
 // typeGraph is what every fingerprint is built over: the global component, hashing every file that can
 // change other files' types without being imported, the import edges between project files, every file's
 // content hash, computed once for all three, and each project file's resolutions.
+//
+// Computed once per graph. A walk keyed on both fingerprints asked for it twice, about 45ms each on ahra
+// and all of it before the first worker starts (#zqsdzbq). The callers only read what it returns.
 func (g *Graph) typeGraph() ([sha256.Size]byte, map[tspath.Path][]tspath.Path, map[tspath.Path][sha256.Size]byte, map[tspath.Path][sha256.Size]byte) {
+	g.typeGraphOnce.Do(func() {
+		parts := &g.typeGraphParts
+		parts.global, parts.edges, parts.contents, parts.resolutions = g.computeTypeGraph()
+	})
+	return g.typeGraphParts.global, g.typeGraphParts.edges, g.typeGraphParts.contents, g.typeGraphParts.resolutions
+}
+
+func (g *Graph) computeTypeGraph() ([sha256.Size]byte, map[tspath.Path][]tspath.Path, map[tspath.Path][sha256.Size]byte, map[tspath.Path][sha256.Size]byte) {
 	allFiles := g.Program.GetSourceFiles()
 	projectFiles := g.ProjectFiles()
 
-	contents := hashContentsInParallel(allFiles)
+	contents, beyond := hashContentsInParallel(allFiles)
 
 	isProject := make(map[tspath.Path]bool, len(projectFiles))
 	for _, sourceFile := range projectFiles {
@@ -66,7 +85,7 @@ func (g *Graph) typeGraph() ([sha256.Size]byte, map[tspath.Path][]tspath.Path, m
 	global := sha256.New()
 	globalPaths := make([]tspath.Path, 0, len(allFiles))
 	for _, sourceFile := range allFiles {
-		if !isProject[sourceFile.Path()] || reachesBeyondItsImports(sourceFile) {
+		if !isProject[sourceFile.Path()] || beyond[sourceFile.Path()] {
 			globalPaths = append(globalPaths, sourceFile.Path())
 		}
 	}
@@ -160,8 +179,12 @@ func reachesBeyondItsImports(sourceFile *ast.SourceFile) bool {
 
 // hashContentsInParallel hashes every file's text. The texts are already in memory; this is the only
 // per-run cost the fingerprints add over the walk.
-func hashContentsInParallel(files []*ast.SourceFile) map[tspath.Path][sha256.Size]byte {
+//
+// It also answers reachesBeyondItsImports for each file in the same pass, since that reads the same text, and
+// asked one file at a time after the hashing it cost about 11ms on ahra on the path to the first walk worker.
+func hashContentsInParallel(files []*ast.SourceFile) (map[tspath.Path][sha256.Size]byte, map[tspath.Path]bool) {
 	sums := make([][sha256.Size]byte, len(files))
+	reaches := make([]bool, len(files))
 	workers := runtime.NumCPU()
 	var waitGroup sync.WaitGroup
 	for worker := range workers {
@@ -170,15 +193,20 @@ func hashContentsInParallel(files []*ast.SourceFile) map[tspath.Path][sha256.Siz
 			defer waitGroup.Done()
 			for index := worker; index < len(files); index += workers {
 				sums[index] = sha256.Sum256([]byte(files[index].Text()))
+				reaches[index] = reachesBeyondItsImports(files[index])
 			}
 		}()
 	}
 	waitGroup.Wait()
 	contents := make(map[tspath.Path][sha256.Size]byte, len(files))
+	beyond := make(map[tspath.Path]bool, len(files))
 	for index, sourceFile := range files {
 		contents[sourceFile.Path()] = sums[index]
+		if reaches[index] {
+			beyond[sourceFile.Path()] = true
+		}
 	}
-	return contents
+	return contents, beyond
 }
 
 // fingerprintComponents runs Tarjan's algorithm over the project's import graph. Tarjan emits each

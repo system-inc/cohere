@@ -17,6 +17,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
@@ -96,6 +97,11 @@ type Graph struct {
 	// complete there. ProjectFiles returns it rather than recomputing, so the check that every named
 	// file made it into the program happens where a failure can be returned instead of panicked.
 	projectFiles []*ast.SourceFile
+
+	// typeGraphOnce and typeGraphParts hold typeGraph's answer, computed once: the type and the shape
+	// fingerprints both read it, and the program it describes never changes after Build.
+	typeGraphOnce  sync.Once
+	typeGraphParts typeGraphParts
 }
 
 // configHost adapts a filesystem and a working directory to what tsconfig parsing wants.
