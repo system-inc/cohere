@@ -429,7 +429,10 @@ func isFunctionOverloadSignature(node *ast.Node) bool {
 // silently dropped.
 func nearestScopeContainer(node *ast.Node) *ast.Node {
 	for current := node.Parent; current != nil; current = current.Parent {
-		if ast.IsLocalsContainer(current) && ast.GetLocals(current) != nil {
+		// Only the container test. This once also asked `ast.GetLocals(current) != nil`, which was
+		// always true, since GetLocals creates a missing table, and the creating was a write to a
+		// node other workers read, a data race.
+		if ast.IsLocalsContainer(current) {
 			return current
 		}
 	}

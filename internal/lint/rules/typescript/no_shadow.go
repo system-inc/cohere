@@ -184,11 +184,12 @@ func checkFileForShadowing(ctx rule.Context, sourceFile *ast.Node) {
 
 		opened := false
 
-		// GUARDED, always: ast.GetLocals panics on a non-container rather than returning nil, and
-		// an enum declaration is a shape that reaches this line.
+		// node.Locals() reads the table without creating it. ast.GetLocals creates a missing one,
+		// which writes to a node another worker's checker may be resolving names through, a data
+		// race; a container the binder gave no locals has none to shadow, and ranging nil is empty.
 		if ast.IsLocalsContainer(node) {
 			scope := shadowScope{container: node}
-			for name, symbol := range ast.GetLocals(node) {
+			for name, symbol := range node.Locals() {
 				if symbol == nil {
 					continue
 				}
