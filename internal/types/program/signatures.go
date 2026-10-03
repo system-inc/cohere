@@ -250,7 +250,7 @@ func writeSignatureDiagnostic(diagnostic *ast.Diagnostic, sourceFile *ast.Source
 // declaration's syntax stays on TypeFingerprints.
 func (g *Graph) SignatureFingerprints(signatures map[string]SignatureEntry) map[tspath.Path][sha256.Size]byte {
 	projectFiles := g.ProjectFiles()
-	global, edges, contents := g.typeGraph()
+	global, edges, contents, resolutions := g.typeGraph()
 
 	shapes := make(map[tspath.Path][sha256.Size]byte, len(projectFiles))
 	for _, sourceFile := range projectFiles {
@@ -260,7 +260,8 @@ func (g *Graph) SignatureFingerprints(signatures map[string]SignatureEntry) map[
 			// No shape means the bytes stand in, as they would for a file never computed.
 			shape = "version " + FileVersion(sourceFile.Text())
 		}
-		shapes[sourceFile.Path()] = sha256.Sum256([]byte(shape))
+		// Where its imports resolve is part of what a file shows its importers; see TypeFingerprints.
+		shapes[sourceFile.Path()] = withResolutions(sha256.Sum256([]byte(shape)), resolutions[sourceFile.Path()])
 	}
 	components := fingerprintComponents(projectFiles, edges, shapes, global)
 

@@ -2,6 +2,7 @@ package program
 
 import (
 	"crypto/sha256"
+	"fmt"
 	"runtime"
 	"sort"
 	"strings"
@@ -33,15 +34,25 @@ import (
 // Edges come from the program's own module resolution, normalised the way DependentClosure normalises
 // them: compared raw, on a case-insensitive volume, they produced a graph with almost no edges, which
 // reads as valid rather than as broken.
+//
+// Edges only join project files, so each member also carries where every one of its imports resolved,
+// installed files included. A re-export that starts resolving to another installed declaration, both
+// already in the program, moves no edge and no file in the global component: a package.json's "types"
+// changing is enough. Without its resolutions in its hash, the importers of that re-exporter kept their
+// key while the types they see changed (#9bjjk4a, found answering @system_cohere_lint).
 func (g *Graph) TypeFingerprints() map[tspath.Path][sha256.Size]byte {
-	global, edges, contents := g.typeGraph()
-	return fingerprintComponents(g.ProjectFiles(), edges, contents, global)
+	global, edges, contents, resolutions := g.typeGraph()
+	members := make(map[tspath.Path][sha256.Size]byte, len(resolutions))
+	for path, resolved := range resolutions {
+		members[path] = withResolutions(contents[path], resolved)
+	}
+	return fingerprintComponents(g.ProjectFiles(), edges, members, global)
 }
 
 // typeGraph is what every fingerprint is built over: the global component, hashing every file that can
-// change other files' types without being imported, the import edges between project files, and every
-// file's content hash, computed once for all three.
-func (g *Graph) typeGraph() ([sha256.Size]byte, map[tspath.Path][]tspath.Path, map[tspath.Path][sha256.Size]byte) {
+// change other files' types without being imported, the import edges between project files, every file's
+// content hash, computed once for all three, and each project file's resolutions.
+func (g *Graph) typeGraph() ([sha256.Size]byte, map[tspath.Path][]tspath.Path, map[tspath.Path][sha256.Size]byte, map[tspath.Path][sha256.Size]byte) {
 	allFiles := g.Program.GetSourceFiles()
 	projectFiles := g.ProjectFiles()
 
@@ -84,7 +95,57 @@ func (g *Graph) typeGraph() ([sha256.Size]byte, map[tspath.Path][]tspath.Path, m
 			}
 		}
 	}
-	return globalSum, edges, contents
+	return globalSum, edges, contents, g.resolutionSums(isProject)
+}
+
+// resolutionSums hashes, for each project file, every module specifier and type reference it wrote and the
+// file each resolved to, or that it resolved to nothing. Sorted, so the order the compiler resolved in cannot
+// move it.
+func (g *Graph) resolutionSums(isProject map[tspath.Path]bool) map[tspath.Path][sha256.Size]byte {
+	entries := make(map[tspath.Path][]string, len(isProject))
+	for fromPath, resolutions := range g.Program.GetResolvedModules() {
+		if !isProject[fromPath] {
+			continue
+		}
+		for key, resolution := range resolutions {
+			target := ""
+			if resolution != nil {
+				target = resolution.ResolvedFileName
+			}
+			entries[fromPath] = append(entries[fromPath], fmt.Sprintf("module\x00%s\x00%d\x00%s", key.Name, key.Mode, target))
+		}
+	}
+	for fromPath, references := range g.Program.GetResolvedTypeReferenceDirectives() {
+		if !isProject[fromPath] {
+			continue
+		}
+		for key, reference := range references {
+			target := ""
+			if reference != nil {
+				target = reference.ResolvedFileName
+			}
+			entries[fromPath] = append(entries[fromPath], fmt.Sprintf("type\x00%s\x00%d\x00%s", key.Name, key.Mode, target))
+		}
+	}
+	sums := make(map[tspath.Path][sha256.Size]byte, len(isProject))
+	for path := range isProject {
+		lines := entries[path]
+		sort.Strings(lines)
+		hash := sha256.New()
+		for _, line := range lines {
+			hash.Write([]byte(line))
+			hash.Write([]byte{0})
+		}
+		var sum [sha256.Size]byte
+		copy(sum[:], hash.Sum(nil))
+		sums[path] = sum
+	}
+	return sums
+}
+
+// withResolutions is a member's hash: its own content or shape, and where its imports resolved.
+func withResolutions(own [sha256.Size]byte, resolutions [sha256.Size]byte) [sha256.Size]byte {
+	return sha256.Sum256(append(own[:], resolutions[:]...))
 }
 
 // reachesBeyondItsImports reports whether a project file can change other files' types without being
