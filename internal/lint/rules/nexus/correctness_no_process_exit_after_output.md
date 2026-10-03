@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Recommendation** | **Yes, but registered `off` until the sites are fixed.** About a thousand findings on ahra, 0 false. Turning it on at `error` today would bury the tree |
+| **Recommendation** | **Registered `off` in ahra, by @system_cohere's ruling of 2026-10-03.** Every finding is true about the code, but ahra blocks stdout and stderr at every process entry (nexus `blockStandardStreams`), and a blocking stream has nothing queued when `process.exit` runs, so the 1,012 findings hold 0 real truncations there. The exactness moved to the entry rule, which requires a process that can exit after a write to block first. On for a project whose entries do not block |
 | Findings | **ahra 1,012** (983 in ahra's own files, 29 in the `libraries/structure` submodule), measured 2026-10-03 on a tree being edited live |
 | Measured precision | 1,012 of 1,012 true. 1,002 are reached having written on every path into the exit; the other 10 were read one by one and each prints on the path that exits |
 | Plugin | cohere-native, `nexus` |
