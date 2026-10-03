@@ -35,8 +35,10 @@ import (
 // A call through an interface cannot be followed, since its target is not known here. Rather than trust
 // that no helper is called that way, any rule that reaches an interface method taking an *ast.Node fails:
 // a future visitor-style helper turns this red instead of blind.
+//
+// It reads the overlay GOFLAGS names, if any (guardOverlay), never the one `go test -overlay` names.
 func TestRulesClaimShapesOnlyWhereTheScanAllowsIt(t *testing.T) {
-	scan := scanTypeReach(t)
+	scan := scanTypeReach(t, guardOverlay(t))
 	if len(scan.claims) == 0 && len(scan.mayReadImportedBodies) == 0 {
 		t.Fatal("the scan found no rules at all, so this test proved nothing")
 	}
@@ -102,7 +104,7 @@ func TestShapeReadersHandBackNoSyntax(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	loaded, err := packages.Load(&packages.Config{Mode: packages.NeedName | packages.NeedTypes, Dir: root}, "./internal/lint/rule")
+	loaded, err := packages.Load(&packages.Config{Mode: packages.NeedName | packages.NeedTypes, Dir: root, Overlay: guardOverlay(t)}, "./internal/lint/rule")
 	if err != nil || len(loaded) != 1 || len(loaded[0].Errors) > 0 {
 		t.Fatalf("loading the rule package: %v %v", err, loaded)
 	}
@@ -262,7 +264,8 @@ func isOwnSourceFile(expression ast.Expr, info *types.Info) bool {
 		strings.HasSuffix(named.Obj().Pkg().Path(), "/internal/lint/rule")
 }
 
-func scanTypeReach(t *testing.T) typeReachScan {
+// scanTypeReach reads the rule packages with overlay in place of the files it names.
+func scanTypeReach(t *testing.T, overlay map[string][]byte) typeReachScan {
 	t.Helper()
 	root, err := filepath.Abs("../../..")
 	if err != nil {
@@ -271,7 +274,8 @@ func scanTypeReach(t *testing.T) typeReachScan {
 	loaded, err := packages.Load(&packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes |
 			packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps,
-		Dir: root,
+		Dir:     root,
+		Overlay: overlay,
 	}, "./internal/lint/...")
 	if err != nil {
 		t.Fatalf("loading the rule packages: %v", err)

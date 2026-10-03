@@ -24,7 +24,7 @@ var creatingGetters = map[string]bool{"GetLocals": true, "GetMembers": true, "Ge
 
 // No rule code calls a compiler getter that creates what it returns.
 func TestRulesCallNoCompilerGetterThatWrites(t *testing.T) {
-	for _, call := range creatingGetterCalls(t, nil) {
+	for _, call := range creatingGetterCalls(t, guardOverlay(t)) {
 		t.Errorf("%s, which creates the table when it is missing and so writes to a node or symbol other "+
 			"workers read; read it without creating it (node.Locals(), symbol.Members, symbol.Exports)", call)
 	}
@@ -32,7 +32,7 @@ func TestRulesCallNoCompilerGetterThatWrites(t *testing.T) {
 
 // creatingGetterCalls lists every call to a creating getter in the rule packages, read with overlay in
 // place of the files it names. go/packages reads files itself, so `go test -overlay` never reaches
-// this scan, and a probe proving it can see a call has to hand its file in here.
+// this scan; the guard hands in the overlay GOFLAGS names (guardOverlay), and a probe hands in its own.
 func creatingGetterCalls(t *testing.T, overlay map[string][]byte) []string {
 	t.Helper()
 	root, err := filepath.Abs("../../..")
