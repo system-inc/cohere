@@ -77,25 +77,14 @@ func TestDumpDifferences(t *testing.T) {
 		}
 		seen[root] = true
 
-		structureIgnore := formatfiles.StructureIgnorePath(root)
-		enumeration, err := enumerator.Enumerate(root, structureIgnore)
+		// Nested repositories regardless of root's own ignore lists, before anything can skip root, as
+		// TestCorpora finds them (#k6vebep).
+		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
 		if err != nil {
-			t.Fatalf("enumerating %s: %v", root, err)
+			t.Fatalf("finding the repositories nested in %s: %v", root, err)
 		}
-		for _, nested := range enumeration.NestedRepositories {
-			if !filepath.IsAbs(nested) {
-				nested = filepath.Join(root, nested)
-			}
-			pending = append(pending, nested)
-		}
-		files := enumeration.Files
-		if len(extensions) > 0 {
-			files = nil
-			for _, file := range enumeration.Files {
-				if extensions[filepath.Ext(file)] {
-					files = append(files, file)
-				}
-			}
+		for _, nested := range nestedRepositories {
+			pending = append(pending, filepath.Join(root, nested))
 		}
 
 		resolution, err := formatoptions.Resolve(root)
@@ -108,6 +97,22 @@ func TestDumpDifferences(t *testing.T) {
 		if err != nil {
 			t.Fatalf("resolving the format options for %s: %v", root, err)
 		}
+
+		structureIgnore := formatfiles.StructureIgnorePath(root)
+		enumeration, err := enumerator.Enumerate(root, structureIgnore)
+		if err != nil {
+			t.Fatalf("enumerating %s: %v", root, err)
+		}
+		files := enumeration.Files
+		if len(extensions) > 0 {
+			files = nil
+			for _, file := range enumeration.Files {
+				if extensions[filepath.Ext(file)] {
+					files = append(files, file)
+				}
+			}
+		}
+
 		options := resolution.Options
 		if width := os.Getenv("COHERE_FORMAT_PRINT_WIDTH"); width != "" {
 			if _, err := fmt.Sscan(width, &options.PrintWidth); err != nil {

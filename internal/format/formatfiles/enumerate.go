@@ -290,7 +290,7 @@ func Enumerate(root string, structureIgnorePath string, handles func(fileName st
 	} else {
 		retiring = nil
 	}
-	if resolution.Source != "" {
+	if resolution.Source != "" && !repositoryBoundaryBetween(root, filepath.Dir(resolution.Source)) {
 		layers = append(layers, ignoreLayer{
 			name:      IgnorePatternsLayer,
 			patterns:  resolution.IgnorePatterns,
@@ -385,6 +385,65 @@ func Enumerate(root string, structureIgnorePath string, handles func(fileName st
 	}
 
 	return enumeration, nil
+}
+
+// repositoryBoundaryBetween reports whether a repository of its own begins at root or between root and
+// the directory of the settings governing it. Then the settings belong to an outer repository: its
+// options still apply, the house formats one way, but its ignorePatterns describe its own tree, and
+// `projects/**` in ahra's list would otherwise leave a repository under projects/ offering nothing.
+func repositoryBoundaryBetween(root string, settingsDirectory string) bool {
+	root = filepath.Clean(root)
+	settingsDirectory = filepath.Clean(settingsDirectory)
+	for directory := root; directory != settingsDirectory; directory = filepath.Dir(directory) {
+		if HasOwnRepository(directory) {
+			return true
+		}
+		if parent := filepath.Dir(directory); parent == directory {
+			return false
+		}
+	}
+	return false
+}
+
+// NestedRepositoriesBelow finds every repository of its own below root, the outermost of each, relative
+// to root: what a corpus harness measures beside root, each as its own corpus.
+//
+// It checks a directory for a repository before pruning it, as Enumerate does, and prunes only by
+// root's .gitignore. The project's own lists (the house list, ignorePatterns) are not read: they say
+// what root formats, and a repository under a path root never formats is still a body of code a printer
+// can be measured on. Reading them is how ahra's `projects/**` hid five repositories from the
+// differential (#k6vebep).
+func NestedRepositoriesBelow(root string) ([]string, error) {
+	gitignore, err := readIgnoreFile(filepath.Join(root, ".gitignore"))
+	if err != nil {
+		return nil, err
+	}
+	layer := ignoreLayer{name: ".gitignore", patterns: gitignore}
+	var nested []string
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil || !entry.IsDir() {
+			return nil
+		}
+		relative, relativeError := filepath.Rel(root, path)
+		if relativeError != nil || relative == "." {
+			return nil
+		}
+		if entry.Name() == ".git" {
+			return filepath.SkipDir
+		}
+		if HasOwnRepository(path) {
+			nested = append(nested, relative)
+			return filepath.SkipDir
+		}
+		if _, covered := layer.covers(root, filepath.ToSlash(relative), true); covered {
+			return filepath.SkipDir
+		}
+		return nil
+	})
+	if walkError != nil {
+		return nil, fmt.Errorf("walking %s for nested repositories: %w", root, walkError)
+	}
+	return nested, nil
 }
 
 // HasOwnRepository reports whether a directory is the root of a git repository of its own: it holds a

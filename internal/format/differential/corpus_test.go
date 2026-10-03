@@ -69,6 +69,10 @@ func TestCorpora(t *testing.T) {
 		named[expandHome(strings.TrimSpace(root))] = true
 	}
 	seen := map[string]bool{}
+	// Every corpus measured, and every one skipped, logged together at the end, so a run that measures
+	// fewer repositories than the last one says so in one place rather than in a smaller total.
+	var measured, skipped []string
+	offeredTotal := 0
 	for len(pending) > 0 {
 		root := expandHome(strings.TrimSpace(pending[0]))
 		pending = pending[1:]
@@ -76,6 +80,34 @@ func TestCorpora(t *testing.T) {
 			continue
 		}
 		seen[root] = true
+
+		// Nested repositories are found regardless of root's own ignore lists, before anything else can
+		// skip root: a repository under a path root never formats (ahra's projects/**) is still evidence
+		// for the printers, and dropping it shrank the corpus by about 1,950 files with every line still
+		// reading 100% (#k6vebep).
+		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
+		if err != nil {
+			t.Fatalf("finding the repositories nested in %s: %v", root, err)
+		}
+		for _, nested := range nestedRepositories {
+			pending = append(pending, filepath.Join(root, nested))
+		}
+
+		// Each corpus formats with its own resolved options. One set of options for every repository is
+		// how api-phi-health's bracketSameLine went unmeasured on the first run.
+		//
+		// A nested repository still carrying Prettier config is one pinned to its own adoption (www-ahra-ai,
+		// #j3nk2zk): measuring it would mean guessing its options, so it is named and skipped. A named
+		// corpus refusing is a migration that did not happen, and stops the run.
+		resolution, err := formatoptions.Resolve(root)
+		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) && !named[root] {
+			t.Logf("skipping %s, a nested repository not yet adopted: %v", root, err)
+			skipped = append(skipped, root)
+			continue
+		}
+		if err != nil {
+			t.Fatalf("resolving the format options for %s: %v", root, err)
+		}
 
 		structureIgnore := formatfiles.StructureIgnorePath(root)
 		enumeration, err := enumerator.Enumerate(root, structureIgnore)
@@ -92,27 +124,7 @@ func TestCorpora(t *testing.T) {
 			}
 			t.Logf("%s pins a Structure with no ignore defaults at %v", root, enumeration.MissingLayers)
 		}
-		for _, nested := range enumeration.NestedRepositories {
-			if !filepath.IsAbs(nested) {
-				nested = filepath.Join(root, nested)
-			}
-			pending = append(pending, nested)
-		}
 
-		// Each corpus formats with its own resolved options. One set of options for every repository is
-		// how api-phi-health's bracketSameLine went unmeasured on the first run.
-		//
-		// A nested repository still carrying Prettier config is one pinned to its own adoption (www-ahra-ai,
-		// #j3nk2zk): measuring it would mean guessing its options, so it is named and skipped. A named
-		// corpus refusing is a migration that did not happen, and stops the run.
-		resolution, err := formatoptions.Resolve(root)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) && !named[root] {
-			t.Logf("skipping %s, a nested repository not yet adopted: %v", root, err)
-			continue
-		}
-		if err != nil {
-			t.Fatalf("resolving the format options for %s: %v", root, err)
-		}
 		options := resolution.Options
 		newOracle := func() (Formatter, error) { return prettier.New(options) }
 		newCandidate := candidateFor(t, candidateName, newOracle, options)
@@ -128,10 +140,14 @@ func TestCorpora(t *testing.T) {
 			t.Fatalf("comparing %s: %v", root, err)
 		}
 		t.Logf("walked %d, offered %d, nested repositories %v\nconfig %s\n%s",
-			enumeration.Walked, len(enumeration.Files), enumeration.NestedRepositories,
+			enumeration.Walked, len(enumeration.Files), nestedRepositories,
 			resolution.Source, report.Summary())
 		logSampleDifferences(t, report)
+		measured = append(measured, fmt.Sprintf("%s (%d)", root, len(enumeration.Files)))
+		offeredTotal += len(enumeration.Files)
 	}
+	t.Logf("measured %d corpora, %d files offered in all:\n  %s\nskipped %d: %v",
+		len(measured), offeredTotal, strings.Join(measured, "\n  "), len(skipped), skipped)
 }
 
 func candidateFor(t *testing.T, name string, newOracle NewFormatter, options formatoptions.Options) NewFormatter {

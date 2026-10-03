@@ -394,3 +394,61 @@ func TestIgnorePatternsCoverNestedPaths(t *testing.T) {
 		t.Errorf("survivors = %v, want %v", survivors, want)
 	}
 }
+
+// TestNestedRepositoriesAreFoundUnderAPathTheProjectNeverFormats: ahra lists projects/** in its
+// ignorePatterns, and the repositories under projects/ are still corpora a harness measures. Discovery
+// reads only .gitignore, and checks a directory for a repository before pruning it, so a gitignored
+// repository is found too; a gitignored plain directory is not descended.
+func TestNestedRepositoriesAreFoundUnderAPathTheProjectNeverFormats(t *testing.T) {
+	root := settingsTree(t, `["pnpm-lock.yaml"]`, `["projects/**"]`, map[string]string{
+		".gitignore":                      "projects/ignored-repo/\nprojects/scratch/\n",
+		"a.ts":                            "export const a = 1;\n",
+		"projects/listed/.git/HEAD":       "ref: refs/heads/main\n",
+		"projects/listed/b.ts":            "export const b = 1;\n",
+		"projects/ignored-repo/.git":      "gitdir: elsewhere\n",
+		"projects/scratch/deep/.git/HEAD": "ref: refs/heads/main\n",
+	})
+	nested, err := NestedRepositoriesBelow(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(nested)
+	if strings.Join(nested, ",") != "projects/ignored-repo,projects/listed" {
+		t.Errorf("found %v, want projects/ignored-repo and projects/listed, and nothing below a gitignored plain directory", nested)
+	}
+
+	// The host's own walk still offers nothing under projects/, and finds no repository there either.
+	enumeration, err := Enumerate(root, "", handlesEveryLanguage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range enumeration.Files {
+		if strings.Contains(filepath.ToSlash(file), "/projects/") {
+			t.Errorf("the host's walk offered %s, under its own projects/**", file)
+		}
+	}
+}
+
+// TestANestedRepositoryDoesNotInheritItsHostsIgnorePatterns: a repository with no settings of its own
+// takes its host's options, but not its host's ignorePatterns, which describe the host's tree. Walked as
+// its own corpus, projects/listed must offer its files although the host lists projects/**.
+func TestANestedRepositoryDoesNotInheritItsHostsIgnorePatterns(t *testing.T) {
+	root := settingsTree(t, `["pnpm-lock.yaml"]`, `["projects/**"]`, map[string]string{
+		"projects/listed/.git/HEAD":      "ref: refs/heads/main\n",
+		"projects/listed/b.ts":           "export const b = 1;\n",
+		"projects/listed/pnpm-lock.yaml": "lockfileVersion: 1\n",
+	})
+	enumeration, err := Enumerate(filepath.Join(root, "projects", "listed"), "", handlesEveryLanguage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(enumeration.Files) != 1 || filepath.Base(enumeration.Files[0]) != "b.ts" {
+		t.Errorf("offered %v, want b.ts alone: the host's ignorePatterns do not reach in, its house list does", enumeration.Files)
+	}
+	if _, counted := enumeration.IgnoredByLayer[IgnorePatternsLayer]; counted {
+		t.Error("the host's ignorePatterns were read as a layer of the nested repository's walk")
+	}
+	if enumeration.IgnoredByLayer[HouseIgnoreLayer] != 1 {
+		t.Errorf("the house list removed %d, want pnpm-lock.yaml", enumeration.IgnoredByLayer[HouseIgnoreLayer])
+	}
+}
