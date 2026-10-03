@@ -24,7 +24,12 @@ func TestResolvingFormatsEachFileWithItsOwnDirectorysOptions(t *testing.T) {
 		if err := os.MkdirAll(directory, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		settings := `{"format": {"printWidth": ` + printWidth + `}}`
+		// Each repository extends its own Nexus tier, the one file a format block may live in.
+		nexusTier := `{"format": {"printWidth": ` + printWidth + `}}`
+		if err := os.WriteFile(filepath.Join(root, name, "NexusCohereSettings.json"), []byte(nexusTier), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		settings := `{"extends": "./NexusCohereSettings.json"}`
 		if err := os.WriteFile(filepath.Join(root, name, "CohereSettings.json"), []byte(settings), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -41,7 +46,7 @@ func TestResolvingFormatsEachFileWithItsOwnDirectorysOptions(t *testing.T) {
 			t.Fatal(err)
 		}
 		if got != want {
-			t.Fatalf("%s formatted with printWidth %s, want %s from its own CohereSettings.json", name, got, want)
+			t.Fatalf("%s formatted with printWidth %s, want %s from its own Nexus tier", name, got, want)
 		}
 	}
 }

@@ -26,14 +26,15 @@ import (
 // -race, it is also the race test: the printers run side by side here as they do on a first run.
 func TestTheParallelFormatPassMatchesTheSerialOne(t *testing.T) {
 	files := map[string]string{
-		"CohereSettings.json": "{ \"rules\": { \"no-debugger\": \"error\" }, \"format\": {} }\n",
-		"Ugly.ts":             "export const ugly   =   1\n",
-		"Fixable.ts":          "export function fixable(): number {\n  debugger;\n  return 1;\n}\n",
-		"FixableUgly.ts":      "export function both(): number {\n    debugger;\n    return 2\n}\n",
-		"notes.md":            "#  Notes\n\nSome   text.\n",
-		"tidy.md":             "# Tidy\n\nText.\n",
-		"style.css":           ".a{color:red}\n",
-		"data.json":           "{\"a\":1}\n",
+		"CohereSettings.json":      "{ \"extends\": \"./NexusCohereSettings.json\", \"rules\": { \"no-debugger\": \"error\" } }\n",
+		"NexusCohereSettings.json": "{ \"format\": {} }\n",
+		"Ugly.ts":                  "export const ugly   =   1\n",
+		"Fixable.ts":               "export function fixable(): number {\n  debugger;\n  return 1;\n}\n",
+		"FixableUgly.ts":           "export function both(): number {\n    debugger;\n    return 2\n}\n",
+		"notes.md":                 "#  Notes\n\nSome   text.\n",
+		"tidy.md":                  "# Tidy\n\nText.\n",
+		"style.css":                ".a{color:red}\n",
+		"data.json":                "{\"a\":1}\n",
 	}
 	for index := range 60 {
 		files[fmt.Sprintf("source/Tidy%02d.ts", index)] = fmt.Sprintf("export const tidy%d = %d;\n", index, index)

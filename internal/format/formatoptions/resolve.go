@@ -15,19 +15,18 @@ import (
 /*
  * Which options a directory is formatted with.
  *
- * They live in the `format` block of the repository's CohereSettings.json, beside its rules, and
- * nowhere else. They used to be read from package.json's `prettier` key, and before that every caller
- * passed Default, which is ahra's block, to every repository. That was measured wrong on the first
- * differential run: api-phi-health sets `bracketSameLine: true`, the oracle did not, and its JSX
- * numbers described a formatter that repository does not use.
+ * They live in one `format` block, in the Nexus tier (NexusCohereSettings.json) that every
+ * repository's CohereSettings.json extends, and nowhere else: formatting is unified (Kirk's ruling,
+ * 2026-10-03). They used to be read from package.json's `prettier` key, then from each repository's
+ * own block, merged over its tiers.
  *
- * So this resolves from the nearest CohereSettings.json walking up from the directory, following its
- * `extends` chain as the lint loader does: each file's `format` block applies over the one it extends,
- * key by key, from the outermost base to the project's own file. A house format is then written once,
- * in a tier, as house rulings are (#rkm5a31). It refuses every case that would otherwise format with
- * options nobody chose: a chain where no file has a `format` block, and Prettier config left behind in
- * its old place. The only way to get Prettier's defaults is to configure nothing anywhere, which is the
- * honest meaning of a default. A refusal says which file and why.
+ * So this resolves from the nearest CohereSettings.json walking up from the directory, follows its
+ * `extends` chain as the lint loader does, and takes the block from the Nexus tier alone. It refuses
+ * every case that would otherwise format with options nobody chose or chose in two places: a `format`
+ * key in any other file of the chain, a chain without a Nexus tier, a Nexus tier without the block,
+ * and Prettier config left behind in its old place. The only way to get Prettier's defaults is to
+ * configure nothing anywhere, which is the honest meaning of a default. A refusal says which file and
+ * why.
  */
 
 // SettingsFileName is the file a repository's cohere configuration lives in.
@@ -137,8 +136,20 @@ func Resolve(directory string) (Resolution, error) {
 	}
 }
 
-// resolveChain applies the format block of path and of every file it extends, the outermost base first,
-// so a key the project's own file writes wins over a base's and a key it leaves out is inherited.
+// NexusTierFileName is the one file in a chain that may hold the format block: the Nexus tier, which
+// every repository's chain ends at (ahra and www-phi-health through Structure, api-phi-health
+// through Base).
+const NexusTierFileName = "NexusCohereSettings.json"
+
+// resolveChain reads the format block from the Nexus tier of path's `extends` chain, and only from
+// there.
+//
+// Formatting is unified (Kirk's ruling, 2026-10-03): every repository formats the same way, so the
+// block is written once, in the Nexus tier, and a `format` key anywhere else in the chain is refused,
+// naming the file, rather than merged over it. A project or a Structure or Base tier that restated
+// the block would be a second place the house format could drift. A chain with no Nexus tier, or a
+// Nexus tier without the block, does not say how to format, and is refused rather than formatted with
+// Prettier's defaults.
 //
 // The chain is read by the lint loader's own SourcesOf rather than by a second walk of `extends` here,
 // so the two readers cannot disagree about which files a configuration is made of.
@@ -148,28 +159,39 @@ func resolveChain(path string) (Resolution, error) {
 		return Resolution{}, err
 	}
 
-	options := PrettierDefaults()
-	configured := false
-	for index := len(sources) - 1; index >= 0; index-- {
-		contents, err := os.ReadFile(sources[index])
+	var nexusTier string
+	var block json.RawMessage
+	for _, source := range sources {
+		contents, err := os.ReadFile(source)
 		if err != nil {
 			return Resolution{}, err
 		}
 		var settings map[string]json.RawMessage
 		if err := json.Unmarshal(contents, &settings); err != nil {
-			return Resolution{}, fmt.Errorf("%s is not valid JSON: %w", sources[index], err)
+			return Resolution{}, fmt.Errorf("%s is not valid JSON: %w", source, err)
 		}
-		block, present := settings["format"]
-		if !present {
+		sourceBlock, present := settings["format"]
+		if filepath.Base(source) != NexusTierFileName {
+			if present {
+				return Resolution{}, fmt.Errorf("%s has a \"format\" block; formatting is unified, and only the Nexus tier (%s) holds the format block, so remove it here", source, NexusTierFileName)
+			}
 			continue
 		}
-		configured = true
-		if options, err = applyFormatBlock(sources[index], block, options, false); err != nil {
-			return Resolution{}, err
+		nexusTier = source
+		if present {
+			block = sourceBlock
 		}
 	}
-	if !configured {
-		return Resolution{}, fmt.Errorf("%s has no \"format\" block, and neither does any file it extends, so it does not say how to format; add one rather than formatting with Prettier's defaults", path)
+
+	if nexusTier == "" {
+		return Resolution{}, fmt.Errorf("%s does not extend the Nexus tier (%s), which holds the format block, so it does not say how to format", path, NexusTierFileName)
+	}
+	if block == nil {
+		return Resolution{}, fmt.Errorf("%s, the Nexus tier %s extends, has no \"format\" block, so the chain does not say how to format", nexusTier, path)
+	}
+	options, err := applyFormatBlock(nexusTier, block, PrettierDefaults(), false)
+	if err != nil {
+		return Resolution{}, err
 	}
 	return Resolution{Options: options, Source: path}, nil
 }

@@ -43,11 +43,12 @@ const fixScopeTsconfig = `{
 func fixScopeProject(t *testing.T, root string, extra map[string]string) {
 	t.Helper()
 	files := map[string]string{
-		"tsconfig.json":       fixScopeTsconfig,
-		"CohereSettings.json": `{"rules":{"no-debugger":"error"},"format":{}}`,
-		"Producer.ts":         "export function value(): number {\n    debugger;\n    return 1;\n}\n",
-		"Consumer.ts":         "import { value } from './Producer';\n\nexport function doubled(): number {\n    debugger;\n    return value() * 2;\n}\n",
-		"Sibling.ts":          "export function alone(): number {\n    debugger;\n    return 3;\n}\n",
+		"tsconfig.json":            fixScopeTsconfig,
+		"CohereSettings.json":      `{"extends":"./NexusCohereSettings.json","rules":{"no-debugger":"error"}}`,
+		"NexusCohereSettings.json": `{"format":{}}`,
+		"Producer.ts":              "export function value(): number {\n    debugger;\n    return 1;\n}\n",
+		"Consumer.ts":              "import { value } from './Producer';\n\nexport function doubled(): number {\n    debugger;\n    return value() * 2;\n}\n",
+		"Sibling.ts":               "export function alone(): number {\n    debugger;\n    return 3;\n}\n",
 	}
 	for name, contents := range extra {
 		files[name] = contents

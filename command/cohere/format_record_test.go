@@ -311,10 +311,11 @@ func TestTheRecordFollowsTheFormatterNotTheBinary(t *testing.T) {
 	root := t.TempDir()
 	home := t.TempDir()
 	writeTree(t, root, map[string]string{
-		"tsconfig.json":       fixScopeTsconfig,
-		"CohereSettings.json": "{ \"rules\": {}, \"format\": {} }\n",
-		"Tidy.ts":             "export const tidy = 1;\n",
-		"Ugly.ts":             "export const ugly   =   1\n",
+		"tsconfig.json":            fixScopeTsconfig,
+		"CohereSettings.json":      "{ \"extends\": \"./NexusCohereSettings.json\", \"rules\": {} }\n",
+		"NexusCohereSettings.json": "{ \"format\": {} }\n",
+		"Tidy.ts":                  "export const tidy = 1;\n",
+		"Ugly.ts":                  "export const ugly   =   1\n",
 	})
 	run := func(binary string, arguments ...string) string {
 		t.Helper()
@@ -326,10 +327,10 @@ func TestTheRecordFollowsTheFormatterNotTheBinary(t *testing.T) {
 	}
 
 	run(first, "--fix", "--format")
-	if output := run(lintOnly, "--no-fix", "--format"); !strings.Contains(output, "0 of 4 files not on record as formatted") {
+	if output := run(lintOnly, "--no-fix", "--format"); !strings.Contains(output, "0 of 5 files not on record as formatted") {
 		t.Fatalf("a build from another commit with the same formatter did not read the record:\n%s", output)
 	}
-	if output := run(printerChanged, "--no-fix", "--format"); !strings.Contains(output, "all 4 files, because the formatter changed since the last check") {
+	if output := run(printerChanged, "--no-fix", "--format"); !strings.Contains(output, "all 5 files, because the formatter changed since the last check") {
 		t.Fatalf("a build with another formatter trusted the record:\n%s", output)
 	}
 }

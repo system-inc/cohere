@@ -57,15 +57,16 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 	home := t.TempDir()
 	formatted := "export const tidy = 1;\n"
 	writeTree(t, root, map[string]string{
-		"tsconfig.json":       fixScopeTsconfig,
-		"CohereSettings.json": `{"rules":{"no-debugger":"error"},"format":{}}`,
-		".gitignore":          "ignored/\n",
-		"Producer.ts":         "export function value(): number {\n  debugger;\n  return 1;\n}\n",
-		"Tidy.ts":             formatted,
-		"Ugly.ts":             "export const ugly   =   1\n",
-		"ignored/Kept.ts":     "export const kept   =   1\n",
-		".gitmodules":         "[submodule \"library\"]\n\tpath = library\n\turl = ../library\n",
-		"library/.git":        "gitdir: ../.git/modules/library\n",
+		"tsconfig.json":            fixScopeTsconfig,
+		"CohereSettings.json":      `{"extends":"./NexusCohereSettings.json","rules":{"no-debugger":"error"}}`,
+		"NexusCohereSettings.json": `{"format":{}}`,
+		".gitignore":               "ignored/\n",
+		"Producer.ts":              "export function value(): number {\n  debugger;\n  return 1;\n}\n",
+		"Tidy.ts":                  formatted,
+		"Ugly.ts":                  "export const ugly   =   1\n",
+		"ignored/Kept.ts":          "export const kept   =   1\n",
+		".gitmodules":              "[submodule \"library\"]\n\tpath = library\n\turl = ../library\n",
+		"library/.git":             "gitdir: ../.git/modules/library\n",
 		// Unformatted, and carrying a fix no-debugger would apply: a whole-tree run formats it and must not
 		// fix it, because it sits in a repository of its own.
 		"library/Inner.ts":         "export function inner(): number {\n    debugger;\n    return 1;\n}\n",
@@ -145,7 +146,7 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 		t.Fatalf("the first run did not say why it checks every file:\n%s", output)
 	}
 	expectWouldChange("the first format check", output,
-		"CohereSettings.json", "Producer.ts", "Ugly.ts", "library/Inner.ts", "tsconfig.json")
+		"CohereSettings.json", "NexusCohereSettings.json", "Producer.ts", "Ugly.ts", "library/Inner.ts", "tsconfig.json")
 
 	if !strings.Contains(output, "library/Inner.ts:1:1 - --fix would rewrite this file: format [fix/would-change]") {
 		t.Fatalf("a file in the submodule was to be fixed as well as formatted:\n%s", output)
@@ -166,7 +167,7 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 
 	// Everything on record now, so nothing is in scope.
 	output = step("--no-fix", "--format")
-	if !strings.Contains(output, "0 of 6 files not on record as formatted") {
+	if !strings.Contains(output, "0 of 7 files not on record as formatted") {
 		t.Fatalf("a formatted tree's scope:\n%s", output)
 	}
 	expectWouldChange("a formatted tree", output)
@@ -184,7 +185,7 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 	writeTree(t, root, map[string]string{"Fresh.ts": "export const fresh   =   1\n"})
 	output = step("--no-fix", "--format")
 	expectWouldChange("a deletion and a new file", output, "Fresh.ts")
-	if !strings.Contains(output, "1 of 6 files not on record as formatted") {
+	if !strings.Contains(output, "1 of 7 files not on record as formatted") {
 		t.Fatalf("the scope did not count the deletion and the new file:\n%s", output)
 	}
 

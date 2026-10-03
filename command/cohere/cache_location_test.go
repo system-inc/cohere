@@ -25,10 +25,11 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(t *testing.T) {
 	project := func(gitignore string) string {
 		root := t.TempDir()
 		files := map[string]string{
-			"tsconfig.json":       incrementalFixtureConfig,
-			"CohereSettings.json": "{ \"rules\": { \"no-debugger\": \"error\" }, \"format\": {} }\n",
-			"index.ts":            "export function value(): number {\n  debugger;\n  return 1;\n}\n",
-			"Ugly.ts":             "export const ugly   =   1\n",
+			"tsconfig.json":            incrementalFixtureConfig,
+			"CohereSettings.json":      "{ \"extends\": \"./NexusCohereSettings.json\", \"rules\": { \"no-debugger\": \"error\" } }\n",
+			"NexusCohereSettings.json": "{ \"format\": {} }\n",
+			"index.ts":                 "export function value(): number {\n  debugger;\n  return 1;\n}\n",
+			"Ugly.ts":                  "export const ugly   =   1\n",
 		}
 		if gitignore != "" {
 			files[".gitignore"] = gitignore

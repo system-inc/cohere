@@ -18,9 +18,10 @@ func TestOneFixFormatRunSettlesAPrintedArrow(t *testing.T) {
 	binary := buildCohere(t)
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{
-		"tsconfig.json":       fixScopeTsconfig,
-		"CohereSettings.json": `{"rules":{"nexus/consistency-no-multiline-arrow-function":"error"},"format":{"tabWidth":4,"singleQuote":true,"printWidth":120}}`,
-		"Probe.ts":            "export function register(listener: () => void): void {\n    listener();\n}\n\nregister(() => { console.log('ready'); });\n",
+		"tsconfig.json":            fixScopeTsconfig,
+		"CohereSettings.json":      `{"extends":"./NexusCohereSettings.json","rules":{"nexus/consistency-no-multiline-arrow-function":"error"}}`,
+		"NexusCohereSettings.json": `{"format":{"tabWidth":4,"singleQuote":true,"printWidth":120}}`,
+		"Probe.ts":                 "export function register(listener: () => void): void {\n    listener();\n}\n\nregister(() => { console.log('ready'); });\n",
 	})
 
 	output, code := runCohere(t, binary, root, "--fix", "--format", "Probe.ts")

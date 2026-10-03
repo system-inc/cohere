@@ -26,8 +26,11 @@ func TestResolvingFormatsEachFileWithItsOwnConfig(t *testing.T) {
 	root := t.TempDir()
 	apart := filepath.Join(root, "apart")
 	together := filepath.Join(root, "together")
-	writeFile(t, filepath.Join(apart, "CohereSettings.json"), `{"format": {"printWidth": 60, "tabWidth": 4, "singleQuote": true}}`)
-	writeFile(t, filepath.Join(together, "CohereSettings.json"), `{"format": {"printWidth": 60, "tabWidth": 4, "singleQuote": true, "bracketSameLine": true}}`)
+	// Each repository's options live in its own Nexus tier, the one file a format block may live in.
+	writeFile(t, filepath.Join(apart, "NexusCohereSettings.json"), `{"format": {"printWidth": 60, "tabWidth": 4, "singleQuote": true}}`)
+	writeFile(t, filepath.Join(together, "NexusCohereSettings.json"), `{"format": {"printWidth": 60, "tabWidth": 4, "singleQuote": true, "bracketSameLine": true}}`)
+	writeFile(t, filepath.Join(apart, "CohereSettings.json"), `{"extends": "./NexusCohereSettings.json"}`)
+	writeFile(t, filepath.Join(together, "CohereSettings.json"), `{"extends": "./NexusCohereSettings.json"}`)
 
 	resolving, err := NewResolving(apart)
 	if err != nil {

@@ -18,11 +18,22 @@ func writeFile(t *testing.T, path string, contents string) {
 	}
 }
 
+// houseBlock is the house format as nexus 09b88e6 states it.
+const houseBlock = `{"tabWidth": 4, "useTabs": false, "semi": true, "singleQuote": true, "printWidth": 120}`
+
+// project writes a repository whose settings extend a Nexus tier carrying block, the shape every one of
+// ours has: the project's own file states rules and no format.
+func project(t *testing.T, root string, block string) {
+	t.Helper()
+	writeFile(t, filepath.Join(root, NexusTierFileName), `{"format": `+block+`}`)
+	writeFile(t, filepath.Join(root, SettingsFileName), `{"extends": "./`+NexusTierFileName+`", "rules": {}}`)
+}
+
 // TestResolveFindsTheNearestSettingsAbove pins inheritance: a nested library with no settings of its
 // own formats with its containing repository's options, as libraries/structure does inside ahra.
 func TestResolveFindsTheNearestSettingsAbove(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, SettingsFileName), `{"rules": {}, "format": {"tabWidth": 4, "printWidth": 120, "singleQuote": true, "bracketSameLine": true}}`)
+	project(t, root, `{"tabWidth": 4, "printWidth": 120, "singleQuote": true, "bracketSameLine": true}`)
 	writeFile(t, filepath.Join(root, "libraries", "structure", "package.json"), `{"name": "structure"}`)
 
 	resolution, err := Resolve(filepath.Join(root, "libraries", "structure", "source"))
@@ -33,107 +44,136 @@ func TestResolveFindsTheNearestSettingsAbove(t *testing.T) {
 		t.Fatalf("resolved from %q, want the root %s", resolution.Source, SettingsFileName)
 	}
 	if resolution.Options.TabWidth != 4 || resolution.Options.PrintWidth != 120 || !resolution.Options.SingleQuote || !resolution.Options.BracketSameLine {
-		t.Fatalf("options %+v did not take the format block", resolution.Options)
+		t.Fatalf("options %+v did not take the Nexus tier's format block", resolution.Options)
 	}
 }
 
-// TestResolveFollowsTheExtendsChain pins how tiers combine: each file's block applies over the one it
-// extends, the outermost base first, so the nearest file to write a key wins and a key nobody nearer
-// writes is inherited. Every key here is written at a different depth, so reading the chain in the
-// wrong order, or reading only one end of it, changes at least one of them.
-//
-// The project's `bracketSameLine: false` and `tabWidth: 2` are Prettier's own defaults written over a
-// base's other value: a merge that skipped a key equal to the default, or let true win over false,
-// would keep the base's.
-func TestResolveFollowsTheExtendsChain(t *testing.T) {
+// TestTheHouseBlockResolvesThroughTheTiers is every repository's real chain: the project extends a
+// Structure (or Base) tier, which extends the Nexus tier, and only the Nexus tier holds the block.
+func TestTheHouseBlockResolvesThroughTheTiers(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "tiers", "nexus.json"), `{"format": {"tabWidth": 8, "printWidth": 100, "singleQuote": true, "bracketSameLine": true}}`)
-	writeFile(t, filepath.Join(root, "tiers", "structure.json"), `{"extends": "./nexus.json", "format": {"printWidth": 120, "arrowParens": "avoid"}}`)
-	writeFile(t, filepath.Join(root, SettingsFileName), `{"extends": "./tiers/structure.json", "format": {"tabWidth": 2, "bracketSameLine": false}}`)
+	writeFile(t, filepath.Join(root, "nexus", NexusTierFileName), `{"rules": {}, "format": `+houseBlock+`}`)
+	writeFile(t, filepath.Join(root, "structure", "StructureCohereSettings.json"), `{"extends": "../nexus/`+NexusTierFileName+`", "rules": {}}`)
+	writeFile(t, filepath.Join(root, SettingsFileName), `{"extends": "./structure/StructureCohereSettings.json", "rules": {}}`)
 
 	resolution, err := Resolve(filepath.Join(root, "source"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := PrettierDefaults()
-	want.TabWidth = 2            // the project over nexus's 8
-	want.PrintWidth = 120        // structure over nexus's 100
-	want.SingleQuote = true      // nexus alone
-	want.BracketSameLine = false // the project over nexus's true
-	want.ArrowParens = "avoid"   // structure alone
+	want.TabWidth = 4
+	want.SingleQuote = true
+	want.PrintWidth = 120
 	if resolution.Options != want {
-		t.Fatalf("options %+v, want %+v", resolution.Options, want)
+		t.Fatalf("options %+v, want the house block %+v", resolution.Options, want)
 	}
 	if resolution.Source != filepath.Join(root, SettingsFileName) {
 		t.Fatalf("resolved from %q, want the project's %s", resolution.Source, SettingsFileName)
 	}
 }
 
-// TestAProjectWithoutAFormatBlockInheritsItsBases: a project that states no format of its own formats
-// with the house's, which is the point of putting the house format in a tier.
-func TestAProjectWithoutAFormatBlockInheritsItsBases(t *testing.T) {
-	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "tiers", "nexus.json"), `{"format": {"tabWidth": 4, "printWidth": 120}}`)
-	writeFile(t, filepath.Join(root, SettingsFileName), `{"extends": "./tiers/nexus.json", "rules": {}}`)
+// TestAFormatBlockOutsideTheNexusTierIsRefused: formatting is unified, so a format key anywhere but
+// the Nexus tier is a second place the house format could drift, refused naming the file to change,
+// whether it restates the house block or differs from it.
+func TestAFormatBlockOutsideTheNexusTierIsRefused(t *testing.T) {
+	for _, testCase := range []struct {
+		name      string
+		structure string
+		project   string
+		refused   string
+	}{
+		{"the project's own file", `{"extends": "../nexus/` + NexusTierFileName + `"}`, `{"extends": "./structure/StructureCohereSettings.json", "format": ` + houseBlock + `}`, SettingsFileName},
+		{"a project block that differs", `{"extends": "../nexus/` + NexusTierFileName + `"}`, `{"extends": "./structure/StructureCohereSettings.json", "format": {"printWidth": 80}}`, SettingsFileName},
+		{"a Structure or Base tier", `{"extends": "../nexus/` + NexusTierFileName + `", "format": {"printWidth": 100}}`, `{"extends": "./structure/StructureCohereSettings.json"}`, filepath.Join("structure", "StructureCohereSettings.json")},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeFile(t, filepath.Join(root, "nexus", NexusTierFileName), `{"format": `+houseBlock+`}`)
+			writeFile(t, filepath.Join(root, "structure", "StructureCohereSettings.json"), testCase.structure)
+			writeFile(t, filepath.Join(root, SettingsFileName), testCase.project)
 
-	resolution, err := Resolve(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resolution.Options.TabWidth != 4 || resolution.Options.PrintWidth != 120 {
-		t.Fatalf("options %+v, want the base's tab width 4 and print width 120", resolution.Options)
+			resolution, err := Resolve(root)
+			if err == nil {
+				t.Fatalf("a format block in %s resolved to %+v", testCase.refused, resolution.Options)
+			}
+			if !strings.Contains(err.Error(), filepath.Join(root, testCase.refused)) || !strings.Contains(err.Error(), "only the Nexus tier") {
+				t.Fatalf("refusal %v does not name %s as the file holding a format block outside the Nexus tier", err, testCase.refused)
+			}
+		})
 	}
 }
 
-// TestAChainRefusesWhatOneFileWouldBeRefusedFor: no block anywhere in the chain is the old "settings
-// without a format" refusal, and a bad key in a base is refused naming the base, which is the file to
-// change.
-func TestAChainRefusesWhatOneFileWouldBeRefusedFor(t *testing.T) {
-	t.Run("no format block in any file", func(t *testing.T) {
+// TestAChainThatDoesNotSayHowToFormatIsRefused: a Nexus tier without the block, and a chain with no
+// Nexus tier at all, each refused rather than formatted with Prettier's defaults.
+func TestAChainThatDoesNotSayHowToFormatIsRefused(t *testing.T) {
+	t.Run("a Nexus tier without the block", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "tiers", "nexus.json"), `{"rules": {}}`)
-		writeFile(t, filepath.Join(root, SettingsFileName), `{"extends": "./tiers/nexus.json", "rules": {}}`)
+		nexusTier := filepath.Join(root, "nexus", NexusTierFileName)
+		writeFile(t, nexusTier, `{"rules": {}}`)
+		writeFile(t, filepath.Join(root, SettingsFileName), `{"extends": "./nexus/`+NexusTierFileName+`"}`)
 		_, err := Resolve(root)
-		if err == nil || !strings.Contains(err.Error(), "neither does any file it extends") {
-			t.Fatalf("refusal %v, want one saying no file in the chain has a format block", err)
+		if err == nil || !strings.Contains(err.Error(), nexusTier) || !strings.Contains(err.Error(), "has no \"format\" block") {
+			t.Fatalf("refusal %v does not name the Nexus tier %s as missing the block", err, nexusTier)
 		}
 	})
 
-	t.Run("an unknown option in a base", func(t *testing.T) {
+	t.Run("no Nexus tier in the chain", func(t *testing.T) {
 		root := t.TempDir()
-		base := filepath.Join(root, "tiers", "nexus.json")
-		writeFile(t, base, `{"format": {"quoteProps": "consistent"}}`)
-		writeFile(t, filepath.Join(root, SettingsFileName), `{"extends": "./tiers/nexus.json", "format": {}}`)
+		writeFile(t, filepath.Join(root, "structure", "StructureCohereSettings.json"), `{"rules": {}}`)
+		writeFile(t, filepath.Join(root, SettingsFileName), `{"extends": "./structure/StructureCohereSettings.json"}`)
 		_, err := Resolve(root)
-		if err == nil || !strings.Contains(err.Error(), base) {
-			t.Fatalf("refusal %v does not name the base %s", err, base)
+		if err == nil || !strings.Contains(err.Error(), "does not extend the Nexus tier") {
+			t.Fatalf("refusal %v, want one saying the chain has no Nexus tier", err)
+		}
+	})
+
+	t.Run("settings extending nothing", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, SettingsFileName), `{"rules": {}}`)
+		_, err := Resolve(root)
+		if err == nil || !strings.Contains(err.Error(), "does not extend the Nexus tier") {
+			t.Fatalf("refusal %v, want one saying the chain has no Nexus tier", err)
+		}
+	})
+}
+
+// TestAChainRefusesWhatOneFileWouldBeRefusedFor: a bad key in the Nexus tier is refused naming the
+// tier, which is the file to change, and a missing base is refused.
+func TestAChainRefusesWhatOneFileWouldBeRefusedFor(t *testing.T) {
+	t.Run("an unknown option in the Nexus tier", func(t *testing.T) {
+		root := t.TempDir()
+		nexusTier := filepath.Join(root, "tiers", NexusTierFileName)
+		writeFile(t, nexusTier, `{"format": {"quoteProps": "consistent"}}`)
+		writeFile(t, filepath.Join(root, SettingsFileName), `{"extends": "./tiers/`+NexusTierFileName+`"}`)
+		_, err := Resolve(root)
+		if err == nil || !strings.Contains(err.Error(), nexusTier) {
+			t.Fatalf("refusal %v does not name the Nexus tier %s", err, nexusTier)
 		}
 	})
 
 	t.Run("a base that is missing", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, SettingsFileName), `{"extends": "./tiers/nexus.json", "format": {}}`)
+		writeFile(t, filepath.Join(root, SettingsFileName), `{"extends": "./tiers/`+NexusTierFileName+`"}`)
 		if resolution, err := Resolve(root); err == nil {
 			t.Fatalf("a chain naming a missing base resolved to %+v", resolution.Options)
 		}
 	})
 }
 
-// TestALeftoverIsComparedWithTheWholeChain: old Prettier config agrees or disagrees with what the chain
-// resolves to, not with the project's own block alone, which here says nothing about print width.
-func TestALeftoverIsComparedWithTheWholeChain(t *testing.T) {
+// TestALeftoverIsComparedWithTheResolvedOptions: old Prettier config agrees or disagrees with what the
+// Nexus tier resolves to, not with a block of its own.
+func TestALeftoverIsComparedWithTheResolvedOptions(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "tiers", "nexus.json"), `{"format": {"printWidth": 120}}`)
-	writeFile(t, filepath.Join(root, SettingsFileName), `{"extends": "./tiers/nexus.json", "format": {"tabWidth": 4}}`)
+	project(t, root, `{"tabWidth": 4, "printWidth": 120}`)
 
 	writeFile(t, filepath.Join(root, "package.json"), `{"name": "x", "prettier": {"tabWidth": 4, "printWidth": 120}}`)
 	if _, err := Resolve(root); err != nil {
-		t.Fatalf("a leftover agreeing with the chain was refused: %v", err)
+		t.Fatalf("a leftover agreeing with the Nexus tier was refused: %v", err)
 	}
 
 	writeFile(t, filepath.Join(root, "package.json"), `{"name": "x", "prettier": {"tabWidth": 4}}`)
 	if _, err := Resolve(root); !errors.Is(err, ErrPrettierConfigRemains) {
-		t.Fatalf("a leftover missing the inherited print width was not refused as disagreeing: %v", err)
+		t.Fatalf("a leftover missing the Nexus tier's print width was not refused as disagreeing: %v", err)
 	}
 }
 
@@ -154,18 +194,19 @@ func TestResolveWithNothingConfiguredIsPrettierNotAhra(t *testing.T) {
 // TestResolveRefusesEveryOptionNobodyChose covers each refusal, because each one replaces a format run
 // with options nobody chose: Prettier's width 80 where the repository meant 120.
 func TestResolveRefusesEveryOptionNobodyChose(t *testing.T) {
+	extendsNexus := `{"extends": "./` + NexusTierFileName + `"}`
 	for name, testCase := range map[string]struct {
 		files    map[string]string
 		leftover bool
 	}{
-		"unknown option":             {files: map[string]string{SettingsFileName: `{"format": {"quoteProps": "consistent"}}`}},
-		"plugin key in the block":    {files: map[string]string{SettingsFileName: `{"format": {"plugins": ["prettier-plugin-tailwindcss"]}}`}},
-		"crlf":                       {files: map[string]string{SettingsFileName: `{"format": {"endOfLine": "crlf"}}`}},
-		"settings without a format":  {files: map[string]string{SettingsFileName: `{"rules": {}}`}},
-		"disagreeing package.json":   {files: map[string]string{SettingsFileName: `{"format": {"tabWidth": 4}}`, "package.json": `{"prettier": {"tabWidth": 2}}`}, leftover: true},
-		"disagreeing .prettierrc":    {files: map[string]string{SettingsFileName: `{"format": {"tabWidth": 4}}`, ".prettierrc": `{"printWidth": 100, "tabWidth": 4}`}, leftover: true},
+		"unknown option":             {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {"quoteProps": "consistent"}}`}},
+		"plugin key in the block":    {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {"plugins": ["prettier-plugin-tailwindcss"]}}`}},
+		"crlf":                       {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {"endOfLine": "crlf"}}`}},
+		"settings without a format":  {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"rules": {}}`}},
+		"disagreeing package.json":   {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {"tabWidth": 4}}`, "package.json": `{"prettier": {"tabWidth": 2}}`}, leftover: true},
+		"disagreeing .prettierrc":    {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {"tabWidth": 4}}`, ".prettierrc": `{"printWidth": 100, "tabWidth": 4}`}, leftover: true},
 		"old config and no settings": {files: map[string]string{"package.json": `{"prettier": {"tabWidth": 4}}`}, leftover: true},
-		"javascript config":          {files: map[string]string{SettingsFileName: `{"format": {}}`, "prettier.config.js": `module.exports = {}`}, leftover: true},
+		"javascript config":          {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {}}`, "prettier.config.js": `module.exports = {}`}, leftover: true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
@@ -186,7 +227,7 @@ func TestResolveRefusesEveryOptionNobodyChose(t *testing.T) {
 // TestALeftoverIsNamedWithItsFile: a refusal a reader can act on says which file to change.
 func TestALeftoverIsNamedWithItsFile(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, SettingsFileName), `{"format": {"tabWidth": 4}}`)
+	project(t, root, `{"tabWidth": 4}`)
 	writeFile(t, filepath.Join(root, "package.json"), `{"name": "x", "prettier": {"tabWidth": 2}}`)
 	_, err := Resolve(root)
 	if err == nil || !strings.Contains(err.Error(), filepath.Join(root, "package.json")) {
@@ -198,42 +239,42 @@ func TestALeftoverIsNamedWithItsFile(t *testing.T) {
 // its "prettier" key is old config.
 func TestAPackageJSONWithoutPrettierIsNotALeftover(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, SettingsFileName), `{"format": {"printWidth": 120}}`)
+	project(t, root, `{"printWidth": 120}`)
 	writeFile(t, filepath.Join(root, "package.json"), `{"name": "x", "devDependencies": {}}`)
 	resolution, err := Resolve(root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if resolution.Options.PrintWidth != 120 {
-		t.Fatalf("print width %d, want the format block's 120", resolution.Options.PrintWidth)
+		t.Fatalf("print width %d, want the Nexus tier's 120", resolution.Options.PrintWidth)
 	}
 }
 
-// TestALeftoverThatAgreesIsTolerated: ahra keeps package.json's prettier block until its editor moves
-// (#3w83j3k), with the same options as its format block plus the Tailwind plugin's keys. It keeps
-// formatting, from the format block, and the old copy is only compared.
+// TestALeftoverThatAgreesIsTolerated: a repository mid-move keeps package.json's prettier block with
+// the same options as the Nexus tier plus the Tailwind plugin's keys. It keeps formatting, from the
+// Nexus tier, and the old copy is only compared. The tolerance goes with #dv5ng7g.
 func TestALeftoverThatAgreesIsTolerated(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, SettingsFileName), `{"format": {"tabWidth": 4, "singleQuote": true, "printWidth": 120}}`)
+	project(t, root, `{"tabWidth": 4, "singleQuote": true, "printWidth": 120}`)
 	writeFile(t, filepath.Join(root, "package.json"), `{"name": "x", "prettier": {"plugins": ["prettier-plugin-tailwindcss"], "tabWidth": 4, "singleQuote": true, "printWidth": 120, "tailwindFunctions": ["mergeClassNames"]}}`)
 	resolution, err := Resolve(root)
 	if err != nil {
 		t.Fatalf("an agreeing leftover was refused: %v", err)
 	}
 	if resolution.Source != filepath.Join(root, SettingsFileName) || resolution.Options.PrintWidth != 120 {
-		t.Fatalf("resolved %+v from %s, want the format block's", resolution.Options, resolution.Source)
+		t.Fatalf("resolved %+v from %s, want the Nexus tier's", resolution.Options, resolution.Source)
 	}
 }
 
 // TestADroppedKeyCanNeverReachPrettiersDefaults: the move's failure is a repository whose prettier key
 // went and whose options never arrived, formatting at width 80 with nothing said. Both ways it could
-// happen are refusals: settings without a format block, and old config with no settings above it.
+// happen are refusals: settings that do not say how to format, and old config with no settings above it.
 func TestADroppedKeyCanNeverReachPrettiersDefaults(t *testing.T) {
 	withoutBlock := t.TempDir()
 	writeFile(t, filepath.Join(withoutBlock, SettingsFileName), `{"rules": {"no-debugger": "error"}}`)
 	writeFile(t, filepath.Join(withoutBlock, "package.json"), `{"name": "x"}`)
 	if resolution, err := Resolve(withoutBlock); err == nil {
-		t.Fatalf("settings with no format block resolved to %+v", resolution.Options)
+		t.Fatalf("settings that do not say how to format resolved to %+v", resolution.Options)
 	}
 
 	neverMoved := t.TempDir()

@@ -61,9 +61,10 @@ func TestNoFixReportsWhatFixAndFormatWouldChange(t *testing.T) {
 	binary := buildCohere(t)
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{
-		"tsconfig.json":       fixScopeTsconfig,
-		"CohereSettings.json": `{"rules":{"no-debugger":"error"},"format":{}}`,
-		"Clean.ts":            "export const clean = 1;\n",
+		"tsconfig.json":            fixScopeTsconfig,
+		"CohereSettings.json":      `{"extends":"./NexusCohereSettings.json","rules":{"no-debugger":"error"}}`,
+		"NexusCohereSettings.json": `{"format":{}}`,
+		"Clean.ts":                 "export const clean = 1;\n",
 	})
 
 	// Whatever the formatter wants of the fixture's own files, a writing run settles it. `--format-all`
