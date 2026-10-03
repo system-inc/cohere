@@ -306,7 +306,7 @@ func FixAndTransformFile(fileName string, propose Propose, transform Transform, 
 		return result, nil
 	}
 
-	if err := writeAtomically(fileName, result.Text); err != nil {
+	if err := WriteAtomically(fileName, result.Text); err != nil {
 		// The file on disk is untouched: the rename is the only step that changes it, and a failure
 		// before it leaves the original intact. Report the fixes as not-applied rather than applied,
 		// so the count matches what a reader would find in the tree.

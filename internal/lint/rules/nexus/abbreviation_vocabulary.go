@@ -44,6 +44,13 @@ import (
 //go:embed abbreviations.json
 var abbreviationsFile []byte
 
+// AbbreviationsFile is the vocabulary exactly as embedded, for the front door to hand the Swift engine.
+// A released engine has no checkout to read the file from, and handing it this copy keeps one list for
+// both engines. A copy, so no caller can change the words this rule judges by.
+func AbbreviationsFile() []byte {
+	return bytes.Clone(abbreviationsFile)
+}
+
 // abbreviationVocabularyFile is the file's shape. Unknown keys are refused when it is read, so a
 // misspelled form is a startup failure rather than an entry that silently never matches.
 type abbreviationVocabularyFile struct {

@@ -18,7 +18,7 @@ import (
 // complete version. An in-place write fails this: os.WriteFile truncates and then fills, so a
 // reader landing in that window sees a prefix, or nothing.
 //
-// Confirmed to fail: replacing writeAtomically's body with os.WriteFile makes this test report
+// Confirmed to fail: replacing WriteAtomically's body with os.WriteFile makes this test report
 // torn reads. That mutation passes every other test in this package, which is why this one exists.
 func TestConcurrentReadersNeverSeeAPartialFile(t *testing.T) {
 	directory := t.TempDir()
@@ -74,7 +74,7 @@ func TestConcurrentReadersNeverSeeAPartialFile(t *testing.T) {
 		if round%2 == 1 {
 			body = oldBody
 		}
-		if err := writeAtomically(fileName, body); err != nil {
+		if err := WriteAtomically(fileName, body); err != nil {
 			close(stop)
 			waitGroup.Wait()
 			t.Fatalf("write failed on round %d: %v", round, err)
@@ -156,12 +156,12 @@ func TestTemporaryFileIsCreatedBesideTheTarget(t *testing.T) {
 	}()
 
 	for range 200 {
-		if err := writeAtomically(fileName, "const a = 2;\n"); err != nil {
+		if err := WriteAtomically(fileName, "const a = 2;\n"); err != nil {
 			close(stop)
 			<-done
 			t.Fatal(err)
 		}
-		if err := writeAtomically(fileName, "const a = 1;\n"); err != nil {
+		if err := WriteAtomically(fileName, "const a = 1;\n"); err != nil {
 			close(stop)
 			<-done
 			t.Fatal(err)
@@ -203,7 +203,7 @@ func keysOf(set map[string]bool) []string {
 // A write into a directory that does not exist must fail loudly rather than silently doing nothing.
 func TestWriteIntoAMissingDirectoryFails(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "absent", "target.ts")
-	if err := writeAtomically(missing, "const a = 1;\n"); err == nil {
+	if err := WriteAtomically(missing, "const a = 1;\n"); err == nil {
 		t.Fatalf("expected an error writing into a directory that does not exist")
 	}
 }

@@ -109,7 +109,7 @@ func parseText(fileName string, text string) *ast.SourceFile {
 	}, text, scriptKind)
 }
 
-// writeAtomically replaces a file's contents so that no reader ever observes a partial write.
+// WriteAtomically replaces a file's contents so that no reader ever observes a partial write.
 //
 // Write the new text to a temp file in the same directory, then rename over the target. Rename
 // within a filesystem is atomic, so a concurrent reader sees the old bytes or the new bytes and
@@ -123,7 +123,7 @@ func parseText(fileName string, text string) *ast.SourceFile {
 //
 // The original file's permission bits are preserved, because a fresh temp file is created at 0600
 // and renaming it over a source file would quietly change its mode.
-func writeAtomically(fileName string, text string) error {
+func WriteAtomically(fileName string, text string) error {
 	directory := filepath.Dir(fileName)
 
 	mode := os.FileMode(0o644)
