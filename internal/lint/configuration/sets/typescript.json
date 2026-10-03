@@ -231,7 +231,12 @@
         "@typescript-eslint/no-extraneous-class": "error",
         "no-unexpected-multiline": "error",
         "max-nested-callbacks": "error",
-        "max-lines": "off",
+        "max-lines": [
+            "error",
+            {
+                "max": 2000
+            }
+        ],
         "@typescript-eslint/prefer-for-of": "error",
         "prefer-object-has-own": "error",
         "@typescript-eslint/init-declarations": "off",
@@ -370,5 +375,16 @@
         "no-use-before-define": "error",
         "@typescript-eslint/no-shadow": "error",
         "nexus/consistency-no-boolean-outcome": "error"
-    }
+    },
+    "overrides": [
+        {
+            "files": [
+                "**/*.generated.*"
+            ],
+            "reason": "A generator's output is as long as the schema it prints, so its length measures the schema rather than a seam anyone chose. Every other rule holds generated code to the house standard (#c076xbg); max-lines alone does not apply (#50tpzjq).",
+            "rules": {
+                "max-lines": "off"
+            }
+        }
+    ]
 }
