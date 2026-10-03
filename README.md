@@ -203,6 +203,10 @@ the gate this tool replaces printed green over zero files for days because a res
 binary, fell through to a bare command name, and an empty file list is indistinguishable from a
 clean tree.
 
+cohere decides what changed from content hashes and reads ignore files itself, so its own code starts
+no git process. Two exceptions sit outside the checking: the dispatcher extracts the committed tree
+with `git archive`, and SwiftPM clones and describes a Swift package's dependencies.
+
 ## Releasing
 
 `cohere` reaches a machine as an npm install. One thin dispatcher package resolves a per-platform
