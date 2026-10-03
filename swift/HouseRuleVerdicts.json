@@ -121,9 +121,9 @@
   },
   {
     "typeScriptRule": "nexus/concurrency-no-lost-update",
-    "verdict": "Port",
-    "swiftRule": null,
-    "reason": "Actor and @MainActor reentrancy reproduce the bug exactly (state read before an `await`, written back after it), and strict concurrency checking prevents data races but not this."
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/concurrency-no-lost-update",
+    "reason": null
   },
   {
     "typeScriptRule": "nexus/consistency-no-abbreviated-identifier",
