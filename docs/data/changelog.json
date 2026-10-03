@@ -1,0 +1,8 @@
+[
+    {
+        "version": "1.0.0",
+        "unreleased": true,
+        "anchor": "100-unreleased",
+        "body": "The first release. It carries these rule sets:\n\n- `cohere:next`, 22 rules on\n- `cohere:react`, 76 rules on\n- `cohere:system-inc/base`, 20 rules on\n- `cohere:system-inc/structure`, 36 rules on\n- `cohere:tailwind`, 12 rules on\n- `cohere:typescript`, 232 rules on\n"
+    }
+]

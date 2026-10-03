@@ -1,0 +1,149 @@
+{
+    "flags": [
+        {
+            "name": "cache-dump",
+            "usage": "print what the cache table for this project holds, and exit"
+        },
+        {
+            "name": "coverage",
+            "usage": "name every rule once under the coverage fact that describes it, rather than only counting them"
+        },
+        {
+            "name": "directory",
+            "argument": "string",
+            "usage": "the project root, which every relative path resolves against (default: the directory of the nearest tsconfig.json or Package.swift at or above the working directory)"
+        },
+        {
+            "name": "explain",
+            "argument": "string",
+            "usage": "report what every rule did on one file, and why it did or did not run"
+        },
+        {
+            "name": "fix",
+            "usage": "apply fixes only, running no other phase; add --format to format as well"
+        },
+        {
+            "name": "fix-passes",
+            "argument": "int",
+            "usage": "how many times a file may be re-linted while fixes keep landing",
+            "default": "10"
+        },
+        {
+            "name": "format",
+            "usage": "format the files not on record as formatted, or the paths named; with --no-fix, report them instead"
+        },
+        {
+            "name": "format-all",
+            "usage": "format every file, not only the ones not on record as formatted (implies --format)"
+        },
+        {
+            "name": "lint",
+            "usage": "run the lint rules only, reporting their findings without fixing them and without TypeScript's diagnostics"
+        },
+        {
+            "name": "lint-config",
+            "argument": "string",
+            "usage": "the settings file that says which rules apply to which files, relative to --directory or else to where you typed it; unnamed, the file of this name at the project root",
+            "default": "CohereSettings.json"
+        },
+        {
+            "name": "no-cache",
+            "usage": "read nothing from and write nothing to this project's caches (the cache table and the tsconfig's incremental build info), so every phase computes from source"
+        },
+        {
+            "name": "no-fix",
+            "usage": "mutate no source in the checked project: report what would change without writing a byte of it (cohere still keeps its own cache in the project's .cache/cohere, unless --no-cache)"
+        },
+        {
+            "name": "print-config",
+            "usage": "print, as JSON in ESLint's --print-config shape, every registered rule's resolved severity and options for one file (the path given, else index.ts at the project root), and exit"
+        },
+        {
+            "name": "profile",
+            "argument": "file",
+            "usage": "write a Go CPU profile of the run to file, for go tool pprof"
+        },
+        {
+            "name": "rules",
+            "usage": "print the rules this cohere implements for the project's language, one per line, and exit"
+        },
+        {
+            "name": "rules-enabled",
+            "usage": "print the rules the lint config resolves for one file (the path given, else index.ts at the project root), with severity, and exit"
+        },
+        {
+            "name": "single-threaded",
+            "usage": "use one checker instead of several"
+        },
+        {
+            "name": "stdin-filepath",
+            "argument": "string",
+            "usage": "with --fix, read one file's text from stdin and print what --fix (and --format, if named) would write for the file at this path, writing nothing to disk"
+        },
+        {
+            "name": "timing",
+            "usage": "report what each rule cost, most expensive first"
+        },
+        {
+            "name": "tsconfig",
+            "argument": "string",
+            "usage": "the tsconfig that defines the program, relative to --directory or else to where you typed it; unnamed, the file of this name in --directory, or else the nearest one at or above the working directory",
+            "default": "tsconfig.json"
+        },
+        {
+            "name": "types",
+            "usage": "report TypeScript's own diagnostics only, running no rules and writing no fixes"
+        },
+        {
+            "name": "unused",
+            "usage": "report code that was written and never used: unreferenced exports, and statements nothing can reach"
+        },
+        {
+            "name": "unused-all",
+            "usage": "list the unused findings already marked cohere-keep rather than only counting them (implies --unused)"
+        },
+        {
+            "name": "unused-deep",
+            "usage": "also compute the transitive closure of unused code and group it into islands (implies --unused)"
+        },
+        {
+            "name": "version",
+            "usage": "print the version, what this binary was built from, and the Swift contract it speaks, and exit"
+        }
+    ],
+    "verbs": [
+        {
+            "name": "rename",
+            "usage": [
+                "cohere rename <file>:<line>:<column> <newName>",
+                "cohere rename <name> <newName>"
+            ],
+            "summary": "Renames a symbol everywhere the type graph says it is used. The position form is primary; a bare name is refused when it is ambiguous. Nothing is written without --write.",
+            "flags": [
+                {
+                    "name": "directory",
+                    "argument": "string",
+                    "usage": "the working directory paths resolve against (default: the process's own)"
+                },
+                {
+                    "name": "dry-run",
+                    "usage": "print the plan and write nothing (the default; accepted so it can be stated explicitly)"
+                },
+                {
+                    "name": "single-threaded",
+                    "usage": "use one checker instead of several"
+                },
+                {
+                    "name": "tsconfig",
+                    "argument": "string",
+                    "usage": "the tsconfig that defines the program, relative to --directory",
+                    "default": "tsconfig.json"
+                },
+                {
+                    "name": "write",
+                    "usage": "apply the rename; without it nothing is written"
+                }
+            ]
+        }
+    ]
+}
