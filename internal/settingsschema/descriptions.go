@@ -24,6 +24,10 @@ var topLevelDescriptions = map[string]string{
 	"overrides": "Blocks that change rules for the paths their globs match, applied in order after the base " +
 		"rules, a later block winning.",
 
+	"cohere": "The cohere releases this project accepts, as an npm-style range (\"^1.0.0\", \"~1.4.2\", " +
+		"\">=1.2.0 <2.0.0\"). A release outside it refuses to run and names both versions, since rule names, options " +
+		"and sets are part of a release's contract. Only the project's own file may pin, never a file it extends.",
+
 	"ignorePatterns": "Paths cohere never checks and the formatter never offers, one list for both, as globs " +
 		"relative to the directory of the settings file cohere reads first: * within a path segment, ** across " +
 		"any number of segments, ? one character, {a,b} alternation. A file's patterns follow those of the " +

@@ -43,6 +43,7 @@ never something it silently ignores.
 | Key | Type | In |
 | --- | --- | --- |
 | [`$schema`](#schema) | string | any settings file |
+| [`cohere`](#cohere) | string | any settings file |
 | [`departures`](#departures) | object of reasons | any settings file |
 | [`extends`](#extends) | string or array of strings | any settings file |
 | [`format`](#format) | object | the Nexus tier only (NexusCohereSettings.json) |
@@ -59,6 +60,14 @@ The schema an editor validates this file against. cohere does not read it.
 
 ```json
 { "$schema": "./schema/CohereSettings.schema.json" }
+```
+
+### `cohere`
+
+The cohere releases this project accepts, as an npm-style range ("^1.0.0", "~1.4.2", ">=1.2.0 <2.0.0"). A release outside it refuses to run and names both versions, since rule names, options and sets are part of a release's contract. Only the project's own file may pin, never a file it extends.
+
+```json
+{ "cohere": "^1.0.0" }
 ```
 
 ### `departures`

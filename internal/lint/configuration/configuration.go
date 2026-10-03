@@ -115,6 +115,11 @@ type Config struct {
 	// the reason that file gave, keyed by rule name. Coverage reports them, so a departure is always
 	// visible and never becomes a quiet allowance.
 	Departures map[string]Departure
+
+	// CohereVersion is the range of cohere releases the project's own file accepts, or nil when it
+	// pins none. Only the project's own file may pin: a set is read by every project that extends it,
+	// and a range there would decide for all of them which release they run.
+	CohereVersion *VersionRange
 }
 
 // Departure is one rule a configuration sets differently from the file it extends, and why.
@@ -299,6 +304,11 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 
 	for index, layer := range layers {
 		isBase := index < len(layers)-1
+		if isBase && layer.present["cohere"] {
+			return nil, fmt.Errorf("lint config %s pins \"cohere\", and it is extended by %s: only the project's "+
+				"own file may pin a release, since every project extending %s would inherit the pin. Move it "+
+				"to the project's own file", layer.path, layers[len(layers)-1].path, layer.path)
+		}
 		if isBase && layer.present["settings"] {
 			return nil, fmt.Errorf("lint config %s declares \"settings\", and it is extended by %s: "+
 				"the reader of \"settings\" does not follow `extends`, so the value would be ignored "+
@@ -421,6 +431,17 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 	// default overwrite a deliberate `off`.
 	for name, setting := range RulesFromPlugins(loaded.Plugins, loaded.Rules) {
 		loaded.Rules[name] = setting
+	}
+
+	if own := layers[len(layers)-1]; own.present["cohere"] {
+		versionRange, err := ParseVersionRange(own.raw.Cohere)
+		if err != nil {
+			return nil, fmt.Errorf("lint config %s: %w", own.path, err)
+		}
+		if err := checkCoherePin(own.path, versionRange); err != nil {
+			return nil, err
+		}
+		loaded.CohereVersion = &versionRange
 	}
 
 	for index := len(layers) - 1; index >= 0; index-- {
@@ -713,6 +734,7 @@ type rawConfig struct {
 	Rules          map[string]json.RawMessage `json:"rules"`
 	IgnorePatterns []string                   `json:"ignorePatterns"`
 	Overrides      []rawOverride              `json:"overrides"`
+	Cohere         string                     `json:"cohere"`
 }
 
 // parsedTopLevelKeys are the keys `rawConfig` decodes and the loader acts on.
@@ -723,6 +745,7 @@ var parsedTopLevelKeys = map[string]bool{
 	"rules":          true,
 	"ignorePatterns": true,
 	"overrides":      true,
+	"cohere":         true,
 }
 
 // ignoredTopLevelKeys are the keys the loader deliberately does not act on, each with the reason.

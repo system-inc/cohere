@@ -18,6 +18,7 @@ var examples = map[string]string{
 	"departures":     `{ "no-console": "This command-line tool writes to the console by design." }`,
 	"overrides":      `[{ "files": ["**/*.test.ts"], "rules": { "no-console": "off" }, "reason": "Tests print their fixtures." }]`,
 	"ignorePatterns": `["dist/**", "data/**", "modules/*/data/**"]`,
+	"cohere":         `"^1.0.0"`,
 	"plugins":        `["react"]`,
 	"jsPlugins":      `["./code-quality/lint/rules/index.js"]`,
 	"settings":       `{ "react": { "version": "19.0" } }`,

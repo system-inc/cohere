@@ -1504,6 +1504,10 @@
             "description": "The schema an editor validates this file against. cohere does not read it.",
             "type": "string"
         },
+        "cohere": {
+            "description": "The cohere releases this project accepts, as an npm-style range (\"^1.0.0\", \"~1.4.2\", \">=1.2.0 <2.0.0\"). A release outside it refuses to run and names both versions, since rule names, options and sets are part of a release's contract. Only the project's own file may pin, never a file it extends.",
+            "type": "string"
+        },
         "departures": {
             "additionalProperties": {
                 "minLength": 1,

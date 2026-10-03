@@ -70,6 +70,7 @@ var keyFixtures = map[string]map[string]string{
 	"departures":     {"Base.json": `{"rules": {"no-debugger": "warn"}}`, "CohereSettings.json": `{"extends": "./Base.json", "rules": {"no-debugger": "error"}, "departures": {"no-debugger": "A debugger statement never ships here."}}`},
 	"overrides":      {"CohereSettings.json": `{"overrides": [{"files": ["**/*.test.ts"], "rules": {"no-debugger": "off"}, "reason": "fixtures"}]}`},
 	"ignorePatterns": {"CohereSettings.json": `{"ignorePatterns": ["dist/**"]}`},
+	"cohere":         {"CohereSettings.json": `{"cohere": "^1.0.0"}`},
 	"plugins":        {"CohereSettings.json": `{"plugins": ["react"]}`},
 	"jsPlugins":      {"CohereSettings.json": `{"jsPlugins": ["./rules.js"]}`},
 	"settings":       {"CohereSettings.json": `{"settings": {"react": {"version": "19.0"}}}`},
