@@ -19,7 +19,9 @@ import SwiftSyntax
  lookup); a declaration carrying an attribute that may register it, a macro such as `@Test`; Codable's coding
  keys. Some are left alone because removing them changes what the program does without breaking the build:
  an initializer, which may exist to keep a type from being built; a stored property of a type whose
- conformances may read every stored property (Codable); an instance's stored property whose initializer runs
+ conformances reach `Encodable` or `Decodable` (`ConformanceGraph`, through protocols of ours and extensions
+ anywhere in the module), or reach what the index cannot see into, a C or Objective-C type or a protocol with no
+ record; a stored property of a type a macro may expand; an instance's stored property whose initializer runs
  code, which may be held for what it does or keeps alive (a subscription, an observer token); a field of a
  struct made only of numbers and SIMD vectors, whose bytes a shader or C may read whole, so an unread field is
  padding that holds the layout (found on Presence, where LockerBloom's `unused: Int32` pads the constants its
@@ -51,7 +53,8 @@ struct UnusedDeclarations {
     static let compilerCalled = "called by the compiler by name: a property wrapper's or result builder's members, callAsFunction, dynamic member lookup"
     static let codingKeys = "Codable's coding keys, read by the synthesized conformance"
     static let initializer = "an initializer, which may exist to keep its type from being built another way"
-    static let reflectedStorage = "a stored property of a type whose conformances may read every stored property (Codable)"
+    static let reflectedStorage = "a stored property of a type whose conformances reach Encodable or Decodable, which read every stored property"
+    static let unseenConformance = "a stored property of a type that conforms to or inherits from what the index cannot see into (a C or Objective-C type, a type alias, a protocol with no record)"
     static let lifetime = "an instance's stored property whose initializer runs code, which may be kept for what it does or keeps alive"
     static let layout = "a field of a struct of plain numbers, whose bytes may be read whole (a shader's constants, a C struct), padding included"
     static let reachableCase = "a case of an enum with raw values or conformances that may reach it (CaseIterable, Codable, init(rawValue:))"
@@ -63,6 +66,14 @@ struct UnusedDeclarations {
     func run(files: [ParsedFile]) -> Result {
         var result = Result()
         let fresh = IndexStore.freshUnits(of: files, in: stores)
+        /* Every record of ours, read once with its relations: the files judged, and every extension a conformance may come from. */
+        var graph = ConformanceGraph(stores: stores)
+        var occurrencesByFile: [String: [IndexStore.RecordOccurrence]] = [:]
+        for (path, described) in IndexStore.newestUnits(in: stores) {
+            let occurrences = described.unit.ownRecords.flatMap { described.store.occurrences(inRecord: $0, relations: true) ?? [] }
+            occurrencesByFile[path] = occurrences
+            graph.add(occurrences)
+        }
         for file in files {
             guard let described = fresh[file.url.path] else {
                 result.filesUnchecked[file.url.path] = UnusedImports.notCompiled
@@ -72,15 +83,15 @@ struct UnusedDeclarations {
                 result.filesUnchecked[file.url.path] = UnusedImports.conditional
                 continue
             }
-            let occurrences = described.unit.ownRecords.flatMap { described.store.occurrences(inRecord: $0, relations: true) ?? [] }
+            let occurrences = occurrencesByFile[described.unit.mainFile] ?? []
             result.filesChecked += 1
-            judge(file, occurrences: occurrences, into: &result)
+            judge(file, occurrences: occurrences, graph: &graph, into: &result)
         }
         return result
     }
 
     /* One file's declarations against its own record. */
-    private func judge(_ file: ParsedFile, occurrences: [IndexStore.RecordOccurrence], into result: inout Result) {
+    private func judge(_ file: ParsedFile, occurrences: [IndexStore.RecordOccurrence], graph: inout ConformanceGraph, into result: inout Result) {
         var definitions: [Place: [IndexStore.RecordOccurrence]] = [:]
         var references: [String: [Place]] = [:]
         var referencesByName: [String: [Place]] = [:]
@@ -118,6 +129,23 @@ struct UnusedDeclarations {
             if placed.contains(where: { $0.roles & IndexStore.overrideOfRole != 0 }) || candidate.isOverride {
                 result.skipped[Self.overrides, default: 0] += 1
                 continue
+            }
+            if candidate.isInstanceStorage {
+                /* The type holding it, by the index's child-of relation: what its conformances reach decides whether a conformance reads it. */
+                let holder = definition.relations.first { $0.roles & IndexStore.childOfRole != 0 }?.symbol
+                switch holder.map({ graph.reach(of: $0) }) ?? .unseen {
+                case .codable:
+                    result.skipped[Self.reflectedStorage, default: 0] += 1
+                    continue
+                case .unseen:
+                    result.skipped[Self.unseenConformance, default: 0] += 1
+                    continue
+                case .clear:
+                    if let exemption = candidate.storageExemption {
+                        result.skipped[exemption, default: 0] += 1
+                        continue
+                    }
+                }
             }
             result.declarationsChecked += 1
             let start = file.locations.location(for: candidate.node.positionAfterSkippingLeadingTrivia)
@@ -176,6 +204,10 @@ struct UnusedDeclarations {
         /* A property with an attribute, whose projection (`$name`) and storage (`_name`) are its uses too. */
         var isWrapped = false
         var isOverride = false
+        /* An instance's stored property, which a conformance of its type may read whole. */
+        var isInstanceStorage = false
+        /* Why the stored property is never reported if no conformance reads it: what its initializer keeps alive, or a layout. */
+        var storageExemption: String?
     }
 
     /*
@@ -320,16 +352,21 @@ struct UnusedDeclarations {
                 let name = pattern.identifier.text
                 let isStored = Self.isStored(binding)
                 let isStatic = modifiers.contains { ["static", "class"].contains($0.name.text) }
+                let isInstanceStorage = isStored && scope.typeName != nil && !isStatic
                 if exemption == nil {
                     if scope.attributes.contains("propertyWrapper") && ["wrappedValue", "projectedValue"].contains(name) {
                         exemption = UnusedDeclarations.compilerCalled
-                    } else if isStored, scope.typeName != nil, !isStatic, !scope.conformances.isSubset(of: Self.storageBlindConformances) {
-                        exemption = UnusedDeclarations.reflectedStorage
-                    } else if isStored, scope.typeName != nil, !isStatic, let value = binding.initializer?.value, !Self.isPlainValue(value) {
-                        exemption = UnusedDeclarations.lifetime
-                    } else if isStored, scope.isLayout, !isStatic {
-                        exemption = UnusedDeclarations.layout
+                    } else if isInstanceStorage, !scope.attributes.subtracting(Self.knownAttributes).subtracting(["main"]).isEmpty {
+                        /* A type a macro may expand (`@Model`), whose stored properties it may persist or read by name. */
+                        exemption = UnusedDeclarations.registered
                     }
+                }
+                /* Asked after the type's conformances, which come first because a conformance reads the property whatever its value. */
+                var storageExemption: String?
+                if isInstanceStorage, let value = binding.initializer?.value, !Self.isPlainValue(value) {
+                    storageExemption = UnusedDeclarations.lifetime
+                } else if isInstanceStorage, scope.isLayout {
+                    storageExemption = UnusedDeclarations.layout
                 }
                 candidates.append(Candidate(
                     node: Syntax(variable),
@@ -337,7 +374,9 @@ struct UnusedDeclarations {
                     keyword: variable.bindingSpecifier.text,
                     exemption: exemption,
                     isWrapped: !attributes.subtracting(Self.knownAttributes).isEmpty,
-                    isOverride: isOverride
+                    isOverride: isOverride,
+                    isInstanceStorage: isInstanceStorage,
+                    storageExemption: storageExemption
                 ))
             } else if let alias = declaration.as(TypeAliasDeclSyntax.self) {
                 candidates.append(Candidate(node: Syntax(alias), name: alias.name, keyword: "typealias", exemption: exemption))
@@ -468,18 +507,12 @@ struct UnusedDeclarations {
             "available", "discardableResult", "inline", "inlinable", "usableFromInline", "frozen", "MainActor", "Sendable", "preconcurrency",
             "nonobjc", "ViewBuilder", "ToolbarContentBuilder", "SceneBuilder", "CommandsBuilder", "warn_unqualified_access", "_disfavoredOverload",
             "backDeployed", "specialize", "_specialize", "_effects", "_optimize", "_semantics", "resultBuilder", "propertyWrapper", "dynamicCallable",
-            "dynamicMemberLookup", "unchecked", "retroactive", "Observable", "ObservationIgnored", "ObservationTracked", "concurrent",
+            "dynamicMemberLookup", "unchecked", "retroactive", "Observable", "ObservationIgnored", "ObservationTracked", "concurrent", "safe", "unsafe",
         ]
 
         static let objectiveCAttributes: Set<String> = [
             "objc", "objcMembers", "IBAction", "IBOutlet", "IBInspectable", "IBDesignable", "IBSegueAction", "NSManaged", "GKInspectable", "_cdecl",
             "_silgen_name", "_dynamicReplacement", "NSApplicationMain", "UIApplicationMain",
-        ]
-
-        /* Conformances whose synthesized members never read a stored property the rest of the program does not. */
-        static let storageBlindConformances: Set<String> = [
-            "Equatable", "Hashable", "Comparable", "Sendable", "Identifiable", "View", "ViewModifier", "Shape", "CustomStringConvertible",
-            "CustomDebugStringConvertible", "Error", "LocalizedError", "ObservableObject", "AnyObject", "Actor",
         ]
 
         /* Conformances that never reach a case the program does not name. */

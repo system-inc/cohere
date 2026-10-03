@@ -11,7 +11,9 @@ import Testing
  calls; an unused private type holding a member of its own, reported once as the type; a base method only
  its override reaches; a `@State` property used only as `$name`; a Codable type whose coding keys and stored
  properties the synthesized conformance reads; an instance property that holds an observer token beside one
- that holds a plain value; a struct of plain numbers whose padding is never named; a protocol witness; an
+ that holds a plain value; a struct of plain numbers whose padding is never named; stored properties of types
+ whose conformances reach Codable through a protocol of ours, a type alias or an extension in another file, of
+ a type inheriting from NSObject, and of a Hashable type, the one that is reported; a protocol witness; an
  `@objc` method; a file with `#if`; and an internal function, which this stage never judges. The records are a
  report, so the summary counts no findings.
  */
@@ -129,6 +131,47 @@ struct UnusedDeclarationsTests {
             func constantsSize() -> Int { MemoryLayout<Constants>.stride + Int(Constants(scale: 1).scale) }
 
             """,
+        "Control/Conformances.swift": """
+            import Foundation
+
+            protocol Stored: Codable {}
+            protocol Named {}
+            typealias Wire = Codable & Sendable
+
+            private struct ViaOurs: Stored {
+                var kept = 0
+                var neverRead = 0
+            }
+
+            private struct Wired: Wire {
+                var kept = 0
+                var neverRead = 0
+            }
+
+            private struct Tag: Named, Hashable {
+                var label = "tag"
+                var unusedField = 0
+            }
+
+            final class Watcher: NSObject {
+                private var count = 0
+            }
+
+            struct Later {
+                private var hidden = 0
+            }
+
+            func conformances() -> [Any] {
+                [ViaOurs().kept, Wired().kept, Tag().label, Watcher(), Later()]
+            }
+
+            """,
+        "Control/LaterEncoding.swift": """
+            extension Later: Encodable {
+                func encode(to encoder: any Encoder) throws {}
+            }
+
+            """,
         "Control/Conditional.swift": """
             private func stamp() -> Int { 1 }
 
@@ -186,10 +229,12 @@ struct UnusedDeclarationsTests {
          removing it breaks the override. `onlyProjected` is read only as `$onlyProjected`. `token` holds an
          observer for as long as a `Holder` lives, so it is never reported; `plain` holds a number nobody reads.
          `Constants.padding` is never named, but a struct of plain numbers is read by its bytes, and the padding
-         holds the layout.
+         holds the layout. `Tag.unusedField` is reported: Tag conforms to Hashable and to a protocol of ours that
+         refines nothing, so no conformance reads it.
          */
         #expect(
             run.items.sorted() == [
+                "Control/Conformances.swift:19 var unusedField",
                 "Control/Helpers.swift:1 func unusedHelper()",
                 "Control/Helpers.swift:2 let unusedConstant",
                 "Control/Helpers.swift:3 func countdown(_:)",
@@ -199,12 +244,19 @@ struct UnusedDeclarationsTests {
             ],
             "\(run.items)"
         )
-        #expect(run.coverage["found"] as? Int == 6)
+        #expect(run.coverage["found"] as? Int == 7)
         let notChecked = run.coverage["filesNotChecked"] as? [String: Int] ?? [:]
         #expect(notChecked == [UnusedImports.conditional: 1], "only the #if file is left unchecked: \(notChecked)")
         let skipped = run.coverage["skipped"] as? [String: Int] ?? [:]
         #expect(skipped[UnusedDeclarations.codingKeys] == 3, "CodingKeys and its two cases: \(skipped)")
-        #expect(skipped[UnusedDeclarations.reflectedStorage] == 2, "Payload's two stored properties: \(skipped)")
+        /*
+         Codable reaches every stored property: Payload's two directly, ViaOurs's two through `Stored`, a protocol of
+         ours that refines Codable, Wired's two through `Wire`, a type alias the index spells as Encodable and
+         Decodable, and Later's one through an extension in another file. Watcher inherits from NSObject, an
+         Objective-C class the index cannot see into, so its field is never reported either.
+         */
+        #expect(skipped[UnusedDeclarations.reflectedStorage] == 7, "\(skipped)")
+        #expect(skipped[UnusedDeclarations.unseenConformance] == 1, "Watcher's count: \(skipped)")
         #expect(skipped[UnusedDeclarations.lifetime] == 1, "Holder's token: \(skipped)")
         #expect(skipped[UnusedDeclarations.objectiveC] == 1, "Target's @objc method: \(skipped)")
         #expect(skipped[UnusedDeclarations.layout] == 2, "Constants' two fields: \(skipped)")

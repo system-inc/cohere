@@ -36,8 +36,20 @@ import IndexStoreShim
     static let referenceRole: UInt64 = 1 << 2
     /* `INDEXSTORE_SYMBOL_ROLE_IMPLICIT`. */
     static let implicitRole: UInt64 = 1 << 8
+    /* `INDEXSTORE_SYMBOL_ROLE_REL_CHILDOF`: a declaration, related to the type or extension that holds it. */
+    static let childOfRole: UInt64 = 1 << 9
+    /* `INDEXSTORE_SYMBOL_ROLE_REL_BASEOF`: a protocol or superclass named in an inheritance clause, related to the type, protocol or extension that names it. */
+    static let baseOfRole: UInt64 = 1 << 10
     /* `INDEXSTORE_SYMBOL_ROLE_REL_OVERRIDEOF`: a declaration that overrides a superclass member or witnesses a protocol requirement, related to what it overrides. */
     static let overrideOfRole: UInt64 = 1 << 11
+    /* `INDEXSTORE_SYMBOL_ROLE_REL_EXTENDEDBY`: the type an extension extends, related to the extension. */
+    static let extendedByRole: UInt64 = 1 << 14
+    /* The relations `occurrences(inRecord:relations:)` reads. */
+    static let readRelations = childOfRole | baseOfRole | overrideOfRole | extendedByRole
+    /* `INDEXSTORE_SYMBOL_KIND_CLASS`, `_PROTOCOL` and `_TYPEALIAS`. */
+    static let classKind: Int32 = 7
+    static let protocolKind: Int32 = 8
+    static let typeAliasKind: Int32 = 11
     /* `INDEXSTORE_SYMBOL_KIND_MODULE`: a module's own name, as an `import` line or a qualified name spells it. */
     static let moduleKind: Int32 = 1
 
@@ -66,6 +78,12 @@ import IndexStoreShim
         var files: [String]
     }
 
+    /* One relation of an occurrence: its roles, and the symbol it relates the occurrence to. */
+    struct Relation: Sendable {
+        var roles: UInt64
+        var symbol: String
+    }
+
     /* One occurrence as the record holds it, roles and kind kept whole for questions `FileSymbols` does not ask. */
     struct RecordOccurrence: Sendable {
         var line: Int
@@ -74,8 +92,11 @@ import IndexStoreShim
         var name: String
         var roles: UInt64
         var kind: Int32
-        /* What the occurrence overrides or witnesses, when the record was read with its relations. */
-        var overridden: [String] = []
+        /* The occurrence's child-of, base-of, override-of and extended-by relations, when the record was read with them. */
+        var relations: [Relation] = []
+
+        /* What the occurrence overrides or witnesses. */
+        var overridden: [String] { relations.filter { $0.roles & IndexStore.overrideOfRole != 0 }.map(\.symbol) }
 
         var isReference: Bool { roles & IndexStore.referenceRole != 0 }
         var isDeclaration: Bool { roles & IndexStore.declarationRoles != 0 }
@@ -229,6 +250,19 @@ import IndexStoreShim
      not compiled it as it stands, so its record describes text that is no longer there.
      */
     static func freshUnits(of files: [ParsedFile], in stores: [IndexStore]) -> [String: (store: IndexStore, unit: Unit)] {
+        let newest = newestUnits(in: stores)
+        var fresh: [String: (store: IndexStore, unit: Unit)] = [:]
+        for file in files {
+            let modified = (try? file.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantFuture
+            if let described = newest[file.url.resolvingSymlinksInPath().path], described.unit.written >= modified {
+                fresh[file.url.path] = described
+            }
+        }
+        return fresh
+    }
+
+    /* The newest unit of ours that names each compiled file, across the stores, by the file's resolved path. */
+    static func newestUnits(in stores: [IndexStore]) -> [String: (store: IndexStore, unit: Unit)] {
         var newest: [String: (store: IndexStore, unit: Unit)] = [:]
         for store in stores {
             for unit in store.units() where !unit.isSystem && !unit.mainFile.isEmpty && !unit.ownRecords.isEmpty {
@@ -238,14 +272,7 @@ import IndexStoreShim
                 newest[unit.mainFile] = (store, unit)
             }
         }
-        var fresh: [String: (store: IndexStore, unit: Unit)] = [:]
-        for file in files {
-            let modified = (try? file.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantFuture
-            if let described = newest[file.url.resolvingSymlinksInPath().path], described.unit.written >= modified {
-                fresh[file.url.path] = described
-            }
-        }
-        return fresh
+        return newest
     }
 
     /* Each file's records, by resolved path, with when the unit naming them was written. */
@@ -328,8 +355,9 @@ import IndexStoreShim
     /*
      Every occurrence one record holds, or nil when the record cannot be read. A reader: each call into the library
      is handed the open reader or an occurrence it yielded, and `text` copies every string before the `defer`
-     disposes the reader. With `relations`, each occurrence also says what it overrides, read through the same
-     iterator `forEach` drives, whose relation handles live as long as the occurrence that yields them.
+     disposes the reader. With `relations`, each occurrence also carries its relations of the kinds
+     `readRelations` names, read through the same iterator `forEach` drives, whose relation handles live as long
+     as the occurrence that yields them.
      */
     func occurrences(inRecord record: String, relations: Bool = false) -> [RecordOccurrence]? {
         guard let reader = unsafe recordReaderCreate(store, record, nil) else { return nil }
@@ -341,11 +369,12 @@ import IndexStoreShim
             unsafe occurrenceLineColumn(occurrence, &line, &column)
             let symbol = unsafe occurrenceSymbol(occurrence)
             let roles = unsafe occurrenceRoles(occurrence)
-            var overridden: [String] = []
-            if relations && roles & Self.overrideOfRole != 0 {
+            var related: [Relation] = []
+            if relations && roles & Self.readRelations != 0 {
                 unsafe Self.forEach(in: occurrence, relationsApply) { relation in
-                    if unsafe relationRoles(relation) & Self.overrideOfRole != 0 {
-                        overridden.append(unsafe Self.text(symbolIdentifier(relationSymbol(relation))))
+                    let relationRoles = unsafe relationRoles(relation)
+                    if relationRoles & Self.readRelations != 0 {
+                        related.append(Relation(roles: relationRoles, symbol: unsafe Self.text(symbolIdentifier(relationSymbol(relation)))))
                     }
                 }
             }
@@ -356,7 +385,7 @@ import IndexStoreShim
                 name: Self.text(symbolName(symbol)),
                 roles: roles,
                 kind: Int32(symbolKind(symbol)),
-                overridden: overridden
+                relations: related
             ))
         }
         return occurrences
