@@ -161,21 +161,12 @@ func TestNoMisusedSpreadFires(t *testing.T) {
 		{"upstream invalid 66", "file.ts", "\nconst o = { ...new Date() };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
 		{"upstream invalid 67", "file.ts", "\ndeclare class HTMLElementLike {}\ndeclare const element: HTMLElementLike;\nconst o = { ...element };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
 		{"upstream invalid 68", "file.ts", "\ndeclare const regex: RegExp;\nconst o = { ...regex };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
-		{"upstream invalid 69", "file.ts", "\nclass A {\n  a = 1;\n  public b = 2;\n  private c = 3;\n  protected d = 4;\n  static e = 5;\n}\n\nconst o = { ...new A() };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
-		{"upstream invalid 70", "file.ts", "\nclass A {\n  a = 1;\n}\n\nconst a = new A();\n\nconst o = { ...a };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
-		{"upstream invalid 71", "file.ts", "\nclass A {\n  a = 1;\n}\n\ndeclare const a: A;\n\nconst o = { ...a };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
-		{"upstream invalid 72", "file.ts", "\nclass A {\n  a = 1;\n}\n\ndeclare function getA(): A;\n\nconst o = { ...getA() };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
-		{"upstream invalid 73", "file.ts", "\nclass A {\n  a = 1;\n}\n\ndeclare function getA<T extends A>(arg: T): T;\n\nconst o = { ...getA() };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
-		{"upstream invalid 74", "file.ts", "\nclass A {\n  a = 1;\n}\n\nclass B extends A {}\n\nconst o = { ...new B() };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
-		{"upstream invalid 75", "file.ts", "\nclass A {\n  a = 1;\n}\n\ndeclare const a: A | { b: string };\n\nconst o = { ...a };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
-		{"upstream invalid 76", "file.ts", "\nclass A {\n  a = 1;\n}\n\ndeclare const a: A & { b: string };\n\nconst o = { ...a };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
 		{"upstream invalid 77", "file.ts", "\nclass A {}\n\nconst o = { ...A };\n      ", nil, []string{"noClassDeclarationSpreadInObject"}},
 		{"upstream invalid 78", "file.ts", "\nconst A = class {};\n\nconst o = { ...A };\n      ", nil, []string{"noClassDeclarationSpreadInObject"}},
 		{"upstream invalid 79", "file.ts", "\nclass Declaration {\n  declaration?: boolean;\n}\nconst Expression = class {\n  expression?: boolean;\n};\n\ndeclare const either: typeof Declaration | typeof Expression;\n\nconst o = { ...either };\n      ", nil, []string{"noClassDeclarationSpreadInObject"}},
 		{"upstream invalid 80", "file.ts", "\nconst A = Set<number>;\n\nconst o = { ...A };\n      ", nil, []string{"noClassDeclarationSpreadInObject"}},
 		{"upstream invalid 81", "file.ts", "\nconst a = {\n  ...class A {\n    static value = 1;\n    nonStatic = 2;\n  },\n};\n      ", nil, []string{"noClassDeclarationSpreadInObject"}},
 		{"upstream invalid 82", "file.ts", "\n        const a = { ...(class A { static value = 1 }) }\n      ", nil, []string{"noClassDeclarationSpreadInObject"}},
-		{"upstream invalid 83", "file.ts", "\n        const a = { ...new (class A { static value = 1; })() };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
 		{"upstream invalid 84", "file.tsx", "\nconst o = <div {...[1, 2, 3]} />;\n      ", nil, []string{"noArraySpreadInObject"}},
 		{"upstream invalid 85", "file.tsx", "\nclass A {}\n\nconst o = <div {...A} />;\n      ", nil, []string{"noClassDeclarationSpreadInObject"}},
 		{"upstream invalid 86", "file.tsx", "\nconst o = <div {...new Date()} />;\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
@@ -451,7 +442,7 @@ func TestNoMisusedSpreadCascadeOrdering(t *testing.T) {
 		},
 		{
 			"a non-iterable class instance falls through to the instance arm",
-			"class A {\n  z = 1;\n}\ndeclare const a: A;\nconst o = { ...a };",
+			"class A {\n  z = 1;\n  m() {}\n}\ndeclare const a: A;\nconst o = { ...a };",
 			"noClassInstanceSpreadInObject",
 		},
 		{
@@ -566,8 +557,10 @@ func TestNoMisusedSpreadDecoder(t *testing.T) {
 
 	t.Run("the decoded allow list reaches the rule and changes its verdict", func(t *testing.T) {
 		// Byte-identical source, opposite verdicts, separated only by what came off the wire. The
-		// subject is upstream valid 38's class instance, which an inline specifier names by type.
-		const source = "class A {\n  a = 1;\n}\nconst a = new A();\nconst o = { ...a };"
+		// subject is upstream valid 38's class instance, which an inline specifier names by type, with
+		// a method added: a fields-only class is exempt without any allow list, so it could not show
+		// the list changing anything (see TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete).
+		const source = "class A {\n  a = 1;\n  m() {}\n}\nconst a = new A();\nconst o = { ...a };"
 
 		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, source,
 			decode(t, `{}`)), "noClassInstanceSpreadInObject")
@@ -667,6 +660,104 @@ func TestNoMisusedSpreadMergedClassDeclarations(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
 			rule_testing.ExpectFindings(t, result, "noClassInstanceSpreadInObject")
+		})
+	}
+}
+
+// TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete pins cohere's second deliberate divergence from
+// upstream: a spread of a class instance is silent when the copy loses nothing, because the class and
+// every base declare no method, accessor or #private member, are written in our own source, and carry
+// only decorators our own source declares. @system_cohere's ruling, 2026-10-03, from api's decorated
+// GraphQL and Serializable data classes (#ynneze5). See noMisusedSpreadCopiesCompletely.
+//
+// The first group is upstream's invalid 69 through 76 and 83 verbatim, every one a fields-only class,
+// which upstream reports and cohere does not. The rest are the clauses, each with the case it exempts
+// and the case it must still report, so a mutant dropping any one clause fails here.
+func TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete(t *testing.T) {
+	t.Parallel()
+
+	silent := []struct {
+		name       string
+		sourceText string
+	}{
+		{"upstream invalid 69", "\nclass A {\n  a = 1;\n  public b = 2;\n  private c = 3;\n  protected d = 4;\n  static e = 5;\n}\n\nconst o = { ...new A() };\n      "},
+		{"upstream invalid 70", "\nclass A {\n  a = 1;\n}\n\nconst a = new A();\n\nconst o = { ...a };\n      "},
+		{"upstream invalid 71", "\nclass A {\n  a = 1;\n}\n\ndeclare const a: A;\n\nconst o = { ...a };\n      "},
+		{"upstream invalid 72", "\nclass A {\n  a = 1;\n}\n\ndeclare function getA(): A;\n\nconst o = { ...getA() };\n      "},
+		{"upstream invalid 73", "\nclass A {\n  a = 1;\n}\n\ndeclare function getA<T extends A>(arg: T): T;\n\nconst o = { ...getA() };\n      "},
+		{"upstream invalid 74", "\nclass A {\n  a = 1;\n}\n\nclass B extends A {}\n\nconst o = { ...new B() };\n      "},
+		{"upstream invalid 75", "\nclass A {\n  a = 1;\n}\n\ndeclare const a: A | { b: string };\n\nconst o = { ...a };\n      "},
+		{"upstream invalid 76", "\nclass A {\n  a = 1;\n}\n\ndeclare const a: A & { b: string };\n\nconst o = { ...a };\n      "},
+		{"upstream invalid 83", "\n        const a = { ...new (class A { static value = 1; })() };\n      "},
+		{"a generic abstract base, as Base's PaginationResult", "abstract class Page<T> {\n  abstract items: T[];\n  total = 0;\n}\nclass Users extends Page<string> {\n  items: string[] = [];\n}\ndeclare const page: Users;\nconst o = { ...page, more: true };"},
+		{"a static method lives on the constructor, which an instance never carried", "class A {\n  a = 1;\n  static make(): A { return new A(); }\n}\nconst o = { ...new A() };"},
+		{"constructor parameter properties are own properties", "class A {\n  constructor(public a: number, readonly b: string) {}\n}\nconst o = { ...new A(1, 'b') };"},
+		{"decorators our own source declares, on the class, a field and a parameter", "function Entity(): ClassDecorator { return () => {}; }\nfunction Field(): PropertyDecorator { return () => {}; }\nfunction Inject(): ParameterDecorator { return () => {}; }\n@Entity()\nclass A {\n  @Field() a = 1;\n  constructor(@Inject() public b: number) {}\n}\ndeclare const a: A;\nconst o = { ...a };"},
+		{"every class in a union is exempt", "class A {\n  a = 1;\n}\nclass B {\n  b = 2;\n}\ndeclare const value: A | B;\nconst o = { ...value };"},
+	}
+	for _, testCase := range silent {
+		t.Run(testCase.name, func(t *testing.T) {
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil))
+		})
+	}
+
+	reported := []struct {
+		name       string
+		sourceText string
+		wantId     string
+	}{
+		{"a method", "class A {\n  a = 1;\n  m() {}\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
+		{"a getter", "class A {\n  a = 1;\n  get double() { return this.a * 2; }\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
+		{"a setter", "class A {\n  a = 1;\n  set value(next: number) { this.a = next; }\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
+		{"an auto-accessor", "class A {\n  accessor a = 1;\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
+		{"a #private field, which a spread does not copy", "class A {\n  a = 1;\n  #secret = 2;\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
+		{"a method on a base class", "class Base {\n  m() {}\n}\nclass A extends Base {\n  a = 1;\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
+		{"a base from a mixin, which has no class declaration to read", "type Constructor = new (...args: any[]) => object;\nfunction Tagged<T extends Constructor>(Base: T) { return class extends Base { tag = 'x'; }; }\nclass Plain {}\nclass A extends Tagged(Plain) {\n  a = 1;\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
+		{"an ambient class, whose prototype is not ours to read (upstream invalid 67)", "declare class A {\n  a: number;\n}\ndeclare const a: A;\nconst o = { ...a };", "noClassInstanceSpreadInObject"},
+		{"an interface merged into the class, which may describe methods a mixin installs", "interface A {\n  m(): void;\n}\nclass A {\n  a = 1;\n}\ndeclare const a: A;\nconst o = { ...a };", "noClassInstanceSpreadInObject"},
+		{"an ambient decorator, with no implementation in our source", "declare function observable(target: object, key: string): void;\nclass A {\n  @observable a = 1;\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
+		{"an ambient decorator on the class alone", "declare function sealed(target: Function): void;\n@sealed\nclass A {\n  a = 1;\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
+		{"an ambient decorator on a constructor parameter alone", "declare function inject(target: object, key: string | symbol | undefined, index: number): void;\nclass A {\n  constructor(@inject public a: number) {}\n}\nconst o = { ...new A(1) };", "noClassInstanceSpreadInObject"},
+		{"one class in a union that is not exempt", "class A {\n  a = 1;\n}\nclass B {\n  b = 2;\n  m() {}\n}\ndeclare const value: A | B;\nconst o = { ...value };", "noClassInstanceSpreadInObject"},
+		{"the class itself still reports as a declaration", "class A {\n  static a = 1;\n}\nconst o = { ...A };", "noClassDeclarationSpreadInObject"},
+	}
+	for _, testCase := range reported {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
+			rule_testing.ExpectFindings(t, result, testCase.wantId)
+		})
+	}
+
+	// Decorators from other files: the package and declaration-file cases a single-file harness cannot
+	// write, against an own-source decorator in a second file, which is exactly api's shape (Base's
+	// GraphQlField imported into an entity).
+	subject := "import { Field } from './Field';\nclass A {\n  @Field() a = 1;\n}\nconst o = { ...new A() };"
+	files := []struct {
+		name      string
+		decorator map[string]string
+		findings  int
+	}{
+		{"a decorator from our own source in another file", map[string]string{
+			"Field.ts": "export function Field(): PropertyDecorator { return () => {}; }\n",
+		}, 0},
+		{"a decorator from a declaration file", map[string]string{
+			"Field.d.ts": "export declare function Field(): PropertyDecorator;\n",
+		}, 1},
+		{"a decorator from a package", map[string]string{
+			"Field.ts":                   "export { Field } from './node_modules/mobx/index';\n",
+			"node_modules/mobx/index.ts": "export function Field(): PropertyDecorator { return () => {}; }\n",
+		}, 1},
+	}
+	for _, testCase := range files {
+		t.Run(testCase.name, func(t *testing.T) {
+			sources := map[string]string{"Subject.ts": subject}
+			for name, text := range testCase.decorator {
+				sources[name] = text
+			}
+			result := rule_testing.RunTypedFiles(t, NoMisusedSpread, sources, "Subject.ts")
+			if len(result.Diagnostics) != testCase.findings {
+				t.Errorf("got %d findings, want %d: %+v", len(result.Diagnostics), testCase.findings, result.Diagnostics)
+			}
 		})
 	}
 }

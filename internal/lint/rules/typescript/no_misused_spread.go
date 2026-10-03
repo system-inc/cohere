@@ -1,6 +1,8 @@
 package typescript
 
 import (
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
@@ -166,12 +168,19 @@ var NoMisusedSpread = rule.Rule{
 				return
 			}
 
-			if noMisusedSpreadIsClassInstance(ctx.TypeChecker, argumentType) {
+			// An instance whose copy is complete is not reported, and is not handed on either: an
+			// instance's symbol has the class as its value declaration, so the declaration arm below
+			// would otherwise report it under the wrong message. See noMisusedSpreadCopiesCompletely.
+			if noMisusedSpreadIsTypeRecurser(argumentType, func(part *checker.Type) bool {
+				return noMisusedSpreadIsClassInstance(ctx.TypeChecker, part) && !noMisusedSpreadCopiesCompletely(ctx, part)
+			}) {
 				ctx.ReportNode(spread, buildNoClassInstanceSpreadInObjectMessage())
 				return
 			}
 
-			if noMisusedSpreadIsClassDeclaration(argumentType) {
+			if noMisusedSpreadIsTypeRecurser(argumentType, func(part *checker.Type) bool {
+				return !noMisusedSpreadIsClassInstance(ctx.TypeChecker, part) && noMisusedSpreadIsClassDeclaration(part)
+			}) {
 				ctx.ReportNode(spread, buildNoClassDeclarationSpreadInObjectMessage())
 			}
 		}
@@ -324,6 +333,150 @@ func noMisusedSpreadIsClassDeclaration(t *checker.Type) bool {
 		}
 		return false
 	})
+}
+
+// noMisusedSpreadCopiesCompletely says whether spreading an instance of this class loses nothing, so
+// the class-instance arm has no harm to report. Cohere departs from upstream here, by @system_cohere's
+// ruling of 2026-10-03 on api's decorated GraphQL and Serializable data classes (#ynneze5).
+//
+// The arm's harm is the prototype the copy drops. A class with nothing on its prototype loses
+// nothing, and a spread of one is the ordinary way to build a new object from it. So an instance is
+// exempt only when every one of these holds for its class and every base class in its chain:
+//
+//   - Every declaration of the symbol is a class written in the program's own source, not ambient
+//     (`declare class`) and not in a package or a declaration file. Only then is the prototype ours to
+//     read. An interface merged into the class can declare methods a mixin installs, so it disqualifies.
+//   - No instance method, no get or set accessor, and no auto-accessor (`accessor x`), since each lives
+//     on the prototype. Static members live on the constructor, which an instance never carried.
+//   - No `#private` member, since a spread copies only public own properties.
+//   - Every decorator anywhere on the class resolves to a declaration in the program's own source.
+//
+// The remaining trust is the last clause's: one of our own decorators could install a prototype
+// accessor at runtime, which no type shows, and the copy would then silently lack it. Base's and
+// api's decorators register metadata and define nothing on the prototype, and a third-party
+// decorator, MobX's @observable or Lit's @property, stays outside the exemption entirely.
+//
+// A union exempts only when every class instance in it is exempt, because the caller's recurser
+// reports on the first constituent that is not.
+func noMisusedSpreadCopiesCompletely(ctx rule.Context, t *checker.Type) bool {
+	symbol := checker.Type_symbol(t)
+	if symbol == nil {
+		return false
+	}
+	seen := map[*ast.Symbol]bool{}
+	for symbol != nil {
+		if seen[symbol] || !noMisusedSpreadClassLosesNothing(ctx, symbol) {
+			return false
+		}
+		seen[symbol] = true
+
+		declared := checker.Checker_getDeclaredTypeOfSymbol(ctx.TypeChecker, symbol)
+		if declared == nil {
+			return false
+		}
+		bases := checker.Checker_getBaseTypes(ctx.TypeChecker, declared)
+		switch len(bases) {
+		case 0:
+			return true
+		case 1:
+			// A base that is not a class (a mixin's intersection, an interface) has no class
+			// declaration to read, so the next pass refuses it.
+			symbol = checker.Type_symbol(bases[0])
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+// noMisusedSpreadClassLosesNothing is one link of the chain: the symbol's own declarations.
+func noMisusedSpreadClassLosesNothing(ctx rule.Context, symbol *ast.Symbol) bool {
+	if len(symbol.Declarations) == 0 {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		if !ast.IsClassLike(declaration) || !noMisusedSpreadIsOwnSource(declaration) {
+			return false
+		}
+		for _, member := range declaration.Members() {
+			if ast.IsStatic(member) {
+				continue
+			}
+			if ast.IsMethodDeclaration(member) || ast.IsGetAccessorDeclaration(member) ||
+				ast.IsSetAccessorDeclaration(member) || ast.IsAutoAccessorPropertyDeclaration(member) ||
+				ast.IsPrivateIdentifierClassElementDeclaration(member) {
+				return false
+			}
+		}
+		if !noMisusedSpreadDecoratorsAreOwnSource(ctx, declaration) {
+			return false
+		}
+	}
+	return true
+}
+
+// noMisusedSpreadDecoratorsAreOwnSource asks every decorator the class can carry: its own, each
+// member's, and each constructor parameter's. Those are the only places one can sit on a class whose
+// members are all fields, and reading them never enters a function body, which the rule's Shapes
+// reach promises not to do.
+func noMisusedSpreadDecoratorsAreOwnSource(ctx rule.Context, classNode *ast.Node) bool {
+	holders := []*ast.Node{classNode}
+	for _, member := range classNode.Members() {
+		holders = append(holders, member)
+		if ast.IsConstructorDeclaration(member) {
+			holders = append(holders, member.Parameters()...)
+		}
+	}
+	for _, holder := range holders {
+		modifiers := holder.Modifiers()
+		if modifiers == nil {
+			continue
+		}
+		for _, modifier := range modifiers.Nodes {
+			if ast.IsDecorator(modifier) && !noMisusedSpreadDecoratorIsOwnSource(ctx, modifier.AsDecorator().Expression) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// noMisusedSpreadDecoratorIsOwnSource resolves `@Name`, `@Name(...)`, `@namespace.Name` and
+// `@namespace.Name(...)` through any import alias to the declarations of the function applied.
+func noMisusedSpreadDecoratorIsOwnSource(ctx rule.Context, expression *ast.Node) bool {
+	target := ast.SkipParentheses(expression)
+	if ast.IsCallExpression(target) {
+		target = ast.SkipParentheses(target.AsCallExpression().Expression)
+	}
+	if ast.IsPropertyAccessExpression(target) {
+		target = target.AsPropertyAccessExpression().Name()
+	}
+	if !ast.IsIdentifier(target) {
+		return false
+	}
+	symbol := ctx.TypeChecker.GetSymbolAtLocation(target)
+	if symbol == nil {
+		return false
+	}
+	symbol = checker.SkipAlias(symbol, ctx.TypeChecker)
+	if symbol == nil || len(symbol.Declarations) == 0 {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		if !noMisusedSpreadIsOwnSource(declaration) {
+			return false
+		}
+	}
+	return true
+}
+
+// noMisusedSpreadIsOwnSource is a declaration whose implementation the program's own source holds:
+// not ambient (`declare class`, `declare function`, anything in a declaration file or a `declare`
+// block), and not inside a package.
+func noMisusedSpreadIsOwnSource(declaration *ast.Node) bool {
+	sourceFile := ast.GetSourceFileOfNode(declaration)
+	return sourceFile != nil && !sourceFile.IsDeclarationFile && declaration.Flags&ast.NodeFlagsAmbient == 0 &&
+		!strings.Contains(sourceFile.FileName(), "/node_modules/")
 }
 
 // noMisusedSpreadAwaitSuggestion offers `await` before the spread argument.
