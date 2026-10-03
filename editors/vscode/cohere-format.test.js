@@ -121,3 +121,37 @@ NodeTest.test('cohere runs without the override, which would make a dispatcher e
         }
     }
 });
+
+NodeTest.test('on Windows the project\'s cohere is its platform package\'s cohere.exe, under pnpm and npm', function() {
+    const windows = { platform: 'win32', arch: 'x64' };
+    function writeFile(path, contents) {
+        NodeFileSystem.mkdirSync(NodePath.dirname(path), { recursive: true });
+        NodeFileSystem.writeFileSync(path, contents);
+    }
+
+    // pnpm: the project's node_modules/@system-inc/cohere is a link into .pnpm, and the platform package
+    // sits beside cohere's real directory there, not beside the link.
+    const pnpm = temporaryDirectory();
+    const store = NodePath.join(pnpm, 'node_modules', '.pnpm', '@system-inc+cohere@1.0.0', 'node_modules', '@system-inc');
+    writeFile(NodePath.join(store, 'cohere', 'package.json'), '{"name":"@system-inc/cohere"}');
+    writeFile(NodePath.join(store, 'cohere-win32-x64', 'package.json'), '{"name":"@system-inc/cohere-win32-x64"}');
+    writeFile(NodePath.join(store, 'cohere-win32-x64', 'bin', 'cohere.exe'), '');
+    NodeFileSystem.mkdirSync(NodePath.join(pnpm, 'node_modules', '@system-inc'), { recursive: true });
+    NodeFileSystem.symlinkSync(NodePath.join(store, 'cohere'), NodePath.join(pnpm, 'node_modules', '@system-inc', 'cohere'));
+    // The shim a package manager writes on Windows, which can't be spawned without a shell.
+    writeFile(NodePath.join(pnpm, 'node_modules', '.bin', 'cohere.cmd'), '@node launcher.js %*\r\n');
+    const nested = NodePath.join(pnpm, 'app');
+    NodeFileSystem.mkdirSync(nested);
+    NodeAssert.equal(resolveCohereBinary(nested, { PATH: '' }, windows), NodePath.join(store, 'cohere-win32-x64', 'bin', 'cohere.exe'));
+
+    // npm: the two packages are siblings in the project's node_modules.
+    const npm = temporaryDirectory();
+    writeFile(NodePath.join(npm, 'node_modules', '@system-inc', 'cohere', 'package.json'), '{"name":"@system-inc/cohere"}');
+    writeFile(NodePath.join(npm, 'node_modules', '@system-inc', 'cohere-win32-x64', 'package.json'), '{"name":"@system-inc/cohere-win32-x64"}');
+    const npmBinary = NodePath.join(npm, 'node_modules', '@system-inc', 'cohere-win32-x64', 'bin', 'cohere.exe');
+    writeFile(npmBinary, '');
+    NodeAssert.equal(resolveCohereBinary(npm, { PATH: '' }, windows), npmBinary);
+
+    // Installed for another architecture only: not this machine's cohere, and nothing else is found.
+    NodeAssert.equal(resolveCohereBinary(npm, { PATH: '' }, { platform: 'win32', arch: 'arm64' }), undefined);
+});
