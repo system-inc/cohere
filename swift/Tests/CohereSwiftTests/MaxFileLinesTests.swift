@@ -9,9 +9,9 @@ import Testing
  and the one finding's place and wording.
  */
 struct MaxFileLinesTests {
-    static func findings(_ source: String) -> [FindingRecord] {
+    static func findings(_ source: String, fileName: String = "Pane.swift") -> [FindingRecord] {
         let file = ParsedFile(
-            url: URL(fileURLWithPath: "/fixture/Pane.swift"),
+            url: URL(fileURLWithPath: "/fixture/\(fileName)"),
             targetName: "Fixture",
             targetKind: "library",
             source: source,
@@ -38,12 +38,20 @@ struct MaxFileLinesTests {
         let finding = try #require(findings.first)
         #expect("\(finding.line):\(finding.column)-\(finding.endLine ?? 0):\(finding.endColumn ?? 0)" == "1:1-1:1")
         #expect(finding.messageId == "tooManyLines")
-        #expect(finding.message.hasPrefix("This file is 1001 lines, over the 1000 a file may hold."))
+        #expect(finding.message.hasPrefix("This file is 2001 lines, over the 2000 a file may hold."))
     }
 
-    /* The limit is 1,000, the number the measurement chose; a change to it should be a decision, not a drift. */
-    @Test func theLimitIsAThousand() {
-        #expect(MaxFileLines.maximumLines == 1_000)
+    /* The limit is 2,000, the number Kirk chose; a change to it should be a decision, not a drift. */
+    @Test func theLimitIsTwoThousand() {
+        #expect(MaxFileLines.maximumLines == 2_000)
+    }
+
+    /* A generated file, named `*.generated.swift`, is exempt from this rule alone; a name that only contains the word is not. */
+    @Test func aGeneratedFileIsExemptByItsName() {
+        let long = Self.source(lines: MaxFileLines.maximumLines + 1)
+        #expect(Self.findings(long, fileName: "Schema.generated.swift").isEmpty)
+        #expect(Self.findings(long, fileName: "GeneratedSchema.swift").count == 1)
+        #expect(Self.findings(long, fileName: "Schema.generated.swift.swift").count == 1)
     }
 
     /* A final newline ends the last line; it does not start another. Without one, the last line still counts. */

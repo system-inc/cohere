@@ -1,4 +1,4 @@
-// swift-tools-version:6.4
+// swift-tools-version:6.2
 
 /*
  cohere-swift: the Swift engine behind the `cohere` front door. It fixes, formats, type-checks and lints
@@ -11,6 +11,12 @@
  cannot share one binary, and the format phase needs swift-format in process. Measured before
  choosing: built this way, swift-format formats byte-identical to `xcrun swift-format` on 952 of our
  files.
+
+ The floor, measured on 2026-10-03 (#1c80jyh) by stepping each down until the build failed: tools 6.2, which
+ `.strictMemorySafety()` needs, and macOS 15, which Synchronization's `Mutex` needs. Below the tools floor
+ the manifest is rejected ("'strictMemorySafety' is unavailable"), and below macOS 15 every `Mutex` is.
+ Without `Mutex` the floor would be macOS 13, where swift-format's product stops it; 15 was kept for 1.0.
+ So the stable macos-26 runners (Xcode 26, Swift 6.3) build this, and the binary runs on macOS 15 and up.
  */
 
 import PackageDescription
@@ -35,7 +41,7 @@ let houseSettings: [SwiftSetting] = [
 let package = Package(
     name: "CohereSwift",
     platforms: [
-        .macOS(.v27),
+        .macOS(.v15),
     ],
     products: [
         .executable(name: "cohere-swift", targets: ["CohereSwiftCommand"]),

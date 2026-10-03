@@ -55,8 +55,8 @@ struct TypesPhase {
         return [(package.root, scratchPath)] + locals.map { ($0.root, scratchPath.appendingPathComponent("local/\($0.root.lastPathComponent)", isDirectory: true)) }
     }
 
-    private func arguments(for build: (root: URL, scratchPath: URL)) -> [String] {
-        var arguments = ["build", "--build-tests", "--scratch-path", build.scratchPath.path]
+    private func arguments(for build: (root: URL, scratchPath: URL), buildSystem: [String]) -> [String] {
+        var arguments = ["build", "--build-tests", "--scratch-path", build.scratchPath.path] + buildSystem
         if !resolutionAllowed {
             arguments.append("--disable-automatic-resolution")
         }
@@ -80,7 +80,7 @@ struct TypesPhase {
                 roots: inputRoots,
                 resolved: package.root.appendingPathComponent("Package.resolved"),
                 toolchain: toolchain,
-                arguments: builds.flatMap { arguments(for: $0) }
+                arguments: builds.flatMap { arguments(for: $0, buildSystem: Self.swiftBuildArguments) }
             )
 
         /*
@@ -114,10 +114,11 @@ struct TypesPhase {
         /* Each file's interface as this build compiles it, so the next run can tell whether an edit stayed inside bodies. */
         let interfaces = snapshot == nil ? [:] : interfaceFingerprints()
 
+        let buildSystem = try buildSystemArguments()
         var failedBuilds: [ProcessRunner.Result] = []
         var targetDirectories: [(String, URL)] = []
         for build in builds {
-            let result = try runner.run("swift", arguments(for: build), in: build.root)
+            let result = try runner.run("swift", arguments(for: build, buildSystem: buildSystem), in: build.root)
             if !result.succeeded {
                 failedBuilds.append(result)
             }
@@ -131,7 +132,7 @@ struct TypesPhase {
                 if !result.succeeded {
                     throw TypesFailure(description: "swift build of \(build.root.path) failed before compiling anything, so the compiler never ran: \(Self.tail(of: result))")
                 }
-                throw TypesFailure(description: "the build of \(build.root.path) left no target directories under \(intermediates(of: build.scratchPath).path), so this engine does not recognise the build system's layout and cannot read what the compiler said\n\(Self.tail(of: result))")
+                throw TypesFailure(description: "the build of \(build.root.path) left no target directories under \(intermediates(of: build.scratchPath).path), so this engine does not recognise the build system's layout and cannot read what the compiler said (toolchain: \(toolchain))\n\(Self.tail(of: result))")
             }
             targetDirectories.append(contentsOf: directories)
         }
@@ -325,6 +326,31 @@ struct TypesPhase {
             build: build
         )
         return Result(findings: findings, record: record, hasErrors: findings.contains { $0.severity == .error })
+    }
+
+    /*
+     The build system is named rather than left to the toolchain's default, because every record this phase
+     reads sits where swiftbuild puts it. Swift 6.4 builds with swiftbuild by default; Swift 6.3 (Xcode 26) still
+     defaults to the native build system, whose layout differs, while offering swiftbuild as an option. A
+     toolchain that does not offer it fails here by name, never as a types phase that quietly read nothing.
+     Asked only when the phase builds; a run that reuses the last build's records never pays for it.
+     */
+    private func buildSystemArguments() throws -> [String] {
+        let help = try runner.run("swift", ["build", "--help"], in: package.root)
+        guard let arguments = Self.buildSystemArguments(help: String(decoding: help.standardOutput, as: UTF8.self) + help.standardError) else {
+            throw TypesFailure(description: "this toolchain's swift build offers no swiftbuild build system, and the types phase reads only the records swiftbuild writes (toolchain: \(toolchain)). Use a toolchain that offers `swift build --build-system swiftbuild`.")
+        }
+        return arguments
+    }
+
+    static let swiftBuildArguments = ["--build-system", "swiftbuild"]
+
+    /*
+     `--build-system swiftbuild` when `swift build --help` offers swiftbuild, else nil. Help lists the build
+     systems either one per line (6.4) or inline as `(values: ...)`, so the word is looked for, not a layout.
+     */
+    static func buildSystemArguments(help: String) -> [String]? {
+        help.contains("--build-system") && help.contains("swiftbuild") ? swiftBuildArguments : nil
     }
 
     /* The build could not be read at all. */
