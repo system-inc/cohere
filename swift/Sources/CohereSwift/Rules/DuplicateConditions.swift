@@ -49,7 +49,8 @@ public struct DuplicateConditions: FileRule {
                 at: mark,
                 rule: name,
                 messageId: "duplicateConditions",
-                message: "This condition is tested again in the same if/else if chain or switch, so whichever copy comes second can never run. Change the copy to the condition that branch was meant to test, or delete the branch."
+                message:
+                    "This condition is tested again in the same if/else if chain or switch, so whichever copy comes second can never run. Change the copy to the condition that branch was meant to test, or delete the branch.",
             )
         }
     }
@@ -77,7 +78,7 @@ public struct DuplicateConditions: FileRule {
                     mark: Syntax(branch.conditions),
                     key: branch.conditions.contains { Self.mayVary(Syntax($0.condition)) }
                         ? nil
-                        : Set(branch.conditions.map { Self.key($0.condition) })
+                        : Set(branch.conditions.map { Self.key($0.condition) }),
                 )
             }
             report(branches)
@@ -87,11 +88,20 @@ public struct DuplicateConditions: FileRule {
         override func visit(_ node: SwitchCaseListSyntax) -> SyntaxVisitorContinueKind {
             var items: [Item] = []
             for element in node {
-                guard case .switchCase(let switchCase) = element, case .case(let label) = switchCase.label else { continue }
+                guard case .switchCase(let switchCase) = element, case .case(let label) = switchCase.label else {
+                    continue
+                }
                 for caseItem in label.caseItems {
-                    let varies = Self.mayVary(Syntax(caseItem.pattern)) || (caseItem.whereClause.map { Self.mayVary(Syntax($0)) } ?? false)
+                    let varies =
+                        Self.mayVary(Syntax(caseItem.pattern))
+                        || (caseItem.whereClause.map { Self.mayVary(Syntax($0)) } ?? false)
                     let whereKey = caseItem.whereClause.map { Self.key($0) } ?? []
-                    items.append(Item(mark: Syntax(caseItem), key: varies ? nil : Self.key(caseItem.pattern) + [.semicolon] + whereKey))
+                    items.append(
+                        Item(
+                            mark: Syntax(caseItem),
+                            key: varies ? nil : Self.key(caseItem.pattern) + [.semicolon] + whereKey,
+                        )
+                    )
                 }
             }
             report(items)

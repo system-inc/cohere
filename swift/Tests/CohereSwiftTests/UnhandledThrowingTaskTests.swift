@@ -32,16 +32,20 @@ struct UnhandledThrowingTaskTests {
     static let throwingStarters = [
         "Task": "s:ScT12_Concurrencys5Error_pRs_rlE4name8priority9operationScTyxsAB_pGSSSg_ScPSgxyYaKYAcntcfc",
         "init": "s:ScT12_Concurrencys5Error_pRs_rlE4name8priority9operationScTyxsAB_pGSSSg_ScPSgxyYaKYAcntcfc",
-        "detached": "s:ScT12_Concurrencys5Error_pRs_rlE8detached4name8priority9operationScTyxsAB_pGSSSg_ScPSgxyYaKYAcntFZ",
-        "immediate": "s:ScT12_Concurrencys5Error_pRs_rlE9immediate4name8priority18executorPreference9operationScTyxsAB_pGSSSg_ScPSgSch_pSgnxyYaKYAcntFZ",
-        "immediateDetached": "s:ScT12_Concurrencys5Error_pRs_rlE17immediateDetached4name8priority18executorPreference9operationScTyxsAB_pGSSSg_ScPSgSch_pSgnxyYaKYAcntFZ",
+        "detached":
+            "s:ScT12_Concurrencys5Error_pRs_rlE8detached4name8priority9operationScTyxsAB_pGSSSg_ScPSgxyYaKYAcntFZ",
+        "immediate":
+            "s:ScT12_Concurrencys5Error_pRs_rlE9immediate4name8priority18executorPreference9operationScTyxsAB_pGSSSg_ScPSgSch_pSgnxyYaKYAcntFZ",
+        "immediateDetached":
+            "s:ScT12_Concurrencys5Error_pRs_rlE17immediateDetached4name8priority18executorPreference9operationScTyxsAB_pGSSSg_ScPSgSch_pSgnxyYaKYAcntFZ",
     ]
 
     static let neverStarters = [
         "Task": "s:ScT12_Concurrencys5NeverORs_rlE4name8priority9operationScTyxACGSSSg_ScPSgxyYaYAcntcfc",
         "init": "s:ScT12_Concurrencys5NeverORs_rlE4name8priority9operationScTyxACGSSSg_ScPSgxyYaYAcntcfc",
         "detached": "s:ScT12_Concurrencys5NeverORs_rlE8detached4name8priority9operationScTyxACGSSSg_ScPSgxyYaYAcntFZ",
-        "immediate": "s:ScT12_Concurrencys5NeverORs_rlE9immediate4name8priority18executorPreference9operationScTyxACGSSSg_ScPSgSch_pSgnxyYaYAcntFZ",
+        "immediate":
+            "s:ScT12_Concurrencys5NeverORs_rlE9immediate4name8priority18executorPreference9operationScTyxACGSSSg_ScPSgSch_pSgnxyYaYAcntFZ",
     ]
 
     /*
@@ -49,33 +53,66 @@ struct UnhandledThrowingTaskTests {
      last repeats), at its starting name: the last of `Task`, `init`, `detached`, `immediate` and
      `immediateDetached` it spells. `extra` adds occurrences by position, for a result builder's records.
      */
-    static func findings(_ source: String, _ resolutions: Resolution..., extra: [(line: Int, column: Int, symbol: String)] = []) -> [String] {
+    static func findings(
+        _ source: String,
+        _ resolutions: Resolution...,
+        extra: [(line: Int, column: Int, symbol: String)] = [],
+    ) -> [String] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
-        var occurrences: [FileSymbols.Occurrence] = extra.map { FileSymbols.Occurrence(line: $0.line, column: $0.column, symbol: $0.symbol, name: "", isReference: true) }
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
+        var occurrences: [FileSymbols.Occurrence] = extra.map {
+            FileSymbols.Occurrence(line: $0.line, column: $0.column, symbol: $0.symbol, name: "", isReference: true)
+        }
         var index = 0
         for call in Self.taskCalls(in: file.tree) {
             let resolution = resolutions.isEmpty ? .throwing : resolutions[min(index, resolutions.count - 1)]
             index += 1
-            let names = call.calledExpression.tokens(viewMode: .sourceAccurate).filter { Self.throwingStarters[$0.text] != nil }
+            let names = call.calledExpression.tokens(viewMode: .sourceAccurate).filter {
+                Self.throwingStarters[$0.text] != nil
+            }
             guard let starter = names.last else { continue }
             for token in names where token.text == "Task" {
                 let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: resolution == .ours ? Self.ours : Self.task, name: "Task", isReference: true))
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: resolution == .ours ? Self.ours : Self.task,
+                        name: "Task",
+                        isReference: true,
+                    )
+                )
             }
             let location = file.locations.location(for: starter.positionAfterSkippingLeadingTrivia)
             let symbol: String? =
                 switch resolution {
-                case .throwing: Self.throwingStarters[starter.text]
-                case .never: Self.neverStarters[starter.text]
-                case .ours: "s:7Control4JobsO4TaskVyAEyyYaKccfc"
-                case .unresolved: nil
+                    case .throwing: Self.throwingStarters[starter.text]
+                    case .never: Self.neverStarters[starter.text]
+                    case .ours: "s:7Control4JobsO4TaskVyAEyyYaKccfc"
+                    case .unresolved: nil
                 }
             if let symbol {
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: symbol, name: "init(name:priority:operation:)", isReference: true))
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: symbol,
+                        name: "init(name:priority:operation:)",
+                        isReference: true,
+                    )
+                )
             }
         }
-        return UnhandledThrowingTask().findings(in: file, symbols: FileSymbols(occurrences)).map { "\($0.line):\($0.column)" }
+        return UnhandledThrowingTask().findings(in: file, symbols: FileSymbols(occurrences)).map {
+            "\($0.line):\($0.column)"
+        }
     }
 
     /* Every call whose called expression names `Task`, outermost first. */
@@ -270,7 +307,8 @@ struct UnhandledThrowingTaskTests {
         let found = Self.findings(source, .throwing)
         #expect(
             found == [
-                "3:18", "7:15", "9:14", "10:14", "11:29", "12:26", "14:9", "18:26", "19:23", "20:18", "21:14", "22:28", "23:17",
+                "3:18", "7:15", "9:14", "10:14", "11:29", "12:26", "14:9", "18:26", "19:23", "20:18", "21:14", "22:28",
+                "23:17",
                 "24:20", "24:72", "24:107", "26:17", "27:18", "30:9", "32:39", "34:13", "40:1",
             ]
         )
@@ -343,7 +381,14 @@ struct UnhandledThrowingTaskTests {
 
     @Test func aFileWithNoTaskDoesNotApply() {
         let source = "func load() async throws {}\n"
-        let file = ParsedFile(url: URL(fileURLWithPath: "/Plain.swift"), targetName: "Control", targetKind: "regular", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: URL(fileURLWithPath: "/Plain.swift"),
+            targetName: "Control",
+            targetKind: "regular",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         #expect(!UnhandledThrowingTask().applies(to: file))
     }
 
@@ -384,23 +429,49 @@ struct UnhandledThrowingTaskTests {
         """
 
     @Test func aDroppedThrowingTaskIsFlaggedAndATaskOfOursIsNot() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-typed-\(UUID().uuidString)", isDirectory: true)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-typed-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-        try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try Self.packageSource.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
+        try PipelineControlTests.manifest.write(
+            to: root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try Self.packageSource.write(
+            to: sources.appendingPathComponent("Control.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
 
         /* One run builds the package and writes its index. The rule is not registered here, so it is run by hand on what the run left. */
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"],
+            workingDirectory: root,
+        )
         _ = try await Pipeline(options: options, writer: ContractWriter { _ in }, workingDirectory: root).run()
-        let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: ProcessRunner())
+        let package = try PackageModel.load(
+            root: root,
+            scratchPath: Pipeline.scratchPath(for: root),
+            runner: ProcessRunner(),
+        )
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
         let candidates = parsed.files.filter { UnhandledThrowingTask().applies(to: $0) }
-        let symbols = SymbolProvider(scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root), runner: ProcessRunner()).symbols(for: candidates)
+        let symbols = SymbolProvider(
+            scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root),
+            runner: ProcessRunner(),
+        ).symbols(for: candidates)
         #expect(symbols.fromIndex == 1, "the build's index should describe the file: \(symbols.unavailable)")
         let found = candidates.flatMap { file in
-            UnhandledThrowingTask().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.messageId)@\($0.line):\($0.column)" }
+            UnhandledThrowingTask().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map {
+                "\($0.messageId)@\($0.line):\($0.column)"
+            }
         }
-        #expect(found == ["unhandledThrowingTask@16:5", "unhandledThrowingTask@17:5"], "expected the two dropped throwing tasks and not ours, the quiet one, the handled ones or the held one: \(found)")
+        #expect(
+            found == ["unhandledThrowingTask@16:5", "unhandledThrowingTask@17:5"],
+            "expected the two dropped throwing tasks and not ours, the quiet one, the handled ones or the held one: \(found)",
+        )
     }
 }

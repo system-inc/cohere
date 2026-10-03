@@ -101,7 +101,9 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
 
     /* Every flagged binding is a `var`, and its type is spelled with a bracket or one of the three names. */
     public func applies(to file: ParsedFile) -> Bool {
-        file.source.contains("var") && (file.source.contains("[") || file.source.contains("Set") || file.source.contains("Array") || file.source.contains("Dictionary"))
+        file.source.contains("var")
+            && (file.source.contains("[") || file.source.contains("Set") || file.source.contains("Array")
+                || file.source.contains("Dictionary"))
     }
 
     public func findings(in file: ParsedFile, symbols: FileSymbols) -> [FindingRecord] {
@@ -111,7 +113,8 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
         collector.walk(folded)
         let reader = Reader(file: file, symbols: symbols)
         return collector.bindings.compactMap { variable, binding, token in
-            guard let kind = reader.kind(of: binding), reader.isOnlyWritten(token, declaredBy: variable, kind: kind) else { return nil }
+            guard let kind = reader.kind(of: binding), reader.isOnlyWritten(token, declaredBy: variable, kind: kind)
+            else { return nil }
             return file.finding(at: token, rule: name, messageId: "writeOnlyCollection", message: Self.message)
         }
     }
@@ -123,7 +126,8 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
         override func visit(_ node: VariableDeclSyntax) -> SyntaxVisitorContinueKind {
             guard node.bindingSpecifier.tokenKind == .keyword(.var), node.attributes.isEmpty, node.modifiers.isEmpty,
                 let list = node.parent?.parent?.as(CodeBlockItemListSyntax.self), let scope = list.parent,
-                !scope.is(SourceFileSyntax.self), !scope.is(IfConfigClauseSyntax.self), ConcurrencyNoCheckThenWrite.enclosingFunction(Syntax(node)) != nil,
+                !scope.is(SourceFileSyntax.self), !scope.is(IfConfigClauseSyntax.self),
+                ConcurrencyNoCheckThenWrite.enclosingFunction(Syntax(node)) != nil,
                 Self.functionBeforeType(Syntax(node))
             else {
                 return .visitChildren
@@ -210,12 +214,12 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
 
     static func writers(of kind: Kind) -> Set<Writer> {
         switch kind {
-        case .array:
-            return arrayWriters
-        case .set:
-            return setWriters
-        case .dictionary:
-            return dictionaryWriters
+            case .array:
+                return arrayWriters
+            case .set:
+                return setWriters
+            case .dictionary:
+                return dictionaryWriters
         }
     }
 
@@ -259,7 +263,9 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
             if let reference = callee.as(DeclReferenceExprSyntax.self) {
                 return named(reference.baseName)
             }
-            if let specialized = callee.as(GenericSpecializationExprSyntax.self), let reference = specialized.expression.as(DeclReferenceExprSyntax.self) {
+            if let specialized = callee.as(GenericSpecializationExprSyntax.self),
+                let reference = specialized.expression.as(DeclReferenceExprSyntax.self)
+            {
                 return named(reference.baseName)
             }
             return nil
@@ -282,7 +288,9 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
         func named(_ token: TokenSyntax) -> Kind? {
             guard let entry = CorrectnessNoWriteOnlyCollection.typeSymbols[token.text] else { return nil }
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
-            let resolved = symbols.occurrences(line: location.line, column: location.column).contains { $0.isReference && !$0.isImplicit && $0.symbol == entry.symbol }
+            let resolved = symbols.occurrences(line: location.line, column: location.column).contains {
+                $0.isReference && !$0.isImplicit && $0.symbol == entry.symbol
+            }
             return resolved ? entry.kind : nil
         }
 
@@ -298,7 +306,9 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
          label and the declaration of another binding are not uses, and anything else is taken as a read.
          */
         func isOnlyWritten(_ declared: TokenSyntax, declaredBy variable: VariableDeclSyntax, kind: Kind) -> Bool {
-            guard let item = variable.parent?.as(CodeBlockItemSyntax.self), let list = item.parent?.as(CodeBlockItemListSyntax.self) else { return false }
+            guard let item = variable.parent?.as(CodeBlockItemSyntax.self),
+                let list = item.parent?.as(CodeBlockItemListSyntax.self)
+            else { return false }
             let name = CorrectnessNoWriteOnlyCollection.bareName(declared)
             var writes = 0
             var reachedDeclaration = false
@@ -307,14 +317,15 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
                     reachedDeclaration = true
                 }
                 guard reachedDeclaration else { continue }
-                for token in statement.tokens(viewMode: .sourceAccurate) where token.id != declared.id && CorrectnessNoWriteOnlyCollection.bareName(token) == name {
+                for token in statement.tokens(viewMode: .sourceAccurate)
+                where token.id != declared.id && CorrectnessNoWriteOnlyCollection.bareName(token) == name {
                     switch use(of: token, declared: declared, kind: kind) {
-                    case .none:
-                        continue
-                    case .write:
-                        writes += 1
-                    case .read:
-                        return false
+                        case .none:
+                            continue
+                        case .write:
+                            writes += 1
+                        case .read:
+                            return false
                     }
                 }
             }
@@ -349,7 +360,9 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
                 }
                 return .none
             }
-            if parent.is(ClosureShorthandParameterSyntax.self) || parent.is(ClosureParameterSyntax.self) || parent.is(FunctionParameterSyntax.self) {
+            if parent.is(ClosureShorthandParameterSyntax.self) || parent.is(ClosureParameterSyntax.self)
+                || parent.is(FunctionParameterSyntax.self)
+            {
                 return .none
             }
             /*
@@ -372,12 +385,12 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
                     return true
                 }
                 switch ConcurrencyNoCheckThenWrite.lookup(name, in: node, below: child) {
-                case .declared(let found)?:
-                    return found.id == declared.id
-                case .unknown?:
-                    return true
-                case nil:
-                    break
+                    case .declared(let found)?:
+                        return found.id == declared.id
+                    case .unknown?:
+                        return true
+                    case nil:
+                        break
                 }
                 child = node
             }
@@ -387,36 +400,46 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
         /* One reference judged: a dropped mutating call on it, a plain `=` through its subscript, or `+=` on an array. */
         func isWrite(_ reference: DeclReferenceExprSyntax, kind: Kind) -> Bool {
             guard let parent = reference.parent else { return false }
-            if let member = parent.as(MemberAccessExprSyntax.self), member.base?.id == reference.id, member.declName.argumentNames == nil,
+            if let member = parent.as(MemberAccessExprSyntax.self), member.base?.id == reference.id,
+                member.declName.argumentNames == nil,
                 let call = member.parent?.as(FunctionCallExprSyntax.self), call.calledExpression.id == member.id,
                 call.trailingClosure == nil, call.additionalTrailingClosures.isEmpty
             {
                 let labels = call.arguments.map { $0.label?.text }
-                guard let writer = CorrectnessNoWriteOnlyCollection.writers(of: kind).first(where: { $0.name == member.declName.baseName.text && $0.labels == labels }),
+                guard
+                    let writer = CorrectnessNoWriteOnlyCollection.writers(of: kind).first(where: {
+                        $0.name == member.declName.baseName.text && $0.labels == labels
+                    }),
                     isStandardLibrary(member.declName.baseName)
                 else {
                     return false
                 }
-                return CorrectnessNoWriteOnlyCollection.dropsResult(of: ExprSyntax(call), returnsValue: writer.returnsValue)
+                return CorrectnessNoWriteOnlyCollection.dropsResult(
+                    of: ExprSyntax(call),
+                    returnsValue: writer.returnsValue,
+                )
             }
-            if let subscriptCall = parent.as(SubscriptCallExprSyntax.self), subscriptCall.calledExpression.id == reference.id,
+            if let subscriptCall = parent.as(SubscriptCallExprSyntax.self),
+                subscriptCall.calledExpression.id == reference.id,
                 subscriptCall.trailingClosure == nil, subscriptCall.additionalTrailingClosures.isEmpty,
-                let assignment = subscriptCall.parent?.as(InfixOperatorExprSyntax.self), assignment.operator.is(AssignmentExprSyntax.self),
+                let assignment = subscriptCall.parent?.as(InfixOperatorExprSyntax.self),
+                assignment.operator.is(AssignmentExprSyntax.self),
                 assignment.leftOperand.id == subscriptCall.id
             {
                 let labels = subscriptCall.arguments.map { $0.label?.text }
                 let keyed: Bool
                 switch kind {
-                case .array:
-                    keyed = labels == [nil]
-                case .dictionary:
-                    keyed = labels == [nil] || labels == [nil, "default"]
-                case .set:
-                    keyed = false
+                    case .array:
+                        keyed = labels == [nil]
+                    case .dictionary:
+                        keyed = labels == [nil] || labels == [nil, "default"]
+                    case .set:
+                        keyed = false
                 }
                 return keyed && isStandardLibrary(subscriptCall.leftSquare)
             }
-            if kind == .array, let infix = parent.as(InfixOperatorExprSyntax.self), infix.leftOperand.id == reference.id,
+            if kind == .array, let infix = parent.as(InfixOperatorExprSyntax.self),
+                infix.leftOperand.id == reference.id,
                 let operation = infix.operator.as(BinaryOperatorExprSyntax.self), operation.operator.text == "+="
             {
                 return isStandardLibrary(operation.operator)
@@ -436,7 +459,8 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
         while let wrapper = current.parent, wrapper.is(TryExprSyntax.self) || wrapper.is(AwaitExprSyntax.self) {
             current = wrapper
         }
-        if let discard = current.parent?.as(InfixOperatorExprSyntax.self), discard.operator.is(AssignmentExprSyntax.self),
+        if let discard = current.parent?.as(InfixOperatorExprSyntax.self),
+            discard.operator.is(AssignmentExprSyntax.self),
             discard.leftOperand.is(DiscardAssignmentExprSyntax.self), discard.rightOperand.id == current.id
         {
             return discard.parent?.is(CodeBlockItemSyntax.self) == true
@@ -456,7 +480,9 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
             return true
         }
         if let construct = list.parent?.as(CodeBlockSyntax.self)?.parent {
-            if construct.is(ForStmtSyntax.self) || construct.is(WhileStmtSyntax.self) || construct.is(RepeatStmtSyntax.self) || construct.is(DeferStmtSyntax.self) {
+            if construct.is(ForStmtSyntax.self) || construct.is(WhileStmtSyntax.self)
+                || construct.is(RepeatStmtSyntax.self) || construct.is(DeferStmtSyntax.self)
+            {
                 return true
             }
             if construct.is(IfExprSyntax.self) {
@@ -464,7 +490,9 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
             }
             return false
         }
-        if let switchCase = list.parent?.as(SwitchCaseSyntax.self), let switchExpression = switchCase.parent?.parent?.as(SwitchExprSyntax.self) {
+        if let switchCase = list.parent?.as(SwitchCaseSyntax.self),
+            let switchExpression = switchCase.parent?.parent?.as(SwitchExprSyntax.self)
+        {
             return isStatement(Syntax(switchExpression))
         }
         return false
@@ -476,7 +504,9 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
         while let outer = current.parent?.as(IfExprSyntax.self) {
             current = Syntax(outer)
         }
-        guard let statement = current.parent?.as(ExpressionStmtSyntax.self), let item = statement.parent?.as(CodeBlockItemSyntax.self) else { return false }
+        guard let statement = current.parent?.as(ExpressionStmtSyntax.self),
+            let item = statement.parent?.as(CodeBlockItemSyntax.self)
+        else { return false }
         return discardsValue(item)
     }
 

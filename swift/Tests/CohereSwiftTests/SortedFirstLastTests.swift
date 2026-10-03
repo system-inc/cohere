@@ -24,8 +24,13 @@ struct SortedFirstLastTests {
     static let oursSorted: Resolution = ("s:7Control6LedgerV6sortedACyF", "sorted()")
     static let oursFirst: Resolution = ("s:7Control6LedgerV5firstSiSgvp", "first")
     static let oursLast: Resolution = ("s:7Control6LedgerV4lastSiSgvp", "last")
-    static let oursKeyPathSorted: Resolution = ("s:ST7ControlE6sorted2bySay7ElementQzGs7KeyPathCyAEqd__G_tSLRd__lF", "sorted(by:)")
-    static let foundationSorted: Resolution = ("s:ST10FoundationE6sorted5usingSay7ElementQzGqd___tAA14SortComparatorRd__8ComparedQyd__AERSlF", "sorted(using:)")
+    static let oursKeyPathSorted: Resolution = (
+        "s:ST7ControlE6sorted2bySay7ElementQzGs7KeyPathCyAEqd__G_tSLRd__lF", "sorted(by:)",
+    )
+    static let foundationSorted: Resolution = (
+        "s:ST10FoundationE6sorted5usingSay7ElementQzGqd___tAA14SortComparatorRd__8ComparedQyd__AERSlF",
+        "sorted(using:)",
+    )
 
     /* The standard library's `sorted()` where the call is written with empty parentheses, and `sorted(by:)` otherwise. */
     static func standardSorted(_ token: TokenSyntax) -> Resolution? {
@@ -43,27 +48,53 @@ struct SortedFirstLastTests {
         _ source: String,
         sorted: (TokenSyntax) -> Resolution? = standardSorted,
         first: Resolution? = collectionFirst,
-        last: Resolution? = bidirectionalLast
+        last: Resolution? = bidirectionalLast,
     ) -> [String] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         var occurrences: [FileSymbols.Occurrence] = []
         for token in file.tree.tokens(viewMode: .sourceAccurate) {
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
             let resolution: Resolution? =
                 switch token.text {
-                case "sorted": sorted(token)
-                case "first": first
-                case "last": last
-                default: nil
+                    case "sorted": sorted(token)
+                    case "first": first
+                    case "last": last
+                    default: nil
                 }
             guard let resolution else { continue }
-            occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: resolution.symbol, name: resolution.name, isReference: true))
+            occurrences.append(
+                FileSymbols.Occurrence(
+                    line: location.line,
+                    column: location.column,
+                    symbol: resolution.symbol,
+                    name: resolution.name,
+                    isReference: true,
+                )
+            )
             if token.text != "sorted" {
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: "s:SlsE5first7ElementQzSgvg", name: "getter:\(token.text)", isReference: true, isImplicit: true))
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: "s:SlsE5first7ElementQzSgvg",
+                        name: "getter:\(token.text)",
+                        isReference: true,
+                        isImplicit: true,
+                    )
+                )
             }
         }
-        return SortedFirstLast().findings(in: file, symbols: FileSymbols(occurrences)).map { "\($0.messageId)@\($0.line):\($0.column)" }
+        return SortedFirstLast().findings(in: file, symbols: FileSymbols(occurrences)).map {
+            "\($0.messageId)@\($0.line):\($0.column)"
+        }
     }
 
     /* SwiftLint's triggering examples, each at the start of the chain. */
@@ -86,8 +117,10 @@ struct SortedFirstLastTests {
             """
         #expect(
             Self.findings(source) == [
-                "sortedFirst@1:1", "sortedFirst@2:1", "sortedFirst@3:1", "sortedFirst@4:1", "sortedFirst@5:1", "sortedFirst@6:1",
-                "sortedLast@7:1", "sortedLast@8:1", "sortedLast@9:1", "sortedLast@10:1", "sortedLast@11:1", "sortedLast@12:1", "sortedLast@13:1",
+                "sortedFirst@1:1", "sortedFirst@2:1", "sortedFirst@3:1", "sortedFirst@4:1", "sortedFirst@5:1",
+                "sortedFirst@6:1",
+                "sortedLast@7:1", "sortedLast@8:1", "sortedLast@9:1", "sortedLast@10:1", "sortedLast@11:1",
+                "sortedLast@12:1", "sortedLast@13:1",
             ]
         )
     }
@@ -128,7 +161,9 @@ struct SortedFirstLastTests {
             let second = ledger.sorted().last
 
             """
-        #expect(Self.findings(source, sorted: { _ in Self.oursSorted }, first: Self.oursFirst, last: Self.oursLast).isEmpty)
+        #expect(
+            Self.findings(source, sorted: { _ in Self.oursSorted }, first: Self.oursFirst, last: Self.oursLast).isEmpty
+        )
         #expect(Self.findings(source, sorted: { _ in Self.oursSorted }).isEmpty)
     }
 
@@ -139,8 +174,17 @@ struct SortedFirstLastTests {
      */
     @Test func aKeyPathSortedOfOursOnSequenceIsNotFound() {
         let source = "let first = scores.sorted(by: \\.name).first\n"
-        let ours = FileSymbols.Occurrence(line: 1, column: 1, symbol: Self.oursKeyPathSorted.symbol, name: Self.oursKeyPathSorted.name, isReference: true)
-        #expect(!ours.isStandardLibrary, "an extension of ours on a standard library protocol read as the standard library's")
+        let ours = FileSymbols.Occurrence(
+            line: 1,
+            column: 1,
+            symbol: Self.oursKeyPathSorted.symbol,
+            name: Self.oursKeyPathSorted.name,
+            isReference: true,
+        )
+        #expect(
+            !ours.isStandardLibrary,
+            "an extension of ours on a standard library protocol read as the standard library's",
+        )
         #expect(Self.findings(source, sorted: { _ in Self.oursKeyPathSorted }).isEmpty)
     }
 
@@ -189,7 +233,12 @@ struct SortedFirstLastTests {
                 .first
 
             """
-        #expect(Self.findings(source) == ["sortedFirst@2:30", "sortedLast@3:29", "sortedFirst@4:26", "sortedFirst@6:14", "sortedLast@7:13", "sortedFirst@8:13"])
+        #expect(
+            Self.findings(source) == [
+                "sortedFirst@2:30", "sortedLast@3:29", "sortedFirst@4:26", "sortedFirst@6:14", "sortedLast@7:13",
+                "sortedFirst@8:13",
+            ]
+        )
     }
 
     /* Reads that are not the shape: an end by subscript or prefix, two pairs of parentheses, and an unapplied `first(where:)`. */
@@ -208,19 +257,34 @@ struct SortedFirstLastTests {
     /* The findings on a source whose every `sorted`, `first` and `last` resolves to the standard library's. */
     static func records(_ source: String) -> [FindingRecord] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         var occurrences: [FileSymbols.Occurrence] = []
         for token in file.tree.tokens(viewMode: .sourceAccurate) {
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
             let resolution: Resolution? =
                 switch token.text {
-                case "sorted": standardSorted(token)
-                case "first": collectionFirst
-                case "last": bidirectionalLast
-                default: nil
+                    case "sorted": standardSorted(token)
+                    case "first": collectionFirst
+                    case "last": bidirectionalLast
+                    default: nil
                 }
             guard let resolution else { continue }
-            occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: resolution.symbol, name: resolution.name, isReference: true))
+            occurrences.append(
+                FileSymbols.Occurrence(
+                    line: location.line,
+                    column: location.column,
+                    symbol: resolution.symbol,
+                    name: resolution.name,
+                    isReference: true,
+                )
+            )
         }
         return SortedFirstLast().findings(in: file, symbols: FileSymbols(occurrences))
     }
@@ -280,21 +344,40 @@ struct SortedFirstLastTests {
 
             """
         let findings = Self.records(source)
-        #expect(findings.map { $0.suggestions.map(\.message) } == [["Use max(by:) with < for >"], ["Use min(by:) with < for >"], ["Use min(by:)"], ["Use max()"]])
+        #expect(
+            findings.map { $0.suggestions.map(\.message) } == [
+                ["Use max(by:) with < for >"], ["Use min(by:) with < for >"], ["Use min(by:)"], ["Use max()"],
+            ]
+        )
         #expect(
             findings.first?.message
                 == "Sorting a collection to read its first element builds and sorts a whole new array to keep one element. Use max(by:) with the predicate's > turned to <, which reads as the largest by the forward order rather than the smallest by a reversed one: it says what is meant, and it walks the elements once."
         )
         let smallest = try #require(findings.dropFirst().first)
-        #expect(smallest.message.contains("Use min(by:) with the predicate's > turned to <, which reads as the smallest by the forward order rather than the largest by a reversed one"))
-        #expect(smallest.message.contains("Among equally ordered elements min returns the first where sorted().last returned the last"))
+        #expect(
+            smallest.message.contains(
+                "Use min(by:) with the predicate's > turned to <, which reads as the smallest by the forward order rather than the largest by a reversed one"
+            )
+        )
+        #expect(
+            smallest.message.contains(
+                "Among equally ordered elements min returns the first where sorted().last returned the last"
+            )
+        )
         #expect(findings.dropFirst(2).first?.message.contains("Use min(by:) with the same predicate:") == true)
         #expect(findings.last?.message.contains("Use max():") == true)
     }
 
     @Test func aFileWithNoSortedDoesNotApply() {
         let source = "let first = items.first\nlet last = items.last\n"
-        let file = ParsedFile(url: URL(fileURLWithPath: "/Plain.swift"), targetName: "Control", targetKind: "regular", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: URL(fileURLWithPath: "/Plain.swift"),
+            targetName: "Control",
+            targetKind: "regular",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         #expect(!SortedFirstLast().applies(to: file))
     }
 
@@ -342,26 +425,52 @@ struct SortedFirstLastTests {
         """
 
     @Test func aStandardLibrarySortIsFlaggedAndOursIsNot() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-typed-\(UUID().uuidString)", isDirectory: true)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-typed-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-        try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try Self.packageSource.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
+        try PipelineControlTests.manifest.write(
+            to: root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try Self.packageSource.write(
+            to: sources.appendingPathComponent("Control.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
 
         /* One run builds the package and writes its index. The rule is not registered here, so it is run by hand on what the run left. */
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"],
+            workingDirectory: root,
+        )
         _ = try await Pipeline(options: options, writer: ContractWriter { _ in }, workingDirectory: root).run()
-        let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: ProcessRunner())
+        let package = try PackageModel.load(
+            root: root,
+            scratchPath: Pipeline.scratchPath(for: root),
+            runner: ProcessRunner(),
+        )
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
         let candidates = parsed.files.filter { SortedFirstLast().applies(to: $0) }
-        let symbols = SymbolProvider(scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root), runner: ProcessRunner()).symbols(for: candidates)
+        let symbols = SymbolProvider(
+            scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root),
+            runner: ProcessRunner(),
+        ).symbols(for: candidates)
         #expect(symbols.fromIndex == 1, "the build's index should describe the file: \(symbols.unavailable)")
         let found = candidates.flatMap { file in
-            SortedFirstLast().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.messageId)@\($0.line)" }
+            SortedFirstLast().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map {
+                "\($0.messageId)@\($0.line)"
+            }
         }
         #expect(
-            found == ["sortedFirst@21", "sortedLast@22", "sortedFirst@23", "sortedFirst@24", "sortedLast@25", "sortedFirst@26", "sortedLast@27", "sortedLast@32"],
-            "expected the standard library's sorts and not the ledger's, the key path one of ours, sorted(using:) or first(where:): \(found)"
+            found == [
+                "sortedFirst@21", "sortedLast@22", "sortedFirst@23", "sortedFirst@24", "sortedLast@25",
+                "sortedFirst@26", "sortedLast@27", "sortedLast@32",
+            ],
+            "expected the standard library's sorts and not the ledger's, the key path one of ours, sorted(using:) or first(where:): \(found)",
         )
     }
 }

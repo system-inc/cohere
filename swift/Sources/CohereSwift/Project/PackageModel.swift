@@ -33,7 +33,15 @@ public struct PackageModel: Equatable, Sendable {
         /* Whether its settings turn on strict memory safety (SE-0458). */
         public var strictMemorySafety: Bool
 
-        public init(name: String, kind: String, directory: URL, sources: [URL], languageMode: String, upcomingFeatures: Set<String> = [], strictMemorySafety: Bool = false) {
+        public init(
+            name: String,
+            kind: String,
+            directory: URL,
+            sources: [URL],
+            languageMode: String,
+            upcomingFeatures: Set<String> = [],
+            strictMemorySafety: Bool = false,
+        ) {
             self.name = name
             self.kind = kind
             self.directory = directory
@@ -72,7 +80,14 @@ public struct PackageModel: Equatable, Sendable {
     /* The targets a library product is built from: the package's API to whoever depends on it, so what they declare public is used by someone this build never sees. */
     public var libraryProductTargets: Set<String> = []
 
-    public init(name: String, root: URL, toolsVersion: String, targets: [Target], localDependencyRoots: [URL] = [], localPackages: [PackageModel] = []) {
+    public init(
+        name: String,
+        root: URL,
+        toolsVersion: String,
+        targets: [Target],
+        localDependencyRoots: [URL] = [],
+        localPackages: [PackageModel] = [],
+    ) {
         self.name = name
         self.root = root
         self.toolsVersion = toolsVersion
@@ -98,7 +113,12 @@ public struct PackageModel: Equatable, Sendable {
      could not name) every run describes cold, because an entry keyed on an unknown toolchain could survive
      a toolchain change.
      */
-    public static func load(root: URL, scratchPath: URL, runner: ProcessRunner = ProcessRunner(), toolchain: String? = nil) throws -> PackageModel {
+    public static func load(
+        root: URL,
+        scratchPath: URL,
+        runner: ProcessRunner = ProcessRunner(),
+        toolchain: String? = nil,
+    ) throws -> PackageModel {
         let cache = PackageDescriptionCache(scratchPath: scratchPath)
         let cacheable = toolchain.map { !$0.hasPrefix("unknown") } ?? false
         if cacheable, let toolchain, let cached = cache.members(root: root, toolchain: toolchain) {
@@ -107,14 +127,25 @@ public struct PackageModel: Equatable, Sendable {
                     guard let member = cached[packageRoot.path] else { throw CacheMiss() }
                     return (member.describe, member.dump)
                 }.model
-            } catch {
+            }
+            catch {
                 /* A member the cache never held: describe cold below, which also refills it. */
             }
         }
         let cold = try traverse(root: root, scratchPath: scratchPath) { packageRoot, packageScratch in
             (
-                try runPackageCommand(["describe", "--type", "json"], root: packageRoot, scratchPath: packageScratch, runner: runner),
-                try runPackageCommand(["dump-package"], root: packageRoot, scratchPath: packageScratch, runner: runner)
+                try runPackageCommand(
+                    ["describe", "--type", "json"],
+                    root: packageRoot,
+                    scratchPath: packageScratch,
+                    runner: runner,
+                ),
+                try runPackageCommand(
+                    ["dump-package"],
+                    root: packageRoot,
+                    scratchPath: packageScratch,
+                    runner: runner,
+                ),
             )
         }
         if cacheable, let toolchain {
@@ -127,7 +158,7 @@ public struct PackageModel: Equatable, Sendable {
     private static func traverse(
         root: URL,
         scratchPath: URL,
-        answer: (URL, URL) throws -> Answers
+        answer: (URL, URL) throws -> Answers,
     ) throws -> (model: PackageModel, answers: [(root: URL, describe: Data, dump: Data, model: PackageModel)]) {
         var answers: [(root: URL, describe: Data, dump: Data, model: PackageModel)] = []
         func loadOne(_ packageRoot: URL, _ packageScratch: URL) throws -> PackageModel {
@@ -176,7 +207,8 @@ public struct PackageModel: Equatable, Sendable {
 
         let toolsVersion = manifest.toolsVersion.version
         /* SwiftPM compiles with the highest version in the package's list, not the first, so the list is read the same way. */
-        let packageDefault = manifest.swiftLanguageVersions?.max(by: PackageModel.isOlderLanguageMode)
+        let packageDefault =
+            manifest.swiftLanguageVersions?.max(by: PackageModel.isOlderLanguageMode)
             ?? PackageModel.defaultLanguageMode(toolsVersion: toolsVersion)
         var modesByTarget: [String: String] = [:]
         var featuresByTarget: [String: Set<String>] = [:]
@@ -210,7 +242,7 @@ public struct PackageModel: Equatable, Sendable {
                 sources: sources,
                 languageMode: modesByTarget[target.name] ?? packageDefault,
                 upcomingFeatures: featuresByTarget[target.name] ?? [],
-                strictMemorySafety: strictMemorySafetyTargets.contains(target.name)
+                strictMemorySafety: strictMemorySafetyTargets.contains(target.name),
             )
         }
         .sorted { $0.name < $1.name }
@@ -220,10 +252,14 @@ public struct PackageModel: Equatable, Sendable {
         self.localDependencyRoots = pathDependencyRoots.filter { PackageModel.isInside($0, root) }
         self.localPackages = []
         self.productTargets = Dictionary(
-            (description.products ?? []).compactMap { product in product.targets.count == 1 ? product.targets.first.map { (product.name, $0) } : nil },
-            uniquingKeysWith: { first, _ in first }
+            (description.products ?? []).compactMap { product in
+                product.targets.count == 1 ? product.targets.first.map { (product.name, $0) } : nil
+            },
+            uniquingKeysWith: { first, _ in first },
         )
-        self.libraryProductTargets = Set((description.products ?? []).filter { $0.type?.name == "library" }.flatMap(\.targets))
+        self.libraryProductTargets = Set(
+            (description.products ?? []).filter { $0.type?.name == "library" }.flatMap(\.targets)
+        )
     }
 
     /*
@@ -242,7 +278,12 @@ public struct PackageModel: Equatable, Sendable {
         return firstParts.lexicographicallyPrecedes(secondParts)
     }
 
-    private static func runPackageCommand(_ arguments: [String], root: URL, scratchPath: URL, runner: ProcessRunner) throws -> Data {
+    private static func runPackageCommand(
+        _ arguments: [String],
+        root: URL,
+        scratchPath: URL,
+        runner: ProcessRunner,
+    ) throws -> Data {
         let result = try runner.run("swift", ["package", "--scratch-path", scratchPath.path] + arguments, in: root)
         guard result.succeeded else {
             throw DescriptionFailure(command: arguments.joined(separator: " "), standardError: result.standardError)

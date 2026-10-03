@@ -47,19 +47,27 @@ public struct ConsistencyNoUtilsFolder: FileRule {
     public func findings(in file: ParsedFile) -> [FindingRecord] {
         let folders = Self.foldersInsidePackage(of: file)
         var findings: [FindingRecord] = []
-        if let folder = folders.first(where: { Self.underscoreReplacements[$0] != nil }), let replacement = Self.underscoreReplacements[folder] {
-            findings.append(finding(
-                in: file,
-                messageId: "noUnderscoreUtils",
-                message: "Folder name \"\(folder)\" is not allowed. Use \"\(replacement)\" instead."
-            ))
+        if let folder = folders.first(where: { Self.underscoreReplacements[$0] != nil }),
+            let replacement = Self.underscoreReplacements[folder]
+        {
+            findings.append(
+                finding(
+                    in: file,
+                    messageId: "noUnderscoreUtils",
+                    message: "Folder name \"\(folder)\" is not allowed. Use \"\(replacement)\" instead.",
+                )
+            )
         }
-        if let folder = folders.first(where: { Self.replacements[$0] != nil }), let replacement = Self.replacements[folder] {
-            findings.append(finding(
-                in: file,
-                messageId: "noUtils",
-                message: "Folder name \"\(folder)\" is not allowed. Use \"\(replacement)\" instead."
-            ))
+        if let folder = folders.first(where: { Self.replacements[$0] != nil }),
+            let replacement = Self.replacements[folder]
+        {
+            findings.append(
+                finding(
+                    in: file,
+                    messageId: "noUtils",
+                    message: "Folder name \"\(folder)\" is not allowed. Use \"\(replacement)\" instead.",
+                )
+            )
         }
         return findings
     }
@@ -85,7 +93,7 @@ public struct ConsistencyNoUtilsFolder: FileRule {
             severity: .error,
             rule: name,
             messageId: messageId,
-            message: message
+            message: message,
         )
     }
 }

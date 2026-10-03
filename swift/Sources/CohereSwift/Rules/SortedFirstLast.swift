@@ -77,12 +77,23 @@ public struct SortedFirstLast: TypedFileRule {
         let visitor = Visitor(viewMode: .sourceAccurate)
         visitor.walk(file.tree)
         return visitor.found.compactMap { candidate in
-            guard Self.resolves(candidate.sorted, in: file, symbols: symbols, symbolPrefix: "s:STs", names: ["sorted()", "sorted(by:)"]) else { return nil }
+            guard
+                Self.resolves(
+                    candidate.sorted,
+                    in: file,
+                    symbols: symbols,
+                    symbolPrefix: "s:STs",
+                    names: ["sorted()", "sorted(by:)"],
+                )
+            else { return nil }
             let isFirst = candidate.end.text == "first"
             if isFirst {
-                guard Self.resolves(candidate.end, in: file, symbols: symbols, symbolPrefix: "s:Sls", names: ["first"]) else { return nil }
-            } else {
-                guard Self.resolves(candidate.end, in: file, symbols: symbols, symbolPrefix: "s:SKs", names: ["last"]) else { return nil }
+                guard Self.resolves(candidate.end, in: file, symbols: symbols, symbolPrefix: "s:Sls", names: ["first"])
+                else { return nil }
+            }
+            else {
+                guard Self.resolves(candidate.end, in: file, symbols: symbols, symbolPrefix: "s:SKs", names: ["last"])
+                else { return nil }
             }
             let repair = Repair(candidate: candidate, isFirst: isFirst)
             let suggestion = FindingRecord.Suggestion(message: repair.suggestion, fixes: repair.edits(candidate))
@@ -91,16 +102,18 @@ public struct SortedFirstLast: TypedFileRule {
                     at: candidate.node,
                     rule: name,
                     messageId: "sortedFirst",
-                    message: "Sorting a collection to read its first element builds and sorts a whole new array to keep one element. Use \(repair.phrase): it says what is meant, and it walks the elements once.",
-                    suggestions: [suggestion]
+                    message:
+                        "Sorting a collection to read its first element builds and sorts a whole new array to keep one element. Use \(repair.phrase): it says what is meant, and it walks the elements once.",
+                    suggestions: [suggestion],
                 )
             }
             return file.finding(
                 at: candidate.node,
                 rule: name,
                 messageId: "sortedLast",
-                message: "Sorting a collection to read its last element builds and sorts a whole new array to keep one element. Use \(repair.phrase): it says what is meant, and it walks the elements once. Among equally ordered elements \(repair.method) returns the first where sorted().last returned the last, so check that a tie does not matter.",
-                suggestions: [suggestion]
+                message:
+                    "Sorting a collection to read its last element builds and sorts a whole new array to keep one element. Use \(repair.phrase): it says what is meant, and it walks the elements once. Among equally ordered elements \(repair.method) returns the first where sorted().last returned the last, so check that a tie does not matter.",
+                suggestions: [suggestion],
             )
         }
     }
@@ -128,7 +141,10 @@ public struct SortedFirstLast: TypedFileRule {
         var phrase: String {
             guard hasComparator else { return "\(method)()" }
             guard isTurnedAround else { return "\(method)(by:) with the same predicate" }
-            let reads = method == "max" ? "the largest by the forward order rather than the smallest by a reversed one" : "the smallest by the forward order rather than the largest by a reversed one"
+            let reads =
+                method == "max"
+                ? "the largest by the forward order rather than the smallest by a reversed one"
+                : "the smallest by the forward order rather than the largest by a reversed one"
             return "\(method)(by:) with the predicate's > turned to <, which reads as \(reads)"
         }
 
@@ -140,15 +156,35 @@ public struct SortedFirstLast: TypedFileRule {
 
         /* `sorted` renamed, a descending `>` turned to `<`, and the `.first` or `.last` removed, with the line break before it when only whitespace sits there. */
         func edits(_ candidate: Candidate) -> [FindingRecord.Edit] {
-            var edits = [FindingRecord.Edit(start: candidate.sorted.positionAfterSkippingLeadingTrivia.utf8Offset, end: candidate.sorted.endPositionBeforeTrailingTrivia.utf8Offset, text: method)]
+            var edits = [
+                FindingRecord.Edit(
+                    start: candidate.sorted.positionAfterSkippingLeadingTrivia.utf8Offset,
+                    end: candidate.sorted.endPositionBeforeTrailingTrivia.utf8Offset,
+                    text: method,
+                )
+            ]
             if let descending {
-                edits.append(FindingRecord.Edit(start: descending.positionAfterSkippingLeadingTrivia.utf8Offset, end: descending.endPositionBeforeTrailingTrivia.utf8Offset, text: "<"))
+                edits.append(
+                    FindingRecord.Edit(
+                        start: descending.positionAfterSkippingLeadingTrivia.utf8Offset,
+                        end: descending.endPositionBeforeTrailingTrivia.utf8Offset,
+                        text: "<",
+                    )
+                )
             }
             var removalStart = candidate.node.period.positionAfterSkippingLeadingTrivia
-            if let base = candidate.node.base, (base.trailingTrivia + candidate.node.period.leadingTrivia).allSatisfy(\.isWhitespace) {
+            if let base = candidate.node.base,
+                (base.trailingTrivia + candidate.node.period.leadingTrivia).allSatisfy(\.isWhitespace)
+            {
                 removalStart = base.endPositionBeforeTrailingTrivia
             }
-            edits.append(FindingRecord.Edit(start: removalStart.utf8Offset, end: candidate.end.endPositionBeforeTrailingTrivia.utf8Offset, text: ""))
+            edits.append(
+                FindingRecord.Edit(
+                    start: removalStart.utf8Offset,
+                    end: candidate.end.endPositionBeforeTrailingTrivia.utf8Offset,
+                    text: "",
+                )
+            )
             return edits
         }
 
@@ -163,21 +199,27 @@ public struct SortedFirstLast: TypedFileRule {
             if let reference = comparator.as(DeclReferenceExprSyntax.self) {
                 return reference.baseName.tokenKind == .binaryOperator(">") ? reference.baseName : nil
             }
-            guard let closure = comparator.as(ClosureExprSyntax.self), closure.statements.count == 1, let body = closure.statements.first else { return nil }
+            guard let closure = comparator.as(ClosureExprSyntax.self), closure.statements.count == 1,
+                let body = closure.statements.first
+            else { return nil }
             let comparison: ExprSyntax
             switch body.item {
-            case .expr(let expression):
-                comparison = expression
-            case .stmt(let statement):
-                guard let returned = statement.as(ReturnStmtSyntax.self)?.expression else { return nil }
-                comparison = returned
-            case .decl:
-                return nil
+                case .expr(let expression):
+                    comparison = expression
+                case .stmt(let statement):
+                    guard let returned = statement.as(ReturnStmtSyntax.self)?.expression else { return nil }
+                    comparison = returned
+                case .decl:
+                    return nil
             }
             guard let sequence = comparison.as(SequenceExprSyntax.self) else { return nil }
-            let greater = sequence.elements.compactMap { $0.as(BinaryOperatorExprSyntax.self) }.filter { $0.operator.tokenKind == .binaryOperator(">") }
+            let greater = sequence.elements.compactMap { $0.as(BinaryOperatorExprSyntax.self) }.filter {
+                $0.operator.tokenKind == .binaryOperator(">")
+            }
             guard greater.count == 1, let only = greater.first,
-                let folded = OperatorTable.standardOperators.foldSingle(sequence, errorHandler: { _ in }).as(InfixOperatorExprSyntax.self),
+                let folded = OperatorTable.standardOperators.foldSingle(sequence, errorHandler: { _ in }).as(
+                    InfixOperatorExprSyntax.self
+                ),
                 folded.operator.as(BinaryOperatorExprSyntax.self)?.operator.tokenKind == .binaryOperator(">")
             else { return nil }
             return only.operator
@@ -189,7 +231,13 @@ public struct SortedFirstLast: TypedFileRule {
      these names: the symbol starts with the type's substitution and `s`, the `Swift` module, so an extension of
      ours on the same protocol (`s:ST7Control...`) or Foundation's (`s:ST10Foundation...`) does not answer.
      */
-    static func resolves(_ token: TokenSyntax, in file: ParsedFile, symbols: FileSymbols, symbolPrefix: String, names: Set<String>) -> Bool {
+    static func resolves(
+        _ token: TokenSyntax,
+        in file: ParsedFile,
+        symbols: FileSymbols,
+        symbolPrefix: String,
+        names: Set<String>,
+    ) -> Bool {
         let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
         guard let resolved = symbols.reference(line: location.line, column: location.column) else { return false }
         return resolved.symbol.hasPrefix(symbolPrefix) && names.contains(resolved.name)
@@ -209,7 +257,9 @@ public struct SortedFirstLast: TypedFileRule {
 
         override func visit(_ node: MemberAccessExprSyntax) -> SyntaxVisitorContinueKind {
             let end = node.declName.baseName
-            guard end.text == "first" || end.text == "last", node.declName.argumentNames == nil, !Self.isCalled(node), let base = node.base, let sorted = Self.sortedCall(base) else {
+            guard end.text == "first" || end.text == "last", node.declName.argumentNames == nil, !Self.isCalled(node),
+                let base = node.base, let sorted = Self.sortedCall(base)
+            else {
                 return .visitChildren
             }
             found.append(Candidate(node: node, end: end, call: sorted.call, sorted: sorted.name))
@@ -225,16 +275,22 @@ public struct SortedFirstLast: TypedFileRule {
         /* The `sorted` call and its name token: `items.sorted()`, `sorted(by:)`, `sorted { }`, or either inside one pair of parentheses. */
         static func sortedCall(_ expression: ExprSyntax) -> (call: FunctionCallExprSyntax, name: TokenSyntax)? {
             var callExpression = expression
-            if let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1, let only = tuple.elements.first, only.label == nil {
+            if let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1,
+                let only = tuple.elements.first, only.label == nil
+            {
                 callExpression = only.expression
             }
             guard let call = callExpression.as(FunctionCallExprSyntax.self) else { return nil }
             let labels = call.arguments.map { $0.label?.text }
             guard labels.isEmpty || labels == ["by"] else { return nil }
-            if let member = call.calledExpression.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "sorted", member.declName.argumentNames == nil {
+            if let member = call.calledExpression.as(MemberAccessExprSyntax.self),
+                member.declName.baseName.text == "sorted", member.declName.argumentNames == nil
+            {
                 return (call, member.declName.baseName)
             }
-            if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self), reference.baseName.text == "sorted", reference.argumentNames == nil {
+            if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self),
+                reference.baseName.text == "sorted", reference.argumentNames == nil
+            {
                 return (call, reference.baseName)
             }
             return nil

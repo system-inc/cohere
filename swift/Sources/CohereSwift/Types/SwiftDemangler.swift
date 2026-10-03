@@ -21,7 +21,8 @@ import Synchronization
     }
 
     /* `swift_demangle_getDemangledName(const char *, char *, size_t) -> size_t`: the full length, written up to the buffer's size. */
-    private typealias GetDemangledName = @convention(c) (UnsafePointer<CChar>?, UnsafeMutablePointer<CChar>?, Int) -> Int
+    private typealias GetDemangledName =
+        @convention(c) (UnsafePointer<CChar>?, UnsafeMutablePointer<CChar>?, Int) -> Int
 
     private let getDemangledName: GetDemangledName
 
@@ -54,7 +55,9 @@ import Synchronization
     /* The library beside the `swift` that `xcrun` resolves. */
     static func toolchainLibraryPath(runner: ProcessRunner = ProcessRunner()) throws -> String {
         let library = try SerializedDiagnosticsReader.toolchainLibraryPath(runner: runner)
-        return URL(fileURLWithPath: library).deletingLastPathComponent().appendingPathComponent("libswiftDemangle.dylib").path
+        return URL(fileURLWithPath: library).deletingLastPathComponent().appendingPathComponent(
+            "libswiftDemangle.dylib"
+        ).path
     }
 
     /*

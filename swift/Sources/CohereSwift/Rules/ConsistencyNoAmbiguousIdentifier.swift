@@ -94,14 +94,17 @@ public struct ConsistencyNoAmbiguousIdentifier: FileRule {
         visitor.walk(file.tree)
         return visitor.declared.compactMap { token in
             let spelled = token.text.trimmingCharacters(in: CharacterSet(charactersIn: "`"))
-            guard Self.isSingleLowercaseLetter(spelled), !Self.alwaysAllowedSingleLetters.contains(spelled) else { return nil }
+            guard Self.isSingleLowercaseLetter(spelled), !Self.alwaysAllowedSingleLetters.contains(spelled) else {
+                return nil
+            }
             if spelled == "e" {
                 let inference = Self.inferEventOrError(token)
                 return file.finding(
                     at: token,
                     rule: name,
                     messageId: "noAmbiguousE",
-                    message: "Variable named \"e\" is too ambiguous\(inference.contextHint). It is the one name that could be an error or an event, and a reader has to find the declaration to learn which. Use \"\(inference.suggestedName)\" or a more descriptive name."
+                    message:
+                        "Variable named \"e\" is too ambiguous\(inference.contextHint). It is the one name that could be an error or an event, and a reader has to find the declaration to learn which. Use \"\(inference.suggestedName)\" or a more descriptive name.",
                 )
             }
             /* A sort comparator is one place a and b read correctly. */
@@ -116,7 +119,8 @@ public struct ConsistencyNoAmbiguousIdentifier: FileRule {
                 at: token,
                 rule: name,
                 messageId: "noSingleLetter",
-                message: "Single-letter identifier \"\(spelled)\" is not descriptive enough. The name is read everywhere it is used and declared only once, so the saving is at the declaration and the cost is at every call site."
+                message:
+                    "Single-letter identifier \"\(spelled)\" is not descriptive enough. The name is read everywhere it is used and declared only once, so the saving is at the declaration and the cost is at every call site.",
             )
         }
     }
@@ -139,7 +143,8 @@ public struct ConsistencyNoAmbiguousIdentifier: FileRule {
         }
         let lowered = Array(loweredName.utf8)
         guard lowered.count >= 3 else { return false }
-        for start in 0..<(lowered.count - 2) where lowered[start] == UInt8(ascii: "o") && lowered[start + 1] == UInt8(ascii: "n") {
+        for start in 0..<(lowered.count - 2)
+        where lowered[start] == UInt8(ascii: "o") && lowered[start + 1] == UInt8(ascii: "n") {
             let following = lowered[start + 2]
             if following >= UInt8(ascii: "a") && following <= UInt8(ascii: "z") {
                 return true
@@ -162,20 +167,27 @@ public struct ConsistencyNoAmbiguousIdentifier: FileRule {
      inside a comparator is judged.
      */
     static func isInsideSortComparator(_ token: TokenSyntax) -> Bool {
-        guard let closure = token.parent?.ancestorOrSelf(mapping: { $0.as(ClosureExprSyntax.self) }) else { return false }
+        guard let closure = token.parent?.ancestorOrSelf(mapping: { $0.as(ClosureExprSyntax.self) }) else {
+            return false
+        }
         let call: FunctionCallExprSyntax
         if let argument = closure.parent?.as(LabeledExprSyntax.self) {
-            guard argument.label?.text == "by", let list = argument.parent?.as(LabeledExprListSyntax.self), list.count == 1,
+            guard argument.label?.text == "by", let list = argument.parent?.as(LabeledExprListSyntax.self),
+                list.count == 1,
                 let owner = list.parent?.as(FunctionCallExprSyntax.self), owner.trailingClosure == nil
             else { return false }
             call = owner
-        } else if let owner = closure.parent?.as(FunctionCallExprSyntax.self), owner.trailingClosure?.id == closure.id {
+        }
+        else if let owner = closure.parent?.as(FunctionCallExprSyntax.self), owner.trailingClosure?.id == closure.id {
             guard owner.arguments.isEmpty, owner.additionalTrailingClosures.isEmpty else { return false }
             call = owner
-        } else {
+        }
+        else {
             return false
         }
-        guard let callee = call.calledExpression.as(MemberAccessExprSyntax.self), callee.base != nil else { return false }
+        guard let callee = call.calledExpression.as(MemberAccessExprSyntax.self), callee.base != nil else {
+            return false
+        }
         return comparatorMethodNames.contains(callee.declName.baseName.text)
     }
 
@@ -189,12 +201,18 @@ public struct ConsistencyNoAmbiguousIdentifier: FileRule {
         var current = token.parent
         while let node = current {
             if let function = node.as(FunctionDeclSyntax.self) {
-                return isNumericKernel(parameters: function.signature.parameterClause.parameters.map(\.type), result: function.signature.returnClause?.type)
+                return isNumericKernel(
+                    parameters: function.signature.parameterClause.parameters.map(\.type),
+                    result: function.signature.returnClause?.type,
+                )
             }
-            if let closure = node.as(ClosureExprSyntax.self), let signature = closure.signature, let types = writtenParameterTypes(signature) {
+            if let closure = node.as(ClosureExprSyntax.self), let signature = closure.signature,
+                let types = writtenParameterTypes(signature)
+            {
                 return isNumericKernel(parameters: types, result: signature.returnClause?.type)
             }
-            if node.is(InitializerDeclSyntax.self) || node.is(SubscriptDeclSyntax.self) || node.is(AccessorDeclSyntax.self) || node.is(AccessorBlockSyntax.self)
+            if node.is(InitializerDeclSyntax.self) || node.is(SubscriptDeclSyntax.self)
+                || node.is(AccessorDeclSyntax.self) || node.is(AccessorBlockSyntax.self)
                 || node.asProtocol((any DeclGroupSyntax).self) != nil
             {
                 return false
@@ -212,7 +230,9 @@ public struct ConsistencyNoAmbiguousIdentifier: FileRule {
     static func isNumericKernel(parameters: [TypeSyntax], result: TypeSyntax?) -> Bool {
         guard !parameters.isEmpty, parameters.allSatisfy(isNumeric) else { return false }
         let returned = result.map { $0.as(OptionalTypeSyntax.self)?.wrappedType ?? $0 }
-        if let returned, !isNumeric(returned), returned.as(IdentifierTypeSyntax.self)?.name.text != "Void", returned.as(TupleTypeSyntax.self)?.elements.isEmpty != true {
+        if let returned, !isNumeric(returned), returned.as(IdentifierTypeSyntax.self)?.name.text != "Void",
+            returned.as(TupleTypeSyntax.self)?.elements.isEmpty != true
+        {
             return false
         }
         return (parameters + [returned].compactMap { $0 }).contains(where: isReal)
@@ -227,7 +247,9 @@ public struct ConsistencyNoAmbiguousIdentifier: FileRule {
 
     /* The real scalar types, and with the integers every scalar a kernel computes with. */
     static let realScalars: Set<String> = ["Float", "Double", "Float16", "Float80", "CGFloat"]
-    static let numericScalars: Set<String> = realScalars.union(["Int", "Int8", "Int16", "Int32", "Int64", "UInt", "UInt8", "UInt16", "UInt32", "UInt64"])
+    static let numericScalars: Set<String> = realScalars.union([
+        "Int", "Int8", "Int16", "Int32", "Int64", "UInt", "UInt8", "UInt16", "UInt32", "UInt64",
+    ])
 
     /* The vector types that take a scalar as their generic argument. */
     static let numericVectors: Set<String> = ["SIMD2", "SIMD3", "SIMD4", "SIMD8", "SIMD16", "SIMD32", "SIMD64"]
@@ -242,10 +264,11 @@ public struct ConsistencyNoAmbiguousIdentifier: FileRule {
             guard let generic = identifier.genericArgumentClause else {
                 return numericScalars.contains(name) || name.hasPrefix("simd_") || name.hasPrefix("matrix_")
             }
-            return numericVectors.contains(name) && generic.arguments.allSatisfy { argument in
-                guard case .type(let scalar) = argument.argument else { return false }
-                return isNumeric(scalar)
-            }
+            return numericVectors.contains(name)
+                && generic.arguments.allSatisfy { argument in
+                    guard case .type(let scalar) = argument.argument else { return false }
+                    return isNumeric(scalar)
+                }
         }
         if let array = type.as(ArrayTypeSyntax.self) {
             return isNumeric(array.element)
@@ -265,7 +288,8 @@ public struct ConsistencyNoAmbiguousIdentifier: FileRule {
             let name = identifier.name.text
             guard let generic = identifier.genericArgumentClause else {
                 let isSimd = name.hasPrefix("simd_") || name.hasPrefix("matrix_")
-                return realScalars.contains(name) || (isSimd && ["float", "double", "half", "quat"].contains { name.contains($0) })
+                return realScalars.contains(name)
+                    || (isSimd && ["float", "double", "half", "quat"].contains { name.contains($0) })
             }
             return generic.arguments.contains { argument in
                 guard case .type(let scalar) = argument.argument else { return false }
@@ -312,7 +336,8 @@ public struct ConsistencyNoAmbiguousIdentifier: FileRule {
                 }
                 /* Assigned to something named like a handler, `let handleClick = { e in ... }`. */
                 if let binding = parent.as(PatternBindingSyntax.self), binding.initializer?.id == node.id,
-                    let identifier = binding.pattern.as(IdentifierPatternSyntax.self), isNamedLikeHandler(identifier.identifier.text)
+                    let identifier = binding.pattern.as(IdentifierPatternSyntax.self),
+                    isNamedLikeHandler(identifier.identifier.text)
                 {
                     return event
                 }
@@ -338,7 +363,8 @@ public struct ConsistencyNoAmbiguousIdentifier: FileRule {
             if parent.is(CatchItemSyntax.self) {
                 return true
             }
-            if parent.is(ValueBindingPatternSyntax.self) || parent.is(PatternExprSyntax.self) || parent.is(ExpressionPatternSyntax.self)
+            if parent.is(ValueBindingPatternSyntax.self) || parent.is(PatternExprSyntax.self)
+                || parent.is(ExpressionPatternSyntax.self)
                 || parent.is(AsExprSyntax.self)
             {
                 current = parent

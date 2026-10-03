@@ -57,16 +57,17 @@ public struct UnusedClosureParameter: FileRule {
                 at: parameter.token,
                 rule: name,
                 messageId: "unusedClosureParameter",
-                message: "The closure never reads this parameter, so its name tells the reader it matters when it does not. Name it _ to say the closure ignores this argument.",
+                message:
+                    "The closure never reads this parameter, so its name tells the reader it matters when it does not. Name it _ to say the closure ignores this argument.",
                 fixes: parameter.isProjection
                     ? []
                     : [
                         FindingRecord.Edit(
                             start: parameter.token.positionAfterSkippingLeadingTrivia.utf8Offset,
                             end: parameter.token.endPositionBeforeTrailingTrivia.utf8Offset,
-                            text: "_"
-                        ),
-                    ]
+                            text: "_",
+                        )
+                    ],
             )
         }
     }
@@ -93,13 +94,13 @@ public struct UnusedClosureParameter: FileRule {
     /* The named parameters a closure declares, shorthand `{ a, b in }` or clause `{ (a: A, b) in }`. */
     static func parameters(of closure: ClosureExprSyntax) -> [Parameter] {
         switch closure.signature?.parameterClause {
-        case .simpleInput(let list):
-            return list.compactMap { Parameter(token: $0.name) }
-        case .parameterClause(let clause):
-            /* A labelled parameter binds its second name; closures reject labels anyway, so it is left to the compiler. */
-            return clause.parameters.compactMap { $0.secondName == nil ? Parameter(token: $0.firstName) : nil }
-        case nil:
-            return []
+            case .simpleInput(let list):
+                return list.compactMap { Parameter(token: $0.name) }
+            case .parameterClause(let clause):
+                /* A labelled parameter binds its second name; closures reject labels anyway, so it is left to the compiler. */
+                return clause.parameters.compactMap { $0.secondName == nil ? Parameter(token: $0.firstName) : nil }
+            case nil:
+                return []
         }
     }
 
@@ -173,7 +174,9 @@ public struct UnusedClosureParameter: FileRule {
             if isRead {
                 return .skipChildren
             }
-            if node.initializer == nil, let pattern = node.pattern.as(IdentifierPatternSyntax.self), names(pattern.identifier.text) {
+            if node.initializer == nil, let pattern = node.pattern.as(IdentifierPatternSyntax.self),
+                names(pattern.identifier.text)
+            {
                 isRead = true
             }
             return .visitChildren
@@ -198,7 +201,8 @@ public struct UnusedClosureParameter: FileRule {
             if isRead {
                 return .skipChildren
             }
-            guard !parameter.isProjection, UnusedClosureParameter.boundNames(of: node).contains(parameter.bareName) else {
+            guard !parameter.isProjection, UnusedClosureParameter.boundNames(of: node).contains(parameter.bareName)
+            else {
                 return .visitChildren
             }
             if let capture = node.signature?.capture {

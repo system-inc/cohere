@@ -105,7 +105,9 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
     ]
 
     /* The initializer labels that leave the zone at its default. `from` (a decoder) can carry any zone. */
-    static let styleInitializerLabels: Set<String> = ["dateSeparator", "dateTimeSeparator", "timeSeparator", "timeZoneSeparator", "includingFractionalSeconds"]
+    static let styleInitializerLabels: Set<String> = [
+        "dateSeparator", "dateTimeSeparator", "timeSeparator", "timeZoneSeparator", "includingFractionalSeconds",
+    ]
 
     /* `ISO8601DateFormatter.Options` and the fields each adds. */
     static let formatterOptionFields: [String: Set<String>] = [
@@ -139,12 +141,12 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
 
         var message: String {
             switch self {
-            case .cut:
-                "This cuts an ISO 8601 timestamp down to its date part. ISO 8601 formatting is UTC unless it is given a time zone, so the cut is the UTC calendar day whether or not that was the day meant, and in Utah the UTC day turns over at 5 pm in winter and 6 pm in summer: an evening run gets tomorrow. Format the day itself and say the zone: Date.ISO8601FormatStyle(timeZone: .current).year().month().day() when the local day is meant, or timeZone: .gmt when the UTC day is."
-            case .dateOnlyStyle:
-                "This formats a date as its ISO 8601 calendar day without naming a time zone. Date.ISO8601FormatStyle is UTC unless it is given one, so this is the UTC day whether or not that was the day meant, and in Utah the UTC day turns over at 5 pm in winter and 6 pm in summer: an evening run gets tomorrow. Say the zone: Date.ISO8601FormatStyle(timeZone: .current) when the local day is meant, or timeZone: .gmt when the UTC day is."
-            case .dateOnlyFormatter:
-                "This formats a date as its ISO 8601 calendar day without naming a time zone. ISO8601DateFormatter is UTC unless its timeZone is set, so this is the UTC day whether or not that was the day meant, and in Utah the UTC day turns over at 5 pm in winter and 6 pm in summer: an evening run gets tomorrow. Say the zone: set the formatter's timeZone to .current when the local day is meant, or to .gmt when the UTC day is."
+                case .cut:
+                    "This cuts an ISO 8601 timestamp down to its date part. ISO 8601 formatting is UTC unless it is given a time zone, so the cut is the UTC calendar day whether or not that was the day meant, and in Utah the UTC day turns over at 5 pm in winter and 6 pm in summer: an evening run gets tomorrow. Format the day itself and say the zone: Date.ISO8601FormatStyle(timeZone: .current).year().month().day() when the local day is meant, or timeZone: .gmt when the UTC day is."
+                case .dateOnlyStyle:
+                    "This formats a date as its ISO 8601 calendar day without naming a time zone. Date.ISO8601FormatStyle is UTC unless it is given one, so this is the UTC day whether or not that was the day meant, and in Utah the UTC day turns over at 5 pm in winter and 6 pm in summer: an evening run gets tomorrow. Say the zone: Date.ISO8601FormatStyle(timeZone: .current) when the local day is meant, or timeZone: .gmt when the UTC day is."
+                case .dateOnlyFormatter:
+                    "This formats a date as its ISO 8601 calendar day without naming a time zone. ISO8601DateFormatter is UTC unless its timeZone is set, so this is the UTC day whether or not that was the day meant, and in Utah the UTC day turns over at 5 pm in winter and 6 pm in summer: an evening run gets tomorrow. Say the zone: set the formatter's timeZone to .current when the local day is meant, or to .gmt when the UTC day is."
             }
         }
     }
@@ -168,12 +170,14 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
 
         /* A date and nothing after it: no time, and no zone that would name itself. */
         var isDateOnly: Bool {
-            !fields.isDisjoint(with: ConsistencyNoIsoStringDateCut.dateFields) && !fields.contains("time") && !fields.contains("timeZone")
+            !fields.isDisjoint(with: ConsistencyNoIsoStringDateCut.dateFields) && !fields.contains("time")
+                && !fields.contains("timeZone")
         }
 
         /* The text opens with `YYYY-MM-DD` and goes on past it. */
         var opensWithFullDate: Bool {
-            fields.isSuperset(of: ["year", "month", "day", "dashSeparatorInDate"]) && !fields.contains("weekOfYear") && !isDateOnly
+            fields.isSuperset(of: ["year", "month", "day", "dashSeparatorInDate"]) && !fields.contains("weekOfYear")
+                && !isDateOnly
         }
 
         /* `YYYY-MM-DDT...`, so a split on `T` puts the date first. */
@@ -197,7 +201,9 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
         /* Whether a name written here resolves to a declaration the predicate accepts. More than one may be recorded at a place (a type and its initializer), and any may answer. */
         func resolves(_ token: TokenSyntax, _ predicate: (FileSymbols.Occurrence) -> Bool) -> Bool {
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
-            return symbols.occurrences(line: location.line, column: location.column).contains { $0.isReference && !$0.isImplicit && predicate($0) }
+            return symbols.occurrences(line: location.line, column: location.column).contains {
+                $0.isReference && !$0.isImplicit && predicate($0)
+            }
         }
 
         func resolves(_ token: TokenSyntax, to symbol: String) -> Bool {
@@ -208,18 +214,23 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
 
         /* `date.formatted(<style>)` or `date.ISO8601Format(<style>)` with a date-only UTC style, or `<style>.format(date)`. */
         func isDateOnlyStyleFormatting(_ call: FunctionCallExprSyntax) -> Bool {
-            guard let member = call.calledExpression.as(MemberAccessExprSyntax.self), let base = member.base, call.trailingClosure == nil,
-                member.declName.argumentNames == nil, call.arguments.count == 1, let argument = call.arguments.first, argument.label == nil
+            guard let member = call.calledExpression.as(MemberAccessExprSyntax.self), let base = member.base,
+                call.trailingClosure == nil,
+                member.declName.argumentNames == nil, call.arguments.count == 1, let argument = call.arguments.first,
+                argument.label == nil
             else { return false }
             switch member.declName.baseName.text {
-            case "formatted":
-                return resolves(member.declName.baseName, to: ConsistencyNoIsoStringDateCut.dateFormatted) && styleRendering(argument.expression)?.isDateOnly == true
-            case "ISO8601Format":
-                return resolves(member.declName.baseName, to: ConsistencyNoIsoStringDateCut.dateIso8601Format) && styleRendering(argument.expression)?.isDateOnly == true
-            case "format":
-                return resolves(member.declName.baseName, to: ConsistencyNoIsoStringDateCut.styleFormat) && styleRendering(base)?.isDateOnly == true
-            default:
-                return false
+                case "formatted":
+                    return resolves(member.declName.baseName, to: ConsistencyNoIsoStringDateCut.dateFormatted)
+                        && styleRendering(argument.expression)?.isDateOnly == true
+                case "ISO8601Format":
+                    return resolves(member.declName.baseName, to: ConsistencyNoIsoStringDateCut.dateIso8601Format)
+                        && styleRendering(argument.expression)?.isDateOnly == true
+                case "format":
+                    return resolves(member.declName.baseName, to: ConsistencyNoIsoStringDateCut.styleFormat)
+                        && styleRendering(base)?.isDateOnly == true
+                default:
+                    return false
             }
         }
 
@@ -231,9 +242,12 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
 
         /* `<timestamp>.prefix(n)` with `n` from 1 to 10. */
         func isPrefixCut(_ call: FunctionCallExprSyntax) -> Bool {
-            guard let member = call.calledExpression.as(MemberAccessExprSyntax.self), let base = member.base, member.declName.baseName.text == "prefix",
-                member.declName.argumentNames == nil, call.trailingClosure == nil, call.arguments.count == 1, let argument = call.arguments.first,
-                argument.label == nil, let literal = argument.expression.as(IntegerLiteralExprSyntax.self), let length = Int(literal.literal.text),
+            guard let member = call.calledExpression.as(MemberAccessExprSyntax.self), let base = member.base,
+                member.declName.baseName.text == "prefix",
+                member.declName.argumentNames == nil, call.trailingClosure == nil, call.arguments.count == 1,
+                let argument = call.arguments.first,
+                argument.label == nil, let literal = argument.expression.as(IntegerLiteralExprSyntax.self),
+                let length = Int(literal.literal.text),
                 (1...10).contains(length), resolves(member.declName.baseName, { $0.isStandardLibrary })
             else { return false }
             return timestampRendering(base, depth: 0)?.opensWithFullDate == true
@@ -241,7 +255,8 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
 
         /* `<timestamp>.split(separator: "T").first` or `.components(separatedBy: "T").first`. */
         func isFirstOfSplit(_ member: MemberAccessExprSyntax) -> Bool {
-            guard member.declName.baseName.text == "first", member.declName.argumentNames == nil, let base = member.base,
+            guard member.declName.baseName.text == "first", member.declName.argumentNames == nil,
+                let base = member.base,
                 resolves(member.declName.baseName, { $0.isStandardLibrary })
             else { return false }
             return isSplitOnT(base)
@@ -249,24 +264,32 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
 
         /* `<timestamp>.split(separator: "T")[0]` or `.components(separatedBy: "T")[0]`. */
         func isFirstOfSplit(_ subscripted: SubscriptCallExprSyntax) -> Bool {
-            guard subscripted.trailingClosure == nil, subscripted.arguments.count == 1, let argument = subscripted.arguments.first, argument.label == nil,
+            guard subscripted.trailingClosure == nil, subscripted.arguments.count == 1,
+                let argument = subscripted.arguments.first, argument.label == nil,
                 argument.expression.as(IntegerLiteralExprSyntax.self)?.literal.text == "0"
             else { return false }
             return isSplitOnT(subscripted.calledExpression)
         }
 
         func isSplitOnT(_ expression: ExprSyntax) -> Bool {
-            guard let call = expression.as(FunctionCallExprSyntax.self), let member = call.calledExpression.as(MemberAccessExprSyntax.self), let base = member.base,
+            guard let call = expression.as(FunctionCallExprSyntax.self),
+                let member = call.calledExpression.as(MemberAccessExprSyntax.self), let base = member.base,
                 call.trailingClosure == nil, call.arguments.count == 1, let argument = call.arguments.first,
-                let literal = argument.expression.as(StringLiteralExprSyntax.self), literal.representedLiteralValue == "T"
+                let literal = argument.expression.as(StringLiteralExprSyntax.self),
+                literal.representedLiteralValue == "T"
             else { return false }
             switch (member.declName.baseName.text, argument.label?.text) {
-            case ("split", "separator"):
-                guard resolves(member.declName.baseName, { $0.isStandardLibrary }) else { return false }
-            case ("components", "separatedBy"):
-                guard resolves(member.declName.baseName, { $0.symbol.hasPrefix(ConsistencyNoIsoStringDateCut.componentsSeparatedByPrefix) }) else { return false }
-            default:
-                return false
+                case ("split", "separator"):
+                    guard resolves(member.declName.baseName, { $0.isStandardLibrary }) else { return false }
+                case ("components", "separatedBy"):
+                    guard
+                        resolves(
+                            member.declName.baseName,
+                            { $0.symbol.hasPrefix(ConsistencyNoIsoStringDateCut.componentsSeparatedByPrefix) },
+                        )
+                    else { return false }
+                default:
+                    return false
             }
             return timestampRendering(base, depth: 0)?.separatesTimeWithT == true
         }
@@ -280,12 +303,20 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
         func styleRendering(_ expression: ExprSyntax) -> Rendering? {
             var fields: Set<String> = []
             var current = Reader.unwrapped(expression)
-            while let call = current.as(FunctionCallExprSyntax.self), let member = call.calledExpression.as(MemberAccessExprSyntax.self), let base = member.base,
+            while let call = current.as(FunctionCallExprSyntax.self),
+                let member = call.calledExpression.as(MemberAccessExprSyntax.self), let base = member.base,
                 let added = ConsistencyNoIsoStringDateCut.styleCalls[member.declName.baseName.text]
             {
                 let callName = member.declName.baseName.text
                 guard call.trailingClosure == nil,
-                    resolves(member.declName.baseName, { $0.symbol.hasPrefix(ConsistencyNoIsoStringDateCut.styleMemberPrefix + "\(callName.utf8.count)\(callName)") })
+                    resolves(
+                        member.declName.baseName,
+                        {
+                            $0.symbol.hasPrefix(
+                                ConsistencyNoIsoStringDateCut.styleMemberPrefix + "\(callName.utf8.count)\(callName)"
+                            )
+                        },
+                    )
                 else { return nil }
                 fields.formUnion(added)
                 current = Reader.unwrapped(base)
@@ -299,18 +330,28 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
                     && resolves(member.declName.baseName, { $0.symbol.hasPrefix("s:10Foundation") })
             }
             guard let call = expression.as(FunctionCallExprSyntax.self), call.trailingClosure == nil,
-                call.arguments.allSatisfy({ $0.label.map { ConsistencyNoIsoStringDateCut.styleInitializerLabels.contains($0.text) } ?? false })
+                call.arguments.allSatisfy({
+                    $0.label.map { ConsistencyNoIsoStringDateCut.styleInitializerLabels.contains($0.text) } ?? false
+                })
             else { return false }
             let typeName: TokenSyntax
             if let member = call.calledExpression.as(MemberAccessExprSyntax.self) {
                 typeName = member.declName.baseName
-            } else if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self) {
+            }
+            else if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self) {
                 typeName = reference.baseName
-            } else {
+            }
+            else {
                 return false
             }
             return typeName.text == "ISO8601FormatStyle"
-                && resolves(typeName, { $0.symbol.hasPrefix(ConsistencyNoIsoStringDateCut.styleMemberPrefix) && $0.symbol.hasSuffix("cfc") })
+                && resolves(
+                    typeName,
+                    {
+                        $0.symbol.hasPrefix(ConsistencyNoIsoStringDateCut.styleMemberPrefix)
+                            && $0.symbol.hasSuffix("cfc")
+                    },
+                )
         }
 
         /*
@@ -320,34 +361,43 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
         func timestampRendering(_ expression: ExprSyntax, depth: Int) -> Rendering? {
             let expression = Reader.unwrapped(expression)
             if let reference = expression.as(DeclReferenceExprSyntax.self) {
-                guard depth < 4, reference.argumentNames == nil, let initializer = heldValue(reference) else { return nil }
+                guard depth < 4, reference.argumentNames == nil, let initializer = heldValue(reference) else {
+                    return nil
+                }
                 return timestampRendering(initializer, depth: depth + 1)
             }
-            guard let call = expression.as(FunctionCallExprSyntax.self), let member = call.calledExpression.as(MemberAccessExprSyntax.self), member.base != nil,
+            guard let call = expression.as(FunctionCallExprSyntax.self),
+                let member = call.calledExpression.as(MemberAccessExprSyntax.self), member.base != nil,
                 call.trailingClosure == nil, member.declName.argumentNames == nil
             else { return nil }
             switch member.declName.baseName.text {
-            case "ISO8601Format":
-                guard call.arguments.isEmpty, resolves(member.declName.baseName, to: ConsistencyNoIsoStringDateCut.dateIso8601Format) else { return nil }
-                return Rendering(fields: ConsistencyNoIsoStringDateCut.internetDateTime)
-            case "formatted":
-                guard call.arguments.count == 1, let argument = call.arguments.first, argument.label == nil,
-                    let style = argument.expression.as(MemberAccessExprSyntax.self), style.base == nil, style.declName.baseName.text == "iso8601",
-                    style.declName.argumentNames == nil, resolves(style.declName.baseName, { $0.symbol.hasPrefix("s:10Foundation") }),
-                    resolves(member.declName.baseName, to: ConsistencyNoIsoStringDateCut.dateFormatted)
-                else { return nil }
-                return Rendering(fields: ConsistencyNoIsoStringDateCut.internetDateTime)
-            case "string":
-                return formatterOfString(call).flatMap(formatterRendering)
-            default:
-                return nil
+                case "ISO8601Format":
+                    guard call.arguments.isEmpty,
+                        resolves(member.declName.baseName, to: ConsistencyNoIsoStringDateCut.dateIso8601Format)
+                    else { return nil }
+                    return Rendering(fields: ConsistencyNoIsoStringDateCut.internetDateTime)
+                case "formatted":
+                    guard call.arguments.count == 1, let argument = call.arguments.first, argument.label == nil,
+                        let style = argument.expression.as(MemberAccessExprSyntax.self), style.base == nil,
+                        style.declName.baseName.text == "iso8601",
+                        style.declName.argumentNames == nil,
+                        resolves(style.declName.baseName, { $0.symbol.hasPrefix("s:10Foundation") }),
+                        resolves(member.declName.baseName, to: ConsistencyNoIsoStringDateCut.dateFormatted)
+                    else { return nil }
+                    return Rendering(fields: ConsistencyNoIsoStringDateCut.internetDateTime)
+                case "string":
+                    return formatterOfString(call).flatMap(formatterRendering)
+                default:
+                    return nil
             }
         }
 
         /* The receiver of Foundation's `ISO8601DateFormatter.string(from:)`. */
         func formatterOfString(_ call: FunctionCallExprSyntax) -> ExprSyntax? {
-            guard let member = call.calledExpression.as(MemberAccessExprSyntax.self), let base = member.base, member.declName.baseName.text == "string",
-                member.declName.argumentNames == nil, call.trailingClosure == nil, call.arguments.count == 1, call.arguments.first?.label?.text == "from",
+            guard let member = call.calledExpression.as(MemberAccessExprSyntax.self), let base = member.base,
+                member.declName.baseName.text == "string",
+                member.declName.argumentNames == nil, call.trailingClosure == nil, call.arguments.count == 1,
+                call.arguments.first?.label?.text == "from",
                 resolves(member.declName.baseName, to: ConsistencyNoIsoStringDateCut.formatterString)
             else { return nil }
             return base
@@ -359,22 +409,29 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
             if isNewFormatter(expression) {
                 return Rendering(fields: ConsistencyNoIsoStringDateCut.internetDateTime)
             }
-            guard let reference = expression.as(DeclReferenceExprSyntax.self), reference.argumentNames == nil else { return nil }
+            guard let reference = expression.as(DeclReferenceExprSyntax.self), reference.argumentNames == nil else {
+                return nil
+            }
             return confinedFormatter(reference)
         }
 
         /* `ISO8601DateFormatter()`, resolved to Foundation's initializer. */
         func isNewFormatter(_ expression: ExprSyntax) -> Bool {
-            guard let call = Reader.unwrapped(expression).as(FunctionCallExprSyntax.self), call.arguments.isEmpty, call.trailingClosure == nil else { return false }
+            guard let call = Reader.unwrapped(expression).as(FunctionCallExprSyntax.self), call.arguments.isEmpty,
+                call.trailingClosure == nil
+            else { return false }
             let typeName: TokenSyntax
             if let member = call.calledExpression.as(MemberAccessExprSyntax.self) {
                 typeName = member.declName.baseName
-            } else if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self) {
+            }
+            else if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self) {
                 typeName = reference.baseName
-            } else {
+            }
+            else {
                 return false
             }
-            return typeName.text == "ISO8601DateFormatter" && resolves(typeName, to: ConsistencyNoIsoStringDateCut.formatterInitializer)
+            return typeName.text == "ISO8601DateFormatter"
+                && resolves(typeName, to: ConsistencyNoIsoStringDateCut.formatterInitializer)
         }
 
         /*
@@ -382,29 +439,40 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
          statement of that block and then `name.string(from:)` calls. Its options are the assignment's, or the default.
          */
         func confinedFormatter(_ reference: DeclReferenceExprSyntax) -> Rendering? {
-            guard let local = localLet(reference), local.isInFunctionBody, let initializer = local.binding.initializer?.value, isNewFormatter(initializer) else {
+            guard let local = localLet(reference), local.isInFunctionBody,
+                let initializer = local.binding.initializer?.value, isNewFormatter(initializer)
+            else {
                 return nil
             }
             let name = reference.baseName.text
             var fields = ConsistencyNoIsoStringDateCut.internetDateTime
             var assignmentEnd: AbsolutePosition?
             var uses: [AbsolutePosition] = []
-            for use in Reader.references(named: name, in: Syntax(local.block)) where use.position >= local.binding.endPosition {
-                guard let member = use.parent?.as(MemberAccessExprSyntax.self), member.base?.id == use.id else { return nil }
+            for use in Reader.references(named: name, in: Syntax(local.block))
+            where use.position >= local.binding.endPosition {
+                guard let member = use.parent?.as(MemberAccessExprSyntax.self), member.base?.id == use.id else {
+                    return nil
+                }
                 if member.declName.baseName.text == "formatOptions", member.declName.argumentNames == nil,
-                    let elements = member.parent?.as(ExprListSyntax.self), let sequence = elements.parent?.as(SequenceExprSyntax.self),
+                    let elements = member.parent?.as(ExprListSyntax.self),
+                    let sequence = elements.parent?.as(SequenceExprSyntax.self),
                     sequence.parent?.as(CodeBlockItemSyntax.self)?.parent?.id == local.block.id, elements.count == 3,
-                    elements.first?.id == member.id, elements.dropFirst().first?.is(AssignmentExprSyntax.self) == true, let value = elements.last,
-                    assignmentEnd == nil, resolves(member.declName.baseName, to: ConsistencyNoIsoStringDateCut.formatterOptions),
+                    elements.first?.id == member.id, elements.dropFirst().first?.is(AssignmentExprSyntax.self) == true,
+                    let value = elements.last,
+                    assignmentEnd == nil,
+                    resolves(member.declName.baseName, to: ConsistencyNoIsoStringDateCut.formatterOptions),
                     let options = Reader.optionFields(value)
                 {
                     fields = options
                     assignmentEnd = sequence.endPosition
-                } else if member.declName.baseName.text == "string", let call = member.parent?.as(FunctionCallExprSyntax.self),
+                }
+                else if member.declName.baseName.text == "string",
+                    let call = member.parent?.as(FunctionCallExprSyntax.self),
                     call.calledExpression.id == member.id, formatterOfString(call) != nil
                 {
                     uses.append(call.position)
-                } else {
+                }
+                else {
                     return nil
                 }
             }
@@ -419,12 +487,14 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
             let members: [ExprSyntax]
             if let array = value.as(ArrayExprSyntax.self) {
                 members = array.elements.map(\.expression)
-            } else {
+            }
+            else {
                 members = [value]
             }
             var fields: Set<String> = []
             for member in members {
-                guard let access = member.as(MemberAccessExprSyntax.self), access.base == nil, access.declName.argumentNames == nil,
+                guard let access = member.as(MemberAccessExprSyntax.self), access.base == nil,
+                    access.declName.argumentNames == nil,
                     let added = ConsistencyNoIsoStringDateCut.formatterOptionFields[access.declName.baseName.text]
                 else { return nil }
                 fields.formUnion(added)
@@ -443,7 +513,9 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
                 return nil
             }
             let location = file.locations.location(for: reference.baseName.positionAfterSkippingLeadingTrivia)
-            guard let resolved = symbols.reference(line: location.line, column: location.column), let binding = bindingsDeclaredHere()[resolved.symbol] else {
+            guard let resolved = symbols.reference(line: location.line, column: location.column),
+                let binding = bindingsDeclaredHere()[resolved.symbol]
+            else {
                 return nil
             }
             return binding.initializer?.value
@@ -456,11 +528,13 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
             }
             var found: [String: PatternBindingSyntax] = [:]
             for token in file.tree.tokens(viewMode: .sourceAccurate) {
-                guard let pattern = token.parent?.as(IdentifierPatternSyntax.self), let binding = pattern.parent?.as(PatternBindingSyntax.self),
+                guard let pattern = token.parent?.as(IdentifierPatternSyntax.self),
+                    let binding = pattern.parent?.as(PatternBindingSyntax.self),
                     binding.initializer != nil, binding.accessorBlock == nil, Reader.isLet(binding)
                 else { continue }
                 let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
-                for occurrence in symbols.occurrences(line: location.line, column: location.column) where !occurrence.isReference {
+                for occurrence in symbols.occurrences(line: location.line, column: location.column)
+                where !occurrence.isReference {
                     found[occurrence.symbol] = binding
                 }
             }
@@ -482,7 +556,9 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
          */
         func localLet(_ reference: DeclReferenceExprSyntax) -> LocalLet? {
             let name = reference.baseName.text
-            guard reference.argumentNames == nil, !ConsistencyNoIsoStringDateCut.implicitNames.contains(name) else { return nil }
+            guard reference.argumentNames == nil, !ConsistencyNoIsoStringDateCut.implicitNames.contains(name) else {
+                return nil
+            }
             var child = Syntax(reference)
             while let scope = child.parent {
                 defer { child = scope }
@@ -492,7 +568,8 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
                 guard let list = scope.as(CodeBlockItemListSyntax.self) else { continue }
                 for statement in list.reversed() where statement.endPosition <= child.position {
                     guard let variable = statement.item.as(VariableDeclSyntax.self) else { continue }
-                    for binding in variable.bindings where binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.text == name {
+                    for binding in variable.bindings
+                    where binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.text == name {
                         guard variable.bindingSpecifier.tokenKind == .keyword(.let), binding.initializer != nil,
                             Reader.binders(named: name, in: Syntax(list)) == 1
                         else { return nil }
@@ -512,7 +589,8 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
                 if isTypeScope(scope) || scope.is(SourceFileSyntax.self) {
                     return false
                 }
-                if scope.is(FunctionDeclSyntax.self) || scope.is(InitializerDeclSyntax.self) || scope.is(ClosureExprSyntax.self) || scope.is(AccessorDeclSyntax.self)
+                if scope.is(FunctionDeclSyntax.self) || scope.is(InitializerDeclSyntax.self)
+                    || scope.is(ClosureExprSyntax.self) || scope.is(AccessorDeclSyntax.self)
                     || scope.is(SubscriptDeclSyntax.self) || scope.is(CodeBlockItemListSyntax.self)
                 {
                     if binders(named: name, in: scope) > 0 {
@@ -524,7 +602,8 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
         }
 
         static func isTypeScope(_ node: Syntax) -> Bool {
-            node.is(StructDeclSyntax.self) || node.is(ClassDeclSyntax.self) || node.is(EnumDeclSyntax.self) || node.is(ActorDeclSyntax.self)
+            node.is(StructDeclSyntax.self) || node.is(ClassDeclSyntax.self) || node.is(EnumDeclSyntax.self)
+                || node.is(ActorDeclSyntax.self)
                 || node.is(ExtensionDeclSyntax.self) || node.is(ProtocolDeclSyntax.self)
         }
 
@@ -533,13 +612,20 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
             var count = 0
             for token in node.tokens(viewMode: .sourceAccurate) where token.text == name {
                 guard let parent = token.parent else { continue }
-                if parent.is(IdentifierPatternSyntax.self) || parent.is(ClosureShorthandParameterSyntax.self) || parent.is(ClosureCaptureSyntax.self)
+                if parent.is(IdentifierPatternSyntax.self) || parent.is(ClosureShorthandParameterSyntax.self)
+                    || parent.is(ClosureCaptureSyntax.self)
                     || parent.is(AccessorParametersSyntax.self)
                 {
                     count += 1
-                } else if let parameter = parent.as(FunctionParameterSyntax.self), (parameter.secondName ?? parameter.firstName).id == token.id {
+                }
+                else if let parameter = parent.as(FunctionParameterSyntax.self),
+                    (parameter.secondName ?? parameter.firstName).id == token.id
+                {
                     count += 1
-                } else if let parameter = parent.as(ClosureParameterSyntax.self), (parameter.secondName ?? parameter.firstName).id == token.id {
+                }
+                else if let parameter = parent.as(ClosureParameterSyntax.self),
+                    (parameter.secondName ?? parameter.firstName).id == token.id
+                {
                     count += 1
                 }
             }
@@ -549,7 +635,8 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
         /* Every bare use of a name under a node: a reference, not a member's name after a dot. */
         static func references(named name: String, in node: Syntax) -> [DeclReferenceExprSyntax] {
             node.tokens(viewMode: .sourceAccurate).compactMap { token in
-                guard token.text == name, let reference = token.parent?.as(DeclReferenceExprSyntax.self), reference.argumentNames == nil,
+                guard token.text == name, let reference = token.parent?.as(DeclReferenceExprSyntax.self),
+                    reference.argumentNames == nil,
                     reference.parent?.as(MemberAccessExprSyntax.self)?.declName.id != reference.id
                 else { return nil }
                 return reference
@@ -563,7 +650,9 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
         /* Through parentheses around one unlabeled value. */
         static func unwrapped(_ expression: ExprSyntax) -> ExprSyntax {
             var current = expression
-            while let tuple = current.as(TupleExprSyntax.self), tuple.elements.count == 1, let only = tuple.elements.first, only.label == nil {
+            while let tuple = current.as(TupleExprSyntax.self), tuple.elements.count == 1,
+                let only = tuple.elements.first, only.label == nil
+            {
                 current = only.expression
             }
             return current
@@ -583,9 +672,11 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
         override func visit(_ node: FunctionCallExprSyntax) -> SyntaxVisitorContinueKind {
             if reader.isDateOnlyStyleFormatting(node) {
                 found.append((Syntax(node), .dateOnlyStyle))
-            } else if reader.isDateOnlyFormatterString(node) {
+            }
+            else if reader.isDateOnlyFormatterString(node) {
                 found.append((Syntax(node), .dateOnlyFormatter))
-            } else if reader.isPrefixCut(node) {
+            }
+            else if reader.isPrefixCut(node) {
                 found.append((Syntax(node), .cut))
             }
             return .visitChildren

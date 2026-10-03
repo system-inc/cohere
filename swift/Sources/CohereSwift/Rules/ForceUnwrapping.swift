@@ -23,7 +23,8 @@ public struct ForceUnwrapping: FileRule {
                 at: node.exclamationMark,
                 rule: name,
                 messageId: "forceUnwrap",
-                message: "This force unwrap crashes the process when the value is nil, and says nothing about why that cannot happen. Say what happens on nil with guard let or if let instead."
+                message:
+                    "This force unwrap crashes the process when the value is nil, and says nothing about why that cannot happen. Say what happens on nil with guard let or if let instead.",
             )
         }
     }

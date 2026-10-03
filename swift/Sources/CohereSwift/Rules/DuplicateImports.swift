@@ -44,17 +44,21 @@ public struct DuplicateImports: FileRule {
                 if other.clauses == candidate.clauses {
                     return otherPosition < position
                 }
-                return other.clauses.count < candidate.clauses.count && Array(candidate.clauses.prefix(other.clauses.count)) == other.clauses
+                return other.clauses.count < candidate.clauses.count
+                    && Array(candidate.clauses.prefix(other.clauses.count)) == other.clauses
             }
             guard let covering else { continue }
             let coveringLine = covering.element.declaration.startLocation(converter: file.locations).line
-            findings.append(file.finding(
-                at: candidate.declaration,
-                rule: name,
-                messageId: "duplicateImport",
-                message: "This import repeats the one on line \(coveringLine), which is already in effect wherever this one is, so it adds nothing and hides which of the two was meant. Delete this line.",
-                fixes: Self.deletion(of: candidate.declaration, in: file).map { [$0] } ?? []
-            ))
+            findings.append(
+                file.finding(
+                    at: candidate.declaration,
+                    rule: name,
+                    messageId: "duplicateImport",
+                    message:
+                        "This import repeats the one on line \(coveringLine), which is already in effect wherever this one is, so it adds nothing and hides which of the two was meant. Delete this line.",
+                    fixes: Self.deletion(of: candidate.declaration, in: file).map { [$0] } ?? [],
+                )
+            )
         }
         return findings
     }
@@ -65,12 +69,16 @@ public struct DuplicateImports: FileRule {
      above it that would be left describing the wrong line.
      */
     static func deletion(of declaration: ImportDeclSyntax, in file: ParsedFile) -> FindingRecord.Edit? {
-        if declaration.leadingTrivia.contains(where: \.isComment) || declaration.trailingTrivia.contains(where: \.isComment) {
+        if declaration.leadingTrivia.contains(where: \.isComment)
+            || declaration.trailingTrivia.contains(where: \.isComment)
+        {
             return nil
         }
         let inner = declaration.trimmed
         let tokens = Array(inner.tokens(viewMode: .sourceAccurate))
-        if tokens.contains(where: { $0.leadingTrivia.contains(where: \.isComment) || $0.trailingTrivia.contains(where: \.isComment) }) {
+        if tokens.contains(where: {
+            $0.leadingTrivia.contains(where: \.isComment) || $0.trailingTrivia.contains(where: \.isComment)
+        }) {
             return nil
         }
         let bytes = Array(file.source.utf8)
@@ -138,12 +146,14 @@ public struct DuplicateImports: FileRule {
             let modifiers = node.modifiers.map { spelling(of: $0) }
             let kind = node.importKindSpecifier?.text ?? ""
             let path = node.path.map { unquoted($0.name.text) }.joined(separator: ".")
-            return [attributes.sorted().joined(separator: " "), modifiers.sorted().joined(separator: " "), kind, path].joined(separator: "|")
+            return [attributes.sorted().joined(separator: " "), modifiers.sorted().joined(separator: " "), kind, path]
+                .joined(separator: "|")
         }
 
         /* An identifier written in backticks names the same module as one written without. */
         static func unquoted(_ identifier: String) -> String {
-            identifier.count > 1 && identifier.hasPrefix("`") && identifier.hasSuffix("`") ? String(identifier.dropFirst().dropLast()) : identifier
+            identifier.count > 1 && identifier.hasPrefix("`") && identifier.hasSuffix("`")
+                ? String(identifier.dropFirst().dropLast()) : identifier
         }
 
         static func spelling(of node: some SyntaxProtocol) -> String {
@@ -160,7 +170,8 @@ public struct DuplicateImports: FileRule {
                 }
                 if ancestor.is(IfConfigClauseSyntax.self) {
                     clauses.append(ancestor.id)
-                } else if !(ancestor.is(CodeBlockItemSyntax.self) || ancestor.is(CodeBlockItemListSyntax.self)
+                }
+                else if !(ancestor.is(CodeBlockItemSyntax.self) || ancestor.is(CodeBlockItemListSyntax.self)
                     || ancestor.is(IfConfigClauseListSyntax.self) || ancestor.is(IfConfigDeclSyntax.self))
                 {
                     return nil

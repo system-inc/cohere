@@ -14,10 +14,14 @@ struct CohereSwiftCommand {
     static func main() async {
         let workingDirectory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
         do {
-            let options = try CommandOptions.parse(Array(CommandLine.arguments.dropFirst()), workingDirectory: workingDirectory)
+            let options = try CommandOptions.parse(
+                Array(CommandLine.arguments.dropFirst()),
+                workingDirectory: workingDirectory,
+            )
             let pipeline = Pipeline(options: options, writer: .standardOutput(), workingDirectory: workingDirectory)
             exit(try await pipeline.run())
-        } catch {
+        }
+        catch {
             FileHandle.standardError.write(Data("cohere-swift: \(error)\n".utf8))
             exit(2)
         }

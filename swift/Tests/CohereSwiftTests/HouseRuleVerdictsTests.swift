@@ -31,7 +31,10 @@ struct HouseRuleVerdictsTests {
 
     /* Decoding refuses a verdict outside the five, which is the unknown-verdict check. */
     static func rows() throws -> [Row] {
-        try JSONDecoder().decode([Row].self, from: Data(contentsOf: packageRoot.appendingPathComponent("HouseRuleVerdicts.json")))
+        try JSONDecoder().decode(
+            [Row].self,
+            from: Data(contentsOf: packageRoot.appendingPathComponent("HouseRuleVerdicts.json")),
+        )
     }
 
     /* Every house rule the Go engine registers, by the `Name:` its rule value declares. */
@@ -39,8 +42,11 @@ struct HouseRuleVerdictsTests {
         let rules = packageRoot.deletingLastPathComponent().appendingPathComponent("internal/lint/rules")
         let pattern = try Regex(#"Name:\s+"((?:nexus|structure|base)/[a-z0-9-]+)""#)
         var names = Set<String>()
-        guard let walker = FileManager.default.enumerator(at: rules, includingPropertiesForKeys: nil) else { return names }
-        for case let url as URL in walker where url.pathExtension == "go" && !url.lastPathComponent.hasSuffix("_test.go") {
+        guard let walker = FileManager.default.enumerator(at: rules, includingPropertiesForKeys: nil) else {
+            return names
+        }
+        for case let url as URL in walker
+        where url.pathExtension == "go" && !url.lastPathComponent.hasSuffix("_test.go") {
             for match in try String(contentsOf: url, encoding: .utf8).matches(of: pattern) {
                 if let name = match.output[1].substring {
                     names.insert(String(name))
@@ -67,12 +73,19 @@ struct HouseRuleVerdictsTests {
         let swiftRules = Set(RuleRegistry.allNames)
         for row in try Self.rows() {
             if let swiftRule = row.swiftRule {
-                #expect(swiftRules.contains(swiftRule), "\(row.typeScriptRule) names \(swiftRule), which cohere-swift does not register")
+                #expect(
+                    swiftRules.contains(swiftRule),
+                    "\(row.typeScriptRule) names \(swiftRule), which cohere-swift does not register",
+                )
             }
             if row.verdict == .ported {
                 #expect(row.swiftRule != nil, "\(row.typeScriptRule) is Ported but names no Swift rule")
-            } else {
-                #expect(!(row.reason ?? "").trimmingCharacters(in: .whitespaces).isEmpty, "\(row.typeScriptRule) needs a reason")
+            }
+            else {
+                #expect(
+                    !(row.reason ?? "").trimmingCharacters(in: .whitespaces).isEmpty,
+                    "\(row.typeScriptRule) needs a reason",
+                )
             }
         }
     }

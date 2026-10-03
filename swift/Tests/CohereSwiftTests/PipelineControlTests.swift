@@ -60,8 +60,18 @@ struct PipelineControlTests {
     }
 
     /* A fresh package per run, because the engine's build cache is keyed by the package's path. */
-    static func run(source: String, manifest: String = manifest, otherFiles: [String: Data] = [:], arguments: [String] = [], mutating: Bool = false, sink: ((Data) -> Void)? = nil) async throws -> Run {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-control-\(UUID().uuidString)", isDirectory: true)
+    static func run(
+        source: String,
+        manifest: String = manifest,
+        otherFiles: [String: Data] = [:],
+        arguments: [String] = [],
+        mutating: Bool = false,
+        sink: ((Data) -> Void)? = nil,
+    ) async throws -> Run {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-control-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
         try manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
@@ -72,12 +82,17 @@ struct PipelineControlTests {
         defer {
             do {
                 try FileManager.default.removeItem(at: root)
-            } catch {
+            }
+            catch {
                 /* Ignored on purpose: a leftover fixture in the temporary directory costs nothing, and failing a test that already answered would hide its answer. */
             }
         }
 
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path] + (mutating ? [] : ["--no-fix"]) + arguments, workingDirectory: root)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path] + (mutating ? [] : ["--no-fix"])
+                + arguments,
+            workingDirectory: root,
+        )
         var lines = Data()
         let writer = ContractWriter { data in
             lines.append(data)
@@ -88,7 +103,11 @@ struct PipelineControlTests {
             try #require(try JSONSerialization.jsonObject(with: Data(line)) as? [String: Any])
         }
         if !mutating {
-            #expect(String(decoding: try Data(contentsOf: sources.appendingPathComponent("Control.swift")), as: UTF8.self) == source, "a --no-fix run wrote to the package")
+            #expect(
+                String(decoding: try Data(contentsOf: sources.appendingPathComponent("Control.swift")), as: UTF8.self)
+                    == source,
+                "a --no-fix run wrote to the package",
+            )
         }
         return Run(records: records)
     }
@@ -108,9 +127,12 @@ struct PipelineControlTests {
      */
     @Test func aPhaseNobodyAskedForIsSkippedInTheContractsWords() async throws {
         let run = try await Self.run(source: Self.cleanSource, arguments: ["--lint"])
-        let details = Dictionary(run.of("phase").compactMap { phase in
-            (phase["name"] as? String).map { ($0, "\(phase["outcome"] ?? "")|\(phase["detail"] ?? "")") }
-        }, uniquingKeysWith: { first, _ in first })
+        let details = Dictionary(
+            run.of("phase").compactMap { phase in
+                (phase["name"] as? String).map { ($0, "\(phase["outcome"] ?? "")|\(phase["detail"] ?? "")") }
+            },
+            uniquingKeysWith: { first, _ in first },
+        )
         #expect(details["fix"] == "skipped|not requested")
         #expect(details["types"] == "skipped|not requested")
         #expect(details["unused"] == "skipped|not requested — this is a report, ask for it with --unused")
@@ -126,7 +148,10 @@ struct PipelineControlTests {
     }
 
     @Test func lintCatchesAForceUnwrap() async throws {
-        let source = Self.cleanSource.replacingOccurrences(of: "        value * 2", with: "        Int(\"2\")! * value")
+        let source = Self.cleanSource.replacingOccurrences(
+            of: "        value * 2",
+            with: "        Int(\"2\")! * value",
+        )
         let run = try await Self.run(source: source)
         #expect(run.findings == ["cohere-swift/force-unwrapping:5"])
         #expect(run.phase("types") == "ran")
@@ -137,7 +162,10 @@ struct PipelineControlTests {
      what a fresh walk finds. The --no-fix run has no fixer, so its lint walks; the two are compared.
      */
     @Test func lintReusesTheFixWalkAndFindsTheSame() async throws {
-        let source = Self.cleanSource.replacingOccurrences(of: "        value * 2", with: "        Int(\"2\")! * value")
+        let source = Self.cleanSource.replacingOccurrences(
+            of: "        value * 2",
+            with: "        Int(\"2\")! * value",
+        )
         let reused = try await Self.run(source: source, mutating: true)
         let walked = try await Self.run(source: source)
         #expect(reused.phase("lint") == "reused")
@@ -148,7 +176,10 @@ struct PipelineControlTests {
     }
 
     @Test func typesCatchesATypeErrorAndStopsLint() async throws {
-        let source = Self.cleanSource.replacingOccurrences(of: "        value * 2", with: "        let text: Int = \"two\"\n        return value * text")
+        let source = Self.cleanSource.replacingOccurrences(
+            of: "        value * 2",
+            with: "        let text: Int = \"two\"\n        return value * text",
+        )
         let run = try await Self.run(source: source)
         #expect(run.findings == [":5"], "the compiler's error, which carries no rule name")
         #expect(run.phase("lint") == "notReached")
@@ -162,17 +193,25 @@ struct PipelineControlTests {
      */
     @Test(arguments: ["missing", "malformed"])
     func aVocabularyThatCannotBeLoadedRefusesTheRun(problem: String) async throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-vocabulary-\(UUID().uuidString)", isDirectory: true)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-vocabulary-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let path = directory.appendingPathComponent("abbreviations.json")
         if problem == "malformed" {
-            try Data(#"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "suffx": {}}]}"#.utf8).write(to: path)
+            try Data(#"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "suffx": {}}]}"#.utf8).write(
+                to: path
+            )
         }
         var written = Data()
         do {
-            _ = try await Self.run(source: Self.cleanSource, arguments: ["--abbreviations", path.path]) { written.append($0) }
+            _ = try await Self.run(source: Self.cleanSource, arguments: ["--abbreviations", path.path]) {
+                written.append($0)
+            }
             Issue.record("a \(problem) vocabulary did not refuse the run")
-        } catch let failure as Pipeline.RunFailure {
+        }
+        catch let failure as Pipeline.RunFailure {
             #expect(failure.description.contains(path.path), "the refusal must name the path it looked at: \(failure)")
             #expect(failure.description.contains("nothing was checked"))
         }
@@ -183,13 +222,25 @@ struct PipelineControlTests {
     }
 
     @Test func theVocabularyAtTheGivenPathIsTheOneJudgedWith() async throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-vocabulary-\(UUID().uuidString)", isDirectory: true)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-vocabulary-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let path = directory.appendingPathComponent("words.json")
-        try Data(#"{"abbreviations": [{"abbreviation": "qty", "expansion": "quantity", "whole": {"messageId": "noQty", "style": "plain"}}]}"#.utf8).write(to: path)
+        try Data(
+            #"{"abbreviations": [{"abbreviation": "qty", "expansion": "quantity", "whole": {"messageId": "noQty", "style": "plain"}}]}"#
+                .utf8
+        ).write(to: path)
         let source = Self.cleanSource.replacingOccurrences(of: "    let value: Int", with: "    let qty: Int")
-        let run = try await Self.run(source: source.replacingOccurrences(of: "value * 2", with: "qty * 2"), arguments: ["--abbreviations", path.path])
-        #expect(run.findings == ["cohere-swift/consistency-no-abbreviated-identifier:2"], "a word only the given file holds is the proof it was read")
+        let run = try await Self.run(
+            source: source.replacingOccurrences(of: "value * 2", with: "qty * 2"),
+            arguments: ["--abbreviations", path.path],
+        )
+        #expect(
+            run.findings == ["cohere-swift/consistency-no-abbreviated-identifier:2"],
+            "a word only the given file holds is the proof it was read",
+        )
     }
 
     /* Contract 2: a file the engine cannot read is a record, between `project` and the first `phase`, and the run is incomplete. */
@@ -213,7 +264,8 @@ struct PipelineControlTests {
     @Test func aBuildThatFailsBeforeCompilingSaysSo() async throws {
         let manifest = Self.manifest.replacingOccurrences(
             of: "name: \"Control\",\n    targets:",
-            with: "name: \"Control\",\n    dependencies: [.package(url: \"https://example.invalid/Missing.git\", from: \"1.0.0\")],\n    targets:"
+            with:
+                "name: \"Control\",\n    dependencies: [.package(url: \"https://example.invalid/Missing.git\", from: \"1.0.0\")],\n    targets:",
         )
         await #expect {
             _ = try await Self.run(source: Self.cleanSource, manifest: manifest)

@@ -55,9 +55,9 @@ import Synchronization
 
         var findingSeverity: FindingRecord.Severity? {
             switch severity {
-            case "source.diagnostic.severity.error": .error
-            case "source.diagnostic.severity.warning": .warning
-            default: nil
+                case "source.diagnostic.severity.error": .error
+                case "source.diagnostic.severity.warning": .warning
+                default: nil
             }
         }
     }
@@ -179,19 +179,43 @@ import Synchronization
             return unsafe unsafeBitCast(address, to: type)
         }
         unsafe uidFromString = try symbol("sourcekitd_uid_get_from_cstr", as: CohereSourcekitdUidGetFromCString.self)
-        unsafe dictionaryCreate = try symbol("sourcekitd_request_dictionary_create", as: CohereSourcekitdRequestDictionaryCreate.self)
-        unsafe dictionarySetString = try symbol("sourcekitd_request_dictionary_set_string", as: CohereSourcekitdRequestDictionarySetString.self)
-        unsafe dictionarySetUid = try symbol("sourcekitd_request_dictionary_set_uid", as: CohereSourcekitdRequestDictionarySetUid.self)
-        unsafe dictionarySetInteger = try symbol("sourcekitd_request_dictionary_set_int64", as: CohereSourcekitdRequestDictionarySetInt64.self)
-        unsafe dictionarySetValue = try symbol("sourcekitd_request_dictionary_set_value", as: CohereSourcekitdRequestDictionarySetValue.self)
+        unsafe dictionaryCreate = try symbol(
+            "sourcekitd_request_dictionary_create",
+            as: CohereSourcekitdRequestDictionaryCreate.self,
+        )
+        unsafe dictionarySetString = try symbol(
+            "sourcekitd_request_dictionary_set_string",
+            as: CohereSourcekitdRequestDictionarySetString.self,
+        )
+        unsafe dictionarySetUid = try symbol(
+            "sourcekitd_request_dictionary_set_uid",
+            as: CohereSourcekitdRequestDictionarySetUid.self,
+        )
+        unsafe dictionarySetInteger = try symbol(
+            "sourcekitd_request_dictionary_set_int64",
+            as: CohereSourcekitdRequestDictionarySetInt64.self,
+        )
+        unsafe dictionarySetValue = try symbol(
+            "sourcekitd_request_dictionary_set_value",
+            as: CohereSourcekitdRequestDictionarySetValue.self,
+        )
         unsafe arrayCreate = try symbol("sourcekitd_request_array_create", as: CohereSourcekitdRequestArrayCreate.self)
-        unsafe arraySetString = try symbol("sourcekitd_request_array_set_string", as: CohereSourcekitdRequestArraySetString.self)
+        unsafe arraySetString = try symbol(
+            "sourcekitd_request_array_set_string",
+            as: CohereSourcekitdRequestArraySetString.self,
+        )
         unsafe requestRelease = try symbol("sourcekitd_request_release", as: CohereSourcekitdRequestRelease.self)
         unsafe sendSynchronously = try symbol("sourcekitd_send_request_sync", as: CohereSourcekitdSendRequestSync.self)
         unsafe responseIsError = try symbol("sourcekitd_response_is_error", as: CohereSourcekitdResponseIsError.self)
-        unsafe errorDescription = try symbol("sourcekitd_response_error_get_description", as: CohereSourcekitdResponseErrorGetDescription.self)
+        unsafe errorDescription = try symbol(
+            "sourcekitd_response_error_get_description",
+            as: CohereSourcekitdResponseErrorGetDescription.self,
+        )
         unsafe responseValue = try symbol("sourcekitd_response_get_value", as: CohereSourcekitdResponseGetValue.self)
-        unsafe jsonDescription = try symbol("sourcekitd_variant_json_description_copy", as: CohereSourcekitdVariantJsonDescriptionCopy.self)
+        unsafe jsonDescription = try symbol(
+            "sourcekitd_variant_json_description_copy",
+            as: CohereSourcekitdVariantJsonDescriptionCopy.self,
+        )
         unsafe responseDispose = try symbol("sourcekitd_response_dispose", as: CohereSourcekitdResponseDispose.self)
         let initialize = try symbol("sourcekitd_initialize", as: CohereSourcekitdInitialize.self)
         initialize()
@@ -249,23 +273,35 @@ import Synchronization
         while let entity = pending.popLast() {
             pending.append(contentsOf: entity.entities ?? [])
             guard let symbol = entity.symbol, let line = entity.line, let column = entity.column else { continue }
-            occurrences.append(FileSymbols.Occurrence(
-                line: line,
-                column: column,
-                symbol: symbol,
-                name: entity.name ?? "",
-                isReference: entity.kind.hasPrefix("source.lang.swift.ref."),
-                isImplicit: entity.kind.contains(".accessor.")
-            ))
+            occurrences.append(
+                FileSymbols.Occurrence(
+                    line: line,
+                    column: column,
+                    symbol: symbol,
+                    name: entity.name ?? "",
+                    isReference: entity.kind.hasPrefix("source.lang.swift.ref."),
+                    isImplicit: entity.kind.contains(".accessor."),
+                )
+            )
         }
         return FileSymbols(occurrences)
     }
 
-    private func withOpenDocument<Answer: Sendable>(file: String, arguments: [String], text: String?, _ body: () throws -> Answer) throws -> Answer {
+    private func withOpenDocument<Answer: Sendable>(
+        file: String,
+        arguments: [String],
+        text: String?,
+        _ body: () throws -> Answer,
+    ) throws -> Answer {
         try asking.withLock { _ in try answerWithOpenDocument(file: file, arguments: arguments, text: text, body) }
     }
 
-    private func answerWithOpenDocument<Answer>(file: String, arguments: [String], text: String?, _ body: () throws -> Answer) throws -> Answer {
+    private func answerWithOpenDocument<Answer>(
+        file: String,
+        arguments: [String],
+        text: String?,
+        _ body: () throws -> Answer,
+    ) throws -> Answer {
         let _: Acknowledgement = try send("source.request.editor.open") { request in
             set(request, "key.name", file)
             set(request, "key.sourcefile", file)

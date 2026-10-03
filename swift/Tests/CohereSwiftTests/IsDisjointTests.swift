@@ -28,12 +28,27 @@ struct IsDisjointTests {
     /* The findings, as `messageId@line:column`, with every `intersection` token resolved to `intersection`. A nil leaves it unresolved. */
     static func findings(_ source: String, intersection: String? = setIntersection) -> [FindingRecord] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         var occurrences: [FileSymbols.Occurrence] = []
         for token in file.tree.tokens(viewMode: .sourceAccurate) where token.text == "intersection" {
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
             if let intersection {
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: intersection, name: "intersection(_:)", isReference: true))
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: intersection,
+                        name: "intersection(_:)",
+                        isReference: true,
+                    )
+                )
             }
         }
         return IsDisjoint().findings(in: file, symbols: FileSymbols(occurrences))
@@ -78,7 +93,10 @@ struct IsDisjointTests {
     }
 
     /* Every `intersection` whose type has `isDisjoint(with:)`: a set's with a set or a sequence, a generic `SetAlgebra`'s, an `OptionSet`'s, and Foundation's `IndexSet`'s and `CharacterSet`'s. */
-    @Test(arguments: [setIntersection, setSequenceIntersection, setAlgebraIntersection, optionSetIntersection, indexSetIntersection, characterSetIntersection])
+    @Test(arguments: [
+        setIntersection, setSequenceIntersection, setAlgebraIntersection, optionSetIntersection, indexSetIntersection,
+        characterSetIntersection,
+    ])
     func everyIntersectionWithTheRepairIsFound(intersection: String) {
         let found = Self.findings("let first = left.intersection(right).isEmpty\n", intersection: intersection)
         #expect(found.map { "\($0.messageId)@\($0.line):\($0.column)" } == ["isDisjoint@1:18"])
@@ -87,7 +105,10 @@ struct IsDisjointTests {
 
     /* A `RangeSet`'s repair is spelled `isDisjoint(_:)`, and the message says so. */
     @Test func aRangeSetsRepairIsNamedAsItIsSpelled() {
-        let found = Self.findings("let first = ranges.intersection(other).isEmpty\n", intersection: Self.rangeSetIntersection)
+        let found = Self.findings(
+            "let first = ranges.intersection(other).isEmpty\n",
+            intersection: Self.rangeSetIntersection,
+        )
         #expect(found.count == 1)
         #expect(found.allSatisfy { $0.message.contains("isDisjoint(_:)") && !$0.message.contains("isDisjoint(with:)") })
     }
@@ -118,7 +139,14 @@ struct IsDisjointTests {
 
     @Test func aFileWithNoIntersectionDoesNotApply() {
         let source = "let first = items.isEmpty\n"
-        let file = ParsedFile(url: URL(fileURLWithPath: "/Plain.swift"), targetName: "Control", targetKind: "regular", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: URL(fileURLWithPath: "/Plain.swift"),
+            targetName: "Control",
+            targetKind: "regular",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         #expect(!IsDisjoint().applies(to: file))
     }
 
@@ -149,23 +177,49 @@ struct IsDisjointTests {
         """
 
     @Test func aSetsIntersectionIsFlaggedAndABagsAndARectanglesAreNot() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-typed-\(UUID().uuidString)", isDirectory: true)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-typed-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-        try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try Self.packageSource.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
+        try PipelineControlTests.manifest.write(
+            to: root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try Self.packageSource.write(
+            to: sources.appendingPathComponent("Control.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
 
         /* One run builds the package and writes its index. The rule is not registered here, so it is run by hand on what the run left. */
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"],
+            workingDirectory: root,
+        )
         _ = try await Pipeline(options: options, writer: ContractWriter { _ in }, workingDirectory: root).run()
-        let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: ProcessRunner())
+        let package = try PackageModel.load(
+            root: root,
+            scratchPath: Pipeline.scratchPath(for: root),
+            runner: ProcessRunner(),
+        )
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
         let candidates = parsed.files.filter { IsDisjoint().applies(to: $0) }
-        let symbols = SymbolProvider(scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root), runner: ProcessRunner()).symbols(for: candidates)
+        let symbols = SymbolProvider(
+            scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root),
+            runner: ProcessRunner(),
+        ).symbols(for: candidates)
         #expect(symbols.fromIndex == 1, "the build's index should describe the file: \(symbols.unavailable)")
         let found = candidates.flatMap { file in
-            IsDisjoint().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.messageId)@\($0.line)" }
+            IsDisjoint().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map {
+                "\($0.messageId)@\($0.line)"
+            }
         }
-        #expect(found == ["isDisjoint@9", "isDisjoint@11", "isDisjoint@17"], "expected the set's, the index set's and the generic's intersections and not the bag's or the rectangle's: \(found)")
+        #expect(
+            found == ["isDisjoint@9", "isDisjoint@11", "isDisjoint@17"],
+            "expected the set's, the index set's and the generic's intersections and not the bag's or the rectangle's: \(found)",
+        )
     }
 }

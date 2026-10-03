@@ -37,23 +37,62 @@ struct FirstWhereTests {
      The findings of `rule`, as `messageId@line:column`, with every `filter` token resolved to `filter` and
      every `first` and `last` token to `member`. A nil symbol leaves that name unresolved.
      */
-    static func findings(_ source: String, rule: some TypedFileRule = FirstWhere(), filter: String? = arrayFilter, member: String? = collectionFirst) -> [String] {
+    static func findings(
+        _ source: String,
+        rule: some TypedFileRule = FirstWhere(),
+        filter: String? = arrayFilter,
+        member: String? = collectionFirst,
+    ) -> [String] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         var occurrences: [FileSymbols.Occurrence] = []
         for token in file.tree.tokens(viewMode: .sourceAccurate) {
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
             if token.text == "filter", let filter {
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: filter, name: "filter(_:)", isReference: true))
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: filter,
+                        name: "filter(_:)",
+                        isReference: true,
+                    )
+                )
             }
             if token.text == "first" || token.text == "last", let member {
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: member, name: token.text, isReference: true))
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: member,
+                        name: token.text,
+                        isReference: true,
+                    )
+                )
                 if member.hasSuffix("vp") {
-                    occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: member.dropLast(2) + "vg", name: "getter:\(token.text)", isReference: true, isImplicit: true))
+                    occurrences.append(
+                        FileSymbols.Occurrence(
+                            line: location.line,
+                            column: location.column,
+                            symbol: member.dropLast(2) + "vg",
+                            name: "getter:\(token.text)",
+                            isReference: true,
+                            isImplicit: true,
+                        )
+                    )
                 }
             }
         }
-        return rule.findings(in: file, symbols: FileSymbols(occurrences)).map { "\($0.messageId)@\($0.line):\($0.column)" }
+        return rule.findings(in: file, symbols: FileSymbols(occurrences)).map {
+            "\($0.messageId)@\($0.line):\($0.column)"
+        }
     }
 
     /* SwiftLint's `first_where` triggering examples, each at the start of the `filter` call. */
@@ -73,7 +112,8 @@ struct FirstWhereTests {
             """
         #expect(
             Self.findings(source) == [
-                "firstWhere@1:5", "firstWhere@2:5", "firstWhere@3:5", "firstWhere@4:5", "firstWhere@5:5", "firstWhere@6:5", "firstWhere@8:6", "firstWhere@9:5", "firstWhere@10:5",
+                "firstWhere@1:5", "firstWhere@2:5", "firstWhere@3:5", "firstWhere@4:5", "firstWhere@5:5",
+                "firstWhere@6:5", "firstWhere@8:6", "firstWhere@9:5", "firstWhere@10:5",
             ]
         )
     }
@@ -102,7 +142,9 @@ struct FirstWhereTests {
     }
 
     /* Every standard library `filter` that builds a new collection: array, sequence, string, substring, dictionary and set alike. */
-    @Test(arguments: [arrayFilter, sequenceFilter, rangeReplaceableFilter, substringFilter, dictionaryFilter, setFilter])
+    @Test(arguments: [
+        arrayFilter, sequenceFilter, rangeReplaceableFilter, substringFilter, dictionaryFilter, setFilter,
+    ])
     func everyEagerFilterIsFound(filter: String) {
         #expect(Self.findings("_ = values.filter { _ in true }.first\n", filter: filter) == ["firstWhere@1:5"])
     }
@@ -188,7 +230,14 @@ struct FirstWhereTests {
 
     @Test func aFileWithNoFilterOrNoFirstDoesNotApply() {
         for source in ["_ = items.first\n", "_ = items.filter { $0 > 1 }.last\n"] {
-            let file = ParsedFile(url: URL(fileURLWithPath: "/Plain.swift"), targetName: "Control", targetKind: "regular", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+            let file = ParsedFile(
+                url: URL(fileURLWithPath: "/Plain.swift"),
+                targetName: "Control",
+                targetKind: "regular",
+                source: source,
+                tree: Parser.parse(source: source),
+                nodeCount: 0,
+            )
             #expect(!FirstWhere().applies(to: file))
         }
     }
@@ -198,20 +247,39 @@ struct FirstWhereTests {
      here, so it is run by hand on what the run left: the findings as `messageId@line`.
      */
     static func packageFindings(source: String, rule: some TypedFileRule) async throws -> [String] {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-typed-\(UUID().uuidString)", isDirectory: true)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-typed-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-        try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
+        try PipelineControlTests.manifest.write(
+            to: root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
         try source.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"],
+            workingDirectory: root,
+        )
         _ = try await Pipeline(options: options, writer: ContractWriter { _ in }, workingDirectory: root).run()
-        let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: ProcessRunner())
+        let package = try PackageModel.load(
+            root: root,
+            scratchPath: Pipeline.scratchPath(for: root),
+            runner: ProcessRunner(),
+        )
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
         let candidates = parsed.files.filter { rule.applies(to: $0) }
-        let symbols = SymbolProvider(scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root), runner: ProcessRunner()).symbols(for: candidates)
+        let symbols = SymbolProvider(
+            scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root),
+            runner: ProcessRunner(),
+        ).symbols(for: candidates)
         #expect(symbols.fromIndex == 1, "the build's index should describe the file: \(symbols.unavailable)")
         return candidates.flatMap { file in
-            rule.findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.messageId)@\($0.line)" }
+            rule.findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map {
+                "\($0.messageId)@\($0.line)"
+            }
         }
     }
 
@@ -238,6 +306,9 @@ struct FirstWhereTests {
 
             """
         let found = try await Self.packageFindings(source: source, rule: FirstWhere())
-        #expect(found == ["firstWhere@12", "firstWhere@13"], "expected the array's and the values' filter and not the query's or the lazy one: \(found)")
+        #expect(
+            found == ["firstWhere@12", "firstWhere@13"],
+            "expected the array's and the values' filter and not the query's or the lazy one: \(found)",
+        )
     }
 }

@@ -23,7 +23,8 @@ struct ConsistencyNoIsoStringDateCutTests {
     static let styleInitializer =
         "s:10Foundation4DateV18ISO8601FormatStyleV13dateSeparator0f4TimeG004timeG00i4ZoneG026includingFractionalSeconds0iJ0A2E0bG0O_AE0bhG0OAE0hG0OAE0hjG0OSbAA0hJ0Vtcfc"
     static let prefix = "s:SlsE6prefixy11SubSequenceQzSiF"
-    static let split = "s:SlsSQ7ElementRpzrlE5split9separator9maxSplits25omittingEmptySubsequencesSay11SubSequenceQzGAB_SiSbtF"
+    static let split =
+        "s:SlsSQ7ElementRpzrlE5split9separator9maxSplits25omittingEmptySubsequencesSay11SubSequenceQzGAB_SiSbtF"
     static let first = "s:SlsE5first7ElementQzSgvp"
     static let components = "s:Sy10FoundationE10components11separatedBySaySSGqd___tSyRd__lF"
     /* `DateComponents.ISO8601FormatStyle`'s chain, spelled the same as `Date`'s. */
@@ -49,7 +50,9 @@ struct ConsistencyNoIsoStringDateCutTests {
         "dateSeparator": [style + "13dateSeparatoryA2E0bG0OF"],
         "timeSeparator": [style + "13timeSeparatoryA2E04TimeG0OF"],
         "ISO8601FormatStyle": [style, styleInitializer],
-        "ISO8601DateFormatter": ["c:objc(cs)NSISO8601DateFormatter", ConsistencyNoIsoStringDateCut.formatterInitializer],
+        "ISO8601DateFormatter": [
+            "c:objc(cs)NSISO8601DateFormatter", ConsistencyNoIsoStringDateCut.formatterInitializer,
+        ],
         "string": [ConsistencyNoIsoStringDateCut.formatterString],
         "formatOptions": [ConsistencyNoIsoStringDateCut.formatterOptions],
         "prefix": [prefix],
@@ -61,14 +64,29 @@ struct ConsistencyNoIsoStringDateCutTests {
     /* Every finding as the text of its span and its message id. */
     static func findings(_ source: String, resolving: [String: [String]] = foundation) -> [String] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         var occurrences: [FileSymbols.Occurrence] = []
         for token in file.tree.tokens(viewMode: .sourceAccurate) {
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
             /* A name a pattern declares is the declaration, as the index records it; anywhere else it is a reference. */
             let isReference = !(token.parent?.is(IdentifierPatternSyntax.self) ?? false)
             for symbol in resolving["\(location.line):\(token.text)"] ?? resolving[token.text] ?? [] {
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: symbol, name: token.text, isReference: isReference))
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: symbol,
+                        name: token.text,
+                        isReference: isReference,
+                    )
+                )
             }
         }
         let rule = ConsistencyNoIsoStringDateCut()
@@ -77,7 +95,9 @@ struct ConsistencyNoIsoStringDateCutTests {
         let lines = source.split(separator: "\n", omittingEmptySubsequences: false).map { Array($0.utf8) }
         return found.map { finding in
             #expect(finding.fixes.isEmpty && finding.suggestions.isEmpty, "the rule never fixes")
-            guard let endLine = finding.endLine, let endColumn = finding.endColumn, endLine == finding.line else { return "spans lines" }
+            guard let endLine = finding.endLine, let endColumn = finding.endColumn, endLine == finding.line else {
+                return "spans lines"
+            }
             let span = String(decoding: lines[finding.line - 1][(finding.column - 1)..<(endColumn - 1)], as: UTF8.self)
             return "\(span) | \(finding.messageId)"
         }
@@ -116,15 +136,27 @@ struct ConsistencyNoIsoStringDateCutTests {
     }
 
     @Test func theBodiesProbesAddedDateIsFlagged() {
-        let found = Self.findings(Self.bodiesProbe(added: "                let added = BodyDates.added(body.fileUrl).formatted(.iso8601.year().month().day())"))
-        #expect(found == ["BodyDates.added(body.fileUrl).formatted(.iso8601.year().month().day()) | isoDateWithoutTimeZone"], "\(found)")
+        let found = Self.findings(
+            Self.bodiesProbe(
+                added:
+                    "                let added = BodyDates.added(body.fileUrl).formatted(.iso8601.year().month().day())"
+            )
+        )
+        #expect(
+            found == [
+                "BodyDates.added(body.fileUrl).formatted(.iso8601.year().month().day()) | isoDateWithoutTimeZone"
+            ],
+            "\(found)",
+        )
     }
 
     /* The repair names the zone; `arranged.prefix(5)` on the same file is an array's prefix, never a timestamp's. */
     @Test func theBodiesProbesAddedDateWithItsZoneIsClean() {
-        let local = "                let added = BodyDates.added(body.fileUrl).formatted(Date.ISO8601FormatStyle(timeZone: .current).year().month().day())"
+        let local =
+            "                let added = BodyDates.added(body.fileUrl).formatted(Date.ISO8601FormatStyle(timeZone: .current).year().month().day())"
         #expect(Self.findings(Self.bodiesProbe(added: local)).isEmpty)
-        let utc = "                let added = BodyDates.added(body.fileUrl).formatted(Date.ISO8601FormatStyle(timeZone: .gmt).year().month().day())"
+        let utc =
+            "                let added = BodyDates.added(body.fileUrl).formatted(Date.ISO8601FormatStyle(timeZone: .gmt).year().month().day())"
         #expect(Self.findings(Self.bodiesProbe(added: utc)).isEmpty)
     }
 
@@ -154,7 +186,13 @@ struct ConsistencyNoIsoStringDateCutTests {
     }
 
     @Test func theStallMetersCutWithTheFormattersZoneSetIsClean() {
-        #expect(Self.findings(Self.stallMeter("        formatter.timeZone = .current\n        return String(formatter.string(from: Date()).prefix(10))")).isEmpty)
+        #expect(
+            Self.findings(
+                Self.stallMeter(
+                    "        formatter.timeZone = .current\n        return String(formatter.string(from: Date()).prefix(10))"
+                )
+            ).isEmpty
+        )
     }
 
     /* `ahraos-presence` `Tests/LibraryTests/PresenceStore+ParityFreeze.swift:18`: the freeze instant as a whole timestamp, compared with stored ones. */
@@ -173,11 +211,15 @@ struct ConsistencyNoIsoStringDateCutTests {
     }
 
     @Test func theParityFreezeTimestampIsClean() {
-        #expect(Self.findings(Self.parityFreeze("        let at = ISO8601DateFormatter().string(from: freeze)")).isEmpty)
+        #expect(
+            Self.findings(Self.parityFreeze("        let at = ISO8601DateFormatter().string(from: freeze)")).isEmpty
+        )
     }
 
     @Test func theParityFreezeTimestampCutToItsDayIsFlagged() {
-        let found = Self.findings(Self.parityFreeze("        let at = ISO8601DateFormatter().string(from: freeze).prefix(10)"))
+        let found = Self.findings(
+            Self.parityFreeze("        let at = ISO8601DateFormatter().string(from: freeze).prefix(10)")
+        )
         #expect(found == ["ISO8601DateFormatter().string(from: freeze).prefix(10) | isoStringCutToDate"], "\(found)")
     }
 
@@ -197,13 +239,27 @@ struct ConsistencyNoIsoStringDateCutTests {
     }
 
     @Test func theSongProbesHourAgoIsClean() {
-        #expect(Self.findings(Self.songProbe("        let hourAgo = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3600))")).isEmpty)
+        #expect(
+            Self.findings(
+                Self.songProbe(
+                    "        let hourAgo = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3600))"
+                )
+            ).isEmpty
+        )
     }
 
     @Test func theSongProbesHourAgoSplitToItsDayIsFlagged() {
         let found = Self.findings(
-            Self.songProbe("        let hourAgo = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3600)).split(separator: \"T\").first ?? \"\""))
-        #expect(found == ["ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3600)).split(separator: \"T\").first | isoStringCutToDate"], "\(found)")
+            Self.songProbe(
+                "        let hourAgo = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3600)).split(separator: \"T\").first ?? \"\""
+            )
+        )
+        #expect(
+            found == [
+                "ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3600)).split(separator: \"T\").first | isoStringCutToDate"
+            ],
+            "\(found)",
+        )
     }
 
     /* `ahraos-macos` `Sources/AhraOsServices/TraceLog.swift:37`: a whole timestamp style held in a static and formatted by `format(_:)`. */
@@ -226,32 +282,89 @@ struct ConsistencyNoIsoStringDateCutTests {
     // MARK: Flagged
 
     @Test(arguments: [
-        ("date.formatted(.iso8601.year().month().day())", "date.formatted(.iso8601.year().month().day()) | isoDateWithoutTimeZone"),
-        ("date.formatted(.iso8601.year().month())", "date.formatted(.iso8601.year().month()) | isoDateWithoutTimeZone"),
-        ("date.formatted(.iso8601.year().weekOfYear().day())", "date.formatted(.iso8601.year().weekOfYear().day()) | isoDateWithoutTimeZone"),
-        ("date.formatted(.iso8601.day().year().month())", "date.formatted(.iso8601.day().year().month()) | isoDateWithoutTimeZone"),
-        ("date.formatted(.iso8601.dateSeparator(.omitted).year().month().day())", "date.formatted(.iso8601.dateSeparator(.omitted).year().month().day()) | isoDateWithoutTimeZone"),
-        ("date.formatted(.iso8601.year().month().day().timeSeparator(.omitted))", "date.formatted(.iso8601.year().month().day().timeSeparator(.omitted)) | isoDateWithoutTimeZone"),
+        (
+            "date.formatted(.iso8601.year().month().day())",
+            "date.formatted(.iso8601.year().month().day()) | isoDateWithoutTimeZone",
+        ),
+        (
+            "date.formatted(.iso8601.year().month())",
+            "date.formatted(.iso8601.year().month()) | isoDateWithoutTimeZone",
+        ),
+        (
+            "date.formatted(.iso8601.year().weekOfYear().day())",
+            "date.formatted(.iso8601.year().weekOfYear().day()) | isoDateWithoutTimeZone",
+        ),
+        (
+            "date.formatted(.iso8601.day().year().month())",
+            "date.formatted(.iso8601.day().year().month()) | isoDateWithoutTimeZone",
+        ),
+        (
+            "date.formatted(.iso8601.dateSeparator(.omitted).year().month().day())",
+            "date.formatted(.iso8601.dateSeparator(.omitted).year().month().day()) | isoDateWithoutTimeZone",
+        ),
+        (
+            "date.formatted(.iso8601.year().month().day().timeSeparator(.omitted))",
+            "date.formatted(.iso8601.year().month().day().timeSeparator(.omitted)) | isoDateWithoutTimeZone",
+        ),
         ("date.formatted((.iso8601.year()))", "date.formatted((.iso8601.year())) | isoDateWithoutTimeZone"),
-        ("date.formatted(Date.ISO8601FormatStyle.iso8601.year().month().day())", "date.formatted(Date.ISO8601FormatStyle.iso8601.year().month().day()) | isoDateWithoutTimeZone"),
-        ("date.formatted(Date.ISO8601FormatStyle().year().month().day())", "date.formatted(Date.ISO8601FormatStyle().year().month().day()) | isoDateWithoutTimeZone"),
+        (
+            "date.formatted(Date.ISO8601FormatStyle.iso8601.year().month().day())",
+            "date.formatted(Date.ISO8601FormatStyle.iso8601.year().month().day()) | isoDateWithoutTimeZone",
+        ),
+        (
+            "date.formatted(Date.ISO8601FormatStyle().year().month().day())",
+            "date.formatted(Date.ISO8601FormatStyle().year().month().day()) | isoDateWithoutTimeZone",
+        ),
         (
             "date.formatted(Date.ISO8601FormatStyle(dateSeparator: .omitted, includingFractionalSeconds: true).year().month().day())",
-            "date.formatted(Date.ISO8601FormatStyle(dateSeparator: .omitted, includingFractionalSeconds: true).year().month().day()) | isoDateWithoutTimeZone"
+            "date.formatted(Date.ISO8601FormatStyle(dateSeparator: .omitted, includingFractionalSeconds: true).year().month().day()) | isoDateWithoutTimeZone",
         ),
-        ("date.ISO8601Format(.iso8601.year().month().day())", "date.ISO8601Format(.iso8601.year().month().day()) | isoDateWithoutTimeZone"),
-        ("Date.ISO8601FormatStyle().year().month().day().format(date)", "Date.ISO8601FormatStyle().year().month().day().format(date) | isoDateWithoutTimeZone"),
-        ("ISO8601DateFormatter().string(from: date).prefix(10)", "ISO8601DateFormatter().string(from: date).prefix(10) | isoStringCutToDate"),
-        ("ISO8601DateFormatter().string(from: date).prefix(7)", "ISO8601DateFormatter().string(from: date).prefix(7) | isoStringCutToDate"),
-        ("ISO8601DateFormatter().string(from: date).prefix(1)", "ISO8601DateFormatter().string(from: date).prefix(1) | isoStringCutToDate"),
-        ("(ISO8601DateFormatter().string(from: date)).prefix(10)", "(ISO8601DateFormatter().string(from: date)).prefix(10) | isoStringCutToDate"),
-        ("Foundation.ISO8601DateFormatter().string(from: date).prefix(10)", "Foundation.ISO8601DateFormatter().string(from: date).prefix(10) | isoStringCutToDate"),
+        (
+            "date.ISO8601Format(.iso8601.year().month().day())",
+            "date.ISO8601Format(.iso8601.year().month().day()) | isoDateWithoutTimeZone",
+        ),
+        (
+            "Date.ISO8601FormatStyle().year().month().day().format(date)",
+            "Date.ISO8601FormatStyle().year().month().day().format(date) | isoDateWithoutTimeZone",
+        ),
+        (
+            "ISO8601DateFormatter().string(from: date).prefix(10)",
+            "ISO8601DateFormatter().string(from: date).prefix(10) | isoStringCutToDate",
+        ),
+        (
+            "ISO8601DateFormatter().string(from: date).prefix(7)",
+            "ISO8601DateFormatter().string(from: date).prefix(7) | isoStringCutToDate",
+        ),
+        (
+            "ISO8601DateFormatter().string(from: date).prefix(1)",
+            "ISO8601DateFormatter().string(from: date).prefix(1) | isoStringCutToDate",
+        ),
+        (
+            "(ISO8601DateFormatter().string(from: date)).prefix(10)",
+            "(ISO8601DateFormatter().string(from: date)).prefix(10) | isoStringCutToDate",
+        ),
+        (
+            "Foundation.ISO8601DateFormatter().string(from: date).prefix(10)",
+            "Foundation.ISO8601DateFormatter().string(from: date).prefix(10) | isoStringCutToDate",
+        ),
         ("date.ISO8601Format().prefix(10)", "date.ISO8601Format().prefix(10) | isoStringCutToDate"),
         ("date.formatted(.iso8601).prefix(10)", "date.formatted(.iso8601).prefix(10) | isoStringCutToDate"),
-        ("ISO8601DateFormatter().string(from: date).split(separator: \"T\")[0]", "ISO8601DateFormatter().string(from: date).split(separator: \"T\")[0] | isoStringCutToDate"),
-        ("ISO8601DateFormatter().string(from: date).components(separatedBy: \"T\").first", "ISO8601DateFormatter().string(from: date).components(separatedBy: \"T\").first | isoStringCutToDate"),
-        ("ISO8601DateFormatter().string(from: date).components(separatedBy: \"T\")[0]", "ISO8601DateFormatter().string(from: date).components(separatedBy: \"T\")[0] | isoStringCutToDate"),
-        ("date.ISO8601Format().split(separator: \"T\").first", "date.ISO8601Format().split(separator: \"T\").first | isoStringCutToDate"),
+        (
+            "ISO8601DateFormatter().string(from: date).split(separator: \"T\")[0]",
+            "ISO8601DateFormatter().string(from: date).split(separator: \"T\")[0] | isoStringCutToDate",
+        ),
+        (
+            "ISO8601DateFormatter().string(from: date).components(separatedBy: \"T\").first",
+            "ISO8601DateFormatter().string(from: date).components(separatedBy: \"T\").first | isoStringCutToDate",
+        ),
+        (
+            "ISO8601DateFormatter().string(from: date).components(separatedBy: \"T\")[0]",
+            "ISO8601DateFormatter().string(from: date).components(separatedBy: \"T\")[0] | isoStringCutToDate",
+        ),
+        (
+            "date.ISO8601Format().split(separator: \"T\").first",
+            "date.ISO8601Format().split(separator: \"T\").first | isoStringCutToDate",
+        ),
     ])
     func flagsTheShape(expression: String, expected: String) {
         let source = """
@@ -427,7 +540,9 @@ struct ConsistencyNoIsoStringDateCutTests {
             resolving["year"] = [Self.componentsYear]
             resolving["month"] = [Self.componentsMonth]
             resolving["day"] = [Self.componentsDay]
-            resolving["formatted"] = ["s:10Foundation14DateComponentsV9formattedy12FormatOutputQzxAA0E5StyleRzAC0E5InputRtzlF"]
+            resolving["formatted"] = [
+                "s:10Foundation14DateComponentsV9formattedy12FormatOutputQzxAA0E5StyleRzAC0E5InputRtzlF"
+            ]
         }
         #expect(Self.findings(source, resolving: resolving).isEmpty)
     }
@@ -438,7 +553,12 @@ struct ConsistencyNoIsoStringDateCutTests {
         resolving["year"] = [Self.componentsYear]
         resolving["month"] = [Self.componentsMonth]
         resolving["day"] = [Self.componentsDay]
-        #expect(Self.findings("import Foundation\nlet day = components.formatted(.iso8601.year().month().day())\n", resolving: resolving).isEmpty)
+        #expect(
+            Self.findings(
+                "import Foundation\nlet day = components.formatted(.iso8601.year().month().day())\n",
+                resolving: resolving,
+            ).isEmpty
+        )
     }
 
     /* Names the index did not record, or resolved to declarations of ours. */
@@ -451,7 +571,12 @@ struct ConsistencyNoIsoStringDateCutTests {
     func aStyleTheIndexDoesNotPlaceIsLeftAlone(name: String, symbols: [String]) {
         var resolving = Self.foundation
         resolving[name] = symbols
-        #expect(Self.findings("import Foundation\nlet day = date.formatted(.iso8601.year().month().day())\n", resolving: resolving).isEmpty)
+        #expect(
+            Self.findings(
+                "import Foundation\nlet day = date.formatted(.iso8601.year().month().day())\n",
+                resolving: resolving,
+            ).isEmpty
+        )
     }
 
     @Test(arguments: [
@@ -464,15 +589,17 @@ struct ConsistencyNoIsoStringDateCutTests {
     func aCutTheIndexDoesNotPlaceIsLeftAlone(name: String, symbols: [String]) {
         var resolving = Self.foundation
         resolving[name] = symbols
-        let source = "import Foundation\nlet first = ISO8601DateFormatter().string(from: date).prefix(10)\nlet second = date.ISO8601Format().prefix(10)\n"
+        let source =
+            "import Foundation\nlet first = ISO8601DateFormatter().string(from: date).prefix(10)\nlet second = date.ISO8601Format().prefix(10)\n"
         let found = Self.findings(source, resolving: resolving)
         /* Removing one name silences the line that needs it and only that line. */
-        let expected = [
-            ("ISO8601DateFormatter", ["date.ISO8601Format().prefix(10) | isoStringCutToDate"]),
-            ("string", ["date.ISO8601Format().prefix(10) | isoStringCutToDate"]),
-            ("prefix", []),
-            ("ISO8601Format", ["ISO8601DateFormatter().string(from: date).prefix(10) | isoStringCutToDate"]),
-        ].first { $0.0 == name }?.1 ?? []
+        let expected =
+            [
+                ("ISO8601DateFormatter", ["date.ISO8601Format().prefix(10) | isoStringCutToDate"]),
+                ("string", ["date.ISO8601Format().prefix(10) | isoStringCutToDate"]),
+                ("prefix", []),
+                ("ISO8601Format", ["ISO8601DateFormatter().string(from: date).prefix(10) | isoStringCutToDate"]),
+            ].first { $0.0 == name }?.1 ?? []
         #expect(found == expected, "\(found)")
     }
 
@@ -625,7 +752,14 @@ struct ConsistencyNoIsoStringDateCutTests {
     @Test func thePrefilterNeedsIso8601() {
         let rule = ConsistencyNoIsoStringDateCut()
         func parsed(_ source: String) -> ParsedFile {
-            ParsedFile(url: URL(fileURLWithPath: "/fixture/Subject.swift"), targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+            ParsedFile(
+                url: URL(fileURLWithPath: "/fixture/Subject.swift"),
+                targetName: "Fixture",
+                targetKind: "library",
+                source: source,
+                tree: Parser.parse(source: source),
+                nodeCount: 0,
+            )
         }
         #expect(rule.applies(to: parsed("let day = date.formatted(.iso8601.year())")))
         #expect(rule.applies(to: parsed("let stamp = ISO8601DateFormatter()")))
@@ -680,25 +814,54 @@ struct ConsistencyNoIsoStringDateCutTests {
         """#
 
     @Test func theIndexResolvesFoundationsStyleFormatterAndCuts() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-typed-\(UUID().uuidString)", isDirectory: true)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-typed-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-        try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try Self.packageSource.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
+        try PipelineControlTests.manifest.write(
+            to: root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try Self.packageSource.write(
+            to: sources.appendingPathComponent("Control.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
 
         /* One run builds the package and writes its index. The rule is run by hand on what the run left. */
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"],
+            workingDirectory: root,
+        )
         _ = try await Pipeline(options: options, writer: ContractWriter { _ in }, workingDirectory: root).run()
-        let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: ProcessRunner())
+        let package = try PackageModel.load(
+            root: root,
+            scratchPath: Pipeline.scratchPath(for: root),
+            runner: ProcessRunner(),
+        )
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
         let rule = ConsistencyNoIsoStringDateCut()
         let candidates = parsed.files.filter { rule.applies(to: $0) }
-        let symbols = SymbolProvider(scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root), runner: ProcessRunner()).symbols(for: candidates)
+        let symbols = SymbolProvider(
+            scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root),
+            runner: ProcessRunner(),
+        ).symbols(for: candidates)
         #expect(symbols.fromIndex == 1, "the build's index should describe the file: \(symbols.unavailable)")
         let found = candidates.flatMap { file in
-            rule.findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.line):\($0.column) \($0.messageId)" }
+            rule.findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map {
+                "\($0.line):\($0.column) \($0.messageId)"
+            }
         }
         /* `probe`, `cut`, `held` and `dayOnly`; not `local` or `zoned` (the zone said), `components` (not Date's style) or `parsed` (a parse). */
-        #expect(found == ["5:9 isoDateWithoutTimeZone", "13:16 isoStringCutToDate", "18:23 isoStringCutToDate", "24:16 isoDateWithoutTimeZone"], "\(found)")
+        #expect(
+            found == [
+                "5:9 isoDateWithoutTimeZone", "13:16 isoStringCutToDate", "18:23 isoStringCutToDate",
+                "24:16 isoDateWithoutTimeZone",
+            ],
+            "\(found)",
+        )
     }
 }

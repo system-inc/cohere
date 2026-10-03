@@ -26,7 +26,7 @@ public struct FixRecord: Codable, Equatable, Sendable {
         filesReformatted: Int,
         filesNotFormatted: Int,
         notFormattedReasons: [String: Int],
-        formatScope: String
+        formatScope: String,
     ) {
         self.filesConsidered = filesConsidered
         self.filesRewritten = filesRewritten

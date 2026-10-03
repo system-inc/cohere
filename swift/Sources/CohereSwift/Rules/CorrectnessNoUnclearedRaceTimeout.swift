@@ -84,7 +84,12 @@ public struct CorrectnessNoUnclearedRaceTimeout: FileRule {
         let visitor = Visitor(viewMode: .sourceAccurate)
         visitor.walk(file.tree)
         return visitor.found.map { found in
-            file.finding(at: found.child, rule: name, messageId: "unclearedRaceTimeout", message: Self.message(group: found.group))
+            file.finding(
+                at: found.child,
+                rule: name,
+                messageId: "unclearedRaceTimeout",
+                message: Self.message(group: found.group),
+            )
         }
     }
 
@@ -124,7 +129,9 @@ public struct CorrectnessNoUnclearedRaceTimeout: FileRule {
             if let reference = expression.as(DeclReferenceExprSyntax.self) {
                 return groupFunctions.contains(reference.baseName.text) && reference.argumentNames == nil
             }
-            guard let member = expression.as(MemberAccessExprSyntax.self), groupFunctions.contains(member.declName.baseName.text), member.declName.argumentNames == nil else {
+            guard let member = expression.as(MemberAccessExprSyntax.self),
+                groupFunctions.contains(member.declName.baseName.text), member.declName.argumentNames == nil
+            else {
                 return false
             }
             return member.base?.as(DeclReferenceExprSyntax.self)?.baseName.text == "_Concurrency"
@@ -134,14 +141,14 @@ public struct CorrectnessNoUnclearedRaceTimeout: FileRule {
         static func groupName(_ body: ClosureExprSyntax) -> String? {
             let name: String
             switch body.signature?.parameterClause {
-            case .simpleInput(let parameters)?:
-                guard parameters.count == 1, let parameter = parameters.first else { return nil }
-                name = parameter.name.text
-            case .parameterClause(let clause)?:
-                guard clause.parameters.count == 1, let parameter = clause.parameters.first else { return nil }
-                name = (parameter.secondName ?? parameter.firstName).text
-            case nil:
-                name = "$0"
+                case .simpleInput(let parameters)?:
+                    guard parameters.count == 1, let parameter = parameters.first else { return nil }
+                    name = parameter.name.text
+                case .parameterClause(let clause)?:
+                    guard clause.parameters.count == 1, let parameter = clause.parameters.first else { return nil }
+                    name = (parameter.secondName ?? parameter.firstName).text
+                case nil:
+                    name = "$0"
             }
             return name == "_" ? nil : name
         }
@@ -158,17 +165,21 @@ public struct CorrectnessNoUnclearedRaceTimeout: FileRule {
             var children: [FunctionCallExprSyntax] = []
             var reads: [FunctionCallExprSyntax] = []
             for reference in uses.references {
-                guard isOwn(Syntax(reference), of: body), let member = reference.parent?.as(MemberAccessExprSyntax.self), member.base?.id == reference.id,
-                    member.declName.argumentNames == nil, let call = member.parent?.as(FunctionCallExprSyntax.self), call.calledExpression.id == member.id
+                guard isOwn(Syntax(reference), of: body),
+                    let member = reference.parent?.as(MemberAccessExprSyntax.self), member.base?.id == reference.id,
+                    member.declName.argumentNames == nil, let call = member.parent?.as(FunctionCallExprSyntax.self),
+                    call.calledExpression.id == member.id
                 else {
                     return []
                 }
                 let method = member.declName.baseName.text
                 if childMethods.contains(method) {
                     children.append(call)
-                } else if readMethods.contains(method) {
+                }
+                else if readMethods.contains(method) {
                     reads.append(call)
-                } else {
+                }
+                else {
                     return []
                 }
             }
@@ -192,15 +203,19 @@ public struct CorrectnessNoUnclearedRaceTimeout: FileRule {
 
         /* A node whose contents run apart from the code around it: another closure, a function or accessor, or a type. */
         static func isBoundary(_ node: Syntax) -> Bool {
-            node.is(ClosureExprSyntax.self) || node.is(FunctionDeclSyntax.self) || node.is(AccessorBlockSyntax.self) || node.is(InitializerDeclSyntax.self)
-                || node.is(DeinitializerDeclSyntax.self) || node.is(SubscriptDeclSyntax.self) || node.asProtocol((any DeclGroupSyntax).self) != nil
+            node.is(ClosureExprSyntax.self) || node.is(FunctionDeclSyntax.self) || node.is(AccessorBlockSyntax.self)
+                || node.is(InitializerDeclSyntax.self)
+                || node.is(DeinitializerDeclSyntax.self) || node.is(SubscriptDeclSyntax.self)
+                || node.asProtocol((any DeclGroupSyntax).self) != nil
         }
 
         /* Whether the read sits in a loop of the body, where it collects results rather than taking the first. */
         static func isInLoop(_ node: Syntax, of body: ClosureExprSyntax) -> Bool {
             var current = node.parent
             while let ancestor = current, ancestor.id != body.id {
-                if ancestor.is(ForStmtSyntax.self) || ancestor.is(WhileStmtSyntax.self) || ancestor.is(RepeatStmtSyntax.self) {
+                if ancestor.is(ForStmtSyntax.self) || ancestor.is(WhileStmtSyntax.self)
+                    || ancestor.is(RepeatStmtSyntax.self)
+                {
                     return true
                 }
                 current = ancestor.parent
@@ -240,27 +255,33 @@ public struct CorrectnessNoUnclearedRaceTimeout: FileRule {
                 return endsAbruptly(expression)
             }
             if let doStatement = last.as(DoStmtSyntax.self) {
-                return endsAbruptly(doStatement.body.statements) && doStatement.catchClauses.allSatisfy { endsAbruptly($0.body.statements) }
+                return endsAbruptly(doStatement.body.statements)
+                    && doStatement.catchClauses.allSatisfy { endsAbruptly($0.body.statements) }
             }
             return false
         }
 
         static func endsAbruptly(_ expression: ExprSyntax) -> Bool {
-            if let call = expression.as(FunctionCallExprSyntax.self), let callee = call.calledExpression.as(DeclReferenceExprSyntax.self) {
+            if let call = expression.as(FunctionCallExprSyntax.self),
+                let callee = call.calledExpression.as(DeclReferenceExprSyntax.self)
+            {
                 return stoppingCalls.contains(callee.baseName.text)
             }
             if let conditional = expression.as(IfExprSyntax.self) {
                 switch conditional.elseBody {
-                case .ifExpr(let elseIf)?:
-                    return endsAbruptly(conditional.body.statements) && endsAbruptly(ExprSyntax(elseIf))
-                case .codeBlock(let block)?:
-                    return endsAbruptly(conditional.body.statements) && endsAbruptly(block.statements)
-                case nil:
-                    return false
+                    case .ifExpr(let elseIf)?:
+                        return endsAbruptly(conditional.body.statements) && endsAbruptly(ExprSyntax(elseIf))
+                    case .codeBlock(let block)?:
+                        return endsAbruptly(conditional.body.statements) && endsAbruptly(block.statements)
+                    case nil:
+                        return false
                 }
             }
             if let choice = expression.as(SwitchExprSyntax.self) {
-                return !choice.cases.isEmpty && choice.cases.allSatisfy { $0.as(SwitchCaseSyntax.self).map { endsAbruptly($0.statements) } ?? false }
+                return !choice.cases.isEmpty
+                    && choice.cases.allSatisfy {
+                        $0.as(SwitchCaseSyntax.self).map { endsAbruptly($0.statements) } ?? false
+                    }
             }
             return false
         }
@@ -271,12 +292,17 @@ public struct CorrectnessNoUnclearedRaceTimeout: FileRule {
          */
         static func isTimeout(_ child: FunctionCallExprSyntax) -> Bool {
             guard child.additionalTrailingClosures.isEmpty,
-                let operation = child.trailingClosure ?? child.arguments.first(where: { $0.label?.text == "operation" })?.expression.as(ClosureExprSyntax.self)
+                let operation = child.trailingClosure
+                    ?? child.arguments.first(where: { $0.label?.text == "operation" })?.expression.as(
+                        ClosureExprSyntax.self
+                    )
             else {
                 return false
             }
             let statements = Array(operation.statements)
-            guard statements.count == 2, let sleep = statements[0].item.as(ExprSyntax.self), isSleep(sleep) else { return false }
+            guard statements.count == 2, let sleep = statements[0].item.as(ExprSyntax.self), isSleep(sleep) else {
+                return false
+            }
             if let throwing = statements[1].item.as(ThrowStmtSyntax.self) {
                 return !awaits(Syntax(throwing.expression))
             }
@@ -292,12 +318,17 @@ public struct CorrectnessNoUnclearedRaceTimeout: FileRule {
             if let attempt = inner.as(TryExprSyntax.self) {
                 inner = ConsistencyNoHandRolledDelay.Visitor.unparenthesized(attempt.expression)
             }
-            guard let awaited = inner.as(AwaitExprSyntax.self), let call = ConsistencyNoHandRolledDelay.Visitor.unparenthesized(awaited.expression).as(FunctionCallExprSyntax.self),
+            guard let awaited = inner.as(AwaitExprSyntax.self),
+                let call = ConsistencyNoHandRolledDelay.Visitor.unparenthesized(awaited.expression).as(
+                    FunctionCallExprSyntax.self
+                ),
                 call.trailingClosure == nil, call.additionalTrailingClosures.isEmpty
             else {
                 return false
             }
-            guard let callee = call.calledExpression.as(MemberAccessExprSyntax.self), callee.declName.baseName.text == "sleep", callee.declName.argumentNames == nil, let base = callee.base else {
+            guard let callee = call.calledExpression.as(MemberAccessExprSyntax.self),
+                callee.declName.baseName.text == "sleep", callee.declName.argumentNames == nil, let base = callee.base
+            else {
                 return false
             }
             return ConsistencyNoHandRolledDelay.Visitor.isTask(base)
@@ -324,7 +355,9 @@ public struct CorrectnessNoUnclearedRaceTimeout: FileRule {
 
         override func visit(_ node: DeclReferenceExprSyntax) -> SyntaxVisitorContinueKind {
             /* `other.group` names a member, not the binding. */
-            if node.baseName.text == group, node.argumentNames == nil, node.parent?.as(MemberAccessExprSyntax.self)?.declName.id != node.id {
+            if node.baseName.text == group, node.argumentNames == nil,
+                node.parent?.as(MemberAccessExprSyntax.self)?.declName.id != node.id
+            {
                 references.append(node)
             }
             return .visitChildren
@@ -343,17 +376,19 @@ public struct CorrectnessNoUnclearedRaceTimeout: FileRule {
                 return .skipChildren
             }
             switch node.signature?.parameterClause {
-            case .simpleInput(let parameters)?:
-                return parameters.contains { $0.name.text == group } ? .skipChildren : .visitChildren
-            case .parameterClause(let clause)?:
-                return clause.parameters.contains { ($0.secondName ?? $0.firstName).text == group } ? .skipChildren : .visitChildren
-            case nil:
-                return .visitChildren
+                case .simpleInput(let parameters)?:
+                    return parameters.contains { $0.name.text == group } ? .skipChildren : .visitChildren
+                case .parameterClause(let clause)?:
+                    return clause.parameters.contains { ($0.secondName ?? $0.firstName).text == group }
+                        ? .skipChildren : .visitChildren
+                case nil:
+                    return .visitChildren
             }
         }
 
         override func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
-            node.signature.parameterClause.parameters.contains { ($0.secondName ?? $0.firstName).text == group } ? .skipChildren : .visitChildren
+            node.signature.parameterClause.parameters.contains { ($0.secondName ?? $0.firstName).text == group }
+                ? .skipChildren : .visitChildren
         }
     }
 

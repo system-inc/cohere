@@ -31,7 +31,7 @@ public struct UnusedRecord: Codable, Equatable, Sendable {
         messageId: String,
         message: String,
         subject: String,
-        suggestions: [FindingRecord.Suggestion] = []
+        suggestions: [FindingRecord.Suggestion] = [],
     ) {
         self.file = file
         self.line = line
@@ -57,7 +57,7 @@ public struct UnusedRecord: Codable, Equatable, Sendable {
             messageId: finding.messageId,
             message: finding.message,
             subject: subject,
-            suggestions: finding.suggestions
+            suggestions: finding.suggestions,
         )
     }
 }

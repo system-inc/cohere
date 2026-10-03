@@ -52,7 +52,10 @@ struct ModuleReexports {
         var interfaces: [String: InterfaceExports?] = [:]
         var moduleMaps: [String: ModuleMap?] = [:]
         var clangModules: [Headers.ClangModule] = []
-        let moduleOfFile = Dictionary(units.filter { !$0.isSystem }.map { ($0.mainFile, $0.module) }, uniquingKeysWith: { first, _ in first })
+        let moduleOfFile = Dictionary(
+            units.filter { !$0.isSystem }.map { ($0.mainFile, $0.module) },
+            uniquingKeysWith: { first, _ in first },
+        )
         /* A module of the build is bounded by its files' `@_exported` lines only when every one of its files was read. */
         let read = Set(files.map { $0.url.resolvingSymlinksInPath().path })
         let unread = Set(units.filter { !$0.isSystem && !read.contains($0.mainFile) }.map(\.module))
@@ -80,7 +83,9 @@ struct ModuleReexports {
             for candidate in Self.moduleMapCandidates(of: unit) {
                 var path = candidate
                 if let extern = map(at: path)?.externs[unit.module] {
-                    path = URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent(extern).standardizedFileURL.path
+                    path =
+                        URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent(extern)
+                        .standardizedFileURL.path
                 }
                 guard let exports = map(at: path)?.exports(ofModule: unit.module) else { continue }
                 clangModules.append(Headers.ClangModule(unit: unit, exports: exports, moduleMap: path))
@@ -97,7 +102,11 @@ struct ModuleReexports {
         headers = Headers(clangModules: clangModules)
         for clangModule in clangModules {
             let imported = Set(clangModule.unit.importedModules)
-            known[clangModule.unit.module, default: []].formUnion(headers.wholeImports(of: clangModule.unit.module, named: clangModule.exports.named).intersection(imported))
+            known[clangModule.unit.module, default: []].formUnion(
+                headers.wholeImports(of: clangModule.unit.module, named: clangModule.exports.named).intersection(
+                    imported
+                )
+            )
         }
         for file in files {
             guard let module = moduleOfFile[file.url.resolvingSymlinksInPath().path] else { continue }
@@ -115,12 +124,12 @@ struct ModuleReexports {
     func closure(of module: String, reach: Reach) -> Set<String> {
         let edges: [String: Set<String>]
         switch reach {
-        case .known:
-            edges = known
-        case .assumed:
-            edges = assumed
-        case .bounded:
-            edges = bounded
+            case .known:
+                edges = known
+            case .assumed:
+                edges = assumed
+            case .bounded:
+                edges = bounded
         }
         var seen: Set<String> = []
         var pending = [module]
@@ -205,7 +214,9 @@ struct ModuleReexports {
                     }
                 }
                 let explicit = Set(exports.explicitHeaders.map(place))
-                let own = Self.ownHeaders(of: clangModule.unit).union(declared.filter { FileManager.default.fileExists(atPath: $0) })
+                let own = Self.ownHeaders(of: clangModule.unit).union(
+                    declared.filter { FileManager.default.fileExists(atPath: $0) }
+                )
                 headersOfModule[module, default: []].formUnion(own.subtracting(explicit))
                 for header in own {
                     modulesOfHeader[header, default: []].insert(module)
@@ -234,7 +245,8 @@ struct ModuleReexports {
             if let range = moduleMap.range(of: ".framework/Modules/", options: .backwards) {
                 return String(moduleMap[..<range.lowerBound]) + ".framework/Headers/" + header
             }
-            return URL(fileURLWithPath: moduleMap).deletingLastPathComponent().appendingPathComponent(header).standardizedFileURL.path
+            return URL(fileURLWithPath: moduleMap).deletingLastPathComponent().appendingPathComponent(header)
+                .standardizedFileURL.path
         }
 
         /* How an include spells a header: `Name/Header.h` for a framework's, the path under `usr/include` otherwise. */
@@ -263,7 +275,8 @@ struct ModuleReexports {
                 found.remove(module)
                 if reexports(header) {
                     whole.formUnion(found)
-                } else if header == umbrellaOfModule[module] {
+                }
+                else if header == umbrellaOfModule[module] {
                     whole.formUnion(found.intersection(named))
                 }
             }
@@ -324,7 +337,10 @@ struct ModuleReexports {
                     if line.hasPrefix("@import ") {
                         guard conditions.compiled else { continue }
                         let name = line.dropFirst("@import ".count).prefix { $0.isLetter || $0.isNumber || $0 == "_" }
-                        if !name.isEmpty, line.dropFirst("@import ".count + name.count).trimmingCharacters(in: .whitespaces).hasPrefix(";") {
+                        if !name.isEmpty,
+                            line.dropFirst("@import ".count + name.count).trimmingCharacters(in: .whitespaces)
+                                .hasPrefix(";")
+                        {
                             modules.append(String(name))
                         }
                         continue
@@ -334,14 +350,21 @@ struct ModuleReexports {
                     if conditions.read(directive) {
                         continue
                     }
-                    guard conditions.compiled, directive.hasPrefix("import") || directive.hasPrefix("include") else { continue }
+                    guard conditions.compiled, directive.hasPrefix("import") || directive.hasPrefix("include") else {
+                        continue
+                    }
                     if let open = directive.firstIndex(of: "<"), let close = directive[open...].firstIndex(of: ">") {
                         if let path = pathOfName[String(directive[directive.index(after: open)..<close])] {
                             included.append(path)
                         }
-                    } else if let open = directive.firstIndex(of: "\""), let close = directive[directive.index(after: open)...].firstIndex(of: "\"") {
+                    }
+                    else if let open = directive.firstIndex(of: "\""),
+                        let close = directive[directive.index(after: open)...].firstIndex(of: "\"")
+                    {
                         let name = String(directive[directive.index(after: open)..<close])
-                        let sibling = URL(fileURLWithPath: header).deletingLastPathComponent().appendingPathComponent(name).standardizedFileURL.path
+                        let sibling = URL(fileURLWithPath: header).deletingLastPathComponent().appendingPathComponent(
+                            name
+                        ).standardizedFileURL.path
                         if modulesOfHeader[sibling] != nil || textualHeaders.contains(sibling) {
                             included.append(sibling)
                         }
@@ -355,7 +378,8 @@ struct ModuleReexports {
                     let pasted = parse(path)
                     headers.append(contentsOf: pasted.headers)
                     modules.append(contentsOf: pasted.modules)
-                } else {
+                }
+                else {
                     headers.append(path)
                 }
             }
@@ -372,15 +396,21 @@ struct ModuleReexports {
      */
     struct Conditions {
         static let values: [String: Int] = [
-            "TARGET_OS_OSX": 1, "TARGET_OS_MAC": 1, "TARGET_OS_IPHONE": 0, "TARGET_OS_IOS": 0, "TARGET_OS_WATCH": 0, "TARGET_OS_TV": 0,
-            "TARGET_OS_VISION": 0, "TARGET_OS_XR": 0, "TARGET_OS_MACCATALYST": 0, "TARGET_OS_SIMULATOR": 0, "TARGET_OS_EMBEDDED": 0,
-            "TARGET_OS_DRIVERKIT": 0, "TARGET_OS_BRIDGE": 0, "TARGET_OS_WIN32": 0, "TARGET_OS_WINDOWS": 0, "TARGET_OS_LINUX": 0,
+            "TARGET_OS_OSX": 1, "TARGET_OS_MAC": 1, "TARGET_OS_IPHONE": 0, "TARGET_OS_IOS": 0, "TARGET_OS_WATCH": 0,
+            "TARGET_OS_TV": 0,
+            "TARGET_OS_VISION": 0, "TARGET_OS_XR": 0, "TARGET_OS_MACCATALYST": 0, "TARGET_OS_SIMULATOR": 0,
+            "TARGET_OS_EMBEDDED": 0,
+            "TARGET_OS_DRIVERKIT": 0, "TARGET_OS_BRIDGE": 0, "TARGET_OS_WIN32": 0, "TARGET_OS_WINDOWS": 0,
+            "TARGET_OS_LINUX": 0,
             "__METAL_VERSION__": 0,
         ]
         static let defined: [String: Bool] = values.mapValues { _ in true }.merging(
-            ["__swift__": true, "__OBJC__": true, "__OBJC2__": true, "__APPLE__": true, "__MACH__": true, "__cplusplus": false,
-                "__METAL_VERSION__": false, "CF_EXCLUDE_CSTD_HEADERS": false],
-            uniquingKeysWith: { _, new in new }
+            [
+                "__swift__": true, "__OBJC__": true, "__OBJC2__": true, "__APPLE__": true, "__MACH__": true,
+                "__cplusplus": false,
+                "__METAL_VERSION__": false, "CF_EXCLUDE_CSTD_HEADERS": false,
+            ],
+            uniquingKeysWith: { _, new in new },
         )
 
         /* Each open `#if`: whether its live branch holds, and whether an earlier branch did. */
@@ -402,35 +432,38 @@ struct ModuleReexports {
             let guarded = guardMacro
             guardMacro = nil
             switch word {
-            case "ifdef":
-                stack.append((Self.defined[rest], Self.defined[rest]))
-            case "ifndef":
-                let value = Self.defined[rest].map { !$0 }
-                stack.append((value, value))
-                guardMacro = rest
-            case "if":
-                let value = evaluate(rest)
-                stack.append((value, value))
-                if rest.hasPrefix("!defined") {
-                    guardMacro = rest.dropFirst("!defined".count).trimmingCharacters(in: CharacterSet(charactersIn: " ()"))
-                }
-            case "elif":
-                guard let top = stack.popLast() else { return true }
-                let value = evaluate(rest)
-                let live: Bool? = top.taken == true ? false : (top.taken == false ? value : (value == false ? false : nil))
-                stack.append((live, Self.or(top.taken, value)))
-            case "else":
-                guard let top = stack.popLast() else { return true }
-                stack.append((top.taken.map { !$0 }, true))
-            case "endif":
-                _ = stack.popLast()
-            case "define":
-                /* `#ifndef X` then `#define X`: an include guard, true the first time the header is read. */
-                if let guarded, rest.prefix(while: { !$0.isWhitespace }) == guarded, !stack.isEmpty {
-                    stack[stack.count - 1] = (true, true)
-                }
-            default:
-                return false
+                case "ifdef":
+                    stack.append((Self.defined[rest], Self.defined[rest]))
+                case "ifndef":
+                    let value = Self.defined[rest].map { !$0 }
+                    stack.append((value, value))
+                    guardMacro = rest
+                case "if":
+                    let value = evaluate(rest)
+                    stack.append((value, value))
+                    if rest.hasPrefix("!defined") {
+                        guardMacro = rest.dropFirst("!defined".count).trimmingCharacters(
+                            in: CharacterSet(charactersIn: " ()")
+                        )
+                    }
+                case "elif":
+                    guard let top = stack.popLast() else { return true }
+                    let value = evaluate(rest)
+                    let live: Bool? =
+                        top.taken == true ? false : (top.taken == false ? value : (value == false ? false : nil))
+                    stack.append((live, Self.or(top.taken, value)))
+                case "else":
+                    guard let top = stack.popLast() else { return true }
+                    stack.append((top.taken.map { !$0 }, true))
+                case "endif":
+                    _ = stack.popLast()
+                case "define":
+                    /* `#ifndef X` then `#define X`: an include guard, true the first time the header is read. */
+                    if let guarded, rest.prefix(while: { !$0.isWhitespace }) == guarded, !stack.isEmpty {
+                        stack[stack.count - 1] = (true, true)
+                    }
+                default:
+                    return false
             }
             return true
         }
@@ -457,26 +490,33 @@ struct ModuleReexports {
                 let character = expression[index]
                 if character.isWhitespace {
                     index = expression.index(after: index)
-                } else if character.isLetter || character == "_" || character.isNumber {
+                }
+                else if character.isLetter || character == "_" || character.isNumber {
                     let word = expression[index...].prefix { $0.isLetter || $0.isNumber || $0 == "_" }
                     index = expression.index(index, offsetBy: word.count)
                     if word == "__has_include" {
                         guard let open = expression[index...].firstIndex(where: { $0 == "<" || $0 == "\"" }),
-                            let close = expression[expression.index(after: open)...].firstIndex(where: { $0 == ">" || $0 == "\"" }),
+                            let close = expression[expression.index(after: open)...].firstIndex(where: {
+                                $0 == ">" || $0 == "\""
+                            }),
                             let end = expression[close...].firstIndex(of: ")")
                         else { return nil }
                         tokens.append(exists(String(expression[expression.index(after: open)..<close])) ? "1" : "?")
                         index = expression.index(after: end)
-                    } else {
+                    }
+                    else {
                         tokens.append(String(word))
                     }
-                } else if expression[index...].hasPrefix("&&") || expression[index...].hasPrefix("||") {
+                }
+                else if expression[index...].hasPrefix("&&") || expression[index...].hasPrefix("||") {
                     tokens.append(String(expression[index...].prefix(2)))
                     index = expression.index(index, offsetBy: 2)
-                } else if "!()".contains(character), !expression[index...].hasPrefix("!=") {
+                }
+                else if "!()".contains(character), !expression[index...].hasPrefix("!=") {
                     tokens.append(String(character))
                     index = expression.index(after: index)
-                } else {
+                }
+                else {
                     return nil
                 }
             }
@@ -486,32 +526,34 @@ struct ModuleReexports {
                 let token = tokens[position]
                 position += 1
                 switch token {
-                case "!":
-                    guard let value = primary() else { return .none }
-                    return .some(value.map { !$0 })
-                case "(":
-                    guard let value = disjunction(), position < tokens.count, tokens[position] == ")" else { return .none }
-                    position += 1
-                    return .some(value)
-                case "defined":
-                    let parenthesized = position < tokens.count && tokens[position] == "("
-                    position += parenthesized ? 1 : 0
-                    guard position < tokens.count else { return .none }
-                    let name = tokens[position]
-                    position += 1
-                    if parenthesized {
-                        guard position < tokens.count, tokens[position] == ")" else { return .none }
+                    case "!":
+                        guard let value = primary() else { return .none }
+                        return .some(value.map { !$0 })
+                    case "(":
+                        guard let value = disjunction(), position < tokens.count, tokens[position] == ")" else {
+                            return .none
+                        }
                         position += 1
-                    }
-                    return .some(Self.defined[name])
-                case "?":
-                    return .some(nil)
-                default:
-                    if let first = token.first, first.isNumber {
-                        let digits = token.prefix { $0.isNumber }
-                        return .some(Int(digits).map { $0 != 0 })
-                    }
-                    return .some(Self.values[token].map { $0 != 0 })
+                        return .some(value)
+                    case "defined":
+                        let parenthesized = position < tokens.count && tokens[position] == "("
+                        position += parenthesized ? 1 : 0
+                        guard position < tokens.count else { return .none }
+                        let name = tokens[position]
+                        position += 1
+                        if parenthesized {
+                            guard position < tokens.count, tokens[position] == ")" else { return .none }
+                            position += 1
+                        }
+                        return .some(Self.defined[name])
+                    case "?":
+                        return .some(nil)
+                    default:
+                        if let first = token.first, first.isNumber {
+                            let digits = token.prefix { $0.isNumber }
+                            return .some(Int(digits).map { $0 != 0 })
+                        }
+                        return .some(Self.values[token].map { $0 != 0 })
                 }
             }
             func conjunction() -> Bool?? {
@@ -551,7 +593,8 @@ struct ModuleReexports {
                         if rawLine[index...].hasPrefix("*/") {
                             inComment = false
                             index = rawLine.index(index, offsetBy: 2)
-                        } else {
+                        }
+                        else {
                             index = rawLine.index(after: index)
                         }
                         continue
@@ -596,12 +639,16 @@ struct ModuleReexports {
         var exports = InterfaceExports()
         for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
             let words = line.split(whereSeparator: \.isWhitespace)
-            guard words.first?.hasPrefix("@") == true, let importIndex = words.firstIndex(of: "import"), importIndex + 1 < words.count else { continue }
+            guard words.first?.hasPrefix("@") == true, let importIndex = words.firstIndex(of: "import"),
+                importIndex + 1 < words.count
+            else { continue }
             guard words[..<importIndex].contains("@_exported") else { continue }
             let path = words[words.count - 1]
             guard let module = path.split(separator: ".").first else { continue }
             exports.atMost.insert(String(module))
-            if words[..<importIndex].allSatisfy({ $0.hasPrefix("@") }), importIndex + 2 == words.count, !path.contains(".") {
+            if words[..<importIndex].allSatisfy({ $0.hasPrefix("@") }), importIndex + 2 == words.count,
+                !path.contains(".")
+            {
                 exports.whole.insert(String(path))
             }
         }
@@ -616,14 +663,19 @@ struct ModuleReexports {
     static func moduleMapCandidates(of unit: IndexStore.Unit) -> [String] {
         var candidates: [String] = []
         let framework = "/\(unit.module).framework/"
-        if let header = unit.files.first(where: { $0.contains(framework) }) ?? unit.recordFiles.values.first(where: { $0.contains(framework) }),
+        if let header = unit.files.first(where: { $0.contains(framework) })
+            ?? unit.recordFiles.values.first(where: { $0.contains(framework) }),
             let range = header.range(of: framework)
         {
             candidates.append(String(header[..<range.upperBound]) + "Modules/module.modulemap")
         }
         let maps = unit.files.filter { $0.hasSuffix(".modulemap") }
-        candidates.append(contentsOf: maps.filter { URL(fileURLWithPath: $0).lastPathComponent == "\(unit.module).modulemap" })
-        candidates.append(contentsOf: maps.filter { URL(fileURLWithPath: $0).lastPathComponent != "\(unit.module).modulemap" })
+        candidates.append(
+            contentsOf: maps.filter { URL(fileURLWithPath: $0).lastPathComponent == "\(unit.module).modulemap" }
+        )
+        candidates.append(
+            contentsOf: maps.filter { URL(fileURLWithPath: $0).lastPathComponent != "\(unit.module).modulemap" }
+        )
         var seen: Set<String> = []
         return candidates.filter { seen.insert($0).inserted }
     }
@@ -680,82 +732,96 @@ struct ModuleReexports {
             while index < tokens.count {
                 let token = tokens[index]
                 switch token {
-                case "module" where index + 1 < tokens.count:
-                    /* `[framework] [explicit] module Name [attributes] {`, or `extern module Name "path"`, which declares nothing here. */
-                    if index > 0, tokens[index - 1] == "extern" {
-                        if index + 2 < tokens.count, tokens[index + 2].hasPrefix("\"") {
-                            externs[tokens[index + 1]] = String(tokens[index + 2].dropFirst().dropLast())
-                            index += 3
+                    case "module" where index + 1 < tokens.count:
+                        /* `[framework] [explicit] module Name [attributes] {`, or `extern module Name "path"`, which declares nothing here. */
+                        if index > 0, tokens[index - 1] == "extern" {
+                            if index + 2 < tokens.count, tokens[index + 2].hasPrefix("\"") {
+                                externs[tokens[index + 1]] = String(tokens[index + 2].dropFirst().dropLast())
+                                index += 3
+                                continue
+                            }
+                            index += 2
                             continue
+                        }
+                        let isExplicit = tokens[max(0, index - 2)..<index].contains("explicit")
+                        pending = (tokens[index + 1], tokens[index + 1] == "*", isExplicit)
+                        index += 2
+                        continue
+                    case "{":
+                        if let opened = pending {
+                            let top = stack.compactMap { $0 }.first?.top ?? opened.name
+                            let isExplicit = opened.isExplicit || stack.contains { $0?.isExplicit == true }
+                            stack.append(
+                                Block(
+                                    top: top,
+                                    isTop: stack.isEmpty,
+                                    isWildcard: opened.isWildcard,
+                                    isExplicit: isExplicit,
+                                )
+                            )
+                            if stack.count == 1, modules[top] == nil {
+                                modules[top] = Exports()
+                            }
+                            pending = nil
+                        }
+                        else {
+                            stack.append(nil)
+                        }
+                    case "}":
+                        guard let closed = stack.popLast(), let block = closed else { break }
+                        if block.isTop {
+                            modules[block.top]?.all = block.exportsAll
+                            modules[block.top]?.topHeaders.append(contentsOf: block.headers)
+                        }
+                        else if block.isWildcard, block.exportsAll {
+                            modules[block.top]?.everySubmodule = true
+                        }
+                        for header in block.headers {
+                            modules[block.top]?.headerExports[header] = block.exportsAll
+                            if block.isExplicit {
+                                modules[block.top]?.explicitHeaders.insert(header)
+                            }
+                        }
+                    case "export" where index + 1 < tokens.count:
+                        guard let open = stack.last, let block = open else { break }
+                        let exported = tokens[index + 1]
+                        if exported == "*" {
+                            block.exportsAll = true
+                        }
+                        else if block.isTop, !exported.contains(".") {
+                            modules[block.top]?.named.insert(exported)
                         }
                         index += 2
                         continue
-                    }
-                    let isExplicit = tokens[max(0, index - 2)..<index].contains("explicit")
-                    pending = (tokens[index + 1], tokens[index + 1] == "*", isExplicit)
-                    index += 2
-                    continue
-                case "{":
-                    if let opened = pending {
-                        let top = stack.compactMap { $0 }.first?.top ?? opened.name
-                        let isExplicit = opened.isExplicit || stack.contains { $0?.isExplicit == true }
-                        stack.append(Block(top: top, isTop: stack.isEmpty, isWildcard: opened.isWildcard, isExplicit: isExplicit))
-                        if stack.count == 1, modules[top] == nil {
-                            modules[top] = Exports()
+                    case "umbrella" where index + 2 < tokens.count:
+                        /* `umbrella header "Foundation.h"`; an umbrella directory names no header and is left out. */
+                        guard let open = stack.last, let block = open, tokens[index + 1] == "header",
+                            tokens[index + 2].hasPrefix("\"")
+                        else { break }
+                        let header = String(tokens[index + 2].dropFirst().dropLast())
+                        if block.isTop {
+                            modules[block.top]?.umbrella = header
                         }
-                        pending = nil
-                    } else {
-                        stack.append(nil)
-                    }
-                case "}":
-                    guard let closed = stack.popLast(), let block = closed else { break }
-                    if block.isTop {
-                        modules[block.top]?.all = block.exportsAll
-                        modules[block.top]?.topHeaders.append(contentsOf: block.headers)
-                    } else if block.isWildcard, block.exportsAll {
-                        modules[block.top]?.everySubmodule = true
-                    }
-                    for header in block.headers {
-                        modules[block.top]?.headerExports[header] = block.exportsAll
-                        if block.isExplicit {
-                            modules[block.top]?.explicitHeaders.insert(header)
+                        else {
+                            block.headers.append(header)
                         }
-                    }
-                case "export" where index + 1 < tokens.count:
-                    guard let open = stack.last, let block = open else { break }
-                    let exported = tokens[index + 1]
-                    if exported == "*" {
-                        block.exportsAll = true
-                    } else if block.isTop, !exported.contains(".") {
-                        modules[block.top]?.named.insert(exported)
-                    }
-                    index += 2
-                    continue
-                case "umbrella" where index + 2 < tokens.count:
-                    /* `umbrella header "Foundation.h"`; an umbrella directory names no header and is left out. */
-                    guard let open = stack.last, let block = open, tokens[index + 1] == "header", tokens[index + 2].hasPrefix("\"") else { break }
-                    let header = String(tokens[index + 2].dropFirst().dropLast())
-                    if block.isTop {
-                        modules[block.top]?.umbrella = header
-                    } else {
-                        block.headers.append(header)
-                    }
-                    index += 3
-                    continue
-                case "header" where index + 1 < tokens.count:
-                    /* A member header. `exclude` and `private` ones are not the module's to re-export; `textual` ones belong to no module. */
-                    guard let open = stack.last, let block = open, tokens[index + 1].hasPrefix("\"") else { break }
-                    let header = String(tokens[index + 1].dropFirst().dropLast())
-                    let qualifier = index > 0 ? tokens[index - 1] : ""
-                    if qualifier == "textual" {
-                        modules[block.top]?.textualHeaders.insert(header)
-                    } else if !["exclude", "private", "umbrella"].contains(qualifier) {
-                        block.headers.append(header)
-                    }
-                    index += 2
-                    continue
-                default:
-                    break
+                        index += 3
+                        continue
+                    case "header" where index + 1 < tokens.count:
+                        /* A member header. `exclude` and `private` ones are not the module's to re-export; `textual` ones belong to no module. */
+                        guard let open = stack.last, let block = open, tokens[index + 1].hasPrefix("\"") else { break }
+                        let header = String(tokens[index + 1].dropFirst().dropLast())
+                        let qualifier = index > 0 ? tokens[index - 1] : ""
+                        if qualifier == "textual" {
+                            modules[block.top]?.textualHeaders.insert(header)
+                        }
+                        else if !["exclude", "private", "umbrella"].contains(qualifier) {
+                            block.headers.append(header)
+                        }
+                        index += 2
+                        continue
+                    default:
+                        break
                 }
                 index += 1
             }
@@ -813,9 +879,11 @@ struct ModuleReexports {
                     if character != "," {
                         tokens.append(String(character))
                     }
-                } else if character.isWhitespace {
+                }
+                else if character.isWhitespace {
                     flush()
-                } else {
+                }
+                else {
                     word.append(character)
                 }
                 index += 1

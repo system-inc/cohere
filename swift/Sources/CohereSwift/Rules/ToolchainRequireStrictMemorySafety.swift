@@ -24,9 +24,15 @@ public struct ToolchainRequireStrictMemorySafety: PackageRule {
         package.targets
             .filter { $0.kind != "plugin" && $0.kind != "macro" && !$0.sources.isEmpty && !$0.strictMemorySafety }
             .map { target in
-                let message = "\(target.name) does not compile under strict memory safety. Add .strictMemorySafety() to its swiftSettings, so every unsafe construct is visible where it is used; then replace each flagged site with a safe API where one exists, and mark unsafe only what must be."
+                let message =
+                    "\(target.name) does not compile under strict memory safety. Add .strictMemorySafety() to its swiftSettings, so every unsafe construct is visible where it is used; then replace each flagged site with a safe API where one exists, and mark unsafe only what must be."
                 if let manifest, let declaration = TargetNameFinder.find(target.name, in: manifest.tree) {
-                    return manifest.finding(at: declaration, rule: name, messageId: "strictMemorySafetyMissing", message: message)
+                    return manifest.finding(
+                        at: declaration,
+                        rule: name,
+                        messageId: "strictMemorySafetyMissing",
+                        message: message,
+                    )
                 }
                 /* No declaration found (a target named by a computed string): point at the manifest's first line rather than drop the finding. */
                 return FindingRecord(
@@ -37,7 +43,7 @@ public struct ToolchainRequireStrictMemorySafety: PackageRule {
                     severity: .error,
                     rule: name,
                     messageId: "strictMemorySafetyMissing",
-                    message: message
+                    message: message,
                 )
             }
     }

@@ -13,13 +13,19 @@ import Testing
 @Suite(.serialized)
 struct ScratchPruneTests {
     static func makeDirectory(_ name: String) throws -> URL {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-prune-\(name)-\(UUID().uuidString)", isDirectory: true)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-prune-\(name)-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }
 
     static func age(_ url: URL, by seconds: TimeInterval) throws {
-        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-seconds)], ofItemAtPath: url.path)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-seconds)],
+            ofItemAtPath: url.path,
+        )
     }
 
     @Test func onlyAnUnlistedLocalScratchUnusedForAnHourGoes() throws {
@@ -42,7 +48,9 @@ struct ScratchPruneTests {
         #expect(outcome.bytesRemoved == 1_500)
         #expect(outcome.sentence.hasPrefix("the scratch prune removed 2 KB: "), "\(outcome.sentence)")
         #expect(!FileManager.default.fileExists(atPath: local.appendingPathComponent("Gone").path))
-        #expect(FileManager.default.fileExists(atPath: local.appendingPathComponent("Listed/out/debug/artifact.o").path))
+        #expect(
+            FileManager.default.fileExists(atPath: local.appendingPathComponent("Listed/out/debug/artifact.o").path)
+        )
         #expect(FileManager.default.fileExists(atPath: local.appendingPathComponent("Fresh/out/debug/artifact.o").path))
         #expect(outcome.sentence.contains("the scratch of Gone, no longer a local package"), "\(outcome.sentence)")
     }
@@ -58,8 +66,17 @@ struct ScratchPruneTests {
         #expect(ScratchPrune.run(stores: [], scratchPath: scratch, listedLocalPackages: []) == ScratchPrune.Outcome())
         #expect(FileManager.default.fileExists(atPath: gone.path))
         try Self.age(stamp, by: 7_200)
-        #expect(ScratchPrune.run(stores: [], scratchPath: scratch, listedLocalPackages: []).localScratchesRemoved == ["Gone"])
-        #expect(Date().timeIntervalSince(try #require(try FileManager.default.attributesOfItem(atPath: stamp.path)[.modificationDate] as? Date)) < 60, "the run stamps its time")
+        #expect(
+            ScratchPrune.run(stores: [], scratchPath: scratch, listedLocalPackages: []).localScratchesRemoved == [
+                "Gone"
+            ]
+        )
+        #expect(
+            Date().timeIntervalSince(
+                try #require(try FileManager.default.attributesOfItem(atPath: stamp.path)[.modificationDate] as? Date)
+            ) < 60,
+            "the run stamps its time",
+        )
     }
 
     /* A scratch used between the plan and the removal stays: its time is asked again first. */
@@ -76,29 +93,46 @@ struct ScratchPruneTests {
     }
 
     static let firstSource = "public struct Gauge { public init() {} }\npublic func reading() -> Int { 1 }\n"
-    static let secondSource = "public struct Gauge { public init() {} }\npublic func reading() -> Int { 1 }\npublic func spare() -> Int { 2 }\n"
+    static let secondSource =
+        "public struct Gauge { public init() {} }\npublic func reading() -> Int { 1 }\npublic func spare() -> Int { 2 }\n"
 
     /* A package built, edited so its file declares something new, and built again. */
     static func editedBuild() throws -> (scratch: URL, store: IndexStore, storePath: URL) {
         let root = try makeDirectory("records")
-        let manifest = "// swift-tools-version:6.0\nimport PackageDescription\nlet package = Package(name: \"Gauge\", targets: [.target(name: \"Gauge\")])\n"
+        let manifest =
+            "// swift-tools-version:6.0\nimport PackageDescription\nlet package = Package(name: \"Gauge\", targets: [.target(name: \"Gauge\")])\n"
         try manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
         let source = root.appendingPathComponent("Sources/Gauge/Gauge.swift")
-        try FileManager.default.createDirectory(at: source.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: source.deletingLastPathComponent(),
+            withIntermediateDirectories: true,
+        )
         let scratch = root.appendingPathComponent(".cache/cohere/swift", isDirectory: true)
         let runner = ProcessRunner()
         for text in [firstSource, secondSource] {
             try text.write(to: source, atomically: true, encoding: .utf8)
-            let built = try runner.run("swift", ["build", "--build-system", "swiftbuild", "--scratch-path", scratch.path], in: root)
+            let built = try runner.run(
+                "swift",
+                ["build", "--build-system", "swiftbuild", "--scratch-path", scratch.path],
+                in: root,
+            )
             try #require(built.succeeded, "the fixture package must build: \(built.standardError)")
         }
         let storePath = IndexStore.storePath(scratchPath: scratch)
-        return (scratch, try IndexStore(libraryPath: IndexStore.toolchainLibraryPath(), storePath: storePath), storePath)
+        return (
+            scratch, try IndexStore(libraryPath: IndexStore.toolchainLibraryPath(), storePath: storePath), storePath,
+        )
     }
 
     static func allRecords(_ storePath: URL) -> [URL] {
-        let shards = (try? FileManager.default.contentsOfDirectory(at: storePath.appendingPathComponent("v5/records"), includingPropertiesForKeys: nil)) ?? []
-        return shards.flatMap { (try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)) ?? [] }
+        let shards =
+            (try? FileManager.default.contentsOfDirectory(
+                at: storePath.appendingPathComponent("v5/records"),
+                includingPropertiesForKeys: nil,
+            )) ?? []
+        return shards.flatMap {
+            (try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)) ?? []
+        }
     }
 
     @Test func aRecordNoUnitNamesGoesOnceAnHourOld() throws {
@@ -114,7 +148,10 @@ struct ScratchPruneTests {
             try Self.age(record, by: 7_200)
         }
         let plan = ScratchPrune.planRecords(store: store, storePath: storePath, now: Date())
-        #expect(Set(plan.records.map(\.lastPathComponent)) == Set(orphans.map(\.lastPathComponent)), "exactly the records no unit names")
+        #expect(
+            Set(plan.records.map(\.lastPathComponent)) == Set(orphans.map(\.lastPathComponent)),
+            "exactly the records no unit names",
+        )
 
         let descriptions = scratch.appendingPathComponent("out/Intermediates.noindex/XCBuildData", isDirectory: true)
         let before = try FileManager.default.contentsOfDirectory(atPath: descriptions.path).sorted()
@@ -123,7 +160,10 @@ struct ScratchPruneTests {
         #expect(removed.bytes > 0)
         let remaining = Set(Self.allRecords(storePath).map(\.lastPathComponent))
         #expect(named.isSubset(of: remaining), "every record a unit names stays")
-        #expect(try FileManager.default.contentsOfDirectory(atPath: descriptions.path).sorted() == before, "build descriptions are the build system's to keep")
+        #expect(
+            try FileManager.default.contentsOfDirectory(atPath: descriptions.path).sorted() == before,
+            "build descriptions are the build system's to keep",
+        )
     }
 
     /* A unit written after the plan means a build is writing into the store: nothing goes. */

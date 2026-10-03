@@ -72,14 +72,17 @@ public struct UnhandledThrowingTask: TypedFileRule {
         let visitor = Visitor(viewMode: .sourceAccurate)
         visitor.walk(file.tree)
         return visitor.found.filter { candidate in
-            let starts = Self.references(at: candidate.starter, in: file, symbols: symbols).contains { Self.startsThrowingTask($0.symbol) }
+            let starts = Self.references(at: candidate.starter, in: file, symbols: symbols).contains {
+                Self.startsThrowingTask($0.symbol)
+            }
             return starts && !Self.isBuilderComponent(candidate.call, in: file, symbols: symbols)
         }.map { candidate in
             file.finding(
                 at: candidate.call.calledExpression,
                 rule: name,
                 messageId: "unhandledThrowingTask",
-                message: "This task's closure can throw, and nothing reads the task's result, so any error it throws is dropped without a trace. Catch the error inside the task with do and catch, or keep the task and read its value with try await."
+                message:
+                    "This task's closure can throw, and nothing reads the task's result, so any error it throws is dropped without a trace. Catch the error inside the task with do and catch, or keep the task and read its value with try await.",
             )
         }
     }
@@ -92,9 +95,15 @@ public struct UnhandledThrowingTask: TypedFileRule {
     }
 
     /* The written references the compiler recorded at this token. */
-    static func references(at token: TokenSyntax, in file: ParsedFile, symbols: FileSymbols) -> [FileSymbols.Occurrence] {
+    static func references(
+        at token: TokenSyntax,
+        in file: ParsedFile,
+        symbols: FileSymbols,
+    ) -> [FileSymbols.Occurrence] {
         let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
-        return symbols.occurrences(line: location.line, column: location.column).filter { $0.isReference && !$0.isImplicit }
+        return symbols.occurrences(line: location.line, column: location.column).filter {
+            $0.isReference && !$0.isImplicit
+        }
     }
 
     /*
@@ -106,7 +115,11 @@ public struct UnhandledThrowingTask: TypedFileRule {
      closure or function, marks a builder's body.
      */
     static func isBuilderComponent(_ call: FunctionCallExprSyntax, in file: ParsedFile, symbols: FileSymbols) -> Bool {
-        if let first = call.firstToken(viewMode: .sourceAccurate), references(at: first, in: file, symbols: symbols).contains(where: { !$0.symbol.hasPrefix("s:ScT") && !$0.symbol.hasPrefix("c:@M@") }) {
+        if let first = call.firstToken(viewMode: .sourceAccurate),
+            references(at: first, in: file, symbols: symbols).contains(where: {
+                !$0.symbol.hasPrefix("s:ScT") && !$0.symbol.hasPrefix("c:@M@")
+            })
+        {
             return true
         }
         var node = call.parent
@@ -116,13 +129,20 @@ public struct UnhandledThrowingTask: TypedFileRule {
             if let closure = current.as(ClosureExprSyntax.self) {
                 brace = closure.leftBrace
                 isBoundary = true
-            } else if let accessors = current.as(AccessorBlockSyntax.self) {
+            }
+            else if let accessors = current.as(AccessorBlockSyntax.self) {
                 brace = accessors.leftBrace
                 isBoundary = true
-            } else if let block = current.as(CodeBlockSyntax.self) {
+            }
+            else if let block = current.as(CodeBlockSyntax.self) {
                 brace = block.leftBrace
-                isBoundary = block.parent.map { $0.is(FunctionDeclSyntax.self) || $0.is(AccessorDeclSyntax.self) || $0.is(InitializerDeclSyntax.self) || $0.is(DeinitializerDeclSyntax.self) } ?? true
-            } else if let switchExpression = current.as(SwitchExprSyntax.self) {
+                isBoundary =
+                    block.parent.map {
+                        $0.is(FunctionDeclSyntax.self) || $0.is(AccessorDeclSyntax.self)
+                            || $0.is(InitializerDeclSyntax.self) || $0.is(DeinitializerDeclSyntax.self)
+                    } ?? true
+            }
+            else if let switchExpression = current.as(SwitchExprSyntax.self) {
                 brace = switchExpression.leftBrace
             }
             if let brace, !references(at: brace, in: file, symbols: symbols).isEmpty {
@@ -147,7 +167,9 @@ public struct UnhandledThrowingTask: TypedFileRule {
         private(set) var found: [Candidate] = []
 
         override func visit(_ node: FunctionCallExprSyntax) -> SyntaxVisitorContinueKind {
-            if let starter = Self.starter(node.calledExpression), let item = node.parent?.as(CodeBlockItemSyntax.self), Self.isDropped(item) {
+            if let starter = Self.starter(node.calledExpression), let item = node.parent?.as(CodeBlockItemSyntax.self),
+                Self.isDropped(item)
+            {
                 found.append(Candidate(call: node, starter: starter))
             }
             return .visitChildren
@@ -159,7 +181,9 @@ public struct UnhandledThrowingTask: TypedFileRule {
          for a specialisation whose failure type is written as anything but `_`.
          */
         static func starter(_ called: ExprSyntax) -> TokenSyntax? {
-            if let member = called.as(MemberAccessExprSyntax.self), UnhandledThrowingTask.starterNames.contains(member.declName.baseName.text), let base = member.base {
+            if let member = called.as(MemberAccessExprSyntax.self),
+                UnhandledThrowingTask.starterNames.contains(member.declName.baseName.text), let base = member.base
+            {
                 return taskName(base) == nil ? nil : member.declName.baseName
             }
             return taskName(called)
@@ -169,13 +193,20 @@ public struct UnhandledThrowingTask: TypedFileRule {
         static func taskName(_ expression: ExprSyntax) -> TokenSyntax? {
             var named = expression
             if let specialized = expression.as(GenericSpecializationExprSyntax.self) {
-                guard specialized.genericArgumentClause.arguments.last?.argument.as(IdentifierTypeSyntax.self)?.name.text == "_" else { return nil }
+                guard
+                    specialized.genericArgumentClause.arguments.last?.argument.as(IdentifierTypeSyntax.self)?.name.text
+                        == "_"
+                else { return nil }
                 named = specialized.expression
             }
-            if let reference = named.as(DeclReferenceExprSyntax.self), reference.baseName.text == "Task", reference.argumentNames == nil {
+            if let reference = named.as(DeclReferenceExprSyntax.self), reference.baseName.text == "Task",
+                reference.argumentNames == nil
+            {
                 return reference.baseName
             }
-            if let member = named.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "Task", member.base?.as(DeclReferenceExprSyntax.self)?.baseName.text == "_Concurrency" {
+            if let member = named.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "Task",
+                member.base?.as(DeclReferenceExprSyntax.self)?.baseName.text == "_Concurrency"
+            {
                 return member.declName.baseName
             }
             return nil
@@ -190,7 +221,9 @@ public struct UnhandledThrowingTask: TypedFileRule {
          a function returning a value, the value may be returned, and this is not judged dropped.
          */
         static func isDropped(_ item: CodeBlockItemSyntax) -> Bool {
-            guard let list = item.parent?.as(CodeBlockItemListSyntax.self), let owner = list.parent else { return false }
+            guard let list = item.parent?.as(CodeBlockItemListSyntax.self), let owner = list.parent else {
+                return false
+            }
             if list.count > 1 || owner.is(SourceFileSyntax.self) {
                 return true
             }
@@ -198,7 +231,9 @@ public struct UnhandledThrowingTask: TypedFileRule {
                 return closure.signature?.returnClause.map { isVoid($0.type) } ?? false
             }
             if let switchCase = owner.as(SwitchCaseSyntax.self) {
-                return switchCase.parent?.parent?.as(SwitchExprSyntax.self).map { isDropped(expression: ExprSyntax($0)) } ?? false
+                return switchCase.parent?.parent?.as(SwitchExprSyntax.self).map {
+                    isDropped(expression: ExprSyntax($0))
+                } ?? false
             }
             if let clause = owner.as(IfConfigClauseSyntax.self) {
                 return clause.parent?.parent?.parent?.as(CodeBlockItemSyntax.self).map(isDropped) ?? false
@@ -213,9 +248,12 @@ public struct UnhandledThrowingTask: TypedFileRule {
             if let conditional = blockOwner.as(IfExprSyntax.self) {
                 return isDropped(expression: ExprSyntax(conditional))
             }
-            return blockOwner.is(InitializerDeclSyntax.self) || blockOwner.is(DeinitializerDeclSyntax.self) || blockOwner.is(DoStmtSyntax.self)
-                || blockOwner.is(CatchClauseSyntax.self) || blockOwner.is(ForStmtSyntax.self) || blockOwner.is(WhileStmtSyntax.self)
-                || blockOwner.is(RepeatStmtSyntax.self) || blockOwner.is(GuardStmtSyntax.self) || blockOwner.is(DeferStmtSyntax.self)
+            return blockOwner.is(InitializerDeclSyntax.self) || blockOwner.is(DeinitializerDeclSyntax.self)
+                || blockOwner.is(DoStmtSyntax.self)
+                || blockOwner.is(CatchClauseSyntax.self) || blockOwner.is(ForStmtSyntax.self)
+                || blockOwner.is(WhileStmtSyntax.self)
+                || blockOwner.is(RepeatStmtSyntax.self) || blockOwner.is(GuardStmtSyntax.self)
+                || blockOwner.is(DeferStmtSyntax.self)
         }
 
         /* An `if` or `switch` (through any `else if` above it) whose own value goes nowhere: a statement that is dropped. */

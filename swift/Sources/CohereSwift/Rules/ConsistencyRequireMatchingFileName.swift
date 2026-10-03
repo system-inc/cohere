@@ -53,39 +53,52 @@ public struct ConsistencyRequireMatchingFileName: FileRule {
         let primary = declarations.primary(stem: stem)
         /* A visible extension the file is named for: the face of a `Type+Purpose.swift` file. */
         let hasPurposeFace = declarations.extensions.contains { other in
-            Self.isPurposeFile(stem: stem, for: other.name) && !(other.extensionDeclaration.map(Self.isFilePrivate) ?? false)
+            Self.isPurposeFile(stem: stem, for: other.name)
+                && !(other.extensionDeclaration.map(Self.isFilePrivate) ?? false)
         }
         /* Every type here is a helper to that face, so the file is named for the face, not for a helper. */
-        let helpersOnly = hasPurposeFace && !declarations.types.isEmpty
+        let helpersOnly =
+            hasPurposeFace && !declarations.types.isEmpty
             && declarations.types.allSatisfy { Self.isHelper($0, declarations: declarations, in: file) }
         if let declared = primary, declared.name != stem, !helpersOnly {
-            findings.append(file.finding(
-                at: declared.token,
-                rule: name,
-                messageId: "fileNotNamedForType",
-                message: "This file is \(stem).swift and declares \(declared.name). Name it \(declared.name).swift, so a reader looking for \(declared.name) opens it without a search."
-            ))
+            findings.append(
+                file.finding(
+                    at: declared.token,
+                    rule: name,
+                    messageId: "fileNotNamedForType",
+                    message:
+                        "This file is \(stem).swift and declares \(declared.name). Name it \(declared.name).swift, so a reader looking for \(declared.name) opens it without a search.",
+                )
+            )
         }
 
         let declaredName = helpersOnly ? nil : primary?.name
         let helperNames = helpersOnly ? Set(declarations.types.map(\.name)) : []
         /* The file has a public face: a type it declares, or a visible extension it is named for. A file-private helper may sit beside either. */
         let anchored = declaredName != nil || hasPurposeFace
-        for extended in declarations.extensions where extended.name != declaredName && !helperNames.contains(extended.name) {
+        for extended in declarations.extensions
+        where extended.name != declaredName && !helperNames.contains(extended.name) {
             if Self.isPurposeFile(stem: stem, for: extended.name) {
                 continue
             }
             if let declaration = extended.extensionDeclaration, anchored, Self.isFilePrivate(declaration) {
                 continue
             }
-            if let declaredName, let declaration = extended.extensionDeclaration, Self.everyMemberNames(declaredName, in: declaration) {
+            if let declaredName, let declaration = extended.extensionDeclaration,
+                Self.everyMemberNames(declaredName, in: declaration)
+            {
                 continue
             }
-            let suggestion = "\(extended.name.split(separator: ".").first.map(String.init) ?? extended.name)+Purpose.swift"
-            let message = declaredName.map {
-                "An extension of \(extended.name) in the file for \($0). Extensions of another type belong in that type's own file, such as \(suggestion), so everything added to \(extended.name) is found together."
-            } ?? "This file is \(stem).swift and extends \(extended.name). Name it \(suggestion) after what it adds, so everything added to \(extended.name) is found together."
-            findings.append(file.finding(at: extended.token, rule: name, messageId: "extensionOutsideItsFile", message: message))
+            let suggestion =
+                "\(extended.name.split(separator: ".").first.map(String.init) ?? extended.name)+Purpose.swift"
+            let message =
+                declaredName.map {
+                    "An extension of \(extended.name) in the file for \($0). Extensions of another type belong in that type's own file, such as \(suggestion), so everything added to \(extended.name) is found together."
+                }
+                ?? "This file is \(stem).swift and extends \(extended.name). Name it \(suggestion) after what it adds, so everything added to \(extended.name) is found together."
+            findings.append(
+                file.finding(at: extended.token, rule: name, messageId: "extensionOutsideItsFile", message: message)
+            )
         }
         return findings
     }
@@ -94,15 +107,23 @@ public struct ConsistencyRequireMatchingFileName: FileRule {
     static let smallValueTypeLines = 30
 
     /* A type that may sit beside the extension a `Type+Purpose.swift` file is named for: private or fileprivate of any size, or a struct or enum of at most `smallValueTypeLines`. */
-    static func isHelper(_ type: TopLevelDeclarations.Entry, declarations: TopLevelDeclarations, in file: ParsedFile) -> Bool {
+    static func isHelper(
+        _ type: TopLevelDeclarations.Entry,
+        declarations: TopLevelDeclarations,
+        in file: ParsedFile,
+    ) -> Bool {
         guard let declaration = type.token.parent.flatMap({ DeclSyntax($0) }) else { return false }
         if let modifiers = declaration.asProtocol((any WithModifiersSyntax).self)?.modifiers,
-            modifiers.contains(where: { $0.name.tokenKind == .keyword(.private) || $0.name.tokenKind == .keyword(.fileprivate) })
+            modifiers.contains(where: {
+                $0.name.tokenKind == .keyword(.private) || $0.name.tokenKind == .keyword(.fileprivate)
+            })
         {
             return true
         }
         guard declaration.is(StructDeclSyntax.self) || declaration.is(EnumDeclSyntax.self) else { return false }
-        let lines = lineCount(of: declaration, in: file) + declarations.extensions
+        let lines =
+            lineCount(of: declaration, in: file)
+            + declarations.extensions
             .filter { $0.name == type.name }
             .compactMap(\.extensionDeclaration)
             .map { lineCount(of: DeclSyntax($0), in: file) }
@@ -124,16 +145,16 @@ public struct ConsistencyRequireMatchingFileName: FileRule {
         var lineBreaks = 0
         for piece in firstToken.leadingTrivia {
             switch piece {
-            case .newlines(let count), .carriageReturns(let count), .carriageReturnLineFeeds(let count):
-                lineBreaks += count
-                if lineBreaks > 1 {
-                    attachedComment = nil
-                }
-            default:
-                if piece.isComment {
-                    attachedComment = attachedComment ?? position
-                    lineBreaks = 0
-                }
+                case .newlines(let count), .carriageReturns(let count), .carriageReturnLineFeeds(let count):
+                    lineBreaks += count
+                    if lineBreaks > 1 {
+                        attachedComment = nil
+                    }
+                default:
+                    if piece.isComment {
+                        attachedComment = attachedComment ?? position
+                        lineBreaks = 0
+                    }
             }
             position = position.advanced(by: piece.sourceLength.utf8Length)
         }
@@ -146,7 +167,9 @@ public struct ConsistencyRequireMatchingFileName: FileRule {
     }
 
     static func isFilePrivate(_ declaration: ExtensionDeclSyntax) -> Bool {
-        declaration.modifiers.contains { $0.name.tokenKind == .keyword(.private) || $0.name.tokenKind == .keyword(.fileprivate) }
+        declaration.modifiers.contains {
+            $0.name.tokenKind == .keyword(.private) || $0.name.tokenKind == .keyword(.fileprivate)
+        }
     }
 
     /* Every member mentions the type by name, in its signature or its body: the extension exists to expose that type. */

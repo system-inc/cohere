@@ -49,7 +49,8 @@ public struct IdenticalOperands: FileRule {
                 at: comparison,
                 rule: name,
                 messageId: "identicalOperands",
-                message: "Both sides of this comparison are the same expression, so it can only ever give one answer and one side is probably a typo. Compare against the value you meant. If this checks for NaN, write value.isNaN instead."
+                message:
+                    "Both sides of this comparison are the same expression, so it can only ever give one answer and one side is probably a typo. Compare against the value you meant. If this checks for NaN, write value.isNaN instead.",
             )
         }
     }

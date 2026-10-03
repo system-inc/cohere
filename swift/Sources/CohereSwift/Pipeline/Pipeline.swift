@@ -22,7 +22,12 @@ public struct Pipeline {
     private let workingDirectory: URL
     private let runner: ProcessRunner
 
-    public init(options: CommandOptions, writer: ContractWriter, workingDirectory: URL, runner: ProcessRunner = ProcessRunner()) {
+    public init(
+        options: CommandOptions,
+        writer: ContractWriter,
+        workingDirectory: URL,
+        runner: ProcessRunner = ProcessRunner(),
+    ) {
         self.options = options
         self.writer = writer
         self.workingDirectory = workingDirectory
@@ -41,7 +46,10 @@ public struct Pipeline {
             return 0
         }
 
-        let configuration = try RuleConfiguration.load(packageRoot: options.root ?? workingDirectory, explicitPath: options.lintConfiguration)
+        let configuration = try RuleConfiguration.load(
+            packageRoot: options.root ?? workingDirectory,
+            explicitPath: options.lintConfiguration,
+        )
         if options.listRules || options.listRulesEnabled {
             for name in RuleRegistry.allNames {
                 let severity = configuration.severity(of: name)
@@ -67,18 +75,29 @@ public struct Pipeline {
          nothing, and its rule list holds an empty vocabulary that is never consulted.
          */
         var vocabulary = AbbreviationVocabulary()
-        if configuration.severity(of: ConsistencyNoAbbreviatedIdentifier.ruleName) != .off && (options.runFix || options.runLint) {
+        if configuration.severity(of: ConsistencyNoAbbreviatedIdentifier.ruleName) != .off
+            && (options.runFix || options.runLint)
+        {
             let vocabularyFile = options.abbreviations ?? AbbreviationVocabulary.defaultFile
             do {
                 vocabulary = try AbbreviationVocabulary.load(contentsOf: vocabularyFile)
-            } catch {
-                throw RunFailure(description: "the naming rules read their words from \(vocabularyFile.path), and it could not be loaded, so nothing was checked: \(error)")
+            }
+            catch {
+                throw RunFailure(
+                    description:
+                        "the naming rules read their words from \(vocabularyFile.path), and it could not be loaded, so nothing was checked: \(error)"
+                )
             }
         }
         let fileRules = RuleRegistry.fileRules(vocabulary: vocabulary)
 
         let describeStart = Date()
-        let package = try PackageModel.load(root: root, scratchPath: Self.scratchPath(for: root), runner: runner, toolchain: toolchain)
+        let package = try PackageModel.load(
+            root: root,
+            scratchPath: Self.scratchPath(for: root),
+            runner: runner,
+            toolchain: toolchain,
+        )
         let fileSet = try FileSet.build(package: package)
         let scope = try FileScope.resolve(options: options, fileSet: fileSet, workingDirectory: workingDirectory)
         /*
@@ -86,14 +105,24 @@ public struct Pipeline {
          leftover Prettier config refuses a TypeScript run: Swift has one house format, and a file still there is
          one that `Format.sh` or an editor reads and cohere never will.
          */
-        let leftovers = HouseSwiftFormat.leftoverConfigurationFiles(above: fileSet.owned.map(\.url), boundary: repositoryRoot(of: root))
+        let leftovers = HouseSwiftFormat.leftoverConfigurationFiles(
+            above: fileSet.owned.map(\.url),
+            boundary: repositoryRoot(of: root),
+        )
         guard leftovers.isEmpty else {
             throw RunFailure(description: leftovers.map(HouseSwiftFormat.refusal(of:)).joined(separator: "\n"))
         }
         if !fileSet.note.isEmpty {
             FileHandle.standardError.write(Data("note: \(fileSet.note)\n".utf8))
         }
-        try writer.write(projectRecord(package: package, fileSet: fileSet, scope: scope, elapsed: Self.milliseconds(since: describeStart)))
+        try writer.write(
+            projectRecord(
+                package: package,
+                fileSet: fileSet,
+                scope: scope,
+                elapsed: Self.milliseconds(since: describeStart),
+            )
+        )
 
         var complete = true
 
@@ -115,19 +144,25 @@ public struct Pipeline {
 
         if !options.runFix {
             try writer.write(PhaseRecord(name: .fix, outcome: .skipped, detail: "not requested"))
-        } else if filesThatDoNotParse > 0 {
+        }
+        else if filesThatDoNotParse > 0 {
             /* Nothing is rewritten in a run where any file does not parse: the bail below says why, and the fix line says nothing moved. */
-            try writer.write(fixRecord(
-                scope: scope,
-                considered: parsed.files.count,
-                rewritten: 0,
-                fixesApplied: 0,
-                refusals: [:],
-                reformatted: 0,
-                notFormatted: ["a file in scope does not parse, so nothing was rewritten": parsed.files.count]
-            ))
-            try writer.write(PhaseRecord(name: .fix, outcome: .ran, elapsedMilliseconds: Self.milliseconds(since: fixStart)))
-        } else {
+            try writer.write(
+                fixRecord(
+                    scope: scope,
+                    considered: parsed.files.count,
+                    rewritten: 0,
+                    fixesApplied: 0,
+                    refusals: [:],
+                    reformatted: 0,
+                    notFormatted: ["a file in scope does not parse, so nothing was rewritten": parsed.files.count],
+                )
+            )
+            try writer.write(
+                PhaseRecord(name: .fix, outcome: .ran, elapsedMilliseconds: Self.milliseconds(since: fixStart))
+            )
+        }
+        else {
             /*
              Fixers first, then the formatter over the fixed text, so the formatter has the last word on layout
              and a fixer's output is always formatted. Under `--no-fix` nothing is fixed: the fixable findings
@@ -161,7 +196,10 @@ public struct Pipeline {
                     return result.file
                 }
             }
-            let originals = Dictionary(parsed.files.map { ($0.url.path, $0.source) }, uniquingKeysWith: { first, _ in first })
+            let originals = Dictionary(
+                parsed.files.map { ($0.url.path, $0.source) },
+                uniquingKeysWith: { first, _ in first },
+            )
             let formatting = await FormatPhase().run(toFormat)
             var rewritten: [FileSet.OwnedFile] = []
             var reformatted = 0
@@ -169,29 +207,32 @@ public struct Pipeline {
             for (file, outcome) in formatting.outcomes {
                 var final = file.source
                 switch outcome {
-                case .unchanged:
-                    break
-                case let .changed(formatted):
-                    if options.mutate {
-                        final = formatted
-                        reformatted += 1
-                    } else {
-                        /* `--no-fix` writes nothing and reports what it would have changed, one finding per file, at the first line that moves. */
-                        let line = FormatPhase.firstDifferingLine(file.source, formatted)
-                        try writer.write(FindingRecord(
-                            source: .format,
-                            file: file.url.path,
-                            line: line,
-                            column: 1,
-                            severity: .error,
-                            rule: "cohere-swift/consistency-require-formatting",
-                            messageId: "notFormatted",
-                            message: "not formatted the house way; a run without --no-fix rewrites it"
-                        ))
-                    }
-                case let .failed(reason):
-                    notFormatted["the formatter failed: \(reason)", default: 0] += 1
-                    complete = false
+                    case .unchanged:
+                        break
+                    case let .changed(formatted):
+                        if options.mutate {
+                            final = formatted
+                            reformatted += 1
+                        }
+                        else {
+                            /* `--no-fix` writes nothing and reports what it would have changed, one finding per file, at the first line that moves. */
+                            let line = FormatPhase.firstDifferingLine(file.source, formatted)
+                            try writer.write(
+                                FindingRecord(
+                                    source: .format,
+                                    file: file.url.path,
+                                    line: line,
+                                    column: 1,
+                                    severity: .error,
+                                    rule: "cohere-swift/consistency-require-formatting",
+                                    messageId: "notFormatted",
+                                    message: "not formatted the house way; a run without --no-fix rewrites it",
+                                )
+                            )
+                        }
+                    case let .failed(reason):
+                        notFormatted["the formatter failed: \(reason)", default: 0] += 1
+                        complete = false
                 }
                 /* The fixer walked exactly this text when the formatter left it as the fixer did, so its findings are lint's. */
                 if final == file.source, let found = fixerFindings[file.url.path] {
@@ -200,32 +241,59 @@ public struct Pipeline {
                 /* One write per file, of the fixed and formatted text, and only when it differs from what was read. */
                 if options.mutate, final != originals[file.url.path] {
                     try final.write(to: file.url, atomically: true, encoding: .utf8)
-                    rewritten.append(FileSet.OwnedFile(url: file.url, targetName: file.targetName, targetKind: file.targetKind, packageRoot: file.packageRoot))
+                    rewritten.append(
+                        FileSet.OwnedFile(
+                            url: file.url,
+                            targetName: file.targetName,
+                            targetKind: file.targetKind,
+                            packageRoot: file.packageRoot,
+                        )
+                    )
                 }
             }
             /* Rewritten files are parsed again, so lint reads the text that is on disk now rather than the text that was. */
             if !rewritten.isEmpty {
                 let reparsed = await SourceParser().parse(rewritten)
-                let replacements = Dictionary(reparsed.files.map { ($0.url.path, $0) }, uniquingKeysWith: { first, _ in first })
+                let replacements = Dictionary(
+                    reparsed.files.map { ($0.url.path, $0) },
+                    uniquingKeysWith: { first, _ in first },
+                )
                 parsed.files = parsed.files.map { replacements[$0.url.path] ?? $0 }
             }
             nothingRewritten = rewritten.isEmpty
-            try writer.write(fixRecord(
-                scope: scope,
-                considered: parsed.files.count,
-                rewritten: rewritten.count,
-                fixesApplied: fixesApplied,
-                refusals: refusals,
-                reformatted: reformatted,
-                notFormatted: notFormatted
-            ))
-            try writer.write(PhaseRecord(name: .fix, outcome: .ran, elapsedMilliseconds: Self.milliseconds(since: fixStart)))
+            try writer.write(
+                fixRecord(
+                    scope: scope,
+                    considered: parsed.files.count,
+                    rewritten: rewritten.count,
+                    fixesApplied: fixesApplied,
+                    refusals: refusals,
+                    reformatted: reformatted,
+                    notFormatted: notFormatted,
+                )
+            )
+            try writer.write(
+                PhaseRecord(name: .fix, outcome: .ran, elapsedMilliseconds: Self.milliseconds(since: fixStart))
+            )
         }
 
         if filesThatDoNotParse > 0 {
-            let reason = "parsing bailed: \(filesThatDoNotParse) files do not parse, and checking a tree the parser could not read reports nonsense"
-            try writer.write(PhaseRecord(name: .types, outcome: options.runTypes ? .notReached : .skipped, detail: options.runTypes ? reason : "not requested"))
-            try writer.write(PhaseRecord(name: .lint, outcome: options.runLint ? .notReached : .skipped, detail: options.runLint ? reason : "not requested"))
+            let reason =
+                "parsing bailed: \(filesThatDoNotParse) files do not parse, and checking a tree the parser could not read reports nonsense"
+            try writer.write(
+                PhaseRecord(
+                    name: .types,
+                    outcome: options.runTypes ? .notReached : .skipped,
+                    detail: options.runTypes ? reason : "not requested",
+                )
+            )
+            try writer.write(
+                PhaseRecord(
+                    name: .lint,
+                    outcome: options.runLint ? .notReached : .skipped,
+                    detail: options.runLint ? reason : "not requested",
+                )
+            )
             try writer.write(unusedPhase(notReached: reason))
             return try writer.finish(complete: false)
         }
@@ -233,7 +301,8 @@ public struct Pipeline {
         var typeErrors = 0
         if !options.runTypes {
             try writer.write(PhaseRecord(name: .types, outcome: .skipped, detail: "not requested"))
-        } else {
+        }
+        else {
             /* The whole package, whatever the scope: a change in one file changes what the rest of its module means. */
             var typesPhase = TypesPhase(
                 package: package,
@@ -241,15 +310,20 @@ public struct Pipeline {
                 scratchPath: Self.scratchPath(for: root),
                 resolutionAllowed: !options.noFix,
                 toolchain: toolchain,
-                runner: runner
+                runner: runner,
             )
-            typesPhase.parsed = Dictionary(parsed.files.map { ($0.url.path, $0.tree) }, uniquingKeysWith: { first, _ in first })
+            typesPhase.parsed = Dictionary(
+                parsed.files.map { ($0.url.path, $0.tree) },
+                uniquingKeysWith: { first, _ in first },
+            )
             let types = try typesPhase.run()
             for finding in types.findings {
                 try writer.write(finding)
             }
             try writer.write(types.record)
-            try writer.write(PhaseRecord(name: .types, outcome: .ran, elapsedMilliseconds: types.record.elapsedMilliseconds))
+            try writer.write(
+                PhaseRecord(name: .types, outcome: .ran, elapsedMilliseconds: types.record.elapsedMilliseconds)
+            )
             if !types.record.filesWithoutRecord.isEmpty {
                 complete = false
             }
@@ -257,24 +331,44 @@ public struct Pipeline {
         }
 
         if typeErrors > 0 && options.runLint {
-            try writer.write(PhaseRecord(name: .lint, outcome: .notReached, detail: "types bailed: \(typeErrors) type errors — lint findings against wrong semantics are noise"))
-            try writer.write(unusedPhase(notReached: "types bailed: \(typeErrors) type errors, and the index of a package that does not compile is not the package"))
+            try writer.write(
+                PhaseRecord(
+                    name: .lint,
+                    outcome: .notReached,
+                    detail: "types bailed: \(typeErrors) type errors — lint findings against wrong semantics are noise",
+                )
+            )
+            try writer.write(
+                unusedPhase(
+                    notReached:
+                        "types bailed: \(typeErrors) type errors, and the index of a package that does not compile is not the package"
+                )
+            )
             return try writer.finish(complete: false)
         }
 
         if !options.runLint {
             try writer.write(PhaseRecord(name: .lint, outcome: .skipped, detail: "not requested"))
-        } else {
+        }
+        else {
             let lintStart = Date()
             var linter = Linter(configuration: configuration, fileRules: fileRules)
             linter.typedRules = RuleRegistry.typedRules
             let typedCandidates = parsed.files.filter { file in
                 RuleRegistry.typedRules.contains { configuration.severity(of: $0.name) != .off && $0.applies(to: file) }
             }
-            var symbolProvider = SymbolProvider(scratchPaths: Self.symbolScratchPaths(package: package, root: root), runner: runner)
+            var symbolProvider = SymbolProvider(
+                scratchPaths: Self.symbolScratchPaths(package: package, root: root),
+                runner: runner,
+            )
             symbolProvider.ownedModules = Self.ownedModules(of: package)
             linter.symbols = symbolProvider.symbols(for: typedCandidates)
-            let lint = await linter.run(package: package, manifests: await manifests(of: package), files: parsed.files, reusable: reusableFindings)
+            let lint = await linter.run(
+                package: package,
+                manifests: await manifests(of: package),
+                files: parsed.files,
+                reusable: reusableFindings,
+            )
             for finding in lint.findings {
                 try writer.write(finding)
             }
@@ -283,14 +377,23 @@ public struct Pipeline {
              because that is what the front door's line says. A run that reused some files and walked others
              still saves the walk, and says it ran.
              */
-            let reusedEverything = nothingRewritten && typedCandidates.isEmpty && !parsed.files.isEmpty && parsed.files.allSatisfy { reusableFindings[$0.url.path] != nil }
+            let reusedEverything =
+                nothingRewritten && typedCandidates.isEmpty && !parsed.files.isEmpty
+                && parsed.files.allSatisfy { reusableFindings[$0.url.path] != nil }
             var record = lint.record
             record.elapsedMilliseconds = Self.milliseconds(since: lintStart)
             record.reusedFrom = reusedEverything ? "fix" : ""
             try writer.write(record)
-            try writer.write(reusedEverything
-                ? PhaseRecord(name: .lint, outcome: .reused, elapsedMilliseconds: record.elapsedMilliseconds, detail: "the fix phase's walk (nothing was rewritten)")
-                : PhaseRecord(name: .lint, outcome: .ran, elapsedMilliseconds: record.elapsedMilliseconds))
+            try writer.write(
+                reusedEverything
+                    ? PhaseRecord(
+                        name: .lint,
+                        outcome: .reused,
+                        elapsedMilliseconds: record.elapsedMilliseconds,
+                        detail: "the fix phase's walk (nothing was rewritten)",
+                    )
+                    : PhaseRecord(name: .lint, outcome: .ran, elapsedMilliseconds: record.elapsedMilliseconds)
+            )
             if !record.crashes.isEmpty {
                 complete = false
             }
@@ -298,7 +401,8 @@ public struct Pipeline {
 
         if options.unused {
             try await runUnused(package: package, root: root, fileSet: fileSet, parsed: parsed.files)
-        } else {
+        }
+        else {
             try writer.write(PhaseRecord(name: .unused, outcome: .skipped, detail: Self.unusedNotRequested))
         }
         return try writer.finish(complete: complete)
@@ -330,12 +434,26 @@ public struct Pipeline {
                 try? IndexStore(libraryPath: library, storePath: IndexStore.storePath(scratchPath: $0))
             }
             demangler = try SwiftDemangler.shared(runner: runner)
-        } catch {
-            try writer.write(PhaseRecord(name: .unused, outcome: .notReached, detail: "the index store or the demangler could not be loaded: \(error)"))
+        }
+        catch {
+            try writer.write(
+                PhaseRecord(
+                    name: .unused,
+                    outcome: .notReached,
+                    detail: "the index store or the demangler could not be loaded: \(error)",
+                )
+            )
             return
         }
         guard !stores.isEmpty else {
-            try writer.write(PhaseRecord(name: .unused, outcome: .notReached, detail: "no build has written an index store for this package yet; a run with the types phase writes one"))
+            try writer.write(
+                PhaseRecord(
+                    name: .unused,
+                    outcome: .notReached,
+                    detail:
+                        "no build has written an index store for this package yet; a run with the types phase writes one",
+                )
+            )
             return
         }
         /* Every file of ours, the out-of-scope ones parsed here: an `@_exported import` anywhere decides what a module re-exports. */
@@ -349,8 +467,9 @@ public struct Pipeline {
             filesChecked: imports.filesChecked,
             filesUnchecked: imports.filesUnchecked,
             checked: imports.importsChecked,
-            skipped: imports.importsExported > 0 ? ["re-exported with @_exported, which is API": imports.importsExported] : [:],
-            since: start
+            skipped: imports.importsExported > 0
+                ? ["re-exported with @_exported, which is API": imports.importsExported] : [:],
+            since: start,
         )
         let declarationsStart = Date()
         let declarations = UnusedDeclarations(stores: stores, package: package).run(files: files)
@@ -361,9 +480,11 @@ public struct Pipeline {
             filesUnchecked: declarations.filesUnchecked,
             checked: declarations.declarationsChecked,
             skipped: declarations.skipped,
-            since: declarationsStart
+            since: declarationsStart,
         )
-        try writer.write(PhaseRecord(name: .unused, outcome: .ran, elapsedMilliseconds: Self.milliseconds(since: start)))
+        try writer.write(
+            PhaseRecord(name: .unused, outcome: .ran, elapsedMilliseconds: Self.milliseconds(since: start))
+        )
     }
 
     /* One rule's part of the unused report: its records in file order, then the coverage record that counts them. */
@@ -374,9 +495,13 @@ public struct Pipeline {
         filesUnchecked: [String: String],
         checked: Int,
         skipped: [String: Int],
-        since start: Date
+        since start: Date,
     ) throws {
-        let ordered = findings.sorted { ($0.finding.file, $0.finding.line, $0.finding.column) < ($1.finding.file, $1.finding.line, $1.finding.column) }
+        let ordered = findings.sorted {
+            ($0.finding.file, $0.finding.line, $0.finding.column) < (
+                $1.finding.file, $1.finding.line, $1.finding.column,
+            )
+        }
         for found in ordered {
             try writer.write(UnusedRecord(found.finding, subject: found.subject))
         }
@@ -384,18 +509,25 @@ public struct Pipeline {
         for reason in filesUnchecked.values {
             notChecked[reason, default: 0] += 1
         }
-        try writer.write(UnusedCoverageRecord(
-            rule: rule,
-            filesChecked: filesChecked,
-            filesNotChecked: notChecked,
-            checked: checked,
-            skipped: skipped,
-            found: ordered.count,
-            elapsedMilliseconds: Self.milliseconds(since: start)
-        ))
+        try writer.write(
+            UnusedCoverageRecord(
+                rule: rule,
+                filesChecked: filesChecked,
+                filesNotChecked: notChecked,
+                checked: checked,
+                skipped: skipped,
+                found: ordered.count,
+                elapsedMilliseconds: Self.milliseconds(since: start),
+            )
+        )
     }
 
-    private func projectRecord(package: PackageModel, fileSet: FileSet, scope: FileScope, elapsed: Int) -> ProjectRecord {
+    private func projectRecord(
+        package: PackageModel,
+        fileSet: FileSet,
+        scope: FileScope,
+        elapsed: Int,
+    ) -> ProjectRecord {
         let counts = Dictionary(grouping: fileSet.owned, by: \.targetName).mapValues(\.count)
         return ProjectRecord(
             root: package.root.path,
@@ -409,10 +541,15 @@ public struct Pipeline {
             targets: package.allPackages.flatMap { member in
                 member.targets.map { target in
                     let name = member.root == package.root ? target.name : "\(member.name)/\(target.name)"
-                    return ProjectRecord.Target(name: name, kind: target.kind, files: counts[target.name] ?? 0, languageMode: target.languageMode)
+                    return ProjectRecord.Target(
+                        name: name,
+                        kind: target.kind,
+                        files: counts[target.name] ?? 0,
+                        languageMode: target.languageMode,
+                    )
                 }
             },
-            excluded: fileSet.excluded
+            excluded: fileSet.excluded,
         )
     }
 
@@ -424,7 +561,7 @@ public struct Pipeline {
         fixesApplied: Int,
         refusals: [String: Int],
         reformatted: Int,
-        notFormatted: [String: Int]
+        notFormatted: [String: Int],
     ) -> FixRecord {
         FixRecord(
             filesConsidered: considered,
@@ -435,7 +572,7 @@ public struct Pipeline {
             filesReformatted: reformatted,
             filesNotFormatted: notFormatted.values.reduce(0, +),
             notFormattedReasons: notFormatted,
-            formatScope: scope.everything ? "every file in the package" : scope.description
+            formatScope: scope.everything ? "every file in the package" : scope.description,
         )
     }
 
@@ -451,21 +588,33 @@ public struct Pipeline {
     /* The modules of every target this package owns, vendored packages left out, spelled as the compiler spells a module: non-identifier characters made `_`. */
     static func ownedModules(of package: PackageModel) -> Set<String> {
         let owned = package.allPackages.filter { $0.root == package.root || !package.isVendored($0) }
-        return Set(owned.flatMap(\.targets).map { target in
-            String(target.name.map { $0.isLetter || $0.isNumber || $0 == "_" ? $0 : "_" })
-        })
+        return Set(
+            owned.flatMap(\.targets).map { target in
+                String(target.name.map { $0.isLetter || $0.isNumber || $0 == "_" ? $0 : "_" })
+            }
+        )
     }
 
     /* Every scratch a build of this package writes an index store into: the root's, and each local package's that the types phase builds for its tests. */
     static func symbolScratchPaths(package: PackageModel, root: URL) -> [URL] {
         let scratch = Self.scratchPath(for: root)
-        return [scratch] + package.localPackages.map { scratch.appendingPathComponent("local/\($0.root.lastPathComponent)", isDirectory: true) }
+        return [scratch]
+            + package.localPackages.map {
+                scratch.appendingPathComponent("local/\($0.root.lastPathComponent)", isDirectory: true)
+            }
     }
 
     /* Each owned package's manifest, parsed, so package rules can point at the line that would fix them. A manifest that cannot be read is absent, and its findings point at line 1. */
     private func manifests(of package: PackageModel) async -> [String: ParsedFile] {
         let owned = package.allPackages.filter { $0.root == package.root || !package.isVendored($0) }
-        let files = owned.map { FileSet.OwnedFile(url: $0.root.appendingPathComponent("Package.swift"), targetName: $0.root.path, targetKind: "manifest", packageRoot: $0.root) }
+        let files = owned.map {
+            FileSet.OwnedFile(
+                url: $0.root.appendingPathComponent("Package.swift"),
+                targetName: $0.root.path,
+                targetKind: "manifest",
+                packageRoot: $0.root,
+            )
+        }
         let result = await SourceParser().parse(files)
         return Dictionary(result.files.map { ($0.targetName, $0) }, uniquingKeysWith: { first, _ in first })
     }

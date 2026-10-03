@@ -26,12 +26,12 @@ public struct ConsistencyNoPrint: FileRule {
 
     public func applies(to file: ParsedFile) -> Bool {
         switch file.targetKind {
-        case "test", "manifest", "plugin", "macro":
-            return false
-        case "executable":
-            return false
-        default:
-            return true
+            case "test", "manifest", "plugin", "macro":
+                return false
+            case "executable":
+                return false
+            default:
+                return true
         }
     }
 
@@ -44,7 +44,8 @@ public struct ConsistencyNoPrint: FileRule {
                 at: call,
                 rule: name,
                 messageId: "print",
-                message: "print in \(kind) writes to a stdout nobody reads. Log through os.Logger, so the message lands in the unified log with a subsystem, a category and a level."
+                message:
+                    "print in \(kind) writes to a stdout nobody reads. Log through os.Logger, so the message lands in the unified log with a subsystem, a category and a level.",
             )
         }
     }

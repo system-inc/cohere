@@ -47,7 +47,8 @@ struct ConformanceGraph {
             for unit in store.units() where !unit.isSystem && !unit.module.isEmpty {
                 compiledModules.insert(unit.module)
             }
-            for unit in store.units() where unit.isSystem && !unit.module.isEmpty && unit.outputFile.hasSuffix(".swiftinterface") {
+            for unit in store.units()
+            where unit.isSystem && !unit.module.isEmpty && unit.outputFile.hasSuffix(".swiftinterface") {
                 moduleImports[unit.module, default: []].formUnion(unit.importedModules)
                 for record in unit.allRecords where seen.insert(record).inserted {
                     moduleRecords[unit.module, default: []].append((store, record))
@@ -85,13 +86,13 @@ struct ConformanceGraph {
                     return .codable
                 }
                 switch kind(of: parent) {
-                case IndexStore.protocolKind, IndexStore.classKind:
-                    queue.append(parent)
-                case nil, IndexStore.typeAliasKind:
-                    unseen = true
-                default:
-                    /* A struct or an enum, which an inheritance clause names only as an enum's raw type: it adds no conformance of the type's. */
-                    break
+                    case IndexStore.protocolKind, IndexStore.classKind:
+                        queue.append(parent)
+                    case nil, IndexStore.typeAliasKind:
+                        unseen = true
+                    default:
+                        /* A struct or an enum, which an inheritance clause names only as an enum's raw type: it adds no conformance of the type's. */
+                        break
                 }
             }
         }
@@ -107,7 +108,8 @@ struct ConformanceGraph {
         var found: Set<String> = []
         var queue = [type]
         while let node = queue.popLast() {
-            for parent in (parents[node] ?? []).union((extensions[node] ?? []).flatMap { parents[$0] ?? [] }) where found.insert(parent).inserted {
+            for parent in (parents[node] ?? []).union((extensions[node] ?? []).flatMap { parents[$0] ?? [] })
+            where found.insert(parent).inserted {
                 queue.append(parent)
             }
         }

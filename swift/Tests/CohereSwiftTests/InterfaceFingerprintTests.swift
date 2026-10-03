@@ -18,16 +18,25 @@ struct InterfaceFingerprintTests {
     }
 
     @Test func aFunctionBodyIsInvisible() {
-        #expect(Self.same("func count() -> Int {\n    1\n}\n", "func count() -> Int {\n    let two = 2\n    return two\n}\n"))
+        #expect(
+            Self.same(
+                "func count() -> Int {\n    1\n}\n",
+                "func count() -> Int {\n    let two = 2\n    return two\n}\n",
+            )
+        )
     }
 
     @Test func commentsAndLayoutAreInvisible() {
-        #expect(Self.same("struct Shape { var sides: Int }\n", "/* A shape. */\nstruct Shape {\n    var sides: Int\n}\n"))
+        #expect(
+            Self.same("struct Shape { var sides: Int }\n", "/* A shape. */\nstruct Shape {\n    var sides: Int\n}\n")
+        )
     }
 
     @Test func initializerDeinitializerAndObserverBodiesAreInvisible() {
-        let before = "final class Box {\n    var size = 0 { didSet { print(1) } }\n    init() { size = 1 }\n    deinit { print(2) }\n}\n"
-        let after = "final class Box {\n    var size = 0 { didSet { print(3) } }\n    init() { size = 4 }\n    deinit { print(5) }\n}\n"
+        let before =
+            "final class Box {\n    var size = 0 { didSet { print(1) } }\n    init() { size = 1 }\n    deinit { print(2) }\n}\n"
+        let after =
+            "final class Box {\n    var size = 0 { didSet { print(3) } }\n    init() { size = 4 }\n    deinit { print(5) }\n}\n"
         #expect(Self.same(before, after))
     }
 
@@ -57,7 +66,12 @@ struct InterfaceFingerprintTests {
     }
 
     @Test func gainingABodyIsVisible() {
-        #expect(!Self.same("protocol Shape {\n    func area() -> Double\n}\n", "protocol Shape {\n    func area() -> Double {}\n}\n"))
+        #expect(
+            !Self.same(
+                "protocol Shape {\n    func area() -> Double\n}\n",
+                "protocol Shape {\n    func area() -> Double {}\n}\n",
+            )
+        )
     }
 
     @Test func anAttributeIsVisible() {

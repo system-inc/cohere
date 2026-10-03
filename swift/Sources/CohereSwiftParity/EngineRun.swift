@@ -10,7 +10,10 @@ struct EngineRun {
     let root: URL
 
     func findings() async throws -> [RuleFinding] {
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix", "--lint"], workingDirectory: root)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix", "--lint"],
+            workingDirectory: root,
+        )
         var stream = Data()
         let writer = ContractWriter { stream.append($0) }
         _ = try await Pipeline(options: options, writer: writer, workingDirectory: root).run()
@@ -22,7 +25,14 @@ struct EngineRun {
             let object = try JSONSerialization.jsonObject(with: Data(line)) as? [String: Any]
             guard object?["kind"] as? String == "finding" else { continue }
             let record = try decoder.decode(FindingRecord.self, from: Data(line))
-            findings.append(RuleFinding(file: PackagePath.relative(record.file, to: root), line: record.line, rule: record.rule, messageId: record.messageId))
+            findings.append(
+                RuleFinding(
+                    file: PackagePath.relative(record.file, to: root),
+                    line: record.line,
+                    rule: record.rule,
+                    messageId: record.messageId,
+                )
+            )
         }
         return findings
     }

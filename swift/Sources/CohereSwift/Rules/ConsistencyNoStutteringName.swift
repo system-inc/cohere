@@ -56,7 +56,9 @@ public struct ConsistencyNoStutteringName: FileRule {
      The words that count as saying nothing when they stutter: the Go rule's `defaultGenericNames`, kept short
      on purpose because these already read as placeholders everywhere.
      */
-    static let genericNames: Set<String> = ["outcome", "result", "data", "value", "output", "response", "state", "item", "thing"]
+    static let genericNames: Set<String> = [
+        "outcome", "result", "data", "value", "output", "response", "state", "item", "thing",
+    ]
 
     public init() {}
 
@@ -69,7 +71,8 @@ public struct ConsistencyNoStutteringName: FileRule {
                 at: member,
                 rule: name,
                 messageId: "stutteringName",
-                message: "\"\(word).\(word)\" stutters, which means the name is carrying nothing: it repeats the field instead of saying which \(word) this is. Rename the value for what it holds, the type it came back as or whatever distinguishes it from another \(word) in this scope, so a reader forty lines down does not have to find the declaration."
+                message:
+                    "\"\(word).\(word)\" stutters, which means the name is carrying nothing: it repeats the field instead of saying which \(word) this is. Rename the value for what it holds, the type it came back as or whatever distinguishes it from another \(word) in this scope, so a reader forty lines down does not have to find the declaration.",
             )
         }
     }
@@ -91,7 +94,9 @@ public struct ConsistencyNoStutteringName: FileRule {
                 case .identifier = node.declName.baseName.tokenKind
             else { return .visitChildren }
             let word = ConsistencyNoStutteringName.spelling(base.baseName)
-            guard word == ConsistencyNoStutteringName.spelling(node.declName.baseName), ConsistencyNoStutteringName.genericNames.contains(word) else {
+            guard word == ConsistencyNoStutteringName.spelling(node.declName.baseName),
+                ConsistencyNoStutteringName.genericNames.contains(word)
+            else {
                 return .visitChildren
             }
             if Resolution.isChosenHere(word, from: Syntax(base)) {
@@ -129,17 +134,18 @@ public struct ConsistencyNoStutteringName: FileRule {
             var child = reference
             while let scope = child.parent {
                 if scope.is(StructDeclSyntax.self) || scope.is(ClassDeclSyntax.self) || scope.is(EnumDeclSyntax.self)
-                    || scope.is(ActorDeclSyntax.self) || scope.is(ExtensionDeclSyntax.self) || scope.is(ProtocolDeclSyntax.self)
+                    || scope.is(ActorDeclSyntax.self) || scope.is(ExtensionDeclSyntax.self)
+                    || scope.is(ProtocolDeclSyntax.self)
                 {
                     return false
                 }
                 switch verdict(of: scope, for: word, reachedThrough: child) {
-                case .chosenHere:
-                    return true
-                case .dictated:
-                    return false
-                case .notDeclared:
-                    child = scope
+                    case .chosenHere:
+                        return true
+                    case .dictated:
+                        return false
+                    case .notDeclared:
+                        child = scope
                 }
             }
             return false
@@ -157,16 +163,31 @@ public struct ConsistencyNoStutteringName: FileRule {
                 return closureDeclares(closure, word)
             }
             if let function = scope.as(FunctionDeclSyntax.self), child.id == function.body?.id {
-                return parameters(function.signature.parameterClause.parameters, declare: word, overriding: isOverride(function.modifiers))
+                return parameters(
+                    function.signature.parameterClause.parameters,
+                    declare: word,
+                    overriding: isOverride(function.modifiers),
+                )
             }
             if let initializer = scope.as(InitializerDeclSyntax.self), child.id == initializer.body?.id {
-                return parameters(initializer.signature.parameterClause.parameters, declare: word, overriding: isOverride(initializer.modifiers))
+                return parameters(
+                    initializer.signature.parameterClause.parameters,
+                    declare: word,
+                    overriding: isOverride(initializer.modifiers),
+                )
             }
-            if let subscriptDeclaration = scope.as(SubscriptDeclSyntax.self), child.id == subscriptDeclaration.accessorBlock?.id {
-                return parameters(subscriptDeclaration.parameterClause.parameters, declare: word, overriding: isOverride(subscriptDeclaration.modifiers))
+            if let subscriptDeclaration = scope.as(SubscriptDeclSyntax.self),
+                child.id == subscriptDeclaration.accessorBlock?.id
+            {
+                return parameters(
+                    subscriptDeclaration.parameterClause.parameters,
+                    declare: word,
+                    overriding: isOverride(subscriptDeclaration.modifiers),
+                )
             }
             if let accessor = scope.as(AccessorDeclSyntax.self), child.id == accessor.body?.id {
-                return accessor.parameters.map { ConsistencyNoStutteringName.spelling($0.name) == word } == true ? .chosenHere : .notDeclared
+                return accessor.parameters.map { ConsistencyNoStutteringName.spelling($0.name) == word } == true
+                    ? .chosenHere : .notDeclared
             }
             if let conditions = scope.as(ConditionElementListSyntax.self) {
                 /* A condition sees the bindings of the conditions before it. */
@@ -178,14 +199,19 @@ public struct ConsistencyNoStutteringName: FileRule {
             if let whileStatement = scope.as(WhileStmtSyntax.self), child.id == whileStatement.body.id {
                 return conditionsDeclare(Array(whileStatement.conditions), word)
             }
-            if let forStatement = scope.as(ForStmtSyntax.self), child.id == forStatement.body.id || child.id == forStatement.whereClause?.id {
+            if let forStatement = scope.as(ForStmtSyntax.self),
+                child.id == forStatement.body.id || child.id == forStatement.whereClause?.id
+            {
                 return binds(Syntax(forStatement.pattern), word) ? .chosenHere : .notDeclared
             }
-            if let switchCase = scope.as(SwitchCaseSyntax.self), child.id == switchCase.statements.id, case .case(let label) = switchCase.label {
+            if let switchCase = scope.as(SwitchCaseSyntax.self), child.id == switchCase.statements.id,
+                case .case(let label) = switchCase.label
+            {
                 return label.caseItems.contains { binds(Syntax($0.pattern), word) } ? .chosenHere : .notDeclared
             }
             if let catchClause = scope.as(CatchClauseSyntax.self), child.id == catchClause.body.id {
-                return catchClause.catchItems.contains { item in item.pattern.map { binds(Syntax($0), word) } ?? false } ? .chosenHere : .notDeclared
+                return catchClause.catchItems.contains { item in item.pattern.map { binds(Syntax($0), word) } ?? false }
+                    ? .chosenHere : .notDeclared
             }
             return .notDeclared
         }
@@ -200,7 +226,9 @@ public struct ConsistencyNoStutteringName: FileRule {
                 if statement.id == child.id && !topLevel {
                     break
                 }
-                if let variable = statement.item.as(VariableDeclSyntax.self), variable.bindings.contains(where: { binds(Syntax($0.pattern), word) }) {
+                if let variable = statement.item.as(VariableDeclSyntax.self),
+                    variable.bindings.contains(where: { binds(Syntax($0.pattern), word) })
+                {
                     return .chosenHere
                 }
                 if !topLevel, let guardStatement = statement.item.as(GuardStmtSyntax.self) {
@@ -216,10 +244,14 @@ public struct ConsistencyNoStutteringName: FileRule {
         /* `if let word = …` and `case let … word … = …` choose the word; `if let word` re-binds the outer one. */
         static func conditionsDeclare(_ conditions: [ConditionElementSyntax], _ word: String) -> Verdict {
             for element in conditions.reversed() {
-                if let binding = element.condition.as(OptionalBindingConditionSyntax.self), binding.initializer != nil, binds(Syntax(binding.pattern), word) {
+                if let binding = element.condition.as(OptionalBindingConditionSyntax.self), binding.initializer != nil,
+                    binds(Syntax(binding.pattern), word)
+                {
                     return .chosenHere
                 }
-                if let match = element.condition.as(MatchingPatternConditionSyntax.self), binds(Syntax(match.pattern), word) {
+                if let match = element.condition.as(MatchingPatternConditionSyntax.self),
+                    binds(Syntax(match.pattern), word)
+                {
                     return .chosenHere
                 }
             }
@@ -229,16 +261,23 @@ public struct ConsistencyNoStutteringName: FileRule {
         /* Closure parameters, and captures that give a new name; `[word]` alone re-binds the outer `word`. */
         static func closureDeclares(_ closure: ClosureExprSyntax, _ word: String) -> Verdict {
             guard let signature = closure.signature else { return .notDeclared }
-            if let captures = signature.capture?.items, captures.contains(where: { ConsistencyNoStutteringName.spelling($0.name) == word && $0.initializer != nil }) {
+            if let captures = signature.capture?.items,
+                captures.contains(where: {
+                    ConsistencyNoStutteringName.spelling($0.name) == word && $0.initializer != nil
+                })
+            {
                 return .chosenHere
             }
             switch signature.parameterClause {
-            case .simpleInput(let shorthand):
-                return shorthand.contains { ConsistencyNoStutteringName.spelling($0.name) == word } ? .chosenHere : .notDeclared
-            case .parameterClause(let clause):
-                return clause.parameters.contains { ConsistencyNoStutteringName.spelling($0.secondName ?? $0.firstName) == word } ? .chosenHere : .notDeclared
-            case nil:
-                return .notDeclared
+                case .simpleInput(let shorthand):
+                    return shorthand.contains { ConsistencyNoStutteringName.spelling($0.name) == word }
+                        ? .chosenHere : .notDeclared
+                case .parameterClause(let clause):
+                    return clause.parameters.contains {
+                        ConsistencyNoStutteringName.spelling($0.secondName ?? $0.firstName) == word
+                    } ? .chosenHere : .notDeclared
+                case nil:
+                    return .notDeclared
             }
         }
 
@@ -252,7 +291,8 @@ public struct ConsistencyNoStutteringName: FileRule {
                     if ConsistencyNoStutteringName.spelling(secondName) == word {
                         return .chosenHere
                     }
-                } else if ConsistencyNoStutteringName.spelling(parameter.firstName) == word {
+                }
+                else if ConsistencyNoStutteringName.spelling(parameter.firstName) == word {
                     return overriding ? .dictated : .chosenHere
                 }
             }

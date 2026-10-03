@@ -7,7 +7,10 @@ struct CommandOptionsTests {
     static let here = URL(fileURLWithPath: "/work", isDirectory: true)
 
     @Test func aBareRunRunsEveryPhaseAndMutates() throws {
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", "/work"], workingDirectory: Self.here)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", "/work"],
+            workingDirectory: Self.here,
+        )
         #expect(options.runFix && options.runTypes && options.runLint && options.mutate)
     }
 
@@ -16,7 +19,10 @@ struct CommandOptionsTests {
         #expect(options.runLint && !options.runTypes && !options.runFix && options.noFix)
     }
 
-    @Test(arguments: [["--timing"], ["--explain", "A.swift"], ["--tsconfig", "x"], ["--bogus"], ["--changed"], ["--fix", "--no-fix"], ["--contract", "1"], ["--fix-passes", "0"]])
+    @Test(arguments: [
+        ["--timing"], ["--explain", "A.swift"], ["--tsconfig", "x"], ["--bogus"], ["--changed"], ["--fix", "--no-fix"],
+        ["--contract", "1"], ["--fix-passes", "0"],
+    ])
     func refusedCommandLines(arguments: [String]) {
         #expect(throws: CommandOptions.UsageFailure.self) {
             try CommandOptions.parse(arguments, workingDirectory: Self.here)

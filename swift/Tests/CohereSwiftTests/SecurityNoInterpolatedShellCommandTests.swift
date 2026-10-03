@@ -16,10 +16,14 @@ import Testing
 @Suite(.serialized)
 struct SecurityNoInterpolatedShellCommandTests {
     /* `NSString.appendingPathComponent(_:)`, as the index names the Objective-C method it imports. */
-    static let appendingPathComponent: (symbol: String, name: String) = ("c:objc(cs)NSString(im)stringByAppendingPathComponent:", "appendingPathComponent(_:)")
+    static let appendingPathComponent: (symbol: String, name: String) = (
+        "c:objc(cs)NSString(im)stringByAppendingPathComponent:", "appendingPathComponent(_:)",
+    )
     static let quoted: (symbol: String, name: String) = ("s:7Control9DescribedO6quotedyS2SFZ", "quoted(_:)")
     static let urlPath: (symbol: String, name: String) = ("s:10Foundation3URLV4pathSSvp", "path")
-    static let processIdentifier: (symbol: String, name: String) = ("c:objc(cs)NSTask(py)processIdentifier", "processIdentifier")
+    static let processIdentifier: (symbol: String, name: String) = (
+        "c:objc(cs)NSTask(py)processIdentifier", "processIdentifier",
+    )
     /* `static let root: String` of ours, declared in another file. */
     static let configurationRoot: (symbol: String, name: String) = ("s:7Control6ConfigO4rootSSvpZ", "root")
     static let boxCount: (symbol: String, name: String) = ("s:7Control3BoxV5countSivp", "count")
@@ -27,12 +31,27 @@ struct SecurityNoInterpolatedShellCommandTests {
     /* The text of every finding's span, with every token named in `resolving` resolved to its declaration. */
     static func spans(_ source: String, resolving: [String: (symbol: String, name: String)] = [:]) -> [String] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         var occurrences: [FileSymbols.Occurrence] = []
         for token in file.tree.tokens(viewMode: .sourceAccurate) {
             guard let resolved = resolving[token.text] else { continue }
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
-            occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: resolved.symbol, name: resolved.name, isReference: true))
+            occurrences.append(
+                FileSymbols.Occurrence(
+                    line: location.line,
+                    column: location.column,
+                    symbol: resolved.symbol,
+                    name: resolved.name,
+                    isReference: true,
+                )
+            )
         }
         let rule = SecurityNoInterpolatedShellCommand()
         let findings = rule.findings(in: file, symbols: FileSymbols(occurrences, ownedModules: ["Control"]))
@@ -99,7 +118,11 @@ struct SecurityNoInterpolatedShellCommandTests {
 
     @Test func memberLifecyclesHomePathIsFlagged() {
         let source = Self.memberLifecycle(Self.memberLifecycleArguments)
-        #expect(Self.spans(source, resolving: ["appendingPathComponent": Self.appendingPathComponent]) == [#""cd \(projectRoot) && ahra os sleep --force --dead-watchers --yes""#])
+        #expect(
+            Self.spans(source, resolving: ["appendingPathComponent": Self.appendingPathComponent]) == [
+                #""cd \(projectRoot) && ahra os sleep --force --dead-watchers --yes""#
+            ]
+        )
     }
 
     /* Without the index, `appendingPathComponent`'s result is unread, and nothing is said rather than guessed. */
@@ -122,9 +145,11 @@ struct SecurityNoInterpolatedShellCommandTests {
                         "-l", "-i", "-c",
                         "ahra os sleep --force --dead-watchers --yes",
             """#,
-            setup: "\n        process.currentDirectoryURL = URL(fileURLWithPath: projectRoot)"
+            setup: "\n        process.currentDirectoryURL = URL(fileURLWithPath: projectRoot)",
         )
-        #expect(Self.spans(workingDirectory, resolving: ["appendingPathComponent": Self.appendingPathComponent]).isEmpty)
+        #expect(
+            Self.spans(workingDirectory, resolving: ["appendingPathComponent": Self.appendingPathComponent]).isEmpty
+        )
     }
 
     /*
@@ -179,7 +204,10 @@ struct SecurityNoInterpolatedShellCommandTests {
 
     /* A parameter whose type the rule does not read (an enum of the commands the author wrote) is not guessed at. */
     @Test func kingdomWithAnEnumParameterIsNotGuessed() {
-        let source = Self.kingdom(#"process.arguments = ["-lc", "cd ~/Projects/ahra && " + command.rawValue]"#, parameter: "_ command: Listing")
+        let source = Self.kingdom(
+            #"process.arguments = ["-lc", "cd ~/Projects/ahra && " + command.rawValue]"#,
+            parameter: "_ command: Listing",
+        )
         #expect(Self.spans(source, resolving: ["rawValue": ("s:7Control7ListingO8rawValueSSvp", "rawValue")]).isEmpty)
     }
 
@@ -337,259 +365,262 @@ struct SecurityNoInterpolatedShellCommandTests {
     // MARK: Flagged shapes
 
     @Test func everyFlaggedShapeIsFound() {
-        let cases: [(name: String, source: String, resolving: [String: (symbol: String, name: String)], span: String)] = [
-            (
-                "Process.run with a URL and arguments",
-                #"""
-                func remove(path: String) throws {
-                    _ = try Process.run(URL(fileURLWithPath: "/bin/bash"), arguments: ["-c", "rm -rf \(path)"])
-                }
-                """#,
-                [:], #""rm -rf \(path)""#
-            ),
-            (
-                "launchPath and a cluster with c",
-                #"""
-                func open(url: String) {
-                    let task = Process()
-                    task.launchPath = "/bin/sh"
-                    task.arguments = ["-ec", "open \(url)"]
-                    task.launch()
-                }
-                """#,
-                [:], #""open \(url)""#
-            ),
-            (
-                "an option with its argument before -c",
-                #"""
-                func run(path: String) {
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/usr/local/bin/bash")
-                    process.arguments = ["-o", "pipefail", "--login", "-c", "ls \(path) | wc -l"]
-                }
-                """#,
-                [:], #""ls \(path) | wc -l""#
-            ),
-            (
-                "a command built into a let",
-                #"""
-                func build(directory: String) {
-                    let script = "cd \(directory) && make"
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-                    process.arguments = ["-lc", script]
-                }
-                """#,
-                [:], "script"
-            ),
-            (
-                "arguments and the shell through lets",
-                #"""
-                func build(directory: String) {
-                    let shell = URL(fileURLWithPath: "/bin/zsh")
-                    let arguments = ["-lc", "cd \(directory) && make"]
-                    let process = Process()
-                    process.executableURL = shell
-                    process.arguments = arguments
-                }
-                """#,
-                [:], #""cd \(directory) && make""#
-            ),
-            (
-                "a URL's path, read from the index",
-                #"""
-                import Foundation
-                func build(directory: URL) {
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-                    process.arguments = ["-lc", "cd \(directory.path) && make"]
-                }
-                """#,
-                ["path": Self.urlPath], #""cd \(directory.path) && make""#
-            ),
-            (
-                "a var bound to a literal, which may be reassigned",
-                #"""
-                func build(clean: Bool) {
-                    var target = "all"
-                    if clean {
-                        target = "clean"
+        let cases: [(name: String, source: String, resolving: [String: (symbol: String, name: String)], span: String)] =
+            [
+                (
+                    "Process.run with a URL and arguments",
+                    #"""
+                    func remove(path: String) throws {
+                        _ = try Process.run(URL(fileURLWithPath: "/bin/bash"), arguments: ["-c", "rm -rf \(path)"])
                     }
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/bin/sh")
-                    process.arguments = ["-c", "make \(target)"]
-                }
-                """#,
-                [:], #""make \(target)""#
-            ),
-            (
-                "a guard let bound to an optional String",
-                #"""
-                func open(file: String?) {
-                    guard let target = file else { return }
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/bin/sh")
-                    process.arguments = ["-c", "open '\(target)'"]
-                }
-                """#,
-                [:], #""open '\(target)'""#
-            ),
-            (
-                "an optional with a fallback",
-                #"""
-                func open(file: String?) {
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/bin/sh")
-                    process.arguments = ["-c", "open \(file ?? "/tmp")"]
-                }
-                """#,
-                [:], #""open \(file ?? "/tmp")""#
-            ),
-            (
-                "a text branch of a ternary",
-                #"""
-                func list(path: String, all: Bool) {
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/bin/sh")
-                    process.arguments = ["-c", "ls \(all ? "-a \(path)" : "-1")"]
-                }
-                """#,
-                [:], #""ls \(all ? "-a \(path)" : "-1")""#
-            ),
-            (
-                "a ternary command",
-                #"""
-                func open(url: String, background: Bool) {
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/bin/sh")
-                    process.arguments = ["-c", background ? "open -g \(url)" : "true"]
-                }
-                """#,
-                [:], #"background ? "open -g \(url)" : "true""#
-            ),
-            (
-                "String(...), which is text whatever it was built from",
-                #"""
-                func stop(pid: Int32) {
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/bin/sh")
-                    process.arguments = ["-c", "kill " + String(pid)]
-                }
-                """#,
-                [:], #""kill " + String(pid)"#
-            ),
-            (
-                "a subscript concatenated with a literal",
-                #"""
-                import Foundation
-                func home() {
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/bin/sh")
-                    process.arguments = ["-c", "ls " + ProcessInfo.processInfo.environment["HOME", default: "/"]]
-                }
-                """#,
-                [:], #""ls " + ProcessInfo.processInfo.environment["HOME", default: "/"]"#
-            ),
-            (
-                "a Substring and a Character",
-                #"""
-                func run(name: Substring, separator: Character) {
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/bin/dash")
-                    process.arguments = ["-c", "echo \(name)\(separator)"]
-                }
-                """#,
-                [:], #""echo \(name)\(separator)""#
-            ),
-            (
-                "a property of this type declared as String",
-                #"""
-                struct Builder {
-                    let directory: String
-
-                    func build() {
+                    """#,
+                    [:], #""rm -rf \(path)""#,
+                ),
+                (
+                    "launchPath and a cluster with c",
+                    #"""
+                    func open(url: String) {
+                        let task = Process()
+                        task.launchPath = "/bin/sh"
+                        task.arguments = ["-ec", "open \(url)"]
+                        task.launch()
+                    }
+                    """#,
+                    [:], #""open \(url)""#,
+                ),
+                (
+                    "an option with its argument before -c",
+                    #"""
+                    func run(path: String) {
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/usr/local/bin/bash")
+                        process.arguments = ["-o", "pipefail", "--login", "-c", "ls \(path) | wc -l"]
+                    }
+                    """#,
+                    [:], #""ls \(path) | wc -l""#,
+                ),
+                (
+                    "a command built into a let",
+                    #"""
+                    func build(directory: String) {
+                        let script = "cd \(directory) && make"
                         let process = Process()
                         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-                        process.arguments = ["-lc", "cd \(self.directory) && make"]
+                        process.arguments = ["-lc", script]
                     }
-                }
-                """#,
-                [:], #""cd \(self.directory) && make""#
-            ),
-            /* The SQL sits in a quoted heredoc and is data, but the output path follows the closing line and is code. */
-            (
-                "a value after a quoted heredoc has closed",
-                #"""
-                func query(sql: String, outputPath: String) {
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/bin/bash")
-                    process.arguments = ["-c", "cat <<'EOSQL' > /tmp/query.sql\n\(sql)\nEOSQL\nmv /tmp/query.sql \(outputPath)"]
-                }
-                """#,
-                [:], #""cat <<'EOSQL' > /tmp/query.sql\n\(sql)\nEOSQL\nmv /tmp/query.sql \(outputPath)""#
-            ),
-            /* An unquoted delimiter leaves the body expanded: a `$(...)` in the SQL runs. */
-            (
-                "a value in an unquoted heredoc's body",
-                #"""
-                func query(sql: String) {
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/bin/bash")
-                    process.arguments = ["-c", """
-                        cat <<EOSQL | pscale shell phi main
-                        \(sql)
-                        EOSQL
-                        """]
-                }
-                """#,
-                [:], "\"\"\"\n        cat <<EOSQL | pscale shell phi main\n        \\(sql)\n        EOSQL\n        \"\"\""
-            ),
-            (
-                "values on a quoted heredoc's opener line",
-                #"""
-                func pscaleShell(database: String, branch: String, sql: String) {
-                    let command = "cat <<'EOSQL' | pscale shell \(database) \(branch)\n\(sql)\nEOSQL"
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/bin/bash")
-                    process.arguments = ["-c", command]
-                }
-                """#,
-                [:], "command"
-            ),
-            (
-                "a here-string's word",
-                #"""
-                func count(text: String) {
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/bin/bash")
-                    process.arguments = ["-c", "wc -c <<< \"\(text)\""]
-                }
-                """#,
-                [:], #""wc -c <<< \"\(text)\"""#
-            ),
-            (
-                "a closure parameter declared as String",
-                #"""
-                let open: (String) -> Void = { (url: String) in
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/bin/sh")
-                    process.arguments = ["-c", "open \(url)"]
-                }
-                """#,
-                [:], #""open \(url)""#
-            ),
-            (
-                "a value before one whose type is unread",
-                #"""
-                func stop(name: String, process: Process) {
-                    let shell = Process()
-                    shell.executableURL = URL(fileURLWithPath: "/bin/sh")
-                    shell.arguments = ["-c", "echo \(name); kill \(process.processIdentifier)"]
-                }
-                """#,
-                ["processIdentifier": Self.processIdentifier], #""echo \(name); kill \(process.processIdentifier)""#
-            ),
-        ]
+                    """#,
+                    [:], "script",
+                ),
+                (
+                    "arguments and the shell through lets",
+                    #"""
+                    func build(directory: String) {
+                        let shell = URL(fileURLWithPath: "/bin/zsh")
+                        let arguments = ["-lc", "cd \(directory) && make"]
+                        let process = Process()
+                        process.executableURL = shell
+                        process.arguments = arguments
+                    }
+                    """#,
+                    [:], #""cd \(directory) && make""#,
+                ),
+                (
+                    "a URL's path, read from the index",
+                    #"""
+                    import Foundation
+                    func build(directory: URL) {
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+                        process.arguments = ["-lc", "cd \(directory.path) && make"]
+                    }
+                    """#,
+                    ["path": Self.urlPath], #""cd \(directory.path) && make""#,
+                ),
+                (
+                    "a var bound to a literal, which may be reassigned",
+                    #"""
+                    func build(clean: Bool) {
+                        var target = "all"
+                        if clean {
+                            target = "clean"
+                        }
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+                        process.arguments = ["-c", "make \(target)"]
+                    }
+                    """#,
+                    [:], #""make \(target)""#,
+                ),
+                (
+                    "a guard let bound to an optional String",
+                    #"""
+                    func open(file: String?) {
+                        guard let target = file else { return }
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+                        process.arguments = ["-c", "open '\(target)'"]
+                    }
+                    """#,
+                    [:], #""open '\(target)'""#,
+                ),
+                (
+                    "an optional with a fallback",
+                    #"""
+                    func open(file: String?) {
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+                        process.arguments = ["-c", "open \(file ?? "/tmp")"]
+                    }
+                    """#,
+                    [:], #""open \(file ?? "/tmp")""#,
+                ),
+                (
+                    "a text branch of a ternary",
+                    #"""
+                    func list(path: String, all: Bool) {
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+                        process.arguments = ["-c", "ls \(all ? "-a \(path)" : "-1")"]
+                    }
+                    """#,
+                    [:], #""ls \(all ? "-a \(path)" : "-1")""#,
+                ),
+                (
+                    "a ternary command",
+                    #"""
+                    func open(url: String, background: Bool) {
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+                        process.arguments = ["-c", background ? "open -g \(url)" : "true"]
+                    }
+                    """#,
+                    [:], #"background ? "open -g \(url)" : "true""#,
+                ),
+                (
+                    "String(...), which is text whatever it was built from",
+                    #"""
+                    func stop(pid: Int32) {
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+                        process.arguments = ["-c", "kill " + String(pid)]
+                    }
+                    """#,
+                    [:], #""kill " + String(pid)"#,
+                ),
+                (
+                    "a subscript concatenated with a literal",
+                    #"""
+                    import Foundation
+                    func home() {
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+                        process.arguments = ["-c", "ls " + ProcessInfo.processInfo.environment["HOME", default: "/"]]
+                    }
+                    """#,
+                    [:], #""ls " + ProcessInfo.processInfo.environment["HOME", default: "/"]"#,
+                ),
+                (
+                    "a Substring and a Character",
+                    #"""
+                    func run(name: Substring, separator: Character) {
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/bin/dash")
+                        process.arguments = ["-c", "echo \(name)\(separator)"]
+                    }
+                    """#,
+                    [:], #""echo \(name)\(separator)""#,
+                ),
+                (
+                    "a property of this type declared as String",
+                    #"""
+                    struct Builder {
+                        let directory: String
+
+                        func build() {
+                            let process = Process()
+                            process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+                            process.arguments = ["-lc", "cd \(self.directory) && make"]
+                        }
+                    }
+                    """#,
+                    [:], #""cd \(self.directory) && make""#,
+                ),
+                /* The SQL sits in a quoted heredoc and is data, but the output path follows the closing line and is code. */
+                (
+                    "a value after a quoted heredoc has closed",
+                    #"""
+                    func query(sql: String, outputPath: String) {
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+                        process.arguments = ["-c", "cat <<'EOSQL' > /tmp/query.sql\n\(sql)\nEOSQL\nmv /tmp/query.sql \(outputPath)"]
+                    }
+                    """#,
+                    [:], #""cat <<'EOSQL' > /tmp/query.sql\n\(sql)\nEOSQL\nmv /tmp/query.sql \(outputPath)""#,
+                ),
+                /* An unquoted delimiter leaves the body expanded: a `$(...)` in the SQL runs. */
+                (
+                    "a value in an unquoted heredoc's body",
+                    #"""
+                    func query(sql: String) {
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+                        process.arguments = ["-c", """
+                            cat <<EOSQL | pscale shell phi main
+                            \(sql)
+                            EOSQL
+                            """]
+                    }
+                    """#,
+                    [:],
+                    "\"\"\"\n        cat <<EOSQL | pscale shell phi main\n        \\(sql)\n        EOSQL\n        \"\"\"",
+                ),
+                (
+                    "values on a quoted heredoc's opener line",
+                    #"""
+                    func pscaleShell(database: String, branch: String, sql: String) {
+                        let command = "cat <<'EOSQL' | pscale shell \(database) \(branch)\n\(sql)\nEOSQL"
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+                        process.arguments = ["-c", command]
+                    }
+                    """#,
+                    [:], "command",
+                ),
+                (
+                    "a here-string's word",
+                    #"""
+                    func count(text: String) {
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+                        process.arguments = ["-c", "wc -c <<< \"\(text)\""]
+                    }
+                    """#,
+                    [:], #""wc -c <<< \"\(text)\"""#,
+                ),
+                (
+                    "a closure parameter declared as String",
+                    #"""
+                    let open: (String) -> Void = { (url: String) in
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+                        process.arguments = ["-c", "open \(url)"]
+                    }
+                    """#,
+                    [:], #""open \(url)""#,
+                ),
+                (
+                    "a value before one whose type is unread",
+                    #"""
+                    func stop(name: String, process: Process) {
+                        let shell = Process()
+                        shell.executableURL = URL(fileURLWithPath: "/bin/sh")
+                        shell.arguments = ["-c", "echo \(name); kill \(process.processIdentifier)"]
+                    }
+                    """#,
+                    ["processIdentifier": Self.processIdentifier],
+                    #""echo \(name); kill \(process.processIdentifier)""#,
+                ),
+            ]
         for testCase in cases {
             #expect(Self.spans(testCase.source, resolving: testCase.resolving) == [testCase.span], "\(testCase.name)")
         }
@@ -604,7 +635,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                 #"""
                 let spec = SpawnRequest(shell: "/bin/zsh", arguments: ["-l", "-i", "-c", "cd /Users/kirkouimet/Projects/ahra && claude 'hi'"], cwd: "/tmp")
                 """#,
-                [:]
+                [:],
             ),
             (
                 "numbers and booleans",
@@ -615,7 +646,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     process.arguments = ["-c", "kill -\(force ? 9 : 15) \(pid); sleep \(2)"]
                 }
                 """#,
-                [:]
+                [:],
             ),
             (
                 "a number read from the index",
@@ -626,7 +657,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     process.arguments = ["-c", "seq \(box.count)"]
                 }
                 """#,
-                ["count": Self.boxCount]
+                ["count": Self.boxCount],
             ),
             (
                 "literal constants, local and of the type",
@@ -642,7 +673,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     }
                 }
                 """#,
-                [:]
+                [:],
             ),
             (
                 "a let of ours in another file, which may be a literal there",
@@ -653,7 +684,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     process.arguments = ["-lc", "cd \(Config.root) && " + Config.root]
                 }
                 """#,
-                ["root": Self.configurationRoot]
+                ["root": Self.configurationRoot],
             ),
             (
                 "the value as a positional parameter",
@@ -662,7 +693,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     _ = try Process.run(URL(fileURLWithPath: "/bin/sh"), arguments: ["-c", "rm -rf -- \"$1\"", "sh", path])
                 }
                 """#,
-                [:]
+                [:],
             ),
             (
                 "no shell: the arguments reach the program as they are",
@@ -673,7 +704,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     process.arguments = ["-C", path, "log", "-c", "--format=\(path)"]
                 }
                 """#,
-                [:]
+                [:],
             ),
             (
                 "an interpreter that is not a POSIX shell",
@@ -687,7 +718,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     fish.arguments = ["-c", "echo \(script)"]
                 }
                 """#,
-                [:]
+                [:],
             ),
             (
                 "a shell with no -c",
@@ -698,7 +729,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     process.arguments = ["-l", "-i", "-o", "INC_APPEND_HISTORY", "\(history)"]
                 }
                 """#,
-                [:]
+                [:],
             ),
             (
                 "an option the rule cannot read before the command",
@@ -712,7 +743,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     other.arguments = ["--command", "ls \(path)"]
                 }
                 """#,
-                [:]
+                [:],
             ),
             (
                 "a program that may not be a shell",
@@ -726,7 +757,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     process.arguments = ["-c", "ls \(path)"]
                 }
                 """#,
-                [:]
+                [:],
             ),
             (
                 "another receiver's arguments",
@@ -739,7 +770,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     git.arguments = ["-c", "core.pager=\(path)", "log"]
                 }
                 """#,
-                [:]
+                [:],
             ),
             (
                 "an opaque command held in a var",
@@ -752,7 +783,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     process.arguments = ["-c", command]
                 }
                 """#,
-                [:]
+                [:],
             ),
             /* `i18n-conversion.ts:243`'s shape: the SQL is the body of a heredoc whose delimiter is quoted. */
             (
@@ -765,7 +796,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     process.arguments = ["-c", "cat <<'EOSQL' | pscale shell \(database) main --replica\n\(sql)\nEOSQL"]
                 }
                 """#,
-                [:]
+                [:],
             ),
             (
                 "values in a double-quoted, a backslashed and a tab-stripped heredoc's body",
@@ -776,7 +807,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     process.arguments = ["-c", "cat <<\"ONE\" <<\\TWO <<-'THREE'\n\(first)\nONE\n\(second)\nTWO\n\t\(third)\n\tTHREE"]
                 }
                 """#,
-                [:]
+                [:],
             ),
             (
                 "a heredoc delimiter it cannot read",
@@ -787,7 +818,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     process.arguments = ["-c", "cat <<'\(delimiter)'\n\(sql)\n\(delimiter)"]
                 }
                 """#,
-                [:]
+                [:],
             ),
             (
                 "a ternary branch that opens a heredoc",
@@ -798,7 +829,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     process.arguments = ["-c", "pscale shell phi main \(strip ? "<<-'EOSQL'" : "<<'EOSQL'")\n\(sql)\nEOSQL"]
                 }
                 """#,
-                [:]
+                [:],
             ),
             (
                 "a value after one whose type is unread",
@@ -809,7 +840,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     shell.arguments = ["-c", "kill \(process.processIdentifier); echo \(name)"]
                 }
                 """#,
-                ["processIdentifier": Self.processIdentifier]
+                ["processIdentifier": Self.processIdentifier],
             ),
             (
                 "a closure's untyped parameter shadowing a String",
@@ -825,7 +856,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     }
                 }
                 """#,
-                [:]
+                [:],
             ),
             (
                 "a value of a type the rule does not read",
@@ -836,7 +867,7 @@ struct SecurityNoInterpolatedShellCommandTests {
                     process.arguments = ["-c", "open \(target) --mode \(mode)"]
                 }
                 """#,
-                [:]
+                [:],
             ),
         ]
         for testCase in cases {
@@ -852,7 +883,7 @@ struct SecurityNoInterpolatedShellCommandTests {
             targetKind: "library",
             source: "let value = 1\n",
             tree: Parser.parse(source: "let value = 1\n"),
-            nodeCount: 0
+            nodeCount: 0,
         )
         #expect(!SecurityNoInterpolatedShellCommand().applies(to: file))
     }
@@ -906,23 +937,46 @@ struct SecurityNoInterpolatedShellCommandTests {
         """#
 
     @Test func theIndexResolvesNSStringsAndFoundationsTextAndLeavesAProcessIdentifierAlone() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-typed-\(UUID().uuidString)", isDirectory: true)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-typed-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-        try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try Self.packageSource.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
+        try PipelineControlTests.manifest.write(
+            to: root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try Self.packageSource.write(
+            to: sources.appendingPathComponent("Control.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
 
         /* One run builds the package and writes its index. The rule is run by hand on what the run left. */
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"],
+            workingDirectory: root,
+        )
         _ = try await Pipeline(options: options, writer: ContractWriter { _ in }, workingDirectory: root).run()
-        let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: ProcessRunner())
+        let package = try PackageModel.load(
+            root: root,
+            scratchPath: Pipeline.scratchPath(for: root),
+            runner: ProcessRunner(),
+        )
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
         let rule = SecurityNoInterpolatedShellCommand()
         let candidates = parsed.files.filter { rule.applies(to: $0) }
-        let symbols = SymbolProvider(scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root), runner: ProcessRunner()).symbols(for: candidates)
+        let symbols = SymbolProvider(
+            scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root),
+            runner: ProcessRunner(),
+        ).symbols(for: candidates)
         #expect(symbols.fromIndex == 1, "the build's index should describe the file: \(symbols.unavailable)")
         let found = candidates.flatMap { file in
-            rule.findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.line):\($0.column)" }
+            rule.findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map {
+                "\($0.line):\($0.column)"
+            }
         }
         /* The home path through NSString and the URL's path are flagged; the process identifier is not; `Described.ask`'s list is no shell's until a caller makes it one. */
         #expect(found == ["18:48", "25:37"], "\(found)")

@@ -22,7 +22,7 @@ public struct ProvenanceRecord: Codable, Equatable, Sendable {
         sourceTreeModified: Bool,
         toolchain: String,
         swiftSyntax: String,
-        swiftFormat: String
+        swiftFormat: String,
     ) {
         self.contract = contract
         self.engine = engine

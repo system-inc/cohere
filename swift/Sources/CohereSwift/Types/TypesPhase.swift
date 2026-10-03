@@ -52,7 +52,10 @@ struct TypesPhase {
         let locals = package.localPackages.filter { local in
             local.targets.contains { $0.kind == "test" && testTargetNames.contains($0.name) }
         }
-        return [(package.root, scratchPath)] + locals.map { ($0.root, scratchPath.appendingPathComponent("local/\($0.root.lastPathComponent)", isDirectory: true)) }
+        return [(package.root, scratchPath)]
+            + locals.map {
+                ($0.root, scratchPath.appendingPathComponent("local/\($0.root.lastPathComponent)", isDirectory: true))
+            }
     }
 
     private func arguments(for build: (root: URL, scratchPath: URL), buildSystem: [String]) -> [String] {
@@ -68,19 +71,21 @@ struct TypesPhase {
         let roots = package.allPackages.flatMap { [$0.root] + $0.pathDependencyRoots }
         var seen = Set<String>()
         return roots.filter { root in
-            !roots.contains { other in PackageModel.isInside(root, other) } && seen.insert(root.resolvingSymlinksInPath().path).inserted
+            !roots.contains { other in PackageModel.isInside(root, other) }
+                && seen.insert(root.resolvingSymlinksInPath().path).inserted
         }
     }
 
     func run() throws -> Result {
         let start = Date()
-        let snapshot = toolchain.hasPrefix("unknown")
+        let snapshot =
+            toolchain.hasPrefix("unknown")
             ? nil
             : BuildInputSnapshot.take(
                 roots: inputRoots,
                 resolved: package.root.appendingPathComponent("Package.resolved"),
                 toolchain: toolchain,
-                arguments: builds.flatMap { arguments(for: $0, buildSystem: Self.swiftBuildArguments) }
+                arguments: builds.flatMap { arguments(for: $0, buildSystem: Self.swiftBuildArguments) },
             )
 
         /*
@@ -89,7 +94,9 @@ struct TypesPhase {
          less (a scratch someone cleaned, a record gone) means building after all.
          */
         let stored = BuildInputSnapshot.stored(scratchPath: scratchPath)
-        if let snapshot, let stored, stored != snapshot, let checked = checkBodiesOnly(snapshot: snapshot, stored: stored, start: start) {
+        if let snapshot, let stored, stored != snapshot,
+            let checked = checkBodiesOnly(snapshot: snapshot, stored: stored, start: start)
+        {
             return checked
         }
         if let snapshot, stored == snapshot {
@@ -100,13 +107,15 @@ struct TypesPhase {
                         targetDirectories: directories,
                         failedBuilds: [],
                         start: start,
-                        build: "no input changed since the last successful build, so its compiler records were read without building"
+                        build:
+                            "no input changed since the last successful build, so its compiler records were read without building",
                     )
                     if reused.record.filesWithoutRecord.isEmpty {
                         return reused
                     }
                 }
-            } catch {
+            }
+            catch {
                 /* The records could not be read as they stood: build, which rewrites them. */
             }
         }
@@ -133,16 +142,23 @@ struct TypesPhase {
              */
             guard !directories.isEmpty else {
                 if !result.succeeded {
-                    throw TypesFailure(description: "swift build of \(build.root.path) failed before compiling anything, so the compiler never ran: \(Self.tail(of: result))")
+                    throw TypesFailure(
+                        description:
+                            "swift build of \(build.root.path) failed before compiling anything, so the compiler never ran: \(Self.tail(of: result))"
+                    )
                 }
-                throw TypesFailure(description: "the build of \(build.root.path) left no target directories under \(intermediates(of: build.scratchPath).path), so this engine does not recognise the build system's layout and cannot read what the compiler said (toolchain: \(toolchain))\n\(Self.tail(of: result))")
+                throw TypesFailure(
+                    description:
+                        "the build of \(build.root.path) left no target directories under \(intermediates(of: build.scratchPath).path), so this engine does not recognise the build system's layout and cannot read what the compiler said (toolchain: \(toolchain))\n\(Self.tail(of: result))"
+                )
             }
             targetDirectories.append(contentsOf: directories)
         }
         if var snapshot, failedBuilds.isEmpty {
             snapshot.interfaces = interfaces
             snapshot.store(scratchPath: scratchPath)
-        } else {
+        }
+        else {
             BuildInputSnapshot.forget(scratchPath: scratchPath)
         }
         var build = "swift build --build-tests of \(builds.count) packages, scratch \(scratchPath.path)"
@@ -163,7 +179,11 @@ struct TypesPhase {
             let storePath = IndexStore.storePath(scratchPath: build.scratchPath)
             return (try? IndexStore(libraryPath: library, storePath: storePath)).map { ($0, storePath) }
         }
-        return ScratchPrune.run(stores: stores, scratchPath: scratchPath, listedLocalPackages: Set(package.localPackages.map(\.root.lastPathComponent)))
+        return ScratchPrune.run(
+            stores: stores,
+            scratchPath: scratchPath,
+            listedLocalPackages: Set(package.localPackages.map(\.root.lastPathComponent)),
+        )
     }
 
     /* The words the types record uses for a run that checked its edited files in process, so a reader can tell it from a build. */
@@ -178,7 +198,10 @@ struct TypesPhase {
      */
     private func checkBodiesOnly(snapshot: BuildInputSnapshot, stored: BuildInputSnapshot, start: Date) -> Result? {
         guard let changed = snapshot.filesChanged(since: stored), !changed.isEmpty else { return nil }
-        let owned = Dictionary(files.map { ($0.url.resolvingSymlinksInPath().path, $0) }, uniquingKeysWith: { first, _ in first })
+        let owned = Dictionary(
+            files.map { ($0.url.resolvingSymlinksInPath().path, $0) },
+            uniquingKeysWith: { first, _ in first },
+        )
         var edited: [(path: String, file: FileSet.OwnedFile)] = []
         for path in changed {
             let resolved = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
@@ -196,8 +219,11 @@ struct TypesPhase {
             var answered: [String: [FindingRecord]] = [:]
             for (path, file) in edited.sorted(by: { $0.path < $1.path }) {
                 guard let command = tables.lazy.compactMap({ $0.command(for: file.url) }).first else { return nil }
-                answered[path] = try session.diagnostics(file: path, arguments: command.arguments).compactMap { diagnostic in
-                    guard let severity = diagnostic.findingSeverity, URL(fileURLWithPath: diagnostic.file).resolvingSymlinksInPath().path == path else { return nil }
+                answered[path] = try session.diagnostics(file: path, arguments: command.arguments).compactMap {
+                    diagnostic in
+                    guard let severity = diagnostic.findingSeverity,
+                        URL(fileURLWithPath: diagnostic.file).resolvingSymlinksInPath().path == path
+                    else { return nil }
                     return FindingRecord(
                         source: .compiler,
                         file: path,
@@ -206,7 +232,7 @@ struct TypesPhase {
                         severity: severity,
                         rule: TypesOracle.group(of: diagnostic),
                         messageId: "",
-                        message: diagnostic.message
+                        message: diagnostic.message,
                     )
                 }
             }
@@ -216,11 +242,13 @@ struct TypesPhase {
                 targetDirectories: directories,
                 failedBuilds: [],
                 start: start,
-                build: "\(edited.count == 1 ? "1 file" : "\(edited.count) files") \(Self.checkedInProcessWords), and the rest were read from the last successful build's compiler records",
-                answeredInProcess: answered
+                build:
+                    "\(edited.count == 1 ? "1 file" : "\(edited.count) files") \(Self.checkedInProcessWords), and the rest were read from the last successful build's compiler records",
+                answeredInProcess: answered,
             )
             return result.record.filesWithoutRecord.isEmpty ? result : nil
-        } catch {
+        }
+        catch {
             /* Anything this path could not do, a build does. */
             return nil
         }
@@ -252,18 +280,25 @@ struct TypesPhase {
         failedBuilds: [ProcessRunner.Result],
         start: Date,
         build: String,
-        answeredInProcess: [String: [FindingRecord]] = [:]
+        answeredInProcess: [String: [FindingRecord]] = [:],
     ) throws -> Result {
-        let reader = try SerializedDiagnosticsReader(libraryPath: SerializedDiagnosticsReader.toolchainLibraryPath(runner: runner))
+        let reader = try SerializedDiagnosticsReader(
+            libraryPath: SerializedDiagnosticsReader.toolchainLibraryPath(runner: runner)
+        )
 
-        let ours = Dictionary(files.map { ($0.url.resolvingSymlinksInPath().path, $0) }, uniquingKeysWith: { first, _ in first })
+        let ours = Dictionary(
+            files.map { ($0.url.resolvingSymlinksInPath().path, $0) },
+            uniquingKeysWith: { first, _ in first },
+        )
         var seen = Set<String>()
         var findings: [FindingRecord] = []
         var recordFor: [String: Date] = [:]
 
         for (targetName, directory) in targetDirectories {
             for record in try diaFiles(in: directory) {
-                let modified = try record.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate ?? .distantPast
+                let modified =
+                    try record.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+                    ?? .distantPast
                 /* Keyed by target as well as name: two targets may each hold a `Utilities.swift`, and one must not vouch for the other. */
                 let key = "\(targetName)/\(record.deletingPathExtension().lastPathComponent)"
                 /*
@@ -276,10 +311,12 @@ struct TypesPhase {
                 let diagnostics: [SerializedDiagnosticsReader.Diagnostic]
                 do {
                     diagnostics = try reader.read(record)
-                } catch {
+                }
+                catch {
                     do {
                         try FileManager.default.removeItem(at: record)
-                    } catch {
+                    }
+                    catch {
                         /* Left in place, the file stays without a record and the run says so; only the repair is lost. */
                     }
                     continue
@@ -292,16 +329,18 @@ struct TypesPhase {
                     guard ours[file] != nil, answeredInProcess[file] == nil else { continue }
                     let identity = "\(file):\(diagnostic.line):\(diagnostic.column):\(diagnostic.message)"
                     guard seen.insert(identity).inserted else { continue }
-                    findings.append(FindingRecord(
-                        source: .compiler,
-                        file: file,
-                        line: max(diagnostic.line, 1),
-                        column: max(diagnostic.column, 1),
-                        severity: severity,
-                        rule: diagnostic.group,
-                        messageId: "",
-                        message: diagnostic.message
-                    ))
+                    findings.append(
+                        FindingRecord(
+                            source: .compiler,
+                            file: file,
+                            line: max(diagnostic.line, 1),
+                            column: max(diagnostic.column, 1),
+                            severity: severity,
+                            rule: diagnostic.group,
+                            messageId: "",
+                            message: diagnostic.message,
+                        )
+                    )
                 }
             }
         }
@@ -312,7 +351,9 @@ struct TypesPhase {
         var withoutRecord: [String] = []
         for file in files where answeredInProcess[file.url.resolvingSymlinksInPath().path] == nil {
             let key = "\(file.targetName)/\(file.url.deletingPathExtension().lastPathComponent)"
-            let sourceModified = try file.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate ?? .distantFuture
+            let sourceModified =
+                try file.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+                ?? .distantFuture
             guard let recorded = recordFor[key], recorded >= sourceModified else {
                 withoutRecord.append(file.url.path)
                 continue
@@ -321,16 +362,19 @@ struct TypesPhase {
 
         /* A failed build with no error in any file of ours failed somewhere no file carries: linking, a dependency, the manifest. Said, never swallowed. */
         if let failed = failedBuilds.first, !findings.contains(where: { $0.severity == .error }) {
-            findings.append(FindingRecord(
-                source: .compiler,
-                file: package.root.appendingPathComponent("Package.swift").path,
-                line: 1,
-                column: 1,
-                severity: .error,
-                rule: "",
-                messageId: "buildFailed",
-                message: "swift build failed outside any file this run checks, so the package does not build: \(Self.tail(of: failed))"
-            ))
+            findings.append(
+                FindingRecord(
+                    source: .compiler,
+                    file: package.root.appendingPathComponent("Package.swift").path,
+                    line: 1,
+                    column: 1,
+                    severity: .error,
+                    rule: "",
+                    messageId: "buildFailed",
+                    message:
+                        "swift build failed outside any file this run checks, so the package does not build: \(Self.tail(of: failed))",
+                )
+            )
         }
 
         findings.sort { ($0.file, $0.line, $0.column) < ($1.file, $1.line, $1.column) }
@@ -339,7 +383,7 @@ struct TypesPhase {
             files: files.count,
             elapsedMilliseconds: Pipeline.milliseconds(since: start),
             filesWithoutRecord: withoutRecord.sorted(),
-            build: build
+            build: build,
         )
         return Result(findings: findings, record: record, hasErrors: findings.contains { $0.severity == .error })
     }
@@ -353,8 +397,15 @@ struct TypesPhase {
      */
     private func buildSystemArguments() throws -> [String] {
         let help = try runner.run("swift", ["build", "--help"], in: package.root)
-        guard let arguments = Self.buildSystemArguments(help: String(decoding: help.standardOutput, as: UTF8.self) + help.standardError) else {
-            throw TypesFailure(description: "this toolchain's swift build offers no swiftbuild build system, and the types phase reads only the records swiftbuild writes (toolchain: \(toolchain)). Use a toolchain that offers `swift build --build-system swiftbuild`.")
+        guard
+            let arguments = Self.buildSystemArguments(
+                help: String(decoding: help.standardOutput, as: UTF8.self) + help.standardError
+            )
+        else {
+            throw TypesFailure(
+                description:
+                    "this toolchain's swift build offers no swiftbuild build system, and the types phase reads only the records swiftbuild writes (toolchain: \(toolchain)). Use a toolchain that offers `swift build --build-system swiftbuild`."
+            )
         }
         return arguments
     }
@@ -385,7 +436,10 @@ struct TypesPhase {
         let intermediatesDirectory = intermediates(of: scratchPath)
         guard manager.fileExists(atPath: intermediatesDirectory.path) else { return [] }
         var directories: [(String, URL)] = []
-        for packageDirectory in try manager.contentsOfDirectory(at: intermediatesDirectory, includingPropertiesForKeys: nil) {
+        for packageDirectory in try manager.contentsOfDirectory(
+            at: intermediatesDirectory,
+            includingPropertiesForKeys: nil,
+        ) {
             let configuration = packageDirectory.appendingPathComponent("Debug", isDirectory: true)
             guard manager.fileExists(atPath: configuration.path) else { continue }
             for targetDirectory in try manager.contentsOfDirectory(at: configuration, includingPropertiesForKeys: nil) {
@@ -406,7 +460,9 @@ struct TypesPhase {
 
     /* Every single-target product of every package this phase builds, to its target. */
     private var productTargets: [String: String] {
-        package.allPackages.reduce(into: [:]) { merged, member in merged.merge(member.productTargets) { first, _ in first } }
+        package.allPackages.reduce(into: [:]) { merged, member in
+            merged.merge(member.productTargets) { first, _ in first }
+        }
     }
 
     /*
@@ -428,7 +484,12 @@ struct TypesPhase {
         guard FileManager.default.fileExists(atPath: objects.path) else { return [] }
         var records: [URL] = []
         for architecture in try FileManager.default.contentsOfDirectory(at: objects, includingPropertiesForKeys: nil) {
-            records.append(contentsOf: try FileManager.default.contentsOfDirectory(at: architecture, includingPropertiesForKeys: nil).filter { $0.pathExtension == "dia" })
+            records.append(
+                contentsOf: try FileManager.default.contentsOfDirectory(
+                    at: architecture,
+                    includingPropertiesForKeys: nil,
+                ).filter { $0.pathExtension == "dia" }
+            )
         }
         return records
     }
@@ -436,7 +497,11 @@ struct TypesPhase {
     /* The last lines of the build's own output, colours stripped, for a failure no file carries. */
     static func tail(of build: ProcessRunner.Result) -> String {
         let text = String(decoding: build.standardOutput, as: UTF8.self) + build.standardError
-        let plain = text.replacingOccurrences(of: #"\u{1B}\[[0-9;]*m|\u{1B}\]8;;[^\u{1B}]*\u{1B}\\"#, with: "", options: .regularExpression)
+        let plain = text.replacingOccurrences(
+            of: #"\u{1B}\[[0-9;]*m|\u{1B}\]8;;[^\u{1B}]*\u{1B}\\"#,
+            with: "",
+            options: .regularExpression,
+        )
         let errors = plain.split(separator: "\n").filter { $0.contains("error:") }
         return (errors.isEmpty ? plain.split(separator: "\n").suffix(5) : errors.prefix(5)).joined(separator: " / ")
     }

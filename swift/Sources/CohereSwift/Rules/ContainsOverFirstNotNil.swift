@@ -57,14 +57,19 @@ public struct ContainsOverFirstNotNil: TypedFileRule {
         visitor.walk(folded)
         return visitor.found.compactMap { candidate in
             let location = file.locations.location(for: candidate.method.positionAfterSkippingLeadingTrivia)
-            guard let resolved = symbols.reference(line: location.line, column: location.column), resolved.isStandardLibrary else { return nil }
-            let searched = candidate.call.arguments.first?.label?.text == "of" ? "firstIndex(of:)" : "\(candidate.method.text)(where:)"
+            guard let resolved = symbols.reference(line: location.line, column: location.column),
+                resolved.isStandardLibrary
+            else { return nil }
+            let searched =
+                candidate.call.arguments.first?.label?.text == "of"
+                ? "firstIndex(of:)" : "\(candidate.method.text)(where:)"
             let repair = searched == "firstIndex(of:)" ? "contains(_:)" : "contains(where:)"
             return file.finding(
                 at: candidate.call,
                 rule: name,
                 messageId: "containsOverFirstNotNil",
-                message: "Comparing \(searched) with nil searches for something only to throw it away and ask whether it was found. Use \(repair) (or !\(repair) for == nil): it asks the yes or no question that is meant."
+                message:
+                    "Comparing \(searched) with nil searches for something only to throw it away and ask whether it was found. Use \(repair) (or !\(repair) for == nil): it asks the yes or no question that is meant.",
             )
         }
     }
@@ -80,12 +85,15 @@ public struct ContainsOverFirstNotNil: TypedFileRule {
         private(set) var found: [Candidate] = []
 
         override func visit(_ node: InfixOperatorExprSyntax) -> SyntaxVisitorContinueKind {
-            guard let operation = node.operator.as(BinaryOperatorExprSyntax.self), ContainsOverFirstNotNil.comparisons.contains(operation.operator.text) else {
+            guard let operation = node.operator.as(BinaryOperatorExprSyntax.self),
+                ContainsOverFirstNotNil.comparisons.contains(operation.operator.text)
+            else {
                 return .visitChildren
             }
             if node.rightOperand.is(NilLiteralExprSyntax.self), let candidate = Self.searchCall(node.leftOperand) {
                 found.append(candidate)
-            } else if node.leftOperand.is(NilLiteralExprSyntax.self), let candidate = Self.searchCall(node.rightOperand) {
+            }
+            else if node.leftOperand.is(NilLiteralExprSyntax.self), let candidate = Self.searchCall(node.rightOperand) {
                 found.append(candidate)
             }
             return .visitChildren
@@ -94,17 +102,23 @@ public struct ContainsOverFirstNotNil: TypedFileRule {
         /* The call of `items.first { }`, `firstIndex(of: target)`, or either inside one pair of parentheses, when no optional chain leads to it. */
         static func searchCall(_ expression: ExprSyntax) -> Candidate? {
             var callExpression = expression
-            if let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1, let only = tuple.elements.first, only.label == nil {
+            if let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1,
+                let only = tuple.elements.first, only.label == nil
+            {
                 callExpression = only.expression
             }
             guard let call = callExpression.as(FunctionCallExprSyntax.self) else { return nil }
-            if let member = call.calledExpression.as(MemberAccessExprSyntax.self), ContainsOverFirstNotNil.methods.contains(member.declName.baseName.text) {
+            if let member = call.calledExpression.as(MemberAccessExprSyntax.self),
+                ContainsOverFirstNotNil.methods.contains(member.declName.baseName.text)
+            {
                 if let base = member.base, isOptionalChain(base) {
                     return nil
                 }
                 return Candidate(call: call, method: member.declName.baseName)
             }
-            if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self), ContainsOverFirstNotNil.methods.contains(reference.baseName.text) {
+            if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self),
+                ContainsOverFirstNotNil.methods.contains(reference.baseName.text)
+            {
                 return Candidate(call: call, method: reference.baseName)
             }
             return nil

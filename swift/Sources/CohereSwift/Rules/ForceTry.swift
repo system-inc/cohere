@@ -21,7 +21,8 @@ public struct ForceTry: FileRule {
                 at: mark,
                 rule: name,
                 messageId: "forceTry",
-                message: "try! turns a thrown error into a crash and throws away the error's explanation. Handle it with do/catch, or pass it up with try."
+                message:
+                    "try! turns a thrown error into a crash and throws away the error's explanation. Handle it with do/catch, or pass it up with try.",
             )
         }
     }

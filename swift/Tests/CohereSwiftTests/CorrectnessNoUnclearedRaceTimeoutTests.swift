@@ -19,14 +19,24 @@ import Testing
 struct CorrectnessNoUnclearedRaceTimeoutTests {
     static func file(_ source: String) -> ParsedFile {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        return ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        return ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
     }
 
     /* The findings for a file the rule agrees to read, and none for one it declines, as the pipeline runs it. */
     static func findings(_ source: String) -> [FindingRecord] {
         let file = Self.file(source)
         let found = CorrectnessNoUnclearedRaceTimeout().findings(in: file)
-        #expect(found.isEmpty || CorrectnessNoUnclearedRaceTimeout().applies(to: file), "the prefilter must never hide a finding")
+        #expect(
+            found.isEmpty || CorrectnessNoUnclearedRaceTimeout().applies(to: file),
+            "the prefilter must never hide a finding",
+        )
         guard CorrectnessNoUnclearedRaceTimeout().applies(to: file) else { return [] }
         #expect(found.allSatisfy { $0.fixes.isEmpty && $0.suggestions.isEmpty }, "the rule never fixes")
         return found
@@ -79,7 +89,8 @@ struct CorrectnessNoUnclearedRaceTimeoutTests {
         #expect(
             found.map(\.message) == [
                 "This child only sleeps and then gives up, racing the group's other work for the first result, but nothing cancels the group once that result is in. A task group waits for every child before it returns, so when the work wins the caller still sits out the whole timeout, and a timeout that returns rather than throws bounds nothing, since the group then waits for the work too. Call group.cancelAll() once the first result is in (a defer { group.cancelAll() } at the top of the group's body covers every path), so the losing child is cancelled and its sleep ends at once."
-            ])
+            ]
+        )
     }
 
     /* The TypeScript rule's site, `PhiSocialGenerator`'s ten-minute render bound, as Swift: a caught timeout returns, and so waits. */
@@ -535,7 +546,9 @@ struct CorrectnessNoUnclearedRaceTimeoutTests {
     /* The prefilter declines a file with no task group or no sleep. */
     @Test func thePrefilterDeclinesFilesWithoutTheShape() {
         #expect(!CorrectnessNoUnclearedRaceTimeout().applies(to: Self.file("let value = try await work()")))
-        #expect(!CorrectnessNoUnclearedRaceTimeout().applies(to: Self.file("await withTaskGroup(of: Int.self) { _ in }")))
+        #expect(
+            !CorrectnessNoUnclearedRaceTimeout().applies(to: Self.file("await withTaskGroup(of: Int.self) { _ in }"))
+        )
         #expect(CorrectnessNoUnclearedRaceTimeout().applies(to: Self.file(Self.voiceRecorder(cancelling: true))))
     }
 }

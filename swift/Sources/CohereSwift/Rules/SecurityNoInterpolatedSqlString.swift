@@ -133,7 +133,9 @@ public struct SecurityNoInterpolatedSqlString: TypedFileRule {
         private(set) var found: [ExprSyntax] = []
 
         override func visit(_ node: StringLiteralExprSyntax) -> SyntaxVisitorContinueKind {
-            guard [.stringQuote, .multilineStringQuote].contains(node.openingQuote.tokenKind), let pieces = Self.pieces(of: node) else {
+            guard [.stringQuote, .multilineStringQuote].contains(node.openingQuote.tokenKind),
+                let pieces = Self.pieces(of: node)
+            else {
                 return .visitChildren
             }
             for index in SqlReading.quotedSpans(pieces.texts) {
@@ -150,24 +152,26 @@ public struct SecurityNoInterpolatedSqlString: TypedFileRule {
          Each segment is resolved on its own through a literal holding only it, so its escapes read as the
          compiler reads them. Nil when there is no interpolation or a segment does not resolve.
          */
-        static func pieces(of literal: StringLiteralExprSyntax) -> (texts: [[UInt8]], interpolations: [ExpressionSegmentSyntax])? {
+        static func pieces(
+            of literal: StringLiteralExprSyntax
+        ) -> (texts: [[UInt8]], interpolations: [ExpressionSegmentSyntax])? {
             var texts: [[UInt8]] = [[]]
             var interpolations: [ExpressionSegmentSyntax] = []
             for segment in literal.segments {
                 switch segment {
-                case .stringSegment(let text):
-                    let alone = StringLiteralExprSyntax(
-                        openingPounds: literal.openingPounds,
-                        openingQuote: literal.openingQuote,
-                        segments: StringLiteralSegmentListSyntax([.stringSegment(text)]),
-                        closingQuote: literal.closingQuote,
-                        closingPounds: literal.closingPounds
-                    )
-                    guard let value = alone.representedLiteralValue else { return nil }
-                    texts[texts.count - 1].append(contentsOf: Array(value.utf8))
-                case .expressionSegment(let interpolation):
-                    interpolations.append(interpolation)
-                    texts.append([])
+                    case .stringSegment(let text):
+                        let alone = StringLiteralExprSyntax(
+                            openingPounds: literal.openingPounds,
+                            openingQuote: literal.openingQuote,
+                            segments: StringLiteralSegmentListSyntax([.stringSegment(text)]),
+                            closingQuote: literal.closingQuote,
+                            closingPounds: literal.closingPounds,
+                        )
+                        guard let value = alone.representedLiteralValue else { return nil }
+                        texts[texts.count - 1].append(contentsOf: Array(value.utf8))
+                    case .expressionSegment(let interpolation):
+                        interpolations.append(interpolation)
+                        texts.append([])
                 }
             }
             return interpolations.isEmpty ? nil : (texts, interpolations)
@@ -182,22 +186,26 @@ public struct SecurityNoInterpolatedSqlString: TypedFileRule {
  */
 enum SqlReading {
     static let leadingKeywords: Set<String> = [
-        "SELECT", "INSERT", "UPDATE", "DELETE", "REPLACE", "WITH", "SHOW", "EXPLAIN", "PRAGMA", "WHERE", "AND", "OR", "SET", "VALUES", "HAVING",
+        "SELECT", "INSERT", "UPDATE", "DELETE", "REPLACE", "WITH", "SHOW", "EXPLAIN", "PRAGMA", "WHERE", "AND", "OR",
+        "SET", "VALUES", "HAVING",
     ]
 
     /* An uppercase `WHERE` or `HAVING` opening a literal is a clause, where `SELECT` or `AND` could open a shouted sentence. */
     static let selfConfirmingKeywords: Set<String> = ["WHERE", "HAVING"]
 
     static let keywords: Set<String> = [
-        "SELECT", "INSERT", "UPDATE", "DELETE", "REPLACE", "WITH", "SHOW", "EXPLAIN", "PRAGMA", "WHERE", "AND", "OR", "SET", "VALUES", "HAVING",
-        "FROM", "INTO", "LIKE", "GLOB", "BETWEEN", "JOIN", "ON", "IN", "IS", "NOT", "NULL", "ORDER", "GROUP", "BY", "LIMIT", "OFFSET", "AS",
+        "SELECT", "INSERT", "UPDATE", "DELETE", "REPLACE", "WITH", "SHOW", "EXPLAIN", "PRAGMA", "WHERE", "AND", "OR",
+        "SET", "VALUES", "HAVING",
+        "FROM", "INTO", "LIKE", "GLOB", "BETWEEN", "JOIN", "ON", "IN", "IS", "NOT", "NULL", "ORDER", "GROUP", "BY",
+        "LIMIT", "OFFSET", "AS",
         "DISTINCT", "COUNT", "TABLE", "STATUS", "CASE", "WHEN", "THEN", "ELSE", "END", "UNION", "ESCAPE", "ASC", "DESC",
     ]
 
     /* The tokens after which an opening quote begins a value. */
     static let valueTokens: Set<String> = [
         "=", "==", "<", ">", "<=", ">=", "<>", "!=", "||", "+", "(", ",",
-        "LIKE", "GLOB", "REGEXP", "RLIKE", "BETWEEN", "AND", "SELECT", "WHEN", "THEN", "ELSE", "ESCAPE", "DEFAULT", "INTERVAL",
+        "LIKE", "GLOB", "REGEXP", "RLIKE", "BETWEEN", "AND", "SELECT", "WHEN", "THEN", "ELSE", "ESCAPE", "DEFAULT",
+        "INTERVAL",
     ]
 
     static let fragmentKeywords: Set<String> = ["AND", "OR", "NOT", "WHERE", "SELECT", "FROM", "ESCAPE"]
@@ -220,7 +228,8 @@ enum SqlReading {
 
     static func isWordCharacter(_ character: UInt8) -> Bool {
         character == UInt8(ascii: "_") || (character >= UInt8(ascii: "a") && character <= UInt8(ascii: "z"))
-            || (character >= UInt8(ascii: "A") && character <= UInt8(ascii: "Z")) || (character >= UInt8(ascii: "0") && character <= UInt8(ascii: "9"))
+            || (character >= UInt8(ascii: "A") && character <= UInt8(ascii: "Z"))
+            || (character >= UInt8(ascii: "0") && character <= UInt8(ascii: "9"))
     }
 
     static func wordLength(_ text: [UInt8], _ start: Int) -> Int {
@@ -232,7 +241,8 @@ enum SqlReading {
     }
 
     static func isWhitespace(_ character: UInt8) -> Bool {
-        character == UInt8(ascii: " ") || character == UInt8(ascii: "\t") || character == UInt8(ascii: "\r") || character == UInt8(ascii: "\n")
+        character == UInt8(ascii: " ") || character == UInt8(ascii: "\t") || character == UInt8(ascii: "\r")
+            || character == UInt8(ascii: "\n")
     }
 
     static func isOperatorCharacter(_ character: UInt8) -> Bool {
@@ -260,97 +270,112 @@ enum SqlReading {
             while index < text.count {
                 let character = text[index]
                 switch state {
-                case .code:
-                    if isWhitespace(character) {
-                        index += 1
-                    } else if character == quote {
-                        state = .string
-                        openedAtValue = valueTokens.contains(previousToken)
-                        index += 1
-                    } else if character == UInt8(ascii: "\"") {
-                        state = .doubleQuotes
-                        index += 1
-                    } else if character == UInt8(ascii: "`") {
-                        state = .backquotes
-                        index += 1
-                    } else if character == UInt8(ascii: "-"), index + 1 < text.count, text[index + 1] == UInt8(ascii: "-") {
-                        /* MySQL reads `a--1` as arithmetic, so only `-- ` is a comment everywhere. */
-                        guard index + 2 < text.count, isWhitespace(text[index + 2]) else { return [] }
-                        state = .lineComment
-                        index += 3
-                    } else if character == UInt8(ascii: "/"), index + 1 < text.count, text[index + 1] == UInt8(ascii: "*") {
-                        state = .blockComment
-                        index += 2
-                    } else if character == UInt8(ascii: "#") {
-                        /* A comment in MySQL only. */
-                        return []
-                    } else if character == UInt8(ascii: "$") {
-                        /* `$1` and `$name` are placeholders; `$$` and `$tag$` open a dollar-quoted string. */
-                        let length = wordLength(text, index + 1)
-                        if index + 1 + length < text.count, text[index + 1 + length] == UInt8(ascii: "$") {
+                    case .code:
+                        if isWhitespace(character) {
+                            index += 1
+                        }
+                        else if character == quote {
+                            state = .string
+                            openedAtValue = valueTokens.contains(previousToken)
+                            index += 1
+                        }
+                        else if character == UInt8(ascii: "\"") {
+                            state = .doubleQuotes
+                            index += 1
+                        }
+                        else if character == UInt8(ascii: "`") {
+                            state = .backquotes
+                            index += 1
+                        }
+                        else if character == UInt8(ascii: "-"), index + 1 < text.count,
+                            text[index + 1] == UInt8(ascii: "-")
+                        {
+                            /* MySQL reads `a--1` as arithmetic, so only `-- ` is a comment everywhere. */
+                            guard index + 2 < text.count, isWhitespace(text[index + 2]) else { return [] }
+                            state = .lineComment
+                            index += 3
+                        }
+                        else if character == UInt8(ascii: "/"), index + 1 < text.count,
+                            text[index + 1] == UInt8(ascii: "*")
+                        {
+                            state = .blockComment
+                            index += 2
+                        }
+                        else if character == UInt8(ascii: "#") {
+                            /* A comment in MySQL only. */
                             return []
                         }
-                        previousToken = "$"
-                        index += 1 + length
-                    } else if isWordCharacter(character) {
-                        let length = wordLength(text, index)
-                        let word = String(decoding: text[index..<index + length], as: UTF8.self)
-                        if keywords.contains(word) {
-                            keywordCount += 1
+                        else if character == UInt8(ascii: "$") {
+                            /* `$1` and `$name` are placeholders; `$$` and `$tag$` open a dollar-quoted string. */
+                            let length = wordLength(text, index + 1)
+                            if index + 1 + length < text.count, text[index + 1 + length] == UInt8(ascii: "$") {
+                                return []
+                            }
+                            previousToken = "$"
+                            index += 1 + length
                         }
-                        previousToken = word.uppercased()
-                        index += length
-                    } else if isOperatorCharacter(character) {
-                        var end = index
-                        while end < text.count, isOperatorCharacter(text[end]) {
-                            end += 1
+                        else if isWordCharacter(character) {
+                            let length = wordLength(text, index)
+                            let word = String(decoding: text[index..<index + length], as: UTF8.self)
+                            if keywords.contains(word) {
+                                keywordCount += 1
+                            }
+                            previousToken = word.uppercased()
+                            index += length
                         }
-                        previousToken = String(decoding: text[index..<end], as: UTF8.self)
-                        index = end
-                    } else {
-                        previousToken = String(decoding: [character], as: UTF8.self)
+                        else if isOperatorCharacter(character) {
+                            var end = index
+                            while end < text.count, isOperatorCharacter(text[end]) {
+                                end += 1
+                            }
+                            previousToken = String(decoding: text[index..<end], as: UTF8.self)
+                            index = end
+                        }
+                        else {
+                            previousToken = String(decoding: [character], as: UTF8.self)
+                            index += 1
+                        }
+                    case .string:
+                        if character == backslash {
+                            /* An escape in MySQL, an ordinary character elsewhere: where the string ends depends on the engine. */
+                            return []
+                        }
+                        if character == quote {
+                            if index + 1 < text.count, text[index + 1] == quote {
+                                index += 2
+                                continue
+                            }
+                            state = .code
+                            previousToken = "'"
+                        }
                         index += 1
-                    }
-                case .string:
-                    if character == backslash {
-                        /* An escape in MySQL, an ordinary character elsewhere: where the string ends depends on the engine. */
-                        return []
-                    }
-                    if character == quote {
-                        if index + 1 < text.count, text[index + 1] == quote {
+                    case .doubleQuotes, .backquotes:
+                        let closing = state == .backquotes ? UInt8(ascii: "`") : UInt8(ascii: "\"")
+                        if character == backslash {
+                            return []
+                        }
+                        if character == closing {
+                            if index + 1 < text.count, text[index + 1] == closing {
+                                index += 2
+                                continue
+                            }
+                            state = .code
+                            previousToken = String(decoding: [closing], as: UTF8.self)
+                        }
+                        index += 1
+                    case .lineComment:
+                        if character == UInt8(ascii: "\n") {
+                            state = .code
+                        }
+                        index += 1
+                    case .blockComment:
+                        if character == UInt8(ascii: "*"), index + 1 < text.count, text[index + 1] == UInt8(ascii: "/")
+                        {
+                            state = .code
                             index += 2
                             continue
                         }
-                        state = .code
-                        previousToken = "'"
-                    }
-                    index += 1
-                case .doubleQuotes, .backquotes:
-                    let closing = state == .backquotes ? UInt8(ascii: "`") : UInt8(ascii: "\"")
-                    if character == backslash {
-                        return []
-                    }
-                    if character == closing {
-                        if index + 1 < text.count, text[index + 1] == closing {
-                            index += 2
-                            continue
-                        }
-                        state = .code
-                        previousToken = String(decoding: [closing], as: UTF8.self)
-                    }
-                    index += 1
-                case .lineComment:
-                    if character == UInt8(ascii: "\n") {
-                        state = .code
-                    }
-                    index += 1
-                case .blockComment:
-                    if character == UInt8(ascii: "*"), index + 1 < text.count, text[index + 1] == UInt8(ascii: "/") {
-                        state = .code
-                        index += 2
-                        continue
-                    }
-                    index += 1
+                        index += 1
                 }
             }
             if textIndex == texts.count - 1 {
@@ -358,14 +383,14 @@ enum SqlReading {
             }
             /* The interpolation after this text. */
             switch state {
-            case .string:
-                if openedAtValue {
-                    quotedSpans.append(textIndex)
-                }
-            case .code:
-                previousToken = "\\()"
-            case .doubleQuotes, .backquotes, .lineComment, .blockComment:
-                break
+                case .string:
+                    if openedAtValue {
+                        quotedSpans.append(textIndex)
+                    }
+                case .code:
+                    previousToken = "\\()"
+                case .doubleQuotes, .backquotes, .lineComment, .blockComment:
+                    break
             }
         }
         guard state == .code || state == .lineComment else { return [] }
@@ -389,7 +414,9 @@ enum SqlReading {
                     quotesBefore += 1
                     continue
                 }
-                guard text[index...].starts(with: like), index == 0 || !isWordCharacter(text[index - 1]) else { continue }
+                guard text[index...].starts(with: like), index == 0 || !isWordCharacter(text[index - 1]) else {
+                    continue
+                }
                 var opening = index + like.count
                 guard opening < text.count, isWhitespace(text[opening]) else { continue }
                 while opening < text.count, isWhitespace(text[opening]) {
@@ -433,7 +460,11 @@ enum SqlReading {
      A single-quoted string read from just after its opening quote, across interpolations: the interpolations
      inside it, and where its closing quote is. Nil when it never closes or holds a backslash.
      */
-    static func readString(_ texts: [[UInt8]], textIndex start: Int, start position: Int) -> (spans: [Int], closingText: Int, closingIndex: Int)? {
+    static func readString(
+        _ texts: [[UInt8]],
+        textIndex start: Int,
+        start position: Int,
+    ) -> (spans: [Int], closingText: Int, closingIndex: Int)? {
         var spans: [Int] = []
         var index = position
         for textIndex in start..<texts.count {
@@ -480,10 +511,10 @@ indirect enum ValueShape: Equatable {
     /* TypeScript's `string`, `any` and `unknown`, and a literal holding a quote or a backslash. */
     var canHoldQuote: Bool {
         switch self {
-        case .named(let name): Self.textTypes.contains(name)
-        case .literal(let text): text.map { $0.contains("'") || $0.contains("\\") } ?? true
-        case .optional(let wrapped): wrapped.canHoldQuote
-        case .sequence, .dictionary, .tuple: false
+            case .named(let name): Self.textTypes.contains(name)
+            case .literal(let text): text.map { $0.contains("'") || $0.contains("\\") } ?? true
+            case .optional(let wrapped): wrapped.canHoldQuote
+            case .sequence, .dictionary, .tuple: false
         }
     }
 
@@ -504,9 +535,9 @@ indirect enum ValueShape: Equatable {
 
     var element: ValueShape? {
         switch self {
-        case .sequence(let element): element
-        case .dictionary(let key, let value): .tuple([key, value])
-        case .named, .literal, .optional, .tuple: nil
+            case .sequence(let element): element
+            case .dictionary(let key, let value): .tuple([key, value])
+            case .named, .literal, .optional, .tuple: nil
         }
     }
 
@@ -523,7 +554,9 @@ indirect enum ValueShape: Equatable {
         if text.first == "[", text.last == "]", closing(of: text) == text.index(before: text.endIndex) {
             let inner = text.dropFirst().dropLast()
             if let colon = topLevel(" : ", in: inner) {
-                guard let key = parse(inner[..<colon.lowerBound]), let value = parse(inner[colon.upperBound...]) else { return nil }
+                guard let key = parse(inner[..<colon.lowerBound]), let value = parse(inner[colon.upperBound...]) else {
+                    return nil
+                }
                 return .dictionary(key: key, value: value)
             }
             return parse(inner).map(ValueShape.sequence)
@@ -538,12 +571,13 @@ indirect enum ValueShape: Equatable {
         if let open = text.firstIndex(of: "<"), text.last == ">" {
             let arguments = split(text[text.index(after: open)..<text.index(before: text.endIndex)]).map(parse)
             switch (text[..<open], arguments.count) {
-            case ("Swift.Optional", 1): return arguments[0].map(ValueShape.optional)
-            case ("Swift.Array", 1), ("Swift.Set", 1), ("Swift.ArraySlice", 1), ("Swift.ContiguousArray", 1): return arguments[0].map(ValueShape.sequence)
-            case ("Swift.Dictionary", 2):
-                guard let key = arguments[0], let value = arguments[1] else { return nil }
-                return .dictionary(key: key, value: value)
-            default: return .named(String(text))
+                case ("Swift.Optional", 1): return arguments[0].map(ValueShape.optional)
+                case ("Swift.Array", 1), ("Swift.Set", 1), ("Swift.ArraySlice", 1), ("Swift.ContiguousArray", 1):
+                    return arguments[0].map(ValueShape.sequence)
+                case ("Swift.Dictionary", 2):
+                    guard let key = arguments[0], let value = arguments[1] else { return nil }
+                    return .dictionary(key: key, value: value)
+                default: return .named(String(text))
             }
         }
         return .named(String(text))
@@ -562,9 +596,9 @@ indirect enum ValueShape: Equatable {
                 continue
             }
             switch text[index] {
-            case "(", "[", "<": depth += 1
-            case ")", "]", ">": depth -= 1
-            default: break
+                case "(", "[", "<": depth += 1
+                case ")", "]", ">": depth -= 1
+                default: break
             }
             index = text.index(after: index)
         }
@@ -581,13 +615,13 @@ indirect enum ValueShape: Equatable {
                 continue
             }
             switch text[index] {
-            case "(", "[", "<": depth += 1
-            case ")", "]", ">":
-                depth -= 1
-                if depth == 0 {
-                    return index
-                }
-            default: break
+                case "(", "[", "<": depth += 1
+                case ")", "]", ">":
+                    depth -= 1
+                    if depth == 0 {
+                        return index
+                    }
+                default: break
             }
             index = text.index(after: index)
         }
@@ -609,7 +643,9 @@ indirect enum ValueShape: Equatable {
 
     /* `key: Swift.String` is `Swift.String`. */
     static func dropLabel(_ member: Substring) -> Substring {
-        guard let colon = member.range(of: ": "), member[..<colon.lowerBound].allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" }) else {
+        guard let colon = member.range(of: ": "),
+            member[..<colon.lowerBound].allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" })
+        else {
             return member
         }
         return member[colon.upperBound...]
@@ -631,7 +667,9 @@ final class ValueTypes {
     }
 
     /* The stdlib members that keep a collection's element. */
-    static let elementPreserving: Set<String> = ["sorted", "reversed", "filter", "shuffled", "prefix", "suffix", "dropFirst", "dropLast"]
+    static let elementPreserving: Set<String> = [
+        "sorted", "reversed", "filter", "shuffled", "prefix", "suffix", "dropFirst", "dropLast",
+    ]
 
     func canHoldQuote(_ value: ExprSyntax) -> Bool {
         shape(of: value)?.canHoldQuote ?? false
@@ -639,7 +677,8 @@ final class ValueTypes {
 
     func shape(of expression: ExprSyntax) -> ValueShape? {
         if let literal = expression.as(StringLiteralExprSyntax.self) {
-            return literal.segments.contains { $0.is(ExpressionSegmentSyntax.self) } ? .literal(nil) : literal.representedLiteralValue.map { .literal($0) }
+            return literal.segments.contains { $0.is(ExpressionSegmentSyntax.self) }
+                ? .literal(nil) : literal.representedLiteralValue.map { .literal($0) }
         }
         if let tried = expression.as(TryExprSyntax.self) {
             return shape(of: tried.expression)
@@ -659,11 +698,13 @@ final class ValueTypes {
         }
         if let cast = expression.as(AsExprSyntax.self) {
             let target = shape(of: cast.type)
-            return cast.questionOrExclamationMark?.tokenKind == .postfixQuestionMark ? target.map(ValueShape.optional) : target
+            return cast.questionOrExclamationMark?.tokenKind == .postfixQuestionMark
+                ? target.map(ValueShape.optional) : target
         }
         if let array = expression.as(ArrayExprSyntax.self) {
             /* An array literal of string literals is `[String]`, as TypeScript widens `['a', 'b']` to `string[]`. */
-            guard !array.elements.isEmpty, array.elements.allSatisfy({ $0.expression.is(StringLiteralExprSyntax.self) }) else { return nil }
+            guard !array.elements.isEmpty, array.elements.allSatisfy({ $0.expression.is(StringLiteralExprSyntax.self) })
+            else { return nil }
             return .sequence(.named("Swift.String"))
         }
         if let infix = expression.as(InfixOperatorExprSyntax.self) {
@@ -697,35 +738,37 @@ final class ValueTypes {
             return nil
         }
         switch operation.operator.text {
-        case "??":
-            return shape(of: infix.leftOperand)?.unwrapped.widened
-        case "+":
-            let left = shape(of: infix.leftOperand)
-            let right = shape(of: infix.rightOperand)
-            /* Strings concatenate to a string; collections keep their element, which either side may show. */
-            if left?.widened == .named("Swift.String") || right?.widened == .named("Swift.String") {
-                return .named("Swift.String")
-            }
-            if case .sequence(let element)? = left {
-                return .sequence(element)
-            }
-            if case .sequence(let element)? = right {
-                return .sequence(element)
-            }
-            return nil
-        default:
-            return nil
+            case "??":
+                return shape(of: infix.leftOperand)?.unwrapped.widened
+            case "+":
+                let left = shape(of: infix.leftOperand)
+                let right = shape(of: infix.rightOperand)
+                /* Strings concatenate to a string; collections keep their element, which either side may show. */
+                if left?.widened == .named("Swift.String") || right?.widened == .named("Swift.String") {
+                    return .named("Swift.String")
+                }
+                if case .sequence(let element)? = left {
+                    return .sequence(element)
+                }
+                if case .sequence(let element)? = right {
+                    return .sequence(element)
+                }
+                return nil
+            default:
+                return nil
         }
     }
 
     func shape(ofMember member: MemberAccessExprSyntax) -> ValueShape? {
-        guard member.declName.argumentNames == nil, let declaration = reference(at: member.declName.baseName) else { return nil }
+        guard member.declName.argumentNames == nil, let declaration = reference(at: member.declName.baseName) else {
+            return nil
+        }
         if declaration.isStandardLibrary, let base = member.base {
             switch (member.declName.baseName.text, shape(of: base)) {
-            case ("keys", .dictionary(let key, _)?): return .sequence(key)
-            case ("values", .dictionary(_, let value)?): return .sequence(value)
-            case ("lazy", let collection?): return collection.element.map(ValueShape.sequence)
-            default: break
+                case ("keys", .dictionary(let key, _)?): return .sequence(key)
+                case ("values", .dictionary(_, let value)?): return .sequence(value)
+                case ("lazy", let collection?): return collection.element.map(ValueShape.sequence)
+                default: break
             }
         }
         return declared(declaration)?.shape
@@ -733,7 +776,9 @@ final class ValueTypes {
 
     func shape(ofCall call: FunctionCallExprSyntax) -> ValueShape? {
         let callee = call.calledExpression
-        if let member = callee.as(MemberAccessExprSyntax.self), let base = member.base, let declaration = reference(at: member.declName.baseName), declaration.isStandardLibrary {
+        if let member = callee.as(MemberAccessExprSyntax.self), let base = member.base,
+            let declaration = reference(at: member.declName.baseName), declaration.isStandardLibrary
+        {
             let name = member.declName.baseName.text
             if Self.elementPreserving.contains(name), let element = shape(of: base)?.element {
                 return .sequence(element)
@@ -742,24 +787,30 @@ final class ValueTypes {
                 return .sequence(.tuple([.named("Swift.Int"), element]))
             }
         }
-        if let type = callee.as(DeclReferenceExprSyntax.self), ["Array", "Set", "ContiguousArray"].contains(type.baseName.text), call.trailingClosure == nil,
-            let argument = call.arguments.first, call.arguments.count == 1, argument.label == nil, isStandardLibrary(at: type.baseName)
+        if let type = callee.as(DeclReferenceExprSyntax.self),
+            ["Array", "Set", "ContiguousArray"].contains(type.baseName.text), call.trailingClosure == nil,
+            let argument = call.arguments.first, call.arguments.count == 1, argument.label == nil,
+            isStandardLibrary(at: type.baseName)
         {
             return shape(of: argument.expression)?.element.map(ValueShape.sequence)
         }
         let name: TokenSyntax
         if let member = callee.as(MemberAccessExprSyntax.self) {
             name = member.declName.baseName
-        } else if let reference = callee.as(DeclReferenceExprSyntax.self) {
+        }
+        else if let reference = callee.as(DeclReferenceExprSyntax.self) {
             /* A local closure's result is not read. */
             guard localBinding(named: reference.baseName.text, from: Syntax(reference)) == nil else { return nil }
             name = reference.baseName
-        } else {
+        }
+        else {
             return nil
         }
         /* A type's name called as a function records the type and its initializer at one place; the one function among them answers. */
         let location = file.locations.location(for: name.positionAfterSkippingLeadingTrivia)
-        let functions = symbols.occurrences(line: location.line, column: location.column).filter { $0.isReference && !$0.isImplicit }.compactMap(declared).filter(\.isFunction)
+        let functions = symbols.occurrences(line: location.line, column: location.column).filter {
+            $0.isReference && !$0.isImplicit
+        }.compactMap(declared).filter(\.isFunction)
         guard functions.count == 1, let function = functions.first else { return nil }
         return function.shape
     }
@@ -773,7 +824,9 @@ final class ValueTypes {
     /* The index records both the type and its initializer at `Array(...)`; every written reference there must be the standard library's. */
     func isStandardLibrary(at token: TokenSyntax) -> Bool {
         let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
-        let references = symbols.occurrences(line: location.line, column: location.column).filter { $0.isReference && !$0.isImplicit }
+        let references = symbols.occurrences(line: location.line, column: location.column).filter {
+            $0.isReference && !$0.isImplicit
+        }
         return !references.isEmpty && references.allSatisfy(\.isStandardLibrary)
     }
 
@@ -790,7 +843,9 @@ final class ValueTypes {
         if occurrence.symbol.contains("O8rawValue") {
             return nil
         }
-        guard let demangler, var demangled = demangler.declaration(ofSymbol: occurrence.symbol)?[...] else { return nil }
+        guard let demangler, var demangled = demangler.declaration(ofSymbol: occurrence.symbol)?[...] else {
+            return nil
+        }
         if demangled.hasPrefix("static ") {
             demangled = demangled.dropFirst("static ".count)
         }
@@ -811,7 +866,9 @@ final class ValueTypes {
             }
             return (type, false)
         }
-        if let arrow = ValueShape.topLevel(" -> ", in: demangled), [")", " throws", " rethrows", " async"].contains(where: { demangled[..<arrow.lowerBound].hasSuffix($0) }) {
+        if let arrow = ValueShape.topLevel(" -> ", in: demangled),
+            [")", " throws", " rethrows", " async"].contains(where: { demangled[..<arrow.lowerBound].hasSuffix($0) })
+        {
             return (ValueShape.parse(demangled[arrow.upperBound...])?.widened, true)
         }
         return (nil, false)
@@ -821,10 +878,13 @@ final class ValueTypes {
     func declaredHere(_ symbol: String) -> PatternBindingSyntax? {
         if declaredHere == nil {
             var found: [String: PatternBindingSyntax] = [:]
-            for binding in file.tree.tokens(viewMode: .sourceAccurate).compactMap({ $0.parent?.as(IdentifierPatternSyntax.self)?.parent?.as(PatternBindingSyntax.self) }) {
+            for binding in file.tree.tokens(viewMode: .sourceAccurate).compactMap({
+                $0.parent?.as(IdentifierPatternSyntax.self)?.parent?.as(PatternBindingSyntax.self)
+            }) {
                 guard let name = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier else { continue }
                 let location = file.locations.location(for: name.positionAfterSkippingLeadingTrivia)
-                for occurrence in symbols.occurrences(line: location.line, column: location.column) where !occurrence.isReference {
+                for occurrence in symbols.occurrences(line: location.line, column: location.column)
+                where !occurrence.isReference {
                     found[occurrence.symbol] = binding
                 }
             }
@@ -864,7 +924,8 @@ final class ValueTypes {
         var child = start
         while let scope = child.parent {
             defer { child = scope }
-            if scope.is(StructDeclSyntax.self) || scope.is(ClassDeclSyntax.self) || scope.is(EnumDeclSyntax.self) || scope.is(ActorDeclSyntax.self)
+            if scope.is(StructDeclSyntax.self) || scope.is(ClassDeclSyntax.self) || scope.is(EnumDeclSyntax.self)
+                || scope.is(ActorDeclSyntax.self)
                 || scope.is(ExtensionDeclSyntax.self) || scope.is(ProtocolDeclSyntax.self)
             {
                 return nil
@@ -875,45 +936,60 @@ final class ValueTypes {
                         return binding
                     }
                 }
-            } else if let conditions = scope.as(ConditionElementListSyntax.self) {
+            }
+            else if let conditions = scope.as(ConditionElementListSyntax.self) {
                 for condition in conditions.reversed() where condition.endPosition <= child.position {
                     if let binding = binding(named: name, in: condition, at: scope) {
                         return binding
                     }
                 }
-            } else if let ifExpression = scope.as(IfExprSyntax.self), child.id == ifExpression.body.id {
+            }
+            else if let ifExpression = scope.as(IfExprSyntax.self), child.id == ifExpression.body.id {
                 if let binding = binding(named: name, in: ifExpression.conditions, at: scope) {
                     return binding
                 }
-            } else if let whileStatement = scope.as(WhileStmtSyntax.self), child.id == whileStatement.body.id {
+            }
+            else if let whileStatement = scope.as(WhileStmtSyntax.self), child.id == whileStatement.body.id {
                 if let binding = binding(named: name, in: whileStatement.conditions, at: scope) {
                     return binding
                 }
-            } else if let forStatement = scope.as(ForStmtSyntax.self), child.id == forStatement.body.id || child.id == forStatement.whereClause?.id {
+            }
+            else if let forStatement = scope.as(ForStmtSyntax.self),
+                child.id == forStatement.body.id || child.id == forStatement.whereClause?.id
+            {
                 if Self.binds(name, forStatement.pattern) {
-                    guard forStatement.caseKeyword == nil, forStatement.typeAnnotation == nil, let element = shape(of: forStatement.sequence)?.element else {
+                    guard forStatement.caseKeyword == nil, forStatement.typeAnnotation == nil,
+                        let element = shape(of: forStatement.sequence)?.element
+                    else {
                         return Binding()
                     }
                     return Binding(shape: Self.destructure(forStatement.pattern, element, name: name))
                 }
-            } else if let closure = scope.as(ClosureExprSyntax.self), child.id == closure.statements.id {
+            }
+            else if let closure = scope.as(ClosureExprSyntax.self), child.id == closure.statements.id {
                 if let binding = binding(named: name, in: closure) {
                     return binding
                 }
-            } else if let parameters = Self.parameters(of: scope) {
+            }
+            else if let parameters = Self.parameters(of: scope) {
                 for parameter in parameters where (parameter.secondName ?? parameter.firstName).text == name {
                     let type = shape(of: parameter.type)
                     return Binding(shape: parameter.ellipsis == nil ? type : type.map(ValueShape.sequence))
                 }
-                if let accessor = scope.as(AccessorDeclSyntax.self), accessor.parameters?.name.text == name || (accessor.parameters == nil && ["newValue", "oldValue"].contains(name)) {
+                if let accessor = scope.as(AccessorDeclSyntax.self),
+                    accessor.parameters?.name.text == name
+                        || (accessor.parameters == nil && ["newValue", "oldValue"].contains(name))
+                {
                     return Binding()
                 }
-            } else if let switchCase = scope.as(SwitchCaseSyntax.self), child.id == switchCase.statements.id {
+            }
+            else if let switchCase = scope.as(SwitchCaseSyntax.self), child.id == switchCase.statements.id {
                 /* A case pattern's bindings are not read. */
                 if Self.binds(name, switchCase.label) {
                     return Binding()
                 }
-            } else if let catchClause = scope.as(CatchClauseSyntax.self), child.id == catchClause.body.id {
+            }
+            else if let catchClause = scope.as(CatchClauseSyntax.self), child.id == catchClause.body.id {
                 /* Nor a catch pattern's, nor its implicit `error`. */
                 if Self.binds(name, catchClause.catchItems) || (catchClause.catchItems.isEmpty && name == "error") {
                     return Binding()
@@ -946,9 +1022,16 @@ final class ValueTypes {
             let isLet = declaration.bindingSpecifier.tokenKind == .keyword(.let)
             for binding in declaration.bindings where Self.binds(name, binding.pattern) {
                 guard binding.pattern.is(IdentifierPatternSyntax.self) else {
-                    return Binding(shape: shape(of: binding, isLet: isLet).flatMap { Self.destructure(binding.pattern, $0, name: name) })
+                    return Binding(
+                        shape: shape(of: binding, isLet: isLet).flatMap {
+                            Self.destructure(binding.pattern, $0, name: name)
+                        }
+                    )
                 }
-                return Binding(shape: shape(of: binding, isLet: isLet), letInitializer: isLet ? binding.initializer?.value : nil)
+                return Binding(
+                    shape: shape(of: binding, isLet: isLet),
+                    letInitializer: isLet ? binding.initializer?.value : nil,
+                )
             }
             return nil
         }
@@ -973,7 +1056,9 @@ final class ValueTypes {
 
     func binding(named name: String, in condition: ConditionElementSyntax, at statement: Syntax) -> Binding? {
         guard Self.binds(name, condition) else { return nil }
-        guard let optional = condition.condition.as(OptionalBindingConditionSyntax.self), let pattern = optional.pattern.as(IdentifierPatternSyntax.self) else {
+        guard let optional = condition.condition.as(OptionalBindingConditionSyntax.self),
+            let pattern = optional.pattern.as(IdentifierPatternSyntax.self)
+        else {
             /* `if case let`, and anything else that binds, is not read. */
             return Binding()
         }
@@ -1001,23 +1086,25 @@ final class ValueTypes {
             }
         }
         switch signature.parameterClause {
-        case .simpleInput(let names):
-            if names.contains(where: { $0.name.text == name }) {
-                return Binding()
-            }
-        case .parameterClause(let clause):
-            for parameter in clause.parameters where (parameter.secondName ?? parameter.firstName).text == name {
-                return Binding(shape: parameter.type.flatMap { shape(of: $0) })
-            }
-        case nil:
-            break
+            case .simpleInput(let names):
+                if names.contains(where: { $0.name.text == name }) {
+                    return Binding()
+                }
+            case .parameterClause(let clause):
+                for parameter in clause.parameters where (parameter.secondName ?? parameter.firstName).text == name {
+                    return Binding(shape: parameter.type.flatMap { shape(of: $0) })
+                }
+            case nil:
+                break
         }
         return nil
     }
 
     /* Whether any identifier pattern under this node binds the name. */
     static func binds(_ name: String, _ node: some SyntaxProtocol) -> Bool {
-        node.tokens(viewMode: .sourceAccurate).contains { $0.text == name && $0.parent?.is(IdentifierPatternSyntax.self) == true }
+        node.tokens(viewMode: .sourceAccurate).contains {
+            $0.text == name && $0.parent?.is(IdentifierPatternSyntax.self) == true
+        }
     }
 
     /* The part of a shown type a pattern gives a name: the whole for a name, a member by position for a tuple. */
@@ -1025,7 +1112,9 @@ final class ValueTypes {
         if let identifier = pattern.as(IdentifierPatternSyntax.self) {
             return identifier.identifier.text == name ? shape.widened : nil
         }
-        guard let tuple = pattern.as(TuplePatternSyntax.self), case .tuple(let members) = shape, members.count == tuple.elements.count else { return nil }
+        guard let tuple = pattern.as(TuplePatternSyntax.self), case .tuple(let members) = shape,
+            members.count == tuple.elements.count
+        else { return nil }
         for (element, member) in zip(tuple.elements, members) where binds(name, element.pattern) {
             return destructure(element.pattern, member, name: name)
         }
@@ -1063,34 +1152,43 @@ final class ValueTypes {
             }
             name = identifier.name
             arguments = identifier.genericArgumentClause?.arguments
-        } else if let member = type.as(MemberTypeSyntax.self) {
+        }
+        else if let member = type.as(MemberTypeSyntax.self) {
             name = member.name
             arguments = member.genericArgumentClause?.arguments
-        } else {
+        }
+        else {
             return nil
         }
-        guard let declaration = reference(at: name), declaration.isStandardLibrary, let demangled = demangler?.declaration(ofSymbol: declaration.symbol) else { return nil }
+        guard let declaration = reference(at: name), declaration.isStandardLibrary,
+            let demangled = demangler?.declaration(ofSymbol: declaration.symbol)
+        else { return nil }
         guard let arguments else { return .named(demangled) }
         let shapes = arguments.compactMap { $0.argument.as(TypeSyntax.self).flatMap { shape(of: $0) } }
         guard shapes.count == arguments.count else { return nil }
         switch (demangled, shapes.count) {
-        case ("Swift.Optional", 1): return .optional(shapes[0])
-        case ("Swift.Array", 1), ("Swift.Set", 1), ("Swift.ArraySlice", 1), ("Swift.ContiguousArray", 1): return .sequence(shapes[0])
-        case ("Swift.Dictionary", 2): return .dictionary(key: shapes[0], value: shapes[1])
-        default: return nil
+            case ("Swift.Optional", 1): return .optional(shapes[0])
+            case ("Swift.Array", 1), ("Swift.Set", 1), ("Swift.ArraySlice", 1), ("Swift.ContiguousArray", 1):
+                return .sequence(shapes[0])
+            case ("Swift.Dictionary", 2): return .dictionary(key: shapes[0], value: shapes[1])
+            default: return nil
         }
     }
 
     /* The value, or the initializer of the local `let` it names, ends in the escape the TypeScript rule accepts. */
     func isEscaped(_ value: ExprSyntax) -> Bool {
         var expression = value
-        while let inner = expression.as(TryExprSyntax.self)?.expression ?? expression.as(AwaitExprSyntax.self)?.expression {
+        while let inner = expression.as(TryExprSyntax.self)?.expression
+            ?? expression.as(AwaitExprSyntax.self)?.expression
+        {
             expression = inner
         }
         if isEscapeChain(expression) {
             return true
         }
-        guard let reference = expression.as(DeclReferenceExprSyntax.self), let initializer = localBinding(named: reference.baseName.text, from: Syntax(reference))?.letInitializer else {
+        guard let reference = expression.as(DeclReferenceExprSyntax.self),
+            let initializer = localBinding(named: reference.baseName.text, from: Syntax(reference))?.letInitializer
+        else {
             return false
         }
         return isEscapeChain(initializer)
@@ -1108,26 +1206,35 @@ final class ValueTypes {
      it doubles, and what it was called on.
      */
     func replaceStep(_ expression: ExprSyntax) -> (doubled: String, receiver: ExprSyntax)? {
-        guard let call = expression.as(FunctionCallExprSyntax.self), call.trailingClosure == nil, call.arguments.count == 2,
-            let member = call.calledExpression.as(MemberAccessExprSyntax.self), var receiver = member.base, !receiver.is(OptionalChainingExprSyntax.self),
+        guard let call = expression.as(FunctionCallExprSyntax.self), call.trailingClosure == nil,
+            call.arguments.count == 2,
+            let member = call.calledExpression.as(MemberAccessExprSyntax.self), var receiver = member.base,
+            !receiver.is(OptionalChainingExprSyntax.self),
             let declaration = reference(at: member.declName.baseName), !symbols.isOwned(declaration)
         else { return nil }
         let arguments = Array(call.arguments)
         let labels = arguments.map { $0.label?.text }
         let doubled: String?
         switch (member.declName.baseName.text, labels) {
-        case ("replacingOccurrences", ["of", "with"]):
-            doubled = arguments[0].expression.as(StringLiteralExprSyntax.self)?.representedLiteralValue
-        case ("replacing", [nil, "with"]):
-            doubled = arguments[0].expression.as(StringLiteralExprSyntax.self)?.representedLiteralValue
-                ?? arguments[0].expression.as(RegexLiteralExprSyntax.self).flatMap { ["'": "'", "\\\\": "\\"][$0.regex.text] }
-        default:
-            doubled = nil
+            case ("replacingOccurrences", ["of", "with"]):
+                doubled = arguments[0].expression.as(StringLiteralExprSyntax.self)?.representedLiteralValue
+            case ("replacing", [nil, "with"]):
+                doubled =
+                    arguments[0].expression.as(StringLiteralExprSyntax.self)?.representedLiteralValue
+                    ?? arguments[0].expression.as(RegexLiteralExprSyntax.self).flatMap {
+                        ["'": "'", "\\\\": "\\"][$0.regex.text]
+                    }
+            default:
+                doubled = nil
         }
-        guard let doubled, ["'", "\\"].contains(doubled), arguments[1].expression.as(StringLiteralExprSyntax.self)?.representedLiteralValue == doubled + doubled else {
+        guard let doubled, ["'", "\\"].contains(doubled),
+            arguments[1].expression.as(StringLiteralExprSyntax.self)?.representedLiteralValue == doubled + doubled
+        else {
             return nil
         }
-        while let inner = receiver.as(TupleExprSyntax.self), inner.elements.count == 1, let only = inner.elements.first, only.label == nil {
+        while let inner = receiver.as(TupleExprSyntax.self), inner.elements.count == 1, let only = inner.elements.first,
+            only.label == nil
+        {
             receiver = only.expression
         }
         return (doubled, receiver)

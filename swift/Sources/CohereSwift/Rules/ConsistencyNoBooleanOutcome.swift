@@ -61,13 +61,17 @@ public struct ConsistencyNoBooleanOutcome: FileRule {
     public init() {}
 
     /* Names that claim to say how an operation turned out. */
-    static let outcomeFlagNames: Set<String> = ["success", "succeeded", "ok", "isSuccess", "isOk", "failed", "isError", "isFailure"]
+    static let outcomeFlagNames: Set<String> = [
+        "success", "succeeded", "ok", "isSuccess", "isOk", "failed", "isError", "isFailure",
+    ]
 
     /* Fields that turn a flag into a result envelope rather than ordinary state. */
     static let resultCompanionNames: Set<String> = ["error", "errors", "message", "value", "result", "reason", "data"]
 
     /* TanStack Query's own fields: a field set carrying one mirrors a third party's request result. */
-    static let thirdPartyRequestFieldNames: Set<String> = ["isLoading", "isPending", "isFetching", "isRefetching", "status"]
+    static let thirdPartyRequestFieldNames: Set<String> = [
+        "isLoading", "isPending", "isFetching", "isRefetching", "status",
+    ]
 
     /* Envelopes another system defines and sends over the wire, each its whole documented field set, so a shape of ours sharing a field or two is still read. */
     static let thirdPartyEnvelopes: [(name: String, fields: Set<String>)] = [
@@ -80,7 +84,8 @@ public struct ConsistencyNoBooleanOutcome: FileRule {
 
     /* SwiftUI's component protocols: a conforming struct's fields are display state its parent hands down, as React properties are. */
     static let componentProtocols: Set<String> = [
-        "View", "ViewModifier", "NSViewRepresentable", "UIViewRepresentable", "NSViewControllerRepresentable", "UIViewControllerRepresentable",
+        "View", "ViewModifier", "NSViewRepresentable", "UIViewRepresentable", "NSViewControllerRepresentable",
+        "UIViewControllerRepresentable",
     ]
 
     /* Every flagged shape spells `Bool` as the flag's type. */
@@ -95,7 +100,9 @@ public struct ConsistencyNoBooleanOutcome: FileRule {
             if declaration.name.hasSuffix("Properties") {
                 return nil
             }
-            if declaration.kind == .structure, declaration.isComponent || visitor.componentExtensionNames.contains(declaration.name) {
+            if declaration.kind == .structure,
+                declaration.isComponent || visitor.componentExtensionNames.contains(declaration.name)
+            {
                 return nil
             }
             guard let flag = Self.booleanOutcomeFlag(declaration.fields) else { return nil }
@@ -104,7 +111,7 @@ public struct ConsistencyNoBooleanOutcome: FileRule {
                 rule: name,
                 messageId: "booleanOutcome",
                 message:
-                    "\(flag.name): Bool on \(declaration.kind.rawValue) \(declaration.name) collapses every way the operation can turn out into one bit, at the moment the distinction is cheapest to keep, and leaves the reader to know which other fields hold for which value of it. Return a named outcome instead: an enum with a case for each way the operation can turn out and the payload on the case that carries it, or Result, or a throw for the failure. Suggested name: \(Self.suggestedName(declaration.name))Outcome."
+                    "\(flag.name): Bool on \(declaration.kind.rawValue) \(declaration.name) collapses every way the operation can turn out into one bit, at the moment the distinction is cheapest to keep, and leaves the reader to know which other fields hold for which value of it. Return a named outcome instead: an enum with a case for each way the operation can turn out and the payload on the case that carries it, or Result, or a throw for the failure. Suggested name: \(Self.suggestedName(declaration.name))Outcome.",
             )
             /* The field's name through its type, short of a trailing comma or an observer's block. */
             let end = flag.end.endLocation(converter: file.locations)
@@ -163,17 +170,32 @@ public struct ConsistencyNoBooleanOutcome: FileRule {
         override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
             let fields = node.memberBlock.members.flatMap { Self.storedFields($0.decl) }
             declarations.append(
-                Declaration(kind: .structure, name: node.name.text, fields: fields, isComponent: Self.declaresComponent(node.inheritanceClause)))
+                Declaration(
+                    kind: .structure,
+                    name: node.name.text,
+                    fields: fields,
+                    isComponent: Self.declaresComponent(node.inheritanceClause),
+                )
+            )
             return .visitChildren
         }
 
         override func visit(_ node: TypeAliasDeclSyntax) -> SyntaxVisitorContinueKind {
             guard let tuple = node.initializer.value.as(TupleTypeSyntax.self) else { return .visitChildren }
             let fields = tuple.elements.compactMap { element -> Field? in
-                guard let label = element.firstName, element.secondName == nil, label.tokenKind != .wildcard else { return nil }
-                return Field(name: label.text, isBool: Self.isBool(element.type), start: Syntax(label), end: Syntax(element.type))
+                guard let label = element.firstName, element.secondName == nil, label.tokenKind != .wildcard else {
+                    return nil
+                }
+                return Field(
+                    name: label.text,
+                    isBool: Self.isBool(element.type),
+                    start: Syntax(label),
+                    end: Syntax(element.type),
+                )
             }
-            declarations.append(Declaration(kind: .typeAlias, name: node.name.text, fields: fields, isComponent: false))
+            declarations.append(
+                Declaration(kind: .typeAlias, name: node.name.text, fields: fields, isComponent: false)
+            )
             return .visitChildren
         }
 
@@ -191,7 +213,9 @@ public struct ConsistencyNoBooleanOutcome: FileRule {
          */
         static func storedFields(_ member: DeclSyntax) -> [Field] {
             guard let variable = member.as(VariableDeclSyntax.self),
-                !variable.modifiers.contains(where: { $0.name.tokenKind == .keyword(.static) || $0.name.tokenKind == .keyword(.class) })
+                !variable.modifiers.contains(where: {
+                    $0.name.tokenKind == .keyword(.static) || $0.name.tokenKind == .keyword(.class)
+                })
             else { return [] }
             var fields: [Field] = []
             var trailingType: TypeSyntax?
@@ -199,17 +223,26 @@ public struct ConsistencyNoBooleanOutcome: FileRule {
                 let type: TypeSyntax?
                 if let annotation = binding.typeAnnotation {
                     type = annotation.type
-                } else if binding.initializer == nil {
+                }
+                else if binding.initializer == nil {
                     type = trailingType
-                } else {
+                }
+                else {
                     type = nil
                 }
                 trailingType = type
-                guard let identifier = binding.pattern.as(IdentifierPatternSyntax.self), isStored(binding) else { continue }
+                guard let identifier = binding.pattern.as(IdentifierPatternSyntax.self), isStored(binding) else {
+                    continue
+                }
                 fields.insert(
                     Field(
-                        name: identifier.identifier.text, isBool: type.map(isBool) ?? false, start: Syntax(binding.pattern),
-                        end: binding.typeAnnotation.map { Syntax($0.type) } ?? Syntax(binding.pattern)), at: 0)
+                        name: identifier.identifier.text,
+                        isBool: type.map(isBool) ?? false,
+                        start: Syntax(binding.pattern),
+                        end: binding.typeAnnotation.map { Syntax($0.type) } ?? Syntax(binding.pattern),
+                    ),
+                    at: 0,
+                )
             }
             return fields
         }
@@ -218,7 +251,10 @@ public struct ConsistencyNoBooleanOutcome: FileRule {
         static func isStored(_ binding: PatternBindingSyntax) -> Bool {
             guard let accessorBlock = binding.accessorBlock else { return true }
             guard case .accessors(let accessors) = accessorBlock.accessors else { return false }
-            return accessors.allSatisfy { $0.accessorSpecifier.tokenKind == .keyword(.willSet) || $0.accessorSpecifier.tokenKind == .keyword(.didSet) }
+            return accessors.allSatisfy {
+                $0.accessorSpecifier.tokenKind == .keyword(.willSet)
+                    || $0.accessorSpecifier.tokenKind == .keyword(.didSet)
+            }
         }
 
         /* `Bool` or `Swift.Bool`, with nothing around it. */
@@ -226,7 +262,8 @@ public struct ConsistencyNoBooleanOutcome: FileRule {
             if let identifier = type.as(IdentifierTypeSyntax.self) {
                 return identifier.name.text == "Bool" && identifier.genericArgumentClause == nil
             }
-            guard let member = type.as(MemberTypeSyntax.self), member.name.text == "Bool", member.genericArgumentClause == nil,
+            guard let member = type.as(MemberTypeSyntax.self), member.name.text == "Bool",
+                member.genericArgumentClause == nil,
                 let base = member.baseType.as(IdentifierTypeSyntax.self)
             else { return false }
             return base.name.text == "Swift" && base.genericArgumentClause == nil

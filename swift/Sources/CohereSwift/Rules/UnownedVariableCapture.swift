@@ -34,7 +34,8 @@ public struct UnownedVariableCapture: FileRule {
                 at: keyword,
                 rule: name,
                 messageId: "unownedCapture",
-                message: "An unowned capture crashes the process if the object is gone when the closure runs, like a force unwrap of the reference. Capture it weak and guard let it, saying what happens when it is gone."
+                message:
+                    "An unowned capture crashes the process if the object is gone when the closure runs, like a force unwrap of the reference. Capture it weak and guard let it, saying what happens when it is gone.",
             )
         }
         let properties = visitor.properties.map { keyword in
@@ -42,7 +43,8 @@ public struct UnownedVariableCapture: FileRule {
                 at: keyword,
                 rule: name,
                 messageId: "unownedProperty",
-                message: "An unowned reference crashes the process if the object is gone when it is read, like a force unwrap of the reference. Declare it weak and guard let it where it is used, saying what happens when it is gone."
+                message:
+                    "An unowned reference crashes the process if the object is gone when it is read, like a force unwrap of the reference. Declare it weak and guard let it where it is used, saying what happens when it is gone.",
             )
         }
         return (captures + properties).sorted { ($0.line, $0.column) < ($1.line, $1.column) }

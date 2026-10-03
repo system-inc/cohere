@@ -42,11 +42,18 @@ struct BuildInputSnapshot: Equatable, Codable {
     }
 
     static func take(roots: [URL], resolved: URL, toolchain: String, arguments: [String]) -> BuildInputSnapshot {
-        let settings = ["toolchain\t\(toolchain)", "arguments\t\(arguments.joined(separator: " "))", "resolved\t\(PackageDescriptionCache.fingerprint(of: resolved))"]
+        let settings = [
+            "toolchain\t\(toolchain)", "arguments\t\(arguments.joined(separator: " "))",
+            "resolved\t\(PackageDescriptionCache.fingerprint(of: resolved))",
+        ]
         var files: [String: String] = [:]
         let keys: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey]
         for root in roots {
-            let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles])
+            let walker = FileManager.default.enumerator(
+                at: root,
+                includingPropertiesForKeys: keys,
+                options: [.skipsHiddenFiles],
+            )
             while let item = walker?.nextObject() as? URL {
                 guard let values = try? item.resourceValues(forKeys: Set(keys)) else {
                     files[item.path] = "unreadable"
@@ -64,7 +71,11 @@ struct BuildInputSnapshot: Equatable, Codable {
         }
         let lines = settings + files.map { "\($0.key)\t\($0.value)" }.sorted()
         let digest = SHA256.hash(data: Data(lines.joined(separator: "\n").utf8))
-        return BuildInputSnapshot(fingerprint: digest.map { String($0 >> 4, radix: 16) + String($0 & 0x0f, radix: 16) }.joined(), settings: settings, files: files)
+        return BuildInputSnapshot(
+            fingerprint: digest.map { String($0 >> 4, radix: 16) + String($0 & 0x0f, radix: 16) }.joined(),
+            settings: settings,
+            files: files,
+        )
     }
 
     /*
@@ -99,7 +110,8 @@ struct BuildInputSnapshot: Equatable, Codable {
         do {
             try FileManager.default.createDirectory(at: scratchPath, withIntermediateDirectories: true)
             try JSONEncoder().encode(self).write(to: Self.storeFile(scratchPath: scratchPath), options: .atomic)
-        } catch {
+        }
+        catch {
             /* Not stored, so the next run builds: slower, and still right. */
         }
     }
@@ -114,7 +126,8 @@ struct BuildInputSnapshot: Equatable, Codable {
         guard FileManager.default.fileExists(atPath: file.path) else { return }
         do {
             try Data().write(to: file, options: .atomic)
-        } catch {
+        }
+        catch {
             /* Only an unwritable scratch reaches here, and then nothing can be stored either, so the next run builds. */
         }
     }

@@ -44,9 +44,14 @@ public struct FileSet: Equatable, Sendable {
     }
 
     /* `environment` is where the global git config and excludes file are found; tests pass their own. */
-    public static func build(package: PackageModel, environment: [String: String] = ProcessInfo.processInfo.environment) throws -> FileSet {
+    public static func build(
+        package: PackageModel,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+    ) throws -> FileSet {
         /* Nil outside a git repository, which is an answer ("there are no ignore rules to apply") rather than an empty set. */
-        let ignoreRules = IgnoreRules.Repository.containing(package.root).map { IgnoreRules(repository: $0, environment: environment) }
+        let ignoreRules = IgnoreRules.Repository.containing(package.root).map {
+            IgnoreRules(repository: $0, environment: environment)
+        }
         var filesInPackage: [URL] = []
         var owned: [OwnedFile] = []
         var excluded: [ProjectRecord.ExcludedFile] = []
@@ -67,7 +72,9 @@ public struct FileSet: Equatable, Sendable {
                         excluded.append(.init(file: source.path, reason: "ignored by git"))
                         continue
                     }
-                    owned.append(OwnedFile(url: source, targetName: target.name, targetKind: kind, packageRoot: member.root))
+                    owned.append(
+                        OwnedFile(url: source, targetName: target.name, targetKind: kind, packageRoot: member.root)
+                    )
                 }
             }
         }
@@ -83,16 +90,19 @@ public struct FileSet: Equatable, Sendable {
             let rootPath = resolvedRoot + "/"
             let compiled = Set(filesInPackage.map { $0.resolvingSymlinksInPath().path })
             let visible = Set(ignoreRules.visibleFiles(under: resolvedRoot))
-            for path in visible.sorted() where path.hasPrefix(rootPath) && path.hasSuffix(".swift") && !compiled.contains(path) {
+            for path in visible.sorted()
+            where path.hasPrefix(rootPath) && path.hasSuffix(".swift") && !compiled.contains(path) {
                 let underVendor = path.dropFirst(rootPath.count).split(separator: "/").dropLast().contains("Vendor")
-                let reason = underVendor
+                let reason =
+                    underVendor
                     ? "vendored under Vendor/"
                     : path.hasSuffix("/Package.swift") ? "a package manifest" : "no target of this package compiles it"
                 excluded.append(.init(file: path, reason: reason))
             }
         }
 
-        let note = ignoreRules == nil
+        let note =
+            ignoreRules == nil
             ? "not a git repository, so every file a target compiles was treated as ours"
             : ""
         return FileSet(filesInPackage: filesInPackage, owned: owned, excluded: excluded, note: note)
@@ -109,7 +119,9 @@ public struct FileSet: Equatable, Sendable {
         guard target.kind == "executable" else { return false }
         for source in target.sources {
             let text = try String(contentsOf: source, encoding: .utf8)
-            if text.range(of: #"(?m)^\s*(@\w+\s+)*import\s+(SwiftUI|AppKit|UIKit)\b"#, options: .regularExpression) != nil {
+            if text.range(of: #"(?m)^\s*(@\w+\s+)*import\s+(SwiftUI|AppKit|UIKit)\b"#, options: .regularExpression)
+                != nil
+            {
                 return true
             }
         }

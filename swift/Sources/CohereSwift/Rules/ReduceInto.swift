@@ -65,7 +65,8 @@ public struct ReduceInto: TypedFileRule {
         visitor.walk(file.tree)
         return visitor.found.compactMap { reduce, initial in
             let location = file.locations.location(for: reduce.positionAfterSkippingLeadingTrivia)
-            guard let resolved = symbols.reference(line: location.line, column: location.column), resolved.symbol.hasPrefix(Self.sequenceReduce),
+            guard let resolved = symbols.reference(line: location.line, column: location.column),
+                resolved.symbol.hasPrefix(Self.sequenceReduce),
                 Self.isCopyOnWrite(initial, in: file, symbols: symbols)
             else {
                 return nil
@@ -74,7 +75,8 @@ public struct ReduceInto: TypedFileRule {
                 at: reduce,
                 rule: name,
                 messageId: "reduceInto",
-                message: "reduce(_:_:) with an array, dictionary, set or string as its accumulator copies the whole accumulator on every element. Use reduce(into:_:) and change the accumulator in place (append, insert, a subscript assignment, +=): it grows one value instead of building a new one per element."
+                message:
+                    "reduce(_:_:) with an array, dictionary, set or string as its accumulator copies the whole accumulator on every element. Use reduce(into:_:) and change the accumulator in place (append, insert, a subscript assignment, +=): it grows one value instead of building a new one per element.",
             )
         }
     }
@@ -95,7 +97,9 @@ public struct ReduceInto: TypedFileRule {
         }
         guard let call = initial.as(FunctionCallExprSyntax.self) else { return false }
         var callee = call.calledExpression
-        if let member = callee.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "init", let base = member.base {
+        if let member = callee.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "init",
+            let base = member.base
+        {
             callee = base
         }
         if callee.is(ArrayExprSyntax.self) || callee.is(DictionaryExprSyntax.self) {
@@ -104,16 +108,24 @@ public struct ReduceInto: TypedFileRule {
         if let specialization = callee.as(GenericSpecializationExprSyntax.self) {
             callee = specialization.expression
         }
-        guard let typeName = callee.as(DeclReferenceExprSyntax.self), copyOnWriteTypeNames.contains(typeName.baseName.text) else { return false }
+        guard let typeName = callee.as(DeclReferenceExprSyntax.self),
+            copyOnWriteTypeNames.contains(typeName.baseName.text)
+        else { return false }
         let location = file.locations.location(for: typeName.baseName.positionAfterSkippingLeadingTrivia)
-        return symbols.occurrences(line: location.line, column: location.column).contains { $0.isReference && !$0.isImplicit && copyOnWriteTypes.contains($0.symbol) }
+        return symbols.occurrences(line: location.line, column: location.column).contains {
+            $0.isReference && !$0.isImplicit && copyOnWriteTypes.contains($0.symbol)
+        }
     }
 
     /*
      The initializers the compiler recorded for a literal, at its first character (and, for a raw string, at its
      opening quote): implied by the source, so implicit, and the only record of the type a literal became.
      */
-    static func literalInitializers(of literal: ExprSyntax, in file: ParsedFile, symbols: FileSymbols) -> [FileSymbols.Occurrence] {
+    static func literalInitializers(
+        of literal: ExprSyntax,
+        in file: ParsedFile,
+        symbols: FileSymbols,
+    ) -> [FileSymbols.Occurrence] {
         var positions = [literal.positionAfterSkippingLeadingTrivia]
         if let string = literal.as(StringLiteralExprSyntax.self) {
             positions.append(string.openingQuote.positionAfterSkippingLeadingTrivia)

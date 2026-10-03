@@ -29,7 +29,8 @@ public struct ConcurrencyRequireEscapeHatchReason: FileRule {
                 at: hatch.node,
                 rule: name,
                 messageId: "escapeHatchWithoutReason",
-                message: "\(hatch.spelling) tells the compiler to trust this code instead of checking it. Say why that is safe in a comment directly above the declaration, so the next reader can check the reasoning the compiler no longer does."
+                message:
+                    "\(hatch.spelling) tells the compiler to trust this code instead of checking it. Say why that is safe in a comment directly above the declaration, so the next reader can check the reasoning the compiler no longer does.",
             )
         }
     }
@@ -51,14 +52,14 @@ public struct ConcurrencyRequireEscapeHatchReason: FileRule {
         var newlinesSinceComment: Int?
         for piece in declaration.leadingTrivia {
             switch piece {
-            case .lineComment, .blockComment, .docLineComment, .docBlockComment:
-                newlinesSinceComment = 0
-            case let .newlines(count):
-                newlinesSinceComment = newlinesSinceComment.map { $0 + count }
-            case let .carriageReturnLineFeeds(count):
-                newlinesSinceComment = newlinesSinceComment.map { $0 + count }
-            default:
-                break
+                case .lineComment, .blockComment, .docLineComment, .docBlockComment:
+                    newlinesSinceComment = 0
+                case let .newlines(count):
+                    newlinesSinceComment = newlinesSinceComment.map { $0 + count }
+                case let .carriageReturnLineFeeds(count):
+                    newlinesSinceComment = newlinesSinceComment.map { $0 + count }
+                default:
+                    break
             }
         }
         guard let newlines = newlinesSinceComment else { return false }
@@ -79,7 +80,8 @@ public struct ConcurrencyRequireEscapeHatchReason: FileRule {
             let name = node.attributeName.trimmedDescription
             if name == "unchecked" {
                 found.append(Hatch(node: Syntax(node), spelling: "@unchecked Sendable"))
-            } else if name == "preconcurrency", node.parent?.parent?.is(ImportDeclSyntax.self) == true {
+            }
+            else if name == "preconcurrency", node.parent?.parent?.is(ImportDeclSyntax.self) == true {
                 found.append(Hatch(node: Syntax(node), spelling: "@preconcurrency import"))
             }
             return .visitChildren

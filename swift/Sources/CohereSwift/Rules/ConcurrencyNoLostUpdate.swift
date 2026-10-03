@@ -125,7 +125,12 @@ public struct ConcurrencyNoLostUpdate: FileRule {
             let analysis = Analysis(root: node, statements: statements)
             for write in analysis.losingWrites() {
                 findings.append(
-                    file.finding(at: write, rule: name, messageId: "lostUpdate", message: Self.message(target: write.leftOperand.trimmedDescription))
+                    file.finding(
+                        at: write,
+                        rule: name,
+                        messageId: "lostUpdate",
+                        message: Self.message(target: write.leftOperand.trimmedDescription),
+                    )
                 )
             }
         }
@@ -179,7 +184,8 @@ public struct ConcurrencyNoLostUpdate: FileRule {
 
         /* Whether this path is the other one or contains it: a write here replaces what the other names. */
         func covers(_ other: Path) -> Bool {
-            origin == other.origin && names.count <= other.names.count && Array(other.names.prefix(names.count)) == names
+            origin == other.origin && names.count <= other.names.count
+                && Array(other.names.prefix(names.count)) == names
         }
     }
 
@@ -204,12 +210,12 @@ public struct ConcurrencyNoLostUpdate: FileRule {
                 return .shared
             }
             switch ConcurrencyNoCheckThenWrite.lookup(name, in: node, below: child) {
-            case .declared(let declared)?:
-                return .local(declared)
-            case .unknown?:
-                return .unknown
-            case nil:
-                break
+                case .declared(let declared)?:
+                    return .local(declared)
+                case .unknown?:
+                    return .unknown
+                case nil:
+                    break
             }
             child = node
         }
@@ -224,23 +230,32 @@ public struct ConcurrencyNoLostUpdate: FileRule {
                 return Path(origin: .shared, names: [])
             }
             switch resolve(reference) {
-            case .local(let declared):
-                let isParameter = declared.node.parent?.is(FunctionParameterSyntax.self) == true || declared.node.parent?.is(ClosureParameterSyntax.self) == true
-                return Path(origin: .binding(declared.id, callerHeld: isParameter && !declared.isVariable), names: [])
-            case .shared:
-                return Path(origin: .shared, names: [reference.baseName.text])
-            case .unknown:
-                return nil
+                case .local(let declared):
+                    let isParameter =
+                        declared.node.parent?.is(FunctionParameterSyntax.self) == true
+                        || declared.node.parent?.is(ClosureParameterSyntax.self) == true
+                    return Path(
+                        origin: .binding(declared.id, callerHeld: isParameter && !declared.isVariable),
+                        names: [],
+                    )
+                case .shared:
+                    return Path(origin: .shared, names: [reference.baseName.text])
+                case .unknown:
+                    return nil
             }
         }
         if let member = expression.as(MemberAccessExprSyntax.self) {
-            guard let base = member.base, member.declName.argumentNames == nil, var path = path(of: base) else { return nil }
+            guard let base = member.base, member.declName.argumentNames == nil, var path = path(of: base) else {
+                return nil
+            }
             path.names.append(member.declName.baseName.text)
             return path
         }
         if let subscriptCall = expression.as(SubscriptCallExprSyntax.self) {
-            guard subscriptCall.trailingClosure == nil, subscriptCall.additionalTrailingClosures.isEmpty, subscriptCall.arguments.count == 1,
-                let only = subscriptCall.arguments.first, only.label == nil, let key = literalKey(only.expression), var path = path(of: subscriptCall.calledExpression)
+            guard subscriptCall.trailingClosure == nil, subscriptCall.additionalTrailingClosures.isEmpty,
+                subscriptCall.arguments.count == 1,
+                let only = subscriptCall.arguments.first, only.label == nil, let key = literalKey(only.expression),
+                var path = path(of: subscriptCall.calledExpression)
             else {
                 return nil
             }
@@ -255,7 +270,9 @@ public struct ConcurrencyNoLostUpdate: FileRule {
         if let integer = expression.as(IntegerLiteralExprSyntax.self) {
             return integer.literal.text
         }
-        if let string = expression.as(StringLiteralExprSyntax.self), string.segments.allSatisfy({ $0.is(StringSegmentSyntax.self) }) {
+        if let string = expression.as(StringLiteralExprSyntax.self),
+            string.segments.allSatisfy({ $0.is(StringSegmentSyntax.self) })
+        {
             return string.trimmedDescription
         }
         return nil
@@ -267,9 +284,11 @@ public struct ConcurrencyNoLostUpdate: FileRule {
         while true {
             if let chained = current.as(OptionalChainingExprSyntax.self) {
                 current = ConcurrencyNoCheckThenWrite.withoutParentheses(chained.expression)
-            } else if let unwrapped = current.as(ForceUnwrapExprSyntax.self) {
+            }
+            else if let unwrapped = current.as(ForceUnwrapExprSyntax.self) {
                 current = ConcurrencyNoCheckThenWrite.withoutParentheses(unwrapped.expression)
-            } else {
+            }
+            else {
                 return current
             }
         }
@@ -280,7 +299,10 @@ public struct ConcurrencyNoLostUpdate: FileRule {
     /* Visits a subtree in source order without entering closures, nested functions or local types. */
     static func forEachOwnNode(_ node: Syntax, _ visit: (Syntax) -> Void) {
         visit(node)
-        for child in node.children(viewMode: .sourceAccurate) where !ConcurrencyNoCheckThenWrite.isFunctionLike(child) && !ConcurrencyNoCheckThenWrite.isTypeDeclaration(child) {
+        for child in node.children(viewMode: .sourceAccurate)
+        where !ConcurrencyNoCheckThenWrite.isFunctionLike(child)
+            && !ConcurrencyNoCheckThenWrite.isTypeDeclaration(child)
+        {
             forEachOwnNode(child, visit)
         }
     }
@@ -416,11 +438,14 @@ public struct ConcurrencyNoLostUpdate: FileRule {
                 if let infix = node.as(InfixOperatorExprSyntax.self), ConcurrencyNoLostUpdate.isPlainAssignment(infix) {
                     assignments.append(infix)
                 }
-                if let variable = node.as(VariableDeclSyntax.self), variable.bindingSpecifier.tokenKind == .keyword(.let), variable.attributes.isEmpty,
+                if let variable = node.as(VariableDeclSyntax.self),
+                    variable.bindingSpecifier.tokenKind == .keyword(.let), variable.attributes.isEmpty,
                     !variable.modifiers.contains(where: { $0.name.tokenKind == .keyword(.async) })
                 {
                     for binding in variable.bindings where binding.accessorBlock == nil {
-                        if let identifier = binding.pattern.as(IdentifierPatternSyntax.self), let value = binding.initializer?.value {
+                        if let identifier = binding.pattern.as(IdentifierPatternSyntax.self),
+                            let value = binding.initializer?.value
+                        {
                             locals[identifier.identifier.id] = Local(token: identifier.identifier, initializer: value)
                         }
                     }
@@ -430,19 +455,28 @@ public struct ConcurrencyNoLostUpdate: FileRule {
             guard suspends, !unreadable else { return [] }
             let exclusive = ConcurrencyNoLostUpdate.holdsSelfExclusively(root)
             return assignments.filter { assignment in
-                guard let target = ConcurrencyNoLostUpdate.path(of: assignment.leftOperand), !target.names.isEmpty, isShared(target, exclusive: exclusive) else { return false }
-                let evaluator = Evaluator(analysis: self, target: target, anchor: .write(assignment.id), anchorNode: Syntax(assignment))
-                return evaluator.evaluate(assignment.rightOperand, suspended: false).contains { $0.dependencies.contains(.staleModified) }
+                guard let target = ConcurrencyNoLostUpdate.path(of: assignment.leftOperand), !target.names.isEmpty,
+                    isShared(target, exclusive: exclusive)
+                else { return false }
+                let evaluator = Evaluator(
+                    analysis: self,
+                    target: target,
+                    anchor: .write(assignment.id),
+                    anchorNode: Syntax(assignment),
+                )
+                return evaluator.evaluate(assignment.rightOperand, suspended: false).contains {
+                    $0.dependencies.contains(.staleModified)
+                }
             }
         }
 
         /* Whether something other than this line can write the target while the function is suspended. */
         func isShared(_ target: Path, exclusive: Bool) -> Bool {
             switch target.origin {
-            case .shared:
-                return !exclusive
-            case .binding(_, let callerHeld):
-                return callerHeld
+                case .shared:
+                    return !exclusive
+                case .binding(_, let callerHeld):
+                    return callerHeld
             }
         }
 
@@ -456,7 +490,12 @@ public struct ConcurrencyNoLostUpdate: FileRule {
                 return []
             }
             localInProgress.insert(key)
-            let evaluator = Evaluator(analysis: self, target: target, anchor: .declaration(local.token.id), anchorNode: Syntax(local.token))
+            let evaluator = Evaluator(
+                analysis: self,
+                target: target,
+                anchor: .declaration(local.token.id),
+                anchorNode: Syntax(local.token),
+            )
             var dependencies: Dependencies = []
             for outcome in evaluator.evaluate(local.initializer, suspended: false) {
                 dependencies.formUnion(outcome.dependencies)
@@ -502,30 +541,33 @@ public struct ConcurrencyNoLostUpdate: FileRule {
                 let events = graph.blocks[position.block].events
                 for event in events[position.start...] {
                     switch event {
-                    case .suspend(let node):
-                        /* A suspension whose expression contains the anchor runs after it. */
-                        if !(node.map { $0.position <= anchorNode.position && anchorNode.endPosition <= $0.endPosition } ?? false) {
-                            suspended = true
-                        }
-                    case .declarationEnd(let id):
-                        /* Declaring the `let` again binds a fresh one, so this path says nothing about the value the anchor reads. */
-                        if id == local {
-                            stopped = true
-                        }
-                    case .declarationStart(let id):
-                        if anchor == .declaration(id), suspended {
-                            answer = true
-                            break search
-                        }
-                    case .write(let node):
-                        if anchor == .write(node.id) {
-                            if suspended {
+                        case .suspend(let node):
+                            /* A suspension whose expression contains the anchor runs after it. */
+                            if !(node.map {
+                                $0.position <= anchorNode.position && anchorNode.endPosition <= $0.endPosition
+                            } ?? false) {
+                                suspended = true
+                            }
+                        case .declarationEnd(let id):
+                            /* Declaring the `let` again binds a fresh one, so this path says nothing about the value the anchor reads. */
+                            if id == local {
+                                stopped = true
+                            }
+                        case .declarationStart(let id):
+                            if anchor == .declaration(id), suspended {
                                 answer = true
                                 break search
                             }
-                        } else if writes(node, target: target) {
-                            stopped = true
-                        }
+                        case .write(let node):
+                            if anchor == .write(node.id) {
+                                if suspended {
+                                    answer = true
+                                    break search
+                                }
+                            }
+                            else if writes(node, target: target) {
+                                stopped = true
+                            }
                     }
                     if stopped {
                         break
@@ -550,11 +592,16 @@ public struct ConcurrencyNoLostUpdate: FileRule {
             let written: Path?
             if let infix = node.as(InfixOperatorExprSyntax.self) {
                 written = ConcurrencyNoLostUpdate.path(of: infix.leftOperand)
-            } else if let call = node.as(FunctionCallExprSyntax.self), let member = call.calledExpression.as(MemberAccessExprSyntax.self), let base = member.base {
+            }
+            else if let call = node.as(FunctionCallExprSyntax.self),
+                let member = call.calledExpression.as(MemberAccessExprSyntax.self), let base = member.base
+            {
                 written = ConcurrencyNoLostUpdate.path(of: base)
-            } else if let passed = node.as(InOutExprSyntax.self) {
+            }
+            else if let passed = node.as(InOutExprSyntax.self) {
                 written = ConcurrencyNoLostUpdate.path(of: passed.expression)
-            } else {
+            }
+            else {
                 written = nil
             }
             /* An object alone (`self.save()`, `model.wear(body)`) is the receiver of every method called on it, not a write of every member, as in TypeScript. */
@@ -582,7 +629,11 @@ public struct ConcurrencyNoLostUpdate: FileRule {
         }
 
         func modifiedAll(_ outcomes: [Outcome]) -> [Outcome] {
-            unique(outcomes.map { Outcome(dependencies: $0.dependencies.modified, suspended: $0.suspended, during: $0.during) })
+            unique(
+                outcomes.map {
+                    Outcome(dependencies: $0.dependencies.modified, suspended: $0.suspended, during: $0.during)
+                }
+            )
         }
 
         /* Expressions evaluated left to right with their values unioned. A suspension in a later one stales what earlier ones read. */
@@ -593,7 +644,13 @@ public struct ConcurrencyNoLostUpdate: FileRule {
                 for state in states {
                     for result in evaluate(expression, suspended: state.suspended) {
                         let carried = result.during ? state.dependencies.staled : state.dependencies
-                        next.append(Outcome(dependencies: carried.union(result.dependencies), suspended: result.suspended, during: state.during || result.during))
+                        next.append(
+                            Outcome(
+                                dependencies: carried.union(result.dependencies),
+                                suspended: result.suspended,
+                                during: state.during || result.during,
+                            )
+                        )
                     }
                 }
                 states = unique(next)
@@ -619,7 +676,10 @@ public struct ConcurrencyNoLostUpdate: FileRule {
             for child in node.children(viewMode: .sourceAccurate) {
                 if let expression = child.as(ExprSyntax.self) {
                     found.append(expression)
-                } else if !ConcurrencyNoCheckThenWrite.isFunctionLike(child), !ConcurrencyNoCheckThenWrite.isTypeDeclaration(child), !child.is(CodeBlockSyntax.self) {
+                }
+                else if !ConcurrencyNoCheckThenWrite.isFunctionLike(child),
+                    !ConcurrencyNoCheckThenWrite.isTypeDeclaration(child), !child.is(CodeBlockSyntax.self)
+                {
                     found += childExpressions(of: child)
                 }
             }
@@ -632,7 +692,9 @@ public struct ConcurrencyNoLostUpdate: FileRule {
                 /* A closure's body runs later, if at all; its value carries nothing read now. */
                 return leaf([], suspended)
             }
-            if let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1, let only = tuple.elements.first, only.label == nil {
+            if let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1,
+                let only = tuple.elements.first, only.label == nil
+            {
                 return evaluate(only.expression, suspended: suspended)
             }
             if let tryExpression = expression.as(TryExprSyntax.self) {
@@ -657,7 +719,9 @@ public struct ConcurrencyNoLostUpdate: FileRule {
                 }
                 return leaf(identifier(reference, suspended: suspended), suspended)
             }
-            if expression.is(MemberAccessExprSyntax.self) || expression.is(SubscriptCallExprSyntax.self), let path = ConcurrencyNoLostUpdate.path(of: expression) {
+            if expression.is(MemberAccessExprSyntax.self) || expression.is(SubscriptCallExprSyntax.self),
+                let path = ConcurrencyNoLostUpdate.path(of: expression)
+            {
                 let matched = match(path)
                 if !matched.isEmpty {
                     return leaf(matched, suspended)
@@ -667,13 +731,17 @@ public struct ConcurrencyNoLostUpdate: FileRule {
                 while true {
                     if let member = rootExpression.as(MemberAccessExprSyntax.self), let base = member.base {
                         rootExpression = ConcurrencyNoLostUpdate.transparent(base)
-                    } else if let subscriptCall = rootExpression.as(SubscriptCallExprSyntax.self) {
+                    }
+                    else if let subscriptCall = rootExpression.as(SubscriptCallExprSyntax.self) {
                         rootExpression = ConcurrencyNoLostUpdate.transparent(subscriptCall.calledExpression)
-                    } else {
+                    }
+                    else {
                         break
                     }
                 }
-                guard let rootReference = rootExpression.as(DeclReferenceExprSyntax.self) else { return leaf([], suspended) }
+                guard let rootReference = rootExpression.as(DeclReferenceExprSyntax.self) else {
+                    return leaf([], suspended)
+                }
                 return leaf(identifier(rootReference, suspended: suspended).modified, suspended)
             }
             if let awaitExpression = expression.as(AwaitExprSyntax.self) {
@@ -686,18 +754,31 @@ public struct ConcurrencyNoLostUpdate: FileRule {
                 if let tryExpression = operand.as(TryExprSyntax.self) {
                     operand = ConcurrencyNoCheckThenWrite.withoutParentheses(tryExpression.expression)
                 }
-                let producedByCallee = operand.is(FunctionCallExprSyntax.self) || operand.is(SubscriptCallExprSyntax.self) || operand.is(MacroExpansionExprSyntax.self)
+                let producedByCallee =
+                    operand.is(FunctionCallExprSyntax.self) || operand.is(SubscriptCallExprSyntax.self)
+                    || operand.is(MacroExpansionExprSyntax.self)
                 return unique(
                     evaluate(awaitExpression.expression, suspended: suspended).map { outcome in
-                        Outcome(dependencies: producedByCallee ? [] : outcome.dependencies, suspended: true, during: true)
-                    })
+                        Outcome(
+                            dependencies: producedByCallee ? [] : outcome.dependencies,
+                            suspended: true,
+                            during: true,
+                        )
+                    }
+                )
             }
             if let infix = expression.as(InfixOperatorExprSyntax.self) {
                 if ConcurrencyNoLostUpdate.isAssignment(infix) {
                     /* An assignment's value is `()`. */
-                    return unique(sequence([infix.leftOperand, infix.rightOperand], suspended: suspended).map { Outcome(dependencies: [], suspended: $0.suspended, during: $0.during) })
+                    return unique(
+                        sequence([infix.leftOperand, infix.rightOperand], suspended: suspended).map {
+                            Outcome(dependencies: [], suspended: $0.suspended, during: $0.during)
+                        }
+                    )
                 }
-                if let operation = infix.operator.as(BinaryOperatorExprSyntax.self)?.operator.text, ["&&", "||", "??"].contains(operation) {
+                if let operation = infix.operator.as(BinaryOperatorExprSyntax.self)?.operator.text,
+                    ["&&", "||", "??"].contains(operation)
+                {
                     let left = evaluate(infix.leftOperand, suspended: suspended)
                     return unique(left + then(left, infix.rightOperand))
                 }
@@ -724,7 +805,8 @@ public struct ConcurrencyNoLostUpdate: FileRule {
                     if let base = member.base {
                         parts.append(base)
                     }
-                } else if !call.calledExpression.is(DeclReferenceExprSyntax.self) {
+                }
+                else if !call.calledExpression.is(DeclReferenceExprSyntax.self) {
                     parts.append(call.calledExpression)
                 }
                 parts += call.arguments.map(\.expression)
@@ -741,14 +823,18 @@ public struct ConcurrencyNoLostUpdate: FileRule {
 
         /* A bare name read: a `let` of this function carrying the target, stale when a suspension lies between its declaration and the anchor. */
         func identifier(_ reference: DeclReferenceExprSyntax, suspended: Bool) -> Dependencies {
-            guard case .local(let declared) = ConcurrencyNoLostUpdate.resolve(reference), let local = analysis.locals[declared.id], local.token.id != reference.baseName.id else {
+            guard case .local(let declared) = ConcurrencyNoLostUpdate.resolve(reference),
+                let local = analysis.locals[declared.id], local.token.id != reference.baseName.id
+            else {
                 return []
             }
             let dependencies = analysis.dependencies(of: local, target: target)
             if dependencies.isEmpty {
                 return []
             }
-            if suspended || analysis.suspensionBetween(local.token.id, anchor: anchor, anchorNode: anchorNode, target: target) {
+            if suspended
+                || analysis.suspensionBetween(local.token.id, anchor: anchor, anchorNode: anchorNode, target: target)
+            {
                 return dependencies.staled
             }
             return dependencies
@@ -853,26 +939,27 @@ public struct ConcurrencyNoLostUpdate: FileRule {
             scopes.append([])
             for entry in statements {
                 switch entry.item {
-                case .decl(let declaration):
-                    if let variable = declaration.as(VariableDeclSyntax.self) {
-                        for binding in variable.bindings where binding.accessorBlock == nil {
-                            let tracked = binding.pattern.as(IdentifierPatternSyntax.self).map(\.identifier.id).flatMap { locals.contains($0) ? $0 : nil }
-                            if let tracked {
-                                emit(.declarationStart(tracked))
-                            }
-                            if let value = binding.initializer?.value {
-                                expression(value)
-                            }
-                            if let tracked {
-                                emit(.declarationEnd(tracked))
+                    case .decl(let declaration):
+                        if let variable = declaration.as(VariableDeclSyntax.self) {
+                            for binding in variable.bindings where binding.accessorBlock == nil {
+                                let tracked = binding.pattern.as(IdentifierPatternSyntax.self).map(\.identifier.id)
+                                    .flatMap { locals.contains($0) ? $0 : nil }
+                                if let tracked {
+                                    emit(.declarationStart(tracked))
+                                }
+                                if let value = binding.initializer?.value {
+                                    expression(value)
+                                }
+                                if let tracked {
+                                    emit(.declarationEnd(tracked))
+                                }
                             }
                         }
-                    }
-                case .stmt(let statement):
-                    self.statement(statement)
-                case .expr(let value):
-                    expression(value)
-                    terminateIfNeverReturns(value)
+                    case .stmt(let statement):
+                        self.statement(statement)
+                    case .expr(let value):
+                        expression(value)
+                        terminateIfNeverReturns(value)
                 }
             }
             if let scope = scopes.popLast() {
@@ -888,7 +975,8 @@ public struct ConcurrencyNoLostUpdate: FileRule {
             if let tryExpression = called.as(TryExprSyntax.self) {
                 called = tryExpression.expression
             }
-            if let call = called.as(FunctionCallExprSyntax.self), let callee = call.calledExpression.as(DeclReferenceExprSyntax.self),
+            if let call = called.as(FunctionCallExprSyntax.self),
+                let callee = call.calledExpression.as(DeclReferenceExprSyntax.self),
                 ["fatalError", "preconditionFailure", "exit", "abort"].contains(callee.baseName.text)
             {
                 cut()
@@ -901,40 +989,64 @@ public struct ConcurrencyNoLostUpdate: FileRule {
             if let labeled = node.as(LabeledStmtSyntax.self) {
                 pendingLabel = labeled.label.text
                 statement(labeled.statement)
-            } else if let expressionStatement = node.as(ExpressionStmtSyntax.self) {
+            }
+            else if let expressionStatement = node.as(ExpressionStmtSyntax.self) {
                 if let ifExpression = expressionStatement.expression.as(IfExprSyntax.self) {
                     self.ifExpression(ifExpression, label: label)
-                } else if let switchExpression = expressionStatement.expression.as(SwitchExprSyntax.self) {
+                }
+                else if let switchExpression = expressionStatement.expression.as(SwitchExprSyntax.self) {
                     self.switchExpression(switchExpression, label: label)
-                } else {
+                }
+                else {
                     expression(expressionStatement.expression)
                     terminateIfNeverReturns(expressionStatement.expression)
                 }
-            } else if let guardStatement = node.as(GuardStmtSyntax.self) {
+            }
+            else if let guardStatement = node.as(GuardStmtSyntax.self) {
                 let elseEntry = newBlock()
                 conditions(guardStatement.conditions, failTo: elseEntry)
                 let after = current
                 current = elseEntry
                 walk(guardStatement.body.statements)
                 current = after
-            } else if let whileStatement = node.as(WhileStmtSyntax.self) {
+            }
+            else if let whileStatement = node.as(WhileStmtSyntax.self) {
                 let header = newBlock()
                 edge(current, header)
                 current = header
                 let exit = newBlock()
                 conditions(whileStatement.conditions, failTo: exit)
-                jumps.append(Jump(label: label, isLoop: true, isSwitch: false, breakTarget: exit, continueTarget: header, depth: scopes.count))
+                jumps.append(
+                    Jump(
+                        label: label,
+                        isLoop: true,
+                        isSwitch: false,
+                        breakTarget: exit,
+                        continueTarget: header,
+                        depth: scopes.count,
+                    )
+                )
                 walk(whileStatement.body.statements)
                 jumps.removeLast()
                 edge(current, header)
                 current = exit
-            } else if let repeatStatement = node.as(RepeatStmtSyntax.self) {
+            }
+            else if let repeatStatement = node.as(RepeatStmtSyntax.self) {
                 let bodyEntry = newBlock()
                 let conditionBlock = newBlock()
                 let exit = newBlock()
                 edge(current, bodyEntry)
                 current = bodyEntry
-                jumps.append(Jump(label: label, isLoop: true, isSwitch: false, breakTarget: exit, continueTarget: conditionBlock, depth: scopes.count))
+                jumps.append(
+                    Jump(
+                        label: label,
+                        isLoop: true,
+                        isSwitch: false,
+                        breakTarget: exit,
+                        continueTarget: conditionBlock,
+                        depth: scopes.count,
+                    )
+                )
                 walk(repeatStatement.body.statements)
                 jumps.removeLast()
                 edge(current, conditionBlock)
@@ -943,7 +1055,8 @@ public struct ConcurrencyNoLostUpdate: FileRule {
                 edge(current, bodyEntry)
                 edge(current, exit)
                 current = exit
-            } else if let forStatement = node.as(ForStmtSyntax.self) {
+            }
+            else if let forStatement = node.as(ForStmtSyntax.self) {
                 expression(forStatement.sequence)
                 let header = newBlock()
                 edge(current, header)
@@ -967,20 +1080,40 @@ public struct ConcurrencyNoLostUpdate: FileRule {
                     edge(current, matched)
                     current = matched
                 }
-                jumps.append(Jump(label: label, isLoop: true, isSwitch: false, breakTarget: exit, continueTarget: header, depth: scopes.count))
+                jumps.append(
+                    Jump(
+                        label: label,
+                        isLoop: true,
+                        isSwitch: false,
+                        breakTarget: exit,
+                        continueTarget: header,
+                        depth: scopes.count,
+                    )
+                )
                 walk(forStatement.body.statements)
                 jumps.removeLast()
                 edge(current, header)
                 current = exit
-            } else if let doStatement = node.as(DoStmtSyntax.self) {
+            }
+            else if let doStatement = node.as(DoStmtSyntax.self) {
                 let join = newBlock()
                 if label != nil {
-                    jumps.append(Jump(label: label, isLoop: false, isSwitch: false, breakTarget: join, continueTarget: nil, depth: scopes.count))
+                    jumps.append(
+                        Jump(
+                            label: label,
+                            isLoop: false,
+                            isSwitch: false,
+                            breakTarget: join,
+                            continueTarget: nil,
+                            depth: scopes.count,
+                        )
+                    )
                 }
                 if doStatement.catchClauses.isEmpty {
                     walk(doStatement.body.statements)
                     edge(current, join)
-                } else {
+                }
+                else {
                     let dispatch = newBlock()
                     catches.append((dispatch, scopes.count))
                     walk(doStatement.body.statements)
@@ -1003,40 +1136,51 @@ public struct ConcurrencyNoLostUpdate: FileRule {
                     jumps.removeLast()
                 }
                 current = join
-            } else if let returnStatement = node.as(ReturnStmtSyntax.self) {
+            }
+            else if let returnStatement = node.as(ReturnStmtSyntax.self) {
                 if let value = returnStatement.expression {
                     expression(value)
                 }
                 jump(to: nil, unwinding: 0)
                 cut()
-            } else if let throwStatement = node.as(ThrowStmtSyntax.self) {
+            }
+            else if let throwStatement = node.as(ThrowStmtSyntax.self) {
                 expression(throwStatement.expression)
                 if let handler = catches.last {
                     jump(to: handler.target, unwinding: handler.depth)
                 }
                 cut()
-            } else if let breakStatement = node.as(BreakStmtSyntax.self) {
-                let target = breakStatement.label.map { name in jumps.last { $0.label == name.text } } ?? jumps.last { $0.isLoop || $0.isSwitch }
+            }
+            else if let breakStatement = node.as(BreakStmtSyntax.self) {
+                let target =
+                    breakStatement.label.map { name in jumps.last { $0.label == name.text } }
+                    ?? jumps.last { $0.isLoop || $0.isSwitch }
                 if let target {
                     jump(to: target.breakTarget, unwinding: target.depth)
                 }
                 cut()
-            } else if let continueStatement = node.as(ContinueStmtSyntax.self) {
-                let target = continueStatement.label.map { name in jumps.last { $0.label == name.text } } ?? jumps.last { $0.isLoop }
+            }
+            else if let continueStatement = node.as(ContinueStmtSyntax.self) {
+                let target =
+                    continueStatement.label.map { name in jumps.last { $0.label == name.text } }
+                    ?? jumps.last { $0.isLoop }
                 if let target, let continueTarget = target.continueTarget {
                     jump(to: continueTarget, unwinding: target.depth)
                 }
                 cut()
-            } else if node.is(FallThroughStmtSyntax.self) {
+            }
+            else if node.is(FallThroughStmtSyntax.self) {
                 if let next = fallthroughs.last, let next {
                     edge(current, next)
                 }
                 cut()
-            } else if let deferStatement = node.as(DeferStmtSyntax.self) {
+            }
+            else if let deferStatement = node.as(DeferStmtSyntax.self) {
                 if !scopes.isEmpty {
                     scopes[scopes.count - 1].append(deferStatement.body)
                 }
-            } else {
+            }
+            else {
                 for child in Evaluator.childExpressions(of: Syntax(node)) {
                     expression(child)
                 }
@@ -1047,16 +1191,16 @@ public struct ConcurrencyNoLostUpdate: FileRule {
         private func conditions(_ list: ConditionElementListSyntax, failTo failure: Int) {
             for element in list {
                 switch element.condition {
-                case .expression(let value):
-                    expression(value)
-                case .optionalBinding(let binding):
-                    if let value = binding.initializer?.value {
+                    case .expression(let value):
                         expression(value)
-                    }
-                case .matchingPattern(let matching):
-                    expression(matching.initializer.value)
-                case .availability:
-                    break
+                    case .optionalBinding(let binding):
+                        if let value = binding.initializer?.value {
+                            expression(value)
+                        }
+                    case .matchingPattern(let matching):
+                        expression(matching.initializer.value)
+                    case .availability:
+                        break
                 }
                 edge(current, failure)
                 let next = newBlock()
@@ -1069,19 +1213,28 @@ public struct ConcurrencyNoLostUpdate: FileRule {
             let join = newBlock()
             let elseEntry = newBlock()
             if label != nil {
-                jumps.append(Jump(label: label, isLoop: false, isSwitch: false, breakTarget: join, continueTarget: nil, depth: scopes.count))
+                jumps.append(
+                    Jump(
+                        label: label,
+                        isLoop: false,
+                        isSwitch: false,
+                        breakTarget: join,
+                        continueTarget: nil,
+                        depth: scopes.count,
+                    )
+                )
             }
             conditions(node.conditions, failTo: elseEntry)
             walk(node.body.statements)
             edge(current, join)
             current = elseEntry
             switch node.elseBody {
-            case .ifExpr(let elseIf)?:
-                ifExpression(elseIf, label: nil)
-            case .codeBlock(let block)?:
-                walk(block.statements)
-            case nil:
-                break
+                case .ifExpr(let elseIf)?:
+                    ifExpression(elseIf, label: nil)
+                case .codeBlock(let block)?:
+                    walk(block.statements)
+                case nil:
+                    break
             }
             edge(current, join)
             if label != nil {
@@ -1104,7 +1257,16 @@ public struct ConcurrencyNoLostUpdate: FileRule {
             for entry in entries {
                 edge(dispatch, entry)
             }
-            jumps.append(Jump(label: label, isLoop: false, isSwitch: true, breakTarget: join, continueTarget: nil, depth: scopes.count))
+            jumps.append(
+                Jump(
+                    label: label,
+                    isLoop: false,
+                    isSwitch: true,
+                    breakTarget: join,
+                    continueTarget: nil,
+                    depth: scopes.count,
+                )
+            )
             for (index, switchCase) in cases.enumerated() {
                 current = entries[index]
                 if case .case(let caseLabel) = switchCase.label {
@@ -1164,9 +1326,12 @@ public struct ConcurrencyNoLostUpdate: FileRule {
             for child in Evaluator.childExpressions(of: Syntax(node)) {
                 expression(child)
             }
-            if let call = node.as(FunctionCallExprSyntax.self), let member = call.calledExpression.as(MemberAccessExprSyntax.self), member.base != nil {
+            if let call = node.as(FunctionCallExprSyntax.self),
+                let member = call.calledExpression.as(MemberAccessExprSyntax.self), member.base != nil
+            {
                 emit(.write(Syntax(call)))
-            } else if node.is(InOutExprSyntax.self) {
+            }
+            else if node.is(InOutExprSyntax.self) {
                 emit(.write(Syntax(node)))
             }
         }
@@ -1180,7 +1345,10 @@ public struct ConcurrencyNoLostUpdate: FileRule {
             guard let call = operand.as(FunctionCallExprSyntax.self) else { return false }
             var others = 0
             ConcurrencyNoLostUpdate.forEachOwnNode(Syntax(call)) { node in
-                if node.id != call.id, node.is(FunctionCallExprSyntax.self) || node.is(SubscriptCallExprSyntax.self) || node.is(MacroExpansionExprSyntax.self) {
+                if node.id != call.id,
+                    node.is(FunctionCallExprSyntax.self) || node.is(SubscriptCallExprSyntax.self)
+                        || node.is(MacroExpansionExprSyntax.self)
+                {
                     others += 1
                 }
             }

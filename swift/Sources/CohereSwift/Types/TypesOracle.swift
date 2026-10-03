@@ -72,11 +72,24 @@ public struct TypesOracle {
         let files = try FileSet.build(package: package).owned
 
         let buildStart = Date()
-        let types = try TypesPhase(package: package, files: files, scratchPath: scratchPath, resolutionAllowed: false, toolchain: toolchain, runner: runner).run()
+        let types = try TypesPhase(
+            package: package,
+            files: files,
+            scratchPath: scratchPath,
+            resolutionAllowed: false,
+            toolchain: toolchain,
+            runner: runner,
+        ).run()
         let buildMilliseconds = Pipeline.milliseconds(since: buildStart)
         var buildGroups: [Diagnostic: String] = [:]
         let build = types.findings.filter { $0.messageId != "buildFailed" }.map { finding in
-            let diagnostic = Diagnostic(file: finding.file, line: finding.line, column: finding.column, severity: finding.severity.rawValue, message: finding.message)
+            let diagnostic = Diagnostic(
+                file: finding.file,
+                line: finding.line,
+                column: finding.column,
+                severity: finding.severity.rawValue,
+                message: finding.message,
+            )
             buildGroups[diagnostic] = finding.rule
             return diagnostic
         }
@@ -84,7 +97,10 @@ public struct TypesOracle {
         /* A local package's tests build into their own scratch, so their commands live in that scratch's task store. */
         var commandTables = [try CompileCommands.read(scratchPath: scratchPath)]
         for local in package.localPackages {
-            let localScratch = scratchPath.appendingPathComponent("local/\(local.root.lastPathComponent)", isDirectory: true)
+            let localScratch = scratchPath.appendingPathComponent(
+                "local/\(local.root.lastPathComponent)",
+                isDirectory: true,
+            )
             if FileManager.default.fileExists(atPath: localScratch.path) {
                 commandTables.append(try CompileCommands.read(scratchPath: localScratch))
             }
@@ -112,11 +128,18 @@ public struct TypesOracle {
                     guard let severity = diagnostic.findingSeverity else { continue }
                     let placed = URL(fileURLWithPath: diagnostic.file).resolvingSymlinksInPath().path
                     guard placed == path else { continue }
-                    let compared = Diagnostic(file: placed, line: max(diagnostic.line, 1), column: max(diagnostic.column, 1), severity: severity.rawValue, message: diagnostic.message)
+                    let compared = Diagnostic(
+                        file: placed,
+                        line: max(diagnostic.line, 1),
+                        column: max(diagnostic.column, 1),
+                        severity: severity.rawValue,
+                        message: diagnostic.message,
+                    )
                     sourcekitd.append(compared)
                     sourcekitdGroups[compared] = Self.group(of: diagnostic)
                 }
-            } catch {
+            }
+            catch {
                 unanswered[path] = "\(error)"
             }
             timings.append((path, Pipeline.milliseconds(since: fileStart)))
@@ -154,7 +177,7 @@ public struct TypesOracle {
             controlFound: controlFound,
             buildMilliseconds: buildMilliseconds,
             sourcekitdMilliseconds: sourcekitdMilliseconds,
-            slowestFiles: Array(timings.sorted { $0.1 > $1.1 }.prefix(5))
+            slowestFiles: Array(timings.sorted { $0.1 > $1.1 }.prefix(5)),
         )
     }
 
@@ -166,7 +189,9 @@ public struct TypesOracle {
      a difference rather than as a silent rename.
      */
     static func group(of diagnostic: Sourcekitd.Diagnostic) -> String {
-        guard let link = diagnostic.educationalNotes?.first, let last = link.split(separator: "/").last else { return "" }
+        guard let link = diagnostic.educationalNotes?.first, let last = link.split(separator: "/").last else {
+            return ""
+        }
         return last.split(separator: "-").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined()
     }
 }

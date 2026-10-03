@@ -17,8 +17,12 @@ struct PerformanceNoIndependentAwaitInLoopTests {
     /* The text of every finding's span, after checking what every finding must be. */
     static func spans(_ source: String) -> [String] {
         let file = ParsedFile(
-            url: URL(fileURLWithPath: "/fixture/Subject.swift"), targetName: "Fixture", targetKind: "library", source: source,
-            tree: Parser.parse(source: source), nodeCount: 0
+            url: URL(fileURLWithPath: "/fixture/Subject.swift"),
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
         )
         let rule = PerformanceNoIndependentAwaitInLoop()
         let findings = rule.findings(in: file)
@@ -377,73 +381,105 @@ struct PerformanceNoIndependentAwaitInLoopTests {
 
     @Test func everyFlaggedShapeIsFlagged() {
         let cases: [(name: String, body: String, header: String)] = [
-            ("a dictionary filled by subscript", """
+            (
+                "a dictionary filled by subscript",
+                """
                 var statistics: [String: Int] = [:]
                 for entry in entries {
                     statistics[entry.name] = await entry.lane.snapshot()
                 }
-                """, "for entry in entries"),
-            ("a dictionary filled by updateValue and a set by insert", """
+                """, "for entry in entries",
+            ),
+            (
+                "a dictionary filled by updateValue and a set by insert",
+                """
                 var statistics: [String: Int] = [:]
                 var depths = Set<Int>()
                 for entry in entries {
                     statistics.updateValue(await entry.lane.snapshot(), forKey: entry.name)
                     depths.insert(await entry.lane.queueDepth)
                 }
-                """, "for entry in entries"),
-            ("the indexed form over indices", """
+                """, "for entry in entries",
+            ),
+            (
+                "the indexed form over indices",
+                """
                 var results: [Int] = []
                 for index in entries.indices {
                     results.append(await entries[index].lane.snapshot())
                 }
-                """, "for index in entries.indices"),
-            ("the indexed form over a range to count", """
+                """, "for index in entries.indices",
+            ),
+            (
+                "the indexed form over a range to count",
+                """
                 var results: [Int] = []
                 for index in 0..<entries.count {
                     results.append(await entries[index].lane.snapshot())
                 }
-                """, "for index in 0..<entries.count"),
-            ("an enumerated walk filling by index", """
+                """, "for index in 0..<entries.count",
+            ),
+            (
+                "an enumerated walk filling by index",
+                """
                 var results: [Int: Int] = [:]
                 for (index, entry) in entries.enumerated() {
                     results[index] = await entry.lane.snapshot()
                 }
-                """, "for (index, entry) in entries.enumerated()"),
-            ("a loop-invariant outer value read by the await", """
+                """, "for (index, entry) in entries.enumerated()",
+            ),
+            (
+                "a loop-invariant outer value read by the await",
+                """
                 var results: [Int] = []
                 for entry in entries {
                     results.append(await entry.lane.snapshot(resolveSessionId: resolver))
                 }
-                """, "for entry in entries"),
-            ("an await through a body let bound to the item's chain", """
+                """, "for entry in entries",
+            ),
+            (
+                "an await through a body let bound to the item's chain",
+                """
                 var results: [Int] = []
                 for entry in entries {
                     let lane = entry.lane
                     results.append(await lane.snapshot())
                 }
-                """, "for entry in entries"),
-            ("a where clause on the item", """
+                """, "for entry in entries",
+            ),
+            (
+                "a where clause on the item",
+                """
                 var results: [Int] = []
                 for entry in entries where !entry.name.isEmpty {
                     results.append(await entry.lane.snapshot())
                 }
-                """, "for entry in entries where !entry.name.isEmpty"),
-            ("a validation throw that reads no awaited value", """
+                """, "for entry in entries where !entry.name.isEmpty",
+            ),
+            (
+                "a validation throw that reads no awaited value",
+                """
                 var results: [Int] = []
                 for entry in entries {
                     if entry.name.isEmpty { throw CancellationError() }
                     results.append(await entry.lane.snapshot())
                 }
-                """, "for entry in entries"),
-            ("a continue on an awaited value, which only skips this item", """
+                """, "for entry in entries",
+            ),
+            (
+                "a continue on an awaited value, which only skips this item",
+                """
                 var results: [Int] = []
                 for entry in entries {
                     let value = await entry.lane.snapshot()
                     if value < 0 { continue }
                     results.append(value)
                 }
-                """, "for entry in entries"),
-            ("a do and catch that records the failure and moves on", """
+                """, "for entry in entries",
+            ),
+            (
+                "a do and catch that records the failure and moves on",
+                """
                 var results: [Int] = []
                 var failures: [String] = []
                 for entry in entries {
@@ -454,8 +490,11 @@ struct PerformanceNoIndependentAwaitInLoopTests {
                         continue
                     }
                 }
-                """, "for entry in entries"),
-            ("a break that leaves only an inner switch", """
+                """, "for entry in entries",
+            ),
+            (
+                "a break that leaves only an inner switch",
+                """
                 var results: [String] = []
                 for entry in entries {
                     switch await entry.lane.snapshot() {
@@ -463,8 +502,11 @@ struct PerformanceNoIndependentAwaitInLoopTests {
                     default: results.append(entry.name)
                     }
                 }
-                """, "for entry in entries"),
-            ("a throw caught inside the body", """
+                """, "for entry in entries",
+            ),
+            (
+                "a throw caught inside the body",
+                """
                 var failures: [String] = []
                 for entry in entries {
                     do {
@@ -474,27 +516,39 @@ struct PerformanceNoIndependentAwaitInLoopTests {
                         failures.append("\\(error)")
                     }
                 }
-                """, "for entry in entries"),
-            ("a body-local var reassigned within the iteration", """
+                """, "for entry in entries",
+            ),
+            (
+                "a body-local var reassigned within the iteration",
+                """
                 var results: [Int] = []
                 for entry in entries {
                     var value = await entry.lane.snapshot()
                     value += 1
                     results.append(value)
                 }
-                """, "for entry in entries"),
-            ("a property read on each item's actor", """
+                """, "for entry in entries",
+            ),
+            (
+                "a property read on each item's actor",
+                """
                 var depths: [Int] = []
                 for entry in entries {
                     depths.append(await entry.lane.queueDepth)
                 }
-                """, "for entry in entries"),
-            ("an await whose result is dropped", """
+                """, "for entry in entries",
+            ),
+            (
+                "an await whose result is dropped",
+                """
                 for entry in entries {
                     _ = await entry.lane.cancelAll()
                 }
-                """, "for entry in entries"),
-            ("a failure logged as an error from the catch", """
+                """, "for entry in entries",
+            ),
+            (
+                "a failure logged as an error from the catch",
+                """
                 var results: [Int] = []
                 for entry in entries {
                     do {
@@ -503,14 +557,20 @@ struct PerformanceNoIndependentAwaitInLoopTests {
                         logger.error("refresh failed: \\(error)")
                     }
                 }
-                """, "for entry in entries"),
-            ("a sink by prefix whose receiver the body never reads back", """
+                """, "for entry in entries",
+            ),
+            (
+                "a sink by prefix whose receiver the body never reads back",
+                """
                 var document = Document()
                 for entry in entries {
                     document.addPage(await entry.lane.snapshot())
                 }
-                """, "for entry in entries"),
-            ("a debug block with no effect in it", """
+                """, "for entry in entries",
+            ),
+            (
+                "a debug block with no effect in it",
+                """
                 var results: [Int] = []
                 for entry in entries {
                     #if DEBUG
@@ -518,7 +578,8 @@ struct PerformanceNoIndependentAwaitInLoopTests {
                     #endif
                     results.append(await entry.lane.snapshot())
                 }
-                """, "for entry in entries"),
+                """, "for entry in entries",
+            ),
         ]
         for testCase in cases {
             #expect(Self.spans(Self.subject(testCase.body)) == [testCase.header], "\(testCase.name)")
@@ -783,16 +844,20 @@ struct PerformanceNoIndependentAwaitInLoopTests {
     /* A bare call to a global function is silence before its name is read, so the bare names are read one call down. */
     @Test func everyBareOrderedNameIsReadOneCallDown() {
         for effect in [
-            "print(\"rendering\")", "debugPrint(1)", "dump(1)", "NSLog(\"rendering\")", "os_log(\"rendering\")", "fputs(\"rendering\", stdout)",
-            "puts(\"rendering\")", "fflush(stdout)", "usleep(1000)", "presenceLog(\"rendering\")", "log(\"rendering\")", "printTree(1)",
-            "reportProgress(1)", "updateSpinner()", "delayBriefly()", "waitForIdle()", "pauseBriefly()", "throttleRequests()", "backoffAfterFailure()",
+            "print(\"rendering\")", "debugPrint(1)", "dump(1)", "NSLog(\"rendering\")", "os_log(\"rendering\")",
+            "fputs(\"rendering\", stdout)",
+            "puts(\"rendering\")", "fflush(stdout)", "usleep(1000)", "presenceLog(\"rendering\")", "log(\"rendering\")",
+            "printTree(1)",
+            "reportProgress(1)", "updateSpinner()", "delayBriefly()", "waitForIdle()", "pauseBriefly()",
+            "throttleRequests()", "backoffAfterFailure()",
             "rateLimitRequests()", "try? await Task.sleep(for: .seconds(1))", "await Task.yield()",
         ] {
             #expect(Self.spans(Self.oneCallDown(effect)).isEmpty, "\(effect)")
         }
         /* The narrowed list: a failure report and a request timer one call down do not make the loop ordered. */
         for quiet in [
-            "logger.error(\"failed\")", "logger.warning(\"slow\")", "poolLog.fault(\"lost\")", "fputs(\"failed\", stderr)",
+            "logger.error(\"failed\")", "logger.warning(\"slow\")", "poolLog.fault(\"lost\")",
+            "fputs(\"failed\", stderr)",
             "FileHandle.standardError.write(Data())", "DispatchQueue.main.asyncAfter(deadline: .now()) {}",
         ] {
             #expect(Self.spans(Self.oneCallDown(quiet)) == ["for lane in lanes"], "\(quiet)")
@@ -829,7 +894,14 @@ struct PerformanceNoIndependentAwaitInLoopTests {
     @Test func thePrefilterNeedsBothWords() {
         let rule = PerformanceNoIndependentAwaitInLoop()
         let without = "func f() { for item in [1] { print(item) } }"
-        let file = ParsedFile(url: URL(fileURLWithPath: "/fixture/A.swift"), targetName: "Fixture", targetKind: "library", source: without, tree: Parser.parse(source: without), nodeCount: 0)
+        let file = ParsedFile(
+            url: URL(fileURLWithPath: "/fixture/A.swift"),
+            targetName: "Fixture",
+            targetKind: "library",
+            source: without,
+            tree: Parser.parse(source: without),
+            nodeCount: 0,
+        )
         #expect(!rule.applies(to: file))
     }
 }

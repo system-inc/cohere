@@ -19,7 +19,14 @@ import Testing
 struct ConsistencyNoBareThrowTests {
     static func file(_ source: String, targetKind: String = "library") -> ParsedFile {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        return ParsedFile(url: url, targetName: "Fixture", targetKind: targetKind, source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        return ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: targetKind,
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
     }
 
     /* The findings for a file the rule agrees to read, and none for one it declines, as the pipeline runs it. */
@@ -53,7 +60,8 @@ struct ConsistencyNoBareThrowTests {
         #expect(
             found.map(\.message) == [
                 "This throws an NSError made up here, with the domain \"bench\", which names no declared failure: a caller can match it only by repeating that string and the code, and nothing keeps the two in step. Declare the failure as a case of an error type of our own (an enum conforming to Error, and LocalizedError for its text) and throw that case, so a caller catches it by case."
-            ])
+            ]
+        )
         #expect(found.map(\.rule) == ["cohere-swift/consistency-no-bare-throw"])
     }
 
@@ -205,7 +213,10 @@ struct ConsistencyNoBareThrowTests {
 
     /* Half-typed source still parses into a tree the rule walks, and walks without a finding it cannot place. */
     @Test func malformedThrowsAreSurvived() {
-        for source in ["throw", "throw NSError(", "throw NSError(domain: ", "throw ?? NSError(domain: \"X\", code: 1)", "throw (", "throw NSError"] {
+        for source in [
+            "throw", "throw NSError(", "throw NSError(domain: ", "throw ?? NSError(domain: \"X\", code: 1)", "throw (",
+            "throw NSError",
+        ] {
             _ = Self.findings(source)
         }
     }

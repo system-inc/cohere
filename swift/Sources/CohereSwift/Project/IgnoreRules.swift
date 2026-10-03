@@ -60,7 +60,10 @@ final class IgnoreRules {
                 let marker = URL(fileURLWithPath: candidate, isDirectory: true).appendingPathComponent(".git")
                 if FileManager.default.fileExists(atPath: marker.path) {
                     let gitDirectory = IgnoreRules.isDirectory(marker) ? marker : linkedGitDirectory(marker)
-                    return Repository(root: URL(fileURLWithPath: candidate, isDirectory: true), commonDirectory: gitDirectory.map(commonDirectory(of:)))
+                    return Repository(
+                        root: URL(fileURLWithPath: candidate, isDirectory: true),
+                        commonDirectory: gitDirectory.map(commonDirectory(of:)),
+                    )
                 }
                 let parent = (candidate as NSString).deletingLastPathComponent
                 if parent == candidate || parent.isEmpty {
@@ -82,7 +85,11 @@ final class IgnoreRules {
 
         /* A worktree's git directory names the shared one in `commondir`, relative to itself. Any other git directory is its own. */
         static func commonDirectory(of gitDirectory: URL) -> URL {
-            guard let contents = FileManager.default.contents(atPath: gitDirectory.appendingPathComponent("commondir").path) else {
+            guard
+                let contents = FileManager.default.contents(
+                    atPath: gitDirectory.appendingPathComponent("commondir").path
+                )
+            else {
                 return gitDirectory
             }
             let path = String(decoding: contents, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -156,18 +163,18 @@ final class IgnoreRules {
             var index = line.startIndex
             while index < line.endIndex {
                 switch line[index] {
-                case Byte.space:
-                    if firstTrailingSpace == nil {
-                        firstTrailingSpace = index
-                    }
-                case Byte.backslash:
-                    index += 1
-                    if index == line.endIndex {
-                        return line
-                    }
-                    firstTrailingSpace = nil
-                default:
-                    firstTrailingSpace = nil
+                    case Byte.space:
+                        if firstTrailingSpace == nil {
+                            firstTrailingSpace = index
+                        }
+                    case Byte.backslash:
+                        index += 1
+                        if index == line.endIndex {
+                            return line
+                        }
+                        firstTrailingSpace = nil
+                    default:
+                        firstTrailingSpace = nil
                 }
                 index += 1
             }
@@ -241,105 +248,113 @@ final class IgnoreRules {
                 }
                 textCharacter = folded(textCharacter)
                 switch patternCharacter {
-                case Byte.backslash:
-                    /* Literal match with the next byte. A pattern ending in `\` reads 0 here and matches nothing. */
-                    patternIndex += 1
-                    patternCharacter = patternByte(patternIndex)
-                    if textCharacter != patternCharacter {
-                        return .noMatch
-                    }
-                case Byte.question:
-                    if slashIsSpecial && textCharacter == Byte.slash {
-                        return .noMatch
-                    }
-                case Byte.asterisk:
-                    let crossesSlashes: Bool
-                    patternIndex += 1
-                    if patternByte(patternIndex) == Byte.asterisk {
-                        let beforeAsterisks = patternIndex - 2
+                    case Byte.backslash:
+                        /* Literal match with the next byte. A pattern ending in `\` reads 0 here and matches nothing. */
                         patternIndex += 1
-                        while patternByte(patternIndex) == Byte.asterisk {
+                        patternCharacter = patternByte(patternIndex)
+                        if textCharacter != patternCharacter {
+                            return .noMatch
+                        }
+                    case Byte.question:
+                        if slashIsSpecial && textCharacter == Byte.slash {
+                            return .noMatch
+                        }
+                    case Byte.asterisk:
+                        let crossesSlashes: Bool
+                        patternIndex += 1
+                        if patternByte(patternIndex) == Byte.asterisk {
+                            let beforeAsterisks = patternIndex - 2
                             patternIndex += 1
-                        }
-                        let next = patternByte(patternIndex)
-                        if !slashIsSpecial {
-                            crossesSlashes = true
-                        } else if (beforeAsterisks < 0 || pattern[beforeAsterisks] == Byte.slash)
-                            && (next == 0 || next == Byte.slash
-                                || (next == Byte.backslash && patternByte(patternIndex + 1) == Byte.slash))
-                        {
-                            /* A whole-segment `**` between slashes may match no directory at all, so try that first. */
-                            if next == Byte.slash && match(patternFrom: patternIndex + 1, textFrom: textIndex) == .match {
-                                return .match
+                            while patternByte(patternIndex) == Byte.asterisk {
+                                patternIndex += 1
                             }
-                            crossesSlashes = true
-                        } else {
-                            crossesSlashes = false
+                            let next = patternByte(patternIndex)
+                            if !slashIsSpecial {
+                                crossesSlashes = true
+                            }
+                            else if (beforeAsterisks < 0 || pattern[beforeAsterisks] == Byte.slash)
+                                && (next == 0 || next == Byte.slash
+                                    || (next == Byte.backslash && patternByte(patternIndex + 1) == Byte.slash))
+                            {
+                                /* A whole-segment `**` between slashes may match no directory at all, so try that first. */
+                                if next == Byte.slash
+                                    && match(patternFrom: patternIndex + 1, textFrom: textIndex) == .match
+                                {
+                                    return .match
+                                }
+                                crossesSlashes = true
+                            }
+                            else {
+                                crossesSlashes = false
+                            }
                         }
-                    } else {
-                        crossesSlashes = !slashIsSpecial
-                    }
-                    if patternIndex >= pattern.count {
-                        /* A trailing `**` matches everything left. A trailing `*` matches only within this directory. */
-                        if !crossesSlashes && text[textIndex...].contains(Byte.slash) {
-                            return .abortToDoubleAsterisk
+                        else {
+                            crossesSlashes = !slashIsSpecial
                         }
-                        return .match
-                    }
-                    if !crossesSlashes && pattern[patternIndex] == Byte.slash {
-                        /* One `*` before a slash matches the rest of this directory's name. */
-                        guard let slash = text[textIndex...].firstIndex(of: Byte.slash) else {
+                        if patternIndex >= pattern.count {
+                            /* A trailing `**` matches everything left. A trailing `*` matches only within this directory. */
+                            if !crossesSlashes && text[textIndex...].contains(Byte.slash) {
+                                return .abortToDoubleAsterisk
+                            }
+                            return .match
+                        }
+                        if !crossesSlashes && pattern[patternIndex] == Byte.slash {
+                            /* One `*` before a slash matches the rest of this directory's name. */
+                            guard let slash = text[textIndex...].firstIndex(of: Byte.slash) else {
+                                return .abortAll
+                            }
+                            textIndex = slash + 1
+                            patternIndex += 1
+                            continue
+                        }
+                        while true {
+                            if textCharacter == 0 {
+                                break
+                            }
+                            let next = pattern[patternIndex]
+                            if !Self.isGlobSpecial(next) {
+                                /* A literal after the asterisk: skip ahead to where it occurs, since everything before it belongs to the asterisk. */
+                                let literal = folded(next)
+                                while textIndex < text.count {
+                                    textCharacter = folded(text[textIndex])
+                                    if (!crossesSlashes && textCharacter == Byte.slash) || textCharacter == literal {
+                                        break
+                                    }
+                                    textIndex += 1
+                                }
+                                if textIndex >= text.count {
+                                    textCharacter = 0
+                                }
+                                if textCharacter != literal {
+                                    return .noMatch
+                                }
+                            }
+                            let outcome = match(patternFrom: patternIndex, textFrom: textIndex)
+                            if outcome != .noMatch {
+                                if !crossesSlashes || outcome != .abortToDoubleAsterisk {
+                                    return outcome
+                                }
+                            }
+                            else if !crossesSlashes && textCharacter == Byte.slash {
+                                return .abortToDoubleAsterisk
+                            }
+                            textIndex += 1
+                            textCharacter = textByte(textIndex)
+                        }
+                        return .abortAll
+                    case Byte.openBracket:
+                        guard
+                            let afterBracket = matchBracket(patternIndex: &patternIndex, textCharacter: textCharacter)
+                        else {
                             return .abortAll
                         }
-                        textIndex = slash + 1
-                        patternIndex += 1
-                        continue
-                    }
-                    while true {
-                        if textCharacter == 0 {
-                            break
+                        if !afterBracket || (slashIsSpecial && textCharacter == Byte.slash) {
+                            return .noMatch
                         }
-                        let next = pattern[patternIndex]
-                        if !Self.isGlobSpecial(next) {
-                            /* A literal after the asterisk: skip ahead to where it occurs, since everything before it belongs to the asterisk. */
-                            let literal = folded(next)
-                            while textIndex < text.count {
-                                textCharacter = folded(text[textIndex])
-                                if (!crossesSlashes && textCharacter == Byte.slash) || textCharacter == literal {
-                                    break
-                                }
-                                textIndex += 1
-                            }
-                            if textIndex >= text.count {
-                                textCharacter = 0
-                            }
-                            if textCharacter != literal {
-                                return .noMatch
-                            }
+                    default:
+                        if textCharacter != patternCharacter {
+                            return .noMatch
                         }
-                        let outcome = match(patternFrom: patternIndex, textFrom: textIndex)
-                        if outcome != .noMatch {
-                            if !crossesSlashes || outcome != .abortToDoubleAsterisk {
-                                return outcome
-                            }
-                        } else if !crossesSlashes && textCharacter == Byte.slash {
-                            return .abortToDoubleAsterisk
-                        }
-                        textIndex += 1
-                        textCharacter = textByte(textIndex)
-                    }
-                    return .abortAll
-                case Byte.openBracket:
-                    guard let afterBracket = matchBracket(patternIndex: &patternIndex, textCharacter: textCharacter) else {
-                        return .abortAll
-                    }
-                    if !afterBracket || (slashIsSpecial && textCharacter == Byte.slash) {
-                        return .noMatch
-                    }
-                default:
-                    if textCharacter != patternCharacter {
-                        return .noMatch
-                    }
                 }
                 patternIndex += 1
                 textIndex += 1
@@ -378,7 +393,8 @@ final class IgnoreRules {
                     if textCharacter == classCharacter {
                         matched = true
                     }
-                } else if classCharacter == Byte.hyphen && previous != 0
+                }
+                else if classCharacter == Byte.hyphen && previous != 0
                     && patternByte(patternIndex + 1) != 0 && patternByte(patternIndex + 1) != Byte.closeBracket
                 {
                     patternIndex += 1
@@ -392,14 +408,16 @@ final class IgnoreRules {
                     }
                     if textCharacter <= classCharacter && textCharacter >= previous {
                         matched = true
-                    } else if foldCase && Self.isLower(textCharacter) {
+                    }
+                    else if foldCase && Self.isLower(textCharacter) {
                         let upper = textCharacter - 32
                         if upper <= classCharacter && upper >= previous {
                             matched = true
                         }
                     }
                     classCharacter = 0
-                } else if classCharacter == Byte.openBracket && patternByte(patternIndex + 1) == Byte.colon {
+                }
+                else if classCharacter == Byte.openBracket && patternByte(patternIndex + 1) == Byte.colon {
                     patternIndex += 2
                     let nameStart = patternIndex
                     while patternByte(patternIndex) != 0 && patternByte(patternIndex) != Byte.closeBracket {
@@ -416,7 +434,8 @@ final class IgnoreRules {
                         if textCharacter == classCharacter {
                             matched = true
                         }
-                    } else {
+                    }
+                    else {
                         let name = String(decoding: pattern[nameStart..<(nameStart + nameLength)], as: UTF8.self)
                         guard let member = Self.isInNamedClass(name, textCharacter, foldCase: foldCase) else {
                             return nil
@@ -426,7 +445,8 @@ final class IgnoreRules {
                         }
                         classCharacter = 0
                     }
-                } else if textCharacter == classCharacter {
+                }
+                else if textCharacter == classCharacter {
                     matched = true
                 }
                 previous = classCharacter
@@ -439,21 +459,23 @@ final class IgnoreRules {
         /* `[:name:]` inside a class. Nil for a name git does not know, which aborts the match as git does. */
         static func isInNamedClass(_ name: String, _ byte: UInt8, foldCase: Bool) -> Bool? {
             switch name {
-            case "alnum": isAlpha(byte) || isDigit(byte)
-            case "alpha": isAlpha(byte)
-            case "blank": byte == Byte.space || byte == Byte.tab
-            case "cntrl": byte < 0x20 || byte == 0x7F
-            case "digit": isDigit(byte)
-            case "graph": byte > 0x20 && byte < 0x7F
-            case "lower": isLower(byte)
-            case "print": byte >= 0x20 && byte < 0x7F
-            case "punct": byte > 0x20 && byte < 0x7F && !isAlpha(byte) && !isDigit(byte)
-            /* git's own `isspace`: no vertical tab or form feed. */
-            case "space": byte == Byte.space || byte == Byte.tab || byte == Byte.newline || byte == Byte.carriageReturn
-            case "upper": isUpper(byte) || (foldCase && isLower(byte))
-            case "xdigit": isDigit(byte) || (byte >= UInt8(ascii: "a") && byte <= UInt8(ascii: "f"))
-                || (byte >= UInt8(ascii: "A") && byte <= UInt8(ascii: "F"))
-            default: nil
+                case "alnum": isAlpha(byte) || isDigit(byte)
+                case "alpha": isAlpha(byte)
+                case "blank": byte == Byte.space || byte == Byte.tab
+                case "cntrl": byte < 0x20 || byte == 0x7F
+                case "digit": isDigit(byte)
+                case "graph": byte > 0x20 && byte < 0x7F
+                case "lower": isLower(byte)
+                case "print": byte >= 0x20 && byte < 0x7F
+                case "punct": byte > 0x20 && byte < 0x7F && !isAlpha(byte) && !isDigit(byte)
+                /* git's own `isspace`: no vertical tab or form feed. */
+                case "space":
+                    byte == Byte.space || byte == Byte.tab || byte == Byte.newline || byte == Byte.carriageReturn
+                case "upper": isUpper(byte) || (foldCase && isLower(byte))
+                case "xdigit":
+                    isDigit(byte) || (byte >= UInt8(ascii: "a") && byte <= UInt8(ascii: "f"))
+                        || (byte >= UInt8(ascii: "A") && byte <= UInt8(ascii: "F"))
+                default: nil
             }
         }
 
@@ -495,7 +517,8 @@ final class IgnoreRules {
         self.repository = repository
         rootPath = repository.root.path
         let home = environment["HOME"].flatMap { $0.isEmpty ? nil : $0 } ?? NSHomeDirectory()
-        let configurationDirectory = environment["XDG_CONFIG_HOME"].flatMap { $0.isEmpty ? nil : $0 + "/git" } ?? home + "/.config/git"
+        let configurationDirectory =
+            environment["XDG_CONFIG_HOME"].flatMap { $0.isEmpty ? nil : $0 + "/git" } ?? home + "/.config/git"
 
         /* git's order: the XDG file, then `~/.gitconfig`, then the repository's own; the last one setting a key wins. */
         var configurationFiles = [configurationDirectory + "/config", home + "/.gitconfig"]
@@ -515,13 +538,16 @@ final class IgnoreRules {
         if let configured = settings["excludesfile"], !configured.isEmpty {
             if configured.hasPrefix("~/") {
                 globalExcludes = home + configured.dropFirst(1)
-            } else if configured.hasPrefix("/") {
+            }
+            else if configured.hasPrefix("/") {
                 globalExcludes = configured
-            } else {
+            }
+            else {
                 /* git reads it from the top of the work tree, where it runs. */
                 globalExcludes = repository.root.appendingPathComponent(configured).path
             }
-        } else {
+        }
+        else {
             globalExcludes = configurationDirectory + "/ignore"
         }
         var repositoryWide: [[Pattern]] = []
@@ -568,9 +594,10 @@ final class IgnoreRules {
         do {
             entries = try FileManager.default.contentsOfDirectory(
                 at: URL(fileURLWithPath: absolute, isDirectory: true),
-                includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey]
+                includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
             )
-        } catch {
+        }
+        catch {
             /* A directory that cannot be read lists nothing, as git skips one it cannot open. */
             return
         }
@@ -579,10 +606,13 @@ final class IgnoreRules {
             let relative = relativeDirectory.isEmpty ? name : relativeDirectory + "/" + name
             let isSymbolicLink = Self.isSymbolicLink(entry)
             let isDirectory = !isSymbolicLink && Self.isDirectory(entry)
-            guard admits(name: name, relative: relative, parent: relativeDirectory, isDirectory: isDirectory) else { continue }
+            guard admits(name: name, relative: relative, parent: relativeDirectory, isDirectory: isDirectory) else {
+                continue
+            }
             if isDirectory {
                 collect(relativeDirectory: relative, into: &files)
-            } else {
+            }
+            else {
                 let path = rootPath + "/" + relative
                 files.append(isSymbolicLink ? URL(fileURLWithPath: path).resolvingSymlinksInPath().path : path)
             }
@@ -608,13 +638,25 @@ final class IgnoreRules {
         while let current = directory {
             let patterns = patterns(ownedBy: current)
             let below = current.isEmpty ? path[...] : path[(current.utf8.count + 1)...]
-            if let decision = Self.decision(patterns, path: below, name: nameBytes, isDirectory: isDirectory, foldCase: foldCase) {
+            if let decision = Self.decision(
+                patterns,
+                path: below,
+                name: nameBytes,
+                isDirectory: isDirectory,
+                foldCase: foldCase,
+            ) {
                 return decision
             }
             directory = current.isEmpty ? nil : String(current[..<(current.lastIndex(of: "/") ?? current.startIndex)])
         }
         for patterns in repositoryWidePatterns {
-            if let decision = Self.decision(patterns, path: path[...], name: nameBytes, isDirectory: isDirectory, foldCase: foldCase) {
+            if let decision = Self.decision(
+                patterns,
+                path: path[...],
+                name: nameBytes,
+                isDirectory: isDirectory,
+                foldCase: foldCase,
+            ) {
                 return decision
             }
         }
@@ -627,7 +669,7 @@ final class IgnoreRules {
         path: ArraySlice<UInt8>,
         name: ArraySlice<UInt8>,
         isDirectory: Bool,
-        foldCase: Bool
+        foldCase: Bool,
     ) -> Bool? {
         guard !patterns.isEmpty else { return nil }
         let path = Array(path)
@@ -640,7 +682,8 @@ final class IgnoreRules {
         if let cached = directoryPatterns[relativeDirectory] {
             return cached
         }
-        let file = relativeDirectory.isEmpty ? rootPath + "/.gitignore" : rootPath + "/" + relativeDirectory + "/.gitignore"
+        let file =
+            relativeDirectory.isEmpty ? rootPath + "/.gitignore" : rootPath + "/" + relativeDirectory + "/.gitignore"
         let patterns = Self.patterns(inFile: file)
         directoryPatterns[relativeDirectory] = patterns
         return patterns
@@ -693,19 +736,23 @@ final class IgnoreRules {
                 value += pendingSpaces
                 pendingSpaces = ""
                 switch escaped {
-                case "n": value.append("\n")
-                case "t": value.append("\t")
-                default: value.append(escaped)
+                    case "n": value.append("\n")
+                    case "t": value.append("\t")
+                    default: value.append(escaped)
                 }
-            } else if character == "\"" {
+            }
+            else if character == "\"" {
                 quoted.toggle()
-            } else if !quoted && (character == "#" || character == ";") {
+            }
+            else if !quoted && (character == "#" || character == ";") {
                 break
-            } else if !quoted && character.isWhitespace {
+            }
+            else if !quoted && character.isWhitespace {
                 if !value.isEmpty {
                     pendingSpaces.append(character)
                 }
-            } else {
+            }
+            else {
                 value += pendingSpaces
                 pendingSpaces = ""
                 value.append(character)
@@ -721,7 +768,8 @@ final class IgnoreRules {
     static func isDirectory(_ url: URL) -> Bool {
         do {
             return try url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory ?? false
-        } catch {
+        }
+        catch {
             /* Gone between listing and asking: not a directory to descend into. */
             return false
         }
@@ -730,7 +778,8 @@ final class IgnoreRules {
     static func isSymbolicLink(_ url: URL) -> Bool {
         do {
             return try url.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink ?? false
-        } catch {
+        }
+        catch {
             /* Gone between listing and asking: nothing to resolve. */
             return false
         }

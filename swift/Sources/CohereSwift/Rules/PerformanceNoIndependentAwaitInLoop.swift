@@ -140,7 +140,7 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                 severity: .error,
                 rule: name,
                 messageId: "independentAwaitInLoop",
-                message: Self.message
+                message: Self.message,
             )
         }
     }
@@ -225,8 +225,10 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
      Not `#if`, whose active and inactive clauses both stay in view: an effect under `#if DEBUG` is still one.
      */
     static func isWalkBoundary(_ node: Syntax) -> Bool {
-        isFunctionBoundary(node) || node.is(AccessorBlockSyntax.self) || node.is(StructDeclSyntax.self) || node.is(ClassDeclSyntax.self)
-            || node.is(EnumDeclSyntax.self) || node.is(ActorDeclSyntax.self) || node.is(ProtocolDeclSyntax.self) || node.is(ExtensionDeclSyntax.self)
+        isFunctionBoundary(node) || node.is(AccessorBlockSyntax.self) || node.is(StructDeclSyntax.self)
+            || node.is(ClassDeclSyntax.self)
+            || node.is(EnumDeclSyntax.self) || node.is(ActorDeclSyntax.self) || node.is(ProtocolDeclSyntax.self)
+            || node.is(ExtensionDeclSyntax.self)
     }
 
     /* What a scope node declares under the name, seen from `child`, or nil. `isShared` marks an `inout` parameter. */
@@ -242,22 +244,34 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                 if let variable = statement.item.as(VariableDeclSyntax.self) {
                     for binding in variable.bindings where boundNames(binding.pattern).contains(name) {
                         /* An `async let` started its work already; reading it later is not the item's own work being started. */
-                        let isPlainLet = variable.bindingSpecifier.tokenKind == .keyword(.let)
+                        let isPlainLet =
+                            variable.bindingSpecifier.tokenKind == .keyword(.let)
                             && !variable.modifiers.contains { $0.name.tokenKind == .keyword(.async) }
-                        return Declared(letInitializer: isPlainLet ? binding.initializer?.value : nil, isVariable: variable.bindingSpecifier.tokenKind == .keyword(.var))
+                        return Declared(
+                            letInitializer: isPlainLet ? binding.initializer?.value : nil,
+                            isVariable: variable.bindingSpecifier.tokenKind == .keyword(.var),
+                        )
                     }
-                } else if let guardStatement = statement.item.as(GuardStmtSyntax.self), conditionNames(guardStatement.conditions).contains(name) {
-                    return Declared(isVariable: guardStatement.conditions.contains { element in
-                        element.condition.as(OptionalBindingConditionSyntax.self)?.bindingSpecifier.tokenKind == .keyword(.var)
-                    })
-                } else if let function = statement.item.as(FunctionDeclSyntax.self), plainName(function.name) == name {
+                }
+                else if let guardStatement = statement.item.as(GuardStmtSyntax.self),
+                    conditionNames(guardStatement.conditions).contains(name)
+                {
+                    return Declared(
+                        isVariable: guardStatement.conditions.contains { element in
+                            element.condition.as(OptionalBindingConditionSyntax.self)?.bindingSpecifier.tokenKind
+                                == .keyword(.var)
+                        }
+                    )
+                }
+                else if let function = statement.item.as(FunctionDeclSyntax.self), plainName(function.name) == name {
                     return Declared()
                 }
             }
             return nil
         }
         if let conditions = parent.as(ConditionElementListSyntax.self) {
-            for element in conditions where element.position < child.position && conditionNames([element]).contains(name) {
+            for element in conditions
+            where element.position < child.position && conditionNames([element]).contains(name) {
                 return Declared()
             }
             return nil
@@ -268,16 +282,21 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
         if let whileStatement = parent.as(WhileStmtSyntax.self), child.id == whileStatement.body.id {
             return conditionNames(whileStatement.conditions).contains(name) ? Declared() : nil
         }
-        if let forStatement = parent.as(ForStmtSyntax.self), child.id == forStatement.body.id || child.id == forStatement.whereClause?.id {
+        if let forStatement = parent.as(ForStmtSyntax.self),
+            child.id == forStatement.body.id || child.id == forStatement.whereClause?.id
+        {
             return boundNames(forStatement.pattern).contains(name) ? Declared() : nil
         }
         if let catchClause = parent.as(CatchClauseSyntax.self), child.id == catchClause.body.id {
             if catchClause.catchItems.isEmpty {
                 return name == "error" ? Declared() : nil
             }
-            return catchClause.catchItems.contains { item in item.pattern.map { boundNames($0).contains(name) } ?? false } ? Declared() : nil
+            return catchClause.catchItems.contains { item in item.pattern.map { boundNames($0).contains(name) } ?? false
+            } ? Declared() : nil
         }
-        if let switchCase = parent.as(SwitchCaseSyntax.self), child.id == switchCase.statements.id, case let .case(label) = switchCase.label {
+        if let switchCase = parent.as(SwitchCaseSyntax.self), child.id == switchCase.statements.id,
+            case let .case(label) = switchCase.label
+        {
             return label.caseItems.contains { boundNames($0.pattern).contains(name) } ? Declared() : nil
         }
         if let closure = parent.as(ClosureExprSyntax.self) {
@@ -303,9 +322,9 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
         var names: Set<String> = []
         for element in conditions {
             switch element.condition {
-            case let .optionalBinding(binding): names.formUnion(boundNames(binding.pattern))
-            case let .matchingPattern(matching): names.formUnion(boundNames(matching.pattern))
-            default: break
+                case let .optionalBinding(binding): names.formUnion(boundNames(binding.pattern))
+                case let .matchingPattern(matching): names.formUnion(boundNames(matching.pattern))
+                default: break
             }
         }
         return names
@@ -318,16 +337,16 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                 names.insert(plainName(capture.name))
             }
             switch signature.parameterClause {
-            case let .simpleInput(parameters):
-                for parameter in parameters {
-                    names.insert(plainName(parameter.name))
-                }
-            case let .parameterClause(clause):
-                for parameter in clause.parameters {
-                    names.insert(plainName(parameter.secondName ?? parameter.firstName))
-                }
-            case nil:
-                break
+                case let .simpleInput(parameters):
+                    for parameter in parameters {
+                        names.insert(plainName(parameter.name))
+                    }
+                case let .parameterClause(clause):
+                    for parameter in clause.parameters {
+                        names.insert(plainName(parameter.secondName ?? parameter.firstName))
+                    }
+                case nil:
+                    break
             }
         }
         return names
@@ -335,9 +354,10 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
 
     static func parameter(_ name: String, in parameters: FunctionParameterListSyntax) -> Declared? {
         for parameter in parameters where plainName(parameter.secondName ?? parameter.firstName) == name {
-            let isInout = parameter.type.as(AttributedTypeSyntax.self)?.specifiers.contains { specifier in
-                specifier.as(SimpleTypeSpecifierSyntax.self)?.specifier.tokenKind == .keyword(.inout)
-            } ?? false
+            let isInout =
+                parameter.type.as(AttributedTypeSyntax.self)?.specifiers.contains { specifier in
+                    specifier.as(SimpleTypeSpecifierSyntax.self)?.specifier.tokenKind == .keyword(.inout)
+                } ?? false
             return Declared(isShared: isInout)
         }
         return nil
@@ -349,15 +369,21 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
     static func stripped(_ expression: ExprSyntax) -> ExprSyntax {
         var current = expression
         while true {
-            if let tuple = current.as(TupleExprSyntax.self), tuple.elements.count == 1, let only = tuple.elements.first, only.label == nil {
+            if let tuple = current.as(TupleExprSyntax.self), tuple.elements.count == 1, let only = tuple.elements.first,
+                only.label == nil
+            {
                 current = only.expression
-            } else if let tryExpression = current.as(TryExprSyntax.self) {
+            }
+            else if let tryExpression = current.as(TryExprSyntax.self) {
                 current = tryExpression.expression
-            } else if let unwrap = current.as(ForceUnwrapExprSyntax.self) {
+            }
+            else if let unwrap = current.as(ForceUnwrapExprSyntax.self) {
                 current = unwrap.expression
-            } else if let chaining = current.as(OptionalChainingExprSyntax.self) {
+            }
+            else if let chaining = current.as(OptionalChainingExprSyntax.self) {
                 current = chaining.expression
-            } else {
+            }
+            else {
                 return current
             }
         }
@@ -396,7 +422,9 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
     /* Whether a node is the callee, base or subscripted value of a chain that goes on above it, through `?` and `!`. */
     static func continuesChain(_ node: Syntax) -> Bool {
         var current = node
-        while let parent = current.parent, parent.is(ForceUnwrapExprSyntax.self) || parent.is(OptionalChainingExprSyntax.self) {
+        while let parent = current.parent,
+            parent.is(ForceUnwrapExprSyntax.self) || parent.is(OptionalChainingExprSyntax.self)
+        {
             current = parent
         }
         guard let parent = current.parent else { return false }
@@ -446,7 +474,9 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
         "usleep", "nanosleep", "asyncAfter", "yield", "log",
     ]
     static let pacingPrefixes = ["sleep", "delay", "wait", "pause", "throttle", "backoff", "ratelimit", "print"]
-    static let logMethods: Set<String> = ["log", "info", "notice", "warning", "warn", "error", "debug", "trace", "critical", "fault"]
+    static let logMethods: Set<String> = [
+        "log", "info", "notice", "warning", "warn", "error", "debug", "trace", "critical", "fault",
+    ]
     /* The methods a log receiver uses to report a problem rather than to show progress. */
     static let quietLogMethods: Set<String> = ["warning", "warn", "error", "debug", "trace", "critical", "fault"]
 
@@ -477,7 +507,9 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                 return false
             }
             if called.name == "fputs" || called.name == "fputc",
-                call.arguments.contains(where: { stripped($0.expression).as(DeclReferenceExprSyntax.self)?.baseName.text == "stderr" })
+                call.arguments.contains(where: {
+                    stripped($0.expression).as(DeclReferenceExprSyntax.self)?.baseName.text == "stderr"
+                })
             {
                 return false
             }
@@ -489,7 +521,9 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
         if pacingPrefixes.contains(where: { lowerName.hasPrefix($0) }) {
             return true
         }
-        if lowerName.contains("progress") || lowerName.contains("spinner") || lastReceiver.contains("progress") || lastReceiver.contains("spinner") {
+        if lowerName.contains("progress") || lowerName.contains("spinner") || lastReceiver.contains("progress")
+            || lastReceiver.contains("spinner")
+        {
             return true
         }
         return logMethods.contains(called.name) && lastReceiver.contains("log")
@@ -558,34 +592,47 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
             let itemNames = PerformanceNoIndependentAwaitInLoop.boundNames(loop.pattern)
             guard !itemNames.isEmpty else { return nil }
             let sequence = PerformanceNoIndependentAwaitInLoop.stripped(loop.sequence)
-            if let range = sequence.as(InfixOperatorExprSyntax.self), let operation = range.operator.as(BinaryOperatorExprSyntax.self),
+            if let range = sequence.as(InfixOperatorExprSyntax.self),
+                let operation = range.operator.as(BinaryOperatorExprSyntax.self),
                 operation.operator.text.hasPrefix("..")
             {
                 /* `start..<items.count` is the indexed walk; every other range is a probe, a retry or a count. */
-                guard operation.operator.text == "..<", let bound = PerformanceNoIndependentAwaitInLoop.stripped(range.rightOperand).as(MemberAccessExprSyntax.self),
+                guard operation.operator.text == "..<",
+                    let bound = PerformanceNoIndependentAwaitInLoop.stripped(range.rightOperand).as(
+                        MemberAccessExprSyntax.self
+                    ),
                     bound.declName.baseName.text == "count", bound.declName.argumentNames == nil, let base = bound.base,
                     PerformanceNoIndependentAwaitInLoop.chain(base) != nil
                 else { return nil }
                 self.collection = base
                 self.isIndexed = true
-            } else if sequence.is(PrefixOperatorExprSyntax.self) || sequence.is(PostfixOperatorExprSyntax.self) {
+            }
+            else if sequence.is(PrefixOperatorExprSyntax.self) || sequence.is(PostfixOperatorExprSyntax.self) {
                 /* A one-sided range (`0...`) counts without end. */
                 return nil
-            } else if let member = sequence.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "indices", let base = member.base,
+            }
+            else if let member = sequence.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "indices",
+                let base = member.base,
                 PerformanceNoIndependentAwaitInLoop.chain(base) != nil
             {
                 self.collection = base
                 self.isIndexed = true
-            } else if let call = sequence.as(FunctionCallExprSyntax.self), call.calledExpression.as(DeclReferenceExprSyntax.self)?.baseName.text == "stride" {
+            }
+            else if let call = sequence.as(FunctionCallExprSyntax.self),
+                call.calledExpression.as(DeclReferenceExprSyntax.self)?.baseName.text == "stride"
+            {
                 return nil
-            } else {
+            }
+            else {
                 self.collection = sequence
                 self.isIndexed = false
             }
             self.loop = loop
             self.body = loop.body
             self.itemNames = itemNames
-            self.label = loop.parent?.as(LabeledStmtSyntax.self).map { PerformanceNoIndependentAwaitInLoop.plainName($0.label) }
+            self.label = loop.parent?.as(LabeledStmtSyntax.self).map {
+                PerformanceNoIndependentAwaitInLoop.plainName($0.label)
+            }
             self.callees = callees
         }
 
@@ -615,12 +662,16 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                         return .item
                     }
                     insideLoop = false
-                } else if let found = PerformanceNoIndependentAwaitInLoop.declared(name, in: parent, below: child) {
+                }
+                else if let found = PerformanceNoIndependentAwaitInLoop.declared(name, in: parent, below: child) {
                     if !insideLoop {
                         return found.isShared ? .shared : .functionLocal(isVariable: found.isVariable)
                     }
                     return .inner(letInitializer: found.letInitializer)
-                } else if name.hasPrefix("$"), let closure = parent.as(ClosureExprSyntax.self), closure.signature?.parameterClause == nil {
+                }
+                else if name.hasPrefix("$"), let closure = parent.as(ClosureExprSyntax.self),
+                    closure.signature?.parameterClause == nil
+                {
                     return insideLoop ? .inner(letInitializer: nil) : .functionLocal(isVariable: false)
                 }
                 /* Past the function that holds the loop, a name is a property, a global or a capture. */
@@ -628,7 +679,9 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                     return .shared
                 }
                 /* Top-level code's locals are globals. */
-                if !insideLoop, parent.is(CodeBlockItemListSyntax.self), parent.parent?.is(SourceFileSyntax.self) == true {
+                if !insideLoop, parent.is(CodeBlockItemListSyntax.self),
+                    parent.parent?.is(SourceFileSyntax.self) == true
+                {
                     return .shared
                 }
                 child = parent
@@ -659,7 +712,8 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                     }
                     if isItemRooted(awaitExpression.expression, depth: 0) {
                         found = true
-                    } else {
+                    }
+                    else {
                         blocked = true
                         return
                     }
@@ -700,9 +754,14 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
 
         /* `items[index]`, where `items` is the collection the indexed loop counts and `index` its item. */
         func isIndexedElement(_ expression: ExprSyntax) -> Bool {
-            guard isIndexed, let subscriptCall = PerformanceNoIndependentAwaitInLoop.stripped(expression).as(SubscriptCallExprSyntax.self),
+            guard isIndexed,
+                let subscriptCall = PerformanceNoIndependentAwaitInLoop.stripped(expression).as(
+                    SubscriptCallExprSyntax.self
+                ),
                 subscriptCall.arguments.count == 1, let argument = subscriptCall.arguments.first, argument.label == nil,
-                let index = PerformanceNoIndependentAwaitInLoop.stripped(argument.expression).as(DeclReferenceExprSyntax.self),
+                let index = PerformanceNoIndependentAwaitInLoop.stripped(argument.expression).as(
+                    DeclReferenceExprSyntax.self
+                ),
                 case .item = resolve(index),
                 let walked = PerformanceNoIndependentAwaitInLoop.chain(subscriptCall.calledExpression),
                 let counted = PerformanceNoIndependentAwaitInLoop.chain(collection)
@@ -729,12 +788,16 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                     allRooted = false
                     return
                 }
-                let isChain = node.is(FunctionCallExprSyntax.self) || node.is(SubscriptCallExprSyntax.self)
+                let isChain =
+                    node.is(FunctionCallExprSyntax.self) || node.is(SubscriptCallExprSyntax.self)
                     || node.as(MemberAccessExprSyntax.self)?.base != nil
-                if isChain, !PerformanceNoIndependentAwaitInLoop.continuesChain(node), let expression = node.as(ExprSyntax.self) {
+                if isChain, !PerformanceNoIndependentAwaitInLoop.continuesChain(node),
+                    let expression = node.as(ExprSyntax.self)
+                {
                     if rootIsItem(expression, depth: depth) {
                         rooted = true
-                    } else {
+                    }
+                    else {
                         allRooted = false
                         return
                     }
@@ -756,21 +819,25 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                 }
                 if let call = current.as(FunctionCallExprSyntax.self) {
                     current = PerformanceNoIndependentAwaitInLoop.stripped(call.calledExpression)
-                } else if let member = current.as(MemberAccessExprSyntax.self), let base = member.base {
+                }
+                else if let member = current.as(MemberAccessExprSyntax.self), let base = member.base {
                     current = PerformanceNoIndependentAwaitInLoop.stripped(base)
-                } else if let subscriptCall = current.as(SubscriptCallExprSyntax.self) {
+                }
+                else if let subscriptCall = current.as(SubscriptCallExprSyntax.self) {
                     current = PerformanceNoIndependentAwaitInLoop.stripped(subscriptCall.calledExpression)
-                } else if let reference = current.as(DeclReferenceExprSyntax.self) {
+                }
+                else if let reference = current.as(DeclReferenceExprSyntax.self) {
                     switch resolve(reference) {
-                    case .item:
-                        return true
-                    case let .inner(letInitializer):
-                        guard let initializer = letInitializer else { return false }
-                        return isItemRooted(initializer, depth: depth + 1)
-                    case .functionLocal, .shared:
-                        return false
+                        case .item:
+                            return true
+                        case let .inner(letInitializer):
+                            guard let initializer = letInitializer else { return false }
+                            return isItemRooted(initializer, depth: depth + 1)
+                        case .functionLocal, .shared:
+                            return false
                     }
-                } else {
+                }
+                else {
                     return false
                 }
             }
@@ -794,7 +861,9 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                     if PerformanceNoIndependentAwaitInLoop.isOrderedCall(call, narrow: insideCatch) {
                         return true
                     }
-                    if let called = PerformanceNoIndependentAwaitInLoop.calledName(call), callees.makesOrderedCall(called.name) {
+                    if let called = PerformanceNoIndependentAwaitInLoop.calledName(call),
+                        callees.makesOrderedCall(called.name)
+                    {
                         return true
                     }
                 }
@@ -807,9 +876,12 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
         // MARK: Loop-carried state
 
         static let consumingMethods: Set<String> = [
-            "pop", "popFirst", "popLast", "removeFirst", "removeLast", "removeAll", "next", "read", "sort", "reverse", "shuffle", "swapAt", "partition",
+            "pop", "popFirst", "popLast", "removeFirst", "removeLast", "removeAll", "next", "read", "sort", "reverse",
+            "shuffle", "swapAt", "partition",
         ]
-        static let sinkMethods: Set<String> = ["append", "insert", "updateValue", "removeValue", "merge", "formUnion", "add", "set"]
+        static let sinkMethods: Set<String> = [
+            "append", "insert", "updateValue", "removeValue", "merge", "formUnion", "add", "set",
+        ]
 
         /* A method that fills its receiver: one of the names above, or `add`, `append` or `insert` and a capitalized noun. */
         static func isSinkMethod(_ method: String) -> Bool {
@@ -835,23 +907,26 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                 let target = PerformanceNoIndependentAwaitInLoop.stripped(target)
                 if let reference = target.as(DeclReferenceExprSyntax.self) {
                     switch resolve(reference) {
-                    case .item, .inner: return
-                    case .functionLocal, .shared: carried = true
+                        case .item, .inner: return
+                        case .functionLocal, .shared: carried = true
                     }
                     return
                 }
                 let filled: ExprSyntax
                 if let subscriptCall = target.as(SubscriptCallExprSyntax.self) {
                     filled = subscriptCall.calledExpression
-                } else if target.is(MemberAccessExprSyntax.self) {
+                }
+                else if target.is(MemberAccessExprSyntax.self) {
                     filled = target
-                } else {
+                }
+                else {
                     /* A tuple or anything else written to: read each part as a whole write. */
                     if let tuple = target.as(TupleExprSyntax.self) {
                         for element in tuple.elements {
                             write(into: element.expression, isPlainAssignment: isPlainAssignment)
                         }
-                    } else if !target.is(DiscardAssignmentExprSyntax.self) {
+                    }
+                    else if !target.is(DiscardAssignmentExprSyntax.self) {
                         carried = true
                     }
                     return
@@ -862,7 +937,11 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                  the item here.
                  */
                 let path = PerformanceNoIndependentAwaitInLoop.chain(filled)
-                sinkInto(PerformanceNoIndependentAwaitInLoop.baseReference(filled), segments: path?.segments, isPlain: isPlainAssignment)
+                sinkInto(
+                    PerformanceNoIndependentAwaitInLoop.baseReference(filled),
+                    segments: path?.segments,
+                    isPlain: isPlainAssignment,
+                )
             }
 
             func sinkInto(_ reference: DeclReferenceExprSyntax?, segments: [String]?, isPlain: Bool) {
@@ -871,17 +950,17 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                     return
                 }
                 switch resolve(reference) {
-                case .item, .inner:
-                    return
-                case .shared:
-                    carried = true
-                case .functionLocal:
-                    guard isPlain, let segments else {
-                        carried = true
+                    case .item, .inner:
                         return
-                    }
-                    sinks.append(segments)
-                    sinkRoots.insert(reference.id)
+                    case .shared:
+                        carried = true
+                    case .functionLocal:
+                        guard isPlain, let segments else {
+                            carried = true
+                            return
+                        }
+                        sinks.append(segments)
+                        sinkRoots.insert(reference.id)
                 }
             }
 
@@ -905,19 +984,26 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                 let receiverName = PerformanceNoIndependentAwaitInLoop.plainName(reference.baseName)
                 let binding = resolve(reference)
                 switch binding {
-                case .item, .inner:
-                    return
-                case .functionLocal, .shared:
-                    break
+                    case .item, .inner:
+                        return
+                    case .functionLocal, .shared:
+                        break
                 }
                 if Self.consumingMethods.contains(method) {
                     carried = true
-                } else if Self.isSinkMethod(method) {
-                    sinkInto(reference, segments: PerformanceNoIndependentAwaitInLoop.chain(base)?.segments, isPlain: true)
-                } else if receiverName == "self" || receiverName == "super" {
+                }
+                else if Self.isSinkMethod(method) {
+                    sinkInto(
+                        reference,
+                        segments: PerformanceNoIndependentAwaitInLoop.chain(base)?.segments,
+                        isPlain: true,
+                    )
+                }
+                else if receiverName == "self" || receiverName == "super" {
                     /* Any method of `self` may write the state every pass shares. */
                     carried = true
-                } else if case .functionLocal(isVariable: true) = binding {
+                }
+                else if case .functionLocal(isVariable: true) = binding {
                     /* A method on a local `var` may be `mutating`, and the syntax cannot say it is not. */
                     carried = true
                 }
@@ -930,19 +1016,26 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                 if let infix = node.as(InfixOperatorExprSyntax.self) {
                     if infix.operator.is(AssignmentExprSyntax.self) {
                         write(into: infix.leftOperand, isPlainAssignment: true)
-                    } else if let operation = infix.operator.as(BinaryOperatorExprSyntax.self), operation.operator.text.hasSuffix("="),
+                    }
+                    else if let operation = infix.operator.as(BinaryOperatorExprSyntax.self),
+                        operation.operator.text.hasSuffix("="),
                         !Self.comparisons.contains(operation.operator.text)
                     {
                         write(into: infix.leftOperand, isPlainAssignment: false)
                     }
-                } else if let inOut = node.as(InOutExprSyntax.self) {
+                }
+                else if let inOut = node.as(InOutExprSyntax.self) {
                     write(into: inOut.expression, isPlainAssignment: false)
-                } else if let call = node.as(FunctionCallExprSyntax.self) {
+                }
+                else if let call = node.as(FunctionCallExprSyntax.self) {
                     judge(call)
                     if carried {
                         return
                     }
-                } else if let reference = node.as(DeclReferenceExprSyntax.self), !PerformanceNoIndependentAwaitInLoop.isMemberName(reference) {
+                }
+                else if let reference = node.as(DeclReferenceExprSyntax.self),
+                    !PerformanceNoIndependentAwaitInLoop.isMemberName(reference)
+                {
                     if case .functionLocal = resolve(reference) {
                         reads.append((reference.id, PerformanceNoIndependentAwaitInLoop.readSegments(reference)))
                     }
@@ -961,13 +1054,18 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
             var headerReads: [[String]] = []
             for header in [Syntax(loop.sequence), loop.whereClause.map { Syntax($0) }].compactMap({ $0 }) {
                 for token in header.tokens(viewMode: .sourceAccurate) {
-                    if let reference = token.parent?.as(DeclReferenceExprSyntax.self), !PerformanceNoIndependentAwaitInLoop.isMemberName(reference) {
+                    if let reference = token.parent?.as(DeclReferenceExprSyntax.self),
+                        !PerformanceNoIndependentAwaitInLoop.isMemberName(reference)
+                    {
                         headerReads.append(PerformanceNoIndependentAwaitInLoop.readSegments(reference))
                     }
                 }
             }
             for sink in sinks {
-                for read in reads where !sinkRoots.contains(read.root) && PerformanceNoIndependentAwaitInLoop.pathsOverlap(sink, read.segments) {
+                for read in reads
+                where !sinkRoots.contains(read.root)
+                    && PerformanceNoIndependentAwaitInLoop.pathsOverlap(sink, read.segments)
+                {
                     return true
                 }
                 for read in headerReads where PerformanceNoIndependentAwaitInLoop.pathsOverlap(sink, read) {
@@ -988,24 +1086,36 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                     if PerformanceNoIndependentAwaitInLoop.isWalkBoundary(node) {
                         return
                     }
-                    if let binding = node.as(PatternBindingSyntax.self), let initializer = binding.initializer, containsTaint(Syntax(initializer.value), tainted: tainted) {
+                    if let binding = node.as(PatternBindingSyntax.self), let initializer = binding.initializer,
+                        containsTaint(Syntax(initializer.value), tainted: tainted)
+                    {
                         tainted.formUnion(PerformanceNoIndependentAwaitInLoop.boundNames(binding.pattern))
-                    } else if let infix = node.as(InfixOperatorExprSyntax.self), infix.operator.is(AssignmentExprSyntax.self) || isCompoundAssignment(infix),
+                    }
+                    else if let infix = node.as(InfixOperatorExprSyntax.self),
+                        infix.operator.is(AssignmentExprSyntax.self) || isCompoundAssignment(infix),
                         containsTaint(Syntax(infix.rightOperand), tainted: tainted)
                     {
                         for token in infix.leftOperand.tokens(viewMode: .sourceAccurate) {
-                            if let reference = token.parent?.as(DeclReferenceExprSyntax.self), !PerformanceNoIndependentAwaitInLoop.isMemberName(reference) {
+                            if let reference = token.parent?.as(DeclReferenceExprSyntax.self),
+                                !PerformanceNoIndependentAwaitInLoop.isMemberName(reference)
+                            {
                                 tainted.insert(PerformanceNoIndependentAwaitInLoop.plainName(reference.baseName))
                             }
                         }
-                    } else if let binding = node.as(OptionalBindingConditionSyntax.self) {
+                    }
+                    else if let binding = node.as(OptionalBindingConditionSyntax.self) {
                         let source = binding.initializer.map { Syntax($0.value) } ?? Syntax(binding.pattern)
                         if containsTaint(source, tainted: tainted) {
                             tainted.formUnion(PerformanceNoIndependentAwaitInLoop.boundNames(binding.pattern))
                         }
-                    } else if let matching = node.as(MatchingPatternConditionSyntax.self), containsTaint(Syntax(matching.initializer.value), tainted: tainted) {
+                    }
+                    else if let matching = node.as(MatchingPatternConditionSyntax.self),
+                        containsTaint(Syntax(matching.initializer.value), tainted: tainted)
+                    {
                         tainted.formUnion(PerformanceNoIndependentAwaitInLoop.boundNames(matching.pattern))
-                    } else if let catchClause = node.as(CatchClauseSyntax.self), let doStatement = catchClause.parent?.parent?.as(DoStmtSyntax.self),
+                    }
+                    else if let catchClause = node.as(CatchClauseSyntax.self),
+                        let doStatement = catchClause.parent?.parent?.as(DoStmtSyntax.self),
                         containsAwait(Syntax(doStatement.body), before: nil)
                     {
                         if catchClause.catchItems.isEmpty {
@@ -1016,9 +1126,15 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                                 tainted.formUnion(PerformanceNoIndependentAwaitInLoop.boundNames(pattern))
                             }
                         }
-                    } else if let nested = node.as(ForStmtSyntax.self), containsTaint(Syntax(nested.sequence), tainted: tainted) {
+                    }
+                    else if let nested = node.as(ForStmtSyntax.self),
+                        containsTaint(Syntax(nested.sequence), tainted: tainted)
+                    {
                         tainted.formUnion(PerformanceNoIndependentAwaitInLoop.boundNames(nested.pattern))
-                    } else if let switchExpression = node.as(SwitchExprSyntax.self), containsTaint(Syntax(switchExpression.subject), tainted: tainted) {
+                    }
+                    else if let switchExpression = node.as(SwitchExprSyntax.self),
+                        containsTaint(Syntax(switchExpression.subject), tainted: tainted)
+                    {
                         for element in switchExpression.cases {
                             if case let .switchCase(switchCase) = element, case let .case(label) = switchCase.label {
                                 for item in label.caseItems {
@@ -1052,7 +1168,8 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
             if node.is(AwaitExprSyntax.self) {
                 return true
             }
-            if let reference = node.as(DeclReferenceExprSyntax.self), !PerformanceNoIndependentAwaitInLoop.isMemberName(reference),
+            if let reference = node.as(DeclReferenceExprSyntax.self),
+                !PerformanceNoIndependentAwaitInLoop.isMemberName(reference),
                 tainted.contains(PerformanceNoIndependentAwaitInLoop.plainName(reference.baseName))
             {
                 return true
@@ -1066,7 +1183,9 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                 if PerformanceNoIndependentAwaitInLoop.isWalkBoundary(node) {
                     return false
                 }
-                if isJump(node), exitsLoop(node), isGuardedByTaint(node, limit: Syntax(body), withSiblings: true, tainted: tainted) {
+                if isJump(node), exitsLoop(node),
+                    isGuardedByTaint(node, limit: Syntax(body), withSiblings: true, tainted: tainted)
+                {
                     return true
                 }
                 return node.children(viewMode: .sourceAccurate).contains { visit($0) }
@@ -1078,7 +1197,8 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
             if let tryExpression = node.as(TryExprSyntax.self) {
                 return tryExpression.questionOrExclamationMark == nil
             }
-            return node.is(BreakStmtSyntax.self) || node.is(ContinueStmtSyntax.self) || node.is(ReturnStmtSyntax.self) || node.is(ThrowStmtSyntax.self)
+            return node.is(BreakStmtSyntax.self) || node.is(ContinueStmtSyntax.self) || node.is(ReturnStmtSyntax.self)
+                || node.is(ThrowStmtSyntax.self)
         }
 
         /* A `do` whose catches handle every error: a bare `catch`, or one that only binds it. */
@@ -1089,7 +1209,8 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                 }
                 return clause.catchItems.contains { item in
                     guard item.whereClause == nil, let pattern = item.pattern else { return item.whereClause == nil }
-                    return pattern.as(ValueBindingPatternSyntax.self)?.pattern.is(IdentifierPatternSyntax.self) == true || pattern.is(IdentifierPatternSyntax.self)
+                    return pattern.as(ValueBindingPatternSyntax.self)?.pattern.is(IdentifierPatternSyntax.self) == true
+                        || pattern.is(IdentifierPatternSyntax.self)
                 }
             }
         }
@@ -1104,7 +1225,9 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                 var child = jump
                 var current = jump.parent
                 while let parent = current, child.id != body.id {
-                    if let doStatement = parent.as(DoStmtSyntax.self), child.id == doStatement.body.id, Self.catchesEverything(doStatement) {
+                    if let doStatement = parent.as(DoStmtSyntax.self), child.id == doStatement.body.id,
+                        Self.catchesEverything(doStatement)
+                    {
                         return false
                     }
                     child = parent
@@ -1113,7 +1236,9 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                 return true
             }
             let isBreak = jump.is(BreakStmtSyntax.self)
-            let jumpLabel = (jump.as(BreakStmtSyntax.self)?.label ?? jump.as(ContinueStmtSyntax.self)?.label).map { PerformanceNoIndependentAwaitInLoop.plainName($0) }
+            let jumpLabel = (jump.as(BreakStmtSyntax.self)?.label ?? jump.as(ContinueStmtSyntax.self)?.label).map {
+                PerformanceNoIndependentAwaitInLoop.plainName($0)
+            }
             guard let jumpLabel else {
                 /* The nearest loop, or for `break` the nearest `switch`, is the target. */
                 var current = jump.parent
@@ -1121,7 +1246,8 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                     if parent.id == loop.id {
                         return isBreak
                     }
-                    if parent.is(ForStmtSyntax.self) || parent.is(WhileStmtSyntax.self) || parent.is(RepeatStmtSyntax.self)
+                    if parent.is(ForStmtSyntax.self) || parent.is(WhileStmtSyntax.self)
+                        || parent.is(RepeatStmtSyntax.self)
                         || (isBreak && parent.is(SwitchExprSyntax.self))
                     {
                         return false
@@ -1132,7 +1258,9 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
             }
             var current = jump.parent
             while let parent = current, parent.id != loop.id {
-                if let labeled = parent.as(LabeledStmtSyntax.self), PerformanceNoIndependentAwaitInLoop.plainName(labeled.label) == jumpLabel {
+                if let labeled = parent.as(LabeledStmtSyntax.self),
+                    PerformanceNoIndependentAwaitInLoop.plainName(labeled.label) == jumpLabel
+                {
                     return false
                 }
                 current = parent.parent
@@ -1149,19 +1277,27 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
          awaited value. `withSiblings` also asks whether an earlier statement jumps on such a value.
          */
         func isGuardedByTaint(_ jump: Syntax, limit: Syntax, withSiblings: Bool, tainted: Set<String>) -> Bool {
-            if let returnStatement = jump.as(ReturnStmtSyntax.self), let expression = returnStatement.expression, containsTaint(Syntax(expression), tainted: tainted) {
+            if let returnStatement = jump.as(ReturnStmtSyntax.self), let expression = returnStatement.expression,
+                containsTaint(Syntax(expression), tainted: tainted)
+            {
                 return true
             }
-            if let throwStatement = jump.as(ThrowStmtSyntax.self), containsTaint(Syntax(throwStatement.expression), tainted: tainted) {
+            if let throwStatement = jump.as(ThrowStmtSyntax.self),
+                containsTaint(Syntax(throwStatement.expression), tainted: tainted)
+            {
                 return true
             }
-            if let tryExpression = jump.as(TryExprSyntax.self), containsTaint(Syntax(tryExpression.expression), tainted: tainted) {
+            if let tryExpression = jump.as(TryExprSyntax.self),
+                containsTaint(Syntax(tryExpression.expression), tainted: tainted)
+            {
                 return true
             }
             var child = jump
             var current = jump.parent
             while let parent = current, child.id != limit.id {
-                if let ifExpression = parent.as(IfExprSyntax.self), containsTaint(Syntax(ifExpression.conditions), tainted: tainted) {
+                if let ifExpression = parent.as(IfExprSyntax.self),
+                    containsTaint(Syntax(ifExpression.conditions), tainted: tainted)
+                {
                     return true
                 }
                 if let guardStatement = parent.as(GuardStmtSyntax.self), child.id == guardStatement.body.id,
@@ -1169,37 +1305,52 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                 {
                     return true
                 }
-                if let whileStatement = parent.as(WhileStmtSyntax.self), containsTaint(Syntax(whileStatement.conditions), tainted: tainted) {
+                if let whileStatement = parent.as(WhileStmtSyntax.self),
+                    containsTaint(Syntax(whileStatement.conditions), tainted: tainted)
+                {
                     return true
                 }
-                if let repeatStatement = parent.as(RepeatStmtSyntax.self), containsTaint(Syntax(repeatStatement.condition), tainted: tainted) {
+                if let repeatStatement = parent.as(RepeatStmtSyntax.self),
+                    containsTaint(Syntax(repeatStatement.condition), tainted: tainted)
+                {
                     return true
                 }
                 if let nested = parent.as(ForStmtSyntax.self), parent.id != loop.id {
-                    if containsTaint(Syntax(nested.sequence), tainted: tainted) || (nested.whereClause.map { containsTaint(Syntax($0), tainted: tainted) } ?? false) {
+                    if containsTaint(Syntax(nested.sequence), tainted: tainted)
+                        || (nested.whereClause.map { containsTaint(Syntax($0), tainted: tainted) } ?? false)
+                    {
                         return true
                     }
                 }
-                if parent.is(SwitchCaseSyntax.self), let switchExpression = parent.parent?.parent?.as(SwitchExprSyntax.self) {
+                if parent.is(SwitchCaseSyntax.self),
+                    let switchExpression = parent.parent?.parent?.as(SwitchExprSyntax.self)
+                {
                     if containsTaint(Syntax(switchExpression.subject), tainted: tainted) {
                         return true
                     }
                     for element in switchExpression.cases {
-                        if case let .switchCase(switchCase) = element, case let .case(label) = switchCase.label, containsTaint(Syntax(label), tainted: tainted) {
+                        if case let .switchCase(switchCase) = element, case let .case(label) = switchCase.label,
+                            containsTaint(Syntax(label), tainted: tainted)
+                        {
                             return true
                         }
                     }
                 }
-                if parent.is(CatchClauseSyntax.self), let doStatement = parent.parent?.parent?.as(DoStmtSyntax.self), containsAwait(Syntax(doStatement.body), before: nil) {
+                if parent.is(CatchClauseSyntax.self), let doStatement = parent.parent?.parent?.as(DoStmtSyntax.self),
+                    containsAwait(Syntax(doStatement.body), before: nil)
+                {
                     return true
                 }
                 /* `do { return try await probe() } catch {}` leaves only when the await succeeded. */
-                if let doStatement = parent.as(DoStmtSyntax.self), child.id == doStatement.body.id, !doStatement.catchClauses.isEmpty,
+                if let doStatement = parent.as(DoStmtSyntax.self), child.id == doStatement.body.id,
+                    !doStatement.catchClauses.isEmpty,
                     containsAwait(Syntax(doStatement.body), before: jump.position)
                 {
                     return true
                 }
-                if withSiblings, let list = parent.as(CodeBlockItemListSyntax.self), earlierSiblingJumpsOnTaint(list, before: child, tainted: tainted) {
+                if withSiblings, let list = parent.as(CodeBlockItemListSyntax.self),
+                    earlierSiblingJumpsOnTaint(list, before: child, tainted: tainted)
+                {
                     return true
                 }
                 child = parent
@@ -1209,14 +1360,22 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
         }
 
         /* Conservative: any earlier tainted jump counts, even one whose target lies inside that statement. */
-        func earlierSiblingJumpsOnTaint(_ list: CodeBlockItemListSyntax, before child: Syntax, tainted: Set<String>) -> Bool {
+        func earlierSiblingJumpsOnTaint(
+            _ list: CodeBlockItemListSyntax,
+            before child: Syntax,
+            tainted: Set<String>,
+        ) -> Bool {
             for sibling in list where sibling.position < child.position {
                 func visit(_ node: Syntax) -> Bool {
                     if PerformanceNoIndependentAwaitInLoop.isWalkBoundary(node) {
                         return false
                     }
-                    let isStatementJump = node.is(BreakStmtSyntax.self) || node.is(ContinueStmtSyntax.self) || node.is(ReturnStmtSyntax.self) || node.is(ThrowStmtSyntax.self)
-                    if isStatementJump, isGuardedByTaint(node, limit: Syntax(sibling), withSiblings: false, tainted: tainted) {
+                    let isStatementJump =
+                        node.is(BreakStmtSyntax.self) || node.is(ContinueStmtSyntax.self)
+                        || node.is(ReturnStmtSyntax.self) || node.is(ThrowStmtSyntax.self)
+                    if isStatementJump,
+                        isGuardedByTaint(node, limit: Syntax(sibling), withSiblings: false, tainted: tainted)
+                    {
                         return true
                     }
                     return node.children(viewMode: .sourceAccurate).contains { visit($0) }

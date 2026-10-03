@@ -16,7 +16,14 @@ struct IdenticalOperandsTests {
 
     static func positions(_ source: String) -> [String] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         return IdenticalOperands().findings(in: file).map { "\($0.line):\($0.column)" }
     }
 

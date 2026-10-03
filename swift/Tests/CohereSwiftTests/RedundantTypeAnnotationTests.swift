@@ -47,19 +47,50 @@ struct RedundantTypeAnnotationTests {
     static let derivedInitializer = "s:7Control7DerivedCACycfc"
 
     /* SwiftLint's examples name `URL`, `Int`, `Set`, `CharacterSet`, `Direction` and `A.B`, resolved as the index resolves them. */
-    static let incumbentTypes = ["URL": url, "Int": integer, "Set": set, "CharacterSet": characterSet, "Direction": direction, "A": outer, "B": inner]
-    static let incumbentInitializers = ["URL": urlInitializer, "Set": setInitializer, "Array": arrayInitializer, "B": innerInitializer]
-    static let incumbentMembers = ["alphanumerics": alphanumerics, "random": random, "up": up, "moved": moved, "shared": shared]
-    static let incumbentMemberNames = ["random": "random(in:)", "moved": "moved(by:)", "deletingLastPathComponent": "deletingLastPathComponent()", "f": "f()"]
+    static let incumbentTypes = [
+        "URL": url, "Int": integer, "Set": set, "CharacterSet": characterSet, "Direction": direction, "A": outer,
+        "B": inner,
+    ]
+    static let incumbentInitializers = [
+        "URL": urlInitializer, "Set": setInitializer, "Array": arrayInitializer, "B": innerInitializer,
+    ]
+    static let incumbentMembers = [
+        "alphanumerics": alphanumerics, "random": random, "up": up, "moved": moved, "shared": shared,
+    ]
+    static let incumbentMemberNames = [
+        "random": "random(in:)", "moved": "moved(by:)", "deletingLastPathComponent": "deletingLastPathComponent()",
+        "f": "f()",
+    ]
 
     /* The findings, as `line:column`, with the names resolved as the maps say. */
-    static func findings(_ source: String, types: [String: String] = incumbentTypes, initializers: [String: String] = incumbentInitializers, members: [String: String] = incumbentMembers, memberNames: [String: String] = incumbentMemberNames) -> [String] {
+    static func findings(
+        _ source: String,
+        types: [String: String] = incumbentTypes,
+        initializers: [String: String] = incumbentInitializers,
+        members: [String: String] = incumbentMembers,
+        memberNames: [String: String] = incumbentMemberNames,
+    ) -> [String] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         var occurrences: [FileSymbols.Occurrence] = []
         func record(_ token: TokenSyntax, _ symbol: String, _ name: String) {
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
-            occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: symbol, name: name, isReference: true))
+            occurrences.append(
+                FileSymbols.Occurrence(
+                    line: location.line,
+                    column: location.column,
+                    symbol: symbol,
+                    name: name,
+                    isReference: true,
+                )
+            )
         }
         for token in file.tree.tokens(viewMode: .sourceAccurate) {
             if let symbol = types[token.text] {
@@ -78,7 +109,9 @@ struct RedundantTypeAnnotationTests {
                 record(token, symbol, "init()")
             }
         }
-        return RedundantTypeAnnotation().findings(in: file, symbols: FileSymbols(occurrences)).map { "\($0.line):\($0.column)" }
+        return RedundantTypeAnnotation().findings(in: file, symbols: FileSymbols(occurrences)).map {
+            "\($0.line):\($0.column)"
+        }
     }
 
     /* Where the index records the initializer of each call that builds a type, keyed by the type's name. */
@@ -86,13 +119,19 @@ struct RedundantTypeAnnotationTests {
         private(set) var found: [(String, TokenSyntax)] = []
 
         override func visit(_ node: FunctionCallExprSyntax) -> SyntaxVisitorContinueKind {
-            if let member = node.calledExpression.as(MemberAccessExprSyntax.self), member.declName.baseName.tokenKind == .keyword(.`init`), let base = member.base, let name = Self.name(base) {
+            if let member = node.calledExpression.as(MemberAccessExprSyntax.self),
+                member.declName.baseName.tokenKind == .keyword(.`init`), let base = member.base,
+                let name = Self.name(base)
+            {
                 found.append((name.text, member.declName.baseName))
-            } else if let name = Self.name(node.calledExpression) {
+            }
+            else if let name = Self.name(node.calledExpression) {
                 found.append((name.text, name))
-            } else if let array = node.calledExpression.as(ArrayExprSyntax.self) {
+            }
+            else if let array = node.calledExpression.as(ArrayExprSyntax.self) {
                 found.append(("Array", array.leftSquare))
-            } else if let dictionary = node.calledExpression.as(DictionaryExprSyntax.self) {
+            }
+            else if let dictionary = node.calledExpression.as(DictionaryExprSyntax.self) {
                 found.append(("Dictionary", dictionary.leftSquare))
             }
             return .visitChildren
@@ -171,7 +210,9 @@ struct RedundantTypeAnnotationTests {
      */
     @Test func incumbentMemberReadExamplesAreFound() {
         let types = Self.incumbentTypes.merging(["C": "s:7Control1CV"]) { first, _ in first }
-        let staticChain = ["b": "s:7Control1AV1bAA1CVvpZ", "c": "s:7Control1CV1cAA1DVvp", "d": "s:7Control1DV1dAA1AVvp"]
+        let staticChain = [
+            "b": "s:7Control1AV1bAA1CVvpZ", "c": "s:7Control1CV1cAA1DVvp", "d": "s:7Control1DV1dAA1AVvp",
+        ]
         let callChain = ["f": "s:7Control1AV1fAA1CVyFZ", "b": "s:7Control1CV1bAA1AVvp"]
         #expect(Self.findings("let alphanumerics: CharacterSet = CharacterSet.alphanumerics\n") == ["1:18"])
         #expect(Self.findings("var num: Int = Int.random(0..<10)\n") == ["1:8"])
@@ -213,7 +254,10 @@ struct RedundantTypeAnnotationTests {
             let subclass: Base = Derived.build()
 
             """
-        let types = Self.incumbentTypes.merging(["Base": Self.base, "Derived": Self.derived, "Circle": "s:7Control6CircleV", "Square": "s:7Control6SquareV", "Box": "s:7Control3BoxV", "Shape": "s:7Control5ShapeP"]) { first, _ in first }
+        let types = Self.incumbentTypes.merging([
+            "Base": Self.base, "Derived": Self.derived, "Circle": "s:7Control6CircleV", "Square": "s:7Control6SquareV",
+            "Box": "s:7Control3BoxV", "Shape": "s:7Control5ShapeP",
+        ]) { first, _ in first }
         let members = [
             "other": "s:7Control9DirectionO5otherAA4SideOvpZ",
             "derived": "s:7Control4BaseC7derivedAA7DerivedCvpZ",
@@ -225,7 +269,9 @@ struct RedundantTypeAnnotationTests {
             "standard": "s:7Control5ShapePAAE8standardAaB_pvpZ",
             "build": "s:7Control4BaseC5buildACXDyFZ",
         ]
-        let names = ["decode": "decode(_:)", "make": "decode()", "empty": "empty()", "fresh": "fresh()", "build": "build()"]
+        let names = [
+            "decode": "decode(_:)", "make": "decode()", "empty": "empty()", "fresh": "fresh()", "build": "build()",
+        ]
         #expect(Self.findings(source, types: types, members: members, memberNames: names).isEmpty)
     }
 
@@ -238,11 +284,21 @@ struct RedundantTypeAnnotationTests {
             let twice: Circle = Circle.fresh().again()
 
             """
-        let types = Self.incumbentTypes.merging(["Base": Self.base, "Circle": "s:7Control6CircleV"]) { first, _ in first }
-        let initializers = Self.incumbentInitializers.merging(["Circle": "s:7Control6CircleVACycfc"]) { first, _ in first }
-        let members = ["build": "s:7Control4BaseC5buildACXDyFZ", "fresh": "s:7Control5ShapePAAE5freshxyFZ", "again": "s:7Control5ShapePAAE5againxyF"]
+        let types = Self.incumbentTypes.merging(["Base": Self.base, "Circle": "s:7Control6CircleV"]) { first, _ in first
+        }
+        let initializers = Self.incumbentInitializers.merging(["Circle": "s:7Control6CircleVACycfc"]) { first, _ in
+            first
+        }
+        let members = [
+            "build": "s:7Control4BaseC5buildACXDyFZ", "fresh": "s:7Control5ShapePAAE5freshxyFZ",
+            "again": "s:7Control5ShapePAAE5againxyF",
+        ]
         let names = ["build": "build()", "fresh": "fresh()", "again": "again()"]
-        #expect(Self.findings(source, types: types, initializers: initializers, members: members, memberNames: names) == ["1:10", "2:10", "3:10", "4:10"])
+        #expect(
+            Self.findings(source, types: types, initializers: initializers, members: members, memberNames: names) == [
+                "1:10", "2:10", "3:10", "4:10",
+            ]
+        )
     }
 
     /* An optional result binds unwrapped only through a force unwrap or an optional binding; an implicitly unwrapped one needs its annotation. */
@@ -254,7 +310,11 @@ struct RedundantTypeAnnotationTests {
 
             """
         let types = Self.incumbentTypes.merging(["Circle": "s:7Control6CircleV"]) { first, _ in first }
-        #expect(Self.findings(source, types: types, members: ["maybe": "s:7Control6CircleV5maybeACSgvpZ"]) == ["2:11", "3:13"])
+        #expect(
+            Self.findings(source, types: types, members: ["maybe": "s:7Control6CircleV5maybeACSgvpZ"]) == [
+                "2:11", "3:13",
+            ]
+        )
     }
 
     /* What SwiftLint stops at: a link that is an optional chain, a force unwrap, a subscript or parentheses, a chain off another name, and an implicit member. */
@@ -268,7 +328,10 @@ struct RedundantTypeAnnotationTests {
             let implicit: URL = .init(fileURLWithPath: path).deletingLastPathComponent()
 
             """
-        let members = ["deletingLastPathComponent": Self.deletingLastPathComponent, "optional": "s:10Foundation3URLV8optionalACSgvp"]
+        let members = [
+            "deletingLastPathComponent": Self.deletingLastPathComponent,
+            "optional": "s:10Foundation3URLV8optionalACSgvp",
+        ]
         #expect(Self.findings(source, members: members).isEmpty)
     }
 
@@ -313,7 +376,15 @@ struct RedundantTypeAnnotationTests {
             var str: String = "str"
 
             """
-        #expect(Self.findings(source, types: Self.incumbentTypes.merging(["CustomStringConvertible": "s:s23CustomStringConvertibleP", "Bool": "s:Sb", "Double": "s:Sd", "String": "s:SS"]) { first, _ in first }).isEmpty)
+        #expect(
+            Self.findings(
+                source,
+                types: Self.incumbentTypes.merging([
+                    "CustomStringConvertible": "s:s23CustomStringConvertibleP", "Bool": "s:Sb", "Double": "s:Sd",
+                    "String": "s:SS",
+                ]) { first, _ in first },
+            ).isEmpty
+        )
     }
 
     /* The default `ignore_attributes`: an `@IBInspectable` property keeps the annotation Interface Builder reads. */
@@ -335,8 +406,14 @@ struct RedundantTypeAnnotationTests {
 
     /* The reason the rule is typed: the same declaration on both sides, never a subclass, an existential, or an alias over another spelling. */
     @Test func differentDeclarationsAreNotFound() {
-        let types = ["Base": Self.base, "Derived": Self.derived, "Shape": "s:7Control5ShapeP", "Circle": "s:7Control6CircleV", "Round": "s:7Control5Rounda"]
-        let initializers = ["Base": Self.baseInitializer, "Derived": Self.derivedInitializer, "Circle": "s:7Control6CircleVACycfc", "Round": "s:7Control6CircleVACycfc"]
+        let types = [
+            "Base": Self.base, "Derived": Self.derived, "Shape": "s:7Control5ShapeP", "Circle": "s:7Control6CircleV",
+            "Round": "s:7Control5Rounda",
+        ]
+        let initializers = [
+            "Base": Self.baseInitializer, "Derived": Self.derivedInitializer, "Circle": "s:7Control6CircleVACycfc",
+            "Round": "s:7Control6CircleVACycfc",
+        ]
         let source = """
             let value: Base = Derived()
             let shape: any Shape = Circle()
@@ -373,7 +450,9 @@ struct RedundantTypeAnnotationTests {
 
             """
         let types = ["Lenient": "s:7Control7LenientV", "Takes": "s:7Control5TakesV"]
-        let initializers = ["Lenient": "s:7Control7LenientV5valueACSgSi_tcfc", "Takes": "s:7Control5TakesV4nameACSSSg_tcfc"]
+        let initializers = [
+            "Lenient": "s:7Control7LenientV5valueACSgSi_tcfc", "Takes": "s:7Control5TakesV4nameACSSSg_tcfc",
+        ]
         #expect(Self.findings(source, types: types, initializers: initializers) == ["2:11", "3:13"])
     }
 
@@ -400,7 +479,11 @@ struct RedundantTypeAnnotationTests {
             let explicit: Int = Int.init(5)
 
             """
-        #expect(Self.findings(source, types: Self.incumbentTypes.merging(["String": "s:SS"]) { first, _ in first }) == ["1:10", "2:9"])
+        #expect(
+            Self.findings(source, types: Self.incumbentTypes.merging(["String": "s:SS"]) { first, _ in first }) == [
+                "1:10", "2:9",
+            ]
+        )
     }
 
     /* `try` and `await` change no type, and `try?` in an optional binding is unwrapped by it; `try?` anywhere else is not the shape. */
@@ -426,8 +509,14 @@ struct RedundantTypeAnnotationTests {
             let inferred: Wrapper<Int> = Wrapper.wrapped(1)
 
             """
-        let types = Self.incumbentTypes.merging(["Wrapper": "s:7Control7WrapperO", "Control": "c:@M@Control"]) { first, _ in first }
-        let members = Self.incumbentMembers.merging(["wrapped": "s:7Control7WrapperO7wrappedyACyxGxcAEmlF"]) { first, _ in first }
+        let types = Self.incumbentTypes.merging(["Wrapper": "s:7Control7WrapperO", "Control": "c:@M@Control"]) {
+            first,
+            _ in first
+        }
+        let members = Self.incumbentMembers.merging(["wrapped": "s:7Control7WrapperO7wrappedyACyxGxcAEmlF"]) {
+            first,
+            _ in first
+        }
         #expect(Self.findings(source, types: types, members: members) == ["1:7", "2:10", "3:14", "4:12"])
     }
 
@@ -438,7 +527,9 @@ struct RedundantTypeAnnotationTests {
             let nested: Direction = Direction.Inner
 
             """
-        let members = Self.incumbentMembers.merging(["left": "s:7Control4SideO4leftyA2CmF", "Inner": "s:7Control9DirectionO5InnerV"]) { first, _ in first }
+        let members = Self.incumbentMembers.merging([
+            "left": "s:7Control4SideO4leftyA2CmF", "Inner": "s:7Control9DirectionO5InnerV",
+        ]) { first, _ in first }
         #expect(Self.findings(source, members: members).isEmpty)
     }
 
@@ -451,7 +542,9 @@ struct RedundantTypeAnnotationTests {
             let spelled: [Int] = Array<Int>()
 
             """
-        let initializers = Self.incumbentInitializers.merging(["Dictionary": Self.dictionaryInitializer, "init": Self.arrayInitializer]) { first, _ in first }
+        let initializers = Self.incumbentInitializers.merging([
+            "Dictionary": Self.dictionaryInitializer, "init": Self.arrayInitializer,
+        ]) { first, _ in first }
         #expect(Self.findings(source, initializers: initializers) == ["1:10", "2:12"])
     }
 
@@ -475,7 +568,14 @@ struct RedundantTypeAnnotationTests {
 
     @Test func aFileWithNoAnnotationDoesNotApply() {
         let source = "let url = URL()\n"
-        let file = ParsedFile(url: URL(fileURLWithPath: "/Plain.swift"), targetName: "Control", targetKind: "regular", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: URL(fileURLWithPath: "/Plain.swift"),
+            targetName: "Control",
+            targetKind: "regular",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         #expect(!RedundantTypeAnnotation().applies(to: file))
     }
 
@@ -534,23 +634,48 @@ struct RedundantTypeAnnotationTests {
         """
 
     @Test func aRepeatedTypeIsFlaggedAndASubclassIsNot() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-typed-\(UUID().uuidString)", isDirectory: true)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-typed-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-        try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try Self.packageSource.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
+        try PipelineControlTests.manifest.write(
+            to: root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try Self.packageSource.write(
+            to: sources.appendingPathComponent("Control.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
 
         /* One run builds the package and writes its index. The rule is not registered here, so it is run by hand on what the run left. */
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"],
+            workingDirectory: root,
+        )
         _ = try await Pipeline(options: options, writer: ContractWriter { _ in }, workingDirectory: root).run()
-        let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: ProcessRunner())
+        let package = try PackageModel.load(
+            root: root,
+            scratchPath: Pipeline.scratchPath(for: root),
+            runner: ProcessRunner(),
+        )
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
         let candidates = parsed.files.filter { RedundantTypeAnnotation().applies(to: $0) }
-        let symbols = SymbolProvider(scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root), runner: ProcessRunner()).symbols(for: candidates)
+        let symbols = SymbolProvider(
+            scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root),
+            runner: ProcessRunner(),
+        ).symbols(for: candidates)
         #expect(symbols.fromIndex == 1, "the build's index should describe the file: \(symbols.unavailable)")
         let found = candidates.flatMap { file in
-            RedundantTypeAnnotation().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.line)" }
+            RedundantTypeAnnotation().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map
+            { "\($0.line)" }
         }
-        #expect(found == ["30", "32", "34", "37", "38", "39", "40"], "expected the URL, the struct of ours, the enum case, the coerced literal, the chain, the Self member and the static declared as the type, and not the subclass, the init!, the optional, the implicit init, the static declared as a subclass or the generic method: \(found)")
+        #expect(
+            found == ["30", "32", "34", "37", "38", "39", "40"],
+            "expected the URL, the struct of ours, the enum case, the coerced literal, the chain, the Self member and the static declared as the type, and not the subclass, the init!, the optional, the implicit init, the static declared as a subclass or the generic method: \(found)",
+        )
     }
 }

@@ -89,7 +89,9 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
     static let shells: Set<String> = ["sh", "bash", "zsh", "dash", "ksh", "mksh"]
 
     /* Long options that take no argument, so the reading can step over them. Any other long option stops it. */
-    static let longOptions: Set<String> = ["--login", "--interactive", "--norc", "--noprofile", "--noediting", "--posix", "--restricted", "--verbose"]
+    static let longOptions: Set<String> = [
+        "--login", "--interactive", "--norc", "--noprofile", "--noediting", "--posix", "--restricted", "--verbose",
+    ]
 
     /* Long options whose argument is the next element. */
     static let longOptionsWithArgument: Set<String> = ["--rcfile", "--init-file"]
@@ -123,13 +125,18 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
         for call in visitor.calls {
             /* Filtered as an array of the call's own nodes: filtering the syntax collection builds a detached copy, whose positions start at zero. */
             let arguments = Array(call.arguments).filter { $0.label?.text == "arguments" }
-            guard arguments.count == 1, let list = arguments.first, call.arguments.contains(where: { $0.label?.text != "arguments" && judge.isShell($0.expression, depth: 0) }) else {
+            guard arguments.count == 1, let list = arguments.first,
+                call.arguments.contains(where: {
+                    $0.label?.text != "arguments" && judge.isShell($0.expression, depth: 0)
+                })
+            else {
                 continue
             }
             lists.append(list.expression)
         }
         return lists.compactMap { list in
-            guard let elements = judge.arrayElements(list, depth: 0), let script = Self.script(in: elements, judge: judge),
+            guard let elements = judge.arrayElements(list, depth: 0),
+                let script = Self.script(in: elements, judge: judge),
                 let built = judge.built(script, depth: 0), judge.judge(built, depth: 0) == .unsafe
             else {
                 return nil
@@ -144,7 +151,10 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
         private(set) var calls: [FunctionCallExprSyntax] = []
 
         override func visit(_ node: InfixOperatorExprSyntax) -> SyntaxVisitorContinueKind {
-            if node.operator.is(AssignmentExprSyntax.self), let member = node.leftOperand.as(MemberAccessExprSyntax.self), member.base != nil, member.declName.baseName.text == "arguments" {
+            if node.operator.is(AssignmentExprSyntax.self),
+                let member = node.leftOperand.as(MemberAccessExprSyntax.self), member.base != nil,
+                member.declName.baseName.text == "arguments"
+            {
                 assignments.append((node, member))
             }
             return .visitChildren
@@ -208,11 +218,15 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
 
     static let textTypes: Set<String> = ["String", "Substring", "Character", "NSString"]
     static let inertTypes: Set<String> = [
-        "Int", "Int8", "Int16", "Int32", "Int64", "UInt", "UInt8", "UInt16", "UInt32", "UInt64", "Double", "Float", "Float16", "CGFloat", "Bool",
+        "Int", "Int8", "Int16", "Int32", "Int64", "UInt", "UInt8", "UInt16", "UInt32", "UInt64", "Double", "Float",
+        "Float16", "CGFloat", "Bool",
     ]
     static let textDemangled: Set<String> = ["Swift.String", "Swift.Substring", "Swift.Character", "__C.NSString"]
     static let inertDemangled: Set<String> = Set(
-        ["Int", "Int8", "Int16", "Int32", "Int64", "UInt", "UInt8", "UInt16", "UInt32", "UInt64", "Double", "Float", "Float16", "Bool"].map { "Swift.\($0)" }
+        [
+            "Int", "Int8", "Int16", "Int32", "Int64", "UInt", "UInt8", "UInt16", "UInt32", "UInt64", "Double", "Float",
+            "Float16", "Bool",
+        ].map { "Swift.\($0)" }
             + ["CoreFoundation.CGFloat", "CoreGraphics.CGFloat"]
     )
 
@@ -235,9 +249,11 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
             if option.hasPrefix("--") {
                 if Self.longOptionsWithArgument.contains(option) {
                     index += 2
-                } else if Self.longOptions.contains(option) {
+                }
+                else if Self.longOptions.contains(option) {
                     index += 1
-                } else {
+                }
+                else {
                     return nil
                 }
                 continue
@@ -267,7 +283,9 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
          enclosing body.
          */
         func runsShell(_ assignment: InfixOperatorExprSyntax, receiverOf member: MemberAccessExprSyntax) -> Bool {
-            guard let receiver = member.base?.trimmedDescription, let list = assignment.parent?.as(CodeBlockItemSyntax.self)?.parent?.as(CodeBlockItemListSyntax.self) else {
+            guard let receiver = member.base?.trimmedDescription,
+                let list = assignment.parent?.as(CodeBlockItemSyntax.self)?.parent?.as(CodeBlockItemListSyntax.self)
+            else {
                 return false
             }
             var body = Syntax(list)
@@ -275,15 +293,18 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
                 body = parent
             }
             let programs = body.tokens(viewMode: .sourceAccurate).compactMap { token -> InfixOperatorExprSyntax? in
-                guard token.text == "executableURL" || token.text == "launchPath", let access = token.parent?.parent?.as(MemberAccessExprSyntax.self),
+                guard token.text == "executableURL" || token.text == "launchPath",
+                    let access = token.parent?.parent?.as(MemberAccessExprSyntax.self),
                     access.declName.baseName.id == token.id, access.base?.trimmedDescription == receiver,
-                    let setting = access.parent?.as(InfixOperatorExprSyntax.self), setting.operator.is(AssignmentExprSyntax.self), setting.leftOperand.id == access.id
+                    let setting = access.parent?.as(InfixOperatorExprSyntax.self),
+                    setting.operator.is(AssignmentExprSyntax.self), setting.leftOperand.id == access.id
                 else {
                     return nil
                 }
                 return setting
             }
-            return programs.contains { $0.parent?.parent?.id == list.id } && programs.allSatisfy { isShell($0.rightOperand, depth: 0) }
+            return programs.contains { $0.parent?.parent?.id == list.id }
+                && programs.allSatisfy { isShell($0.rightOperand, depth: 0) }
         }
 
         /* A function's, closure's or accessor's body, or the file: the scope a program's settings are searched in. */
@@ -294,8 +315,11 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
             guard let block = node.as(CodeBlockSyntax.self) else {
                 return node.as(CodeBlockItemListSyntax.self)?.parent?.is(ClosureExprSyntax.self) == true
             }
-            return block.parent?.is(FunctionDeclSyntax.self) == true || block.parent?.is(InitializerDeclSyntax.self) == true || block.parent?.is(AccessorDeclSyntax.self) == true
-                || block.parent?.is(DeinitializerDeclSyntax.self) == true || block.parent?.is(AccessorBlockSyntax.self) == true
+            return block.parent?.is(FunctionDeclSyntax.self) == true
+                || block.parent?.is(InitializerDeclSyntax.self) == true
+                || block.parent?.is(AccessorDeclSyntax.self) == true
+                || block.parent?.is(DeinitializerDeclSyntax.self) == true
+                || block.parent?.is(AccessorBlockSyntax.self) == true
         }
 
         /* A shell named by a literal path, as a string or `URL(fileURLWithPath:)` or `URL(filePath:)`, directly or through a `let`. */
@@ -303,18 +327,23 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
             guard depth <= SecurityNoInterpolatedShellCommand.depthLimit else { return false }
             let expression = Self.withoutParentheses(expression)
             if let call = expression.as(FunctionCallExprSyntax.self) {
-                guard ["URL", "Foundation.URL"].contains(call.calledExpression.trimmedDescription), let first = call.arguments.first,
+                guard ["URL", "Foundation.URL"].contains(call.calledExpression.trimmedDescription),
+                    let first = call.arguments.first,
                     first.label?.text == "fileURLWithPath" || first.label?.text == "filePath"
                 else {
                     return false
                 }
                 return isShell(first.expression, depth: depth + 1)
             }
-            if let reference = expression.as(DeclReferenceExprSyntax.self), reference.argumentNames == nil, case .constant(let value) = binding(of: reference) {
+            if let reference = expression.as(DeclReferenceExprSyntax.self), reference.argumentNames == nil,
+                case .constant(let value) = binding(of: reference)
+            {
                 return isShell(value, depth: depth + 1)
             }
             guard let path = literalText(expression, depth: depth) else { return false }
-            return SecurityNoInterpolatedShellCommand.shells.contains(String(path.split(separator: "/", omittingEmptySubsequences: false).last ?? ""))
+            return SecurityNoInterpolatedShellCommand.shells.contains(
+                String(path.split(separator: "/", omittingEmptySubsequences: false).last ?? "")
+            )
         }
 
         /* An array literal's elements, directly or through a `let`. */
@@ -324,7 +353,9 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
             if let array = expression.as(ArrayExprSyntax.self) {
                 return array.elements.map(\.expression)
             }
-            if let reference = expression.as(DeclReferenceExprSyntax.self), reference.argumentNames == nil, case .constant(let value) = binding(of: reference) {
+            if let reference = expression.as(DeclReferenceExprSyntax.self), reference.argumentNames == nil,
+                case .constant(let value) = binding(of: reference)
+            {
                 return arrayElements(value, depth: depth + 1)
             }
             return nil
@@ -343,9 +374,12 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
                 return expression
             }
             if let ternary = expression.as(TernaryExprSyntax.self) {
-                return built(ternary.thenExpression, depth: depth + 1) != nil || built(ternary.elseExpression, depth: depth + 1) != nil ? expression : nil
+                return built(ternary.thenExpression, depth: depth + 1) != nil
+                    || built(ternary.elseExpression, depth: depth + 1) != nil ? expression : nil
             }
-            if let reference = expression.as(DeclReferenceExprSyntax.self), reference.argumentNames == nil, case .constant(let value) = binding(of: reference) {
+            if let reference = expression.as(DeclReferenceExprSyntax.self), reference.argumentNames == nil,
+                case .constant(let value) = binding(of: reference)
+            {
                 return built(value, depth: depth + 1)
             }
             return nil
@@ -374,24 +408,26 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
                 var pieces: [Piece] = []
                 for segment in literal.segments {
                     switch segment {
-                    case .stringSegment(let text):
-                        /* A literal of this one segment, so the parser resolves its escapes and line endings as the compiler does. */
-                        let alone = StringLiteralExprSyntax(
-                            openingPounds: literal.openingPounds,
-                            openingQuote: literal.openingQuote,
-                            segments: StringLiteralSegmentListSyntax([.stringSegment(text)]),
-                            closingQuote: literal.closingQuote,
-                            closingPounds: literal.closingPounds
-                        )
-                        guard let value = alone.representedLiteralValue else { return nil }
-                        pieces.append(.text(value))
-                    case .expressionSegment(let interpolation):
-                        guard interpolation.expressions.count == 1, let only = interpolation.expressions.first, only.label == nil else {
-                            pieces.append(.opaque)
-                            continue
-                        }
-                        guard let inner = flatten(only.expression, depth: depth + 1) else { return nil }
-                        pieces += inner
+                        case .stringSegment(let text):
+                            /* A literal of this one segment, so the parser resolves its escapes and line endings as the compiler does. */
+                            let alone = StringLiteralExprSyntax(
+                                openingPounds: literal.openingPounds,
+                                openingQuote: literal.openingQuote,
+                                segments: StringLiteralSegmentListSyntax([.stringSegment(text)]),
+                                closingQuote: literal.closingQuote,
+                                closingPounds: literal.closingPounds,
+                            )
+                            guard let value = alone.representedLiteralValue else { return nil }
+                            pieces.append(.text(value))
+                        case .expressionSegment(let interpolation):
+                            guard interpolation.expressions.count == 1, let only = interpolation.expressions.first,
+                                only.label == nil
+                            else {
+                                pieces.append(.opaque)
+                                continue
+                            }
+                            guard let inner = flatten(only.expression, depth: depth + 1) else { return nil }
+                            pieces += inner
                     }
                 }
                 return pieces
@@ -408,7 +444,8 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
             }
             if case .constant(let value)? = constantBinding(expression) {
                 let value = Self.withoutParentheses(value)
-                if value.is(StringLiteralExprSyntax.self) || value.is(InfixOperatorExprSyntax.self) || value.is(TernaryExprSyntax.self) || value.is(DeclReferenceExprSyntax.self)
+                if value.is(StringLiteralExprSyntax.self) || value.is(InfixOperatorExprSyntax.self)
+                    || value.is(TernaryExprSyntax.self) || value.is(DeclReferenceExprSyntax.self)
                     || value.is(MemberAccessExprSyntax.self)
                 {
                     return flatten(value, depth: depth + 1, isConcatenated: isConcatenated)
@@ -436,7 +473,9 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
          whose type cannot be read could open a heredoc the scan never saw, so no value after it is judged.
          */
         func judge(_ expression: ExprSyntax, depth: Int) -> Verdict {
-            guard depth <= SecurityNoInterpolatedShellCommand.depthLimit, let pieces = flatten(expression, depth: depth), let quoted = Self.quotedHeredocValues(pieces) else {
+            guard depth <= SecurityNoInterpolatedShellCommand.depthLimit,
+                let pieces = flatten(expression, depth: depth), let quoted = Self.quotedHeredocValues(pieces)
+            else {
                 return .declined
             }
             var verdict = Verdict.safe
@@ -444,24 +483,24 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
             for (index, piece) in pieces.enumerated() where !quoted.contains(index) {
                 let pieceVerdict: Verdict
                 switch piece {
-                case .text:
-                    continue
-                case .opaque:
-                    pieceVerdict = .unknown
-                case .value(let value, let isConcatenated):
-                    pieceVerdict = judgeValue(value, depth: depth, isConcatenated: isConcatenated)
+                    case .text:
+                        continue
+                    case .opaque:
+                        pieceVerdict = .unknown
+                    case .value(let value, let isConcatenated):
+                        pieceVerdict = judgeValue(value, depth: depth, isConcatenated: isConcatenated)
                 }
                 switch pieceVerdict {
-                case .declined:
-                    return .declined
-                case .unsafe:
-                    if !sawUnknown {
-                        verdict = .unsafe
-                    }
-                case .unknown:
-                    sawUnknown = true
-                case .safe:
-                    break
+                    case .declined:
+                        return .declined
+                    case .unsafe:
+                        if !sawUnknown {
+                            verdict = .unsafe
+                        }
+                    case .unknown:
+                        sawUnknown = true
+                    case .safe:
+                        break
                 }
             }
             return verdict == .safe && sawUnknown ? .unknown : verdict
@@ -485,16 +524,16 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
                         return .declined
                     }
                     switch judge(alternative, depth: depth + 1) {
-                    case .declined:
-                        return .declined
-                    case .unsafe:
-                        verdict = .unsafe
-                    case .unknown:
-                        if verdict == .safe {
-                            verdict = .unknown
-                        }
-                    case .safe:
-                        break
+                        case .declined:
+                            return .declined
+                        case .unsafe:
+                            verdict = .unsafe
+                        case .unknown:
+                            if verdict == .safe {
+                                verdict = .unknown
+                            }
+                        case .safe:
+                            break
                     }
                 }
                 return verdict
@@ -504,20 +543,20 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
             }
             let verdict: Verdict
             switch constantBinding(value) {
-            case .constant(let bound)?:
-                return judgeValue(bound, depth: depth + 1, isConcatenated: isConcatenated)
-            case .variable(let initializer)?:
-                verdict = Self.verdict(kind(initializer, depth: depth + 1))
-            case .typed(let type)?:
-                verdict = Self.verdict(Self.kind(of: type))
-            case .opaque?:
-                verdict = .unknown
-            case nil:
-                /* A property of our own declared in another file may be a `let` bound to a literal there, which a `const` would make safe. */
-                verdict = Self.verdict(kind(value, depth: depth + 1, ownedPropertiesAreUnknown: true))
-                if verdict == .unknown, isConcatenated, mayBeOwnedConstant(value) {
-                    return .unknown
-                }
+                case .constant(let bound)?:
+                    return judgeValue(bound, depth: depth + 1, isConcatenated: isConcatenated)
+                case .variable(let initializer)?:
+                    verdict = Self.verdict(kind(initializer, depth: depth + 1))
+                case .typed(let type)?:
+                    verdict = Self.verdict(Self.kind(of: type))
+                case .opaque?:
+                    verdict = .unknown
+                case nil:
+                    /* A property of our own declared in another file may be a `let` bound to a literal there, which a `const` would make safe. */
+                    verdict = Self.verdict(kind(value, depth: depth + 1, ownedPropertiesAreUnknown: true))
+                    if verdict == .unknown, isConcatenated, mayBeOwnedConstant(value) {
+                        return .unknown
+                    }
             }
             return verdict == .unknown && isConcatenated ? .unsafe : verdict
         }
@@ -525,7 +564,9 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
         /* A name or a property read that resolves to a declaration of ours, or to nothing the index recorded: it may be a `let` bound to a literal somewhere this file does not show. */
         func mayBeOwnedConstant(_ value: ExprSyntax) -> Bool {
             let value = Self.withoutWrappers(value)
-            guard value.is(DeclReferenceExprSyntax.self) || value.is(MemberAccessExprSyntax.self), let token = Self.nameToken(value) else { return false }
+            guard value.is(DeclReferenceExprSyntax.self) || value.is(MemberAccessExprSyntax.self),
+                let token = Self.nameToken(value)
+            else { return false }
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
             guard let resolved = symbols.reference(line: location.line, column: location.column) else { return true }
             return symbols.isOwned(resolved)
@@ -538,7 +579,9 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
             if value.is(StringLiteralExprSyntax.self) {
                 return .text
             }
-            if value.is(IntegerLiteralExprSyntax.self) || value.is(FloatLiteralExprSyntax.self) || value.is(BooleanLiteralExprSyntax.self) {
+            if value.is(IntegerLiteralExprSyntax.self) || value.is(FloatLiteralExprSyntax.self)
+                || value.is(BooleanLiteralExprSyntax.self)
+            {
                 return .inert
             }
             if let alternatives = Self.alternatives(value) ?? Self.operands(value) {
@@ -549,18 +592,20 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
                 return kinds.allSatisfy { $0 == .inert } ? .inert : .unknown
             }
             switch constantBinding(value) {
-            case .constant(let bound)?, .variable(let bound)?:
-                return kind(bound, depth: depth + 1)
-            case .typed(let type)?:
-                return Self.kind(of: type)
-            case .opaque?:
-                return .unknown
-            case nil:
-                break
+                case .constant(let bound)?, .variable(let bound)?:
+                    return kind(bound, depth: depth + 1)
+                case .typed(let type)?:
+                    return Self.kind(of: type)
+                case .opaque?:
+                    return .unknown
+                case nil:
+                    break
             }
             if let call = value.as(FunctionCallExprSyntax.self) {
                 let called = call.calledExpression
-                if called.trimmedDescription == "String" || called.trimmedDescription == "String.init" || called.trimmedDescription == "Swift.String" {
+                if called.trimmedDescription == "String" || called.trimmedDescription == "String.init"
+                    || called.trimmedDescription == "Swift.String"
+                {
                     return .text
                 }
                 guard let token = Self.nameToken(called) else { return .unknown }
@@ -573,13 +618,21 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
         /* The type of the declaration a name resolves to, read from the index and demangled. */
         func declaredKind(at token: TokenSyntax, isCalled: Bool, ownedPropertiesAreUnknown: Bool) -> Kind {
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
-            guard let resolved = symbols.reference(line: location.line, column: location.column) else { return .unknown }
+            guard let resolved = symbols.reference(line: location.line, column: location.column) else {
+                return .unknown
+            }
             /* Every `stringBy` method and property `NSString.h` declares returns `NSString`; the rest of Objective-C is unread. */
-            if resolved.symbol.hasPrefix("c:objc(cs)NSString(im)stringBy") || resolved.symbol.hasPrefix("c:objc(cs)NSString(py)stringBy") {
+            if resolved.symbol.hasPrefix("c:objc(cs)NSString(im)stringBy")
+                || resolved.symbol.hasPrefix("c:objc(cs)NSString(py)stringBy")
+            {
                 return .text
             }
             guard let demangler, let declaration = demangler.declaration(ofSymbol: resolved.symbol),
-                let member = RedundantTypeAnnotation.Member(demangled: declaration, name: resolved.name, isCalled: isCalled)
+                let member = RedundantTypeAnnotation.Member(
+                    demangled: declaration,
+                    name: resolved.name,
+                    isCalled: isCalled,
+                )
             else {
                 return .unknown
             }
@@ -596,12 +649,12 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
 
         static func verdict(_ kind: Kind) -> Verdict {
             switch kind {
-            case .text:
-                return .unsafe
-            case .inert:
-                return .safe
-            case .unknown:
-                return .unknown
+                case .text:
+                    return .unsafe
+                case .inert:
+                    return .safe
+                case .unknown:
+                    return .unknown
             }
         }
 
@@ -611,22 +664,31 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
             while true {
                 if let optional = type.as(OptionalTypeSyntax.self) {
                     type = optional.wrappedType
-                } else if let unwrapped = type.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
+                }
+                else if let unwrapped = type.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
                     type = unwrapped.wrappedType
-                } else if let identifier = type.as(IdentifierTypeSyntax.self), identifier.name.text == "Optional", let argument = identifier.genericArgumentClause?.arguments.first,
+                }
+                else if let identifier = type.as(IdentifierTypeSyntax.self), identifier.name.text == "Optional",
+                    let argument = identifier.genericArgumentClause?.arguments.first,
                     identifier.genericArgumentClause?.arguments.count == 1, case .type(let wrapped) = argument.argument
                 {
                     type = wrapped
-                } else {
+                }
+                else {
                     break
                 }
             }
             let name: String
             if let identifier = type.as(IdentifierTypeSyntax.self), identifier.genericArgumentClause == nil {
                 name = identifier.name.text
-            } else if let member = type.as(MemberTypeSyntax.self), ["Swift", "Foundation", "CoreGraphics"].contains(member.baseType.trimmedDescription), member.genericArgumentClause == nil {
+            }
+            else if let member = type.as(MemberTypeSyntax.self),
+                ["Swift", "Foundation", "CoreGraphics"].contains(member.baseType.trimmedDescription),
+                member.genericArgumentClause == nil
+            {
                 name = member.name.text
-            } else {
+            }
+            else {
                 return .unknown
             }
             if SecurityNoInterpolatedShellCommand.textTypes.contains(name) {
@@ -639,7 +701,9 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
 
         static func withoutParentheses(_ expression: ExprSyntax) -> ExprSyntax {
             var expression = expression
-            while let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1, let only = tuple.elements.first, only.label == nil {
+            while let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1,
+                let only = tuple.elements.first, only.label == nil
+            {
                 expression = only.expression
             }
             return expression
@@ -651,18 +715,22 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
             while true {
                 if let tryExpression = expression.as(TryExprSyntax.self) {
                     expression = withoutParentheses(tryExpression.expression)
-                } else if let awaitExpression = expression.as(AwaitExprSyntax.self) {
+                }
+                else if let awaitExpression = expression.as(AwaitExprSyntax.self) {
                     expression = withoutParentheses(awaitExpression.expression)
-                } else if let forced = expression.as(ForceUnwrapExprSyntax.self) {
+                }
+                else if let forced = expression.as(ForceUnwrapExprSyntax.self) {
                     expression = withoutParentheses(forced.expression)
-                } else {
+                }
+                else {
                     return expression
                 }
             }
         }
 
         static func isConcatenation(_ expression: ExprSyntax) -> Bool {
-            expression.as(InfixOperatorExprSyntax.self)?.operator.as(BinaryOperatorExprSyntax.self)?.operator.text == "+"
+            expression.as(InfixOperatorExprSyntax.self)?.operator.as(BinaryOperatorExprSyntax.self)?.operator.text
+                == "+"
         }
 
         /* Whether the chain of `+` a node belongs to, up to its parentheses, has a string literal among its operands. */
@@ -675,7 +743,8 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
             while let operand = operands.popLast() {
                 if let inner = operand.as(InfixOperatorExprSyntax.self), isConcatenation(operand) {
                     operands += [inner.leftOperand, inner.rightOperand]
-                } else if operand.is(StringLiteralExprSyntax.self) {
+                }
+                else if operand.is(StringLiteralExprSyntax.self) {
                     return true
                 }
             }
@@ -687,7 +756,9 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
             if let ternary = expression.as(TernaryExprSyntax.self) {
                 return [ternary.thenExpression, ternary.elseExpression]
             }
-            if let infix = expression.as(InfixOperatorExprSyntax.self), infix.operator.as(BinaryOperatorExprSyntax.self)?.operator.text == "??" {
+            if let infix = expression.as(InfixOperatorExprSyntax.self),
+                infix.operator.as(BinaryOperatorExprSyntax.self)?.operator.text == "??"
+            {
                 return [infix.leftOperand, infix.rightOperand]
             }
             return nil
@@ -695,7 +766,9 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
 
         /* A `+`'s two operands: text if either is, a number if both are. */
         static func operands(_ expression: ExprSyntax) -> [ExprSyntax]? {
-            guard let infix = expression.as(InfixOperatorExprSyntax.self), isConcatenation(expression) else { return nil }
+            guard let infix = expression.as(InfixOperatorExprSyntax.self), isConcatenation(expression) else {
+                return nil
+            }
             return [infix.leftOperand, infix.rightOperand]
         }
 
@@ -759,7 +832,9 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
 
         static func memberBinding(_ name: String, in members: MemberBlockItemListSyntax) -> Binding? {
             for member in members {
-                if let variable = member.decl.as(VariableDeclSyntax.self), let found = Self.binding(of: name, in: variable) {
+                if let variable = member.decl.as(VariableDeclSyntax.self),
+                    let found = Self.binding(of: name, in: variable)
+                {
                     return found
                 }
             }
@@ -772,12 +847,17 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
                 let statements = Array(list)
                 let isFileScope = list.parent?.is(SourceFileSyntax.self) == true
                 let position = statements.firstIndex { $0.id == child.id } ?? statements.count
-                let visible = isFileScope ? statements.filter { $0.id != child.id } : Array(statements[..<position]).reversed()
+                let visible =
+                    isFileScope ? statements.filter { $0.id != child.id } : Array(statements[..<position]).reversed()
                 for statement in visible {
-                    if let variable = statement.item.as(VariableDeclSyntax.self), let found = Self.binding(of: name, in: variable) {
+                    if let variable = statement.item.as(VariableDeclSyntax.self),
+                        let found = Self.binding(of: name, in: variable)
+                    {
                         return found
                     }
-                    if let guardStatement = statement.item.as(GuardStmtSyntax.self), let found = Self.binding(of: name, in: Array(guardStatement.conditions)) {
+                    if let guardStatement = statement.item.as(GuardStmtSyntax.self),
+                        let found = Self.binding(of: name, in: Array(guardStatement.conditions))
+                    {
                         return found
                     }
                 }
@@ -803,25 +883,32 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
                 return Self.binds(switchCase.label, name) ? .opaque : nil
             }
             if let catchClause = node.as(CatchClauseSyntax.self) {
-                return (catchClause.catchItems.isEmpty && name == "error") || Self.binds(catchClause.catchItems, name) ? .opaque : nil
+                return (catchClause.catchItems.isEmpty && name == "error") || Self.binds(catchClause.catchItems, name)
+                    ? .opaque : nil
             }
             if let closure = node.as(ClosureExprSyntax.self) {
                 return Self.binding(of: name, in: closure)
             }
             if let accessor = node.as(AccessorDeclSyntax.self) {
-                return accessor.parameters?.name.text == name || name == "newValue" || name == "oldValue" ? .opaque : nil
+                return accessor.parameters?.name.text == name || name == "newValue" || name == "oldValue"
+                    ? .opaque : nil
             }
             let parameters: FunctionParameterListSyntax?
             if let function = node.as(FunctionDeclSyntax.self) {
                 parameters = function.signature.parameterClause.parameters
-            } else if let initializer = node.as(InitializerDeclSyntax.self) {
+            }
+            else if let initializer = node.as(InitializerDeclSyntax.self) {
                 parameters = initializer.signature.parameterClause.parameters
-            } else if let subscriptDecl = node.as(SubscriptDeclSyntax.self) {
+            }
+            else if let subscriptDecl = node.as(SubscriptDeclSyntax.self) {
                 parameters = subscriptDecl.parameterClause.parameters
-            } else {
+            }
+            else {
                 parameters = nil
             }
-            guard let parameter = parameters?.first(where: { ($0.secondName ?? $0.firstName).text == name }) else { return nil }
+            guard let parameter = parameters?.first(where: { ($0.secondName ?? $0.firstName).text == name }) else {
+                return nil
+            }
             return .typed(parameter.type)
         }
 
@@ -831,13 +918,15 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
                 return .opaque
             }
             switch signature.parameterClause {
-            case .simpleInput(let parameters)?:
-                return parameters.contains { $0.name.text == name } ? .opaque : nil
-            case .parameterClause(let clause)?:
-                guard let parameter = clause.parameters.first(where: { ($0.secondName ?? $0.firstName).text == name }) else { return nil }
-                return parameter.type.map { .typed($0) } ?? .opaque
-            case nil:
-                return nil
+                case .simpleInput(let parameters)?:
+                    return parameters.contains { $0.name.text == name } ? .opaque : nil
+                case .parameterClause(let clause)?:
+                    guard
+                        let parameter = clause.parameters.first(where: { ($0.secondName ?? $0.firstName).text == name })
+                    else { return nil }
+                    return parameter.type.map { .typed($0) } ?? .opaque
+                case nil:
+                    return nil
             }
         }
 
@@ -914,7 +1003,8 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
             for (index, piece) in pieces.enumerated() {
                 if let text = piece.text {
                     bytes += Array(text.utf8)
-                } else {
+                }
+                else {
                     valueAt[bytes.count] = index
                     bytes.append(0)
                 }
@@ -938,17 +1028,23 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
                     let candidate = open.stripsTabs ? Array(line.drop { $0 == tab }) : line
                     if candidate == open.delimiter {
                         body = nil
-                    } else if open.quotedOpening {
+                    }
+                    else if open.quotedOpening {
                         for offset in lineStart..<lineEnd {
                             if let index = valueAt[offset] {
                                 quoted.insert(index)
                             }
                         }
                     }
-                } else {
+                }
+                else {
                     var offset = 0
                     while offset + 1 < line.count {
-                        guard let opener = (offset..<(line.count - 1)).first(where: { line[$0] == less && line[$0 + 1] == less }) else { break }
+                        guard
+                            let opener = (offset..<(line.count - 1)).first(where: {
+                                line[$0] == less && line[$0 + 1] == less
+                            })
+                        else { break }
                         var cursor = opener + 2
                         if cursor < line.count, line[cursor] == less {
                             /* `<<<` is a here-string, not a heredoc. */
@@ -1000,7 +1096,8 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
         /* How many letters, digits and underscores a text starts with. */
         static func wordLength(_ text: [UInt8]) -> Int {
             text.prefix { character in
-                character == UInt8(ascii: "_") || (UInt8(ascii: "0")...UInt8(ascii: "9")).contains(character) || (UInt8(ascii: "a")...UInt8(ascii: "z")).contains(character)
+                character == UInt8(ascii: "_") || (UInt8(ascii: "0")...UInt8(ascii: "9")).contains(character)
+                    || (UInt8(ascii: "a")...UInt8(ascii: "z")).contains(character)
                     || (UInt8(ascii: "A")...UInt8(ascii: "Z")).contains(character)
             }.count
         }

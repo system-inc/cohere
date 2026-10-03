@@ -21,7 +21,7 @@ struct ConsistencyNoUtilsFolderTests {
             source: source,
             tree: Parser.parse(source: source),
             nodeCount: 0,
-            packageRoot: packageRoot(of: path)
+            packageRoot: packageRoot(of: path),
         )
         let rule = ConsistencyNoUtilsFolder()
         guard rule.applies(to: file) else { return [] }
@@ -42,24 +42,24 @@ struct ConsistencyNoUtilsFolderTests {
     @Test(arguments: [
         (
             "/project/Sources/Fixture/utils/Thing.swift",
-            ["1:1-1:1 noUtils Folder name \"utils\" is not allowed. Use \"utilities\" instead."]
+            ["1:1-1:1 noUtils Folder name \"utils\" is not allowed. Use \"utilities\" instead."],
         ),
         (
             "/project/Sources/Fixture/_utils/Thing.swift",
-            ["1:1-1:1 noUnderscoreUtils Folder name \"_utils\" is not allowed. Use \"_utilities\" instead."]
+            ["1:1-1:1 noUnderscoreUtils Folder name \"_utils\" is not allowed. Use \"_utilities\" instead."],
         ),
         (
             "/project/Sources/Fixture/utils/nested/deep/Thing.swift",
-            ["1:1-1:1 noUtils Folder name \"utils\" is not allowed. Use \"utilities\" instead."]
+            ["1:1-1:1 noUtils Folder name \"utils\" is not allowed. Use \"utilities\" instead."],
         ),
         /* Swift's capitalized folder names: the same ban, the replacement in the folder's own casing. */
         (
             "/project/Sources/Fixture/Utils/Thing.swift",
-            ["1:1-1:1 noUtils Folder name \"Utils\" is not allowed. Use \"Utilities\" instead."]
+            ["1:1-1:1 noUtils Folder name \"Utils\" is not allowed. Use \"Utilities\" instead."],
         ),
         (
             "/project/Tests/Fixture/_Utils/Thing.swift",
-            ["1:1-1:1 noUnderscoreUtils Folder name \"_Utils\" is not allowed. Use \"_Utilities\" instead."]
+            ["1:1-1:1 noUnderscoreUtils Folder name \"_Utils\" is not allowed. Use \"_Utilities\" instead."],
         ),
         /* Both spellings on one path: one finding each, the underscore first, as the Go rule reports them. */
         (
@@ -67,22 +67,22 @@ struct ConsistencyNoUtilsFolderTests {
             [
                 "1:1-1:1 noUnderscoreUtils Folder name \"_utils\" is not allowed. Use \"_utilities\" instead.",
                 "1:1-1:1 noUtils Folder name \"utils\" is not allowed. Use \"utilities\" instead.",
-            ]
+            ],
         ),
         /* The same spelling twice is one finding: the file is misplaced once. */
         (
             "/project/Sources/Fixture/utils/More/utils/Thing.swift",
-            ["1:1-1:1 noUtils Folder name \"utils\" is not allowed. Use \"utilities\" instead."]
+            ["1:1-1:1 noUtils Folder name \"utils\" is not allowed. Use \"utilities\" instead."],
         ),
         /* A directory inside the target that repeats the target's name: folders below it are still judged. */
         (
             "/project/Sources/Fixture/Fixture/Utils/Thing.swift",
-            ["1:1-1:1 noUtils Folder name \"Utils\" is not allowed. Use \"Utilities\" instead."]
+            ["1:1-1:1 noUtils Folder name \"Utils\" is not allowed. Use \"Utilities\" instead."],
         ),
         /* A utils folder between the package root and the target's directory is inside the package too. */
         (
             "/project/utils/Sources/Fixture/Thing.swift",
-            ["1:1-1:1 noUtils Folder name \"utils\" is not allowed. Use \"utilities\" instead."]
+            ["1:1-1:1 noUtils Folder name \"utils\" is not allowed. Use \"utilities\" instead."],
         ),
     ])
     func utilsFoldersAreFound(path: String, expected: [String]) {
@@ -124,8 +124,10 @@ struct ConsistencyNoUtilsFolderTests {
 
     /* A target whose directory is named Utils is itself a utils folder inside the package, and is named first. */
     @Test func aTargetDirectoryNamedUtilsIsJudged() {
-        #expect(Self.described(Self.findings("/project/Sources/Utils/utils/Thing.swift", targetName: "Utils")) == [
-            "1:1-1:1 noUtils Folder name \"Utils\" is not allowed. Use \"Utilities\" instead."
-        ])
+        #expect(
+            Self.described(Self.findings("/project/Sources/Utils/utils/Thing.swift", targetName: "Utils")) == [
+                "1:1-1:1 noUtils Folder name \"Utils\" is not allowed. Use \"Utilities\" instead."
+            ]
+        )
     }
 }

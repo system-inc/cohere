@@ -13,7 +13,14 @@ import Testing
 struct DuplicatedKeyInDictionaryLiteralTests {
     static func positions(_ source: String) -> [String] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         return DuplicatedKeyInDictionaryLiteral().findings(in: file).map { "\($0.line):\($0.column)" }
     }
 
@@ -89,7 +96,11 @@ struct DuplicatedKeyInDictionaryLiteralTests {
             let chains = [owner?.name: 1, owner?.name: 2]
             let forced = [owner!.name: 1, owner!.name: 2]
             """
-        #expect(Self.positions(source) == ["1:36", "2:26", "3:35", "4:25", "5:31", "6:35", "7:29", "8:32", "9:39", "10:22", "11:31", "12:31"])
+        #expect(
+            Self.positions(source) == [
+                "1:36", "2:26", "3:35", "4:25", "5:31", "6:35", "7:29", "8:32", "9:39", "10:22", "11:31", "12:31",
+            ]
+        )
     }
 
     /* Spacing and comments are not part of the key, so these are the same spelling. */

@@ -78,8 +78,11 @@ public struct CorrectnessNoDefaultForOwnedEnum: TypedFileRule {
             var isAnchored = false
             for head in candidate.heads {
                 let location = file.locations.location(for: head.name.positionAfterSkippingLeadingTrivia)
-                let named = symbols.occurrences(line: location.line, column: location.column).filter { $0.isReference && !$0.isImplicit && Self.element($0.symbol) != nil }
-                guard named.count == 1, let occurrence = named.first, let element = Self.element(occurrence.symbol) else { continue }
+                let named = symbols.occurrences(line: location.line, column: location.column).filter {
+                    $0.isReference && !$0.isImplicit && Self.element($0.symbol) != nil
+                }
+                guard named.count == 1, let occurrence = named.first, let element = Self.element(occurrence.symbol)
+                else { continue }
                 enums[element.enumSymbol] = element
                 isOwned = symbols.isOwned(occurrence)
                 if head.isLeadingDot, !Self.matchedByPatternOperator(head.pattern, file: file, symbols: symbols) {
@@ -87,14 +90,17 @@ public struct CorrectnessNoDefaultForOwnedEnum: TypedFileRule {
                 }
             }
             guard isAnchored, isOwned, enums.count == 1, let element = enums.values.first else { return nil }
-            if let projection = candidate.projection, projection.calls.allSatisfy({ Self.isConstructor($0, file: file, symbols: symbols) }) {
+            if let projection = candidate.projection,
+                projection.calls.allSatisfy({ Self.isConstructor($0, file: file, symbols: symbols) })
+            {
                 return nil
             }
             return file.finding(
                 at: candidate.defaultKeyword,
                 rule: name,
                 messageId: "noDefaultForOwnedEnum",
-                message: "This default answers for every case of \(element.enumName), including any added later, so the compiler can no longer say this switch does not handle a new one. List the remaining cases instead."
+                message:
+                    "This default answers for every case of \(element.enumName), including any added later, so the compiler can no longer say this switch does not handle a new one. List the remaining cases instead.",
             )
         }
     }
@@ -117,7 +123,9 @@ public struct CorrectnessNoDefaultForOwnedEnum: TypedFileRule {
     static func matchedByPatternOperator(_ pattern: PatternSyntax, file: ParsedFile, symbols: FileSymbols) -> Bool {
         pattern.tokens(viewMode: .sourceAccurate).contains { token in
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
-            return symbols.occurrences(line: location.line, column: location.column).contains { $0.name.hasPrefix("~=") }
+            return symbols.occurrences(line: location.line, column: location.column).contains {
+                $0.name.hasPrefix("~=")
+            }
         }
     }
 
@@ -138,17 +146,22 @@ public struct CorrectnessNoDefaultForOwnedEnum: TypedFileRule {
             guard let identifier = reader.identifier() else { return nil }
             /* A private type's name is followed by its file's discriminator and `LL`: `14HandProbePhase33_B31C...LLO`. */
             if let next = reader.peek, MangledNameReader.isDigit(next) {
-                guard reader.identifier() != nil, reader.bytes[reader.position...].starts(with: "LL".utf8) else { return nil }
+                guard reader.identifier() != nil, reader.bytes[reader.position...].starts(with: "LL".utf8) else {
+                    return nil
+                }
                 reader.position += 2
             }
-            guard let kind = reader.peek, [UInt8(ascii: "O"), UInt8(ascii: "V"), UInt8(ascii: "C")].contains(kind) else { break }
+            guard let kind = reader.peek, [UInt8(ascii: "O"), UInt8(ascii: "V"), UInt8(ascii: "C")].contains(kind)
+            else { break }
             reader.position += 1
             enclosing.append(identifier)
             lastKind = kind
             enumEnd = reader.position
         }
         let remainder = reader.bytes[reader.position...]
-        let isConstructorType = remainder.reversed().starts(with: "Fm".utf8) || (remainder.reversed().starts(with: "Fl".utf8) && remainder.contains(UInt8(ascii: "m")))
+        let isConstructorType =
+            remainder.reversed().starts(with: "Fm".utf8)
+            || (remainder.reversed().starts(with: "Fl".utf8) && remainder.contains(UInt8(ascii: "m")))
         guard lastKind == UInt8(ascii: "O"), isConstructorType else { return nil }
         let enumSymbol = "s:" + String(decoding: reader.bytes[..<enumEnd], as: UTF8.self)
         return Element(enumSymbol: enumSymbol, enumName: enclosing.joined(separator: "."))
@@ -220,7 +233,10 @@ public struct CorrectnessNoDefaultForOwnedEnum: TypedFileRule {
             var wordStart: Int?
             for index in 0...part.count {
                 let character = index < part.count ? part[index] : 0
-                if let start = wordStart, character == UInt8(ascii: "_") || character == 0 || (!Self.isUppercase(part[index - 1]) && Self.isUppercase(character)) {
+                if let start = wordStart,
+                    character == UInt8(ascii: "_") || character == 0
+                        || (!Self.isUppercase(part[index - 1]) && Self.isUppercase(character))
+                {
                     if index - start >= 2, words.count < 26 {
                         words.append(String(decoding: part[start..<index], as: UTF8.self))
                     }
@@ -276,18 +292,24 @@ public struct CorrectnessNoDefaultForOwnedEnum: TypedFileRule {
             let cases = Self.cases(node.cases)
             for switchCase in cases {
                 switch switchCase.label {
-                case .default(let label):
-                    if switchCase.attribute == nil {
-                        defaultKeyword = label.defaultKeyword
-                    }
-                case .case(let label):
-                    for item in label.caseItems {
-                        heads += Self.heads(item.pattern, isTop: true, top: item.pattern)
-                    }
+                    case .default(let label):
+                        if switchCase.attribute == nil {
+                            defaultKeyword = label.defaultKeyword
+                        }
+                    case .case(let label):
+                        for item in label.caseItems {
+                            heads += Self.heads(item.pattern, isTop: true, top: item.pattern)
+                        }
                 }
             }
             if let defaultKeyword {
-                found.append(Candidate(defaultKeyword: defaultKeyword, heads: heads, projection: Self.projection(cases, subject: node.subject)))
+                found.append(
+                    Candidate(
+                        defaultKeyword: defaultKeyword,
+                        heads: heads,
+                        projection: Self.projection(cases, subject: node.subject),
+                    )
+                )
             }
             return .visitChildren
         }
@@ -299,13 +321,13 @@ public struct CorrectnessNoDefaultForOwnedEnum: TypedFileRule {
                 guard switchCase.statements.count == 1, let body = switchCase.statements.first else { return nil }
                 let value: ExprSyntax
                 switch body.item {
-                case .expr(let expression):
-                    value = expression
-                case .stmt(let statement):
-                    guard let returned = statement.as(ReturnStmtSyntax.self)?.expression else { return nil }
-                    value = returned
-                case .decl:
-                    return nil
+                    case .expr(let expression):
+                        value = expression
+                    case .stmt(let statement):
+                        guard let returned = statement.as(ReturnStmtSyntax.self)?.expression else { return nil }
+                        value = returned
+                    case .decl:
+                        return nil
                 }
                 guard isConstant(value, subject: subject, calls: &calls) else { return nil }
             }
@@ -314,7 +336,8 @@ public struct CorrectnessNoDefaultForOwnedEnum: TypedFileRule {
 
         /* A constant as the header defines one. A call whose name only the index can vouch for is added to `calls`. */
         static func isConstant(_ expression: ExprSyntax, subject: ExprSyntax, calls: inout [TokenSyntax]) -> Bool {
-            if expression.is(IntegerLiteralExprSyntax.self) || expression.is(FloatLiteralExprSyntax.self) || expression.is(BooleanLiteralExprSyntax.self)
+            if expression.is(IntegerLiteralExprSyntax.self) || expression.is(FloatLiteralExprSyntax.self)
+                || expression.is(BooleanLiteralExprSyntax.self)
                 || expression.is(NilLiteralExprSyntax.self)
             {
                 return true
@@ -323,23 +346,30 @@ public struct CorrectnessNoDefaultForOwnedEnum: TypedFileRule {
                 return string.segments.allSatisfy { $0.is(StringSegmentSyntax.self) }
             }
             if let negated = expression.as(PrefixOperatorExprSyntax.self) {
-                return negated.operator.text == "-" && (negated.expression.is(IntegerLiteralExprSyntax.self) || negated.expression.is(FloatLiteralExprSyntax.self))
+                return negated.operator.text == "-"
+                    && (negated.expression.is(IntegerLiteralExprSyntax.self)
+                        || negated.expression.is(FloatLiteralExprSyntax.self))
             }
             if let array = expression.as(ArrayExprSyntax.self) {
                 return array.elements.allSatisfy { isConstant($0.expression, subject: subject, calls: &calls) }
             }
             if let dictionary = expression.as(DictionaryExprSyntax.self) {
                 guard case .elements(let elements) = dictionary.content else { return true }
-                return elements.allSatisfy { isConstant($0.key, subject: subject, calls: &calls) && isConstant($0.value, subject: subject, calls: &calls) }
+                return elements.allSatisfy {
+                    isConstant($0.key, subject: subject, calls: &calls)
+                        && isConstant($0.value, subject: subject, calls: &calls)
+                }
             }
             if let reference = expression.as(DeclReferenceExprSyntax.self) {
-                return reference.baseName.text == "rawValue" && reference.argumentNames == nil && subject.as(DeclReferenceExprSyntax.self)?.baseName.tokenKind == .keyword(.self)
+                return reference.baseName.text == "rawValue" && reference.argumentNames == nil
+                    && subject.as(DeclReferenceExprSyntax.self)?.baseName.tokenKind == .keyword(.self)
             }
             if let member = expression.as(MemberAccessExprSyntax.self) {
                 guard member.declName.argumentNames == nil else { return false }
                 guard let base = member.base else { return true }
                 if member.declName.baseName.text == "rawValue" {
-                    return base.as(DeclReferenceExprSyntax.self)?.baseName.tokenKind == .keyword(.self) || base.trimmedDescription == subject.trimmedDescription
+                    return base.as(DeclReferenceExprSyntax.self)?.baseName.tokenKind == .keyword(.self)
+                        || base.trimmedDescription == subject.trimmedDescription
                 }
                 return isTypeReference(base)
             }
@@ -350,13 +380,17 @@ public struct CorrectnessNoDefaultForOwnedEnum: TypedFileRule {
                 if isTypeReference(call.calledExpression) {
                     return true
                 }
-                if let member = call.calledExpression.as(MemberAccessExprSyntax.self), member.declName.argumentNames == nil, member.base.map(isTypeReference) ?? true {
+                if let member = call.calledExpression.as(MemberAccessExprSyntax.self),
+                    member.declName.argumentNames == nil, member.base.map(isTypeReference) ?? true
+                {
                     if member.declName.baseName.tokenKind != .keyword(.`init`) {
                         calls.append(member.declName.baseName)
                     }
                     return true
                 }
-                if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self), reference.argumentNames == nil {
+                if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self),
+                    reference.argumentNames == nil
+                {
                     calls.append(reference.baseName)
                     return true
                 }
@@ -370,7 +404,8 @@ public struct CorrectnessNoDefaultForOwnedEnum: TypedFileRule {
                 return reference.argumentNames == nil && reference.baseName.text.first?.isUppercase == true
             }
             if let member = expression.as(MemberAccessExprSyntax.self), let base = member.base {
-                return member.declName.argumentNames == nil && member.declName.baseName.text.first?.isUppercase == true && isTypeReference(base)
+                return member.declName.argumentNames == nil && member.declName.baseName.text.first?.isUppercase == true
+                    && isTypeReference(base)
             }
             if let specialized = expression.as(GenericSpecializationExprSyntax.self) {
                 return isTypeReference(specialized.expression)
@@ -382,13 +417,13 @@ public struct CorrectnessNoDefaultForOwnedEnum: TypedFileRule {
         static func cases(_ list: SwitchCaseListSyntax) -> [SwitchCaseSyntax] {
             list.flatMap { element -> [SwitchCaseSyntax] in
                 switch element {
-                case .switchCase(let switchCase):
-                    return [switchCase]
-                case .ifConfigDecl(let conditionalBlock):
-                    return conditionalBlock.clauses.flatMap { clause -> [SwitchCaseSyntax] in
-                        guard case .switchCases(let nested) = clause.elements else { return [] }
-                        return cases(nested)
-                    }
+                    case .switchCase(let switchCase):
+                        return [switchCase]
+                    case .ifConfigDecl(let conditionalBlock):
+                        return conditionalBlock.clauses.flatMap { clause -> [SwitchCaseSyntax] in
+                            guard case .switchCases(let nested) = clause.elements else { return [] }
+                            return cases(nested)
+                        }
                 }
             }
         }
@@ -416,7 +451,8 @@ public struct CorrectnessNoDefaultForOwnedEnum: TypedFileRule {
                 payload = call.arguments.flatMap { heads($0.expression, isTop: false, top: top) }
             }
             guard let member = called.as(MemberAccessExprSyntax.self) else { return payload }
-            return [Head(name: member.declName.baseName, isLeadingDot: isTop && member.base == nil, pattern: top)] + payload
+            return [Head(name: member.declName.baseName, isLeadingDot: isTop && member.base == nil, pattern: top)]
+                + payload
         }
     }
 }

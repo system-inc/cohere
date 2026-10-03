@@ -74,7 +74,8 @@ public struct LegacyConstructors: FileRule {
                 messageId: match.legacy.family.messageId,
                 message: Self.message(for: match),
                 fixes: applies ? edits : [],
-                suggestions: applies || edits.isEmpty ? [] : [FindingRecord.Suggestion(message: "Write \(match.legacy.modern)", fixes: edits)]
+                suggestions: applies || edits.isEmpty
+                    ? [] : [FindingRecord.Suggestion(message: "Write \(match.legacy.modern)", fixes: edits)],
             )
         }
     }
@@ -83,16 +84,21 @@ public struct LegacyConstructors: FileRule {
         let legacyName = match.name
         let modern = match.legacy.modern
         switch match.legacy.family {
-        case .constructor:
-            return "\(legacyName) is the C spelling from before Swift had its own initializers. Write \(modern), which builds the same value and reads as Swift."
-        case .coreGraphicsGeometry:
-            return "\(legacyName) is the C spelling of a CGRect member. Write \(modern), the same function called the Swift way."
-        case .appKitGeometry where match.legacy.exact:
-            return "\(legacyName) is the C spelling from before Swift had its own API. Write \(modern), which compares the same fields and reads as Swift."
-        case .appKitGeometry:
-            return "\(legacyName) is the C spelling from before Swift had its own API. Swift's form is \(modern), but it works on the standardized rectangle, so it differs when a width or height is negative or the rectangle is empty. Switch where that cannot happen."
-        case .random:
-            return "\(legacyName) is the C random API from before Swift had its own. Write \(modern). The result type differs, so choose the type the code needs."
+            case .constructor:
+                return
+                    "\(legacyName) is the C spelling from before Swift had its own initializers. Write \(modern), which builds the same value and reads as Swift."
+            case .coreGraphicsGeometry:
+                return
+                    "\(legacyName) is the C spelling of a CGRect member. Write \(modern), the same function called the Swift way."
+            case .appKitGeometry where match.legacy.exact:
+                return
+                    "\(legacyName) is the C spelling from before Swift had its own API. Write \(modern), which compares the same fields and reads as Swift."
+            case .appKitGeometry:
+                return
+                    "\(legacyName) is the C spelling from before Swift had its own API. Swift's form is \(modern), but it works on the standardized rectangle, so it differs when a width or height is negative or the rectangle is empty. Switch where that cannot happen."
+            case .random:
+                return
+                    "\(legacyName) is the C random API from before Swift had its own. Write \(modern). The result type differs, so choose the type the code needs."
         }
     }
 
@@ -112,19 +118,19 @@ public struct LegacyConstructors: FileRule {
 
         var messageId: String {
             switch self {
-            case .constructor: "legacyConstructor"
-            case .coreGraphicsGeometry: "legacyCGGeometryFunction"
-            case .appKitGeometry: "legacyNSGeometryFunction"
-            case .random: "legacyRandom"
+                case .constructor: "legacyConstructor"
+                case .coreGraphicsGeometry: "legacyCGGeometryFunction"
+                case .appKitGeometry: "legacyNSGeometryFunction"
+                case .random: "legacyRandom"
             }
         }
 
         /* Whether the rewrite is applied as a fix rather than offered: only where it is the same function. */
         func rewritesSafely(_ legacy: Legacy) -> Bool {
             switch self {
-            case .constructor, .coreGraphicsGeometry: true
-            case .appKitGeometry: legacy.exact
-            case .random: false
+                case .constructor, .coreGraphicsGeometry: true
+                case .appKitGeometry: legacy.exact
+                case .random: false
             }
         }
     }
@@ -173,7 +179,7 @@ public struct LegacyConstructors: FileRule {
                 family: .constructor,
                 arity: labels.count,
                 rewrite: .initializer(type: type, labels: labels),
-                modern: "\(type)(\(labels.map { "\($0):" }.joined()))"
+                modern: "\(type)(\(labels.map { "\($0):" }.joined()))",
             )
         }
         let properties: [(Family, String, String)] = [
@@ -202,7 +208,12 @@ public struct LegacyConstructors: FileRule {
             (.appKitGeometry, "NSIntegralRect", "integral"),
         ]
         for (family, legacyName, property) in properties {
-            table[legacyName] = Legacy(family: family, arity: 1, rewrite: .property(property), modern: "rect.\(property)")
+            table[legacyName] = Legacy(
+                family: family,
+                arity: 1,
+                rewrite: .property(property),
+                modern: "rect.\(property)",
+            )
         }
         let methods: [(Family, String, String, [String], Bool, String)] = [
             (.coreGraphicsGeometry, "CGRectInset", "insetBy", ["dx", "dy"], false, "rect.insetBy(dx:dy:)"),
@@ -221,13 +232,40 @@ public struct LegacyConstructors: FileRule {
             (.appKitGeometry, "NSPointInRect", "contains", [""], true, "rect.contains(point)"),
         ]
         for (family, legacyName, method, labels, reversed, modern) in methods {
-            table[legacyName] = Legacy(family: family, arity: labels.count + 1, rewrite: .method(method, labels: labels, reversed: reversed), modern: modern)
+            table[legacyName] = Legacy(
+                family: family,
+                arity: labels.count + 1,
+                rewrite: .method(method, labels: labels, reversed: reversed),
+                modern: modern,
+            )
         }
-        table["NSEqualPoints"] = Legacy(family: .appKitGeometry, arity: 2, rewrite: .equality, modern: "point == other", exact: true)
-        table["NSEqualSizes"] = Legacy(family: .appKitGeometry, arity: 2, rewrite: .equality, modern: "size == other", exact: true)
+        table["NSEqualPoints"] = Legacy(
+            family: .appKitGeometry,
+            arity: 2,
+            rewrite: .equality,
+            modern: "point == other",
+            exact: true,
+        )
+        table["NSEqualSizes"] = Legacy(
+            family: .appKitGeometry,
+            arity: 2,
+            rewrite: .equality,
+            modern: "size == other",
+            exact: true,
+        )
         table["NSEqualRects"] = Legacy(family: .appKitGeometry, arity: 2, rewrite: .equality, modern: "rect == other")
-        table["arc4random"] = Legacy(family: .random, arity: 0, rewrite: .none, modern: "UInt32.random(in: .min ... .max), or random(in:) over the range the code needs")
-        table["arc4random_uniform"] = Legacy(family: .random, arity: 1, rewrite: .none, modern: "Int.random(in: 0..<upperBound), or UInt32.random(in:) where the UInt32 result matters")
+        table["arc4random"] = Legacy(
+            family: .random,
+            arity: 0,
+            rewrite: .none,
+            modern: "UInt32.random(in: .min ... .max), or random(in:) over the range the code needs",
+        )
+        table["arc4random_uniform"] = Legacy(
+            family: .random,
+            arity: 1,
+            rewrite: .none,
+            modern: "Int.random(in: 0..<upperBound), or UInt32.random(in:) where the UInt32 result matters",
+        )
         table["drand48"] = Legacy(family: .random, arity: 0, rewrite: .none, modern: "Double.random(in: 0..<1)")
         return table
     }()
@@ -256,7 +294,8 @@ public struct LegacyConstructors: FileRule {
 
     /* The bare name a call calls, without backticks: `CGPointMake(...)`, never `Module.CGPointMake(...)` or `CGPointMake(_:_:)(...)`. */
     static func legacyName(of call: FunctionCallExprSyntax) -> String? {
-        guard let reference = call.calledExpression.as(DeclReferenceExprSyntax.self), reference.argumentNames == nil else { return nil }
+        guard let reference = call.calledExpression.as(DeclReferenceExprSyntax.self), reference.argumentNames == nil
+        else { return nil }
         return unquoted(reference.baseName.text)
     }
 
@@ -266,7 +305,8 @@ public struct LegacyConstructors: FileRule {
 
     /* Exactly the C function's arity, in parentheses, with no labels and no trailing closure. */
     static func fitsCFunction(_ call: FunctionCallExprSyntax, arity: Int) -> Bool {
-        call.leftParen != nil && call.rightParen != nil && call.trailingClosure == nil && call.additionalTrailingClosures.isEmpty
+        call.leftParen != nil && call.rightParen != nil && call.trailingClosure == nil
+            && call.additionalTrailingClosures.isEmpty
             && call.arguments.count == arity && call.arguments.allSatisfy { $0.label == nil && $0.colon == nil }
     }
 
@@ -320,44 +360,66 @@ public struct LegacyConstructors: FileRule {
 
         var edits: [FindingRecord.Edit]
         switch match.legacy.rewrite {
-        case .none:
-            return nil
-        case let .initializer(type, labels):
-            edits = [FindingRecord.Edit(start: calleeStart, end: call.calledExpression.endPositionBeforeTrailingTrivia.utf8Offset, text: type)]
-            for (index, label) in labels.enumerated() {
-                edits.append(FindingRecord.Edit(start: start(index), end: start(index), text: labeled(label)))
-            }
-            return edits
-        case let .property(property):
-            guard let shape = receiverShape(arguments[0].expression) else { return nil }
-            edits = [
-                FindingRecord.Edit(start: calleeStart, end: start(0), text: shape.open),
-                FindingRecord.Edit(start: end(0), end: closeEnd, text: "\(shape.close).\(property)"),
-            ]
-        case let .method(method, labels, reversed: false):
-            guard let shape = receiverShape(arguments[0].expression) else { return nil }
-            edits = [
-                FindingRecord.Edit(start: calleeStart, end: start(0), text: shape.open),
-                FindingRecord.Edit(start: end(0), end: start(1), text: shape.close + ".\(method)(" + labeled(labels[0])),
-            ]
-            for index in labels.indices.dropFirst() {
-                edits.append(FindingRecord.Edit(start: start(index + 1), end: start(index + 1), text: labeled(labels[index])))
-            }
-        case let .method(method, _, reversed: true):
-            /* Swapping the arguments also swaps their evaluation order, so this form is only ever a suggestion. */
-            guard let shape = receiverShape(arguments[1].expression) else { return nil }
-            let receiver = arguments[1].expression.trimmedDescription
-            let argument = arguments[0].expression.trimmedDescription
-            return [FindingRecord.Edit(start: calleeStart, end: closeEnd, text: "\(shape.open)\(receiver)\(shape.close).\(method)(\(argument))")]
-        case .equality:
-            let left = operandShape(arguments[0].expression)
-            let right = operandShape(arguments[1].expression)
-            let outer = equalityNeedsParentheses(call) ? Shape.parenthesized : Shape.bare
-            edits = [
-                FindingRecord.Edit(start: calleeStart, end: start(0), text: outer.open + left.open),
-                FindingRecord.Edit(start: end(0), end: start(1), text: "\(left.close) == \(right.open)"),
-                FindingRecord.Edit(start: end(1), end: closeEnd, text: right.close + outer.close),
-            ]
+            case .none:
+                return nil
+            case let .initializer(type, labels):
+                edits = [
+                    FindingRecord.Edit(
+                        start: calleeStart,
+                        end: call.calledExpression.endPositionBeforeTrailingTrivia.utf8Offset,
+                        text: type,
+                    )
+                ]
+                for (index, label) in labels.enumerated() {
+                    edits.append(FindingRecord.Edit(start: start(index), end: start(index), text: labeled(label)))
+                }
+                return edits
+            case let .property(property):
+                guard let shape = receiverShape(arguments[0].expression) else { return nil }
+                edits = [
+                    FindingRecord.Edit(start: calleeStart, end: start(0), text: shape.open),
+                    FindingRecord.Edit(start: end(0), end: closeEnd, text: "\(shape.close).\(property)"),
+                ]
+            case let .method(method, labels, reversed: false):
+                guard let shape = receiverShape(arguments[0].expression) else { return nil }
+                edits = [
+                    FindingRecord.Edit(start: calleeStart, end: start(0), text: shape.open),
+                    FindingRecord.Edit(
+                        start: end(0),
+                        end: start(1),
+                        text: shape.close + ".\(method)(" + labeled(labels[0]),
+                    ),
+                ]
+                for index in labels.indices.dropFirst() {
+                    edits.append(
+                        FindingRecord.Edit(
+                            start: start(index + 1),
+                            end: start(index + 1),
+                            text: labeled(labels[index]),
+                        )
+                    )
+                }
+            case let .method(method, _, reversed: true):
+                /* Swapping the arguments also swaps their evaluation order, so this form is only ever a suggestion. */
+                guard let shape = receiverShape(arguments[1].expression) else { return nil }
+                let receiver = arguments[1].expression.trimmedDescription
+                let argument = arguments[0].expression.trimmedDescription
+                return [
+                    FindingRecord.Edit(
+                        start: calleeStart,
+                        end: closeEnd,
+                        text: "\(shape.open)\(receiver)\(shape.close).\(method)(\(argument))",
+                    )
+                ]
+            case .equality:
+                let left = operandShape(arguments[0].expression)
+                let right = operandShape(arguments[1].expression)
+                let outer = equalityNeedsParentheses(call) ? Shape.parenthesized : Shape.bare
+                edits = [
+                    FindingRecord.Edit(start: calleeStart, end: start(0), text: outer.open + left.open),
+                    FindingRecord.Edit(start: end(0), end: start(1), text: "\(left.close) == \(right.open)"),
+                    FindingRecord.Edit(start: end(1), end: closeEnd, text: right.close + outer.close),
+                ]
         }
         /* The replaced spans hold only the callee, parentheses, commas and trivia, so a slash there is a comment the edit would delete. */
         let bytes = Array(source.utf8)
@@ -394,23 +456,34 @@ public struct LegacyConstructors: FileRule {
     static func operandShape(_ expression: ExprSyntax) -> Shape {
         var current = expression
         while true {
-            if current.is(DeclReferenceExprSyntax.self) || current.is(SuperExprSyntax.self) || current.is(TupleExprSyntax.self) {
+            if current.is(DeclReferenceExprSyntax.self) || current.is(SuperExprSyntax.self)
+                || current.is(TupleExprSyntax.self)
+            {
                 return .bare
             }
             if let member = current.as(MemberAccessExprSyntax.self) {
                 guard let base = member.base else { return .bare }
                 current = base
-            } else if let call = current.as(FunctionCallExprSyntax.self) {
-                guard call.trailingClosure == nil, call.additionalTrailingClosures.isEmpty else { return .parenthesized }
+            }
+            else if let call = current.as(FunctionCallExprSyntax.self) {
+                guard call.trailingClosure == nil, call.additionalTrailingClosures.isEmpty else {
+                    return .parenthesized
+                }
                 current = call.calledExpression
-            } else if let subscriptCall = current.as(SubscriptCallExprSyntax.self) {
-                guard subscriptCall.trailingClosure == nil, subscriptCall.additionalTrailingClosures.isEmpty else { return .parenthesized }
+            }
+            else if let subscriptCall = current.as(SubscriptCallExprSyntax.self) {
+                guard subscriptCall.trailingClosure == nil, subscriptCall.additionalTrailingClosures.isEmpty else {
+                    return .parenthesized
+                }
                 current = subscriptCall.calledExpression
-            } else if let unwrap = current.as(ForceUnwrapExprSyntax.self) {
+            }
+            else if let unwrap = current.as(ForceUnwrapExprSyntax.self) {
                 current = unwrap.expression
-            } else if let specialization = current.as(GenericSpecializationExprSyntax.self) {
+            }
+            else if let specialization = current.as(GenericSpecializationExprSyntax.self) {
                 current = specialization.expression
-            } else {
+            }
+            else {
                 return .parenthesized
             }
         }
@@ -420,10 +493,10 @@ public struct LegacyConstructors: FileRule {
     static func movedArguments(of match: Match) -> [ExprSyntax] {
         let arguments = match.call.arguments.map(\.expression)
         switch match.legacy.rewrite {
-        case .initializer, .none: return []
-        case .property, .method(_, _, reversed: false): return Array(arguments.prefix(1))
-        case .method(_, _, reversed: true): return Array(arguments.dropFirst().prefix(1))
-        case .equality: return arguments
+            case .initializer, .none: return []
+            case .property, .method(_, _, reversed: false): return Array(arguments.prefix(1))
+            case .method(_, _, reversed: true): return Array(arguments.dropFirst().prefix(1))
+            case .equality: return arguments
         }
     }
 
@@ -501,7 +574,8 @@ public struct LegacyConstructors: FileRule {
      */
     static func equalityNeedsParentheses(_ call: FunctionCallExprSyntax) -> Bool {
         guard let parent = call.parent else { return true }
-        if parent.is(CodeBlockItemSyntax.self) || parent.is(InitializerClauseSyntax.self) || parent.is(ReturnStmtSyntax.self)
+        if parent.is(CodeBlockItemSyntax.self) || parent.is(InitializerClauseSyntax.self)
+            || parent.is(ReturnStmtSyntax.self)
             || parent.is(ConditionElementSyntax.self)
         {
             return false

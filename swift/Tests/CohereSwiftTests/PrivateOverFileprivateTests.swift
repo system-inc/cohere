@@ -14,7 +14,14 @@ import Testing
 struct PrivateOverFileprivateTests {
     static func findings(_ source: String) -> [FindingRecord] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         return PrivateOverFileprivate().findings(in: file)
     }
 

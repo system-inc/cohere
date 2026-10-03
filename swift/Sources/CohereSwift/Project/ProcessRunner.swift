@@ -48,7 +48,8 @@ public struct ProcessRunner: Sendable {
             process.standardOutput = try FileHandle(forWritingTo: outputFile)
             process.standardError = try FileHandle(forWritingTo: errorFile)
             try process.run()
-        } catch {
+        }
+        catch {
             throw LaunchFailure(command: ([executable] + arguments).joined(separator: " "), underlying: "\(error)")
         }
         process.waitUntilExit()
@@ -65,7 +66,8 @@ public struct ProcessRunner: Sendable {
     private func removeTemporaryFile(_ url: URL) {
         do {
             try FileManager.default.removeItem(at: url)
-        } catch {
+        }
+        catch {
             /*
              Ignored on purpose. A leftover file costs a few bytes in a directory the system sweeps, and
              failing a finished run over it would trade a real answer for tidiness.

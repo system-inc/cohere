@@ -16,7 +16,7 @@ struct FileLengthTests {
             targetKind: "library",
             source: source,
             tree: Parser.parse(source: source),
-            nodeCount: 0
+            nodeCount: 0,
         )
         let rule = FileLength()
         guard rule.applies(to: file) else { return [] }
@@ -65,7 +65,8 @@ struct FileLengthTests {
 
     /* Comments and blank lines are part of what a reader holds, so they count. */
     @Test func commentsAndBlankLinesCount() {
-        let source = "/*\n" + String(repeating: " A line of explanation.\n\n", count: FileLength.maximumLines / 2) + "*/\n"
+        let source =
+            "/*\n" + String(repeating: " A line of explanation.\n\n", count: FileLength.maximumLines / 2) + "*/\n"
         #expect(Self.findings(source).count == 1)
     }
 

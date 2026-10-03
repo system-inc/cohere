@@ -27,7 +27,10 @@ struct ReduceIntoTests {
     static let stringInterpolation = "s:SS19stringInterpolationSSs013DefaultStringB0V_tcfc"
     static let substringLiteral = "s:Ss13stringLiteralSsSS_tcfc"
     static let oursStringLiteral = "s:7Control5LabelV13stringLiteralACSS_tcfc"
-    static let standardTypes = ["Array": "s:Sa", "ContiguousArray": "s:s15ContiguousArrayV", "Dictionary": "s:SD", "Set": "s:Sh", "String": "s:SS"]
+    static let standardTypes = [
+        "Array": "s:Sa", "ContiguousArray": "s:s15ContiguousArrayV", "Dictionary": "s:SD", "Set": "s:Sh",
+        "String": "s:SS",
+    ]
 
     /*
      The findings, as `messageId@line:column`. Every `reduce` name resolves to `reduce`; every array literal
@@ -42,15 +45,31 @@ struct ReduceIntoTests {
         dictionaryLiteral: String? = dictionaryLiteral,
         stringLiteral: String? = nil,
         interpolation: String? = stringInterpolation,
-        types: [String: String] = standardTypes
+        types: [String: String] = standardTypes,
     ) -> [String] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         var occurrences: [FileSymbols.Occurrence] = []
         func record(_ symbol: String?, at position: AbsolutePosition, name: String, isImplicit: Bool) {
             guard let symbol else { return }
             let location = file.locations.location(for: position)
-            occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: symbol, name: name, isReference: true, isImplicit: isImplicit))
+            occurrences.append(
+                FileSymbols.Occurrence(
+                    line: location.line,
+                    column: location.column,
+                    symbol: symbol,
+                    name: name,
+                    isReference: true,
+                    isImplicit: isImplicit,
+                )
+            )
         }
         for token in file.tree.tokens(viewMode: .sourceAccurate) {
             let position = token.positionAfterSkippingLeadingTrivia
@@ -64,35 +83,54 @@ struct ReduceIntoTests {
                 record(dictionaryLiteral, at: position, name: "init(dictionaryLiteral:)", isImplicit: true)
             }
             if let literal = token.parent?.as(StringLiteralExprSyntax.self), token.id == literal.openingQuote.id {
-                record(literal.representedLiteralValue == nil ? interpolation : stringLiteral, at: position, name: "init(stringLiteral:)", isImplicit: true)
+                record(
+                    literal.representedLiteralValue == nil ? interpolation : stringLiteral,
+                    at: position,
+                    name: "init(stringLiteral:)",
+                    isImplicit: true,
+                )
             }
             if token.parent?.is(DeclReferenceExprSyntax.self) == true, let type = types[token.text] {
                 record(type, at: position, name: token.text, isImplicit: false)
                 record("\(type)ycfc", at: position, name: "init()", isImplicit: false)
             }
         }
-        return ReduceInto().findings(in: file, symbols: FileSymbols(occurrences)).map { "\($0.messageId)@\($0.line):\($0.column)" }
+        return ReduceInto().findings(in: file, symbols: FileSymbols(occurrences)).map {
+            "\($0.messageId)@\($0.line):\($0.column)"
+        }
     }
 
     /* SwiftLint's `reduce_into` triggering examples, each at its `reduce` name. */
     @Test(arguments: [
         (#"let bar = values.reduce("abc") { $0 + "\($1)" }"#, "reduceInto@1:18"),
         ("values.reduce(Array<Int>()) { result, value in\n    result += [value]\n}", "reduceInto@1:8"),
-        ("[1, 2, 3].reduce(Set<Int>()) { acc, value in\n    var result = acc\n    result.insert(value)\n    return result\n}", "reduceInto@1:11"),
+        (
+            "[1, 2, 3].reduce(Set<Int>()) { acc, value in\n    var result = acc\n    result.insert(value)\n    return result\n}",
+            "reduceInto@1:11",
+        ),
         (
             "let rows = violations.enumerated().reduce(\"\") { rows, indexAndViolation in\n    return rows + generateSingleRow(for: indexAndViolation.1, at: indexAndViolation.0 + 1)\n}",
-            "reduceInto@1:36"
+            "reduceInto@1:36",
         ),
-        ("zip(group, group.dropFirst()).reduce([]) { result, pair in\n    result + [pair.0 + pair.1]\n}", "reduceInto@1:31"),
-        ("let foo = values.reduce([String: Int]()) { result, value in\n    var result = result\n    result[\"\\(value)\"] = value\n    return result\n}", "reduceInto@1:18"),
+        (
+            "zip(group, group.dropFirst()).reduce([]) { result, pair in\n    result + [pair.0 + pair.1]\n}",
+            "reduceInto@1:31",
+        ),
+        (
+            "let foo = values.reduce([String: Int]()) { result, value in\n    var result = result\n    result[\"\\(value)\"] = value\n    return result\n}",
+            "reduceInto@1:18",
+        ),
         (
             "let bar = values.reduce(Dictionary<String, Int>.init()) { result, value in\n    var result = result\n    result[\"\\(value)\"] = value\n    return result\n}",
-            "reduceInto@1:18"
+            "reduceInto@1:18",
         ),
-        ("let bar = values.reduce([Int](repeating: 0, count: 10)) { result, value in\n    return result + [value]\n}", "reduceInto@1:18"),
+        (
+            "let bar = values.reduce([Int](repeating: 0, count: 10)) { result, value in\n    return result + [value]\n}",
+            "reduceInto@1:18",
+        ),
         (
             "extension Data {\n    var hexString: String {\n        return reduce(\"\") { (output, byte) -> String in\n            output + String(format: \"%02x\", byte)\n        }\n    }\n}",
-            "reduceInto@3:16"
+            "reduceInto@3:16",
         ),
     ])
     func incumbentTriggeringExamplesAreFound(source: String, expected: String) {
@@ -151,9 +189,15 @@ struct ReduceIntoTests {
             """
         #expect(Self.findings(source) == ["reduceInto@1:20", "reduceInto@2:20"])
         #expect(Self.findings(source, arrayLiteral: Self.setLiteral) == ["reduceInto@1:20", "reduceInto@2:20"])
-        #expect(Self.findings(source, arrayLiteral: Self.contiguousArrayLiteral, dictionaryLiteral: nil) == ["reduceInto@1:20"])
+        #expect(
+            Self.findings(source, arrayLiteral: Self.contiguousArrayLiteral, dictionaryLiteral: nil) == [
+                "reduceInto@1:20"
+            ]
+        )
         #expect(Self.findings(source, arrayLiteral: nil, dictionaryLiteral: nil).isEmpty)
-        #expect(Self.findings(source, arrayLiteral: Self.oursArrayLiteral, dictionaryLiteral: Self.oursArrayLiteral).isEmpty)
+        #expect(
+            Self.findings(source, arrayLiteral: Self.oursArrayLiteral, dictionaryLiteral: Self.oursArrayLiteral).isEmpty
+        )
     }
 
     /*
@@ -234,7 +278,14 @@ struct ReduceIntoTests {
 
     @Test func aFileWithNoReduceDoesNotApply() {
         let source = "let first = values.map { $0 }\n"
-        let file = ParsedFile(url: URL(fileURLWithPath: "/Plain.swift"), targetName: "Control", targetKind: "regular", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: URL(fileURLWithPath: "/Plain.swift"),
+            targetName: "Control",
+            targetKind: "regular",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         #expect(!ReduceInto().applies(to: file))
     }
 
@@ -264,23 +315,49 @@ struct ReduceIntoTests {
         """
 
     @Test func anArraysAndAStringsAccumulatorsAreFlaggedAndTheLookAlikesAreNot() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-typed-\(UUID().uuidString)", isDirectory: true)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-typed-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-        try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try Self.packageSource.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
+        try PipelineControlTests.manifest.write(
+            to: root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try Self.packageSource.write(
+            to: sources.appendingPathComponent("Control.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
 
         /* One run builds the package and writes its index. The rule is not registered here, so it is run by hand on what the run left. */
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"],
+            workingDirectory: root,
+        )
         _ = try await Pipeline(options: options, writer: ContractWriter { _ in }, workingDirectory: root).run()
-        let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: ProcessRunner())
+        let package = try PackageModel.load(
+            root: root,
+            scratchPath: Pipeline.scratchPath(for: root),
+            runner: ProcessRunner(),
+        )
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
         let candidates = parsed.files.filter { ReduceInto().applies(to: $0) }
-        let symbols = SymbolProvider(scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root), runner: ProcessRunner()).symbols(for: candidates)
+        let symbols = SymbolProvider(
+            scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root),
+            runner: ProcessRunner(),
+        ).symbols(for: candidates)
         #expect(symbols.fromIndex == 1, "the build's index should describe the file: \(symbols.unavailable)")
         let found = candidates.flatMap { file in
-            ReduceInto().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.messageId)@\($0.line)" }
+            ReduceInto().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map {
+                "\($0.messageId)@\($0.line)"
+            }
         }
-        #expect(found == ["reduceInto@10", "reduceInto@11"], "expected the array's and the string's accumulators and none of the look-alikes: \(found)")
+        #expect(
+            found == ["reduceInto@10", "reduceInto@11"],
+            "expected the array's and the string's accumulators and none of the look-alikes: \(found)",
+        )
     }
 }

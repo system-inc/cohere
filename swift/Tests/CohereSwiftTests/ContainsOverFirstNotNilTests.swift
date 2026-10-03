@@ -23,21 +23,52 @@ struct ContainsOverFirstNotNilTests {
      The findings, as `line:column`, with every `first` token resolved to `first` and every `firstIndex` token to
      `firstIndex`. A nil symbol leaves that name unresolved.
      */
-    static func findings(_ source: String, first: String? = sequenceFirst, firstIndex: String? = collectionFirstIndex) -> [String] {
+    static func findings(
+        _ source: String,
+        first: String? = sequenceFirst,
+        firstIndex: String? = collectionFirstIndex,
+    ) -> [String] {
         records(source, first: first, firstIndex: firstIndex).map { "\($0.line):\($0.column)" }
     }
 
-    static func records(_ source: String, first: String? = sequenceFirst, firstIndex: String? = collectionFirstIndex) -> [FindingRecord] {
+    static func records(
+        _ source: String,
+        first: String? = sequenceFirst,
+        firstIndex: String? = collectionFirstIndex,
+    ) -> [FindingRecord] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         var occurrences: [FileSymbols.Occurrence] = []
         for token in file.tree.tokens(viewMode: .sourceAccurate) {
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
             if token.text == "first", let first {
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: first, name: "first(where:)", isReference: true))
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: first,
+                        name: "first(where:)",
+                        isReference: true,
+                    )
+                )
             }
             if token.text == "firstIndex", let firstIndex {
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: firstIndex, name: "firstIndex(where:)", isReference: true))
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: firstIndex,
+                        name: "firstIndex(where:)",
+                        isReference: true,
+                    )
+                )
             }
         }
         return ContainsOverFirstNotNil().findings(in: file, symbols: FileSymbols(occurrences))
@@ -81,9 +112,15 @@ struct ContainsOverFirstNotNilTests {
         #expect(messages.count == 3)
         #expect(messages.first?.contains("Comparing firstIndex(of:) with nil") == true)
         #expect(messages.first?.contains("Use contains(_:) (or !contains(_:) for == nil)") == true)
-        #expect(messages.dropFirst().allSatisfy { $0.contains("Use contains(where:) (or !contains(where:) for == nil)") })
+        #expect(
+            messages.dropFirst().allSatisfy { $0.contains("Use contains(where:) (or !contains(where:) for == nil)") }
+        )
         #expect(messages.last?.contains("Comparing first(where:) with nil") == true)
-        #expect(Self.records(source, firstIndex: Self.collectionFirstIndexOf).allSatisfy { $0.messageId == "containsOverFirstNotNil" })
+        #expect(
+            Self.records(source, firstIndex: Self.collectionFirstIndexOf).allSatisfy {
+                $0.messageId == "containsOverFirstNotNil"
+            }
+        )
     }
 
     /* The reason the rule is typed: a query builder's own `first(where:)` reads the same and may have no `contains` beside it. */
@@ -98,7 +135,10 @@ struct ContainsOverFirstNotNilTests {
     }
 
     /* Every standard library search by these names is found: a set's, a dictionary's, an async sequence's and a lazy sequence's. */
-    @Test(arguments: ["s:Sh10firstIndex2ofSh5IndexVyx_GSgx_tF", "s:SD10firstIndex5whereSD5IndexVyxq__GSgSbx3key_q_5valuet_tKXE_tKF", "s:ScisE5first5where7ElementQzSgSbADYaKXE_tYaKF"])
+    @Test(arguments: [
+        "s:Sh10firstIndex2ofSh5IndexVyx_GSgx_tF", "s:SD10firstIndex5whereSD5IndexVyxq__GSgSbx3key_q_5valuet_tKXE_tKF",
+        "s:ScisE5first5where7ElementQzSgSbADYaKXE_tYaKF",
+    ])
     func otherStandardLibrarySearchesAreFound(symbol: String) {
         let source = """
             let first = values.firstIndex(of: target) != nil
@@ -145,9 +185,18 @@ struct ContainsOverFirstNotNilTests {
         #expect(Self.findings("let first = owner!.items.first { $0 > 1 } != nil\n") == ["1:13"])
     }
 
-    @Test(arguments: ["let found = items.firstIndex(of: target)\n", "let found = items.contains(target) ? target : nil\n"])
+    @Test(arguments: [
+        "let found = items.firstIndex(of: target)\n", "let found = items.contains(target) ? target : nil\n",
+    ])
     func aFileWithNoFirstOrNoNilDoesNotApply(source: String) {
-        let file = ParsedFile(url: URL(fileURLWithPath: "/Plain.swift"), targetName: "Control", targetKind: "regular", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: URL(fileURLWithPath: "/Plain.swift"),
+            targetName: "Control",
+            targetKind: "regular",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         #expect(!ContainsOverFirstNotNil().applies(to: file))
     }
 
@@ -181,23 +230,48 @@ struct ContainsOverFirstNotNilTests {
         """
 
     @Test func anArraysSearchIsFlaggedAndAQuerysIsNot() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-typed-\(UUID().uuidString)", isDirectory: true)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-typed-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-        try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try Self.packageSource.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
+        try PipelineControlTests.manifest.write(
+            to: root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try Self.packageSource.write(
+            to: sources.appendingPathComponent("Control.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
 
         /* One run builds the package and writes its index. The rule is not registered here, so it is run by hand on what the run left. */
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"],
+            workingDirectory: root,
+        )
         _ = try await Pipeline(options: options, writer: ContractWriter { _ in }, workingDirectory: root).run()
-        let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: ProcessRunner())
+        let package = try PackageModel.load(
+            root: root,
+            scratchPath: Pipeline.scratchPath(for: root),
+            runner: ProcessRunner(),
+        )
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
         let candidates = parsed.files.filter { ContainsOverFirstNotNil().applies(to: $0) }
-        let symbols = SymbolProvider(scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root), runner: ProcessRunner()).symbols(for: candidates)
+        let symbols = SymbolProvider(
+            scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root),
+            runner: ProcessRunner(),
+        ).symbols(for: candidates)
         #expect(symbols.fromIndex == 1, "the build's index should describe the file: \(symbols.unavailable)")
         let found = candidates.flatMap { file in
-            ContainsOverFirstNotNil().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.line):\($0.column)" }
+            ContainsOverFirstNotNil().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map
+            { "\($0.line):\($0.column)" }
         }
-        #expect(found == ["14:16", "15:16", "16:16"], "expected the array's three searches and not the query's: \(found)")
+        #expect(
+            found == ["14:16", "15:16", "16:16"],
+            "expected the array's three searches and not the query's: \(found)",
+        )
     }
 }

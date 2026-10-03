@@ -17,15 +17,23 @@ import Testing
 struct SourcekitdTests {
     /* A two-file module on disk: `Shape.swift` declares a type and `Use.swift` uses it. */
     static func module(use: String) throws -> (use: String, arguments: [String]) {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-sourcekitd-\(UUID().uuidString)", isDirectory: true)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-sourcekitd-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let shape = directory.appendingPathComponent("Shape.swift")
         try "struct Shape {\n    var sides: Int\n}\n".write(to: shape, atomically: true, encoding: .utf8)
         let useFile = directory.appendingPathComponent("Use.swift")
         try use.write(to: useFile, atomically: true, encoding: .utf8)
         let sdk = try ProcessRunner().run("xcrun", ["--show-sdk-path"], in: directory)
-        let sdkPath = String(decoding: sdk.standardOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-        let arguments = ["-module-name", "Subject", "-parse-as-library", "-swift-version", "6", "-sdk", sdkPath, shape.resolvingSymlinksInPath().path, useFile.resolvingSymlinksInPath().path]
+        let sdkPath = String(decoding: sdk.standardOutput, as: UTF8.self).trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        let arguments = [
+            "-module-name", "Subject", "-parse-as-library", "-swift-version", "6", "-sdk", sdkPath,
+            shape.resolvingSymlinksInPath().path, useFile.resolvingSymlinksInPath().path,
+        ]
         return (useFile.resolvingSymlinksInPath().path, arguments)
     }
 
@@ -49,7 +57,9 @@ struct SourcekitdTests {
 
     /* The `.dia` test's warning, at the `.dia` test's position, so the two readers place a diagnostic the same way. */
     @Test func aWarningCarriesItsPositionAndGroupLink() throws {
-        let module = try Self.module(use: "func subject() -> Int {\n    var neverMutated = 3\n    return neverMutated\n}\n")
+        let module = try Self.module(
+            use: "func subject() -> Int {\n    var neverMutated = 3\n    return neverMutated\n}\n"
+        )
         let diagnostics = try Self.session().diagnostics(file: module.use, arguments: module.arguments)
         #expect(diagnostics.map(\.findingSeverity) == [.warning])
         #expect(diagnostics.first?.line == 2)
@@ -62,7 +72,9 @@ struct SourcekitdTests {
         let module = try Self.module(use: "let square = Shape(sides: 4)\n")
         let alone = module.arguments.filter { !$0.hasSuffix("Shape.swift") }
         #expect(try Self.session().diagnostics(file: module.use, arguments: module.arguments).isEmpty)
-        #expect(try Self.session().diagnostics(file: module.use, arguments: alone).contains { $0.message.contains("Shape") })
+        #expect(
+            try Self.session().diagnostics(file: module.use, arguments: alone).contains { $0.message.contains("Shape") }
+        )
     }
 
     @Test func expressionTypesAreTheCompilersTypes() throws {

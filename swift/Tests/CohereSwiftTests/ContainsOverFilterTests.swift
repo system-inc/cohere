@@ -27,19 +27,53 @@ struct ContainsOverFilterTests {
      */
     static func findings(_ source: String, filter: String? = arrayFilter, count: String? = arrayCount) -> [String] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         var occurrences: [FileSymbols.Occurrence] = []
         for token in file.tree.tokens(viewMode: .sourceAccurate) {
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
             if token.text == "filter", let filter {
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: filter, name: "filter(_:)", isReference: true))
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: filter,
+                        name: "filter(_:)",
+                        isReference: true,
+                    )
+                )
             }
             if token.text == "count", let count {
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: count, name: "count", isReference: true))
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: "s:Sa5countSivg", name: "getter:count", isReference: true, isImplicit: true))
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: count,
+                        name: "count",
+                        isReference: true,
+                    )
+                )
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: "s:Sa5countSivg",
+                        name: "getter:count",
+                        isReference: true,
+                        isImplicit: true,
+                    )
+                )
             }
         }
-        return ContainsOverFilter().findings(in: file, symbols: FileSymbols(occurrences)).map { "\($0.messageId)@\($0.line):\($0.column)" }
+        return ContainsOverFilter().findings(in: file, symbols: FileSymbols(occurrences)).map {
+            "\($0.messageId)@\($0.line):\($0.column)"
+        }
     }
 
     /* SwiftLint's `contains_over_filter_count` triggering examples for `>`, `==` and `!=`, each at the start of the comparison. */
@@ -78,7 +112,11 @@ struct ContainsOverFilterTests {
             let fourth = myList.filter(where: someFunction).isEmpty
 
             """
-        #expect(Self.findings(source) == ["filterIsEmpty@1:13", "filterIsEmpty@2:15", "filterIsEmpty@3:13", "filterIsEmpty@4:14"])
+        #expect(
+            Self.findings(source) == [
+                "filterIsEmpty@1:13", "filterIsEmpty@2:15", "filterIsEmpty@3:13", "filterIsEmpty@4:14",
+            ]
+        )
     }
 
     /* SwiftLint's `contains_over_filter_is_empty` non-triggering examples. */
@@ -125,7 +163,10 @@ struct ContainsOverFilterTests {
     }
 
     /* Every standard library collection's `filter` builds a new collection: dictionary, set and string alike. */
-    @Test(arguments: [("s:SD6filteryAByxq_GSbx3key_q_5valuet_tKXEKF", "s:SD5countSivp"), ("s:Sh6filteryShyxGSbxKXEKF", "s:Sh5countSivp"), ("s:SS6filteryS2SSbSJKXEKF", "s:SS5countSivp")])
+    @Test(arguments: [
+        ("s:SD6filteryAByxq_GSbx3key_q_5valuet_tKXEKF", "s:SD5countSivp"),
+        ("s:Sh6filteryShyxGSbxKXEKF", "s:Sh5countSivp"), ("s:SS6filteryS2SSbSJKXEKF", "s:SS5countSivp"),
+    ])
     func otherStandardLibraryCollectionsAreFound(filter: String, count: String) {
         let source = """
             let first = values.filter { _ in true }.isEmpty
@@ -145,7 +186,11 @@ struct ContainsOverFilterTests {
             let fifth = items.filter { $0 > 1 }.count == 0 ? "none" : "some"
 
             """
-        #expect(Self.findings(source) == ["filterCount@1:13", "filterCount@2:14", "filterCount@3:13", "filterCount@4:23", "filterCount@5:13"])
+        #expect(
+            Self.findings(source) == [
+                "filterCount@1:13", "filterCount@2:14", "filterCount@3:13", "filterCount@4:23", "filterCount@5:13",
+            ]
+        )
     }
 
     /* Comparisons that are not the shape: zero the wrong way round, a sum compared with zero, and the same question asked with one. */
@@ -172,7 +217,9 @@ struct ContainsOverFilterTests {
             let fourth = items.filter { $0 > 1 }.count > 0b0
 
             """
-        #expect(Self.findings(source) == ["filterCount@1:13", "filterCount@2:14", "filterCount@3:13", "filterCount@4:14"])
+        #expect(
+            Self.findings(source) == ["filterCount@1:13", "filterCount@2:14", "filterCount@3:13", "filterCount@4:14"]
+        )
     }
 
     /* A bare `filter` in a collection's own extension, a parenthesised call, and `self.filter`. */
@@ -189,7 +236,14 @@ struct ContainsOverFilterTests {
 
     @Test func aFileWithNoFilterDoesNotApply() {
         let source = "let first = items.count > 0\n"
-        let file = ParsedFile(url: URL(fileURLWithPath: "/Plain.swift"), targetName: "Control", targetKind: "regular", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: URL(fileURLWithPath: "/Plain.swift"),
+            targetName: "Control",
+            targetKind: "regular",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         #expect(!ContainsOverFilter().applies(to: file))
     }
 
@@ -221,23 +275,49 @@ struct ContainsOverFilterTests {
         """
 
     @Test func anArraysFilterIsFlaggedAndAQuerysIsNot() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-typed-\(UUID().uuidString)", isDirectory: true)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-typed-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-        try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try Self.packageSource.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
+        try PipelineControlTests.manifest.write(
+            to: root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try Self.packageSource.write(
+            to: sources.appendingPathComponent("Control.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
 
         /* One run builds the package and writes its index. The rule is not registered here, so it is run by hand on what the run left. */
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"],
+            workingDirectory: root,
+        )
         _ = try await Pipeline(options: options, writer: ContractWriter { _ in }, workingDirectory: root).run()
-        let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: ProcessRunner())
+        let package = try PackageModel.load(
+            root: root,
+            scratchPath: Pipeline.scratchPath(for: root),
+            runner: ProcessRunner(),
+        )
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
         let candidates = parsed.files.filter { ContainsOverFilter().applies(to: $0) }
-        let symbols = SymbolProvider(scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root), runner: ProcessRunner()).symbols(for: candidates)
+        let symbols = SymbolProvider(
+            scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root),
+            runner: ProcessRunner(),
+        ).symbols(for: candidates)
         #expect(symbols.fromIndex == 1, "the build's index should describe the file: \(symbols.unavailable)")
         let found = candidates.flatMap { file in
-            ContainsOverFilter().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.messageId)@\($0.line)" }
+            ContainsOverFilter().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map {
+                "\($0.messageId)@\($0.line)"
+            }
         }
-        #expect(found == ["filterIsEmpty@13", "filterCount@14"], "expected the array's two shapes and not the query's or the lazy filter's: \(found)")
+        #expect(
+            found == ["filterIsEmpty@13", "filterCount@14"],
+            "expected the array's two shapes and not the query's or the lazy filter's: \(found)",
+        )
     }
 }

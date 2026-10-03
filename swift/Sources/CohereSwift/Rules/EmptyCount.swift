@@ -37,12 +37,15 @@ public struct EmptyCount: TypedFileRule {
         visitor.walk(folded)
         return visitor.found.compactMap { comparison, count in
             let location = file.locations.location(for: count.positionAfterSkippingLeadingTrivia)
-            guard let resolved = symbols.reference(line: location.line, column: location.column), resolved.isStandardLibrary else { return nil }
+            guard let resolved = symbols.reference(line: location.line, column: location.column),
+                resolved.isStandardLibrary
+            else { return nil }
             return file.finding(
                 at: comparison,
                 rule: name,
                 messageId: "emptyCount",
-                message: "Comparing a collection's count to zero asks whether it is empty in a roundabout way. Use isEmpty (or !isEmpty): it says what is meant, and it is constant time where count may walk the whole collection."
+                message:
+                    "Comparing a collection's count to zero asks whether it is empty in a roundabout way. Use isEmpty (or !isEmpty): it says what is meant, and it is constant time where count may walk the whole collection.",
             )
         }
     }
@@ -52,12 +55,15 @@ public struct EmptyCount: TypedFileRule {
         private(set) var found: [(InfixOperatorExprSyntax, TokenSyntax)] = []
 
         override func visit(_ node: InfixOperatorExprSyntax) -> SyntaxVisitorContinueKind {
-            guard let operation = node.operator.as(BinaryOperatorExprSyntax.self), EmptyCount.comparisons.contains(operation.operator.text) else {
+            guard let operation = node.operator.as(BinaryOperatorExprSyntax.self),
+                EmptyCount.comparisons.contains(operation.operator.text)
+            else {
                 return .visitChildren
             }
             if Self.isZero(node.rightOperand), let count = Self.countToken(node.leftOperand) {
                 found.append((node, count))
-            } else if Self.isZero(node.leftOperand), let count = Self.countToken(node.rightOperand) {
+            }
+            else if Self.isZero(node.leftOperand), let count = Self.countToken(node.rightOperand) {
                 found.append((node, count))
             }
             return .visitChildren
@@ -69,10 +75,14 @@ public struct EmptyCount: TypedFileRule {
 
         /* `items.count`, `self.items.count` or a bare `count`: the name token, which the index places. */
         static func countToken(_ expression: ExprSyntax) -> TokenSyntax? {
-            if let member = expression.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "count", member.declName.argumentNames == nil {
+            if let member = expression.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "count",
+                member.declName.argumentNames == nil
+            {
                 return member.declName.baseName
             }
-            if let reference = expression.as(DeclReferenceExprSyntax.self), reference.baseName.text == "count", reference.argumentNames == nil {
+            if let reference = expression.as(DeclReferenceExprSyntax.self), reference.baseName.text == "count",
+                reference.argumentNames == nil
+            {
                 return reference.baseName
             }
             return nil

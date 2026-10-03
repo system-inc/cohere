@@ -52,12 +52,24 @@ final class SwiftFormatPass: @unchecked Sendable {
         var reported: [Finding] = []
         let linter = SwiftLinter(configuration: configuration) { finding in
             guard let location = finding.location else { return }
-            reported.append(Finding(rule: String(describing: finding.category), line: location.line, column: location.column, text: finding.message.text))
+            reported.append(
+                Finding(
+                    rule: String(describing: finding.category),
+                    line: location.line,
+                    column: location.column,
+                    text: finding.message.text,
+                )
+            )
         }
         linter.debugOptions = [.disablePrettyPrint]
         let folded = OperatorTable.standardOperators.foldAll(file.tree) { _ in }
         guard let tree = folded.as(SourceFileSyntax.self) else { return [] }
-        try linter.lint(syntax: tree, source: file.source, operatorTable: .standardOperators, assumingFileURL: file.url)
+        try linter.lint(
+            syntax: tree,
+            source: file.source,
+            operatorTable: .standardOperators,
+            assumingFileURL: file.url,
+        )
         return reported
     }
 }

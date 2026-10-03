@@ -44,7 +44,8 @@ public enum EngineVersion {
                 return String(text[range])
             }
             return "unknown (swift --version said: \(text.split(separator: "\n").first ?? ""))"
-        } catch {
+        }
+        catch {
             return "unknown (\(error))"
         }
     }
@@ -58,7 +59,7 @@ public enum EngineVersion {
             sourceTreeModified: sourceTreeModified,
             toolchain: toolchain,
             swiftSyntax: swiftSyntax,
-            swiftFormat: swiftFormat
+            swiftFormat: swiftFormat,
         )
     }
 }

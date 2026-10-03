@@ -87,13 +87,15 @@ public struct ConsistencyNoHandRolledDelay: FileRule {
                     at: found.node,
                     rule: name,
                     messageId: "handRolledDelayDoCatch",
-                    message: "This do/catch around Task.sleep, with nothing in the catch, is the house's Task.sleepUnlessCancelled written out by hand: Task.sleep throws only CancellationError, so the catch does nothing but let the pause end early when the task is cancelled, which is all the primitive does. Write await Task.sleepUnlessCancelled with the same duration (declared once per project, in Task+SleepUnlessCancelled.swift, taking for: or nanoseconds:), so the pause reads as a plain pause and the one place that says why cancellation is let go says it for every call."
+                    message:
+                        "This do/catch around Task.sleep, with nothing in the catch, is the house's Task.sleepUnlessCancelled written out by hand: Task.sleep throws only CancellationError, so the catch does nothing but let the pause end early when the task is cancelled, which is all the primitive does. Write await Task.sleepUnlessCancelled with the same duration (declared once per project, in Task+SleepUnlessCancelled.swift, taking for: or nanoseconds:), so the pause reads as a plain pause and the one place that says why cancellation is let go says it for every call.",
                 )
                 : file.finding(
                     at: found.node,
                     rule: name,
                     messageId: "handRolledDelay",
-                    message: "This try? await Task.sleep is the house's Task.sleepUnlessCancelled written out by hand: Task.sleep throws only CancellationError, so the try? does nothing but let the pause end early when the task is cancelled, which is all the primitive does. Write await Task.sleepUnlessCancelled with the same duration (declared once per project, in Task+SleepUnlessCancelled.swift, taking for: or nanoseconds:), so the pause reads as a plain pause and the one place that says why cancellation is let go says it for every call. A do/catch with an empty catch around the sleep is the same pause spelled longer, not the repair."
+                    message:
+                        "This try? await Task.sleep is the house's Task.sleepUnlessCancelled written out by hand: Task.sleep throws only CancellationError, so the try? does nothing but let the pause end early when the task is cancelled, which is all the primitive does. Write await Task.sleepUnlessCancelled with the same duration (declared once per project, in Task+SleepUnlessCancelled.swift, taking for: or nanoseconds:), so the pause reads as a plain pause and the one place that says why cancellation is let go says it for every call. A do/catch with an empty catch around the sleep is the same pause spelled longer, not the repair.",
                 )
         }
     }
@@ -106,16 +108,20 @@ public struct ConsistencyNoHandRolledDelay: FileRule {
         static let durationLabels: Set<String> = ["for", "nanoseconds"]
 
         override func visit(_ node: TryExprSyntax) -> SyntaxVisitorContinueKind {
-            guard node.questionOrExclamationMark?.tokenKind == .postfixQuestionMark, let call = Self.sleepCall(awaitedBy: node.expression) else {
+            guard node.questionOrExclamationMark?.tokenKind == .postfixQuestionMark,
+                let call = Self.sleepCall(awaitedBy: node.expression)
+            else {
                 return .visitChildren
             }
             let item: CodeBlockItemSyntax?
             if CorrectnessNoDiscardedTryOptional.Visitor.isStatement(node) {
                 item = node.parent?.as(CodeBlockItemSyntax.self)
-            } else if CorrectnessNoDiscardedTryOptional.Visitor.isDiscardAssignment(node) {
+            }
+            else if CorrectnessNoDiscardedTryOptional.Visitor.isDiscardAssignment(node) {
                 /* `_ = try? ...` is the sequence `_`, `=`, `try? ...`, whose list sits in a sequence expression that is the statement. */
                 item = node.parent?.parent?.parent?.as(CodeBlockItemSyntax.self)
-            } else {
+            }
+            else {
                 return .visitChildren
             }
             if !Self.isDefinition(item, duration: call) {
@@ -125,12 +131,16 @@ public struct ConsistencyNoHandRolledDelay: FileRule {
         }
 
         override func visit(_ node: DoStmtSyntax) -> SyntaxVisitorContinueKind {
-            guard node.throwsClause == nil, node.body.statements.count == 1, let attempt = node.body.statements.first?.item.as(TryExprSyntax.self), attempt.questionOrExclamationMark == nil,
+            guard node.throwsClause == nil, node.body.statements.count == 1,
+                let attempt = node.body.statements.first?.item.as(TryExprSyntax.self),
+                attempt.questionOrExclamationMark == nil,
                 let call = Self.sleepCall(awaitedBy: attempt.expression)
             else {
                 return .visitChildren
             }
-            guard node.catchClauses.count == 1, let catchClause = node.catchClauses.first, catchClause.catchItems.isEmpty, catchClause.body.statements.isEmpty else {
+            guard node.catchClauses.count == 1, let catchClause = node.catchClauses.first,
+                catchClause.catchItems.isEmpty, catchClause.body.statements.isEmpty
+            else {
                 return .visitChildren
             }
             /* A labeled `do` is the label's statement. */
@@ -143,13 +153,19 @@ public struct ConsistencyNoHandRolledDelay: FileRule {
 
         /* `await Task.sleep(for: d)` or `await Task.sleep(nanoseconds: n)`, the call with its one duration argument. */
         static func sleepCall(awaitedBy expression: ExprSyntax) -> FunctionCallExprSyntax? {
-            guard let awaited = unparenthesized(expression).as(AwaitExprSyntax.self), let call = unparenthesized(awaited.expression).as(FunctionCallExprSyntax.self) else {
+            guard let awaited = unparenthesized(expression).as(AwaitExprSyntax.self),
+                let call = unparenthesized(awaited.expression).as(FunctionCallExprSyntax.self)
+            else {
                 return nil
             }
-            guard call.trailingClosure == nil, call.additionalTrailingClosures.isEmpty, call.arguments.count == 1, let label = call.arguments.first?.label?.text, durationLabels.contains(label) else {
+            guard call.trailingClosure == nil, call.additionalTrailingClosures.isEmpty, call.arguments.count == 1,
+                let label = call.arguments.first?.label?.text, durationLabels.contains(label)
+            else {
                 return nil
             }
-            guard let callee = call.calledExpression.as(MemberAccessExprSyntax.self), callee.declName.baseName.text == "sleep", callee.declName.argumentNames == nil, let base = callee.base else {
+            guard let callee = call.calledExpression.as(MemberAccessExprSyntax.self),
+                callee.declName.baseName.text == "sleep", callee.declName.argumentNames == nil, let base = callee.base
+            else {
                 return nil
             }
             return isTask(base) ? call : nil
@@ -160,7 +176,9 @@ public struct ConsistencyNoHandRolledDelay: FileRule {
             if let reference = expression.as(DeclReferenceExprSyntax.self) {
                 return reference.baseName.text == "Task" && reference.argumentNames == nil
             }
-            guard let member = expression.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "Task", member.declName.argumentNames == nil else {
+            guard let member = expression.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "Task",
+                member.declName.argumentNames == nil
+            else {
                 return false
             }
             return member.base?.as(DeclReferenceExprSyntax.self)?.baseName.text == "_Concurrency"
@@ -168,7 +186,9 @@ public struct ConsistencyNoHandRolledDelay: FileRule {
 
         /* An expression with any parentheses around it taken off: a one-element tuple with no label is a parenthesized expression. */
         static func unparenthesized(_ expression: ExprSyntax) -> ExprSyntax {
-            guard let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1, let element = tuple.elements.first, element.label == nil else {
+            guard let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1,
+                let element = tuple.elements.first, element.label == nil
+            else {
                 return expression
             }
             return unparenthesized(element.expression)
@@ -179,24 +199,30 @@ public struct ConsistencyNoHandRolledDelay: FileRule {
          body, with a duration that is a bare reference to one of that function's own parameters.
          */
         static func isDefinition(_ item: CodeBlockItemSyntax?, duration call: FunctionCallExprSyntax) -> Bool {
-            guard let item, let list = item.parent?.as(CodeBlockItemListSyntax.self), list.count == 1 else { return false }
-            guard let duration = call.arguments.first?.expression.as(DeclReferenceExprSyntax.self), duration.argumentNames == nil else { return false }
+            guard let item, let list = item.parent?.as(CodeBlockItemListSyntax.self), list.count == 1 else {
+                return false
+            }
+            guard let duration = call.arguments.first?.expression.as(DeclReferenceExprSyntax.self),
+                duration.argumentNames == nil
+            else { return false }
             let durationName = duration.baseName.text
             if let function = list.parent?.as(CodeBlockSyntax.self)?.parent?.as(FunctionDeclSyntax.self) {
-                return function.signature.parameterClause.parameters.contains { ($0.secondName ?? $0.firstName).text == durationName }
+                return function.signature.parameterClause.parameters.contains {
+                    ($0.secondName ?? $0.firstName).text == durationName
+                }
             }
             guard let closure = list.parent?.as(ClosureExprSyntax.self) else { return false }
             switch closure.signature?.parameterClause {
-            case .simpleInput(let parameters)?:
-                return parameters.contains { $0.name.text == durationName }
-            case .parameterClause(let clause)?:
-                return clause.parameters.contains { ($0.secondName ?? $0.firstName).text == durationName }
-            case nil:
-                /* A closure that names no parameters reaches them as `$0`, `$1`. */
-                if case .dollarIdentifier = duration.baseName.tokenKind {
-                    return true
-                }
-                return false
+                case .simpleInput(let parameters)?:
+                    return parameters.contains { $0.name.text == durationName }
+                case .parameterClause(let clause)?:
+                    return clause.parameters.contains { ($0.secondName ?? $0.firstName).text == durationName }
+                case nil:
+                    /* A closure that names no parameters reaches them as `$0`, `$1`. */
+                    if case .dollarIdentifier = duration.baseName.tokenKind {
+                        return true
+                    }
+                    return false
             }
         }
     }

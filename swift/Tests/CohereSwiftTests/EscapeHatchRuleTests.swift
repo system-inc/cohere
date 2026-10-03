@@ -8,7 +8,14 @@ import Testing
 /* Fixture pairs for print by target kind, escape hatches with reasons, discarded try?, failure messages and TODO comments. */
 struct EscapeHatchRuleTests {
     static func file(_ source: String, kind: String = "library") -> ParsedFile {
-        ParsedFile(url: URL(fileURLWithPath: "/fixture/Subject.swift"), targetName: "Fixture", targetKind: kind, source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        ParsedFile(
+            url: URL(fileURLWithPath: "/fixture/Subject.swift"),
+            targetName: "Fixture",
+            targetKind: kind,
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
     }
 
     static func lines(_ rule: some FileRule, _ source: String, kind: String = "library") -> [Int] {
@@ -28,8 +35,14 @@ struct EscapeHatchRuleTests {
         let tool = "import Foundation\nprint(\"usage: tool <file>\")\n"
         let app = "import SwiftUI\nprint(\"tapped\")\n"
         #expect(Self.lines(ConsistencyNoPrint(), tool, kind: "library") == [2])
-        #expect(Self.lines(ConsistencyNoPrint(), tool, kind: "executable").isEmpty, "a command-line tool's stdout is its interface")
-        #expect(Self.lines(ConsistencyNoPrint(), tool, kind: "application") == [2], "an app's model file imports only Foundation and is still app code")
+        #expect(
+            Self.lines(ConsistencyNoPrint(), tool, kind: "executable").isEmpty,
+            "a command-line tool's stdout is its interface",
+        )
+        #expect(
+            Self.lines(ConsistencyNoPrint(), tool, kind: "application") == [2],
+            "an app's model file imports only Foundation and is still app code",
+        )
         #expect(Self.lines(ConsistencyNoPrint(), app, kind: "test").isEmpty)
     }
 
@@ -56,7 +69,12 @@ struct EscapeHatchRuleTests {
     }
 
     @Test func plainSendableAndNonisolatedAreNotHatches() {
-        #expect(Self.lines(ConcurrencyRequireEscapeHatchReason(), "struct Value: Sendable {}\nnonisolated func work() {}\n").isEmpty)
+        #expect(
+            Self.lines(
+                ConcurrencyRequireEscapeHatchReason(),
+                "struct Value: Sendable {}\nnonisolated func work() {}\n",
+            ).isEmpty
+        )
     }
 
     @Test func discardedTryOptionalsAreFound() {
@@ -151,20 +169,40 @@ extension EscapeHatchRuleTests {
     typealias Declaration = (symbol: String, name: String)
 
     static let forEach: Declaration = ("s:STsE7forEachyyy7ElementQzKXEKF", "forEach(_:)")
-    static let dispatchAsync: Declaration = ("s:So17OS_dispatch_queueC8DispatchE5async5group3qos5flags7executeySo0a1_b1_F0CSg_AC0D3QoSVAC0D13WorkItemFlagsVyyXLtF", "async(group:qos:flags:execute:)")
-    static let dispatchSync: Declaration = ("s:So17OS_dispatch_queueC8DispatchE4sync7executexxyKXE_tKlF", "sync(execute:)")
+    static let dispatchAsync: Declaration = (
+        "s:So17OS_dispatch_queueC8DispatchE5async5group3qos5flags7executeySo0a1_b1_F0CSg_AC0D3QoSVAC0D13WorkItemFlagsVyyXLtF",
+        "async(group:qos:flags:execute:)",
+    )
+    static let dispatchSync: Declaration = (
+        "s:So17OS_dispatch_queueC8DispatchE4sync7executexxyKXE_tKlF", "sync(execute:)",
+    )
     static let taskType: Declaration = ("s:ScT", "Task")
-    static let taskInit: Declaration = ("s:ScT12_Concurrencys5NeverORs_rlE4name8priority9operationScTyxACGSSSg_ScPSgxyYaYAcntcfc", "init(name:priority:operation:)")
-    static let taskDetached: Declaration = ("s:ScT12_Concurrencys5NeverORs_rlE8detached4name8priority9operationScTyxACGSSSg_ScPSgxyYaYAcntFZ", "detached(name:priority:operation:)")
+    static let taskInit: Declaration = (
+        "s:ScT12_Concurrencys5NeverORs_rlE4name8priority9operationScTyxACGSSSg_ScPSgxyYaYAcntcfc",
+        "init(name:priority:operation:)",
+    )
+    static let taskDetached: Declaration = (
+        "s:ScT12_Concurrencys5NeverORs_rlE8detached4name8priority9operationScTyxACGSSSg_ScPSgxyYaYAcntFZ",
+        "detached(name:priority:operation:)",
+    )
     static let compactMap: Declaration = ("s:STsE10compactMapySayqd__Gqd__Sg7ElementQzKXEKlF", "compactMap(_:)")
-    static let optionalFlatMap: Declaration = ("s:Sq7flatMapyqd_0_SgABxqd__YKXEqd__YKs5ErrorRd__Ri_d_0_r0_lF", "flatMap(_:)")
+    static let optionalFlatMap: Declaration = (
+        "s:Sq7flatMapyqd_0_SgABxqd__YKXEqd__YKs5ErrorRd__Ri_d_0_r0_lF", "flatMap(_:)",
+    )
     static let map: Declaration = ("s:SlsE3mapySayqd__Gqd__7ElementQzqd_0_YKXEqd_0_YKs5ErrorRd_0_r0_lF", "map(_:)")
     static let withAnimation: Declaration = ("s:7SwiftUI13withAnimationyxAA0D0VSg_xyKXEtKlF", "withAnimation(_:_:)")
     static let buttonAction: Declaration = ("s:7SwiftUI6ButtonV6action5labelACyxGyyc_xyXEtcfc", "init(action:label:)")
-    static let buttonTitled: Declaration = ("s:7SwiftUI6ButtonVA2A4TextVRszrlE_6actionACyAEGAA18LocalizedStringKeyV_yyctcfc", "init(_:action:)")
+    static let buttonTitled: Declaration = (
+        "s:7SwiftUI6ButtonVA2A4TextVRszrlE_6actionACyAEGAA18LocalizedStringKeyV_yyctcfc", "init(_:action:)",
+    )
     static let onAppear: Declaration = ("s:7SwiftUI4ViewPAAE8onAppear7performQryycSg_tF", "onAppear(perform:)")
-    static let task: Declaration = ("s:7SwiftUI4ViewPAAE4task4name8priority4file4line_QrSSSg_ScPSSSiyyYaYAcntF", "task(name:priority:file:line:_:)")
-    static let addObserver: Declaration = ("c:objc(cs)NSNotificationCenter(im)addObserverForName:object:queue:usingBlock:", "addObserver(forName:object:queue:using:)")
+    static let task: Declaration = (
+        "s:7SwiftUI4ViewPAAE4task4name8priority4file4line_QrSSSg_ScPSSSiyyYaYAcntF", "task(name:priority:file:line:_:)",
+    )
+    static let addObserver: Declaration = (
+        "c:objc(cs)NSNotificationCenter(im)addObserverForName:object:queue:usingBlock:",
+        "addObserver(forName:object:queue:using:)",
+    )
     static let run: Declaration = ("s:7Control6RunnerV3runyyyyXEF", "run(_:)")
     static let perform: Declaration = ("s:7Control6RunnerV7perform5label_ySS_yyXEtF", "perform(label:_:)")
     static let value: Declaration = ("s:7Control6RunnerV5valueyxxyXElF", "value(_:)")
@@ -185,10 +223,27 @@ extension EscapeHatchRuleTests {
         for token in subject.tree.tokens(viewMode: .sourceAccurate) {
             let location = subject.locations.location(for: token.positionAfterSkippingLeadingTrivia)
             for declaration in resolving[token.text] ?? [] {
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: declaration.symbol, name: declaration.name, isReference: true))
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: declaration.symbol,
+                        name: declaration.name,
+                        isReference: true,
+                    )
+                )
             }
             if builder, token.tokenKind == .leftBrace {
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: "s:7SwiftUI11ViewBuilderV10buildBlockyxxAA0C0RzlFZ", name: "buildBlock(_:)", isReference: true, isImplicit: true))
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: "s:7SwiftUI11ViewBuilderV10buildBlockyxxAA0C0RzlFZ",
+                        name: "buildBlock(_:)",
+                        isReference: true,
+                        isImplicit: true,
+                    )
+                )
             }
         }
         let rule = CorrectnessNoDiscardedTryOptional()
@@ -206,12 +261,28 @@ extension EscapeHatchRuleTests {
             view.onAppear { try? write() }
             view.task { try? await send() }
             """
-        let found = Self.typedFindings(source, resolving: [
-            "forEach": [Self.forEach], "async": [Self.dispatchAsync], "Button": [Self.buttonAction], "onAppear": [Self.onAppear], "task": [Self.task],
-        ])
-        #expect(found == ["discardedTryOptionalInClosure@1", "discardedTryOptionalInClosure@2", "discardedTryOptionalInClosure@3", "discardedTryOptionalInClosure@4"] + ["discardedTryOptionalInClosure@6", "discardedTryOptionalInClosure@7"], "\(found)")
-        let titled = Self.typedFindings("Button(\"y\") { try? write() }\n", resolving: ["Button": [Self.taskType, Self.buttonTitled]])
-        #expect(titled == ["discardedTryOptionalInClosure@1"], "a trailing closure after a positional title binds to the action: \(titled)")
+        let found = Self.typedFindings(
+            source,
+            resolving: [
+                "forEach": [Self.forEach], "async": [Self.dispatchAsync], "Button": [Self.buttonAction],
+                "onAppear": [Self.onAppear], "task": [Self.task],
+            ],
+        )
+        #expect(
+            found == [
+                "discardedTryOptionalInClosure@1", "discardedTryOptionalInClosure@2", "discardedTryOptionalInClosure@3",
+                "discardedTryOptionalInClosure@4",
+            ] + ["discardedTryOptionalInClosure@6", "discardedTryOptionalInClosure@7"],
+            "\(found)",
+        )
+        let titled = Self.typedFindings(
+            "Button(\"y\") { try? write() }\n",
+            resolving: ["Button": [Self.taskType, Self.buttonTitled]],
+        )
+        #expect(
+            titled == ["discardedTryOptionalInClosure@1"],
+            "a trailing closure after a positional title binds to the action: \(titled)",
+        )
     }
 
     /* A generic result is the closure's value: what `map`, `compactMap`, `flatMap`, `sync` and `withAnimation` return. */
@@ -224,9 +295,13 @@ extension EscapeHatchRuleTests {
             DispatchQueue.main.sync { try? write() }
             withAnimation { try? write() }
             """
-        let found = Self.typedFindings(source, resolving: [
-            "compactMap": [Self.compactMap], "flatMap": [Self.optionalFlatMap], "map": [Self.map], "sync": [Self.dispatchSync], "withAnimation": [Self.withAnimation],
-        ])
+        let found = Self.typedFindings(
+            source,
+            resolving: [
+                "compactMap": [Self.compactMap], "flatMap": [Self.optionalFlatMap], "map": [Self.map],
+                "sync": [Self.dispatchSync], "withAnimation": [Self.withAnimation],
+            ],
+        )
         #expect(found.isEmpty, "\(found)")
     }
 
@@ -242,8 +317,20 @@ extension EscapeHatchRuleTests {
             let tasks = items.map { _ in Task { try? await send() } }
             func start() -> Task<Void?, Never> { Task { try? await send() } }
             """
-        let found = Self.typedFindings(source, resolving: ["Task": [Self.taskType, Self.taskInit], "detached": [Self.taskDetached], "run": [Self.run], "map": [Self.map]])
-        #expect(found == ["discardedTryOptionalInClosure@1", "discardedTryOptionalInClosure@2", "discardedTryOptionalInClosure@3", "discardedTryOptionalInClosure@6"], "\(found)")
+        let found = Self.typedFindings(
+            source,
+            resolving: [
+                "Task": [Self.taskType, Self.taskInit], "detached": [Self.taskDetached], "run": [Self.run],
+                "map": [Self.map],
+            ],
+        )
+        #expect(
+            found == [
+                "discardedTryOptionalInClosure@1", "discardedTryOptionalInClosure@2", "discardedTryOptionalInClosure@3",
+                "discardedTryOptionalInClosure@6",
+            ],
+            "\(found)",
+        )
     }
 
     /* Labeled, positional, trailing, optional and additional trailing closures bind as the compiler binds them; where the binding is unsure, nothing is flagged. */
@@ -260,9 +347,13 @@ extension EscapeHatchRuleTests {
             runner.both { try? load() }
             runner.variadic({ try? write() }, { try? write() })
             """
-        let found = Self.typedFindings(source, resolving: [
-            "run": [Self.run], "perform": [Self.perform], "optional": [Self.optional], "multiple": [Self.multiple], "value": [Self.value], "both": [Self.both], "variadic": [Self.variadic],
-        ])
+        let found = Self.typedFindings(
+            source,
+            resolving: [
+                "run": [Self.run], "perform": [Self.perform], "optional": [Self.optional], "multiple": [Self.multiple],
+                "value": [Self.value], "both": [Self.both], "variadic": [Self.variadic],
+            ],
+        )
         #expect(found == (1...7).map { "discardedTryOptionalInClosure@\($0)" }, "\(found)")
     }
 
@@ -277,7 +368,12 @@ extension EscapeHatchRuleTests {
             let returning = { () -> Int? in try? load() }
             """
         let found = Self.typedFindings(source, resolving: [:])
-        #expect(found == ["discardedTryOptionalInClosure@1", "discardedTryOptionalInClosure@2", "discardedTryOptionalInClosure@3"], "\(found)")
+        #expect(
+            found == [
+                "discardedTryOptionalInClosure@1", "discardedTryOptionalInClosure@2", "discardedTryOptionalInClosure@3",
+            ],
+            "\(found)",
+        )
     }
 
     /* A callee not recorded, not Swift's, a look-alike of ours that returns a value, or a closure that is a result builder's body: not flagged. */
@@ -287,8 +383,14 @@ extension EscapeHatchRuleTests {
             center.addObserver(forName: name, object: nil, queue: nil) { _ in try? write() }
             """
         #expect(Self.typedFindings(source, resolving: [:]).isEmpty)
-        #expect(Self.typedFindings(source, resolving: ["forEach": [Self.oursForEach], "addObserver": [Self.addObserver]]).isEmpty)
-        #expect(Self.typedFindings(source, resolving: ["forEach": [Self.forEach, Self.compactMap]]).isEmpty, "two declarations at one name are not one answer")
+        #expect(
+            Self.typedFindings(source, resolving: ["forEach": [Self.oursForEach], "addObserver": [Self.addObserver]])
+                .isEmpty
+        )
+        #expect(
+            Self.typedFindings(source, resolving: ["forEach": [Self.forEach, Self.compactMap]]).isEmpty,
+            "two declarations at one name are not one answer",
+        )
         #expect(Self.typedFindings(source, resolving: ["forEach": [Self.forEach]], builder: true).isEmpty)
     }
 
@@ -302,32 +404,78 @@ extension EscapeHatchRuleTests {
             }
             """
         let found = Self.typedFindings(source, resolving: ["forEach": [Self.forEach]])
-        #expect(found == ["discardedTryOptionalInClosure@2", "discardedTryOptional@3", "discardedTryOptional@4"], "\(found)")
+        #expect(
+            found == ["discardedTryOptionalInClosure@2", "discardedTryOptional@3", "discardedTryOptional@4"],
+            "\(found)",
+        )
     }
 
     @Test func demangledSignaturesAreReadCarefully() throws {
-        let asynchronous = try #require(CorrectnessNoDiscardedTryOptional.Signature(
-            demangled: "(extension in Dispatch):__C.OS_dispatch_queue.async(group: __C.OS_dispatch_group?, qos: Dispatch.DispatchQoS, flags: Dispatch.DispatchWorkItemFlags, execute: @escaping @convention(block) () -> ()) -> ()",
-            name: "async(group:qos:flags:execute:)"
-        ))
+        let asynchronous = try #require(
+            CorrectnessNoDiscardedTryOptional.Signature(
+                demangled:
+                    "(extension in Dispatch):__C.OS_dispatch_queue.async(group: __C.OS_dispatch_group?, qos: Dispatch.DispatchQoS, flags: Dispatch.DispatchWorkItemFlags, execute: @escaping @convention(block) () -> ()) -> ()",
+                name: "async(group:qos:flags:execute:)",
+            )
+        )
         #expect(asynchronous.labels == ["group", "qos", "flags", "execute"])
-        #expect(asynchronous.parameters.map(CorrectnessNoDiscardedTryOptional.Signature.kind(of:)) == [.other, .other, .other, .function(returning: "()")])
+        #expect(
+            asynchronous.parameters.map(CorrectnessNoDiscardedTryOptional.Signature.kind(of:)) == [
+                .other, .other, .other, .function(returning: "()"),
+            ]
+        )
         #expect(asynchronous.result == "()")
-        let mapping = try #require(CorrectnessNoDiscardedTryOptional.Signature(
-            demangled: "(extension in Swift):Swift.Collection.map<A, B where B1: Swift.Error>((A.Element) throws(B1) -> A1) throws(B1) -> [A1]",
-            name: "map(_:)"
-        ))
-        #expect(mapping.parameters.map(CorrectnessNoDiscardedTryOptional.Signature.kind(of:)) == [.function(returning: "A1")])
-        let task = try #require(CorrectnessNoDiscardedTryOptional.Signature(
-            demangled: "(extension in _Concurrency):Swift.Task< where B == Swift.Never>.init(name: Swift.String?, priority: Swift.TaskPriority?, operation: __owned @isolated(any) () async -> A) -> Swift.Task<A, Swift.Never>",
-            name: "init(name:priority:operation:)"
-        ))
-        #expect(task.parameters.map(CorrectnessNoDiscardedTryOptional.Signature.kind(of:)) == [.other, .other, .function(returning: "A")])
+        let mapping = try #require(
+            CorrectnessNoDiscardedTryOptional.Signature(
+                demangled:
+                    "(extension in Swift):Swift.Collection.map<A, B where B1: Swift.Error>((A.Element) throws(B1) -> A1) throws(B1) -> [A1]",
+                name: "map(_:)",
+            )
+        )
+        #expect(
+            mapping.parameters.map(CorrectnessNoDiscardedTryOptional.Signature.kind(of:)) == [
+                .function(returning: "A1")
+            ]
+        )
+        let task = try #require(
+            CorrectnessNoDiscardedTryOptional.Signature(
+                demangled:
+                    "(extension in _Concurrency):Swift.Task< where B == Swift.Never>.init(name: Swift.String?, priority: Swift.TaskPriority?, operation: __owned @isolated(any) () async -> A) -> Swift.Task<A, Swift.Never>",
+                name: "init(name:priority:operation:)",
+            )
+        )
+        #expect(
+            task.parameters.map(CorrectnessNoDiscardedTryOptional.Signature.kind(of:)) == [
+                .other, .other, .function(returning: "A"),
+            ]
+        )
         #expect(CorrectnessNoDiscardedTryOptional.Signature.taskSuccess(task.result) == "A")
-        #expect(CorrectnessNoDiscardedTryOptional.Signature(demangled: "Control.Runner.run(() -> ()) -> ()", name: "run(_:_:)") == nil, "parameters that do not match the name's labels")
-        #expect(CorrectnessNoDiscardedTryOptional.Signature(demangled: "Control.Runner.run(label: () -> ()) -> ()", name: "run(_:)") == nil, "a printed label that is not the name's")
-        #expect(CorrectnessNoDiscardedTryOptional.Signature(demangled: "run #1 (() -> ()) -> () in Control.start() -> ()", name: "run(_:)") == nil, "a local function is not found by name")
-        #expect(CorrectnessNoDiscardedTryOptional.Signature(demangled: "Control.Runner.run(() -> ()", name: "run(_:)") == nil, "text that does not balance")
+        #expect(
+            CorrectnessNoDiscardedTryOptional.Signature(
+                demangled: "Control.Runner.run(() -> ()) -> ()",
+                name: "run(_:_:)",
+            ) == nil,
+            "parameters that do not match the name's labels",
+        )
+        #expect(
+            CorrectnessNoDiscardedTryOptional.Signature(
+                demangled: "Control.Runner.run(label: () -> ()) -> ()",
+                name: "run(_:)",
+            ) == nil,
+            "a printed label that is not the name's",
+        )
+        #expect(
+            CorrectnessNoDiscardedTryOptional.Signature(
+                demangled: "run #1 (() -> ()) -> () in Control.start() -> ()",
+                name: "run(_:)",
+            ) == nil,
+            "a local function is not found by name",
+        )
+        #expect(
+            CorrectnessNoDiscardedTryOptional.Signature(demangled: "Control.Runner.run(() -> ()", name: "run(_:)")
+                == nil,
+            "text that does not balance",
+        )
     }
 
     @Test(arguments: [
@@ -379,21 +527,41 @@ extension EscapeHatchRuleTests {
         """
 
     @Test func theStandardLibrarysForEachDropsItsTryOptionalAndOursDoesNot() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-typed-\(UUID().uuidString)", isDirectory: true)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-typed-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-        try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try Self.discardPackageSource.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
+        try PipelineControlTests.manifest.write(
+            to: root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try Self.discardPackageSource.write(
+            to: sources.appendingPathComponent("Control.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"],
+            workingDirectory: root,
+        )
         var stream = Data()
-        _ = try await Pipeline(options: options, writer: ContractWriter { stream.append($0) }, workingDirectory: root).run()
+        _ = try await Pipeline(options: options, writer: ContractWriter { stream.append($0) }, workingDirectory: root)
+            .run()
         var found: [String] = []
         for line in stream.split(separator: UInt8(ascii: "\n")) {
             let record = try #require(try JSONSerialization.jsonObject(with: Data(line)) as? [String: Any])
-            if record["kind"] as? String == "finding", record["rule"] as? String == CorrectnessNoDiscardedTryOptional().name {
+            if record["kind"] as? String == "finding",
+                record["rule"] as? String == CorrectnessNoDiscardedTryOptional().name
+            {
                 found.append("\(record["messageId"] as? String ?? "")@\(record["line"] as? Int ?? 0)")
             }
         }
-        #expect(found == ["discardedTryOptional@12", "discardedTryOptionalInClosure@13"], "expected the statement and the standard library's forEach, not compactMap's or ours: \(found)")
+        #expect(
+            found == ["discardedTryOptional@12", "discardedTryOptionalInClosure@13"],
+            "expected the statement and the standard library's forEach, not compactMap's or ours: \(found)",
+        )
     }
 }

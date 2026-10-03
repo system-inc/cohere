@@ -63,12 +63,18 @@ import Foundation
             return unsafe unsafeBitCast(address, to: type)
         }
         unsafe loadDiagnostics = try symbol("clang_loadDiagnostics", as: CohereClangLoadDiagnostics.self)
-        unsafe numberOfDiagnostics = try symbol("clang_getNumDiagnosticsInSet", as: CohereClangGetNumDiagnosticsInSet.self)
+        unsafe numberOfDiagnostics = try symbol(
+            "clang_getNumDiagnosticsInSet",
+            as: CohereClangGetNumDiagnosticsInSet.self,
+        )
         unsafe diagnosticAt = try symbol("clang_getDiagnosticInSet", as: CohereClangGetDiagnosticInSet.self)
         unsafe disposeSet = try symbol("clang_disposeDiagnosticSet", as: CohereClangDisposeDiagnosticSet.self)
         unsafe severityOf = try symbol("clang_getDiagnosticSeverity", as: CohereClangGetDiagnosticSeverity.self)
         unsafe spellingOf = try symbol("clang_getDiagnosticSpelling", as: CohereClangGetDiagnosticSpelling.self)
-        unsafe categoryOf = try symbol("clang_getDiagnosticCategoryText", as: CohereClangGetDiagnosticCategoryText.self)
+        unsafe categoryOf = try symbol(
+            "clang_getDiagnosticCategoryText",
+            as: CohereClangGetDiagnosticCategoryText.self,
+        )
         unsafe locationOf = try symbol("clang_getDiagnosticLocation", as: CohereClangGetDiagnosticLocation.self)
         unsafe fileLocation = try symbol("clang_getFileLocation", as: CohereClangGetFileLocation.self)
         unsafe fileName = try symbol("clang_getFileName", as: CohereClangGetFileName.self)
@@ -79,9 +85,14 @@ import Foundation
     /* The libclang beside the `swift` that `xcrun` resolves: the toolchain that also builds the checked package. */
     static func toolchainLibraryPath(runner: ProcessRunner = ProcessRunner()) throws -> String {
         let result = try runner.run("xcrun", ["--find", "swift"], in: URL(fileURLWithPath: "/"))
-        let swift = String(decoding: result.standardOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        let swift = String(decoding: result.standardOutput, as: UTF8.self).trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
         guard result.succeeded, !swift.isEmpty else {
-            throw LoadFailure(description: "xcrun could not find swift, so there is no toolchain libclang to read diagnostics with: \(result.standardError)")
+            throw LoadFailure(
+                description:
+                    "xcrun could not find swift, so there is no toolchain libclang to read diagnostics with: \(result.standardError)"
+            )
         }
         return URL(fileURLWithPath: swift)
             .deletingLastPathComponent()
@@ -97,7 +108,9 @@ import Foundation
     func read(_ url: URL) throws -> [Diagnostic] {
         var error: Int32 = 0
         guard let set = unsafe loadDiagnostics(url.path, &error, nil) else {
-            throw LoadFailure(description: "\(url.path) could not be read as serialized diagnostics (libclang error \(error))")
+            throw LoadFailure(
+                description: "\(url.path) could not be read as serialized diagnostics (libclang error \(error))"
+            )
         }
         defer { unsafe disposeSet(set) }
         var diagnostics: [Diagnostic] = []
@@ -108,14 +121,16 @@ import Foundation
             var column: UInt32 = 0
             var offset: UInt32 = 0
             unsafe fileLocation(locationOf(diagnostic), &file, &line, &column, &offset)
-            unsafe diagnostics.append(Diagnostic(
-                file: file.map { unsafe text(fileName($0)) } ?? "",
-                line: Int(line),
-                column: Int(column),
-                severity: Self.severity(severityOf(diagnostic)),
-                message: text(spellingOf(diagnostic)),
-                group: text(categoryOf(diagnostic))
-            ))
+            unsafe diagnostics.append(
+                Diagnostic(
+                    file: file.map { unsafe text(fileName($0)) } ?? "",
+                    line: Int(line),
+                    column: Int(column),
+                    severity: Self.severity(severityOf(diagnostic)),
+                    message: text(spellingOf(diagnostic)),
+                    group: text(categoryOf(diagnostic)),
+                )
+            )
         }
         return diagnostics
     }
@@ -123,9 +138,9 @@ import Foundation
     /* libclang's CXDiagnosticSeverity: 0 ignored, 1 note, 2 warning, 3 error, 4 fatal. Notes and ignored diagnostics are not findings. */
     static func severity(_ raw: Int32) -> FindingRecord.Severity? {
         switch raw {
-        case 2: .warning
-        case 3, 4: .error
-        default: nil
+            case 2: .warning
+            case 3, 4: .error
+            default: nil
         }
     }
 

@@ -38,25 +38,63 @@ struct CorrectnessNoDefaultForOwnedEnumTests {
         symbols names: [String: String],
         matchedByOperator: Set<String> = [],
         ownedModules: Set<String> = ["Control"],
-        declarationNames: [String: String] = [:]
+        declarationNames: [String: String] = [:],
     ) -> [String] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Control", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Control",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         var occurrences: [FileSymbols.Occurrence] = []
         for token in file.tree.tokens(viewMode: .sourceAccurate) {
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
             if let symbol = names[token.text] {
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: symbol, name: declarationNames[token.text] ?? token.text, isReference: true))
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: symbol,
+                        name: declarationNames[token.text] ?? token.text,
+                        isReference: true,
+                    )
+                )
             }
             /* As the index records `Status.done`: the type a second time, at the element's own name. */
-            if let dot = token.previousToken(viewMode: .sourceAccurate), dot.text == ".", let type = dot.previousToken(viewMode: .sourceAccurate), type.text.first?.isUppercase == true, let symbol = names[type.text] {
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: symbol, name: type.text, isReference: true))
+            if let dot = token.previousToken(viewMode: .sourceAccurate), dot.text == ".",
+                let type = dot.previousToken(viewMode: .sourceAccurate), type.text.first?.isUppercase == true,
+                let symbol = names[type.text]
+            {
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: symbol,
+                        name: type.text,
+                        isReference: true,
+                    )
+                )
             }
             if matchedByOperator.contains(token.text) {
-                occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: patternOperator, name: "~=(_:_:)", isReference: true, isImplicit: true))
+                occurrences.append(
+                    FileSymbols.Occurrence(
+                        line: location.line,
+                        column: location.column,
+                        symbol: patternOperator,
+                        name: "~=(_:_:)",
+                        isReference: true,
+                        isImplicit: true,
+                    )
+                )
             }
         }
-        return CorrectnessNoDefaultForOwnedEnum().findings(in: file, symbols: FileSymbols(occurrences, ownedModules: ownedModules)).map { "\($0.line):\($0.column) \($0.message)" }
+        return CorrectnessNoDefaultForOwnedEnum().findings(
+            in: file,
+            symbols: FileSymbols(occurrences, ownedModules: ownedModules),
+        ).map { "\($0.line):\($0.column) \($0.message)" }
     }
 
     static let statusSymbols = ["running": running, "failed": failed, "done": done, "preferred": preferred]
@@ -98,7 +136,11 @@ struct CorrectnessNoDefaultForOwnedEnumTests {
             }
 
             """
-        #expect(Self.findings(source, symbols: Self.statusSymbolsWithType) == ["5:5 \(Self.message("Status"))", "10:5 \(Self.message("Status"))"])
+        #expect(
+            Self.findings(source, symbols: Self.statusSymbolsWithType) == [
+                "5:5 \(Self.message("Status"))", "10:5 \(Self.message("Status"))",
+            ]
+        )
     }
 
     /* A `let` binding, a `where` guard and a static member of the enum are still patterns on the enum once one leading-dot element anchors it. */
@@ -114,7 +156,11 @@ struct CorrectnessNoDefaultForOwnedEnumTests {
             }
 
             """
-        #expect(Self.findings(source, symbols: Self.statusSymbols, matchedByOperator: ["preferred"]) == ["6:5 \(Self.message("Status"))"])
+        #expect(
+            Self.findings(source, symbols: Self.statusSymbols, matchedByOperator: ["preferred"]) == [
+                "6:5 \(Self.message("Status"))"
+            ]
+        )
     }
 
     /* A nested enum is named with its parents, a generic enum's element ends in its signature, word substitutions spell the whole name, and a private enum's discriminator is read past. */
@@ -124,7 +170,10 @@ struct CorrectnessNoDefaultForOwnedEnumTests {
         ("s:7Control0A5StateO2onyA2CmF", "ControlState"),
         ("s:7Control6StatusO07runningB0yACSi_tcACmF", "Status"),
         ("s:7Control5OuterV5InnerO5alphayA2EmF", "Outer.Inner"),
-        ("s:7Control9StagePaneC14HandProbePhase33_B31C49341E9607FD1243C82440F7E8AALLO6movingyA2FmF", "StagePane.HandProbePhase"),
+        (
+            "s:7Control9StagePaneC14HandProbePhase33_B31C49341E9607FD1243C82440F7E8AALLO6movingyA2FmF",
+            "StagePane.HandProbePhase",
+        ),
     ])
     func theEnumIsNamedFromItsElementsSymbol(element: String, enumName: String) {
         let source = """
@@ -241,11 +290,19 @@ struct CorrectnessNoDefaultForOwnedEnumTests {
             }
 
             """
-        let symbols = Self.statusSymbols.merging(["part": Self.part, "simd_quatd": Self.quaternionInitializer]) { _, written in written }
+        let symbols = Self.statusSymbols.merging(["part": Self.part, "simd_quatd": Self.quaternionInitializer]) {
+            _,
+            written in written
+        }
         /* `quaternion` reads a member of a constructed value, which is not a constructor, so its default is still found. */
         let initializer = ["simd_quatd": "init(ix:iy:iz:r:)"]
-        #expect(Self.findings(source, symbols: symbols, declarationNames: initializer) == ["39:9 \(Self.message("Status"))"])
-        let constructed = source.replacingOccurrences(of: "SIMD4<Double>(0, 0, 0, 1).quaternion", with: "simd_quatd(ix: 1, iy: 0, iz: 0, r: 0)")
+        #expect(
+            Self.findings(source, symbols: symbols, declarationNames: initializer) == ["39:9 \(Self.message("Status"))"]
+        )
+        let constructed = source.replacingOccurrences(
+            of: "SIMD4<Double>(0, 0, 0, 1).quaternion",
+            with: "simd_quatd(ix: 1, iy: 0, iz: 0, r: 0)",
+        )
         #expect(Self.findings(constructed, symbols: symbols, declarationNames: initializer).isEmpty)
         /* The same lowercase call, resolved to something that is not an initializer, is a function call. */
         #expect(Self.findings(constructed, symbols: symbols) == ["39:9 \(Self.message("Status"))"])
@@ -319,11 +376,15 @@ struct CorrectnessNoDefaultForOwnedEnumTests {
             }
 
             """
-        let symbols = Self.statusSymbols.merging(["fallbackName": Self.fallbackName, "make": Self.make]) { _, written in written }
+        let symbols = Self.statusSymbols.merging(["fallbackName": Self.fallbackName, "make": Self.make]) { _, written in
+            written
+        }
         #expect(
             Self.findings(source, symbols: symbols) == [
-                "4:5 \(Self.message("Status"))", "8:5 \(Self.message("Status"))", "12:5 \(Self.message("Status"))", "16:5 \(Self.message("Status"))",
-                "20:5 \(Self.message("Status"))", "26:5 \(Self.message("Status"))", "30:5 \(Self.message("Status"))", "34:5 \(Self.message("Status"))",
+                "4:5 \(Self.message("Status"))", "8:5 \(Self.message("Status"))", "12:5 \(Self.message("Status"))",
+                "16:5 \(Self.message("Status"))",
+                "20:5 \(Self.message("Status"))", "26:5 \(Self.message("Status"))", "30:5 \(Self.message("Status"))",
+                "34:5 \(Self.message("Status"))",
             ]
         )
     }
@@ -357,7 +418,12 @@ struct CorrectnessNoDefaultForOwnedEnumTests {
             }
 
             """
-        #expect(Self.findings(source, symbols: ["leaf": Self.leaf, "red": Self.red, "some": Self.optionalSome, "running": Self.running]).isEmpty)
+        #expect(
+            Self.findings(
+                source,
+                symbols: ["leaf": Self.leaf, "red": Self.red, "some": Self.optionalSome, "running": Self.running],
+            ).isEmpty
+        )
     }
 
     /* `@unknown default` still warns on a case not listed, so it is a different statement. */
@@ -390,7 +456,9 @@ struct CorrectnessNoDefaultForOwnedEnumTests {
 
             """
         #expect(Self.findings(source, symbols: Self.statusSymbols, ownedModules: ["Vendor"]).isEmpty)
-        #expect(Self.findings(source, symbols: ["some": Self.optionalSome], ownedModules: ["Control", "Swift"]).isEmpty)
+        #expect(
+            Self.findings(source, symbols: ["some": Self.optionalSome], ownedModules: ["Control", "Swift"]).isEmpty
+        )
     }
 
     /*
@@ -438,17 +506,30 @@ struct CorrectnessNoDefaultForOwnedEnumTests {
         ("s:7Control0A5StateO2onyA2CmF", "s:7Control0A5StateO", "ControlState"),
     ])
     func anElementsSymbolReadsAsItsEnum(element: String, enumSymbol: String, enumName: String) {
-        #expect(CorrectnessNoDefaultForOwnedEnum.element(element) == CorrectnessNoDefaultForOwnedEnum.Element(enumSymbol: enumSymbol, enumName: enumName))
+        #expect(
+            CorrectnessNoDefaultForOwnedEnum.element(element)
+                == CorrectnessNoDefaultForOwnedEnum.Element(enumSymbol: enumSymbol, enumName: enumName)
+        )
     }
 
-    @Test(arguments: ["s:7Control6StatusO", "s:7Control6StatusO9preferredACvpZ", "s:7Control6StatusO4makeACyFZ", "s:7Control5PointV4zeroACvpZ", "s:Sq4someyxSgxcABmlF", "s:7Control6StatusO007running", "c:@M@Control@E@Bridged"])
+    @Test(arguments: [
+        "s:7Control6StatusO", "s:7Control6StatusO9preferredACvpZ", "s:7Control6StatusO4makeACyFZ",
+        "s:7Control5PointV4zeroACvpZ", "s:Sq4someyxSgxcABmlF", "s:7Control6StatusO007running", "c:@M@Control@E@Bridged",
+    ])
     func otherSymbolsDoNotReadAsAnElement(symbol: String) {
         #expect(CorrectnessNoDefaultForOwnedEnum.element(symbol) == nil)
     }
 
     @Test func aFileWithNoDefaultDoesNotApply() {
         let source = "func describe(status: Status) {\n    switch status {\n    case .running: break\n    }\n}\n"
-        let file = ParsedFile(url: URL(fileURLWithPath: "/Plain.swift"), targetName: "Control", targetKind: "regular", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: URL(fileURLWithPath: "/Plain.swift"),
+            targetName: "Control",
+            targetKind: "regular",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         #expect(!CorrectnessNoDefaultForOwnedEnum().applies(to: file))
     }
 
@@ -532,25 +613,52 @@ struct CorrectnessNoDefaultForOwnedEnumTests {
         """
 
     @Test func aDefaultOverOurEnumIsFlaggedAndTheLookAlikesAreNot() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-typed-\(UUID().uuidString)", isDirectory: true)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-typed-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-        try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try Self.packageSource.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
+        try PipelineControlTests.manifest.write(
+            to: root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try Self.packageSource.write(
+            to: sources.appendingPathComponent("Control.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
 
         /* One run builds the package and writes its index. The rule is not registered here, so it is run by hand on what the run left. */
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"],
+            workingDirectory: root,
+        )
         _ = try await Pipeline(options: options, writer: ContractWriter { _ in }, workingDirectory: root).run()
-        let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: ProcessRunner())
+        let package = try PackageModel.load(
+            root: root,
+            scratchPath: Pipeline.scratchPath(for: root),
+            runner: ProcessRunner(),
+        )
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
         let candidates = parsed.files.filter { CorrectnessNoDefaultForOwnedEnum().applies(to: $0) }
-        var provider = SymbolProvider(scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root), runner: ProcessRunner())
+        var provider = SymbolProvider(
+            scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root),
+            runner: ProcessRunner(),
+        )
         provider.ownedModules = Pipeline.ownedModules(of: package)
         let symbols = provider.symbols(for: candidates)
         #expect(symbols.fromIndex == 1, "the build's index should describe the file: \(symbols.unavailable)")
         let found = candidates.flatMap { file in
-            CorrectnessNoDefaultForOwnedEnum().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.line):\($0.column)" }
+            CorrectnessNoDefaultForOwnedEnum().findings(
+                in: file,
+                symbols: symbols.symbols[file.url.path] ?? FileSymbols([]),
+            ).map { "\($0.line):\($0.column)" }
         }
-        #expect(found == ["16:5", "61:9", "66:9"], "expected the defaults over Status that decide, and not its projections or the look-alikes: \(found)")
+        #expect(
+            found == ["16:5", "61:9", "66:9"],
+            "expected the defaults over Status that decide, and not its projections or the look-alikes: \(found)",
+        )
     }
 }

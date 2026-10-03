@@ -1,4 +1,5 @@
 import Foundation
+
 /*
  Runs every rule over the files in scope and accounts for what each rule did.
 
@@ -21,7 +22,12 @@ struct Linter {
 
     /* `manifests` holds each owned package's parsed `Package.swift`, keyed by the package root's path; vendored packages are absent and never checked. */
     /* `reusable` holds, by path, what the fix phase's last walk found per rule in exactly the text being linted; those files are not walked again. */
-    func run(package: PackageModel, manifests: [String: ParsedFile], files: [ParsedFile], reusable: [String: [String: [FindingRecord]]] = [:]) async -> Result {
+    func run(
+        package: PackageModel,
+        manifests: [String: ParsedFile],
+        files: [ParsedFile],
+        reusable: [String: [String: [FindingRecord]]] = [:],
+    ) async -> Result {
         let ownedPackages = package.allPackages.filter { $0.root == package.root || !package.isVendored($0) }
         var findings: [FindingRecord] = []
         var listening: [String: Int] = [:]
@@ -38,7 +44,9 @@ struct Linter {
             rulesRun += 1
             for member in ownedPackages {
                 listening[rule.name, default: 0] += 1
-                let found = rule.findings(in: member, manifest: manifests[member.root.path]).map { Self.applying(severity, to: $0) }
+                let found = rule.findings(in: member, manifest: manifests[member.root.path]).map {
+                    Self.applying(severity, to: $0)
+                }
                 reporting[rule.name, default: 0] += found.count
                 findings.append(contentsOf: found)
             }
@@ -93,13 +101,19 @@ struct Linter {
             }
         }
 
-        let ranNames = (RuleRegistry.packageRules.map(\.name) + fileRules.map(\.name) + typedRules.map(\.name)).filter { scopedOff[$0] == nil }
+        let ranNames = (RuleRegistry.packageRules.map(\.name) + fileRules.map(\.name) + typedRules.map(\.name)).filter {
+            scopedOff[$0] == nil
+        }
         /* A file a typed rule applies to and no source of symbols described: nothing that rule would say about it was said. */
         let unchecked = files.filter { file in
             symbols.unavailable[file.url.path] != nil && enabledTyped.contains { $0.applies(to: file) }
         }
         let crashes = unchecked.map { file in
-            LintRecord.Crash(file: file.url.path, error: "the typed rules could not read what its names resolve to: \(symbols.unavailable[file.url.path] ?? "")")
+            LintRecord.Crash(
+                file: file.url.path,
+                error:
+                    "the typed rules could not read what its names resolve to: \(symbols.unavailable[file.url.path] ?? "")",
+            )
         }
         let silent = ranNames.filter { (listening[$0] ?? 0) == 0 }.sorted()
         let watchedAndQuiet = ranNames.filter { (listening[$0] ?? 0) > 0 && (reporting[$0] ?? 0) == 0 }.count
@@ -116,7 +130,7 @@ struct Linter {
             crashes: crashes,
             rulesScopedOff: scopedOff,
             rulesNotConfigured: [],
-            configurationNote: configuration.note
+            configurationNote: configuration.note,
         )
         return Result(findings: findings, record: record)
     }

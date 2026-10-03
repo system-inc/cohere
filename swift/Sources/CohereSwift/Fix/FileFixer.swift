@@ -66,12 +66,17 @@ struct FileFixer {
                 source: result.text,
                 tree: tree,
                 nodeCount: counter.count,
-                packageRoot: current.packageRoot
+                packageRoot: current.packageRoot,
             )
             applied += result.applied
             /* The text moved past what this pass found; only a later pass over it can stand for lint. */
             findingsOfFinalText = nil
         }
-        return Result(file: current, applied: applied, refusalsByReason: refusals.filter { $0.value > 0 }, findingsOfFinalText: findingsOfFinalText)
+        return Result(
+            file: current,
+            applied: applied,
+            refusalsByReason: refusals.filter { $0.value > 0 },
+            findingsOfFinalText: findingsOfFinalText,
+        )
     }
 }

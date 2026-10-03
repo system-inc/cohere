@@ -185,29 +185,85 @@ import IndexStoreShim
         unsafe unitsApply = try symbol("indexstore_store_units_apply_f", as: CohereIndexStoreUnitsApply.self)
         unsafe unitReaderCreate = try symbol("indexstore_unit_reader_create", as: CohereIndexUnitReaderCreate.self)
         unsafe unitReaderDispose = try symbol("indexstore_unit_reader_dispose", as: CohereIndexUnitReaderDispose.self)
-        unsafe unitMainFile = try symbol("indexstore_unit_reader_get_main_file", as: CohereIndexUnitReaderGetMainFile.self)
-        unsafe unitModuleName = try symbol("indexstore_unit_reader_get_module_name", as: CohereIndexUnitReaderGetModuleName.self)
-        unsafe unitOutputFile = try symbol("indexstore_unit_reader_get_output_file", as: CohereIndexUnitReaderGetOutputFile.self)
-        unsafe unitIsSystem = try symbol("indexstore_unit_reader_is_system_unit", as: CohereIndexUnitReaderIsSystemUnit.self)
-        unsafe dependenciesApply = try symbol("indexstore_unit_reader_dependencies_apply_f", as: CohereIndexUnitReaderDependenciesApply.self)
-        unsafe dependencyKind = try symbol("indexstore_unit_dependency_get_kind", as: CohereIndexUnitDependencyGetKind.self)
-        unsafe dependencyName = try symbol("indexstore_unit_dependency_get_name", as: CohereIndexUnitDependencyGetName.self)
-        unsafe dependencyFilePath = try symbol("indexstore_unit_dependency_get_filepath", as: CohereIndexUnitDependencyGetFilePath.self)
-        unsafe dependencyModuleName = try symbol("indexstore_unit_dependency_get_modulename", as: CohereIndexUnitDependencyGetModuleName.self)
-        unsafe recordReaderCreate = try symbol("indexstore_record_reader_create", as: CohereIndexRecordReaderCreate.self)
-        unsafe recordReaderDispose = try symbol("indexstore_record_reader_dispose", as: CohereIndexRecordReaderDispose.self)
-        unsafe occurrencesApply = try symbol("indexstore_record_reader_occurrences_apply_f", as: CohereIndexRecordReaderOccurrencesApply.self)
-        unsafe occurrenceSymbol = try symbol("indexstore_occurrence_get_symbol", as: CohereIndexOccurrenceGetSymbol.self)
+        unsafe unitMainFile = try symbol(
+            "indexstore_unit_reader_get_main_file",
+            as: CohereIndexUnitReaderGetMainFile.self,
+        )
+        unsafe unitModuleName = try symbol(
+            "indexstore_unit_reader_get_module_name",
+            as: CohereIndexUnitReaderGetModuleName.self,
+        )
+        unsafe unitOutputFile = try symbol(
+            "indexstore_unit_reader_get_output_file",
+            as: CohereIndexUnitReaderGetOutputFile.self,
+        )
+        unsafe unitIsSystem = try symbol(
+            "indexstore_unit_reader_is_system_unit",
+            as: CohereIndexUnitReaderIsSystemUnit.self,
+        )
+        unsafe dependenciesApply = try symbol(
+            "indexstore_unit_reader_dependencies_apply_f",
+            as: CohereIndexUnitReaderDependenciesApply.self,
+        )
+        unsafe dependencyKind = try symbol(
+            "indexstore_unit_dependency_get_kind",
+            as: CohereIndexUnitDependencyGetKind.self,
+        )
+        unsafe dependencyName = try symbol(
+            "indexstore_unit_dependency_get_name",
+            as: CohereIndexUnitDependencyGetName.self,
+        )
+        unsafe dependencyFilePath = try symbol(
+            "indexstore_unit_dependency_get_filepath",
+            as: CohereIndexUnitDependencyGetFilePath.self,
+        )
+        unsafe dependencyModuleName = try symbol(
+            "indexstore_unit_dependency_get_modulename",
+            as: CohereIndexUnitDependencyGetModuleName.self,
+        )
+        unsafe recordReaderCreate = try symbol(
+            "indexstore_record_reader_create",
+            as: CohereIndexRecordReaderCreate.self,
+        )
+        unsafe recordReaderDispose = try symbol(
+            "indexstore_record_reader_dispose",
+            as: CohereIndexRecordReaderDispose.self,
+        )
+        unsafe occurrencesApply = try symbol(
+            "indexstore_record_reader_occurrences_apply_f",
+            as: CohereIndexRecordReaderOccurrencesApply.self,
+        )
+        unsafe occurrenceSymbol = try symbol(
+            "indexstore_occurrence_get_symbol",
+            as: CohereIndexOccurrenceGetSymbol.self,
+        )
         unsafe occurrenceRoles = try symbol("indexstore_occurrence_get_roles", as: CohereIndexOccurrenceGetRoles.self)
-        unsafe occurrenceLineColumn = try symbol("indexstore_occurrence_get_line_col", as: CohereIndexOccurrenceGetLineColumn.self)
-        unsafe relationsApply = try symbol("indexstore_occurrence_relations_apply_f", as: CohereIndexOccurrenceRelationsApply.self)
-        unsafe relationRoles = try symbol("indexstore_symbol_relation_get_roles", as: CohereIndexSymbolRelationGetRoles.self)
-        unsafe relationSymbol = try symbol("indexstore_symbol_relation_get_symbol", as: CohereIndexSymbolRelationGetSymbol.self)
+        unsafe occurrenceLineColumn = try symbol(
+            "indexstore_occurrence_get_line_col",
+            as: CohereIndexOccurrenceGetLineColumn.self,
+        )
+        unsafe relationsApply = try symbol(
+            "indexstore_occurrence_relations_apply_f",
+            as: CohereIndexOccurrenceRelationsApply.self,
+        )
+        unsafe relationRoles = try symbol(
+            "indexstore_symbol_relation_get_roles",
+            as: CohereIndexSymbolRelationGetRoles.self,
+        )
+        unsafe relationSymbol = try symbol(
+            "indexstore_symbol_relation_get_symbol",
+            as: CohereIndexSymbolRelationGetSymbol.self,
+        )
         unsafe symbolName = try symbol("indexstore_symbol_get_name", as: CohereIndexSymbolGetString.self)
         unsafe symbolIdentifier = try symbol("indexstore_symbol_get_usr", as: CohereIndexSymbolGetString.self)
         unsafe symbolKind = try symbol("indexstore_symbol_get_kind", as: CohereIndexSymbolGetKind.self)
-        guard FileManager.default.fileExists(atPath: storePath.appendingPathComponent("v5/units").path), let store = unsafe create(storePath.path, nil) else {
-            throw Failure(description: "no index store at \(storePath.path): the build wrote none, or wrote it where this engine does not look")
+        guard FileManager.default.fileExists(atPath: storePath.appendingPathComponent("v5/units").path),
+            let store = unsafe create(storePath.path, nil)
+        else {
+            throw Failure(
+                description:
+                    "no index store at \(storePath.path): the build wrote none, or wrote it where this engine does not look"
+            )
         }
         unsafe self.store = store
         self.storePath = storePath
@@ -220,7 +276,8 @@ import IndexStoreShim
     /* The library beside the `swift` that `xcrun` resolves. */
     static func toolchainLibraryPath(runner: ProcessRunner = ProcessRunner()) throws -> String {
         let library = try SerializedDiagnosticsReader.toolchainLibraryPath(runner: runner)
-        return URL(fileURLWithPath: library).deletingLastPathComponent().appendingPathComponent("libIndexStore.dylib").path
+        return URL(fileURLWithPath: library).deletingLastPathComponent().appendingPathComponent("libIndexStore.dylib")
+            .path
     }
 
     /* The store a build into this scratch path writes. */
@@ -231,19 +288,24 @@ import IndexStoreShim
     /* Every name in the file and what it resolves to, or nil when no unit newer than the file describes it. */
     func symbols(of file: URL) -> FileSymbols? {
         let path = file.resolvingSymlinksInPath().path
-        let sourceModified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantFuture
-        guard let newest = records()[path]?.filter({ $0.written >= sourceModified }).max(by: { $0.written < $1.written }) else { return nil }
+        let sourceModified =
+            (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantFuture
+        guard
+            let newest = records()[path]?.filter({ $0.written >= sourceModified }).max(by: { $0.written < $1.written })
+        else { return nil }
         guard let recorded = occurrences(inRecord: newest.record) else { return nil }
-        return FileSymbols(recorded.map { occurrence in
-            FileSymbols.Occurrence(
-                line: occurrence.line,
-                column: occurrence.column,
-                symbol: occurrence.symbol,
-                name: occurrence.name,
-                isReference: occurrence.isReference,
-                isImplicit: occurrence.isImplicit
-            )
-        })
+        return FileSymbols(
+            recorded.map { occurrence in
+                FileSymbols.Occurrence(
+                    line: occurrence.line,
+                    column: occurrence.column,
+                    symbol: occurrence.symbol,
+                    name: occurrence.name,
+                    isReference: occurrence.isReference,
+                    isImplicit: occurrence.isImplicit,
+                )
+            }
+        )
     }
 
     /*
@@ -251,11 +313,16 @@ import IndexStoreShim
      the stores, that names the file and was written after the file was. A file with none is absent: the build has
      not compiled it as it stands, so its record describes text that is no longer there.
      */
-    static func freshUnits(of files: [ParsedFile], in stores: [IndexStore]) -> [String: (store: IndexStore, unit: Unit)] {
+    static func freshUnits(
+        of files: [ParsedFile],
+        in stores: [IndexStore],
+    ) -> [String: (store: IndexStore, unit: Unit)] {
         let newest = newestUnits(in: stores)
         var fresh: [String: (store: IndexStore, unit: Unit)] = [:]
         for file in files {
-            let modified = (try? file.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantFuture
+            let modified =
+                (try? file.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+                ?? .distantFuture
             if let described = newest[file.url.resolvingSymlinksInPath().path], described.unit.written >= modified {
                 fresh[file.url.path] = described
             }
@@ -313,7 +380,9 @@ import IndexStoreShim
         let sdkRoots = SDKRoots()
         for name in unitNames() {
             guard let reading = readUnit(named: name) else { continue }
-            let written = (try? unitsDirectory.appendingPathComponent(name).resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let written =
+                (try? unitsDirectory.appendingPathComponent(name).resourceValues(forKeys: [.contentModificationDateKey])
+                    .contentModificationDate) ?? .distantPast
             var imported: [String] = []
             var own: [String] = []
             var all: [String] = []
@@ -321,34 +390,37 @@ import IndexStoreShim
             var files: [String] = []
             for dependency in reading.dependencies {
                 switch dependency {
-                case .module(let module):
-                    if !module.isEmpty {
-                        imported.append(module)
-                    }
-                case .record(let record, let file):
-                    all.append(record)
-                    recordFiles[record] = sdkRoots.canonical(file)
-                    /* The record of the unit's own file, matched by path: a unit's other records belong to files it only read. */
-                    if file == reading.mainFile {
-                        own.append(record)
-                    }
-                case .file(let file):
-                    files.append(sdkRoots.canonical(file))
+                    case .module(let module):
+                        if !module.isEmpty {
+                            imported.append(module)
+                        }
+                    case .record(let record, let file):
+                        all.append(record)
+                        recordFiles[record] = sdkRoots.canonical(file)
+                        /* The record of the unit's own file, matched by path: a unit's other records belong to files it only read. */
+                        if file == reading.mainFile {
+                            own.append(record)
+                        }
+                    case .file(let file):
+                        files.append(sdkRoots.canonical(file))
                 }
             }
-            units.append(Unit(
-                name: name,
-                mainFile: reading.mainFile.isEmpty ? "" : URL(fileURLWithPath: reading.mainFile).resolvingSymlinksInPath().path,
-                module: reading.module,
-                outputFile: reading.outputFile,
-                isSystem: reading.isSystem,
-                written: written,
-                importedModules: imported,
-                ownRecords: own,
-                allRecords: all,
-                recordFiles: recordFiles,
-                files: files
-            ))
+            units.append(
+                Unit(
+                    name: name,
+                    mainFile: reading.mainFile.isEmpty
+                        ? "" : URL(fileURLWithPath: reading.mainFile).resolvingSymlinksInPath().path,
+                    module: reading.module,
+                    outputFile: reading.outputFile,
+                    isSystem: reading.isSystem,
+                    written: written,
+                    importedModules: imported,
+                    ownRecords: own,
+                    allRecords: all,
+                    recordFiles: recordFiles,
+                    files: files,
+                )
+            )
         }
         cachedUnits = units
         return units
@@ -376,19 +448,26 @@ import IndexStoreShim
                 unsafe Self.forEach(in: occurrence, relationsApply) { relation in
                     let relationRoles = unsafe relationRoles(relation)
                     if relationRoles & Self.readRelations != 0 {
-                        related.append(Relation(roles: relationRoles, symbol: unsafe Self.text(symbolIdentifier(relationSymbol(relation)))))
+                        related.append(
+                            Relation(
+                                roles: relationRoles,
+                                symbol: unsafe Self.text(symbolIdentifier(relationSymbol(relation))),
+                            )
+                        )
                     }
                 }
             }
-            unsafe occurrences.append(RecordOccurrence(
-                line: Int(line),
-                column: Int(column),
-                symbol: Self.text(symbolIdentifier(symbol)),
-                name: Self.text(symbolName(symbol)),
-                roles: roles,
-                kind: Int32(symbolKind(symbol)),
-                relations: related
-            ))
+            unsafe occurrences.append(
+                RecordOccurrence(
+                    line: Int(line),
+                    column: Int(column),
+                    symbol: Self.text(symbolIdentifier(symbol)),
+                    name: Self.text(symbolName(symbol)),
+                    roles: roles,
+                    kind: Int32(symbolKind(symbol)),
+                    relations: related,
+                )
+            )
         }
         return occurrences
     }
@@ -405,14 +484,19 @@ import IndexStoreShim
         var dependencies: [Dependency] = []
         unsafe Self.forEach(in: reader, dependenciesApply) { dependency in
             switch unsafe dependencyKind(dependency) {
-            case Self.unitDependency:
-                dependencies.append(.module(unsafe Self.text(dependencyModuleName(dependency))))
-            case Self.recordDependency:
-                dependencies.append(unsafe .record(name: Self.text(dependencyName(dependency)), file: Self.text(dependencyFilePath(dependency))))
-            case Self.fileDependency:
-                dependencies.append(.file(unsafe Self.text(dependencyFilePath(dependency))))
-            default:
-                break
+                case Self.unitDependency:
+                    dependencies.append(.module(unsafe Self.text(dependencyModuleName(dependency))))
+                case Self.recordDependency:
+                    dependencies.append(
+                        unsafe .record(
+                            name: Self.text(dependencyName(dependency)),
+                            file: Self.text(dependencyFilePath(dependency)),
+                        )
+                    )
+                case Self.fileDependency:
+                    dependencies.append(.file(unsafe Self.text(dependencyFilePath(dependency))))
+                default:
+                    break
             }
         }
         return unsafe UnitReading(
@@ -420,7 +504,7 @@ import IndexStoreShim
             module: Self.text(unitModuleName(reader)),
             outputFile: Self.text(unitOutputFile(reader)),
             isSystem: unitIsSystem(reader),
-            dependencies: dependencies
+            dependencies: dependencies,
         )
     }
 
@@ -452,14 +536,16 @@ import IndexStoreShim
     private static func forEach(
         in reader: UnsafeMutableRawPointer,
         _ iterate: CohereIndexRecordReaderOccurrencesApply,
-        _ visit: (UnsafeMutableRawPointer) -> Void
+        _ visit: (UnsafeMutableRawPointer) -> Void,
     ) {
         unsafe withoutActuallyEscaping(visit) { visit in
             let visitor = unsafe Visitor(visit)
             unsafe withExtendedLifetime(visitor) {
                 _ = unsafe iterate(reader, Unmanaged.passUnretained(visitor).toOpaque()) { context, handle in
                     guard let context = unsafe context, let handle = unsafe handle else { return true }
-                    unsafe Unmanaged<Visitor<UnsafeMutableRawPointer>>.fromOpaque(context).takeUnretainedValue().visit(handle)
+                    unsafe Unmanaged<Visitor<UnsafeMutableRawPointer>>.fromOpaque(context).takeUnretainedValue().visit(
+                        handle
+                    )
                     return true
                 }
             }

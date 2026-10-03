@@ -30,7 +30,11 @@ struct FileSymbolsTests {
 
     @Test func anotherModulesExtensionIsNot() {
         #expect(!Self.isStandardLibrary("s:ST7ControlE6sorted2bySay7ElementQzGs7KeyPathCyADqd__G_tSLRd__lF"))
-        #expect(!Self.isStandardLibrary("s:ST10FoundationE6sorted5usingSay7ElementQzGqd___tAA14SortComparatorRd__AEQyd__AERSlF"))
+        #expect(
+            !Self.isStandardLibrary(
+                "s:ST10FoundationE6sorted5usingSay7ElementQzGqd___tAA14SortComparatorRd__AEQyd__AERSlF"
+            )
+        )
     }
 
     @Test func ourOwnDeclarationsAreNot() {
@@ -41,11 +45,23 @@ struct FileSymbolsTests {
     }
 
     @Test func aDeclarationOfOursKnowsItsModule() {
-        let element = FileSymbols.Occurrence(line: 1, column: 1, symbol: "s:7Control6StatusO7runningyA2CmF", name: "running", isReference: true)
+        let element = FileSymbols.Occurrence(
+            line: 1,
+            column: 1,
+            symbol: "s:7Control6StatusO7runningyA2CmF",
+            name: "running",
+            isReference: true,
+        )
         #expect(element.declaringModule == "Control")
         #expect(FileSymbols([element], ownedModules: ["Control"]).isOwned(element))
         #expect(!FileSymbols([element], ownedModules: ["Other"]).isOwned(element))
-        let standard = FileSymbols.Occurrence(line: 1, column: 1, symbol: "s:Sa5countSivp", name: "count", isReference: true)
+        let standard = FileSymbols.Occurrence(
+            line: 1,
+            column: 1,
+            symbol: "s:Sa5countSivp",
+            name: "count",
+            isReference: true,
+        )
         #expect(standard.declaringModule == nil)
     }
 }

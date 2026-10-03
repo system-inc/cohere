@@ -13,7 +13,14 @@ import Testing
 struct DuplicateImportsTests {
     static func findings(_ source: String) -> [FindingRecord] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         return DuplicateImports().findings(in: file)
     }
 
@@ -165,7 +172,10 @@ struct DuplicateImportsTests {
     }
 
     @Test func fixDeletesTheRepeatedLine() {
-        #expect(Self.fixed("import Foundation\nimport Dispatch\nimport Foundation\n\nlet value = 1\n") == "import Foundation\nimport Dispatch\n\nlet value = 1\n")
+        #expect(
+            Self.fixed("import Foundation\nimport Dispatch\nimport Foundation\n\nlet value = 1\n")
+                == "import Foundation\nimport Dispatch\n\nlet value = 1\n"
+        )
         #expect(Self.fixed("import A\nimport A\nimport A\n") == "import A\n")
         #expect(Self.fixed("import A\n#if DEBUG\n    import A\n#endif\n") == "import A\n#if DEBUG\n#endif\n")
         #expect(Self.fixed("import A\r\nimport A\r\nimport B\r\n") == "import A\r\nimport B\r\n")

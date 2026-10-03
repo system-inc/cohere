@@ -20,10 +20,17 @@ struct BuildInputSnapshotTests {
         let sources: URL
 
         init() throws {
-            root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-build-\(UUID().uuidString)", isDirectory: true)
+            root = FileManager.default.temporaryDirectory.appendingPathComponent(
+                "cohere-swift-build-\(UUID().uuidString)",
+                isDirectory: true,
+            )
             sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
             try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-            try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
+            try PipelineControlTests.manifest.write(
+                to: root.appendingPathComponent("Package.swift"),
+                atomically: true,
+                encoding: .utf8,
+            )
             try write(PipelineControlTests.cleanSource)
         }
 
@@ -33,7 +40,10 @@ struct BuildInputSnapshotTests {
 
         /* One `--no-fix` run: the types record's `build` words, and the compiler findings. */
         func run() async throws -> (build: String, compilerFindings: [String]) {
-            let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
+            let options = try CommandOptions.parse(
+                ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"],
+                workingDirectory: root,
+            )
             var lines = Data()
             let writer = ContractWriter { lines.append($0) }
             _ = try await Pipeline(options: options, writer: writer, workingDirectory: root).run()
@@ -66,16 +76,29 @@ struct BuildInputSnapshotTests {
         let package = try Package()
         _ = try await package.run()
         _ = try await package.run()
-        try package.write(PipelineControlTests.cleanSource.replacingOccurrences(of: "        value * 2", with: "        let text: Int = \"two\"\n        return value * text"))
+        try package.write(
+            PipelineControlTests.cleanSource.replacingOccurrences(
+                of: "        value * 2",
+                with: "        let text: Int = \"two\"\n        return value * text",
+            )
+        )
         let changed = try await package.run()
         #expect(!changed.build.contains(Self.reusedWords))
-        #expect(changed.compilerFindings.contains { $0.hasPrefix("5: cannot convert") }, "the planted error was not found: \(changed.compilerFindings)")
+        #expect(
+            changed.compilerFindings.contains { $0.hasPrefix("5: cannot convert") },
+            "the planted error was not found: \(changed.compilerFindings)",
+        )
     }
 
     /* A failed build is never the one reused: fixing the error after it must build again and come back clean. */
     @Test func aFailedBuildIsNeverReused() async throws {
         let package = try Package()
-        try package.write(PipelineControlTests.cleanSource.replacingOccurrences(of: "        value * 2", with: "        let text: Int = \"two\"\n        return value * text"))
+        try package.write(
+            PipelineControlTests.cleanSource.replacingOccurrences(
+                of: "        value * 2",
+                with: "        let text: Int = \"two\"\n        return value * text",
+            )
+        )
         _ = try await package.run()
         let again = try await package.run()
         #expect(!again.build.contains(Self.reusedWords), "a failed build's records were reused")
@@ -85,7 +108,11 @@ struct BuildInputSnapshotTests {
     @Test func aManifestEditBuilds() async throws {
         let package = try Package()
         _ = try await package.run()
-        try (PipelineControlTests.manifest + "// edited\n").write(to: package.root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
+        try (PipelineControlTests.manifest + "// edited\n").write(
+            to: package.root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
         #expect(!(try await package.run().build.contains(Self.reusedWords)))
     }
 
@@ -94,7 +121,8 @@ struct BuildInputSnapshotTests {
         let package = try Package()
         _ = try await package.run()
         let scratch = Pipeline.scratchPath(for: package.root)
-        let records = FileManager.default.enumerator(at: scratch, includingPropertiesForKeys: nil)?
+        let records =
+            FileManager.default.enumerator(at: scratch, includingPropertiesForKeys: nil)?
             .compactMap { $0 as? URL }
             .filter { $0.pathExtension == "dia" && $0.lastPathComponent.hasPrefix("Control") } ?? []
         #expect(!records.isEmpty, "found no record to remove, so this test would prove nothing")
@@ -110,7 +138,8 @@ struct BuildInputSnapshotTests {
         let package = try Package()
         let first = try await package.run()
         let scratch = Pipeline.scratchPath(for: package.root)
-        let records = FileManager.default.enumerator(at: scratch, includingPropertiesForKeys: nil)?
+        let records =
+            FileManager.default.enumerator(at: scratch, includingPropertiesForKeys: nil)?
             .compactMap { $0 as? URL }
             .filter { $0.pathExtension == "dia" && $0.lastPathComponent.hasPrefix("Control") } ?? []
         #expect(!records.isEmpty, "found no record to corrupt, so this test would prove nothing")
@@ -124,15 +153,32 @@ struct BuildInputSnapshotTests {
 
     @Test func theSnapshotSeesSizeAndTime() throws {
         let package = try Package()
-        let take = { BuildInputSnapshot.take(roots: [package.root], resolved: package.root.appendingPathComponent("Package.resolved"), toolchain: "t", arguments: ["a"]) }
+        let take = {
+            BuildInputSnapshot.take(
+                roots: [package.root],
+                resolved: package.root.appendingPathComponent("Package.resolved"),
+                toolchain: "t",
+                arguments: ["a"],
+            )
+        }
         let first = take()
         #expect(take() == first, "two snapshots of an unchanged tree differ")
         try package.write(PipelineControlTests.cleanSource + "// longer\n")
         #expect(take() != first)
-        #expect(BuildInputSnapshot.take(roots: [package.root], resolved: package.root.appendingPathComponent("Package.resolved"), toolchain: "u", arguments: ["a"]) != take())
+        #expect(
+            BuildInputSnapshot.take(
+                roots: [package.root],
+                resolved: package.root.appendingPathComponent("Package.resolved"),
+                toolchain: "u",
+                arguments: ["a"],
+            ) != take()
+        )
     }
 
-    static let plantedError = PipelineControlTests.cleanSource.replacingOccurrences(of: "        value * 2", with: "        let text: Int = \"two\"\n        return value * text")
+    static let plantedError = PipelineControlTests.cleanSource.replacingOccurrences(
+        of: "        value * 2",
+        with: "        let text: Int = \"two\"\n        return value * text",
+    )
 
     /*
      An edit inside a function body is checked by sourcekitd in this process, never built, and its error is
@@ -145,8 +191,14 @@ struct BuildInputSnapshotTests {
         _ = try await package.run()
         try package.write(Self.plantedError)
         let planted = try await package.run()
-        #expect(planted.build.contains(TypesPhase.checkedInProcessWords), "a body-only edit was built: \(planted.build)")
-        #expect(planted.compilerFindings.contains { $0.hasPrefix("5: cannot convert") }, "the planted error was not found: \(planted.compilerFindings)")
+        #expect(
+            planted.build.contains(TypesPhase.checkedInProcessWords),
+            "a body-only edit was built: \(planted.build)",
+        )
+        #expect(
+            planted.compilerFindings.contains { $0.hasPrefix("5: cannot convert") },
+            "the planted error was not found: \(planted.compilerFindings)",
+        )
         let again = try await package.run()
         #expect(again.compilerFindings == planted.compilerFindings)
         try package.write(PipelineControlTests.cleanSource + "\n")
@@ -159,9 +211,17 @@ struct BuildInputSnapshotTests {
     @Test func anInterfaceEditBuilds() async throws {
         let package = try Package()
         _ = try await package.run()
-        try package.write(PipelineControlTests.cleanSource.replacingOccurrences(of: "func doubled() -> Int {\n        value * 2", with: "func doubled() -> Double {\n        Double(value) * 2"))
+        try package.write(
+            PipelineControlTests.cleanSource.replacingOccurrences(
+                of: "func doubled() -> Int {\n        value * 2",
+                with: "func doubled() -> Double {\n        Double(value) * 2",
+            )
+        )
         let edited = try await package.run()
-        #expect(!edited.build.contains(TypesPhase.checkedInProcessWords), "an interface edit was checked in process: \(edited.build)")
+        #expect(
+            !edited.build.contains(TypesPhase.checkedInProcessWords),
+            "an interface edit was checked in process: \(edited.build)",
+        )
         #expect(!edited.build.contains(Self.reusedWords))
         #expect(edited.compilerFindings.isEmpty)
     }
@@ -170,7 +230,11 @@ struct BuildInputSnapshotTests {
     @Test func aNewFileBuilds() async throws {
         let package = try Package()
         _ = try await package.run()
-        try "struct Added {}\n".write(to: package.sources.appendingPathComponent("Added.swift"), atomically: true, encoding: .utf8)
+        try "struct Added {}\n".write(
+            to: package.sources.appendingPathComponent("Added.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
         let added = try await package.run()
         #expect(!added.build.contains(TypesPhase.checkedInProcessWords))
         #expect(!added.build.contains(Self.reusedWords))

@@ -39,210 +39,219 @@ struct UnusedDeclarationsTests {
 
     static let files: [String: String] = [
         "Control/Helpers.swift": """
-            private func unusedHelper() -> Int { 1 }
-            fileprivate let unusedConstant = 3
-            private func countdown(_ count: Int) -> Int { count == 0 ? 0 : countdown(count - 1) }
-            private func usedHelper() -> Int { 2 }
+        private func unusedHelper() -> Int { 1 }
+        fileprivate let unusedConstant = 3
+        private func countdown(_ count: Int) -> Int { count == 0 ? 0 : countdown(count - 1) }
+        private func usedHelper() -> Int { 2 }
 
-            func entry() -> Int { usedHelper() }
-            func internalUnused() {}
+        func entry() -> Int { usedHelper() }
+        func internalUnused() {}
 
-            """,
+        """,
         "Control/Types.swift": """
-            /* Never built. */
-            private struct Lonely {
-                func inside() {}
-            }
+        /* Never built. */
+        private struct Lonely {
+            func inside() {}
+        }
 
-            private class Base {
-                func speak() {}
-            }
+        private class Base {
+            func speak() {}
+        }
 
-            private final class Derived: Base {
-                override func speak() {}
-            }
+        private final class Derived: Base {
+            override func speak() {}
+        }
 
-            func talk() {
-                Derived().speak()
-            }
+        func talk() {
+            Derived().speak()
+        }
 
-            """,
+        """,
         "Control/Panel.swift": """
-            import SwiftUI
+        import SwiftUI
 
-            struct Panel: View {
-                @State private var onlyProjected = false
+        struct Panel: View {
+            @State private var onlyProjected = false
 
-                var body: some View {
-                    Toggle("Flag", isOn: $onlyProjected)
-                }
+            var body: some View {
+                Toggle("Flag", isOn: $onlyProjected)
             }
+        }
 
-            private extension Panel {
-                func extensionHelper() {}
-            }
+        private extension Panel {
+            func extensionHelper() {}
+        }
 
-            """,
+        """,
         "Control/Payload.swift": """
-            import Foundation
+        import Foundation
 
-            private struct Payload: Codable {
-                var kept: Int
-                var neverRead = 0
+        private struct Payload: Codable {
+            var kept: Int
+            var neverRead = 0
 
-                private enum CodingKeys: String, CodingKey {
-                    case kept
-                    case neverRead
-                }
+            private enum CodingKeys: String, CodingKey {
+                case kept
+                case neverRead
             }
+        }
 
-            func encoded() -> Data? {
-                try? JSONEncoder().encode(Payload(kept: 1))
-            }
+        func encoded() -> Data? {
+            try? JSONEncoder().encode(Payload(kept: 1))
+        }
 
-            """,
+        """,
         "Control/Holder.swift": """
-            import Foundation
+        import Foundation
 
-            final class Holder {
-                private let token = NotificationCenter.default.addObserver(forName: nil, object: nil, queue: nil) { _ in }
-                private var plain = 0
-            }
+        final class Holder {
+            private let token = NotificationCenter.default.addObserver(forName: nil, object: nil, queue: nil) { _ in }
+            private var plain = 0
+        }
 
-            func makeHolder() -> Holder { Holder() }
+        func makeHolder() -> Holder { Holder() }
 
-            """,
+        """,
         "Control/Witness.swift": """
-            import AppKit
+        import AppKit
 
-            private struct Described: CustomStringConvertible {
-                var description: String { "described" }
-            }
+        private struct Described: CustomStringConvertible {
+            var description: String { "described" }
+        }
 
-            final class Target: NSObject {
-                @objc private func clicked() {}
-            }
+        final class Target: NSObject {
+            @objc private func clicked() {}
+        }
 
-            func describe() -> String { String(describing: Described()) }
+        func describe() -> String { String(describing: Described()) }
 
-            """,
+        """,
         "Control/Constants.swift": """
-            private struct Constants {
-                var scale: Float
-                var padding: Int32 = 0
-            }
+        private struct Constants {
+            var scale: Float
+            var padding: Int32 = 0
+        }
 
-            func constantsSize() -> Int { MemoryLayout<Constants>.stride + Int(Constants(scale: 1).scale) }
+        func constantsSize() -> Int { MemoryLayout<Constants>.stride + Int(Constants(scale: 1).scale) }
 
-            """,
+        """,
         "Control/Conformances.swift": """
-            import Foundation
+        import Foundation
 
-            protocol Stored: Codable {}
-            protocol Named {}
-            typealias Wire = Codable & Sendable
+        protocol Stored: Codable {}
+        protocol Named {}
+        typealias Wire = Codable & Sendable
 
-            private struct ViaOurs: Stored {
-                var kept = 0
-                var neverRead = 0
-            }
+        private struct ViaOurs: Stored {
+            var kept = 0
+            var neverRead = 0
+        }
 
-            private struct Wired: Wire {
-                var kept = 0
-                var neverRead = 0
-            }
+        private struct Wired: Wire {
+            var kept = 0
+            var neverRead = 0
+        }
 
-            private struct Tag: Named, Hashable {
-                var label = "tag"
-                var unusedField = 0
-            }
+        private struct Tag: Named, Hashable {
+            var label = "tag"
+            var unusedField = 0
+        }
 
-            final class Watcher: NSObject {
-                private var count = 0
-            }
+        final class Watcher: NSObject {
+            private var count = 0
+        }
 
-            struct Later {
-                private var hidden = 0
-            }
+        struct Later {
+            private var hidden = 0
+        }
 
-            func conformances() -> [Any] {
-                [ViaOurs().kept, Wired().kept, Tag().label, Watcher(), Later()]
-            }
+        func conformances() -> [Any] {
+            [ViaOurs().kept, Wired().kept, Tag().label, Watcher(), Later()]
+        }
 
-            """,
+        """,
         "Control/LaterEncoding.swift": """
-            extension Later: Encodable {
-                func encode(to encoder: any Encoder) throws {}
-            }
+        extension Later: Encodable {
+            func encode(to encoder: any Encoder) throws {}
+        }
 
-            """,
+        """,
         "Control/Conditional.swift": """
-            private func stamp() -> Int { 1 }
+        private func stamp() -> Int { 1 }
 
-            #if DEBUG
-            func debugStamp() -> Int { stamp() }
-            #endif
+        #if DEBUG
+        func debugStamp() -> Int { stamp() }
+        #endif
 
-            #if CONTROL_NEVER_SET
-            func unbuilt() -> Int { onlyInConditional() }
-            #endif
+        #if CONTROL_NEVER_SET
+        func unbuilt() -> Int { onlyInConditional() }
+        #endif
 
-            """,
+        """,
         "Control/Entry.swift": """
-            /* The library's API: public in a library product, so whoever depends on it may call it. */
-            public func run() -> Int {
-                talk()
-                _ = encoded()
-                _ = makeHolder()
-                _ = describe()
-                _ = conformances()
-                _ = Panel()
-                _ = Target()
-                return entry() + constantsSize() + Meter().report().count
-            }
+        /* The library's API: public in a library product, so whoever depends on it may call it. */
+        public func run() -> Int {
+            talk()
+            _ = encoded()
+            _ = makeHolder()
+            _ = describe()
+            _ = conformances()
+            _ = Panel()
+            _ = Target()
+            return entry() + constantsSize() + Meter().report().count
+        }
 
-            public func neverCalledButPublic() {}
+        public func neverCalledButPublic() {}
 
-            func onlyTests() -> Int { 1 }
+        func onlyTests() -> Int { 1 }
 
-            func onlyInConditional() -> Int { 1 }
+        func onlyInConditional() -> Int { 1 }
 
-            @propertyWrapper
-            struct Logged {
-                var wrappedValue: Int
-                var projectedValue: String { "logged" }
-            }
+        @propertyWrapper
+        struct Logged {
+            var wrappedValue: Int
+            var projectedValue: String { "logged" }
+        }
 
-            final class Meter {
-                @Logged private var level = 1
+        final class Meter {
+            @Logged private var level = 1
 
-                func report() -> String { $level }
-            }
+            func report() -> String { $level }
+        }
 
-            """,
+        """,
         "Tests/ControlTests/UsesTests.swift": """
-            import Testing
+        import Testing
 
-            @testable import Control
+        @testable import Control
 
-            @Test func callsTheFunctionOnlyTestsUse() {
-                #expect(onlyTests() == 1)
-            }
+        @Test func callsTheFunctionOnlyTestsUse() {
+            #expect(onlyTests() == 1)
+        }
 
-            """,
+        """,
     ]
 
     /* One `--no-fix --unused` run: each unused-declaration record as `file:line subject`, its coverage record, the phase, and how many findings carried the rule. */
     static func run() async throws -> (items: [String], coverage: [String: Any], phase: String, findings: Int) {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-unused-declarations-\(UUID().uuidString)", isDirectory: true)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-unused-declarations-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
         for (path, source) in files {
             let url = root.appendingPathComponent(path.hasPrefix("Tests/") ? path : "Sources/\(path)")
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true,
+            )
             try source.write(to: url, atomically: true, encoding: .utf8)
         }
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix", "--unused"], workingDirectory: root)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix", "--unused"],
+            workingDirectory: root,
+        )
         var stream = Data()
         let writer = ContractWriter { stream.append($0) }
         _ = try await Pipeline(options: options, writer: writer, workingDirectory: root).run()
@@ -253,17 +262,17 @@ struct UnusedDeclarationsTests {
         for line in stream.split(separator: UInt8(ascii: "\n")) {
             let record = try #require(try JSONSerialization.jsonObject(with: Data(line)) as? [String: Any])
             switch record["kind"] as? String {
-            case "unused" where record["rule"] as? String == UnusedDeclarations.ruleName:
-                let file = (record["file"] as? String ?? "").components(separatedBy: "/Sources/").last ?? ""
-                items.append("\(file):\(record["line"] as? Int ?? 0) \(record["subject"] as? String ?? "")")
-            case "unusedCoverage" where record["rule"] as? String == UnusedDeclarations.ruleName:
-                coverage = record
-            case "phase" where record["name"] as? String == "unused":
-                phase = record["outcome"] as? String ?? ""
-            case "finding" where record["rule"] as? String == UnusedDeclarations.ruleName:
-                findings += 1
-            default:
-                break
+                case "unused" where record["rule"] as? String == UnusedDeclarations.ruleName:
+                    let file = (record["file"] as? String ?? "").components(separatedBy: "/Sources/").last ?? ""
+                    items.append("\(file):\(record["line"] as? Int ?? 0) \(record["subject"] as? String ?? "")")
+                case "unusedCoverage" where record["rule"] as? String == UnusedDeclarations.ruleName:
+                    coverage = record
+                case "phase" where record["name"] as? String == "unused":
+                    phase = record["outcome"] as? String ?? ""
+                case "finding" where record["rule"] as? String == UnusedDeclarations.ruleName:
+                    findings += 1
+                default:
+                    break
             }
         }
         return (items, coverage, phase, findings)
@@ -293,7 +302,7 @@ struct UnusedDeclarationsTests {
                 "Control/Panel.swift:12 func extensionHelper()",
                 "Control/Types.swift:2 struct Lonely",
             ],
-            "\(run.items)"
+            "\(run.items)",
         )
         #expect(run.coverage["found"] as? Int == 8)
         let notChecked = run.coverage["filesNotChecked"] as? [String: Int] ?? [:]
@@ -311,7 +320,10 @@ struct UnusedDeclarationsTests {
         #expect(skipped[UnusedDeclarations.lifetime] == 1, "Holder's token: \(skipped)")
         #expect(skipped[UnusedDeclarations.objectiveC] == 1, "Target's @objc method: \(skipped)")
         #expect(skipped[UnusedDeclarations.layout] == 2, "Constants' two fields: \(skipped)")
-        #expect(skipped[UnusedDeclarations.overrides] == 4, "Derived's override and the witnesses Described.description, Panel.body and Later.encode(to:): \(skipped)")
+        #expect(
+            skipped[UnusedDeclarations.overrides] == 4,
+            "Derived's override and the witnesses Described.description, Panel.body and Later.encode(to:): \(skipped)",
+        )
         /*
          The package-wide kinds. `run` and `neverCalledButPublic` are public in a library product. `onlyInConditional`
          is named only in a `#if` branch the build never compiled. Target and Watcher descend from NSObject, which the
@@ -337,12 +349,22 @@ struct UnusedDeclarationsTests {
             private struct Inline { func first() {}; func second() {} }
 
             """
-        let file = ParsedFile(url: URL(fileURLWithPath: "/Removal.swift"), targetName: "Control", targetKind: "regular", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: URL(fileURLWithPath: "/Removal.swift"),
+            targetName: "Control",
+            targetKind: "regular",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         let function = try #require(file.tree.statements.compactMap { $0.item.as(FunctionDeclSyntax.self) }.first)
         let edit = UnusedDeclarations.removal(of: Syntax(function), in: file)
         var bytes = Array(source.utf8)
         bytes.replaceSubrange(edit.start..<edit.end, with: Array(edit.text.utf8))
-        #expect(String(decoding: bytes, as: UTF8.self) == "struct Kept {}\n\n// MARK: - Helpers\nprivate struct Inline { func first() {}; func second() {} }\n")
+        #expect(
+            String(decoding: bytes, as: UTF8.self)
+                == "struct Kept {}\n\n// MARK: - Helpers\nprivate struct Inline { func first() {}; func second() {} }\n"
+        )
 
         let inline = try #require(file.tree.statements.compactMap { $0.item.as(StructDeclSyntax.self) }.last)
         let member = try #require(inline.memberBlock.members.first?.decl)
@@ -363,12 +385,22 @@ struct UnusedDeclarationsTests {
             }
 
             """
-        let file = ParsedFile(url: URL(fileURLWithPath: "/Trailing.swift"), targetName: "Control", targetKind: "regular", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: URL(fileURLWithPath: "/Trailing.swift"),
+            targetName: "Control",
+            targetKind: "regular",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         let holder = try #require(file.tree.statements.compactMap { $0.item.as(ClassDeclSyntax.self) }.first)
         let member = try #require(holder.memberBlock.members.dropFirst().first?.decl)
         let edit = UnusedDeclarations.removal(of: Syntax(member), in: file)
         var bytes = Array(source.utf8)
         bytes.replaceSubrange(edit.start..<edit.end, with: Array(edit.text.utf8))
-        #expect(String(decoding: bytes, as: UTF8.self) == "final class Holder {\n    var kept = 0\n\n    var alsoKept = 1\n}\n")
+        #expect(
+            String(decoding: bytes, as: UTF8.self)
+                == "final class Holder {\n    var kept = 0\n\n    var alsoKept = 1\n}\n"
+        )
     }
 }

@@ -33,18 +33,21 @@ public struct FileLength: FileRule {
         guard !file.url.lastPathComponent.hasSuffix(".generated.swift") else { return [] }
         let lines = Self.lineCount(of: file.source)
         guard lines > Self.maximumLines else { return [] }
-        return [FindingRecord(
-            source: .rule,
-            file: file.url.path,
-            line: 1,
-            column: 1,
-            endLine: 1,
-            endColumn: 1,
-            severity: .error,
-            rule: name,
-            messageId: "tooManyLines",
-            message: "This file is \(lines) lines, over the \(Self.maximumLines) a file may hold. Split it along its seams, an extension per concern in Type+Purpose.swift or a helper type in its own file, so each part is one a reader can hold whole."
-        )]
+        return [
+            FindingRecord(
+                source: .rule,
+                file: file.url.path,
+                line: 1,
+                column: 1,
+                endLine: 1,
+                endColumn: 1,
+                severity: .error,
+                rule: name,
+                messageId: "tooManyLines",
+                message:
+                    "This file is \(lines) lines, over the \(Self.maximumLines) a file may hold. Split it along its seams, an extension per concern in Type+Purpose.swift or a helper type in its own file, so each part is one a reader can hold whole.",
+            )
+        ]
     }
 
     /* Line feeds, plus one for a last line that does not end in one. `\r\n` ends a line once. */

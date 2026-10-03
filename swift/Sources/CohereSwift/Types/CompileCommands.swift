@@ -58,8 +58,12 @@ struct CompileCommands {
         let listing: String
         do {
             listing = try String(contentsOf: priors, encoding: .utf8)
-        } catch {
-            throw ReadFailure(description: "the build left no \(priors.path), so this engine cannot tell which build description holds the compile arguments")
+        }
+        catch {
+            throw ReadFailure(
+                description:
+                    "the build left no \(priors.path), so this engine cannot tell which build description holds the compile arguments"
+            )
         }
         /* The list is written oldest first; the newest is the build that just ran. */
         guard let newest = listing.split(whereSeparator: \.isNewline).last else {
@@ -69,12 +73,19 @@ struct CompileCommands {
         let bytes: Data
         do {
             bytes = try Data(contentsOf: store)
-        } catch {
-            throw ReadFailure(description: "the newest build description has no task store at \(store.path), so the build system's layout has moved")
+        }
+        catch {
+            throw ReadFailure(
+                description:
+                    "the newest build description has no task store at \(store.path), so the build system's layout has moved"
+            )
         }
         let commands = try driverCommands(in: [UInt8](bytes)).map(command(from:))
         guard !commands.isEmpty else {
-            throw ReadFailure(description: "\(store.path) holds no Swift compile this engine recognises, so the build system's record format has moved")
+            throw ReadFailure(
+                description:
+                    "\(store.path) holds no Swift compile this engine recognises, so the build system's record format has moved"
+            )
         }
         return CompileCommands(commands: deduplicated(commands))
     }
@@ -154,7 +165,9 @@ struct CompileCommands {
         var keptModuleCache = false
         var remaining = driver[...]
         while let argument = remaining.popFirst() {
-            if flagsDropped.contains(argument) || (argument.hasPrefix("-j") && argument.dropFirst(2).allSatisfy(\.isNumber)) {
+            if flagsDropped.contains(argument)
+                || (argument.hasPrefix("-j") && argument.dropFirst(2).allSatisfy(\.isNumber))
+            {
                 continue
             }
             if flagsDroppedWithValue.contains(argument) {
@@ -181,10 +194,16 @@ struct CompileCommands {
                 let listed: String
                 do {
                     listed = try String(contentsOfFile: list, encoding: .utf8)
-                } catch {
-                    throw ReadFailure(description: "the compile of a module reads its files from \(list), and that file could not be read: \(error)")
                 }
-                let paths = listed.split(whereSeparator: \.isNewline).map { URL(fileURLWithPath: String($0)).resolvingSymlinksInPath().path }
+                catch {
+                    throw ReadFailure(
+                        description:
+                            "the compile of a module reads its files from \(list), and that file could not be read: \(error)"
+                    )
+                }
+                let paths = listed.split(whereSeparator: \.isNewline).map {
+                    URL(fileURLWithPath: String($0)).resolvingSymlinksInPath().path
+                }
                 files.append(contentsOf: paths)
                 arguments.append(contentsOf: paths)
                 continue
@@ -192,9 +211,16 @@ struct CompileCommands {
             arguments.append(argument)
         }
         guard !moduleName.isEmpty else {
-            throw ReadFailure(description: "a Swift compile in the build's task store names no module, so its record format has moved")
+            throw ReadFailure(
+                description: "a Swift compile in the build's task store names no module, so its record format has moved"
+            )
         }
-        return Command(moduleName: moduleName, arguments: arguments, files: files, testable: driver.contains("-entry-point-function-name"))
+        return Command(
+            moduleName: moduleName,
+            arguments: arguments,
+            files: files,
+            testable: driver.contains("-entry-point-function-name"),
+        )
     }
 
     private static func deduplicated(_ commands: [Command]) -> [Command] {
@@ -216,23 +242,23 @@ struct CompileCommands {
             let length: Int
             let headerSize: Int
             switch head {
-            case 0xA0...0xBF:
-                length = Int(head & 0x1F)
-                headerSize = 1
-            case 0xD9:
-                guard position + 1 < bytes.count else { return nil }
-                length = Int(bytes[position + 1])
-                headerSize = 2
-            case 0xDA:
-                guard position + 2 < bytes.count else { return nil }
-                length = Int(bytes[position + 1]) << 8 | Int(bytes[position + 2])
-                headerSize = 3
-            case 0xDB:
-                guard position + 4 < bytes.count else { return nil }
-                length = (position + 1...position + 4).reduce(0) { $0 << 8 | Int(bytes[$1]) }
-                headerSize = 5
-            default:
-                return nil
+                case 0xA0...0xBF:
+                    length = Int(head & 0x1F)
+                    headerSize = 1
+                case 0xD9:
+                    guard position + 1 < bytes.count else { return nil }
+                    length = Int(bytes[position + 1])
+                    headerSize = 2
+                case 0xDA:
+                    guard position + 2 < bytes.count else { return nil }
+                    length = Int(bytes[position + 1]) << 8 | Int(bytes[position + 2])
+                    headerSize = 3
+                case 0xDB:
+                    guard position + 4 < bytes.count else { return nil }
+                    length = (position + 1...position + 4).reduce(0) { $0 << 8 | Int(bytes[$1]) }
+                    headerSize = 5
+                default:
+                    return nil
             }
             let start = position + headerSize
             guard start + length <= bytes.count else { return nil }

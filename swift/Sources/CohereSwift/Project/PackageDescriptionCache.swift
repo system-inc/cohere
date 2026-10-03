@@ -49,17 +49,24 @@ struct PackageDescriptionCache {
 
     /* The cached answers for this root, only if every fingerprint still holds. */
     func members(root: URL, toolchain: String) -> [String: Member]? {
-        guard let data = try? Data(contentsOf: file), let entry = try? JSONDecoder().decode(Entry.self, from: data) else {
+        guard let data = try? Data(contentsOf: file), let entry = try? JSONDecoder().decode(Entry.self, from: data)
+        else {
             return nil
         }
-        guard entry.toolchain == toolchain, entry.resolved == Self.fingerprint(of: root.appendingPathComponent("Package.resolved")) else {
+        guard entry.toolchain == toolchain,
+            entry.resolved == Self.fingerprint(of: root.appendingPathComponent("Package.resolved"))
+        else {
             return nil
         }
         var byRoot: [String: Member] = [:]
         for member in entry.members {
             let memberRoot = URL(fileURLWithPath: member.root, isDirectory: true)
             guard member.manifest == Self.fingerprint(of: memberRoot.appendingPathComponent("Package.swift")),
-                let model = try? PackageModel(root: memberRoot, describeJson: member.describe, dumpPackageJson: member.dump),
+                let model = try? PackageModel(
+                    root: memberRoot,
+                    describeJson: member.describe,
+                    dumpPackageJson: member.dump,
+                ),
                 Self.directoryStates(of: model) == member.directories
             else {
                 return nil
@@ -79,14 +86,18 @@ struct PackageDescriptionCache {
                     manifest: Self.fingerprint(of: answer.root.appendingPathComponent("Package.swift")),
                     describe: answer.describe,
                     dump: answer.dump,
-                    directories: Self.directoryStates(of: answer.model)
+                    directories: Self.directoryStates(of: answer.model),
                 )
-            }
+            },
         )
         do {
-            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(
+                at: file.deletingLastPathComponent(),
+                withIntermediateDirectories: true,
+            )
             try JSONEncoder().encode(entry).write(to: file, options: .atomic)
-        } catch {
+        }
+        catch {
             /* Not written, so the next run describes cold: slower, and still right. Failing a run that already has its answer over a cache would trade the answer for speed. */
         }
     }
@@ -103,7 +114,8 @@ struct PackageDescriptionCache {
         let keys: [URLResourceKey] = [.isDirectoryKey, .contentModificationDateKey]
         for target in model.targets {
             states.append(state(of: target.directory))
-            guard let walker = FileManager.default.enumerator(at: target.directory, includingPropertiesForKeys: keys) else { continue }
+            guard let walker = FileManager.default.enumerator(at: target.directory, includingPropertiesForKeys: keys)
+            else { continue }
             for case let item as URL in walker {
                 guard (try? item.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else { continue }
                 states.append(state(of: item))

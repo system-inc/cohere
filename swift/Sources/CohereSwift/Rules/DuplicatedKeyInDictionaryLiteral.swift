@@ -49,7 +49,8 @@ public struct DuplicatedKeyInDictionaryLiteral: FileRule {
                 at: key,
                 rule: name,
                 messageId: "duplicatedDictionaryKey",
-                message: "This key already appears earlier in the same dictionary literal, which crashes at run time or silently drops one of the values. Delete this entry, or correct the key that was meant to be different."
+                message:
+                    "This key already appears earlier in the same dictionary literal, which crashes at run time or silently drops one of the values. Delete this entry, or correct the key that was meant to be different.",
             )
         }
     }
@@ -68,7 +69,8 @@ public struct DuplicatedKeyInDictionaryLiteral: FileRule {
                 let spelling = Self.spelling(of: element.key)
                 if seen.contains(spelling) {
                     found.append(element.key)
-                } else {
+                }
+                else {
                     seen.insert(spelling)
                 }
             }
@@ -90,7 +92,9 @@ public struct DuplicatedKeyInDictionaryLiteral: FileRule {
             if let string = expression.as(StringLiteralExprSyntax.self) {
                 return string.segments.allSatisfy { segment in
                     guard case .expressionSegment(let interpolation) = segment else { return true }
-                    guard interpolation.expressions.count == 1, let only = interpolation.expressions.first, only.label == nil else {
+                    guard interpolation.expressions.count == 1, let only = interpolation.expressions.first,
+                        only.label == nil
+                    else {
                         return false
                     }
                     return isSpellingDecided(only.expression)
@@ -98,7 +102,8 @@ public struct DuplicatedKeyInDictionaryLiteral: FileRule {
             }
             if let negated = expression.as(PrefixOperatorExprSyntax.self) {
                 return negated.operator.text == "-"
-                    && (negated.expression.is(IntegerLiteralExprSyntax.self) || negated.expression.is(FloatLiteralExprSyntax.self))
+                    && (negated.expression.is(IntegerLiteralExprSyntax.self)
+                        || negated.expression.is(FloatLiteralExprSyntax.self))
             }
             if let reference = expression.as(DeclReferenceExprSyntax.self) {
                 return reference.argumentNames == nil
@@ -130,10 +135,14 @@ public struct DuplicatedKeyInDictionaryLiteral: FileRule {
         /* `.nan`, `Double.nan`, `.signalingNaN`: never equal to themselves, so never a duplicate. */
         static func isNotANumber(_ expression: ExprSyntax) -> Bool {
             var inner = expression
-            while let parenthesized = inner.as(TupleExprSyntax.self), parenthesized.elements.count == 1, let only = parenthesized.elements.first {
+            while let parenthesized = inner.as(TupleExprSyntax.self), parenthesized.elements.count == 1,
+                let only = parenthesized.elements.first
+            {
                 inner = only.expression
             }
-            let lastName = inner.as(MemberAccessExprSyntax.self)?.declName.baseName.text ?? inner.as(DeclReferenceExprSyntax.self)?.baseName.text
+            let lastName =
+                inner.as(MemberAccessExprSyntax.self)?.declName.baseName.text
+                ?? inner.as(DeclReferenceExprSyntax.self)?.baseName.text
             return lastName == "nan" || lastName == "signalingNaN"
         }
 
@@ -147,8 +156,11 @@ public struct DuplicatedKeyInDictionaryLiteral: FileRule {
                     return true
                 }
             }
-            if let call = dictionary.parent?.parent?.parent?.as(FunctionCallExprSyntax.self), dictionary.parent?.is(LabeledExprSyntax.self) == true {
-                if call.calledExpression.trimmedDescription == "Mirror" || mentionsKeyValuePairs(call.calledExpression) {
+            if let call = dictionary.parent?.parent?.parent?.as(FunctionCallExprSyntax.self),
+                dictionary.parent?.is(LabeledExprSyntax.self) == true
+            {
+                if call.calledExpression.trimmedDescription == "Mirror" || mentionsKeyValuePairs(call.calledExpression)
+                {
                     return true
                 }
             }

@@ -31,7 +31,8 @@ public struct LintRecord: Codable, Equatable, Sendable {
 
     /* The contract spells this field `configNote`, which the Go front door reads; the Swift name is a full word and the wire name stays the contract's. */
     enum CodingKeys: String, CodingKey {
-        case kind, findings, rulesRun, filesWalked, nodesVisited, elapsedMilliseconds, reusedFrom, rulesSilent, rulesWatchedAndQuiet, crashes, rulesScopedOff, rulesNotConfigured
+        case kind, findings, rulesRun, filesWalked, nodesVisited, elapsedMilliseconds, reusedFrom, rulesSilent,
+            rulesWatchedAndQuiet, crashes, rulesScopedOff, rulesNotConfigured
         case configurationNote = "configNote"
     }
 
@@ -47,7 +48,7 @@ public struct LintRecord: Codable, Equatable, Sendable {
         crashes: [Crash],
         rulesScopedOff: [String: Int],
         rulesNotConfigured: [String],
-        configurationNote: String
+        configurationNote: String,
     ) {
         self.findings = findings
         self.rulesRun = rulesRun

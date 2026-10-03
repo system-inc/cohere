@@ -72,7 +72,8 @@ public struct FirstWhere: TypedFileRule {
                 at: call,
                 rule: name,
                 messageId: "firstWhere",
-                message: "Taking the first element of a filtered collection builds a whole new collection of every match only to keep one. Use first(where:) with the filter's predicate (joined by && with first's own, when it has one): it says what is meant, and it stops at the first match."
+                message:
+                    "Taking the first element of a filtered collection builds a whole new collection of every match only to keep one. Use first(where:) with the filter's predicate (joined by && with first's own, when it has one): it says what is meant, and it stops at the first match.",
             )
         }
     }
@@ -82,11 +83,18 @@ public struct FirstWhere: TypedFileRule {
      resolved to a declaration named in `filters` and the member to the standard library. The pair's one
      matcher, so the two rules read the same shape.
      */
-    static func filterCalls(reading member: String, filters: [String], in file: ParsedFile, symbols: FileSymbols) -> [FunctionCallExprSyntax] {
+    static func filterCalls(
+        reading member: String,
+        filters: [String],
+        in file: ParsedFile,
+        symbols: FileSymbols,
+    ) -> [FunctionCallExprSyntax] {
         let visitor = Visitor(member: member)
         visitor.walk(file.tree)
         return visitor.found.filter { candidate in
-            guard let resolvedFilter = Self.reference(at: candidate.filter, in: file, symbols: symbols), filters.contains(where: { resolvedFilter.symbol.hasPrefix($0) }) else {
+            guard let resolvedFilter = Self.reference(at: candidate.filter, in: file, symbols: symbols),
+                filters.contains(where: { resolvedFilter.symbol.hasPrefix($0) })
+            else {
                 return false
             }
             return Self.reference(at: candidate.member, in: file, symbols: symbols)?.isStandardLibrary == true
@@ -117,8 +125,12 @@ public struct FirstWhere: TypedFileRule {
         }
 
         override func visit(_ node: MemberAccessExprSyntax) -> SyntaxVisitorContinueKind {
-            if node.declName.baseName.text == member, node.declName.argumentNames == nil, let base = node.base, let filterCall = Self.filterCall(base) {
-                found.append(Candidate(call: filterCall.call, filter: filterCall.filter, member: node.declName.baseName))
+            if node.declName.baseName.text == member, node.declName.argumentNames == nil, let base = node.base,
+                let filterCall = Self.filterCall(base)
+            {
+                found.append(
+                    Candidate(call: filterCall.call, filter: filterCall.filter, member: node.declName.baseName)
+                )
             }
             return .visitChildren
         }
@@ -126,14 +138,20 @@ public struct FirstWhere: TypedFileRule {
         /* The call and `filter` name token of `items.filter { }`, `filter(predicate)`, or either inside one pair of parentheses. */
         static func filterCall(_ expression: ExprSyntax) -> (call: FunctionCallExprSyntax, filter: TokenSyntax)? {
             var callExpression = expression
-            if let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1, let only = tuple.elements.first, only.label == nil {
+            if let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1,
+                let only = tuple.elements.first, only.label == nil
+            {
                 callExpression = only.expression
             }
             guard let call = callExpression.as(FunctionCallExprSyntax.self) else { return nil }
-            if let calledMember = call.calledExpression.as(MemberAccessExprSyntax.self), calledMember.declName.baseName.text == "filter" {
+            if let calledMember = call.calledExpression.as(MemberAccessExprSyntax.self),
+                calledMember.declName.baseName.text == "filter"
+            {
                 return (call, calledMember.declName.baseName)
             }
-            if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self), reference.baseName.text == "filter" {
+            if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self),
+                reference.baseName.text == "filter"
+            {
                 return (call, reference.baseName)
             }
             return nil

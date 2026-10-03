@@ -34,14 +34,15 @@ public struct PrivateOverFileprivate: FileRule {
                 at: keyword,
                 rule: name,
                 messageId: "privateOverFileprivate",
-                message: "At the top of a file, fileprivate and private both mean the whole file, so fileprivate only sounds wider than it is. Write private, the least access that says the same thing.",
+                message:
+                    "At the top of a file, fileprivate and private both mean the whole file, so fileprivate only sounds wider than it is. Write private, the least access that says the same thing.",
                 fixes: [
                     FindingRecord.Edit(
                         start: keyword.positionAfterSkippingLeadingTrivia.utf8Offset,
                         end: keyword.endPositionBeforeTrailingTrivia.utf8Offset,
-                        text: "private"
-                    ),
-                ]
+                        text: "private",
+                    )
+                ],
             )
         }
     }

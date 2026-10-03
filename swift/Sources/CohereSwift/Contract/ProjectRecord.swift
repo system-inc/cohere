@@ -50,7 +50,7 @@ public struct ProjectRecord: Codable, Equatable, Sendable {
         filesInScope: Int,
         scopeDescription: String,
         targets: [Target],
-        excluded: [ExcludedFile]
+        excluded: [ExcludedFile],
     ) {
         self.root = root
         self.package = package

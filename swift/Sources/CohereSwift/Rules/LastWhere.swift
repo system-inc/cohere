@@ -63,12 +63,14 @@ public struct LastWhere: TypedFileRule {
     }
 
     public func findings(in file: ParsedFile, symbols: FileSymbols) -> [FindingRecord] {
-        FirstWhere.filterCalls(reading: "last", filters: Self.bidirectionalFilters, in: file, symbols: symbols).map { call in
+        FirstWhere.filterCalls(reading: "last", filters: Self.bidirectionalFilters, in: file, symbols: symbols).map {
+            call in
             file.finding(
                 at: call,
                 rule: name,
                 messageId: "lastWhere",
-                message: "Taking the last element of a filtered collection builds a whole new collection of every match only to keep one. Use last(where:) with the filter's predicate (joined by && with last's own, when it has one): it says what is meant, and it searches from the end and stops at the first match it meets."
+                message:
+                    "Taking the last element of a filtered collection builds a whole new collection of every match only to keep one. Use last(where:) with the filter's predicate (joined by && with last's own, when it has one): it says what is meant, and it searches from the end and stops at the first match it meets.",
             )
         }
     }

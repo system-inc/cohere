@@ -23,16 +23,19 @@ public struct Todo: FileRule {
                 defer { offset += piece.sourceLength.utf8Length }
                 guard let text = Self.commentText(piece), let marker = Self.marker(in: text) else { continue }
                 let location = file.locations.location(for: AbsolutePosition(utf8Offset: offset))
-                findings.append(FindingRecord(
-                    source: .rule,
-                    file: file.url.path,
-                    line: location.line,
-                    column: location.column,
-                    severity: .error,
-                    rule: name,
-                    messageId: "todoComment",
-                    message: "A \(marker) comment is unfinished work that only someone opening this file will see. Put it in the task tree, where it has an owner and a priority, and delete the comment."
-                ))
+                findings.append(
+                    FindingRecord(
+                        source: .rule,
+                        file: file.url.path,
+                        line: location.line,
+                        column: location.column,
+                        severity: .error,
+                        rule: name,
+                        messageId: "todoComment",
+                        message:
+                            "A \(marker) comment is unfinished work that only someone opening this file will see. Put it in the task tree, where it has an owner and a priority, and delete the comment.",
+                    )
+                )
             }
         }
         return findings
@@ -40,10 +43,10 @@ public struct Todo: FileRule {
 
     static func commentText(_ piece: TriviaPiece) -> String? {
         switch piece {
-        case let .lineComment(text), let .docLineComment(text), let .blockComment(text), let .docBlockComment(text):
-            return text
-        default:
-            return nil
+            case let .lineComment(text), let .docLineComment(text), let .blockComment(text), let .docBlockComment(text):
+                return text
+            default:
+                return nil
         }
     }
 

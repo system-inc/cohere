@@ -17,7 +17,9 @@ struct ContractFixtureTests {
         .deletingLastPathComponent()
         .appendingPathComponent("Contract", isDirectory: true)
 
-    static let fixtureNames = ["Clean", "Findings", "TypesBail", "CrashWithoutSummary", "Unreadable", "Unused", "LintOnly"]
+    static let fixtureNames = [
+        "Clean", "Findings", "TypesBail", "CrashWithoutSummary", "Unreadable", "Unused", "LintOnly",
+    ]
 
     @Test(arguments: fixtureNames)
     func everyRecordRoundTrips(fixture: String) throws {
@@ -50,21 +52,21 @@ struct ContractFixtureTests {
         let decoder = JSONDecoder()
         let encoder = JSONEncoder()
         switch kind {
-        case "provenance": return try encoder.encode(decoder.decode(ProvenanceRecord.self, from: data))
-        case "project": return try encoder.encode(decoder.decode(ProjectRecord.self, from: data))
-        case "finding": return try encoder.encode(decoder.decode(FindingRecord.self, from: data))
-        case "fix": return try encoder.encode(decoder.decode(FixRecord.self, from: data))
-        case "types": return try encoder.encode(decoder.decode(TypesRecord.self, from: data))
-        case "lint": return try encoder.encode(decoder.decode(LintRecord.self, from: data))
-        case "phase": return try encoder.encode(decoder.decode(PhaseRecord.self, from: data))
-        case "rule": return try encoder.encode(decoder.decode(RuleRecord.self, from: data))
-        case "summary": return try encoder.encode(decoder.decode(SummaryRecord.self, from: data))
-        case "unreadable": return try encoder.encode(decoder.decode(UnreadableRecord.self, from: data))
-        case "unused": return try encoder.encode(decoder.decode(UnusedRecord.self, from: data))
-        case "unusedCoverage": return try encoder.encode(decoder.decode(UnusedCoverageRecord.self, from: data))
-        default:
-            Issue.record("a fixture holds a record kind the engine has no type for: \(kind)")
-            return Data()
+            case "provenance": return try encoder.encode(decoder.decode(ProvenanceRecord.self, from: data))
+            case "project": return try encoder.encode(decoder.decode(ProjectRecord.self, from: data))
+            case "finding": return try encoder.encode(decoder.decode(FindingRecord.self, from: data))
+            case "fix": return try encoder.encode(decoder.decode(FixRecord.self, from: data))
+            case "types": return try encoder.encode(decoder.decode(TypesRecord.self, from: data))
+            case "lint": return try encoder.encode(decoder.decode(LintRecord.self, from: data))
+            case "phase": return try encoder.encode(decoder.decode(PhaseRecord.self, from: data))
+            case "rule": return try encoder.encode(decoder.decode(RuleRecord.self, from: data))
+            case "summary": return try encoder.encode(decoder.decode(SummaryRecord.self, from: data))
+            case "unreadable": return try encoder.encode(decoder.decode(UnreadableRecord.self, from: data))
+            case "unused": return try encoder.encode(decoder.decode(UnusedRecord.self, from: data))
+            case "unusedCoverage": return try encoder.encode(decoder.decode(UnusedCoverageRecord.self, from: data))
+            default:
+                Issue.record("a fixture holds a record kind the engine has no type for: \(kind)")
+                return Data()
         }
     }
 }

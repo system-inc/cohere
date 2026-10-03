@@ -43,7 +43,9 @@ struct ScratchPrune {
                 parts.append("\(recordsRemoved) index records no unit names")
             }
             if !localScratchesRemoved.isEmpty {
-                parts.append("the scratch of \(localScratchesRemoved.sorted().joined(separator: ", ")), no longer a local package")
+                parts.append(
+                    "the scratch of \(localScratchesRemoved.sorted().joined(separator: ", ")), no longer a local package"
+                )
             }
             let size = ByteCountFormatter.string(fromByteCount: Int64(bytesRemoved), countStyle: .file)
             return "the scratch prune removed \(size): \(parts.joined(separator: "; "))"
@@ -86,7 +88,9 @@ struct ScratchPrune {
         var count = 0
         var bytes = 0
         for record in plan.records {
-            guard let modified = modificationDate(of: record), Date().timeIntervalSince(modified) >= inUseWindow else { continue }
+            guard let modified = modificationDate(of: record), Date().timeIntervalSince(modified) >= inUseWindow else {
+                continue
+            }
             let size = fileSize(of: record)
             if (try? FileManager.default.removeItem(at: record)) != nil {
                 count += 1
@@ -99,7 +103,9 @@ struct ScratchPrune {
     /* The local package scratches under `<scratch>/local` whose package is not listed and that were not used within the window. */
     static func staleLocalScratches(scratchPath: URL, listed: Set<String>, now: Date) -> [URL] {
         contents(of: scratchPath.appendingPathComponent("local", isDirectory: true)).filter { scratch in
-            guard !listed.contains(scratch.lastPathComponent), let modified = modificationDate(of: scratch) else { return false }
+            guard !listed.contains(scratch.lastPathComponent), let modified = modificationDate(of: scratch) else {
+                return false
+            }
             return now.timeIntervalSince(modified) >= inUseWindow
         }
     }
@@ -108,7 +114,8 @@ struct ScratchPrune {
     static func markUsed(_ scratch: URL) {
         do {
             try FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: scratch.path)
-        } catch {
+        }
+        catch {
             /*
              The scratch of a package the model lists is kept whatever its time, so a mark that failed matters only once
              the package stops being local, and then it costs at most a rebuild of a scratch nothing builds into.
@@ -122,15 +129,22 @@ struct ScratchPrune {
      files named under it. Returns the bytes removed, or nil when the directory was used in the meantime.
      */
     static func removeDirectory(_ directory: URL) -> Int? {
-        guard let modified = modificationDate(of: directory), Date().timeIntervalSince(modified) >= inUseWindow else { return nil }
+        guard let modified = modificationDate(of: directory), Date().timeIntervalSince(modified) >= inUseWindow else {
+            return nil
+        }
         var files: [URL] = []
         var directories: [URL] = [directory]
-        let walker = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: [])
+        let walker = FileManager.default.enumerator(
+            at: directory,
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+            options: [],
+        )
         while let item = walker?.nextObject() as? URL {
             let values = try? item.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
             if values?.isDirectory == true && values?.isSymbolicLink != true {
                 directories.append(item)
-            } else {
+            }
+            else {
                 files.append(item)
             }
         }
@@ -159,7 +173,12 @@ struct ScratchPrune {
      its last use, and reading every unit of every store costs 0.4s after a build on ahraos-macos and 3.4s on
      Presence, measured.
      */
-    static func run(stores: [(store: IndexStore, storePath: URL)], scratchPath: URL, listedLocalPackages: Set<String>, now: Date = Date()) -> Outcome {
+    static func run(
+        stores: [(store: IndexStore, storePath: URL)],
+        scratchPath: URL,
+        listedLocalPackages: Set<String>,
+        now: Date = Date(),
+    ) -> Outcome {
         var outcome = Outcome()
         let stamp = scratchPath.appendingPathComponent(stampName)
         if let last = modificationDate(of: stamp), now.timeIntervalSince(last) < inUseWindow {
@@ -181,7 +200,11 @@ struct ScratchPrune {
     }
 
     private static func contents(of directory: URL) -> [URL] {
-        (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey], options: [])) ?? []
+        (try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [],
+        )) ?? []
     }
 
     private static func modificationDate(of url: URL) -> Date? {

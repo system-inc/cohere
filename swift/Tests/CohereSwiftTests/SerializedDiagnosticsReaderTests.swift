@@ -11,7 +11,10 @@ import Testing
  */
 struct SerializedDiagnosticsReaderTests {
     static func serializedDiagnostics(for source: String) throws -> URL {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-dia-\(UUID().uuidString)", isDirectory: true)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-dia-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let file = directory.appendingPathComponent("Subject.swift")
         try source.write(to: file, atomically: true, encoding: .utf8)
@@ -22,13 +25,21 @@ struct SerializedDiagnosticsReaderTests {
          of on the reader.
          */
         let sdk = try ProcessRunner().run("xcrun", ["--show-sdk-path"], in: directory)
-        let sdkPath = String(decoding: sdk.standardOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        let sdkPath = String(decoding: sdk.standardOutput, as: UTF8.self).trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
         _ = try ProcessRunner().run(
             "xcrun",
-            ["swift-frontend", "-typecheck", "-primary-file", file.path, "-swift-version", "6", "-sdk", sdkPath, "-serialize-diagnostics-path", record.path],
-            in: directory
+            [
+                "swift-frontend", "-typecheck", "-primary-file", file.path, "-swift-version", "6", "-sdk", sdkPath,
+                "-serialize-diagnostics-path", record.path,
+            ],
+            in: directory,
         )
-        try #require(FileManager.default.fileExists(atPath: record.path), "the compiler wrote no serialized diagnostics, so this test would check nothing")
+        try #require(
+            FileManager.default.fileExists(atPath: record.path),
+            "the compiler wrote no serialized diagnostics, so this test would check nothing",
+        )
         return record
     }
 
@@ -37,7 +48,9 @@ struct SerializedDiagnosticsReaderTests {
     }
 
     @Test func aWarningCarriesItsGroupAndPosition() throws {
-        let record = try Self.serializedDiagnostics(for: "func subject() -> Int {\n    var neverMutated = 3\n    return neverMutated\n}\n")
+        let record = try Self.serializedDiagnostics(
+            for: "func subject() -> Int {\n    var neverMutated = 3\n    return neverMutated\n}\n"
+        )
         let diagnostics = try Self.reader().read(record).filter { $0.severity != nil }
         #expect(diagnostics.count == 1)
         #expect(diagnostics.first?.severity == .warning)

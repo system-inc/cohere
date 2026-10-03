@@ -18,14 +18,24 @@ import Testing
 struct ConsistencyNoHandRolledDelayTests {
     static func file(_ source: String) -> ParsedFile {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        return ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        return ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
     }
 
     /* The findings for a file the rule agrees to read, and none for one it declines, as the pipeline runs it. */
     static func findings(_ source: String) -> [FindingRecord] {
         let file = Self.file(source)
         let found = ConsistencyNoHandRolledDelay().findings(in: file)
-        #expect(found.isEmpty || ConsistencyNoHandRolledDelay().applies(to: file), "the prefilter must never hide a finding")
+        #expect(
+            found.isEmpty || ConsistencyNoHandRolledDelay().applies(to: file),
+            "the prefilter must never hide a finding",
+        )
         guard ConsistencyNoHandRolledDelay().applies(to: file) else { return [] }
         #expect(found.allSatisfy { $0.fixes.isEmpty && $0.suggestions.isEmpty }, "the rule never fixes")
         return found
@@ -75,12 +85,16 @@ struct ConsistencyNoHandRolledDelayTests {
         #expect(
             tryOptional.map(\.message) == [
                 "This try? await Task.sleep is the house's Task.sleepUnlessCancelled written out by hand: Task.sleep throws only CancellationError, so the try? does nothing but let the pause end early when the task is cancelled, which is all the primitive does. Write await Task.sleepUnlessCancelled with the same duration (declared once per project, in Task+SleepUnlessCancelled.swift, taking for: or nanoseconds:), so the pause reads as a plain pause and the one place that says why cancellation is let go says it for every call. A do/catch with an empty catch around the sleep is the same pause spelled longer, not the repair."
-            ])
-        let doCatch = Self.findings("func f() async {\n    do { try await Task.sleep(for: .seconds(1)) } catch {}\n    work()\n}")
+            ]
+        )
+        let doCatch = Self.findings(
+            "func f() async {\n    do { try await Task.sleep(for: .seconds(1)) } catch {}\n    work()\n}"
+        )
         #expect(
             doCatch.map(\.message) == [
                 "This do/catch around Task.sleep, with nothing in the catch, is the house's Task.sleepUnlessCancelled written out by hand: Task.sleep throws only CancellationError, so the catch does nothing but let the pause end early when the task is cancelled, which is all the primitive does. Write await Task.sleepUnlessCancelled with the same duration (declared once per project, in Task+SleepUnlessCancelled.swift, taking for: or nanoseconds:), so the pause reads as a plain pause and the one place that says why cancellation is let go says it for every call."
-            ])
+            ]
+        )
         #expect(doCatch.map(\.messageId) == ["handRolledDelayDoCatch"])
     }
 

@@ -97,7 +97,8 @@ public struct CorrectnessNoIdenticalBranches: FileRule {
                 at: conditional,
                 rule: name,
                 messageId: "identicalBranches",
-                message: "Every branch of this conditional does the same thing, so its condition chooses nothing: the code runs the same way whether it is true or false. Usually one branch was meant to differ and a copy was never edited (highQuality ? \"pro\" : \"pro\"). Write the branch that was meant, or, if both really are the same, drop the conditional and keep one copy."
+                message:
+                    "Every branch of this conditional does the same thing, so its condition chooses nothing: the code runs the same way whether it is true or false. Usually one branch was meant to differ and a copy was never edited (highQuality ? \"pro\" : \"pro\"). Write the branch that was meant, or, if both really are the same, drop the conditional and keep one copy.",
             )
         }
     }
@@ -140,20 +141,22 @@ public struct CorrectnessNoIdenticalBranches: FileRule {
                 return .visitChildren
             }
             switch elseBody {
-            case .codeBlock(let block):
-                guard !block.statements.isEmpty, Self.same(Syntax(node.body.statements), Syntax(block.statements)) else {
-                    return .visitChildren
-                }
-            case .ifExpr(let elseIf):
-                /* An `else if` against the first branch's one statement: the rare `if a { if c {...} else {...} } else if c {...} else {...}`. */
-                guard node.body.statements.count == 1, let only = node.body.statements.first, only.semicolon == nil,
-                    Self.same(Self.unwrappedStatement(only.item), Syntax(elseIf))
-                else {
-                    return .visitChildren
-                }
+                case .codeBlock(let block):
+                    guard !block.statements.isEmpty, Self.same(Syntax(node.body.statements), Syntax(block.statements))
+                    else {
+                        return .visitChildren
+                    }
+                case .ifExpr(let elseIf):
+                    /* An `else if` against the first branch's one statement: the rare `if a { if c {...} else {...} } else if c {...} else {...}`. */
+                    guard node.body.statements.count == 1, let only = node.body.statements.first, only.semicolon == nil,
+                        Self.same(Self.unwrappedStatement(only.item), Syntax(elseIf))
+                    else {
+                        return .visitChildren
+                    }
             }
             var anchor = node
-            while let parent = Syntax(anchor).parent?.as(IfExprSyntax.self), case .ifExpr(let elseIf) = parent.elseBody, elseIf.id == anchor.id,
+            while let parent = Syntax(anchor).parent?.as(IfExprSyntax.self), case .ifExpr(let elseIf) = parent.elseBody,
+                elseIf.id == anchor.id,
                 Self.judgesItsBranches(parent), Self.same(Syntax(parent.body.statements), Syntax(node.body.statements))
             {
                 anchor = parent
@@ -198,7 +201,9 @@ public struct CorrectnessNoIdenticalBranches: FileRule {
         /* `(value)` is `value`: a parenthesised single unlabeled element, however deep. */
         static func withoutParentheses(_ expression: ExprSyntax) -> ExprSyntax {
             var current = expression
-            while let tuple = current.as(TupleExprSyntax.self), tuple.elements.count == 1, let only = tuple.elements.first, only.label == nil {
+            while let tuple = current.as(TupleExprSyntax.self), tuple.elements.count == 1,
+                let only = tuple.elements.first, only.label == nil
+            {
                 current = only.expression
             }
             return current
@@ -232,14 +237,14 @@ public struct CorrectnessNoIdenticalBranches: FileRule {
             var conditionNames: Set<String> = []
             for element in node.conditions {
                 switch element.condition {
-                case .expression:
-                    continue
-                case .availability:
-                    return false
-                case .optionalBinding(let binding):
-                    conditionNames.formUnion(identifierNames(Syntax(binding.pattern)))
-                case .matchingPattern(let matching):
-                    conditionNames.formUnion(identifierNames(Syntax(matching.pattern)))
+                    case .expression:
+                        continue
+                    case .availability:
+                        return false
+                    case .optionalBinding(let binding):
+                        conditionNames.formUnion(identifierNames(Syntax(binding.pattern)))
+                    case .matchingPattern(let matching):
+                        conditionNames.formUnion(identifierNames(Syntax(matching.pattern)))
                 }
             }
             return conditionNames.isDisjoint(with: identifierNames(Syntax(node.body.statements)))
@@ -253,14 +258,16 @@ public struct CorrectnessNoIdenticalBranches: FileRule {
             Set(
                 node.tokens(viewMode: .sourceAccurate).compactMap { token in
                     switch token.tokenKind {
-                    case .identifier(let text):
-                        return text.count > 1 && text.hasPrefix("`") && text.hasSuffix("`") ? String(text.dropFirst().dropLast()) : text
-                    case .keyword(.self):
-                        return "self"
-                    default:
-                        return nil
+                        case .identifier(let text):
+                            return text.count > 1 && text.hasPrefix("`") && text.hasSuffix("`")
+                                ? String(text.dropFirst().dropLast()) : text
+                        case .keyword(.self):
+                            return "self"
+                        default:
+                            return nil
                     }
-                })
+                }
+            )
         }
 
         static func expandsMacro(_ node: Syntax) -> Bool {
@@ -276,10 +283,14 @@ public struct CorrectnessNoIdenticalBranches: FileRule {
          */
         static func mayBeTransformedByResultBuilder(_ node: IfExprSyntax) -> Bool {
             var head = Syntax(node)
-            while let parent = head.parent?.as(IfExprSyntax.self), case .ifExpr(let elseIf) = parent.elseBody, elseIf.id == head.id {
+            while let parent = head.parent?.as(IfExprSyntax.self), case .ifExpr(let elseIf) = parent.elseBody,
+                elseIf.id == head.id
+            {
                 head = Syntax(parent)
             }
-            guard head.parent?.is(ExpressionStmtSyntax.self) == true || head.parent?.is(CodeBlockItemSyntax.self) == true else {
+            guard
+                head.parent?.is(ExpressionStmtSyntax.self) == true || head.parent?.is(CodeBlockItemSyntax.self) == true
+            else {
                 /* An `if` expression is a value, and a builder transforms statements only. */
                 return false
             }
@@ -304,7 +315,9 @@ public struct CorrectnessNoIdenticalBranches: FileRule {
                     guard case .getter(let body) = accessorBlock.accessors else { return false }
                     return !isVoid(resultType(of: accessorBlock)) && !containsReturn(Syntax(body))
                 }
-                if step.is(InitializerDeclSyntax.self) || step.is(DeinitializerDeclSyntax.self) || step.is(SourceFileSyntax.self) {
+                if step.is(InitializerDeclSyntax.self) || step.is(DeinitializerDeclSyntax.self)
+                    || step.is(SourceFileSyntax.self)
+                {
                     return false
                 }
                 current = step.parent

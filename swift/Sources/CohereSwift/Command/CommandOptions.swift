@@ -60,50 +60,64 @@ public struct CommandOptions: Equatable, Sendable {
             }
             let flag = "--" + argument.drop { $0 == "-" }
             switch flag {
-            case "--contract":
-                let spelled = try value(for: flag)
-                guard let version = Int(spelled) else {
-                    throw UsageFailure(description: "--contract takes a number, not \(spelled)")
-                }
-                options.contract = version
-            case "--root":
-                options.root = URL(fileURLWithPath: try value(for: flag), relativeTo: workingDirectory).standardizedFileURL
-            case "--no-fix": options.noFix = true
-            case "--fix": options.fixOnly = true
-            case "--types": options.typesOnly = true
-            case "--lint": options.lintOnly = true
-            /* Formatting is on by default for Swift (the contract says why), so the flag is accepted and changes nothing. */
-            case "--format": break
-            case "--format-all": options.formatAll = true
-            case "--lint-config":
-                options.lintConfiguration = URL(fileURLWithPath: try value(for: flag), relativeTo: workingDirectory).standardizedFileURL
-            case "--abbreviations":
-                options.abbreviations = URL(fileURLWithPath: try value(for: flag), relativeTo: workingDirectory).standardizedFileURL
-            case "--fix-passes":
-                let spelled = try value(for: flag)
-                guard let passes = Int(spelled), passes > 0 else {
-                    throw UsageFailure(description: "--fix-passes takes a positive number, not \(spelled)")
-                }
-                options.fixPasses = passes
-            case "--single-threaded": options.singleThreaded = true
-            case "--rules": options.listRules = true
-            case "--rules-enabled": options.listRulesEnabled = true
-            case "--version": options.showVersion = true
-            case "--unused", "--unused-all", "--unused-deep": options.unused = true
-            case "--timing", "--explain":
-                throw UsageFailure(description: "\(flag) is not implemented for Swift yet, so the run was refused rather than run without it")
-            case "--tsconfig":
-                throw UsageFailure(description: "--tsconfig names a TypeScript program, and this is a Swift package")
-            default:
-                throw UsageFailure(description: "unknown flag \(argument)")
+                case "--contract":
+                    let spelled = try value(for: flag)
+                    guard let version = Int(spelled) else {
+                        throw UsageFailure(description: "--contract takes a number, not \(spelled)")
+                    }
+                    options.contract = version
+                case "--root":
+                    options.root =
+                        URL(fileURLWithPath: try value(for: flag), relativeTo: workingDirectory).standardizedFileURL
+                case "--no-fix": options.noFix = true
+                case "--fix": options.fixOnly = true
+                case "--types": options.typesOnly = true
+                case "--lint": options.lintOnly = true
+                /* Formatting is on by default for Swift (the contract says why), so the flag is accepted and changes nothing. */
+                case "--format": break
+                case "--format-all": options.formatAll = true
+                case "--lint-config":
+                    options.lintConfiguration =
+                        URL(fileURLWithPath: try value(for: flag), relativeTo: workingDirectory).standardizedFileURL
+                case "--abbreviations":
+                    options.abbreviations =
+                        URL(fileURLWithPath: try value(for: flag), relativeTo: workingDirectory).standardizedFileURL
+                case "--fix-passes":
+                    let spelled = try value(for: flag)
+                    guard let passes = Int(spelled), passes > 0 else {
+                        throw UsageFailure(description: "--fix-passes takes a positive number, not \(spelled)")
+                    }
+                    options.fixPasses = passes
+                case "--single-threaded": options.singleThreaded = true
+                case "--rules": options.listRules = true
+                case "--rules-enabled": options.listRulesEnabled = true
+                case "--version": options.showVersion = true
+                case "--unused", "--unused-all", "--unused-deep": options.unused = true
+                case "--timing", "--explain":
+                    throw UsageFailure(
+                        description:
+                            "\(flag) is not implemented for Swift yet, so the run was refused rather than run without it"
+                    )
+                case "--tsconfig":
+                    throw UsageFailure(
+                        description: "--tsconfig names a TypeScript program, and this is a Swift package"
+                    )
+                default:
+                    throw UsageFailure(description: "unknown flag \(argument)")
             }
         }
 
         if options.noFix && options.fixOnly {
-            throw UsageFailure(description: "--fix and --no-fix contradict each other: --fix runs only the mutating phase, --no-fix mutates nothing")
+            throw UsageFailure(
+                description:
+                    "--fix and --no-fix contradict each other: --fix runs only the mutating phase, --no-fix mutates nothing"
+            )
         }
         if let contract = options.contract, contract != EngineVersion.contract {
-            throw UsageFailure(description: "the front door speaks contract \(contract) and this engine speaks contract \(EngineVersion.contract), so nothing was checked")
+            throw UsageFailure(
+                description:
+                    "the front door speaks contract \(contract) and this engine speaks contract \(EngineVersion.contract), so nothing was checked"
+            )
         }
         return options
     }

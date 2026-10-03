@@ -19,7 +19,11 @@ struct LastWhereTests {
     static let oursBidirectionalLast = "s:SK7ControlE4last7ElementQzSgvp"
 
     /* The findings of `last-where`, as `messageId@line:column`, with every `filter` token resolved to `filter` and every `last` token to `member`. */
-    static func findings(_ source: String, filter: String? = FirstWhereTests.arrayFilter, member: String? = bidirectionalLast) -> [String] {
+    static func findings(
+        _ source: String,
+        filter: String? = FirstWhereTests.arrayFilter,
+        member: String? = bidirectionalLast,
+    ) -> [String] {
         FirstWhereTests.findings(source, rule: LastWhere(), filter: filter, member: member)
     }
 
@@ -36,7 +40,12 @@ struct LastWhereTests {
             _ = (myList.filter { $0 == 1 }).last
 
             """
-        #expect(Self.findings(source) == ["lastWhere@1:5", "lastWhere@2:5", "lastWhere@3:5", "lastWhere@4:5", "lastWhere@5:5", "lastWhere@6:5", "lastWhere@8:6"])
+        #expect(
+            Self.findings(source) == [
+                "lastWhere@1:5", "lastWhere@2:5", "lastWhere@3:5", "lastWhere@4:5", "lastWhere@5:5", "lastWhere@6:5",
+                "lastWhere@8:6",
+            ]
+        )
     }
 
     /* SwiftLint's `last_where` non-triggering examples that are not the shape whatever the types. */
@@ -53,11 +62,16 @@ struct LastWhereTests {
 
     /* SwiftLint's Realm example, skipped there by the spelling of the argument and here because the `filter` is Realm's. */
     @Test func incumbentRealmExampleIsNotFound() {
-        #expect(Self.findings("_ = collection.filter(\"stringCol = '3'\").last\n", filter: FirstWhereTests.realmFilter).isEmpty)
+        #expect(
+            Self.findings("_ = collection.filter(\"stringCol = '3'\").last\n", filter: FirstWhereTests.realmFilter)
+                .isEmpty
+        )
     }
 
     /* The `filter`s whose receiver is known to be bidirectional: an array's, a string's (or any range-replaceable collection's) and a substring's. */
-    @Test(arguments: [FirstWhereTests.arrayFilter, FirstWhereTests.rangeReplaceableFilter, FirstWhereTests.substringFilter])
+    @Test(arguments: [
+        FirstWhereTests.arrayFilter, FirstWhereTests.rangeReplaceableFilter, FirstWhereTests.substringFilter,
+    ])
     func everyBidirectionalFilterIsFound(filter: String) {
         #expect(Self.findings("_ = values.filter { _ in true }.last\n", filter: filter) == ["lastWhere@1:5"])
     }
@@ -127,7 +141,14 @@ struct LastWhereTests {
 
     @Test func aFileWithNoFilterOrNoLastDoesNotApply() {
         for source in ["_ = items.last\n", "_ = items.filter { $0 > 1 }.first\n"] {
-            let file = ParsedFile(url: URL(fileURLWithPath: "/Plain.swift"), targetName: "Control", targetKind: "regular", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+            let file = ParsedFile(
+                url: URL(fileURLWithPath: "/Plain.swift"),
+                targetName: "Control",
+                targetKind: "regular",
+                source: source,
+                tree: Parser.parse(source: source),
+                nodeCount: 0,
+            )
             #expect(!LastWhere().applies(to: file))
         }
     }
@@ -155,6 +176,9 @@ struct LastWhereTests {
 
             """
         let found = try await FirstWhereTests.packageFindings(source: source, rule: LastWhere())
-        #expect(found == ["lastWhere@12"], "expected the array's filter and not the values', the query's or the lazy one: \(found)")
+        #expect(
+            found == ["lastWhere@12"],
+            "expected the array's filter and not the values', the query's or the lazy one: \(found)",
+        )
     }
 }

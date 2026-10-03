@@ -13,7 +13,14 @@ import Testing
 struct ForceRuleTests {
     static func findings(_ rule: some FileRule, _ source: String) -> [FindingRecord] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         return rule.findings(in: file)
     }
 
@@ -102,6 +109,10 @@ struct ForceRuleTests {
 
     @Test func everyForceRuleIsRegistered() {
         let names = Set(RuleRegistry.allNames)
-        #expect(names.isSuperset(of: [ForceUnwrapping().name, ForceTry().name, ForceCast().name, ImplicitlyUnwrappedOptional().name]))
+        #expect(
+            names.isSuperset(of: [
+                ForceUnwrapping().name, ForceTry().name, ForceCast().name, ImplicitlyUnwrappedOptional().name,
+            ])
+        )
     }
 }

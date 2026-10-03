@@ -22,7 +22,8 @@ public struct ImplicitlyUnwrappedOptional: FileRule {
                 at: type,
                 rule: name,
                 messageId: "implicitlyUnwrappedOptional",
-                message: "An implicitly unwrapped optional makes every read a hidden force unwrap, so the crash site has no ! to find. Declare it optional and unwrap at the reads, or make it non-optional and set it in the initializer."
+                message:
+                    "An implicitly unwrapped optional makes every read a hidden force unwrap, so the crash site has no ! to find. Declare it optional and unwrap at the reads, or make it non-optional and set it in the initializer.",
             )
         }
     }

@@ -48,12 +48,27 @@ struct CorrectnessNoWriteOnlyCollectionTests {
     /* Every finding as the name it spans, after checking its message and that it carries no fix. */
     static func findings(_ source: String, resolving: [String: String] = standardLibrary) -> [String] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         var occurrences: [FileSymbols.Occurrence] = []
         for token in file.tree.tokens(viewMode: .sourceAccurate) {
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
             guard let symbol = resolving["\(location.line):\(token.text)"] ?? resolving[token.text] else { continue }
-            occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: symbol, name: token.text, isReference: true))
+            occurrences.append(
+                FileSymbols.Occurrence(
+                    line: location.line,
+                    column: location.column,
+                    symbol: symbol,
+                    name: token.text,
+                    isReference: true,
+                )
+            )
         }
         let rule = CorrectnessNoWriteOnlyCollection()
         let found = rule.findings(in: file, symbols: FileSymbols(occurrences, ownedModules: ["Control"]))
@@ -63,7 +78,9 @@ struct CorrectnessNoWriteOnlyCollectionTests {
             #expect(finding.messageId == "writeOnlyCollection")
             #expect(finding.message == CorrectnessNoWriteOnlyCollection.message)
             #expect(finding.fixes.isEmpty && finding.suggestions.isEmpty, "the rule never fixes")
-            guard let endLine = finding.endLine, let endColumn = finding.endColumn, endLine == finding.line else { return "spans lines" }
+            guard let endLine = finding.endLine, let endColumn = finding.endColumn, endLine == finding.line else {
+                return "spans lines"
+            }
             return String(decoding: lines[finding.line - 1][(finding.column - 1)..<(endColumn - 1)], as: UTF8.self)
         }
     }
@@ -113,7 +130,11 @@ struct CorrectnessNoWriteOnlyCollectionTests {
     }
 
     @Test func processStatisticsAsItStandsReadsTheInsertsAnswer() {
-        #expect(Self.findings(Self.processStatistics(visit: "            guard visited.insert(pid).inserted else { continue }")) == [])
+        #expect(
+            Self.findings(
+                Self.processStatistics(visit: "            guard visited.insert(pid).inserted else { continue }")
+            ) == []
+        )
     }
 
     @Test func processStatisticsWithTheGuardDroppedIsFlagged() {
@@ -215,7 +236,9 @@ struct CorrectnessNoWriteOnlyCollectionTests {
     }
 
     @Test func kingdomAsItStandsReadsVisitedInAClosure() {
-        #expect(Self.findings(Self.kingdom(filter: "                .filter { !visited.contains($0.profileId) }")) == [])
+        #expect(
+            Self.findings(Self.kingdom(filter: "                .filter { !visited.contains($0.profileId) }")) == []
+        )
     }
 
     @Test func kingdomWithoutTheFilterFlagsVisited() {
@@ -264,7 +287,10 @@ struct CorrectnessNoWriteOnlyCollectionTests {
      every flush time is collected and thrown away. Fixed, the summary reads both, and the rule is silent.
      */
     static func motionSearchProbe(summarizesFlushed: Bool) -> String {
-        let flushedSummary = summarizesFlushed ? "\n                presenceLog(\"presence: MOTION SEARCH flushed median \\(flushed.prefix(typed).median()) ms\")" : ""
+        let flushedSummary =
+            summarizesFlushed
+            ? "\n                presenceLog(\"presence: MOTION SEARCH flushed median \\(flushed.prefix(typed).median()) ms\")"
+            : ""
         return """
             extension PresenceApplicationDelegate {
                 func runMotionSearchProbe(query: String, editor: NSTextView, contentView: NSView, window: NSWindow) {
@@ -322,7 +348,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     }
                 }
                 """,
-                ["seen"]
+                ["seen"],
             ),
             (
                 "a set inserted as a loop's only statement",
@@ -333,7 +359,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     return rows.count
                 }
                 """,
-                ["seen"]
+                ["seen"],
             ),
             (
                 "an array written through its subscript from a closure",
@@ -343,7 +369,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     rows.enumerated().forEach { byIndex[$0.offset] = $0.element.id }
                 }
                 """,
-                ["byIndex"]
+                ["byIndex"],
             ),
             (
                 "a dictionary set, updated, removed from and cleared",
@@ -358,7 +384,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     pending.removeAll()
                 }
                 """,
-                ["pending"]
+                ["pending"],
             ),
             (
                 "an array inserted into, removed from, popped and shifted",
@@ -378,7 +404,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     queue.removeAll(keepingCapacity: true)
                 }
                 """,
-                ["queue"]
+                ["queue"],
             ),
             (
                 "a set's other writers",
@@ -396,7 +422,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     names.removeFirst()
                 }
                 """,
-                ["names"]
+                ["names"],
             ),
             (
                 "in a closure stored as a property, TypeScript's property initializer",
@@ -408,7 +434,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     }
                 }
                 """,
-                ["seen"]
+                ["seen"],
             ),
             (
                 "appended in a single-expression closure: append returns nothing to hand on",
@@ -418,7 +444,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     rows.forEach { ids.append($0.id) }
                 }
                 """,
-                ["ids"]
+                ["ids"],
             ),
             (
                 "+= on an array, Swift's append(contentsOf:)",
@@ -430,7 +456,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     }
                 }
                 """,
-                ["ids"]
+                ["ids"],
             ),
             (
                 "behind try and await",
@@ -442,7 +468,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     try await ids.append(contentsOf: source.rest())
                 }
                 """,
-                ["ids"]
+                ["ids"],
             ),
             (
                 "a copy of another collection: a Swift collection is a value, so nothing else sees the writes",
@@ -453,7 +479,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     return original
                 }
                 """,
-                ["copy"]
+                ["copy"],
             ),
             (
                 "every spelling of the type",
@@ -475,7 +501,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     bare.removeAll()
                 }
                 """,
-                ["literal", "keyed", "sugar", "named", "fromRows", "annotated", "bare"]
+                ["literal", "keyed", "sugar", "named", "fromRows", "annotated", "bare"],
             ),
             (
                 "a dictionary written with a default and an array past its end: a trap is not a read",
@@ -489,7 +515,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     slots[9] = 1
                 }
                 """,
-                ["counts", "slots"]
+                ["counts", "slots"],
             ),
             (
                 "a value-returning write as the only statement of an if and a switch that are statements",
@@ -515,7 +541,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     }
                 }
                 """,
-                ["seen", "pending"]
+                ["seen", "pending"],
             ),
             (
                 "written in a defer and a repeat loop",
@@ -527,7 +553,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     log.append("start")
                 }
                 """,
-                ["log"]
+                ["log"],
             ),
             (
                 "a backticked name",
@@ -537,7 +563,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     `default`.append(1)
                 }
                 """,
-                ["`default`"]
+                ["`default`"],
             ),
             (
                 "inside an initializer, an accessor and a nested closure",
@@ -560,7 +586,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     }
                 }
                 """,
-                ["ids", "seen", "queued"]
+                ["ids", "seen", "queued"],
             ),
         ]
         for (label, source, expected) in cases {
@@ -587,9 +613,19 @@ struct CorrectnessNoWriteOnlyCollectionTests {
             }
             """
         #expect(Self.findings(source) == ["ids"])
-        let file = ParsedFile(url: URL(fileURLWithPath: "/fixture/Subject.swift"), targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: URL(fileURLWithPath: "/fixture/Subject.swift"),
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         let found = CorrectnessNoWriteOnlyCollection().findings(in: file, symbols: FileSymbols([]))
-        #expect(found.isEmpty, "with no symbols, append is not known to be the standard library's: \(found.map(\.line))")
+        #expect(
+            found.isEmpty,
+            "with no symbols, append is not known to be the standard library's: \(found.map(\.line))",
+        )
     }
 
     // MARK: Every safe shape
@@ -607,7 +643,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                         use(row)
                     }
                 }
-                """
+                """,
             ),
             (
                 "the dedupe idiom, in an if, a guard and a filter",
@@ -622,7 +658,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     }
                     return rows.filter { kept.insert($0.id).inserted }
                 }
-                """
+                """,
             ),
             (
                 "returned",
@@ -632,7 +668,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     for row in rows { ids.append(row.id) }
                     return ids
                 }
-                """
+                """,
             ),
             (
                 "stored in a value",
@@ -642,7 +678,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     for row in rows { ids.append(row.id) }
                     return Summary(ids: ids)
                 }
-                """
+                """,
             ),
             (
                 "its count read",
@@ -652,7 +688,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     for row in rows { ids.append(row.id) }
                     return ids.count
                 }
-                """
+                """,
             ),
             (
                 "copied into another, TypeScript's spread",
@@ -662,7 +698,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     ids.append("a")
                     use(Array(ids))
                 }
-                """
+                """,
             ),
             (
                 "a mutating call whose result is used",
@@ -673,7 +709,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     use(first)
                     return ids.popLast()
                 }
-                """
+                """,
             ),
             (
                 "a value-returning write in a single-expression closure, which may hand it on: TypeScript's arrow body",
@@ -682,7 +718,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     var seen = Set<String>()
                     rows.forEach { seen.insert($0.id) }
                 }
-                """
+                """,
             ),
             (
                 "a value-returning write alone in a do, which may become an expression",
@@ -691,7 +727,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     var seen = Set<String>()
                     do { seen.insert("a") }
                 }
-                """
+                """,
             ),
             (
                 "a value-returning write as a nested function's single expression, which it returns",
@@ -701,7 +737,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     func add() -> (inserted: Bool, memberAfterInsert: String) { seen.insert("b") }
                     return add().inserted
                 }
-                """
+                """,
             ),
             (
                 "a value-returning write as a branch of an if expression, which is its value",
@@ -711,7 +747,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     let added = if rows.isEmpty { seen.insert("c") } else { seen.insert("d") }
                     return added.inserted
                 }
-                """
+                """,
             ),
             (
                 "a value-returning write as a branch of a switch expression returned implicitly",
@@ -723,7 +759,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     default: seen.insert("b")
                     }
                 }
-                """
+                """,
             ),
             (
                 "compared with ==, which reads, and a += of ours",
@@ -736,7 +772,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     names += other
                     return ids == other
                 }
-                """
+                """,
             ),
             (
                 "a compound write through an element, which reads",
@@ -747,7 +783,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     var byName: [String: Int] = [:]
                     byName["a", default: 0] += 1
                 }
-                """
+                """,
             ),
             (
                 "a write through an element, as TypeScript reads get(key).push",
@@ -758,7 +794,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     var flags = [false]
                     flags[0].toggle()
                 }
-                """
+                """,
             ),
             (
                 "at file scope, a global any file can read",
@@ -768,7 +804,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                 func register(name: String) {
                     registry[name] = 1
                 }
-                """
+                """,
             ),
             (
                 "a stored property, and a member of a local type",
@@ -783,7 +819,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                         mutating func add() { items.append(1) }
                     }
                 }
-                """
+                """,
             ),
             (
                 "never referenced, which swiftc reports",
@@ -791,7 +827,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                 func collect() {
                     var ids: [String] = []
                 }
-                """
+                """,
             ),
             (
                 "reassigned whole, as TypeScript declines a let",
@@ -801,7 +837,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     ids.append("a")
                     ids = []
                 }
-                """
+                """,
             ),
             (
                 "a set type of our own named Set",
@@ -810,7 +846,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     var ranks = Set<Int>()
                     ranks.insert(1)
                 }
-                """
+                """,
             ),
             (
                 "a recorder of ours built from a literal",
@@ -819,7 +855,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     var recorder: Recorder = []
                     recorder.append("a")
                 }
-                """
+                """,
             ),
             (
                 "a type the source does not spell",
@@ -832,7 +868,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     var qualified: Swift.Array<Int> = []
                     qualified.append(1)
                 }
-                """
+                """,
             ),
             (
                 "an append of ours, from an extension on Array",
@@ -842,7 +878,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     ids.append("a")
                     ids.append("b", twice: true)
                 }
-                """
+                """,
             ),
             (
                 "a subscript of ours on Array",
@@ -851,7 +887,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     var slots: [Int] = [0]
                     slots[UInt(0)] = 1
                 }
-                """
+                """,
             ),
             (
                 "iterated",
@@ -861,7 +897,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     ids.append("a")
                     for id in ids { use(id) }
                 }
-                """
+                """,
             ),
             (
                 "read in a closure",
@@ -871,7 +907,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     ids.append("a")
                     return { ids.joined(separator: ",") }
                 }
-                """
+                """,
             ),
             (
                 "captured by a capture list",
@@ -881,7 +917,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     ids.append("a")
                     return { [ids] in use(0) }
                 }
-                """
+                """,
             ),
             (
                 "captured under another name",
@@ -891,7 +927,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     ids.append("a")
                     return { [copy = ids] in use(copy) }
                 }
-                """
+                """,
             ),
             (
                 "passed inout, and interpolated",
@@ -904,7 +940,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     names.append("b")
                     log("\\(names)")
                 }
-                """
+                """,
             ),
             (
                 "methods that hand the elements to our code, and reorder them",
@@ -920,7 +956,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     merged["a"] = 1
                     merged.merge(["b": 2]) { first, _ in first }
                 }
-                """
+                """,
             ),
             (
                 "lazy, observed, and wrapped",
@@ -935,7 +971,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     @Clamped var bounded: [Int] = []
                     bounded.append(1)
                 }
-                """
+                """,
             ),
             (
                 "declared inside #if, which the code after #endif can name",
@@ -946,7 +982,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     ids.append("a")
                     #endif
                 }
-                """
+                """,
             ),
             (
                 "a name the scope reading cannot place: a local function of the same name",
@@ -957,7 +993,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     func ids() {}
                     ids()
                 }
-                """
+                """,
             ),
             (
                 "the shadowing binding read, the outer only written, TypeScript's case",
@@ -971,7 +1007,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     }
                     use(ids.count)
                 }
-                """
+                """,
             ),
             (
                 "a sibling binding in the same declaration reads it",
@@ -981,7 +1017,7 @@ struct CorrectnessNoWriteOnlyCollectionTests {
                     ids.append("a")
                     use(first)
                 }
-                """
+                """,
             ),
         ]
         for (label, source) in cases {
@@ -1019,7 +1055,14 @@ struct CorrectnessNoWriteOnlyCollectionTests {
     @Test func thePrefilterNeedsAVarAndACollection() {
         let rule = CorrectnessNoWriteOnlyCollection()
         let parse = { (source: String) in
-            ParsedFile(url: URL(fileURLWithPath: "/fixture/Subject.swift"), targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+            ParsedFile(
+                url: URL(fileURLWithPath: "/fixture/Subject.swift"),
+                targetName: "Fixture",
+                targetKind: "library",
+                source: source,
+                tree: Parser.parse(source: source),
+                nodeCount: 0,
+            )
         }
         #expect(!rule.applies(to: parse("let x = 1\n")))
         #expect(!rule.applies(to: parse("func f() { var x = 1; x += 1 }\n")))
@@ -1073,23 +1116,46 @@ struct CorrectnessNoWriteOnlyCollectionTests {
         """#
 
     @Test func theIndexResolvesTheCollectionsAndTheirWriters() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-typed-\(UUID().uuidString)", isDirectory: true)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-typed-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-        try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try Self.packageSource.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
+        try PipelineControlTests.manifest.write(
+            to: root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try Self.packageSource.write(
+            to: sources.appendingPathComponent("Control.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
 
         /* One run builds the package and writes its index. The rule is run by hand on what the run left. */
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"],
+            workingDirectory: root,
+        )
         _ = try await Pipeline(options: options, writer: ContractWriter { _ in }, workingDirectory: root).run()
-        let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: ProcessRunner())
+        let package = try PackageModel.load(
+            root: root,
+            scratchPath: Pipeline.scratchPath(for: root),
+            runner: ProcessRunner(),
+        )
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
         let rule = CorrectnessNoWriteOnlyCollection()
         let candidates = parsed.files.filter { rule.applies(to: $0) }
-        let symbols = SymbolProvider(scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root), runner: ProcessRunner()).symbols(for: candidates)
+        let symbols = SymbolProvider(
+            scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root),
+            runner: ProcessRunner(),
+        ).symbols(for: candidates)
         #expect(symbols.fromIndex == 1, "the build's index should describe the file: \(symbols.unavailable)")
         let found = candidates.flatMap { file in
-            rule.findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.line):\($0.column)" }
+            rule.findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map {
+                "\($0.line):\($0.column)"
+            }
         }
         /* `ranks` (a dictionary's subscript), `seen` (Set's insert, through `Set` by name) and `named` (`Array` by name, `+=`); not `unique` (read) and not `doubled` (our append). */
         #expect(found == ["10:13", "18:13", "35:13"], "\(found)")

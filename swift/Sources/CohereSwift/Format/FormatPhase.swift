@@ -35,7 +35,9 @@ struct FormatPhase {
             }
             return collected
         }
-        return Result(outcomes: zip(files, outcomes).map { ($0, $1 ?? .failed(reason: "the formatter never answered")) })
+        return Result(
+            outcomes: zip(files, outcomes).map { ($0, $1 ?? .failed(reason: "the formatter never answered")) }
+        )
     }
 
     static func format(_ file: ParsedFile) -> Outcome {
@@ -45,10 +47,11 @@ struct FormatPhase {
                 source: file.source,
                 assumingFileURL: file.url,
                 selection: .infinite,
-                to: &output
+                to: &output,
             )
             return output == file.source ? .unchanged : .changed(formatted: output)
-        } catch {
+        }
+        catch {
             return .failed(reason: "\(error)")
         }
     }

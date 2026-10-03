@@ -42,7 +42,7 @@ enum FixApplier {
             text: String(decoding: bytes, as: UTF8.self),
             applied: applied,
             refusedOverlapping: refusedOverlapping,
-            refusedInvalidRange: refusedInvalidRange
+            refusedInvalidRange: refusedInvalidRange,
         )
     }
 }

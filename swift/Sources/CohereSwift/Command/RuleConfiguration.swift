@@ -51,11 +51,15 @@ public struct RuleConfiguration: Equatable, Sendable {
         let path = explicitPath ?? packageRoot.appendingPathComponent("CohereSettings.json")
         guard FileManager.default.fileExists(atPath: path.path) else {
             if explicitPath != nil {
-                throw ReadFailure(path: path.path, reason: "no such file, and a config named by flag is never replaced by the defaults")
+                throw ReadFailure(
+                    path: path.path,
+                    reason: "no such file, and a config named by flag is never replaced by the defaults",
+                )
             }
             return RuleConfiguration(
                 severities: [:],
-                note: "config: no CohereSettings.json beside Package.swift, so every house rule ran at error — put one at \(path.path) to change that"
+                note:
+                    "config: no CohereSettings.json beside Package.swift, so every house rule ran at error — put one at \(path.path) to change that",
             )
         }
         return try parse(Data(contentsOf: path), path: path.path)
@@ -74,7 +78,7 @@ public struct RuleConfiguration: Equatable, Sendable {
         guard let swiftBlock = document["swift"] else {
             return RuleConfiguration(
                 severities: [:],
-                note: "config: \(path) has no swift block, so every house rule ran at error"
+                note: "config: \(path) has no swift block, so every house rule ran at error",
             )
         }
         guard let rules = (swiftBlock as? [String: Any])?["rules"] as? [String: Any] else {
@@ -84,7 +88,10 @@ public struct RuleConfiguration: Equatable, Sendable {
         for (name, value) in rules {
             let spelled = (value as? String) ?? ((value as? [Any])?.first as? String)
             guard let spelled, let severity = Severity(rawValue: spelled) else {
-                throw ReadFailure(path: path, reason: "\(name) has severity \(value), which is not error, warning or off")
+                throw ReadFailure(
+                    path: path,
+                    reason: "\(name) has severity \(value), which is not error, warning or off",
+                )
             }
             severities[name] = severity
         }

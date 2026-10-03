@@ -69,7 +69,7 @@ public struct FindingRecord: Codable, Equatable, Sendable {
         messageId: String,
         message: String,
         fixes: [Edit] = [],
-        suggestions: [Suggestion] = []
+        suggestions: [Suggestion] = [],
     ) {
         self.source = source
         self.file = file

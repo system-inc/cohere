@@ -20,7 +20,15 @@ public struct ParsedFile: Sendable {
     /* The root of the package whose target compiles this file (a local package's own root, not the checked root's); nil where nothing set it, such as a test fixture. */
     public var packageRoot: URL?
 
-    public init(url: URL, targetName: String, targetKind: String, source: String, tree: SourceFileSyntax, nodeCount: Int, packageRoot: URL? = nil) {
+    public init(
+        url: URL,
+        targetName: String,
+        targetKind: String,
+        source: String,
+        tree: SourceFileSyntax,
+        nodeCount: Int,
+        packageRoot: URL? = nil,
+    ) {
         self.packageRoot = packageRoot
         self.url = url
         self.targetName = targetName
@@ -42,7 +50,7 @@ public struct ParsedFile: Sendable {
         message: String,
         severity: FindingRecord.Severity = .error,
         fixes: [FindingRecord.Edit] = [],
-        suggestions: [FindingRecord.Suggestion] = []
+        suggestions: [FindingRecord.Suggestion] = [],
     ) -> FindingRecord {
         let start = node.startLocation(converter: locations)
         let end = node.endLocation(converter: locations)
@@ -58,7 +66,7 @@ public struct ParsedFile: Sendable {
             messageId: messageId,
             message: message,
             fixes: fixes,
-            suggestions: suggestions
+            suggestions: suggestions,
         )
     }
 }

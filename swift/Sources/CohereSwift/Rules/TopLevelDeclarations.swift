@@ -56,11 +56,13 @@ struct TopLevelDeclarations {
             return
         }
         if let extensionDeclaration = item.as(ExtensionDeclSyntax.self) {
-            extensions.append(Entry(
-                name: Self.baseName(of: extensionDeclaration.extendedType),
-                token: extensionDeclaration.extensionKeyword,
-                extensionDeclaration: extensionDeclaration
-            ))
+            extensions.append(
+                Entry(
+                    name: Self.baseName(of: extensionDeclaration.extendedType),
+                    token: extensionDeclaration.extensionKeyword,
+                    extensionDeclaration: extensionDeclaration,
+                )
+            )
         }
     }
 

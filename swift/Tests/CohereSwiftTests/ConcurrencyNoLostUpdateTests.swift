@@ -18,8 +18,12 @@ struct ConcurrencyNoLostUpdateTests {
     /* The text of every finding's span, after checking what every finding must be. */
     static func spans(_ source: String) -> [String] {
         let file = ParsedFile(
-            url: URL(fileURLWithPath: "/fixture/Subject.swift"), targetName: "Fixture", targetKind: "library", source: source,
-            tree: Parser.parse(source: source), nodeCount: 0
+            url: URL(fileURLWithPath: "/fixture/Subject.swift"),
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
         )
         let rule = ConcurrencyNoLostUpdate()
         let findings = rule.findings(in: file)
@@ -138,7 +142,11 @@ struct ConcurrencyNoLostUpdateTests {
 
     /* The seeding loop with no replacement in it: the appearance it writes back was read before every photograph. */
     @Test func theStudioLoopWithoutItsReplacementIsAnUpdate() {
-        #expect(Self.spans(Self.studioSeeding(keptInsideTask: true, replaces: false, restore: "kept + presets.count")) == ["self.appearance = kept + presets.count"])
+        #expect(
+            Self.spans(Self.studioSeeding(keptInsideTask: true, replaces: false, restore: "kept + presets.count")) == [
+                "self.appearance = kept + presets.count"
+            ]
+        )
     }
 
     /*
@@ -172,7 +180,11 @@ struct ConcurrencyNoLostUpdateTests {
     }
 
     @Test func theGazeProbeWithoutItsReplacementIsAnUpdate() {
-        #expect(Self.spans(Self.gazeProbe(replaces: false, restore: "!usedMediaPipe")) == ["LiveMirror.usesMediaPipe = !usedMediaPipe"])
+        #expect(
+            Self.spans(Self.gazeProbe(replaces: false, restore: "!usedMediaPipe")) == [
+                "LiveMirror.usesMediaPipe = !usedMediaPipe"
+            ]
+        )
     }
 
     /*
@@ -207,7 +219,11 @@ struct ConcurrencyNoLostUpdateTests {
     }
 
     @Test func thePresetColorProbeWithoutItsReplacementIsAnUpdate() {
-        #expect(Self.spans(Self.presetColorProbe(replaces: false, restore: "kept.tinted()")) == ["model.appearance = kept.tinted()"])
+        #expect(
+            Self.spans(Self.presetColorProbe(replaces: false, restore: "kept.tinted()")) == [
+                "model.appearance = kept.tinted()"
+            ]
+        )
     }
 
     /* A method called on the object itself is not a replacement of one of its members, as in TypeScript. */
@@ -218,7 +234,8 @@ struct ConcurrencyNoLostUpdateTests {
                     entry.reset()
                     await save()
                     entry.retries = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(source) == ["entry.retries = old + 1"])
     }
 
@@ -279,7 +296,11 @@ struct ConcurrencyNoLostUpdateTests {
     /* `total = total + (await pause())` lost the other task's bump, implicit `self` and explicit alike. */
     @Test func aSumReadBeforeItsAwaitIsAnUpdate() {
         #expect(Self.spans(Self.subject("count = count + (await next())")) == ["count = count + (await next())"])
-        #expect(Self.spans(Self.subject("self.total = self.total + (await price())")) == ["self.total = self.total + (await price())"])
+        #expect(
+            Self.spans(Self.subject("self.total = self.total + (await price())")) == [
+                "self.total = self.total + (await price())"
+            ]
+        )
     }
 
     /* `+=` reads its left side when the operator runs, after the await: the bump was kept, on an actor, a subscript, a `@MainActor` class and a global. */
@@ -296,9 +317,21 @@ struct ConcurrencyNoLostUpdateTests {
 
     /* `max(total, await pause())`, `items + [await pause()]` and `items.appending(await pause())` all lost it: a receiver and earlier arguments are read first. */
     @Test func readsBeforeAnAwaitInACallAreAnUpdate() {
-        #expect(Self.spans(Self.subject("self.total = max(self.total, await price())")) == ["self.total = max(self.total, await price())"])
-        #expect(Self.spans(Self.subject("self.items = self.items + [await next()]")) == ["self.items = self.items + [await next()]"])
-        #expect(Self.spans(Self.subject("self.items = self.items.appending(await next())")) == ["self.items = self.items.appending(await next())"])
+        #expect(
+            Self.spans(Self.subject("self.total = max(self.total, await price())")) == [
+                "self.total = max(self.total, await price())"
+            ]
+        )
+        #expect(
+            Self.spans(Self.subject("self.items = self.items + [await next()]")) == [
+                "self.items = self.items + [await next()]"
+            ]
+        )
+        #expect(
+            Self.spans(Self.subject("self.items = self.items.appending(await next())")) == [
+                "self.items = self.items.appending(await next())"
+            ]
+        )
     }
 
     /* `items.append(await pause())` kept it: a mutating call is not an assignment, and its receiver is accessed after the argument. */
@@ -326,7 +359,8 @@ struct ConcurrencyNoLostUpdateTests {
                     let old = self.count
                     await save()
                     self.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(source) == ["self.count = old + 1"])
     }
 
@@ -337,12 +371,21 @@ struct ConcurrencyNoLostUpdateTests {
                     let old = count
                     await save()
                     count = old + 1
-            """)
-        let file = ParsedFile(url: URL(fileURLWithPath: "/fixture/Subject.swift"), targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+            """
+        )
+        let file = ParsedFile(
+            url: URL(fileURLWithPath: "/fixture/Subject.swift"),
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         #expect(
             ConcurrencyNoLostUpdate().findings(in: file).map(\.message) == [
                 "This write loses updates. Its new value is computed from `count` as it was before an await, and the function is suspended in between, so anything else that changes `count` during the suspension (another call on this actor, another task on the main actor) is overwritten by this line. Read `count` after the suspension, or keep the whole read, compute and write on one side of it."
-            ])
+            ]
+        )
     }
 
     /* `count` and `self.count` are one property, whichever spelling reads and whichever writes. */
@@ -352,13 +395,18 @@ struct ConcurrencyNoLostUpdateTests {
                     let old = count
                     await save()
                     self.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(source) == ["self.count = old + 1"])
     }
 
     /* A member of a parameter that is not `inout`: writing through it compiles only for an object the caller holds. */
     @Test func aParametersObjectIsShared() {
-        #expect(Self.spans(Self.subject("entry.retries = entry.retries + (await next())")) == ["entry.retries = entry.retries + (await next())"])
+        #expect(
+            Self.spans(Self.subject("entry.retries = entry.retries + (await next())")) == [
+                "entry.retries = entry.retries + (await next())"
+            ]
+        )
     }
 
     @Test func aSuspensionOnOneBranchIsEnough() {
@@ -369,7 +417,8 @@ struct ConcurrencyNoLostUpdateTests {
                         await save()
                     }
                     self.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(source) == ["self.count = old + 1"])
     }
 
@@ -381,7 +430,8 @@ struct ConcurrencyNoLostUpdateTests {
                         use(value)
                     }
                     self.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(before) == ["self.count = old + 1"])
         let inside = Self.subject(
             """
@@ -390,13 +440,22 @@ struct ConcurrencyNoLostUpdateTests {
                         self.count = old + value
                         break
                     }
-            """)
+            """
+        )
         #expect(Self.spans(inside) == ["self.count = old + value"])
     }
 
     @Test func theReadPrecedesAForkThatSuspends() {
-        #expect(Self.spans(Self.subject("self.count = self.count + (flag ? await next() : 1)")) == ["self.count = self.count + (flag ? await next() : 1)"])
-        #expect(Self.spans(Self.subject("self.count = self.count + ((await next()) > 0 ? 1 : 2)")) == ["self.count = self.count + ((await next()) > 0 ? 1 : 2)"])
+        #expect(
+            Self.spans(Self.subject("self.count = self.count + (flag ? await next() : 1)")) == [
+                "self.count = self.count + (flag ? await next() : 1)"
+            ]
+        )
+        #expect(
+            Self.spans(Self.subject("self.count = self.count + ((await next()) > 0 ? 1 : 2)")) == [
+                "self.count = self.count + ((await next()) > 0 ? 1 : 2)"
+            ]
+        )
     }
 
     @Test func aMethodCalledOnTheStaleValue() {
@@ -405,7 +464,8 @@ struct ConcurrencyNoLostUpdateTests {
                     let items = self.items
                     await save()
                     self.items = items.filter { $0 > 0 }
-            """)
+            """
+        )
         #expect(Self.spans(source) == ["self.items = items.filter { $0 > 0 }"])
     }
 
@@ -416,7 +476,8 @@ struct ConcurrencyNoLostUpdateTests {
                     let following = old + 1
                     await save()
                     self.count = following
-            """)
+            """
+        )
         #expect(Self.spans(source) == ["self.count = following"])
     }
 
@@ -431,7 +492,8 @@ struct ConcurrencyNoLostUpdateTests {
                         use(0)
                     }
                     self.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(after) == ["self.count = old + 1"])
         let inCatch = Self.subject(
             """
@@ -441,7 +503,8 @@ struct ConcurrencyNoLostUpdateTests {
                     } catch {
                         self.count = old + 1
                     }
-            """)
+            """
+        )
         #expect(Self.spans(inCatch) == ["self.count = old + 1"])
     }
 
@@ -452,7 +515,8 @@ struct ConcurrencyNoLostUpdateTests {
                     self.other = 0
                     await save()
                     self.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(sibling) == ["self.count = old + 1"])
         let inside = Self.subject(
             """
@@ -460,7 +524,8 @@ struct ConcurrencyNoLostUpdateTests {
                     self.state.extra = 1
                     await save()
                     self.state = old.adding(2)
-            """)
+            """
+        )
         #expect(Self.spans(inside) == ["self.state = old.adding(2)"])
     }
 
@@ -469,7 +534,8 @@ struct ConcurrencyNoLostUpdateTests {
             """
                     let old = self.count
                     self.count = (await next()) + old
-            """)
+            """
+        )
         #expect(Self.spans(source) == ["self.count = (await next()) + old"])
     }
 
@@ -482,7 +548,8 @@ struct ConcurrencyNoLostUpdateTests {
                         self.count = old + value
                         await save()
                     }
-            """)
+            """
+        )
         #expect(Self.spans(source) == ["self.count = old + value"])
     }
 
@@ -492,7 +559,8 @@ struct ConcurrencyNoLostUpdateTests {
                     let old = self.count
                     await save()
                     self.count = (old + 1) > 0 ? old + 1 : 0
-            """)
+            """
+        )
         #expect(Self.spans(source) == ["self.count = (old + 1) > 0 ? old + 1 : 0"])
     }
 
@@ -517,7 +585,9 @@ struct ConcurrencyNoLostUpdateTests {
                 static func remote() async -> Int { 1 }
             }
             """
-        #expect(Self.spans(source) == ["self.count = old + 1", "self?.count = (self?.count ?? 0) + (await Model.remote())"])
+        #expect(
+            Self.spans(source) == ["self.count = old + 1", "self?.count = (self?.count ?? 0) + (await Model.remote())"]
+        )
     }
 
     /* A global, and a static member through its type, are shared from a free function. */
@@ -531,7 +601,11 @@ struct ConcurrencyNoLostUpdateTests {
                 Counter.total = Counter.total + (await pause())
             }
             """
-        #expect(Self.spans(source) == ["global = global + (await pause())", "Counter.total = Counter.total + (await pause())"])
+        #expect(
+            Self.spans(source) == [
+                "global = global + (await pause())", "Counter.total = Counter.total + (await pause())",
+            ]
+        )
     }
 
     /* A `defer` runs at the end of its scope, after the await. */
@@ -541,12 +615,17 @@ struct ConcurrencyNoLostUpdateTests {
                     let old = self.count
                     defer { self.count = old + 1 }
                     await save()
-            """)
+            """
+        )
         #expect(Self.spans(source) == ["self.count = old + 1"])
     }
 
     @Test func theTargetReadAsASubscriptKey() {
-        #expect(Self.spans(Self.subject("self.count = xs[self.count] + (await next())")) == ["self.count = xs[self.count] + (await next())"])
+        #expect(
+            Self.spans(Self.subject("self.count = xs[self.count] + (await next())")) == [
+                "self.count = xs[self.count] + (await next())"
+            ]
+        )
     }
 
     /* A function named like the property is not a read of it. */
@@ -565,7 +644,9 @@ struct ConcurrencyNoLostUpdateTests {
     // MARK: Silent
 
     @Test func aTimestampAfterAnAwaitIsSilent() {
-        #expect(Self.spans(Self.subject("use(await next())\n        self.lastRunAt = Date().timeIntervalSince1970")).isEmpty)
+        #expect(
+            Self.spans(Self.subject("use(await next())\n        self.lastRunAt = Date().timeIntervalSince1970")).isEmpty
+        )
     }
 
     /* Written back exactly as saved, cast or not. */
@@ -575,14 +656,16 @@ struct ConcurrencyNoLostUpdateTests {
                     let saved = self.count
                     try await run()
                     self.count = saved
-            """)
+            """
+        )
         #expect(Self.spans(source).isEmpty)
         let cast = Self.subject(
             """
                     let saved = self.count
                     try await run()
                     self.count = saved as Int
-            """)
+            """
+        )
         #expect(Self.spans(cast).isEmpty)
     }
 
@@ -593,7 +676,8 @@ struct ConcurrencyNoLostUpdateTests {
                     self.count = 0
                     await save()
                     self.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(direct).isEmpty)
         let compound = Self.subject(
             """
@@ -601,7 +685,8 @@ struct ConcurrencyNoLostUpdateTests {
                     self.count += 1
                     await save()
                     self.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(compound).isEmpty)
         let container = Self.subject(
             """
@@ -609,7 +694,8 @@ struct ConcurrencyNoLostUpdateTests {
                     self.state = Tally()
                     await save()
                     self.state.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(container).isEmpty)
         let mutated = Self.subject(
             """
@@ -617,7 +703,8 @@ struct ConcurrencyNoLostUpdateTests {
                     self.items.removeAll()
                     await save()
                     self.items = old + [1]
-            """)
+            """
+        )
         #expect(Self.spans(mutated).isEmpty)
     }
 
@@ -630,7 +717,8 @@ struct ConcurrencyNoLostUpdateTests {
                     }
                     await save()
                     self.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(source) == ["self.count = old + 1"])
     }
 
@@ -641,7 +729,10 @@ struct ConcurrencyNoLostUpdateTests {
 
     /* A local is never judged: nobody else can see it, and a captured one cannot be written concurrently in Swift 6. */
     @Test func aLocalIsSilent() {
-        #expect(Self.spans(Self.subject("var total = 0\n        total = total + (await next())\n        use(total)")).isEmpty)
+        #expect(
+            Self.spans(Self.subject("var total = 0\n        total = total + (await next())\n        use(total)"))
+                .isEmpty
+        )
         let shadowing = Self.subject("var count = 0\n        count = count + (await next())\n        use(count)")
         #expect(Self.spans(shadowing).isEmpty)
         let captured = Self.subject(
@@ -651,7 +742,8 @@ struct ConcurrencyNoLostUpdateTests {
                         total = total + (await group.next() ?? 0)
                     }
                     use(total)
-            """)
+            """
+        )
         #expect(Self.spans(captured).isEmpty)
         let localObject = Self.subject("let local = Entry()\n        local.retries = local.retries + (await next())")
         #expect(Self.spans(localObject).isEmpty)
@@ -672,7 +764,8 @@ struct ConcurrencyNoLostUpdateTests {
                         return
                     }
                     self.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(returns).isEmpty)
         let fails = Self.subject(
             """
@@ -682,7 +775,8 @@ struct ConcurrencyNoLostUpdateTests {
                         fatalError("unreachable")
                     }
                     self.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(fails).isEmpty)
         let breaks = Self.subject(
             """
@@ -694,7 +788,8 @@ struct ConcurrencyNoLostUpdateTests {
                         }
                         self.count = old + value
                     }
-            """)
+            """
+        )
         #expect(Self.spans(breaks).isEmpty)
         let switches = Self.subject(
             """
@@ -707,7 +802,8 @@ struct ConcurrencyNoLostUpdateTests {
                         break
                     }
                     self.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(switches).isEmpty)
     }
 
@@ -722,7 +818,8 @@ struct ConcurrencyNoLostUpdateTests {
                     } catch {
                         self.count = old + 1
                     }
-            """)
+            """
+        )
         #expect(Self.spans(source).isEmpty)
     }
 
@@ -736,7 +833,8 @@ struct ConcurrencyNoLostUpdateTests {
                     } catch {
                         self.count = old + 1
                     }
-            """)
+            """
+        )
         #expect(Self.spans(source).isEmpty)
     }
 
@@ -748,7 +846,8 @@ struct ConcurrencyNoLostUpdateTests {
                         self.count = old + value
                         await save(value)
                     }
-            """)
+            """
+        )
         #expect(Self.spans(source).isEmpty)
     }
 
@@ -777,7 +876,9 @@ struct ConcurrencyNoLostUpdateTests {
             }
             """
         #expect(Self.spans(parameter).isEmpty)
-        let untyped = Self.subject("let bump: (Entry) async -> Void = { entry in entry.retries = entry.retries + (await self.next()) }")
+        let untyped = Self.subject(
+            "let bump: (Entry) async -> Void = { entry in entry.retries = entry.retries + (await self.next()) }"
+        )
         #expect(Self.spans(untyped).isEmpty)
     }
 
@@ -787,7 +888,8 @@ struct ConcurrencyNoLostUpdateTests {
                     let old = self.other
                     await save()
                     self.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(source).isEmpty)
     }
 
@@ -798,7 +900,8 @@ struct ConcurrencyNoLostUpdateTests {
                     let snapshot = self.state
                     await save()
                     self.state.count = snapshot.count + 1
-            """)
+            """
+        )
         #expect(Self.spans(source).isEmpty)
     }
 
@@ -807,14 +910,16 @@ struct ConcurrencyNoLostUpdateTests {
             """
                     let response = await price(self.count)
                     self.count = response + 1
-            """)
+            """
+        )
         #expect(Self.spans(response).isEmpty)
         let kept = Self.subject(
             """
                     let fetched = await price(self.count)
                     await save()
                     self.count = fetched + 1
-            """)
+            """
+        )
         #expect(Self.spans(kept).isEmpty)
         #expect(Self.spans(Self.subject("self.count = await price(self.count + 1)")).isEmpty)
         #expect(Self.spans(Self.subject("self.count = try await run().hashValue")).isEmpty)
@@ -832,7 +937,8 @@ struct ConcurrencyNoLostUpdateTests {
                     let old = self.count
                     Task { await self.save() }
                     self.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(source).isEmpty)
     }
 
@@ -843,7 +949,8 @@ struct ConcurrencyNoLostUpdateTests {
                     let old = self.count
                     await save()
                     Task { self.count = old + 1 }
-            """)
+            """
+        )
         #expect(Self.spans(source).isEmpty)
     }
 
@@ -853,7 +960,8 @@ struct ConcurrencyNoLostUpdateTests {
                     let old = self.count
                     let chosen = flag ? old : await next()
                     self.count = chosen + 1
-            """)
+            """
+        )
         #expect(Self.spans(source).isEmpty)
     }
 
@@ -864,7 +972,8 @@ struct ConcurrencyNoLostUpdateTests {
                     old = 0
                     await save()
                     self.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(source).isEmpty)
     }
 
@@ -882,7 +991,8 @@ struct ConcurrencyNoLostUpdateTests {
                     #endif
                     await save()
                     self.count = old + 1
-            """)
+            """
+        )
         #expect(Self.spans(source).isEmpty)
     }
 

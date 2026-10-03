@@ -25,7 +25,8 @@ public struct ForceCast: FileRule {
                 at: mark,
                 rule: name,
                 messageId: "forceCast",
-                message: "as! crashes the process when the value is not that type. Use as? and say what happens when it is not."
+                message:
+                    "as! crashes the process when the value is not that type. Use as? and say what happens when it is not.",
             )
         }
     }

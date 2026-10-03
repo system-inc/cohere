@@ -58,29 +58,40 @@ public struct ContainsOverFilter: TypedFileRule {
         let visitor = Visitor(viewMode: .sourceAccurate)
         visitor.walk(folded)
         return visitor.found.compactMap { candidate in
-            guard Self.resolvesToStandardLibrary(candidate.filter, in: file, symbols: symbols, excludingLazy: true) else { return nil }
+            guard Self.resolvesToStandardLibrary(candidate.filter, in: file, symbols: symbols, excludingLazy: true)
+            else { return nil }
             if let count = candidate.count {
-                guard Self.resolvesToStandardLibrary(count, in: file, symbols: symbols, excludingLazy: false) else { return nil }
+                guard Self.resolvesToStandardLibrary(count, in: file, symbols: symbols, excludingLazy: false) else {
+                    return nil
+                }
                 return file.finding(
                     at: candidate.node,
                     rule: name,
                     messageId: "filterCount",
-                    message: "Counting a filtered collection to compare with zero builds a whole new collection to ask whether anything matched. Use contains(where:) (or !contains(where:) for == 0): it says what is meant, and it stops at the first match."
+                    message:
+                        "Counting a filtered collection to compare with zero builds a whole new collection to ask whether anything matched. Use contains(where:) (or !contains(where:) for == 0): it says what is meant, and it stops at the first match.",
                 )
             }
             return file.finding(
                 at: candidate.node,
                 rule: name,
                 messageId: "filterIsEmpty",
-                message: "Asking whether a filtered collection is empty builds a whole new collection to ask whether anything matched. Use !contains(where:) (or contains(where:) for !isEmpty): it says what is meant, and it stops at the first match."
+                message:
+                    "Asking whether a filtered collection is empty builds a whole new collection to ask whether anything matched. Use !contains(where:) (or contains(where:) for !isEmpty): it says what is meant, and it stops at the first match.",
             )
         }
     }
 
     /* Whether the name at this token is a written reference to a standard library declaration, and, when asked, not a lazy one. */
-    static func resolvesToStandardLibrary(_ token: TokenSyntax, in file: ParsedFile, symbols: FileSymbols, excludingLazy: Bool) -> Bool {
+    static func resolvesToStandardLibrary(
+        _ token: TokenSyntax,
+        in file: ParsedFile,
+        symbols: FileSymbols,
+        excludingLazy: Bool,
+    ) -> Bool {
         let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
-        guard let resolved = symbols.reference(line: location.line, column: location.column), resolved.isStandardLibrary else { return false }
+        guard let resolved = symbols.reference(line: location.line, column: location.column), resolved.isStandardLibrary
+        else { return false }
         return !(excludingLazy && resolved.symbol.contains("Lazy"))
     }
 
@@ -98,16 +109,23 @@ public struct ContainsOverFilter: TypedFileRule {
         override func visit(_ node: InfixOperatorExprSyntax) -> SyntaxVisitorContinueKind {
             guard let operation = node.operator.as(BinaryOperatorExprSyntax.self) else { return .visitChildren }
             let comparison = operation.operator.text
-            if ContainsOverFilter.comparisons.contains(comparison), Self.isZero(node.rightOperand), let tokens = Self.filterCountTokens(node.leftOperand) {
+            if ContainsOverFilter.comparisons.contains(comparison), Self.isZero(node.rightOperand),
+                let tokens = Self.filterCountTokens(node.leftOperand)
+            {
                 found.append(Candidate(node: ExprSyntax(node), filter: tokens.filter, count: tokens.count))
-            } else if ContainsOverFilter.mirroredComparisons.contains(comparison), Self.isZero(node.leftOperand), let tokens = Self.filterCountTokens(node.rightOperand) {
+            }
+            else if ContainsOverFilter.mirroredComparisons.contains(comparison), Self.isZero(node.leftOperand),
+                let tokens = Self.filterCountTokens(node.rightOperand)
+            {
                 found.append(Candidate(node: ExprSyntax(node), filter: tokens.filter, count: tokens.count))
             }
             return .visitChildren
         }
 
         override func visit(_ node: MemberAccessExprSyntax) -> SyntaxVisitorContinueKind {
-            if node.declName.baseName.text == "isEmpty", node.declName.argumentNames == nil, let base = node.base, let filter = Self.filterToken(base) {
+            if node.declName.baseName.text == "isEmpty", node.declName.argumentNames == nil, let base = node.base,
+                let filter = Self.filterToken(base)
+            {
                 found.append(Candidate(node: ExprSyntax(node), filter: filter, count: nil))
             }
             return .visitChildren
@@ -126,7 +144,8 @@ public struct ContainsOverFilter: TypedFileRule {
 
         /* `<filter call>.count`: the `filter` token and the `count` token. */
         static func filterCountTokens(_ expression: ExprSyntax) -> (filter: TokenSyntax, count: TokenSyntax)? {
-            guard let member = expression.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "count", member.declName.argumentNames == nil,
+            guard let member = expression.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "count",
+                member.declName.argumentNames == nil,
                 let base = member.base, let filter = filterToken(base)
             else {
                 return nil
@@ -137,14 +156,20 @@ public struct ContainsOverFilter: TypedFileRule {
         /* The `filter` name token of `items.filter { }`, `filter(predicate)`, or either inside one pair of parentheses. */
         static func filterToken(_ expression: ExprSyntax) -> TokenSyntax? {
             var callExpression = expression
-            if let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1, let only = tuple.elements.first, only.label == nil {
+            if let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1,
+                let only = tuple.elements.first, only.label == nil
+            {
                 callExpression = only.expression
             }
             guard let call = callExpression.as(FunctionCallExprSyntax.self) else { return nil }
-            if let member = call.calledExpression.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "filter" {
+            if let member = call.calledExpression.as(MemberAccessExprSyntax.self),
+                member.declName.baseName.text == "filter"
+            {
                 return member.declName.baseName
             }
-            if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self), reference.baseName.text == "filter" {
+            if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self),
+                reference.baseName.text == "filter"
+            {
                 return reference.baseName
             }
             return nil

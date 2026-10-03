@@ -17,11 +17,22 @@ struct PackageDescriptionCacheTests {
     static let toolchain = "swiftlang-test.1"
 
     static func package() throws -> (root: URL, scratch: URL) {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-describe-\(UUID().uuidString)", isDirectory: true)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-describe-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-        try manifest(targets: ["Control"]).write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try "struct Control {}\n".write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
+        try manifest(targets: ["Control"]).write(
+            to: root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try "struct Control {}\n".write(
+            to: sources.appendingPathComponent("Control.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
         return (root, root.appendingPathComponent(".scratch", isDirectory: true))
     }
 
@@ -33,9 +44,15 @@ struct PackageDescriptionCacheTests {
     static func doctor(scratch: URL) throws {
         let cache = PackageDescriptionCache(scratchPath: scratch)
         var entry = try JSONDecoder().decode(PackageDescriptionCache.Entry.self, from: Data(contentsOf: cache.file))
-        let renamed = String(decoding: entry.members[0].describe, as: UTF8.self).replacingOccurrences(of: "\"name\" : \"Control\"", with: "\"name\" : \"FromTheCache\"")
-            .replacingOccurrences(of: "\"name\":\"Control\"", with: "\"name\":\"FromTheCache\"")
-        #expect(renamed.contains("FromTheCache"), "the doctoring found no target name to rename, so this test would prove nothing")
+        let renamed = String(decoding: entry.members[0].describe, as: UTF8.self).replacingOccurrences(
+            of: "\"name\" : \"Control\"",
+            with: "\"name\" : \"FromTheCache\"",
+        )
+        .replacingOccurrences(of: "\"name\":\"Control\"", with: "\"name\":\"FromTheCache\"")
+        #expect(
+            renamed.contains("FromTheCache"),
+            "the doctoring found no target name to rename, so this test would prove nothing",
+        )
         entry.members[0].describe = Data(renamed.utf8)
         try JSONEncoder().encode(entry).write(to: cache.file)
     }
@@ -55,32 +72,54 @@ struct PackageDescriptionCacheTests {
     func aChangeSwiftPMWouldSeeIsNotAnsweredFromTheCache(change: String) throws {
         let (root, scratch) = try Self.package()
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
-        try "struct Second {}\n".write(to: sources.appendingPathComponent("Second.swift"), atomically: true, encoding: .utf8)
+        try "struct Second {}\n".write(
+            to: sources.appendingPathComponent("Second.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
         _ = try Self.targetNames(root, scratch)
         try Self.doctor(scratch: scratch)
 
         var toolchain = Self.toolchain
         switch change {
-        case "file added":
-            try "struct Third {}\n".write(to: sources.appendingPathComponent("Third.swift"), atomically: true, encoding: .utf8)
-        case "file removed":
-            try FileManager.default.removeItem(at: sources.appendingPathComponent("Second.swift"))
-        case "manifest edited":
-            try FileManager.default.createDirectory(at: root.appendingPathComponent("Sources/Extra"), withIntermediateDirectories: true)
-            try "struct Extra {}\n".write(to: root.appendingPathComponent("Sources/Extra/Extra.swift"), atomically: true, encoding: .utf8)
-            try Self.manifest(targets: ["Control", "Extra"]).write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        default:
-            toolchain = "swiftlang-test.2"
+            case "file added":
+                try "struct Third {}\n".write(
+                    to: sources.appendingPathComponent("Third.swift"),
+                    atomically: true,
+                    encoding: .utf8,
+                )
+            case "file removed":
+                try FileManager.default.removeItem(at: sources.appendingPathComponent("Second.swift"))
+            case "manifest edited":
+                try FileManager.default.createDirectory(
+                    at: root.appendingPathComponent("Sources/Extra"),
+                    withIntermediateDirectories: true,
+                )
+                try "struct Extra {}\n".write(
+                    to: root.appendingPathComponent("Sources/Extra/Extra.swift"),
+                    atomically: true,
+                    encoding: .utf8,
+                )
+                try Self.manifest(targets: ["Control", "Extra"]).write(
+                    to: root.appendingPathComponent("Package.swift"),
+                    atomically: true,
+                    encoding: .utf8,
+                )
+            default:
+                toolchain = "swiftlang-test.2"
         }
 
         let model = try PackageModel.load(root: root, scratchPath: scratch, toolchain: toolchain)
-        #expect(!model.targets.map(\.name).contains("FromTheCache"), "after a \(change), the stale cached answer was used")
+        #expect(
+            !model.targets.map(\.name).contains("FromTheCache"),
+            "after a \(change), the stale cached answer was used",
+        )
         let files = Set(model.targets.flatMap(\.sources).map(\.lastPathComponent))
         switch change {
-        case "file added": #expect(files.contains("Third.swift"))
-        case "file removed": #expect(!files.contains("Second.swift"))
-        case "manifest edited": #expect(model.targets.map(\.name) == ["Control", "Extra"])
-        default: break
+            case "file added": #expect(files.contains("Third.swift"))
+            case "file removed": #expect(!files.contains("Second.swift"))
+            case "manifest edited": #expect(model.targets.map(\.name) == ["Control", "Extra"])
+            default: break
         }
     }
 
@@ -89,7 +128,11 @@ struct PackageDescriptionCacheTests {
         let (root, scratch) = try Self.package()
         _ = try Self.targetNames(root, scratch)
         try Self.doctor(scratch: scratch)
-        try "struct Control { let edited = 1 }\n".write(to: root.appendingPathComponent("Sources/Control/Control.swift"), atomically: false, encoding: .utf8)
+        try "struct Control { let edited = 1 }\n".write(
+            to: root.appendingPathComponent("Sources/Control/Control.swift"),
+            atomically: false,
+            encoding: .utf8,
+        )
         #expect(try Self.targetNames(root, scratch).contains("FromTheCache"))
     }
 

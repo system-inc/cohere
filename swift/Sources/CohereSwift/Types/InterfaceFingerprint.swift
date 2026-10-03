@@ -77,7 +77,8 @@ enum InterfaceFingerprint {
             for child in node.children(viewMode: .sourceAccurate) {
                 if let excluded, child.id == excluded.id {
                     add("{body}")
-                } else {
+                }
+                else {
                     walk(child)
                 }
             }

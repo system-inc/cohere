@@ -1,5 +1,5 @@
-import SwiftSyntax
 import Foundation
+import SwiftSyntax
 
 /*
  Every target we own enables the compiler checks the house rules ride on, as upcoming features in its
@@ -27,8 +27,14 @@ public struct ToolchainRequireUpcomingFeatures: PackageRule {
 
     /* The features required, with why each matters, said in the finding. */
     static let required: [(feature: String, reason: String)] = [
-        ("ExistentialAny", "a protocol used as a type is spelled `any P`, so the cost of an existential is written where it is paid"),
-        ("MemberImportVisibility", "a member is visible only from a module the file imports, so no file compiles on an import it does not have"),
+        (
+            "ExistentialAny",
+            "a protocol used as a type is spelled `any P`, so the cost of an existential is written where it is paid",
+        ),
+        (
+            "MemberImportVisibility",
+            "a member is visible only from a module the file imports, so no file compiles on an import it does not have",
+        ),
     ]
 
     public init() {}
@@ -41,9 +47,15 @@ public struct ToolchainRequireUpcomingFeatures: PackageRule {
                 guard !missing.isEmpty else { return nil }
                 let settings = missing.map { ".enableUpcomingFeature(\"\($0.feature)\")" }.joined(separator: ", ")
                 let reasons = missing.map { "\($0.feature): \($0.reason)" }.joined(separator: "; ")
-                let message = "\(target.name) does not enable \(missing.map(\.feature).joined(separator: " and ")). Add \(settings) to its swiftSettings. \(reasons)."
+                let message =
+                    "\(target.name) does not enable \(missing.map(\.feature).joined(separator: " and ")). Add \(settings) to its swiftSettings. \(reasons)."
                 if let manifest, let declaration = TargetNameFinder.find(target.name, in: manifest.tree) {
-                    return manifest.finding(at: declaration, rule: name, messageId: "upcomingFeatureMissing", message: message)
+                    return manifest.finding(
+                        at: declaration,
+                        rule: name,
+                        messageId: "upcomingFeatureMissing",
+                        message: message,
+                    )
                 }
                 /* No declaration found (a target named by a computed string): point at the manifest's first line rather than drop the finding. */
                 return FindingRecord(
@@ -54,7 +66,7 @@ public struct ToolchainRequireUpcomingFeatures: PackageRule {
                     severity: .error,
                     rule: name,
                     messageId: "upcomingFeatureMissing",
-                    message: message
+                    message: message,
                 )
             }
     }

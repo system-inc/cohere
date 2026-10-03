@@ -23,7 +23,8 @@ public struct FatalErrorMessage: FileRule {
                 at: callee,
                 rule: name,
                 messageId: "failureWithoutMessage",
-                message: "\(callee.baseName.text)() with no message crashes without saying why. Pass the reason, so the crash report explains itself."
+                message:
+                    "\(callee.baseName.text)() with no message crashes without saying why. Pass the reason, so the crash report explains itself.",
             )
         }
     }
@@ -42,7 +43,8 @@ public struct FatalErrorMessage: FileRule {
                 found.append(callee)
                 return .visitChildren
             }
-            if let literal = message.as(StringLiteralExprSyntax.self), literal.representedLiteralValue?.isEmpty == true {
+            if let literal = message.as(StringLiteralExprSyntax.self), literal.representedLiteralValue?.isEmpty == true
+            {
                 found.append(callee)
             }
             return .visitChildren

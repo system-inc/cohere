@@ -61,15 +61,42 @@ public struct ConsistencyNoAbbreviatedIdentifier: FileRule {
             modifiers.contains { $0.name.tokenKind == .keyword(.override) }
         }
 
-        override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind { declare(node.name); return .visitChildren }
-        override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind { declare(node.name); return .visitChildren }
-        override func visit(_ node: EnumDeclSyntax) -> SyntaxVisitorContinueKind { declare(node.name); return .visitChildren }
-        override func visit(_ node: ActorDeclSyntax) -> SyntaxVisitorContinueKind { declare(node.name); return .visitChildren }
-        override func visit(_ node: ProtocolDeclSyntax) -> SyntaxVisitorContinueKind { declare(node.name); return .visitChildren }
-        override func visit(_ node: TypeAliasDeclSyntax) -> SyntaxVisitorContinueKind { declare(node.name); return .visitChildren }
-        override func visit(_ node: AssociatedTypeDeclSyntax) -> SyntaxVisitorContinueKind { declare(node.name); return .visitChildren }
-        override func visit(_ node: GenericParameterSyntax) -> SyntaxVisitorContinueKind { declare(node.name); return .visitChildren }
-        override func visit(_ node: EnumCaseElementSyntax) -> SyntaxVisitorContinueKind { declare(node.name); return .visitChildren }
+        override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
+            declare(node.name)
+            return .visitChildren
+        }
+        override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
+            declare(node.name)
+            return .visitChildren
+        }
+        override func visit(_ node: EnumDeclSyntax) -> SyntaxVisitorContinueKind {
+            declare(node.name)
+            return .visitChildren
+        }
+        override func visit(_ node: ActorDeclSyntax) -> SyntaxVisitorContinueKind {
+            declare(node.name)
+            return .visitChildren
+        }
+        override func visit(_ node: ProtocolDeclSyntax) -> SyntaxVisitorContinueKind {
+            declare(node.name)
+            return .visitChildren
+        }
+        override func visit(_ node: TypeAliasDeclSyntax) -> SyntaxVisitorContinueKind {
+            declare(node.name)
+            return .visitChildren
+        }
+        override func visit(_ node: AssociatedTypeDeclSyntax) -> SyntaxVisitorContinueKind {
+            declare(node.name)
+            return .visitChildren
+        }
+        override func visit(_ node: GenericParameterSyntax) -> SyntaxVisitorContinueKind {
+            declare(node.name)
+            return .visitChildren
+        }
+        override func visit(_ node: EnumCaseElementSyntax) -> SyntaxVisitorContinueKind {
+            declare(node.name)
+            return .visitChildren
+        }
 
         override func visit(_ node: EnumCaseParameterSyntax) -> SyntaxVisitorContinueKind {
             declare(node.firstName)
@@ -107,7 +134,8 @@ public struct ConsistencyNoAbbreviatedIdentifier: FileRule {
             for parameter in parameters {
                 if let secondName = parameter.secondName {
                     declare(secondName)
-                } else if !overriding {
+                }
+                else if !overriding {
                     declare(parameter.firstName)
                 }
             }

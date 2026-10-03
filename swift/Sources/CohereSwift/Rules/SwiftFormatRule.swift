@@ -29,13 +29,15 @@ public struct SwiftFormatRule: FileRule {
     public static let requireLowerCamelCase = SwiftFormatRule(
         name: "cohere-swift/always-use-lower-camel-case",
         incumbentRule: "AlwaysUseLowerCamelCase",
-        reason: "Swift spells values in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name is a word boundary camel case already marks."
+        reason:
+            "Swift spells values in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name is a word boundary camel case already marks.",
     )
 
     public static let noLeadingUnderscores = SwiftFormatRule(
         name: "cohere-swift/no-leading-underscores",
         incumbentRule: "NoLeadingUnderscores",
-        reason: "A leading underscore is a convention for \"private\", and access control says that in a way the compiler checks."
+        reason:
+            "A leading underscore is a convention for \"private\", and access control says that in a way the compiler checks.",
     )
 
     /* Every incumbent rule this wrapper runs, so one swift-format pass answers for all of them. */
@@ -45,21 +47,25 @@ public struct SwiftFormatRule: FileRule {
         let reported: SwiftFormatPass.Outcome
         do {
             reported = try SwiftFormatPass.shared.findings(in: file)
-        } catch {
+        }
+        catch {
             /*
              Reported rather than dropped: a rule that threw checked nothing in this file, and an empty list
              would read as a clean file.
              */
-            return [FindingRecord(
-                source: .rule,
-                file: file.url.path,
-                line: 1,
-                column: 1,
-                severity: .error,
-                rule: name,
-                messageId: "incumbentFailed",
-                message: "swift-format's \(incumbentRule) could not run on this file, so it was not checked: \(error)"
-            )]
+            return [
+                FindingRecord(
+                    source: .rule,
+                    file: file.url.path,
+                    line: 1,
+                    column: 1,
+                    severity: .error,
+                    rule: name,
+                    messageId: "incumbentFailed",
+                    message:
+                        "swift-format's \(incumbentRule) could not run on this file, so it was not checked: \(error)",
+                )
+            ]
         }
         return reported.filter { $0.rule == incumbentRule }.map { finding in
             FindingRecord(
@@ -70,7 +76,7 @@ public struct SwiftFormatRule: FileRule {
                 severity: .error,
                 rule: name,
                 messageId: incumbentRule,
-                message: finding.text.prefix(1).uppercased() + finding.text.dropFirst() + ". " + reason
+                message: finding.text.prefix(1).uppercased() + finding.text.dropFirst() + ". " + reason,
             )
         }
     }

@@ -65,14 +65,17 @@ public struct FileSymbols: Sendable {
             if rest.starts(with: "Sc".utf8) {
                 /* The concurrency substitutions are three characters: `ScT` Task, `Sci` AsyncSequence. */
                 rest = rest.dropFirst(3)
-            } else if rest.first == UInt8(ascii: "S") {
+            }
+            else if rest.first == UInt8(ascii: "S") {
                 rest = rest.dropFirst(2)
-            } else if rest.first == UInt8(ascii: "s") {
+            }
+            else if rest.first == UInt8(ascii: "s") {
                 rest = rest.dropFirst()
                 let digits = rest.prefix { $0 >= UInt8(ascii: "0") && $0 <= UInt8(ascii: "9") }
                 guard let length = Int(String(decoding: digits, as: UTF8.self)) else { return false }
                 rest = rest.dropFirst(digits.count + length + 1)
-            } else {
+            }
+            else {
                 return false
             }
             /*

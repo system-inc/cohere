@@ -71,20 +71,24 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
         let closures = ClosureResults(file: file, symbols: symbols, demangler: demangler)
         let discardedByClosure = visitor.closureValues.filter { closures.isDiscarded($0.closure) }.map(\.mark)
         let statements = visitor.found.map { (mark: $0, inClosure: false) }
-        let marks = (statements + discardedByClosure.map { (mark: $0, inClosure: true) }).sorted { $0.mark.position < $1.mark.position }
+        let marks = (statements + discardedByClosure.map { (mark: $0, inClosure: true) }).sorted {
+            $0.mark.position < $1.mark.position
+        }
         return marks.map { mark in
             mark.inClosure
                 ? file.finding(
                     at: mark.mark,
                     rule: name,
                     messageId: "discardedTryOptionalInClosure",
-                    message: "This try? is the whole body of a closure whose result goes nowhere (it returns nothing, or it is the value of a task nobody keeps), so the error is thrown away unseen. Use do/catch inside the closure, and say in the catch why the failure can be ignored if it can."
+                    message:
+                        "This try? is the whole body of a closure whose result goes nowhere (it returns nothing, or it is the value of a task nobody keeps), so the error is thrown away unseen. Use do/catch inside the closure, and say in the catch why the failure can be ignored if it can.",
                 )
                 : file.finding(
                     at: mark.mark,
                     rule: name,
                     messageId: "discardedTryOptional",
-                    message: "This try? throws the error away and keeps nothing, so a failure here is invisible. Use do/catch, and say in the catch why the failure can be ignored if it can."
+                    message:
+                        "This try? throws the error away and keeps nothing, so a failure here is invisible. Use do/catch, and say in the catch why the failure can be ignored if it can.",
                 )
         }
     }
@@ -106,7 +110,8 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
                     return .visitChildren
                 }
                 found.append(mark)
-            } else if let item = node.parent?.as(CodeBlockItemSyntax.self), let closure = Self.soleClosure(of: item) {
+            }
+            else if let item = node.parent?.as(CodeBlockItemSyntax.self), let closure = Self.soleClosure(of: item) {
                 closureValues.append((mark, closure))
             }
             return .visitChildren
@@ -126,7 +131,8 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
 
         /* Whether the item is the sole statement of a body that returns it: the implicit-return positions. */
         static func isImplicitValue(_ item: CodeBlockItemSyntax) -> Bool {
-            guard let list = item.parent?.as(CodeBlockItemListSyntax.self), list.count == 1, let owner = list.parent else { return false }
+            guard let list = item.parent?.as(CodeBlockItemListSyntax.self), list.count == 1, let owner = list.parent
+            else { return false }
             if owner.is(ClosureExprSyntax.self) || owner.is(AccessorBlockSyntax.self) {
                 return true
             }
@@ -167,7 +173,8 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
         static func isDiscardAssignment(_ node: some SyntaxProtocol) -> Bool {
             guard let elements = node.parent?.as(ExprListSyntax.self), elements.count == 3 else { return false }
             let parts = Array(elements)
-            return parts[0].is(DiscardAssignmentExprSyntax.self) && parts[1].is(AssignmentExprSyntax.self) && parts[2].id == node.id
+            return parts[0].is(DiscardAssignmentExprSyntax.self) && parts[1].is(AssignmentExprSyntax.self)
+                && parts[2].id == node.id
         }
     }
 
@@ -187,7 +194,9 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
             if let binding = closure.parent?.as(InitializerClauseSyntax.self)?.parent?.as(PatternBindingSyntax.self) {
                 return binding.typeAnnotation.map { Self.returnsVoid($0.type) } ?? false
             }
-            guard let call = Self.call(passing: closure), let callee = callee(of: call), let types = Self.boundParameterTypes(of: closure, in: call, signature: callee.signature) else {
+            guard let call = Self.call(passing: closure), let callee = callee(of: call),
+                let types = Self.boundParameterTypes(of: closure, in: call, signature: callee.signature)
+            else {
                 return false
             }
             let kinds = types.map(Signature.kind(of:))
@@ -195,7 +204,9 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
                 return true
             }
             /* The operation of a concurrency `Task`, whose value only the task's handle can read. */
-            guard callee.declaration.isStandardLibrary, callee.declaration.symbol.hasPrefix("s:ScT"), let success = Signature.taskSuccess(callee.signature.result) else { return false }
+            guard callee.declaration.isStandardLibrary, callee.declaration.symbol.hasPrefix("s:ScT"),
+                let success = Signature.taskSuccess(callee.signature.result)
+            else { return false }
             return kinds.allSatisfy { $0 == .function(returning: success) } && isDiscarded(call)
         }
 
@@ -228,9 +239,15 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
         func callee(of call: FunctionCallExprSyntax) -> (declaration: FileSymbols.Occurrence, signature: Signature)? {
             guard let demangler, let token = Self.nameToken(call.calledExpression) else { return nil }
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
-            let functions = symbols.occurrences(line: location.line, column: location.column).filter { $0.isReference && !$0.isImplicit && $0.name.contains("(") }
-            guard let declaration = functions.first, functions.allSatisfy({ $0.symbol == declaration.symbol && $0.name == declaration.name }) else { return nil }
-            guard let demangled = demangler.declaration(ofSymbol: declaration.symbol), let signature = Signature(demangled: demangled, name: declaration.name) else { return nil }
+            let functions = symbols.occurrences(line: location.line, column: location.column).filter {
+                $0.isReference && !$0.isImplicit && $0.name.contains("(")
+            }
+            guard let declaration = functions.first,
+                functions.allSatisfy({ $0.symbol == declaration.symbol && $0.name == declaration.name })
+            else { return nil }
+            guard let demangled = demangler.declaration(ofSymbol: declaration.symbol),
+                let signature = Signature(demangled: demangled, name: declaration.name)
+            else { return nil }
             return (declaration, signature)
         }
 
@@ -256,7 +273,11 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
          more than one, the compiler's choice turns on defaults the signature does not show, so all are returned.
          A variadic parameter takes any number of arguments, so with one in the signature only a label is trusted.
          */
-        static func boundParameterTypes(of closure: ClosureExprSyntax, in call: FunctionCallExprSyntax, signature: Signature) -> [String]? {
+        static func boundParameterTypes(
+            of closure: ClosureExprSyntax,
+            in call: FunctionCallExprSyntax,
+            signature: Signature,
+        ) -> [String]? {
             let labels = signature.labels
             let isVariadic = signature.parameters.contains { $0.hasSuffix("...") }
             func labeled(_ label: String) -> [String]? {
@@ -273,7 +294,9 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
             var bound: [Int] = []
             for argument in call.arguments {
                 let label = argument.label?.text ?? "_"
-                guard let index = labels.indices.first(where: { $0 > (bound.last ?? -1) && labels[$0] == label }) else { return nil }
+                guard let index = labels.indices.first(where: { $0 > (bound.last ?? -1) && labels[$0] == label }) else {
+                    return nil
+                }
                 bound.append(index)
             }
             if let position = Array(call.arguments).firstIndex(where: { $0.expression.id == closure.id }) {
@@ -282,7 +305,9 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
             let next = (bound.last ?? -1) + 1
             var end = labels.count
             if let first = call.additionalTrailingClosures.first {
-                guard let index = labels.indices.first(where: { $0 >= next && labels[$0] == first.label.text }) else { return nil }
+                guard let index = labels.indices.first(where: { $0 >= next && labels[$0] == first.label.text }) else {
+                    return nil
+                }
                 end = index
             }
             guard next < end else { return nil }
@@ -298,7 +323,9 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
             if let optional = type.as(OptionalTypeSyntax.self) {
                 return returnsVoid(optional.wrappedType)
             }
-            if let tuple = type.as(TupleTypeSyntax.self), tuple.elements.count == 1, let element = tuple.elements.first, element.firstName == nil {
+            if let tuple = type.as(TupleTypeSyntax.self), tuple.elements.count == 1, let element = tuple.elements.first,
+                element.firstName == nil
+            {
                 return returnsVoid(element.type)
             }
             return type.as(FunctionTypeSyntax.self).map { Visitor.isVoid($0.returnClause.type) } ?? false
@@ -327,28 +354,37 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
             }
         }
 
-        static let specifiers = ["__owned", "__shared", "sending", "inout", "borrowing", "consuming", "isolated", "nonisolated(nonsending)"]
+        static let specifiers = [
+            "__owned", "__shared", "sending", "inout", "borrowing", "consuming", "isolated", "nonisolated(nonsending)",
+        ]
 
         init?(demangled: String, name: String) {
             guard let open = name.firstIndex(of: "("), name.hasSuffix(")") else { return nil }
             let baseName = Array(name[..<open])
-            let labels = name[name.index(after: open)..<name.index(before: name.endIndex)].split(separator: ":", omittingEmptySubsequences: false).dropLast().map(String.init)
+            let labels = name[name.index(after: open)..<name.index(before: name.endIndex)].split(
+                separator: ":",
+                omittingEmptySubsequences: false,
+            ).dropLast().map(String.init)
             let characters = Array(demangled)
             guard !baseName.isEmpty, let depths = Self.depths(characters) else { return nil }
             let needle = ["."] + baseName
             let starts = characters.indices.filter { start in
                 let after = start + needle.count
-                return depths[start] == 0 && after < characters.count && Array(characters[start..<after]) == needle && (characters[after] == "(" || characters[after] == "<")
+                return depths[start] == 0 && after < characters.count && Array(characters[start..<after]) == needle
+                    && (characters[after] == "(" || characters[after] == "<")
             }
             guard starts.count == 1, var parametersOpen = starts.first.map({ $0 + needle.count }) else { return nil }
             if characters[parametersOpen] == "<" {
                 guard let close = Self.closing(characters, depths, from: parametersOpen) else { return nil }
                 parametersOpen = close + 1
             }
-            guard parametersOpen < characters.count, characters[parametersOpen] == "(", let parametersClose = Self.closing(characters, depths, from: parametersOpen) else { return nil }
+            guard parametersOpen < characters.count, characters[parametersOpen] == "(",
+                let parametersClose = Self.closing(characters, depths, from: parametersOpen)
+            else { return nil }
             var entries: [String] = []
             var entryStart = parametersOpen + 1
-            for index in entryStart...parametersClose where index == parametersClose || (depths[index] == 1 && characters[index] == ",") {
+            for index in entryStart...parametersClose
+            where index == parametersClose || (depths[index] == 1 && characters[index] == ",") {
                 entries.append(String(characters[entryStart..<index]).trimmingCharacters(in: .whitespaces))
                 entryStart = index + 1
             }
@@ -382,7 +418,9 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
             var depth = 0
             for index in characters.indices {
                 let character = characters[index]
-                if character == ")" || character == "]" || (character == ">" && (index == 0 || characters[index - 1] != "-")) {
+                if character == ")" || character == "]"
+                    || (character == ">" && (index == 0 || characters[index - 1] != "-"))
+                {
                     depth -= 1
                 }
                 guard depth >= 0 else { return nil }
@@ -401,7 +439,10 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
 
         /* The first `->` after a place, at a depth. */
         static func arrow(_ characters: [Character], _ depths: [Int], after start: Int, depth: Int) -> Int? {
-            characters.indices.first { $0 > start && $0 + 1 < characters.count && depths[$0] == depth && characters[$0] == "-" && characters[$0 + 1] == ">" }
+            characters.indices.first {
+                $0 > start && $0 + 1 < characters.count && depths[$0] == depth && characters[$0] == "-"
+                    && characters[$0 + 1] == ">"
+            }
         }
 
         /*
@@ -423,7 +464,9 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
                     text = text.dropFirst().drop { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "." }
                     if text.first == "(" {
                         let characters = Array(text)
-                        guard let depths = depths(characters), let close = closing(characters, depths, from: 0) else { return .unknown }
+                        guard let depths = depths(characters), let close = closing(characters, depths, from: 0) else {
+                            return .unknown
+                        }
                         text = text.dropFirst(close + 1)
                     }
                     text = text.drop { $0 == " " }
@@ -453,12 +496,15 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
                 return .other
             }
             /* A keyword and a space (`any P`, `some P`, `each T`): not a plain type. */
-            if let space = characters.firstIndex(of: " "), characters[..<space].allSatisfy({ $0.isLowercase || $0 == "_" }) {
+            if let space = characters.firstIndex(of: " "),
+                characters[..<space].allSatisfy({ $0.isLowercase || $0 == "_" })
+            {
                 return .unknown
             }
             let head = characters.prefix { !".<?![".contains($0) }
             let isQualified = characters.dropFirst(head.count).first == "."
-            let isGenericParameter = head.first.map { $0.isUppercase && $0.isASCII } == true && head.dropFirst().allSatisfy(\.isNumber)
+            let isGenericParameter =
+                head.first.map { $0.isUppercase && $0.isASCII } == true && head.dropFirst().allSatisfy(\.isNumber)
             return isQualified && !isGenericParameter && head.first != "τ" ? .other : .unknown
         }
 

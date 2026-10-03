@@ -46,7 +46,9 @@ struct UnusedImports {
     static let ruleName = "cohere-swift/correctness-no-unused-import"
 
     /* Modules every file imports without saying so. */
-    static let implicitModules: Set<String> = ["Swift", "_Concurrency", "_StringProcessing", "_SwiftConcurrencyShims", "SwiftOnoneSupport"]
+    static let implicitModules: Set<String> = [
+        "Swift", "_Concurrency", "_StringProcessing", "_SwiftConcurrencyShims", "SwiftOnoneSupport",
+    ]
 
     struct Result {
         /* Each unused import, with the declaration as written for the report's line. */
@@ -114,13 +116,16 @@ struct UnusedImports {
                  `import Foundation` alive in a file that used nothing of Foundation's.
                  */
                 let reexported = modules.subtracting(Self.implicitModules)
-                needs.append(Need(modules: reexported, declaring: declaring, headers: resolver.declaringHeaders(of: reference)))
+                needs.append(
+                    Need(modules: reexported, declaring: declaring, headers: resolver.declaringHeaders(of: reference))
+                )
                 let direct = modules.intersection(imported)
                 if !direct.isEmpty {
                     used.formUnion(direct)
                     continue
                 }
-                for module in imported where !reexported.isDisjoint(with: reexports.closure(of: module, reach: .assumed)) {
+                for module in imported
+                where !reexported.isDisjoint(with: reexports.closure(of: module, reach: .assumed)) {
                     used.insert(module)
                 }
             }
@@ -144,21 +149,38 @@ struct UnusedImports {
                     at: declaration.node,
                     rule: Self.ruleName,
                     messageId: "unusedImport",
-                    message: "Nothing in this file uses \(declaration.module): no name here resolves into it or into a module it re-exports. Remove the import.",
-                    suggestions: [FindingRecord.Suggestion(message: "Remove `import \(declaration.module)`", fixes: [Self.removal(of: declaration.node, in: entry.file)])]
+                    message:
+                        "Nothing in this file uses \(declaration.module): no name here resolves into it or into a module it re-exports. Remove the import.",
+                    suggestions: [
+                        FindingRecord.Suggestion(
+                            message: "Remove `import \(declaration.module)`",
+                            fixes: [Self.removal(of: declaration.node, in: entry.file)],
+                        )
+                    ],
                 )
                 result.findings.append((finding, declaration.node.trimmedDescription))
             }
             let kept = imported.subtracting(unused.map(\.module))
-            for redundant in Self.redundant(judged.filter { used.contains($0.module) }, kept: kept, needs: needs, reexports: reexports) {
+            for redundant in Self.redundant(
+                judged.filter { used.contains($0.module) },
+                kept: kept,
+                needs: needs,
+                reexports: reexports,
+            ) {
                 let others = redundant.coveredBy.map { "`import \($0)`" }.joined(separator: ", ")
                 let verb = redundant.coveredBy.count == 1 ? "re-exports" : "re-export"
                 let finding = entry.file.finding(
                     at: redundant.declaration.node,
                     rule: Self.ruleName,
                     messageId: "redundantImport",
-                    message: "Everything this file uses through \(redundant.declaration.module) also comes through \(others), which \(verb) it. Remove the import.",
-                    suggestions: [FindingRecord.Suggestion(message: "Remove `import \(redundant.declaration.module)`", fixes: [Self.removal(of: redundant.declaration.node, in: entry.file)])]
+                    message:
+                        "Everything this file uses through \(redundant.declaration.module) also comes through \(others), which \(verb) it. Remove the import.",
+                    suggestions: [
+                        FindingRecord.Suggestion(
+                            message: "Remove `import \(redundant.declaration.module)`",
+                            fixes: [Self.removal(of: redundant.declaration.node, in: entry.file)],
+                        )
+                    ],
                 )
                 result.findings.append((finding, redundant.declaration.node.trimmedDescription))
             }
@@ -186,7 +208,9 @@ struct UnusedImports {
     /* The file's top-level imports. One inside `#if` is never reached here: such a file is left unchecked. */
     static func imports(in tree: SourceFileSyntax) -> [ImportDeclaration] {
         tree.statements.compactMap { statement in
-            guard let declaration = statement.item.as(ImportDeclSyntax.self), let first = declaration.path.first else { return nil }
+            guard let declaration = statement.item.as(ImportDeclSyntax.self), let first = declaration.path.first else {
+                return nil
+            }
             let isExported = declaration.attributes.contains { attribute in
                 attribute.as(AttributeSyntax.self)?.attributeName.trimmedDescription == "_exported"
             }
@@ -239,7 +263,7 @@ struct UnusedImports {
         _ candidates: [ImportDeclaration],
         kept: Set<String>,
         needs: [Need],
-        reexports: ModuleReexports
+        reexports: ModuleReexports,
     ) -> [(declaration: ImportDeclaration, coveredBy: [String])] {
         var kept = kept
         let ordered = candidates.enumerated().sorted { first, second in
@@ -265,7 +289,9 @@ struct UnusedImports {
                         if stillReached.contains(module) {
                             return true
                         }
-                        guard need.declaring.contains(module), !need.headers.isDisjoint(with: visible) else { return false }
+                        guard need.declaring.contains(module), !need.headers.isDisjoint(with: visible) else {
+                            return false
+                        }
                         headers.formUnion(need.headers)
                         return true
                     }
@@ -364,10 +390,18 @@ struct UnusedImports {
             if let container = Self.objectiveCContainer(symbol), let modules = declaring[container] {
                 return modules
             }
-            if let module = FileSymbols.Occurrence(line: 0, column: 0, symbol: symbol, name: occurrence.name, isReference: true).declaringModule {
+            if let module = FileSymbols.Occurrence(
+                line: 0,
+                column: 0,
+                symbol: symbol,
+                name: occurrence.name,
+                isReference: true,
+            ).declaringModule {
                 return [module]
             }
-            if symbol.hasPrefix("s:s") || (symbol.hasPrefix("s:S") && !symbol.hasPrefix("s:So") && !symbol.hasPrefix("s:SC")) {
+            if symbol.hasPrefix("s:s")
+                || (symbol.hasPrefix("s:S") && !symbol.hasPrefix("s:So") && !symbol.hasPrefix("s:SC"))
+            {
                 return ["Swift"]
             }
             if let name = Self.clangImportedName(symbol), let modules = clangNames[name] {
@@ -394,10 +428,14 @@ struct UnusedImports {
             if let container = Self.objectiveCContainer(symbol), declaring[container] != nil {
                 return declaringHeaders[container] ?? []
             }
-            if FileSymbols.Occurrence(line: 0, column: 0, symbol: symbol, name: occurrence.name, isReference: true).declaringModule != nil {
+            if FileSymbols.Occurrence(line: 0, column: 0, symbol: symbol, name: occurrence.name, isReference: true)
+                .declaringModule != nil
+            {
                 return []
             }
-            if symbol.hasPrefix("s:s") || (symbol.hasPrefix("s:S") && !symbol.hasPrefix("s:So") && !symbol.hasPrefix("s:SC")) {
+            if symbol.hasPrefix("s:s")
+                || (symbol.hasPrefix("s:S") && !symbol.hasPrefix("s:So") && !symbol.hasPrefix("s:SC"))
+            {
                 return []
             }
             if let name = Self.clangImportedName(symbol), clangNames[name] != nil {

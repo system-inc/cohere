@@ -15,7 +15,14 @@ import Testing
 struct UnusedClosureParameterTests {
     static func findings(_ source: String) -> [FindingRecord] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         return UnusedClosureParameter().findings(in: file)
     }
 
@@ -54,9 +61,15 @@ struct UnusedClosureParameterTests {
                 """
             ) == ["1:47"]
         )
-        #expect(Self.positions("let failure: Failure = { task, error in\n    observer.sendFailed(error)\n}") == ["1:26"])
+        #expect(
+            Self.positions("let failure: Failure = { task, error in\n    observer.sendFailed(error)\n}") == ["1:26"]
+        )
         #expect(Self.positions("List($names) { $name in\n    Text(\"Foo\")\n}") == ["1:16"])
-        #expect(Self.positions("let class1 = \"a\"\n_ = [\"a\"].filter { `class` in `class1`.hasPrefix(\"a\") }") == ["2:20"])
+        #expect(
+            Self.positions("let class1 = \"a\"\n_ = [\"a\"].filter { `class` in `class1`.hasPrefix(\"a\") }") == [
+                "2:20"
+            ]
+        )
     }
 
     /* SwiftLint's non-triggering examples. */
@@ -159,12 +172,24 @@ struct UnusedClosureParameterTests {
 
     /* The name token alone becomes `_`: a type annotation stays, a backticked name goes whole, a sibling is untouched. */
     @Test func fixRenamesTheNameOnly() {
-        #expect(Self.fixed("genericsFunc { (number: TypeA, idx: TypeB) in return idx }") == "genericsFunc { (_: TypeA, idx: TypeB) in return idx }")
-        #expect(Self.fixed("[1, 2].something { number, idx in\n return number }") == "[1, 2].something { number, _ in\n return number }")
-        #expect(Self.fixed("let class1 = \"a\"\n_ = [\"a\"].filter { `class` in `class1`.hasPrefix(\"a\") }") == "let class1 = \"a\"\n_ = [\"a\"].filter { _ in `class1`.hasPrefix(\"a\") }")
+        #expect(
+            Self.fixed("genericsFunc { (number: TypeA, idx: TypeB) in return idx }")
+                == "genericsFunc { (_: TypeA, idx: TypeB) in return idx }"
+        )
+        #expect(
+            Self.fixed("[1, 2].something { number, idx in\n return number }")
+                == "[1, 2].something { number, _ in\n return number }"
+        )
+        #expect(
+            Self.fixed("let class1 = \"a\"\n_ = [\"a\"].filter { `class` in `class1`.hasPrefix(\"a\") }")
+                == "let class1 = \"a\"\n_ = [\"a\"].filter { _ in `class1`.hasPrefix(\"a\") }"
+        )
         #expect(Self.fixed("run { first, second in 0 }") == "run { _, _ in 0 }")
         #expect(Self.fixed("run { (value: inout Int) in }") == "run { (_: inout Int) in }")
-        #expect(Self.fixed("viewModel?.didSet(weak: self) { (self, image) in\n    imageView.image = image\n}") == "viewModel?.didSet(weak: self) { (_, image) in\n    imageView.image = image\n}")
+        #expect(
+            Self.fixed("viewModel?.didSet(weak: self) { (self, image) in\n    imageView.image = image\n}")
+                == "viewModel?.didSet(weak: self) { (_, image) in\n    imageView.image = image\n}"
+        )
     }
 
     /* A `$name` parameter is reported without a fix, because `_` drops the property wrapper the `$` asked for. */

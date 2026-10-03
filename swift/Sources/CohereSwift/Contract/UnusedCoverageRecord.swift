@@ -16,7 +16,15 @@ public struct UnusedCoverageRecord: Codable, Equatable, Sendable {
     public var found: Int
     public var elapsedMilliseconds: Int
 
-    public init(rule: String, filesChecked: Int, filesNotChecked: [String: Int], checked: Int, skipped: [String: Int], found: Int, elapsedMilliseconds: Int) {
+    public init(
+        rule: String,
+        filesChecked: Int,
+        filesNotChecked: [String: Int],
+        checked: Int,
+        skipped: [String: Int],
+        found: Int,
+        elapsedMilliseconds: Int,
+    ) {
         self.rule = rule
         self.filesChecked = filesChecked
         self.filesNotChecked = filesNotChecked

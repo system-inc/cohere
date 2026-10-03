@@ -104,7 +104,8 @@ public struct RedundantTypeAnnotation: TypedFileRule {
                 at: candidate.annotation,
                 rule: name,
                 messageId: "redundantTypeAnnotation",
-                message: "This annotation names \(candidate.annotation.type.trimmedDescription), which the initializer already names. Remove the annotation and let the type be inferred: the declaration then says its type once."
+                message:
+                    "This annotation names \(candidate.annotation.type.trimmedDescription), which the initializer already names. Remove the annotation and let the type be inferred: the declaration then says its type once.",
             )
         }
     }
@@ -116,18 +117,29 @@ public struct RedundantTypeAnnotation: TypedFileRule {
         var isOptionalBinding: Bool
     }
 
-    static func isRedundant(_ candidate: Candidate, in file: ParsedFile, symbols: FileSymbols, demangler: SwiftDemangler?) -> Bool {
+    static func isRedundant(
+        _ candidate: Candidate,
+        in file: ParsedFile,
+        symbols: FileSymbols,
+        demangler: SwiftDemangler?,
+    ) -> Bool {
         var expression = candidate.initializer
         var isForced = false
         while true {
-            if let tryExpression = expression.as(TryExprSyntax.self), tryExpression.questionOrExclamationMark?.tokenKind != .postfixQuestionMark || candidate.isOptionalBinding {
+            if let tryExpression = expression.as(TryExprSyntax.self),
+                tryExpression.questionOrExclamationMark?.tokenKind != .postfixQuestionMark
+                    || candidate.isOptionalBinding
+            {
                 expression = tryExpression.expression
-            } else if let awaitExpression = expression.as(AwaitExprSyntax.self) {
+            }
+            else if let awaitExpression = expression.as(AwaitExprSyntax.self) {
                 expression = awaitExpression.expression
-            } else if let forceUnwrap = expression.as(ForceUnwrapExprSyntax.self) {
+            }
+            else if let forceUnwrap = expression.as(ForceUnwrapExprSyntax.self) {
                 expression = forceUnwrap.expression
                 isForced = true
-            } else {
+            }
+            else {
                 break
             }
         }
@@ -137,26 +149,38 @@ public struct RedundantTypeAnnotation: TypedFileRule {
 
         /* The sugar, `[Int]` and `[String: Int]`: no name to resolve, so the two spellings must match token for token. */
         if annotationType.is(ArrayTypeSyntax.self) || annotationType.is(DictionaryTypeSyntax.self) {
-            guard let construction = Self.construction(expression), construction.type.is(ArrayExprSyntax.self) || construction.type.is(DictionaryExprSyntax.self) else {
+            guard let construction = Self.construction(expression),
+                construction.type.is(ArrayExprSyntax.self) || construction.type.is(DictionaryExprSyntax.self)
+            else {
                 return false
             }
-            return Self.spelling(construction.type) == Self.spelling(annotationType) && Self.buildsWithoutNil(construction, in: file, symbols: symbols, mayReturnNil: mayReturnNil)
+            return Self.spelling(construction.type) == Self.spelling(annotationType)
+                && Self.buildsWithoutNil(construction, in: file, symbols: symbols, mayReturnNil: mayReturnNil)
         }
 
-        guard let annotationName = Self.typeName(annotationType), let annotationResolved = Self.reference(at: annotationName, in: file, symbols: symbols) else {
+        guard let annotationName = Self.typeName(annotationType),
+            let annotationResolved = Self.reference(at: annotationName, in: file, symbols: symbols)
+        else {
             return false
         }
         /* Generic arguments the annotation spells choose the type, so the initializer must spell the same ones. */
-        let spellsGenericArguments = annotationType.tokens(viewMode: .sourceAccurate).contains { $0.tokenKind == .leftAngle }
+        let spellsGenericArguments = annotationType.tokens(viewMode: .sourceAccurate).contains {
+            $0.tokenKind == .leftAngle
+        }
         func namesTheAnnotatedType(_ typeExpression: ExprSyntax) -> Bool {
-            guard let typeName = Self.typeName(typeExpression), Self.names(typeName, annotationResolved.symbol, in: file, symbols: symbols) else { return false }
+            guard let typeName = Self.typeName(typeExpression),
+                Self.names(typeName, annotationResolved.symbol, in: file, symbols: symbols)
+            else { return false }
             return !spellsGenericArguments || Self.spelling(typeExpression) == Self.spelling(annotationType)
         }
 
         if let construction = Self.construction(expression), namesTheAnnotatedType(construction.type) {
             return Self.buildsWithoutNil(construction, in: file, symbols: symbols, mayReturnNil: mayReturnNil)
         }
-        if let enumCase = Self.enumCase(expression), namesTheAnnotatedType(enumCase.type), let resolvedCase = Self.reference(at: enumCase.member, in: file, symbols: symbols), Self.isCase(resolvedCase.symbol, named: enumCase.member, of: annotationResolved.symbol) {
+        if let enumCase = Self.enumCase(expression), namesTheAnnotatedType(enumCase.type),
+            let resolvedCase = Self.reference(at: enumCase.member, in: file, symbols: symbols),
+            Self.isCase(resolvedCase.symbol, named: enumCase.member, of: annotationResolved.symbol)
+        {
             return true
         }
 
@@ -164,10 +188,19 @@ public struct RedundantTypeAnnotation: TypedFileRule {
          A member or a chain, judged by its last member's result. The annotation must be a Swift type that is not a
          protocol: the demangler prints a protocol descriptor only for a protocol's symbol.
          */
-        guard let demangler, Self.isRooted(expression, namesTheAnnotatedType), let annotatedType = demangler.declaration(ofSymbol: annotationResolved.symbol), demangler.demangle("$s\(annotationResolved.symbol.dropFirst(2))Mp") == nil else {
+        guard let demangler, Self.isRooted(expression, namesTheAnnotatedType),
+            let annotatedType = demangler.declaration(ofSymbol: annotationResolved.symbol),
+            demangler.demangle("$s\(annotationResolved.symbol.dropFirst(2))Mp") == nil
+        else {
             return false
         }
-        let chain = Chain(file: file, symbols: symbols, demangler: demangler, annotatedType: annotatedType, namesTheAnnotatedType: namesTheAnnotatedType)
+        let chain = Chain(
+            file: file,
+            symbols: symbols,
+            demangler: demangler,
+            annotatedType: annotatedType,
+            namesTheAnnotatedType: namesTheAnnotatedType,
+        )
         return chain.hasAnnotatedType(expression, isUnwrapped: mayReturnNil)
     }
 
@@ -184,11 +217,14 @@ public struct RedundantTypeAnnotation: TypedFileRule {
             }
             if let call = current.as(FunctionCallExprSyntax.self) {
                 link = call.calledExpression
-            } else if let member = current.as(MemberAccessExprSyntax.self) {
+            }
+            else if let member = current.as(MemberAccessExprSyntax.self) {
                 link = member.base
-            } else if let specialization = current.as(GenericSpecializationExprSyntax.self) {
+            }
+            else if let specialization = current.as(GenericSpecializationExprSyntax.self) {
                 link = specialization.expression
-            } else {
+            }
+            else {
                 link = nil
             }
         }
@@ -209,10 +245,16 @@ public struct RedundantTypeAnnotation: TypedFileRule {
          counts too.
          */
         func hasAnnotatedType(_ expression: ExprSyntax, isUnwrapped: Bool) -> Bool {
-            if let construction = RedundantTypeAnnotation.construction(expression), namesTheAnnotatedType(construction.type) {
+            if let construction = RedundantTypeAnnotation.construction(expression),
+                namesTheAnnotatedType(construction.type)
+            {
                 return true
             }
-            guard let link = Self.link(expression), let member = RedundantTypeAnnotation.reference(at: link.member, in: file, symbols: symbols), let declaration = demangler.declaration(ofSymbol: member.symbol), let reading = Member(demangled: declaration, name: member.name, isCalled: link.isCalled) else {
+            guard let link = Self.link(expression),
+                let member = RedundantTypeAnnotation.reference(at: link.member, in: file, symbols: symbols),
+                let declaration = demangler.declaration(ofSymbol: member.symbol),
+                let reading = Member(demangled: declaration, name: member.name, isCalled: link.isCalled)
+            else {
                 return false
             }
             var result = reading.result
@@ -229,7 +271,10 @@ public struct RedundantTypeAnnotation: TypedFileRule {
         /* The last link: a member read from a base, `A.b`, or called, `A.f()`. Never `init`, which is a construction, nor an implicit member, which has no base. */
         static func link(_ expression: ExprSyntax) -> (base: ExprSyntax, member: TokenSyntax, isCalled: Bool)? {
             let call = expression.as(FunctionCallExprSyntax.self)
-            guard let access = (call?.calledExpression ?? expression).as(MemberAccessExprSyntax.self), let base = access.base, access.declName.argumentNames == nil, access.declName.baseName.tokenKind != .keyword(.`init`) else {
+            guard let access = (call?.calledExpression ?? expression).as(MemberAccessExprSyntax.self),
+                let base = access.base, access.declName.argumentNames == nil,
+                access.declName.baseName.tokenKind != .keyword(.`init`)
+            else {
                 return nil
             }
             return (base, access.declName.baseName, call != nil)
@@ -249,7 +294,8 @@ public struct RedundantTypeAnnotation: TypedFileRule {
             let descriptor = "protocol descriptor for \(context)"
             return (1..<mangled.count).contains { end in
                 let prefix = String(mangled[..<end])
-                return demangler.demangle("$s\(prefix)D") == context && demangler.demangle("$s\(prefix)Mp") == descriptor
+                return demangler.demangle("$s\(prefix)D") == context
+                    && demangler.demangle("$s\(prefix)Mp") == descriptor
             }
         }
     }
@@ -274,16 +320,20 @@ public struct RedundantTypeAnnotation: TypedFileRule {
             let followers: [Character] = isCalled ? ["(", "<"] : [" "]
             let starts = characters.indices.filter { start in
                 let after = start + needle.count
-                return depths[start] == 0 && after < characters.count && Array(characters[start..<after]) == needle && followers.contains(characters[after])
+                return depths[start] == 0 && after < characters.count && Array(characters[start..<after]) == needle
+                    && followers.contains(characters[after])
             }
             guard starts.count == 1, let start = starts.first else { return nil }
             if isCalled {
-                guard let signature = CorrectnessNoDiscardedTryOptional.Signature(demangled: demangled, name: name) else { return nil }
+                guard let signature = CorrectnessNoDiscardedTryOptional.Signature(demangled: demangled, name: name)
+                else { return nil }
                 result = signature.result
-            } else {
+            }
+            else {
                 let colon = Array(" : ")
                 let after = start + needle.count
-                guard after + colon.count < characters.count, Array(characters[after..<(after + colon.count)]) == colon else { return nil }
+                guard after + colon.count < characters.count, Array(characters[after..<(after + colon.count)]) == colon
+                else { return nil }
                 result = String(characters[(after + colon.count)...])
             }
             var context = Substring(String(characters[..<start]))
@@ -302,10 +352,13 @@ public struct RedundantTypeAnnotation: TypedFileRule {
      `URL(...)` and `Set<Int>(...)` at the type's name, `URL.init(...)` at `init`, and `[Int](...)` at its bracket.
      An implicit `.init(...)` names no type and is not one.
      */
-    static func construction(_ expression: ExprSyntax) -> (type: ExprSyntax, initializer: TokenSyntax, call: FunctionCallExprSyntax)? {
+    static func construction(
+        _ expression: ExprSyntax
+    ) -> (type: ExprSyntax, initializer: TokenSyntax, call: FunctionCallExprSyntax)? {
         guard let call = expression.as(FunctionCallExprSyntax.self) else { return nil }
         let called = call.calledExpression
-        if let member = called.as(MemberAccessExprSyntax.self), member.declName.baseName.tokenKind == .keyword(.`init`) {
+        if let member = called.as(MemberAccessExprSyntax.self), member.declName.baseName.tokenKind == .keyword(.`init`)
+        {
             guard let base = member.base else { return nil }
             return (base, member.declName.baseName, call)
         }
@@ -323,8 +376,12 @@ public struct RedundantTypeAnnotation: TypedFileRule {
 
     /* A member read from a named type, `Direction.up` or `Direction.moved(by: 1)`: the type, and the member's name token. */
     static func enumCase(_ expression: ExprSyntax) -> (type: ExprSyntax, member: TokenSyntax)? {
-        let member = expression.as(MemberAccessExprSyntax.self) ?? expression.as(FunctionCallExprSyntax.self)?.calledExpression.as(MemberAccessExprSyntax.self)
-        guard let member, let base = member.base, member.declName.argumentNames == nil, member.declName.baseName.tokenKind != .keyword(.`init`) else {
+        let member =
+            expression.as(MemberAccessExprSyntax.self)
+            ?? expression.as(FunctionCallExprSyntax.self)?.calledExpression.as(MemberAccessExprSyntax.self)
+        guard let member, let base = member.base, member.declName.argumentNames == nil,
+            member.declName.baseName.tokenKind != .keyword(.`init`)
+        else {
             return nil
         }
         return (base, member.declName.baseName)
@@ -338,7 +395,8 @@ public struct RedundantTypeAnnotation: TypedFileRule {
      */
     static func isCase(_ symbol: String, named member: TokenSyntax, of enumSymbol: String) -> Bool {
         let name = String(member.text.filter { $0 != "`" })
-        return enumSymbol.hasPrefix("s:") && symbol.hasPrefix("\(enumSymbol)\(name.utf8.count)\(name)") && symbol.hasSuffix("F")
+        return enumSymbol.hasPrefix("s:") && symbol.hasPrefix("\(enumSymbol)\(name.utf8.count)\(name)")
+            && symbol.hasSuffix("F")
     }
 
     /*
@@ -346,17 +404,25 @@ public struct RedundantTypeAnnotation: TypedFileRule {
      any construction does. Otherwise the initializer must be a Swift one whose symbol holds no optional (a
      failable one's spells its result `Sg`), or a literal coerced to the type, which records no initializer.
      */
-    static func buildsWithoutNil(_ construction: (type: ExprSyntax, initializer: TokenSyntax, call: FunctionCallExprSyntax), in file: ParsedFile, symbols: FileSymbols, mayReturnNil: Bool) -> Bool {
+    static func buildsWithoutNil(
+        _ construction: (type: ExprSyntax, initializer: TokenSyntax, call: FunctionCallExprSyntax),
+        in file: ParsedFile,
+        symbols: FileSymbols,
+        mayReturnNil: Bool,
+    ) -> Bool {
         if mayReturnNil {
             return true
         }
         let location = file.locations.location(for: construction.initializer.positionAfterSkippingLeadingTrivia)
-        let initializers = symbols.occurrences(line: location.line, column: location.column).filter { $0.isReference && !$0.isImplicit && $0.name.hasPrefix("init(") }
+        let initializers = symbols.occurrences(line: location.line, column: location.column).filter {
+            $0.isReference && !$0.isImplicit && $0.name.hasPrefix("init(")
+        }
         guard let initializer = initializers.first else {
             /* Only `Int(5)` is coerced; `Int.init(5)` and `[Int](...)` are real calls, which record their initializer. */
             return Self.typeName(construction.call.calledExpression) != nil && Self.isCoercedLiteral(construction.call)
         }
-        return initializers.count == 1 && initializer.symbol.hasPrefix("s:") && initializer.symbol.hasSuffix("fc") && !Self.namesOptional(initializer.symbol)
+        return initializers.count == 1 && initializer.symbol.hasPrefix("s:") && initializer.symbol.hasSuffix("fc")
+            && !Self.namesOptional(initializer.symbol)
     }
 
     /*
@@ -380,11 +446,14 @@ public struct RedundantTypeAnnotation: TypedFileRule {
 
     /* `Int(5)`, `String("text")`: one unlabeled literal and no closure, which the compiler reads as the literal of that type. */
     static func isCoercedLiteral(_ call: FunctionCallExprSyntax) -> Bool {
-        guard call.arguments.count == 1, let argument = call.arguments.first, argument.label == nil, call.trailingClosure == nil, call.additionalTrailingClosures.isEmpty else {
+        guard call.arguments.count == 1, let argument = call.arguments.first, argument.label == nil,
+            call.trailingClosure == nil, call.additionalTrailingClosures.isEmpty
+        else {
             return false
         }
         let value = argument.expression
-        return value.is(IntegerLiteralExprSyntax.self) || value.is(FloatLiteralExprSyntax.self) || value.is(StringLiteralExprSyntax.self) || value.is(BooleanLiteralExprSyntax.self)
+        return value.is(IntegerLiteralExprSyntax.self) || value.is(FloatLiteralExprSyntax.self)
+            || value.is(StringLiteralExprSyntax.self) || value.is(BooleanLiteralExprSyntax.self)
     }
 
     /* The name token a type is resolved at: `URL`, the `URL` of `Foundation.URL`, the `Set` of `Set<Int>`, in a type or an expression. */
@@ -402,7 +471,9 @@ public struct RedundantTypeAnnotation: TypedFileRule {
         if let reference = expression.as(DeclReferenceExprSyntax.self), reference.argumentNames == nil {
             return reference.baseName
         }
-        if let member = expression.as(MemberAccessExprSyntax.self), member.base != nil, member.declName.argumentNames == nil, member.declName.baseName.tokenKind != .keyword(.`init`) {
+        if let member = expression.as(MemberAccessExprSyntax.self), member.base != nil,
+            member.declName.argumentNames == nil, member.declName.baseName.tokenKind != .keyword(.`init`)
+        {
             return member.declName.baseName
         }
         if let specialization = expression.as(GenericSpecializationExprSyntax.self) {
@@ -425,7 +496,9 @@ public struct RedundantTypeAnnotation: TypedFileRule {
     /* Whether the name at this token refers to the declaration. A type called as an initializer also records the initializer there, so this asks among every reference. */
     static func names(_ token: TokenSyntax, _ symbol: String, in file: ParsedFile, symbols: FileSymbols) -> Bool {
         let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
-        return symbols.occurrences(line: location.line, column: location.column).contains { $0.isReference && !$0.isImplicit && $0.symbol == symbol }
+        return symbols.occurrences(line: location.line, column: location.column).contains {
+            $0.isReference && !$0.isImplicit && $0.symbol == symbol
+        }
     }
 
     /* Every annotated binding with an initializer: SwiftLint's two places, a variable declaration's bindings and an optional binding. */
@@ -433,7 +506,9 @@ public struct RedundantTypeAnnotation: TypedFileRule {
         private(set) var found: [Candidate] = []
 
         override func visit(_ node: PatternBindingSyntax) -> SyntaxVisitorContinueKind {
-            if let declaration = node.parent?.parent?.as(VariableDeclSyntax.self), !Self.isIgnored(declaration), let annotation = node.typeAnnotation, let initializer = node.initializer?.value {
+            if let declaration = node.parent?.parent?.as(VariableDeclSyntax.self), !Self.isIgnored(declaration),
+                let annotation = node.typeAnnotation, let initializer = node.initializer?.value
+            {
                 found.append(Candidate(annotation: annotation, initializer: initializer, isOptionalBinding: false))
             }
             return .visitChildren

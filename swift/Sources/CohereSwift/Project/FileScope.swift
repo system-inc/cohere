@@ -29,9 +29,12 @@ public struct FileScope: Equatable, Sendable {
     static func named(_ paths: [String], fileSet: FileSet, workingDirectory: URL) throws -> FileScope {
         var prefixes: [String] = []
         for path in paths {
-            let url = URL(fileURLWithPath: path, relativeTo: workingDirectory).standardizedFileURL.resolvingSymlinksInPath()
+            let url = URL(fileURLWithPath: path, relativeTo: workingDirectory).standardizedFileURL
+                .resolvingSymlinksInPath()
             guard FileManager.default.fileExists(atPath: url.path) else {
-                throw CommandOptions.UsageFailure(description: "\(path) does not exist, so there is nothing named to check")
+                throw CommandOptions.UsageFailure(
+                    description: "\(path) does not exist, so there is nothing named to check"
+                )
             }
             prefixes.append(url.path)
         }

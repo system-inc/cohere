@@ -61,7 +61,9 @@ public struct IsDisjoint: TypedFileRule {
         visitor.walk(file.tree)
         return visitor.found.compactMap { intersection in
             let location = file.locations.location(for: intersection.positionAfterSkippingLeadingTrivia)
-            guard let resolved = symbols.reference(line: location.line, column: location.column), Self.intersections.contains(where: { resolved.symbol.hasPrefix($0) }) else {
+            guard let resolved = symbols.reference(line: location.line, column: location.column),
+                Self.intersections.contains(where: { resolved.symbol.hasPrefix($0) })
+            else {
                 return nil
             }
             let repair = resolved.symbol.hasPrefix("s:s8RangeSetV") ? "isDisjoint(_:)" : "isDisjoint(with:)"
@@ -69,7 +71,8 @@ public struct IsDisjoint: TypedFileRule {
                 at: intersection,
                 rule: name,
                 messageId: "isDisjoint",
-                message: "Asking whether an intersection is empty spells out how to compute the answer rather than the question. Use \(repair): it says what is meant, and on a Set it stops at the first common element instead of building the whole intersection."
+                message:
+                    "Asking whether an intersection is empty spells out how to compute the answer rather than the question. Use \(repair): it says what is meant, and on a Set it stops at the first common element instead of building the whole intersection.",
             )
         }
     }
@@ -79,7 +82,9 @@ public struct IsDisjoint: TypedFileRule {
         private(set) var found: [TokenSyntax] = []
 
         override func visit(_ node: MemberAccessExprSyntax) -> SyntaxVisitorContinueKind {
-            if node.declName.baseName.text == "isEmpty", node.declName.argumentNames == nil, let base = node.base, let intersection = Self.intersectionToken(base) {
+            if node.declName.baseName.text == "isEmpty", node.declName.argumentNames == nil, let base = node.base,
+                let intersection = Self.intersectionToken(base)
+            {
                 found.append(intersection)
             }
             return .visitChildren
@@ -88,14 +93,20 @@ public struct IsDisjoint: TypedFileRule {
         /* The `intersection` name token of `left.intersection(right)`, `intersection(right)`, or either inside one pair of parentheses. */
         static func intersectionToken(_ expression: ExprSyntax) -> TokenSyntax? {
             var callExpression = expression
-            if let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1, let only = tuple.elements.first, only.label == nil {
+            if let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1,
+                let only = tuple.elements.first, only.label == nil
+            {
                 callExpression = only.expression
             }
             guard let call = callExpression.as(FunctionCallExprSyntax.self) else { return nil }
-            if let member = call.calledExpression.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "intersection" {
+            if let member = call.calledExpression.as(MemberAccessExprSyntax.self),
+                member.declName.baseName.text == "intersection"
+            {
                 return member.declName.baseName
             }
-            if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self), reference.baseName.text == "intersection" {
+            if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self),
+                reference.baseName.text == "intersection"
+            {
                 return reference.baseName
             }
             return nil

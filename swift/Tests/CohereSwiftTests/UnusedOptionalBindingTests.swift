@@ -14,7 +14,14 @@ import Testing
 struct UnusedOptionalBindingTests {
     static func findings(_ source: String) -> [FindingRecord] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         return UnusedOptionalBinding().findings(in: file)
     }
 
@@ -33,7 +40,9 @@ struct UnusedOptionalBindingTests {
             if let (_, _, _) = getOptionalTuple(), let bar = Foo.optionalValue {}
             func foo() { if let _ = bar {} }
             """
-        #expect(Self.positions(Self.findings(source)) == ["1:8", "2:35", "3:38", "4:50", "5:45", "6:46", "7:8", "8:21"])
+        #expect(
+            Self.positions(Self.findings(source)) == ["1:8", "2:35", "3:38", "4:50", "5:45", "6:46", "7:8", "8:21"]
+        )
     }
 
     @Test func otherBindingShapesAreFound() {
@@ -50,7 +59,11 @@ struct UnusedOptionalBindingTests {
             if let _ = try work() {}
             if let _ = await work() {}
             """
-        #expect(Self.positions(Self.findings(source)) == ["1:8", "2:11", "3:11", "4:8", "5:8", "6:8", "7:8", "8:8", "9:8", "9:23", "10:8", "11:8"])
+        #expect(
+            Self.positions(Self.findings(source)) == [
+                "1:8", "2:11", "3:11", "4:8", "5:8", "6:8", "7:8", "8:8", "9:8", "9:23", "10:8", "11:8",
+            ]
+        )
     }
 
     @Test func incumbentNonTriggeringExamplesAreNot() {
@@ -92,7 +105,12 @@ struct UnusedOptionalBindingTests {
             if let _ = item as NSView? {}
             """
         let messageIds = Self.findings(source).map(\.messageId)
-        #expect(messageIds == ["unusedOptionalBinding", "unusedOptionalBindingTry", "unusedOptionalBindingCast", "unusedOptionalBinding", "unusedOptionalBinding"])
+        #expect(
+            messageIds == [
+                "unusedOptionalBinding", "unusedOptionalBindingTry", "unusedOptionalBindingCast",
+                "unusedOptionalBinding", "unusedOptionalBinding",
+            ]
+        )
     }
 
     /* `correctness-no-discarded-try-optional` leaves a `try?` in a condition alone, so this rule is its only report. */
@@ -101,7 +119,14 @@ struct UnusedOptionalBindingTests {
             if let _ = try? work() {}
             """
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         #expect(CorrectnessNoDiscardedTryOptional().findings(in: file, symbols: FileSymbols([])).isEmpty)
         #expect(Self.positions(Self.findings(source)) == ["1:8"])
     }

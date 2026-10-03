@@ -30,7 +30,9 @@ struct SymbolProvider {
         guard !files.isEmpty else { return result }
         var stores: [IndexStore] = []
         if let library = try? IndexStore.toolchainLibraryPath(runner: runner) {
-            stores = scratchPaths.compactMap { try? IndexStore(libraryPath: library, storePath: IndexStore.storePath(scratchPath: $0)) }
+            stores = scratchPaths.compactMap {
+                try? IndexStore(libraryPath: library, storePath: IndexStore.storePath(scratchPath: $0))
+            }
         }
         var needSourcekitd: [ParsedFile] = []
         for file in files {
@@ -38,7 +40,8 @@ struct SymbolProvider {
                 found.ownedModules = ownedModules
                 result.symbols[file.url.path] = found
                 result.fromIndex += 1
-            } else {
+            }
+            else {
                 needSourcekitd.append(file)
             }
         }
@@ -48,24 +51,32 @@ struct SymbolProvider {
         let session: Sourcekitd
         do {
             session = try Sourcekitd.shared(runner: runner)
-        } catch {
+        }
+        catch {
             for file in needSourcekitd {
-                result.unavailable[file.url.path] = "the build's index does not describe it as it stands, and sourcekitd could not load: \(error)"
+                result.unavailable[file.url.path] =
+                    "the build's index does not describe it as it stands, and sourcekitd could not load: \(error)"
             }
             return result
         }
         for file in needSourcekitd {
             guard let command = tables.lazy.compactMap({ $0.command(for: file.url) }).first else {
-                result.unavailable[file.url.path] = "the build's index does not describe it as it stands, and no build recorded how to compile it"
+                result.unavailable[file.url.path] =
+                    "the build's index does not describe it as it stands, and no build recorded how to compile it"
                 continue
             }
             do {
-                var found = try session.symbols(file: file.url.resolvingSymlinksInPath().path, arguments: command.arguments)
+                var found = try session.symbols(
+                    file: file.url.resolvingSymlinksInPath().path,
+                    arguments: command.arguments,
+                )
                 found.ownedModules = ownedModules
                 result.symbols[file.url.path] = found
                 result.fromSourcekitd += 1
-            } catch {
-                result.unavailable[file.url.path] = "the build's index does not describe it as it stands, and sourcekitd could not index it: \(error)"
+            }
+            catch {
+                result.unavailable[file.url.path] =
+                    "the build's index does not describe it as it stands, and sourcekitd could not index it: \(error)"
             }
         }
         return result

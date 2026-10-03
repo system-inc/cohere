@@ -40,27 +40,30 @@ public struct UnusedOptionalBinding: FileRule {
         visitor.walk(file.tree)
         return visitor.found.map { found in
             switch found.repair {
-            case .nilCheck:
-                file.finding(
-                    at: found.pattern,
-                    rule: name,
-                    messageId: "unusedOptionalBinding",
-                    message: "This binding unwraps a value and throws it away, so it is only a nil check in disguise. Write value != nil instead."
-                )
-            case .successCheck:
-                file.finding(
-                    at: found.pattern,
-                    rule: name,
-                    messageId: "unusedOptionalBindingTry",
-                    message: "This binding keeps nothing from try?, so it only asks whether the call succeeded. Write (try? call()) != nil, with the parentheses, or use do/catch if the failure needs a reason."
-                )
-            case .typeCheck:
-                file.finding(
-                    at: found.pattern,
-                    rule: name,
-                    messageId: "unusedOptionalBindingCast",
-                    message: "This binding keeps nothing from as?, so it only asks what type the value is. Write value is Type instead."
-                )
+                case .nilCheck:
+                    file.finding(
+                        at: found.pattern,
+                        rule: name,
+                        messageId: "unusedOptionalBinding",
+                        message:
+                            "This binding unwraps a value and throws it away, so it is only a nil check in disguise. Write value != nil instead.",
+                    )
+                case .successCheck:
+                    file.finding(
+                        at: found.pattern,
+                        rule: name,
+                        messageId: "unusedOptionalBindingTry",
+                        message:
+                            "This binding keeps nothing from try?, so it only asks whether the call succeeded. Write (try? call()) != nil, with the parentheses, or use do/catch if the failure needs a reason.",
+                    )
+                case .typeCheck:
+                    file.finding(
+                        at: found.pattern,
+                        rule: name,
+                        messageId: "unusedOptionalBindingCast",
+                        message:
+                            "This binding keeps nothing from as?, so it only asks what type the value is. Write value is Type instead.",
+                    )
             }
         }
     }
@@ -121,12 +124,16 @@ public struct UnusedOptionalBinding: FileRule {
          */
         static func repair(for value: ExprSyntax?) -> Repair {
             guard let value else { return .nilCheck }
-            if let tryExpression = value.as(TryExprSyntax.self), tryExpression.questionOrExclamationMark?.tokenKind == .postfixQuestionMark {
+            if let tryExpression = value.as(TryExprSyntax.self),
+                tryExpression.questionOrExclamationMark?.tokenKind == .postfixQuestionMark
+            {
                 return .successCheck
             }
             if let sequence = value.as(SequenceExprSyntax.self), sequence.elements.count == 3 {
                 let parts = Array(sequence.elements)
-                if let cast = parts[1].as(UnresolvedAsExprSyntax.self), cast.questionOrExclamationMark?.tokenKind == .postfixQuestionMark {
+                if let cast = parts[1].as(UnresolvedAsExprSyntax.self),
+                    cast.questionOrExclamationMark?.tokenKind == .postfixQuestionMark
+                {
                     return .typeCheck
                 }
             }

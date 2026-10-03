@@ -17,7 +17,14 @@ import Testing
 struct LegacyConstructorsTests {
     static func findings(_ source: String) -> [FindingRecord] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         return LegacyConstructors().findings(in: file)
     }
 
@@ -388,7 +395,10 @@ struct LegacyConstructorsTests {
         let source = "let width = CGRectGetWidth(CGRectInset(CGRectMake(0, 0, side, side), 1, 1))"
         let found = Self.findings(source)
         #expect(found.map(\.fixes.isEmpty) == [true, true, false])
-        #expect(Self.fixed(source) == "let width = CGRectGetWidth(CGRectInset(CGRect(x: 0, y: 0, width: side, height: side), 1, 1))")
+        #expect(
+            Self.fixed(source)
+                == "let width = CGRectGetWidth(CGRectInset(CGRect(x: 0, y: 0, width: side, height: side), 1, 1))"
+        )
         #expect(Self.suggested(source) == "let width = CGRectMake(0, 0, side, side).insetBy(dx: 1, dy: 1).width")
     }
 
@@ -427,17 +437,21 @@ struct LegacyConstructorsTests {
             let level = NSEqualPoints(start, end)
             """
         #expect(Self.suggested(source) == suggested)
-        #expect(Self.fixed(source) == source.replacingOccurrences(of: "NSEqualPoints(start, end)", with: "start == end"))
+        #expect(
+            Self.fixed(source) == source.replacingOccurrences(of: "NSEqualPoints(start, end)", with: "start == end")
+        )
     }
 
     /* Each message names the legacy call and what to write instead. */
     @Test func messagesNameTheModernForm() {
         let found = Self.findings("CGPointMake(1, 2)\nCGRectGetWidth(rect)\nNSWidth(rect)\narc4random_uniform(6)")
-        #expect(found.map(\.message) == [
-            "CGPointMake is the C spelling from before Swift had its own initializers. Write CGPoint(x:y:), which builds the same value and reads as Swift.",
-            "CGRectGetWidth is the C spelling of a CGRect member. Write rect.width, the same function called the Swift way.",
-            "NSWidth is the C spelling from before Swift had its own API. Swift's form is rect.width, but it works on the standardized rectangle, so it differs when a width or height is negative or the rectangle is empty. Switch where that cannot happen.",
-            "arc4random_uniform is the C random API from before Swift had its own. Write Int.random(in: 0..<upperBound), or UInt32.random(in:) where the UInt32 result matters. The result type differs, so choose the type the code needs.",
-        ])
+        #expect(
+            found.map(\.message) == [
+                "CGPointMake is the C spelling from before Swift had its own initializers. Write CGPoint(x:y:), which builds the same value and reads as Swift.",
+                "CGRectGetWidth is the C spelling of a CGRect member. Write rect.width, the same function called the Swift way.",
+                "NSWidth is the C spelling from before Swift had its own API. Swift's form is rect.width, but it works on the standardized rectangle, so it differs when a width or height is negative or the rectangle is empty. Switch where that cannot happen.",
+                "arc4random_uniform is the C random API from before Swift had its own. Write Int.random(in: 0..<upperBound), or UInt32.random(in:) where the UInt32 result matters. The result type differs, so choose the type the code needs.",
+            ]
+        )
     }
 }

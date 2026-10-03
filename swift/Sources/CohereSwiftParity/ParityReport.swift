@@ -14,10 +14,10 @@ struct ParityReport {
     /* What the comparison keys on, per the mapping: a line, or only the file. */
     private func keys(_ findings: [RuleFinding]) -> Set<String> {
         switch mapping.comparison {
-        case .line:
-            return Set(findings.map { "\($0.file):\($0.line)" })
-        case .file:
-            return Set(findings.map(\.file))
+            case .line:
+                return Set(findings.map { "\($0.file):\($0.line)" })
+            case .file:
+                return Set(findings.map(\.file))
         }
     }
 
@@ -27,13 +27,15 @@ struct ParityReport {
 
     func summaryLine() -> String {
         let name = "\(mapping.incumbent.rawValue) \(mapping.incumbentRule)"
-        return "\(name.padding(toLength: 50, withPad: " ", startingAt: 0)) cohere \(cohere.count)  incumbent \(other.count)  both \(both.count)  cohere-only \(cohereOnly.count)  incumbent-only \(incumbentOnly.count)"
+        return
+            "\(name.padding(toLength: 50, withPad: " ", startingAt: 0)) cohere \(cohere.count)  incumbent \(other.count)  both \(both.count)  cohere-only \(cohereOnly.count)  incumbent-only \(incumbentOnly.count)"
     }
 
     /* Each difference with the source line it points at, so a reader can judge it without opening the file. */
     func differences(root: URL, examples: Int) -> String {
         var text = ""
-        for (label, list) in [("cohere only", cohereOnly), ("\(mapping.incumbent.rawValue) only", incumbentOnly)] where !list.isEmpty {
+        for (label, list) in [("cohere only", cohereOnly), ("\(mapping.incumbent.rawValue) only", incumbentOnly)]
+        where !list.isEmpty {
             text += "  \(label):\n"
             for key in list.prefix(examples) {
                 text += "    \(key)\(Self.sourceLine(for: key, root: root))\n"

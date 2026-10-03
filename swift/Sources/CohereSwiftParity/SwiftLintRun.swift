@@ -40,14 +40,20 @@ struct SwiftLintRun {
         let rules = Set(RuleMapping.incumbentRules(of: .swiftLint))
         let configuration = TemporaryFile.url(extension: "yml")
         /* `file_length` runs at cohere's threshold, not SwiftLint's 400, so the two rules answer the same question. */
-        let thresholds = rules.contains("file_length") ? "file_length:\n  warning: \(FileLength.maximumLines)\n  error: \(FileLength.maximumLines)\n" : ""
-        try ("only_rules:\n" + rules.sorted().map { "  - \($0)\n" }.joined() + thresholds).write(to: configuration, atomically: true, encoding: .utf8)
+        let thresholds =
+            rules.contains("file_length")
+            ? "file_length:\n  warning: \(FileLength.maximumLines)\n  error: \(FileLength.maximumLines)\n" : ""
+        try ("only_rules:\n" + rules.sorted().map { "  - \($0)\n" }.joined() + thresholds).write(
+            to: configuration,
+            atomically: true,
+            encoding: .utf8,
+        )
         defer { TemporaryFile.remove(configuration) }
 
         let result = try runner.run(
             executable.path,
             ["lint", "--config", configuration.path, "--reporter", "json", "--quiet", "--no-cache"] + files.map(\.path),
-            in: root
+            in: root,
         )
         /* SwiftLint exits 2 when it found violations at error severity, which is an answer; anything else nonzero is a failure. */
         guard result.exitCode == 0 || result.exitCode == 2 else {
@@ -55,7 +61,11 @@ struct SwiftLintRun {
         }
         return try JSONDecoder().decode([Violation].self, from: result.standardOutput).compactMap { violation in
             guard rules.contains(violation.ruleIdentifier), let file = violation.file else { return nil }
-            return RuleFinding(file: PackagePath.relative(file, to: root), line: violation.line ?? 1, rule: violation.ruleIdentifier)
+            return RuleFinding(
+                file: PackagePath.relative(file, to: root),
+                line: violation.line ?? 1,
+                rule: violation.ruleIdentifier,
+            )
         }
     }
 }

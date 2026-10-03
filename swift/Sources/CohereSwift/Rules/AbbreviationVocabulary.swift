@@ -44,7 +44,8 @@ public struct AbbreviationVocabulary: Sendable {
         var description: String
     }
 
-    static let reasoning = "A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call site by a reader who has to expand the abbreviation themselves and hope they expanded it the way the author meant."
+    static let reasoning =
+        "A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call site by a reader who has to expand the abbreviation themselves and hope they expanded it the way the author meant."
 
     /* `swift/Sources/CohereSwift/Rules/` up to cohere's root, then the Go rule's directory. */
     public static let defaultFile = URL(fileURLWithPath: #filePath)
@@ -71,14 +72,17 @@ public struct AbbreviationVocabulary: Sendable {
         let data: Data
         do {
             data = try Data(contentsOf: file)
-        } catch {
+        }
+        catch {
             throw LoadFailure(description: "it could not be read (\((error as NSError).localizedDescription))")
         }
         do {
             return try load(data: data)
-        } catch let failure as LoadFailure {
+        }
+        catch let failure as LoadFailure {
             throw failure
-        } catch {
+        }
+        catch {
             throw LoadFailure(description: "it is not valid JSON (\((error as NSError).localizedDescription))")
         }
     }
@@ -92,7 +96,11 @@ public struct AbbreviationVocabulary: Sendable {
         guard let file = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw LoadFailure(description: "the file is not a JSON object")
         }
-        try refuseUnknownKeys(in: file, allowed: ["about", "abbreviations", "allowedNames", "allowedSegments"], context: "the file")
+        try refuseUnknownKeys(
+            in: file,
+            allowed: ["about", "abbreviations", "allowedNames", "allowedSegments"],
+            context: "the file",
+        )
 
         var vocabulary = AbbreviationVocabulary()
         var seen = Set<String>()
@@ -107,7 +115,8 @@ public struct AbbreviationVocabulary: Sendable {
             if let prefix = entry.prefix {
                 if prefix.phase == "early" {
                     vocabulary.earlyPrefixes.append(entry)
-                } else {
+                }
+                else {
                     vocabulary.latePrefixes.append(entry)
                 }
             }
@@ -132,7 +141,11 @@ public struct AbbreviationVocabulary: Sendable {
     private static func parseEntry(_ object: [String: Any], index: Int) throws -> Entry {
         let abbreviation = object["abbreviation"] as? String ?? ""
         let context = "entry \(index) (\"\(abbreviation)\")"
-        try refuseUnknownKeys(in: object, allowed: ["abbreviation", "expansion", "advice", "reason", "whole", "prefix", "suffix", "segment"], context: context)
+        try refuseUnknownKeys(
+            in: object,
+            allowed: ["abbreviation", "expansion", "advice", "reason", "whole", "prefix", "suffix", "segment"],
+            context: context,
+        )
         guard !abbreviation.isEmpty, abbreviation.lowercased() == abbreviation else {
             throw LoadFailure(description: "\(context): the abbreviation must be lowercase and present")
         }
@@ -140,17 +153,18 @@ public struct AbbreviationVocabulary: Sendable {
             abbreviation: abbreviation,
             expansion: object["expansion"] as? String ?? "",
             advice: object["advice"] as? String ?? "",
-            segment: object["segment"] != nil
+            segment: object["segment"] != nil,
         )
         var needsExpansion = entry.segment
         if let whole = object["whole"] as? [String: Any] {
             try refuseUnknownKeys(in: whole, allowed: ["messageId", "style"], context: "\(context) whole")
             let style = whole["style"] as? String ?? ""
             switch style {
-            case "orDescriptive", "plain": needsExpansion = true
-            case "advice" where !entry.advice.isEmpty: break
-            case "advice": throw LoadFailure(description: "\(context): whole style is advice and the entry has none")
-            default: throw LoadFailure(description: "\(context): unknown whole style \"\(style)\"")
+                case "orDescriptive", "plain": needsExpansion = true
+                case "advice" where !entry.advice.isEmpty: break
+                case "advice":
+                    throw LoadFailure(description: "\(context): whole style is advice and the entry has none")
+                default: throw LoadFailure(description: "\(context): unknown whole style \"\(style)\"")
             }
             entry.whole = (try messageId(of: whole, context: "\(context) whole"), style)
         }
@@ -162,15 +176,20 @@ public struct AbbreviationVocabulary: Sendable {
             }
             let style = prefix["style"] as? String ?? ""
             switch style {
-            case "": needsExpansion = true
-            case "advice" where !entry.advice.isEmpty: break
-            case "advice": throw LoadFailure(description: "\(context): prefix style is advice and the entry has none")
-            default: throw LoadFailure(description: "\(context): unknown prefix style \"\(style)\"")
+                case "": needsExpansion = true
+                case "advice" where !entry.advice.isEmpty: break
+                case "advice":
+                    throw LoadFailure(description: "\(context): prefix style is advice and the entry has none")
+                default: throw LoadFailure(description: "\(context): unknown prefix style \"\(style)\"")
             }
             entry.prefix = (try messageId(of: prefix, context: "\(context) prefix"), phase, style)
         }
         if let suffix = object["suffix"] as? [String: Any] {
-            try refuseUnknownKeys(in: suffix, allowed: ["messageId", "advice", "matcher", "replacement"], context: "\(context) suffix")
+            try refuseUnknownKeys(
+                in: suffix,
+                allowed: ["messageId", "advice", "matcher", "replacement"],
+                context: "\(context) suffix",
+            )
             let matcher = suffix["matcher"] as? String ?? ""
             guard matcher.isEmpty || matcher == "millisecondWord" else {
                 throw LoadFailure(description: "\(context): unknown suffix matcher \"\(matcher)\"")
@@ -222,11 +241,16 @@ public struct AbbreviationVocabulary: Sendable {
         if let entry = wholeByName[name], let whole = entry.whole {
             let advice: String
             switch whole.style {
-            case "advice": advice = entry.advice
-            case "plain": advice = "Use \"\(entry.expansion)\"."
-            default: advice = "Use \"\(entry.expansion)\" or a more descriptive name."
+                case "advice": advice = entry.advice
+                case "plain": advice = "Use \"\(entry.expansion)\"."
+                default: advice = "Use \"\(entry.expansion)\" or a more descriptive name."
             }
-            return Finding(form: "whole", abbreviation: entry.abbreviation, messageId: whole.messageId, message: Self.abbreviated(name, advice))
+            return Finding(
+                form: "whole",
+                abbreviation: entry.abbreviation,
+                messageId: whole.messageId,
+                message: Self.abbreviated(name, advice),
+            )
         }
         let bytes = Array(name.utf8)
         for entry in earlyPrefixes where !allowedSegmentHolds(name, entry.abbreviation) {
@@ -238,8 +262,17 @@ public struct AbbreviationVocabulary: Sendable {
             guard let suffix = entry.suffix else { continue }
             if suffix.matcher == "millisecondWord" {
                 if let range = Self.millisecondWord(in: bytes) {
-                    let suggestion = String(decoding: bytes[..<(range.lowerBound + 1)] + Array(suffix.replacement.utf8) + bytes[range.upperBound...], as: UTF8.self)
-                    return Finding(form: "suffix", abbreviation: entry.abbreviation, messageId: "noMsSuffix", message: Self.millisecondMessage(name, suggestion))
+                    let suggestion = String(
+                        decoding: bytes[..<(range.lowerBound + 1)] + Array(suffix.replacement.utf8)
+                            + bytes[range.upperBound...],
+                        as: UTF8.self,
+                    )
+                    return Finding(
+                        form: "suffix",
+                        abbreviation: entry.abbreviation,
+                        messageId: "noMsSuffix",
+                        message: Self.millisecondMessage(name, suggestion),
+                    )
                 }
                 continue
             }
@@ -254,7 +287,7 @@ public struct AbbreviationVocabulary: Sendable {
                 form: "suffix",
                 abbreviation: entry.abbreviation,
                 messageId: suffix.messageId,
-                message: "Identifier \"\(name)\" should not end with \"\(word)\". \(advice) \(Self.reasoning)"
+                message: "Identifier \"\(name)\" should not end with \"\(word)\". \(advice) \(Self.reasoning)",
             )
         }
         for entry in latePrefixes {
@@ -267,8 +300,13 @@ public struct AbbreviationVocabulary: Sendable {
         }
         for entry in segments {
             let word = Array(Self.capitalized(entry.abbreviation).utf8)
-            guard Self.segmentMatches(word, in: bytes), let at = Self.firstSegmentStart(word, in: bytes) else { continue }
-            let suggestion = String(decoding: bytes[..<at] + Array(Self.capitalized(entry.expansion).utf8) + bytes[(at + word.count)...], as: UTF8.self)
+            guard Self.segmentMatches(word, in: bytes), let at = Self.firstSegmentStart(word, in: bytes) else {
+                continue
+            }
+            let suggestion = String(
+                decoding: bytes[..<at] + Array(Self.capitalized(entry.expansion).utf8) + bytes[(at + word.count)...],
+                as: UTF8.self,
+            )
             if suggestion == name {
                 continue
             }
@@ -277,7 +315,7 @@ public struct AbbreviationVocabulary: Sendable {
                 form: "segment",
                 abbreviation: entry.abbreviation,
                 messageId: "noWordSegment",
-                message: "Identifier \"\(name)\" abbreviates \"\(shown)\". Use \"\(suggestion)\". \(Self.reasoning)"
+                message: "Identifier \"\(name)\" abbreviates \"\(shown)\". Use \"\(suggestion)\". \(Self.reasoning)",
             )
         }
         return nil
@@ -287,12 +325,24 @@ public struct AbbreviationVocabulary: Sendable {
     private func prefixFinding(_ entry: Entry, name: String, bytes: [UInt8]) -> Finding? {
         guard let prefix = entry.prefix else { return nil }
         let word = Array(entry.abbreviation.utf8)
-        guard bytes.count > word.count, bytes.starts(with: word), Self.isUppercase(bytes[word.count]) else { return nil }
+        guard bytes.count > word.count, bytes.starts(with: word), Self.isUppercase(bytes[word.count]) else {
+            return nil
+        }
         if prefix.style == "advice" {
-            return Finding(form: "prefix", abbreviation: entry.abbreviation, messageId: prefix.messageId, message: Self.abbreviated(entry.abbreviation, entry.advice))
+            return Finding(
+                form: "prefix",
+                abbreviation: entry.abbreviation,
+                messageId: prefix.messageId,
+                message: Self.abbreviated(entry.abbreviation, entry.advice),
+            )
         }
         let suggestion = entry.expansion + name.dropFirst(entry.abbreviation.count)
-        return Finding(form: "prefix", abbreviation: entry.abbreviation, messageId: prefix.messageId, message: Self.abbreviated(name, "Use \"\(suggestion)\"."))
+        return Finding(
+            form: "prefix",
+            abbreviation: entry.abbreviation,
+            messageId: prefix.messageId,
+            message: Self.abbreviated(name, "Use \"\(suggestion)\"."),
+        )
     }
 
     /* Whether an allowed segment in the name holds this abbreviation's letters, which exempts `db` from an `InnoDb` name's early prefix. */

@@ -13,14 +13,16 @@ struct CompileCommandsTests {
     static func string(_ value: String) -> [UInt8] {
         let bytes = Array(value.utf8)
         switch bytes.count {
-        case 0..<32: return [UInt8(0xA0 | bytes.count)] + bytes
-        case 32..<256: return [0xD9, UInt8(bytes.count)] + bytes
-        default: return [0xDA, UInt8(bytes.count >> 8), UInt8(bytes.count & 0xFF)] + bytes
+            case 0..<32: return [UInt8(0xA0 | bytes.count)] + bytes
+            case 32..<256: return [0xD9, UInt8(bytes.count)] + bytes
+            default: return [0xDA, UInt8(bytes.count >> 8), UInt8(bytes.count & 0xFF)] + bytes
         }
     }
 
     static func array(_ values: [String]) -> [UInt8] {
-        let header: [UInt8] = values.count < 16 ? [UInt8(0x90 | values.count)] : [0xDC, UInt8(values.count >> 8), UInt8(values.count & 0xFF)]
+        let header: [UInt8] =
+            values.count < 16
+            ? [UInt8(0x90 | values.count)] : [0xDC, UInt8(values.count >> 8), UInt8(values.count & 0xFF)]
         return header + values.flatMap(string)
     }
 
@@ -46,7 +48,10 @@ struct CompileCommandsTests {
     }
 
     @Test func dropsTheDriversFlagsAndReadsTheFileList() throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-commands-\(UUID().uuidString)", isDirectory: true)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-commands-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let source = directory.appendingPathComponent("Shape.swift").resolvingSymlinksInPath()
         try "".write(to: source, atomically: true, encoding: .utf8)
@@ -63,10 +68,12 @@ struct CompileCommandsTests {
         ])
         #expect(command.moduleName == "Subject")
         #expect(command.files == [source.path])
-        #expect(command.arguments == [
-            "-module-name", "Subject", source.path, "-DDEBUG", "-module-cache-path", "/implicit",
-            "-Xcc", "-DKEPT=1", "-enable-upcoming-feature", "ExistentialAny",
-        ])
+        #expect(
+            command.arguments == [
+                "-module-name", "Subject", source.path, "-DDEBUG", "-module-cache-path", "/implicit",
+                "-Xcc", "-DKEPT=1", "-enable-upcoming-feature", "ExistentialAny",
+            ]
+        )
         #expect(!command.testable)
     }
 
@@ -78,15 +85,28 @@ struct CompileCommandsTests {
 
     /* An executable compiles twice; the testable twin must not answer for the file the product builds. */
     @Test func aFileTakesTheNormalCompileOverItsTestableTwin() {
-        let testable = CompileCommands.Command(moduleName: "App", arguments: ["testable"], files: ["/App/main.swift"], testable: true)
-        let normal = CompileCommands.Command(moduleName: "App", arguments: ["normal"], files: ["/App/main.swift"], testable: false)
+        let testable = CompileCommands.Command(
+            moduleName: "App",
+            arguments: ["testable"],
+            files: ["/App/main.swift"],
+            testable: true,
+        )
+        let normal = CompileCommands.Command(
+            moduleName: "App",
+            arguments: ["normal"],
+            files: ["/App/main.swift"],
+            testable: false,
+        )
         let commands = CompileCommands(commands: [testable, normal])
         #expect(commands.command(for: URL(fileURLWithPath: "/App/main.swift"))?.arguments == ["normal"])
         #expect(commands.command(for: URL(fileURLWithPath: "/App/Other.swift")) == nil)
     }
 
     @Test func aScratchWithNoBuildDescriptionIsAFailure() {
-        let empty = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-no-build-\(UUID().uuidString)", isDirectory: true)
+        let empty = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-no-build-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         #expect(throws: CompileCommands.ReadFailure.self) {
             try CompileCommands.read(scratchPath: empty)
         }
@@ -94,11 +114,23 @@ struct CompileCommandsTests {
 
     /* A task store with no Swift compile in it means the format moved, and must say so rather than read as no files. */
     @Test func aStoreWithNoCompileIsAFailure() throws {
-        let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-empty-store-\(UUID().uuidString)", isDirectory: true)
+        let scratch = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-empty-store-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let buildData = scratch.appendingPathComponent("out/Intermediates.noindex/XCBuildData", isDirectory: true)
-        try FileManager.default.createDirectory(at: buildData.appendingPathComponent("abc.xcbuilddata"), withIntermediateDirectories: true)
-        try "older\nabc\n".write(to: buildData.appendingPathComponent("prior-build-descriptions.txt"), atomically: true, encoding: .utf8)
-        try Data(Self.array(["something", "else"])).write(to: buildData.appendingPathComponent("abc.xcbuilddata/task-store.msgpack"))
+        try FileManager.default.createDirectory(
+            at: buildData.appendingPathComponent("abc.xcbuilddata"),
+            withIntermediateDirectories: true,
+        )
+        try "older\nabc\n".write(
+            to: buildData.appendingPathComponent("prior-build-descriptions.txt"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try Data(Self.array(["something", "else"])).write(
+            to: buildData.appendingPathComponent("abc.xcbuilddata/task-store.msgpack")
+        )
         #expect(throws: CompileCommands.ReadFailure.self) {
             try CompileCommands.read(scratchPath: scratch)
         }

@@ -14,7 +14,14 @@ struct NamingRuleTests {
     }
 
     static func file(_ source: String, name: String = "Subject.swift") -> ParsedFile {
-        ParsedFile(url: URL(fileURLWithPath: "/fixture/\(name)"), targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        ParsedFile(
+            url: URL(fileURLWithPath: "/fixture/\(name)"),
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
     }
 
     /* `name:line` for each finding, so an expectation reads as what was flagged and where. */
@@ -22,7 +29,8 @@ struct NamingRuleTests {
         rule.findings(in: file(source, name: name)).map { finding in
             /* swift-format quotes the name last in single quotes ("remove the leading '_' from the name '_cache'"); the vocabulary quotes it first in double quotes. */
             let singleQuoted = finding.message.split(separator: "'", omittingEmptySubsequences: false)
-            let quoted = singleQuoted.count >= 3
+            let quoted =
+                singleQuoted.count >= 3
                 ? String(singleQuoted[singleQuoted.count - 2])
                 : finding.message.split(separator: "\"").dropFirst().first.map(String.init) ?? ""
             return "\(quoted):\(finding.line)"
@@ -32,7 +40,11 @@ struct NamingRuleTests {
     @Test func theSharedFileCarriesEveryFormInOrder() throws {
         let vocabulary = try Self.vocabulary()
         #expect(vocabulary.earlyPrefixes.map(\.abbreviation) == ["ctx", "db", "tx", "opts", "cur", "pct", "prev"])
-        #expect(vocabulary.segments.map(\.abbreviation) == ["cwd", "dir", "env", "cli", "len", "seq", "db", "tx", "vars", "var"])
+        #expect(
+            vocabulary.segments.map(\.abbreviation) == [
+                "cwd", "dir", "env", "cli", "len", "seq", "db", "tx", "vars", "var",
+            ]
+        )
         #expect(vocabulary.suffixes.map(\.abbreviation).prefix(5) == ["prop", "props", "param", "params", "ms"])
         #expect(vocabulary.allowedNames == ["URLSearchParams"])
         #expect(vocabulary.allowedSegments == ["InnoDb"])
@@ -43,12 +55,18 @@ struct NamingRuleTests {
         let vocabulary = try Self.vocabulary()
         var judged = 0
         for (word, entry) in vocabulary.wholeByName {
-            #expect(vocabulary.find(word)?.form == "whole" && vocabulary.find(word)?.messageId == entry.whole?.messageId, "whole \(word)")
+            #expect(
+                vocabulary.find(word)?.form == "whole" && vocabulary.find(word)?.messageId == entry.whole?.messageId,
+                "whole \(word)",
+            )
             judged += 1
         }
         for entry in vocabulary.earlyPrefixes + vocabulary.latePrefixes {
             let name = entry.abbreviation + "Widget"
-            #expect(vocabulary.find(name)?.form == "prefix" && vocabulary.find(name)?.messageId == entry.prefix?.messageId, "prefix \(name)")
+            #expect(
+                vocabulary.find(name)?.form == "prefix" && vocabulary.find(name)?.messageId == entry.prefix?.messageId,
+                "prefix \(name)",
+            )
             judged += 1
         }
         for entry in vocabulary.suffixes {
@@ -58,7 +76,10 @@ struct NamingRuleTests {
         }
         for entry in vocabulary.segments {
             let name = "widget" + AbbreviationVocabulary.capitalized(entry.abbreviation) + "Name"
-            #expect(vocabulary.find(name)?.form == "segment" && vocabulary.find(name)?.abbreviation == entry.abbreviation, "segment \(name)")
+            #expect(
+                vocabulary.find(name)?.form == "segment" && vocabulary.find(name)?.abbreviation == entry.abbreviation,
+                "segment \(name)",
+            )
             judged += 1
         }
         #expect(judged == 92)
@@ -107,7 +128,11 @@ struct NamingRuleTests {
                 }
             }
             """
-        #expect(Self.flagged(ConsistencyNoAbbreviatedIdentifier(vocabulary: try Self.vocabulary()), source) == ["Config:1", "maxBytes:2", "params:3", "idx:4"])
+        #expect(
+            Self.flagged(ConsistencyNoAbbreviatedIdentifier(vocabulary: try Self.vocabulary()), source) == [
+                "Config:1", "maxBytes:2", "params:3", "idx:4",
+            ]
+        )
     }
 
     /* An override's name and single-name labels are the superclass's; a separate label is API and only the name after it is ours. */
@@ -139,6 +164,10 @@ struct NamingRuleTests {
     }
 
     @Test func leadingUnderscoresAreSwiftFormatsOwnRule() {
-        #expect(Self.flagged(SwiftFormatRule.noLeadingUnderscores, "let _cache = 1\nlet _ = 2\nfunc _reset() {}\n") == ["_cache:1", "_reset:3"])
+        #expect(
+            Self.flagged(SwiftFormatRule.noLeadingUnderscores, "let _cache = 1\nlet _ = 2\nfunc _reset() {}\n") == [
+                "_cache:1", "_reset:3",
+            ]
+        )
     }
 }

@@ -31,7 +31,8 @@ struct ParityCommand {
     static func main() async {
         do {
             try await run(arguments: Array(CommandLine.arguments.dropFirst()))
-        } catch {
+        }
+        catch {
             FileHandle.standardError.write(Data("cohere-swift-parity: \(error)\n".utf8))
             exit(2)
         }
@@ -57,15 +58,16 @@ struct ParityCommand {
                 throw UsageFailure(description: "\(argument) needs a value")
             }
             switch argument {
-            case "--package": root = URL(fileURLWithPath: value, relativeTo: workingDirectory).standardizedFileURL
-            case "--swiftlint": swiftLint = URL(fileURLWithPath: value, relativeTo: workingDirectory).standardizedFileURL
-            case "--examples":
-                guard let count = Int(value), count >= 0 else {
-                    throw UsageFailure(description: "--examples takes a number, not \(value)")
-                }
-                examples = count
-            default:
-                throw UsageFailure(description: "unknown argument \(argument)")
+                case "--package": root = URL(fileURLWithPath: value, relativeTo: workingDirectory).standardizedFileURL
+                case "--swiftlint":
+                    swiftLint = URL(fileURLWithPath: value, relativeTo: workingDirectory).standardizedFileURL
+                case "--examples":
+                    guard let count = Int(value), count >= 0 else {
+                        throw UsageFailure(description: "--examples takes a number, not \(value)")
+                    }
+                    examples = count
+                default:
+                    throw UsageFailure(description: "unknown argument \(argument)")
             }
         }
         if typesOracle {
@@ -73,7 +75,9 @@ struct ParityCommand {
             return
         }
         guard FileManager.default.isExecutableFile(atPath: swiftLint.path) else {
-            throw UsageFailure(description: "no SwiftLint at \(swiftLint.path); the parity task (#w9hkcza) installs 0.65.1 there")
+            throw UsageFailure(
+                description: "no SwiftLint at \(swiftLint.path); the parity task (#w9hkcza) installs 0.65.1 there"
+            )
         }
 
         let runner = ProcessRunner()
@@ -91,22 +95,31 @@ struct ParityCommand {
         var reports: [ParityReport] = []
         for mapping in RuleMapping.all {
             let incumbentFindings = mapping.incumbent == .swiftLint ? swiftLintFindings : swiftFormatFindings
-            reports.append(ParityReport(
-                mapping: mapping,
-                cohere: cohere.filter { mapping.rules.contains($0.rule) && (mapping.messageIds.isEmpty || mapping.messageIds.contains($0.messageId)) },
-                other: incumbentFindings.filter { $0.rule == mapping.incumbentRule }
-            ))
+            reports.append(
+                ParityReport(
+                    mapping: mapping,
+                    cohere: cohere.filter {
+                        mapping.rules.contains($0.rule)
+                            && (mapping.messageIds.isEmpty || mapping.messageIds.contains($0.messageId))
+                    },
+                    other: incumbentFindings.filter { $0.rule == mapping.incumbentRule },
+                )
+            )
         }
 
         /* Coverage first, so a comparison over nothing cannot read as agreement. */
         print("parity over \(files.count) files in \(root.path)")
-        print("incumbents: SwiftLint \(try swiftLintRun.version()), swift-format from xcrun; \(swiftLintFindings.count) and \(swiftFormatFindings.count) findings under the mapped rules")
+        print(
+            "incumbents: SwiftLint \(try swiftLintRun.version()), swift-format from xcrun; \(swiftLintFindings.count) and \(swiftFormatFindings.count) findings under the mapped rules"
+        )
         print("")
         for report in reports {
             print(report.summaryLine())
         }
         for report in reports where !report.cohereOnly.isEmpty || !report.incumbentOnly.isEmpty {
-            print("\n\(report.mapping.incumbent.rawValue) \(report.mapping.incumbentRule) against \(report.mapping.rules.joined(separator: " + ")), compared by \(report.mapping.comparison):")
+            print(
+                "\n\(report.mapping.incumbent.rawValue) \(report.mapping.incumbentRule) against \(report.mapping.rules.joined(separator: " + ")), compared by \(report.mapping.comparison):"
+            )
             print(report.differences(root: root, examples: examples), terminator: "")
         }
     }
@@ -114,23 +127,40 @@ struct ParityCommand {
     static func printTypesOracle(_ report: TypesOracle.Report, root: URL, examples: Int) {
         /* Coverage first, so a comparison over nothing cannot read as agreement. */
         print("types oracle over \(report.filesOwned) files in \(root.path)")
-        print("asked sourcekitd about \(report.filesAsked); no compile command for \(report.filesWithoutCommand.count); unanswered \(report.filesUnanswered.count)")
-        print("build: \(report.build.count) diagnostics in \(report.buildMilliseconds)ms; sourcekitd: \(report.sourcekitd.count) in \(report.sourcekitdMilliseconds)ms")
-        print("control (an injected type error) in \(PackagePath.relative(report.controlFile, to: root)): \(report.controlFound ? "caught" : "MISSED")")
-        print("slowest: " + report.slowestFiles.map { "\(PackagePath.relative($0.0, to: root)) \($0.1)ms" }.joined(separator: ", "))
+        print(
+            "asked sourcekitd about \(report.filesAsked); no compile command for \(report.filesWithoutCommand.count); unanswered \(report.filesUnanswered.count)"
+        )
+        print(
+            "build: \(report.build.count) diagnostics in \(report.buildMilliseconds)ms; sourcekitd: \(report.sourcekitd.count) in \(report.sourcekitdMilliseconds)ms"
+        )
+        print(
+            "control (an injected type error) in \(PackagePath.relative(report.controlFile, to: root)): \(report.controlFound ? "caught" : "MISSED")"
+        )
+        print(
+            "slowest: "
+                + report.slowestFiles.map { "\(PackagePath.relative($0.0, to: root)) \($0.1)ms" }.joined(
+                    separator: ", "
+                )
+        )
         print("")
-        print("only the build: \(report.onlyBuild.count); only sourcekitd: \(report.onlySourcekitd.count); same diagnostic, different group: \(report.groupDifferences.count)")
+        print(
+            "only the build: \(report.onlyBuild.count); only sourcekitd: \(report.onlySourcekitd.count); same diagnostic, different group: \(report.groupDifferences.count)"
+        )
         func show(_ diagnostic: TypesOracle.Diagnostic) -> String {
             "\(PackagePath.relative(diagnostic.file, to: root)):\(diagnostic.line):\(diagnostic.column) \(diagnostic.severity) \(diagnostic.message)"
         }
-        for (title, diagnostics) in [("only the build", report.onlyBuild), ("only sourcekitd", report.onlySourcekitd)] where !diagnostics.isEmpty {
+        for (title, diagnostics) in [
+            ("only the build", report.onlyBuild), ("only sourcekitd", report.onlySourcekitd),
+        ] where !diagnostics.isEmpty {
             print("\n\(title):")
             for diagnostic in diagnostics.prefix(examples) {
                 print("  \(show(diagnostic))")
             }
         }
         for (diagnostic, built, asked) in report.groupDifferences.prefix(examples) {
-            print("  group \(built.isEmpty ? "(none)" : built) against \(asked.isEmpty ? "(none)" : asked): \(show(diagnostic))")
+            print(
+                "  group \(built.isEmpty ? "(none)" : built) against \(asked.isEmpty ? "(none)" : asked): \(show(diagnostic))"
+            )
         }
         for file in report.filesWithoutCommand.prefix(examples) {
             print("  no compile command: \(PackagePath.relative(file, to: root))")

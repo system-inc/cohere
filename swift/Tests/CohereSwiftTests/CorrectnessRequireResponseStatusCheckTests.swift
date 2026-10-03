@@ -16,11 +16,16 @@ import Testing
  */
 @Suite(.serialized)
 struct CorrectnessRequireResponseStatusCheckTests {
-    static let dataFor = "s:So12NSURLSessionC10FoundationE4data3for8delegateAC4DataV_So13NSURLResponseCtAC10URLRequestV_So0A12TaskDelegate_pSgtYaKF"
-    static let dataFrom = "s:So12NSURLSessionC10FoundationE4data4from8delegateAC4DataV_So13NSURLResponseCtAC3URLV_So0A12TaskDelegate_pSgtYaKF"
-    static let uploadFor = "s:So12NSURLSessionC10FoundationE6upload3for4from8delegateAC4DataV_So13NSURLResponseCtAC10URLRequestV_AISo0A12TaskDelegate_pSgtYaKF"
-    static let bytesFor = "s:So12NSURLSessionC10FoundationE5bytes3for8delegateAbCE10AsyncBytesV_So13NSURLResponseCtAC10URLRequestV_So0A12TaskDelegate_pSgtYaKF"
-    static let downloadFor = "s:So12NSURLSessionC10FoundationE8download3for8delegateAC3URLV_So13NSURLResponseCtAC10URLRequestV_So0A12TaskDelegate_pSgtYaKF"
+    static let dataFor =
+        "s:So12NSURLSessionC10FoundationE4data3for8delegateAC4DataV_So13NSURLResponseCtAC10URLRequestV_So0A12TaskDelegate_pSgtYaKF"
+    static let dataFrom =
+        "s:So12NSURLSessionC10FoundationE4data4from8delegateAC4DataV_So13NSURLResponseCtAC3URLV_So0A12TaskDelegate_pSgtYaKF"
+    static let uploadFor =
+        "s:So12NSURLSessionC10FoundationE6upload3for4from8delegateAC4DataV_So13NSURLResponseCtAC10URLRequestV_AISo0A12TaskDelegate_pSgtYaKF"
+    static let bytesFor =
+        "s:So12NSURLSessionC10FoundationE5bytes3for8delegateAbCE10AsyncBytesV_So13NSURLResponseCtAC10URLRequestV_So0A12TaskDelegate_pSgtYaKF"
+    static let downloadFor =
+        "s:So12NSURLSessionC10FoundationE8download3for8delegateAC3URLV_So13NSURLResponseCtAC10URLRequestV_So0A12TaskDelegate_pSgtYaKF"
     static let dataTask = "c:objc(cs)NSURLSession(im)dataTaskWithRequest:completionHandler:"
     static let uploadTask = "c:objc(cs)NSURLSession(im)uploadTaskWithRequest:fromData:completionHandler:"
     static let httpResponse = "c:objc(cs)NSHTTPURLResponse"
@@ -28,7 +33,8 @@ struct CorrectnessRequireResponseStatusCheckTests {
     /* A client of ours with a `data(for:)` of its own, which already throws on a bad status. */
     static let ourData = "s:7Control9ApiClientC4data3forAA7PayloadVSS_tYaKF"
     /* A longer name in Foundation's extension that starts with `data(for:delegate:)`'s: one more label, so another declaration. */
-    static let longerData = "s:So12NSURLSessionC10FoundationE4data3for8delegate7timeoutAC4DataV_So13NSURLResponseCtAC10URLRequestV_So0A12TaskDelegate_pSgSdtYaKF"
+    static let longerData =
+        "s:So12NSURLSessionC10FoundationE4data3for8delegate7timeoutAC4DataV_So13NSURLResponseCtAC10URLRequestV_So0A12TaskDelegate_pSgSdtYaKF"
 
     static let urlSession: [String: String] = [
         "data": dataFor,
@@ -43,12 +49,27 @@ struct CorrectnessRequireResponseStatusCheckTests {
     /* Every finding as its message (`body` or `discard`) and the text it covers, or its first line and `...` when it spans more. */
     static func findings(_ source: String, resolving: [String: String] = urlSession) -> [String] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         var occurrences: [FileSymbols.Occurrence] = []
         for token in file.tree.tokens(viewMode: .sourceAccurate) {
             let location = file.locations.location(for: token.positionAfterSkippingLeadingTrivia)
             guard let symbol = resolving["\(location.line):\(token.text)"] ?? resolving[token.text] else { continue }
-            occurrences.append(FileSymbols.Occurrence(line: location.line, column: location.column, symbol: symbol, name: token.text, isReference: true))
+            occurrences.append(
+                FileSymbols.Occurrence(
+                    line: location.line,
+                    column: location.column,
+                    symbol: symbol,
+                    name: token.text,
+                    isReference: true,
+                )
+            )
         }
         let rule = CorrectnessRequireResponseStatusCheck()
         let found = rule.findings(in: file, symbols: FileSymbols(occurrences, ownedModules: ["Control"]))
@@ -58,14 +79,14 @@ struct CorrectnessRequireResponseStatusCheckTests {
             #expect(finding.fixes.isEmpty && finding.suggestions.isEmpty, "the rule never fixes")
             let kind: String
             switch finding.messageId {
-            case "bodyReadWithoutStatusCheck":
-                kind = "body"
-                #expect(finding.message == CorrectnessRequireResponseStatusCheck.bodyMessage)
-            case "responseDiscarded":
-                kind = "discard"
-                #expect(finding.message == CorrectnessRequireResponseStatusCheck.discardMessage)
-            default:
-                kind = "unknown \(finding.messageId)"
+                case "bodyReadWithoutStatusCheck":
+                    kind = "body"
+                    #expect(finding.message == CorrectnessRequireResponseStatusCheck.bodyMessage)
+                case "responseDiscarded":
+                    kind = "discard"
+                    #expect(finding.message == CorrectnessRequireResponseStatusCheck.discardMessage)
+                default:
+                    kind = "unknown \(finding.messageId)"
             }
             let line = lines[finding.line - 1]
             guard let endLine = finding.endLine, let endColumn = finding.endColumn, endLine == finding.line else {
@@ -117,7 +138,12 @@ struct CorrectnessRequireResponseStatusCheckTests {
         """
 
     @Test func portraitFetchAsItStandsChecksFirst() {
-        #expect(Self.findings(Self.portrait(response: "response", check: Self.portraitCheck), resolving: Self.urlSession.merging(["data": Self.dataFrom]) { _, new in new }).isEmpty)
+        #expect(
+            Self.findings(
+                Self.portrait(response: "response", check: Self.portraitCheck),
+                resolving: Self.urlSession.merging(["data": Self.dataFrom]) { _, new in new },
+            ).isEmpty
+        )
     }
 
     @Test func portraitFetchWithoutItsCheckCachesAnErrorPageAsAPortrait() {
@@ -178,15 +204,32 @@ struct CorrectnessRequireResponseStatusCheckTests {
     static let lifecycleResolving = urlSession.merging(["9:data": jsonData]) { _, new in new }
 
     @Test func lifecyclePostAsItStandsReadsTheBodyOnlyBehindTheCheck() {
-        let source = Self.lifecyclePost("                let (data, response) = try await self.urlSession.data(for: request)", check: true)
+        let source = Self.lifecyclePost(
+            "                let (data, response) = try await self.urlSession.data(for: request)",
+            check: true,
+        )
         #expect(Self.findings(source, resolving: Self.lifecycleResolving).isEmpty)
     }
 
     @Test func lifecyclePostWithoutItsCheckReportsSuccessWhateverTheStatus() {
-        let kept = Self.lifecyclePost("                let (data, response) = try await self.urlSession.data(for: request)", check: false)
-        #expect(Self.findings(kept, resolving: Self.lifecycleResolving) == ["discard try await self.urlSession.data(for: request)"])
-        let dropped = Self.lifecyclePost("                _ = try await self.urlSession.data(for: request)", check: false)
-        #expect(Self.findings(dropped, resolving: Self.lifecycleResolving) == ["discard try await self.urlSession.data(for: request)"])
+        let kept = Self.lifecyclePost(
+            "                let (data, response) = try await self.urlSession.data(for: request)",
+            check: false,
+        )
+        #expect(
+            Self.findings(kept, resolving: Self.lifecycleResolving) == [
+                "discard try await self.urlSession.data(for: request)"
+            ]
+        )
+        let dropped = Self.lifecyclePost(
+            "                _ = try await self.urlSession.data(for: request)",
+            check: false,
+        )
+        #expect(
+            Self.findings(dropped, resolving: Self.lifecycleResolving) == [
+                "discard try await self.urlSession.data(for: request)"
+            ]
+        )
     }
 
     /*
@@ -360,7 +403,11 @@ struct CorrectnessRequireResponseStatusCheckTests {
                 return first + second
             }
             """
-        #expect(Self.findings(source) == ["body session.data(for: request).0", "body (try await session.data(for: request)).0"])
+        #expect(
+            Self.findings(source) == [
+                "body session.data(for: request).0", "body (try await session.data(for: request)).0",
+            ]
+        )
     }
 
     @Test func aCompletionHandlerThatDecodes() {
@@ -488,7 +535,11 @@ struct CorrectnessRequireResponseStatusCheckTests {
                 session.dataTask(with: request) { _, _, error in completion(error == nil) }.resume()
             }
             """
-        #expect(Self.findings(source) == ["discard session.dataTask(with: request) { _, _, error in completion(error == nil) }"])
+        #expect(
+            Self.findings(source) == [
+                "discard session.dataTask(with: request) { _, _, error in completion(error == nil) }"
+            ]
+        )
     }
 
     // MARK: What it leaves alone
@@ -659,8 +710,13 @@ struct CorrectnessRequireResponseStatusCheckTests {
                 return try JSONDecoder().decode(Profile.self, from: data)
             }
             """
-        #expect(Self.findings(source, resolving: Self.urlSession.merging(["data": Self.ourData]) { _, new in new }).isEmpty)
-        #expect(Self.findings(source, resolving: Self.urlSession.merging(["data": Self.longerData]) { _, new in new }).isEmpty)
+        #expect(
+            Self.findings(source, resolving: Self.urlSession.merging(["data": Self.ourData]) { _, new in new }).isEmpty
+        )
+        #expect(
+            Self.findings(source, resolving: Self.urlSession.merging(["data": Self.longerData]) { _, new in new })
+                .isEmpty
+        )
     }
 
     @Test func aCastToAnotherTypeOrAnIsTestHandsTheResponseOn() {
@@ -768,29 +824,57 @@ struct CorrectnessRequireResponseStatusCheckTests {
         """#
 
     @Test func theIndexResolvesURLSessionsMethodsAndHTTPURLResponse() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-typed-\(UUID().uuidString)", isDirectory: true)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-typed-\(UUID().uuidString)",
+            isDirectory: true,
+        )
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-        try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try Self.packageSource.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
+        try PipelineControlTests.manifest.write(
+            to: root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try Self.packageSource.write(
+            to: sources.appendingPathComponent("Control.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
 
         /* One run builds the package and writes its index. The rule is run by hand on what the run left. */
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
+        let options = try CommandOptions.parse(
+            ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"],
+            workingDirectory: root,
+        )
         _ = try await Pipeline(options: options, writer: ContractWriter { _ in }, workingDirectory: root).run()
-        let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: ProcessRunner())
+        let package = try PackageModel.load(
+            root: root,
+            scratchPath: Pipeline.scratchPath(for: root),
+            runner: ProcessRunner(),
+        )
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
         let rule = CorrectnessRequireResponseStatusCheck()
         let candidates = parsed.files.filter { rule.applies(to: $0) }
-        let symbols = SymbolProvider(scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root), runner: ProcessRunner()).symbols(for: candidates)
+        let symbols = SymbolProvider(
+            scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root),
+            runner: ProcessRunner(),
+        ).symbols(for: candidates)
         #expect(symbols.fromIndex == 1, "the build's index should describe the file: \(symbols.unavailable)")
         let found = candidates.flatMap { file in
-            rule.findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.line):\($0.column) \($0.messageId)" }
+            rule.findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map {
+                "\($0.line):\($0.column) \($0.messageId)"
+            }
         }
         /*
          `unchecked` (the decode), `discarded` (the upload's `_ =`), `handler` (the completion handler's body) and
          `streamed` (the stream counted before the status is read, and the count returned on a path that reads it
          only afterwards, so silent); not `checked` and not `downloaded`.
          */
-        #expect(found == ["10:61 bodyReadWithoutStatusCheck", "22:13 responseDiscarded", "27:24 bodyReadWithoutStatusCheck"], "\(found)")
+        #expect(
+            found == [
+                "10:61 bodyReadWithoutStatusCheck", "22:13 responseDiscarded", "27:24 bodyReadWithoutStatusCheck",
+            ],
+            "\(found)",
+        )
     }
 }

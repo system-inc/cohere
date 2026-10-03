@@ -34,11 +34,11 @@ public struct SourceParser: Sendable {
             var result = Result(files: [], parseErrors: [], unreadable: [])
             for outcome in outcomes.compactMap({ $0 }) {
                 switch outcome {
-                case let .parsed(file, errors):
-                    result.files.append(file)
-                    result.parseErrors.append(contentsOf: errors)
-                case let .unreadable(crash):
-                    result.unreadable.append(crash)
+                    case let .parsed(file, errors):
+                        result.files.append(file)
+                        result.parseErrors.append(contentsOf: errors)
+                    case let .unreadable(crash):
+                        result.unreadable.append(crash)
                 }
             }
             return result
@@ -55,8 +55,14 @@ public struct SourceParser: Sendable {
         let source: String
         do {
             source = try String(contentsOf: owned.url, encoding: .utf8)
-        } catch {
-            return .unreadable(LintRecord.Crash(file: owned.url.path, error: "it is not valid UTF-8 or could not be opened (\(error))"))
+        }
+        catch {
+            return .unreadable(
+                LintRecord.Crash(
+                    file: owned.url.path,
+                    error: "it is not valid UTF-8 or could not be opened (\(error))",
+                )
+            )
         }
         let tree = Parser.parse(source: source)
         let counter = NodeCounter(viewMode: .sourceAccurate)
@@ -68,7 +74,7 @@ public struct SourceParser: Sendable {
             source: source,
             tree: tree,
             nodeCount: counter.count,
-            packageRoot: owned.packageRoot
+            packageRoot: owned.packageRoot,
         )
         guard tree.hasError else {
             return .parsed(file, [])
@@ -83,7 +89,7 @@ public struct SourceParser: Sendable {
                 severity: diagnostic.diagMessage.severity == .warning ? .warning : .error,
                 rule: "",
                 messageId: "parseError",
-                message: diagnostic.message
+                message: diagnostic.message,
             )
         }
         return .parsed(file, errors)

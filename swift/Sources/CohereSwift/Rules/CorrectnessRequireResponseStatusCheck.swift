@@ -136,7 +136,9 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
     static let httpResponse = "c:objc(cs)NSHTTPURLResponse"
 
     /* The members of a response that neither read the status nor hand the response anywhere: the counterpart of `.headers` and `.url`. */
-    static let neutralProperties: Set<String> = ["url", "mimeType", "expectedContentLength", "textEncodingName", "suggestedFilename", "allHeaderFields"]
+    static let neutralProperties: Set<String> = [
+        "url", "mimeType", "expectedContentLength", "textEncodingName", "suggestedFilename", "allHeaderFields",
+    ]
 
     static let bodyMessageId = "bodyReadWithoutStatusCheck"
     static let discardMessageId = "responseDiscarded"
@@ -149,7 +151,8 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
 
     /* Every tracked method's name holds one of these, and a call names its method. */
     public func applies(to file: ParsedFile) -> Bool {
-        file.source.contains("data") || file.source.contains("upload") || file.source.contains("bytes") || file.source.contains("download")
+        file.source.contains("data") || file.source.contains("upload") || file.source.contains("bytes")
+            || file.source.contains("download")
     }
 
     public func findings(in file: ParsedFile, symbols: FileSymbols) -> [FindingRecord] {
@@ -164,19 +167,19 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
         var handlers: [SyntaxIdentifier: FunctionCallExprSyntax] = [:]
         for call in finder.calls {
             switch producers.kind(of: call) {
-            case .async:
-                if let report = Self.loneReport(call) {
-                    reports.append(report)
-                }
-                if let root = Self.enclosingRoot(of: Syntax(call)) {
-                    producerRoots.insert(root)
-                }
-            case .completion:
-                if let handler = Self.handler(of: call) {
-                    handlers[handler.id] = call
-                }
-            case nil:
-                break
+                case .async:
+                    if let report = Self.loneReport(call) {
+                        reports.append(report)
+                    }
+                    if let root = Self.enclosingRoot(of: Syntax(call)) {
+                        producerRoots.insert(root)
+                    }
+                case .completion:
+                    if let handler = Self.handler(of: call) {
+                        handlers[handler.id] = call
+                    }
+                case nil:
+                    break
             }
         }
         for root in finder.roots {
@@ -196,7 +199,7 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
                     at: report.node,
                     rule: name,
                     messageId: report.discarded ? Self.discardMessageId : Self.bodyMessageId,
-                    message: report.discarded ? Self.discardMessage : Self.bodyMessage
+                    message: report.discarded ? Self.discardMessage : Self.bodyMessage,
                 )
             }
     }
@@ -273,8 +276,10 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
     static func enclosingRoot(of node: Syntax) -> SyntaxIdentifier? {
         var current = node.parent
         while let candidate = current {
-            if candidate.is(ClosureExprSyntax.self) || candidate.is(FunctionDeclSyntax.self) || candidate.is(InitializerDeclSyntax.self)
-                || candidate.is(DeinitializerDeclSyntax.self) || candidate.is(AccessorDeclSyntax.self) || candidate.is(SourceFileSyntax.self)
+            if candidate.is(ClosureExprSyntax.self) || candidate.is(FunctionDeclSyntax.self)
+                || candidate.is(InitializerDeclSyntax.self)
+                || candidate.is(DeinitializerDeclSyntax.self) || candidate.is(AccessorDeclSyntax.self)
+                || candidate.is(SourceFileSyntax.self)
             {
                 return candidate.id
             }
@@ -301,24 +306,32 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
     static func loneReport(_ call: FunctionCallExprSyntax) -> Report? {
         let node = outward(Syntax(call))
         guard let parent = node.parent else { return nil }
-        if let access = parent.as(MemberAccessExprSyntax.self), access.base.map({ Syntax($0).id == node.id }) == true, access.declName.baseName.text == "0" {
+        if let access = parent.as(MemberAccessExprSyntax.self), access.base.map({ Syntax($0).id == node.id }) == true,
+            access.declName.baseName.text == "0"
+        {
             return Report(node: Syntax(access), discarded: false)
         }
-        if let assignment = parent.as(InfixOperatorExprSyntax.self), Syntax(assignment.rightOperand).id == node.id, assignment.operator.is(AssignmentExprSyntax.self),
+        if let assignment = parent.as(InfixOperatorExprSyntax.self), Syntax(assignment.rightOperand).id == node.id,
+            assignment.operator.is(AssignmentExprSyntax.self),
             assignment.leftOperand.is(DiscardAssignmentExprSyntax.self)
         {
             return Report(node: node, discarded: true)
         }
-        if let item = parent.as(CodeBlockItemSyntax.self), let list = item.parent?.as(CodeBlockItemListSyntax.self), list.count > 1 {
+        if let item = parent.as(CodeBlockItemSyntax.self), let list = item.parent?.as(CodeBlockItemListSyntax.self),
+            list.count > 1
+        {
             return Report(node: node, discarded: true)
         }
-        if let initializer = parent.as(InitializerClauseSyntax.self), let binding = initializer.parent?.as(PatternBindingSyntax.self),
+        if let initializer = parent.as(InitializerClauseSyntax.self),
+            let binding = initializer.parent?.as(PatternBindingSyntax.self),
             let declaration = binding.parent?.parent?.as(VariableDeclSyntax.self), !isDeferred(declaration)
         {
             if binding.pattern.is(WildcardPatternSyntax.self) {
                 return Report(node: node, discarded: true)
             }
-            if let tuple = binding.pattern.as(TuplePatternSyntax.self), tuple.elements.allSatisfy({ $0.pattern.is(WildcardPatternSyntax.self) }) {
+            if let tuple = binding.pattern.as(TuplePatternSyntax.self),
+                tuple.elements.allSatisfy({ $0.pattern.is(WildcardPatternSyntax.self) })
+            {
                 return Report(node: node, discarded: true)
             }
         }
@@ -342,11 +355,14 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
     static func outward(_ node: Syntax) -> Syntax {
         var current = node
         while let parent = current.parent {
-            if parent.is(TryExprSyntax.self) || parent.is(AwaitExprSyntax.self) || parent.is(ForceUnwrapExprSyntax.self) || parent.is(OptionalChainingExprSyntax.self) {
+            if parent.is(TryExprSyntax.self) || parent.is(AwaitExprSyntax.self) || parent.is(ForceUnwrapExprSyntax.self)
+                || parent.is(OptionalChainingExprSyntax.self)
+            {
                 current = parent
                 continue
             }
-            if let element = parent.as(LabeledExprSyntax.self), element.label == nil, let list = element.parent?.as(LabeledExprListSyntax.self), list.count == 1,
+            if let element = parent.as(LabeledExprSyntax.self), element.label == nil,
+                let list = element.parent?.as(LabeledExprListSyntax.self), list.count == 1,
                 let tuple = list.parent?.as(TupleExprSyntax.self)
             {
                 current = Syntax(tuple)
@@ -362,15 +378,22 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
         while true {
             if let wrapper = current.as(TryExprSyntax.self) {
                 current = wrapper.expression
-            } else if let wrapper = current.as(AwaitExprSyntax.self) {
+            }
+            else if let wrapper = current.as(AwaitExprSyntax.self) {
                 current = wrapper.expression
-            } else if let wrapper = current.as(ForceUnwrapExprSyntax.self) {
+            }
+            else if let wrapper = current.as(ForceUnwrapExprSyntax.self) {
                 current = wrapper.expression
-            } else if let wrapper = current.as(OptionalChainingExprSyntax.self) {
+            }
+            else if let wrapper = current.as(OptionalChainingExprSyntax.self) {
                 current = wrapper.expression
-            } else if let tuple = current.as(TupleExprSyntax.self), tuple.elements.count == 1, let only = tuple.elements.first, only.label == nil {
+            }
+            else if let tuple = current.as(TupleExprSyntax.self), tuple.elements.count == 1,
+                let only = tuple.elements.first, only.label == nil
+            {
                 current = only.expression
-            } else {
+            }
+            else {
                 return current
             }
         }
@@ -395,9 +418,11 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
             let token: TokenSyntax
             if let member = call.calledExpression.as(MemberAccessExprSyntax.self) {
                 token = member.declName.baseName
-            } else if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self) {
+            }
+            else if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self) {
                 token = reference.baseName
-            } else {
+            }
+            else {
                 return nil
             }
             guard let symbol = resolved(token) else { return nil }
@@ -419,12 +444,17 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
             let token: TokenSyntax
             if let identifier = type.as(IdentifierTypeSyntax.self), identifier.genericArgumentClause == nil {
                 token = identifier.name
-            } else if let member = type.as(MemberTypeSyntax.self), member.baseType.as(IdentifierTypeSyntax.self)?.name.text == "Foundation" {
+            }
+            else if let member = type.as(MemberTypeSyntax.self),
+                member.baseType.as(IdentifierTypeSyntax.self)?.name.text == "Foundation"
+            {
                 token = member.name
-            } else {
+            }
+            else {
                 return false
             }
-            return token.text == "HTTPURLResponse" && resolved(token) == CorrectnessRequireResponseStatusCheck.httpResponse
+            return token.text == "HTTPURLResponse"
+                && resolved(token) == CorrectnessRequireResponseStatusCheck.httpResponse
         }
     }
 
@@ -551,16 +581,17 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
         func lowerItems(_ items: CodeBlockItemListSyntax) {
             for statement in items {
                 switch statement.item {
-                case .decl(let declaration):
-                    if let variable = declaration.as(VariableDeclSyntax.self) {
-                        lowerVariable(variable)
-                    } else {
-                        opaque(Syntax(declaration))
-                    }
-                case .stmt(let statement):
-                    lowerStatement(statement, label: nil)
-                case .expr(let expression):
-                    walk(Syntax(expression))
+                    case .decl(let declaration):
+                        if let variable = declaration.as(VariableDeclSyntax.self) {
+                            lowerVariable(variable)
+                        }
+                        else {
+                            opaque(Syntax(declaration))
+                        }
+                    case .stmt(let statement):
+                        lowerStatement(statement, label: nil)
+                    case .expr(let expression):
+                        walk(Syntax(expression))
                 }
             }
         }
@@ -575,53 +606,71 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
             if let expression = statement.as(ExpressionStmtSyntax.self) {
                 if let conditional = expression.expression.as(IfExprSyntax.self) {
                     lowerIf(conditional, label: label)
-                } else if let switchExpression = expression.expression.as(SwitchExprSyntax.self) {
+                }
+                else if let switchExpression = expression.expression.as(SwitchExprSyntax.self) {
                     lowerSwitch(switchExpression, label: label)
-                } else {
+                }
+                else {
                     walk(Syntax(expression.expression))
                 }
-            } else if let labeled = statement.as(LabeledStmtSyntax.self) {
+            }
+            else if let labeled = statement.as(LabeledStmtSyntax.self) {
                 lowerStatement(labeled.statement, label: labeled.label.text)
-            } else if let returned = statement.as(ReturnStmtSyntax.self) {
+            }
+            else if let returned = statement.as(ReturnStmtSyntax.self) {
                 if let expression = returned.expression {
                     walk(Syntax(expression))
                 }
                 blocks[current].isFinal = true
                 startUnreachable()
-            } else if let thrown = statement.as(ThrowStmtSyntax.self) {
+            }
+            else if let thrown = statement.as(ThrowStmtSyntax.self) {
                 walk(Syntax(thrown.expression))
                 if let frame = catchFrames.last {
                     link(current, frame.dispatch)
                 }
                 startUnreachable()
-            } else if let breakStatement = statement.as(BreakStmtSyntax.self) {
-                let target = breakStatement.label.map { label in jumps.last { $0.label == label.text } } ?? jumps.last { $0.takesUnlabeledBreak }
+            }
+            else if let breakStatement = statement.as(BreakStmtSyntax.self) {
+                let target =
+                    breakStatement.label.map { label in jumps.last { $0.label == label.text } }
+                    ?? jumps.last { $0.takesUnlabeledBreak }
                 if let target {
                     link(current, target.breakBlock)
                 }
                 startUnreachable()
-            } else if let continueStatement = statement.as(ContinueStmtSyntax.self) {
-                let target = continueStatement.label.map { label in jumps.last { $0.label == label.text } } ?? jumps.last { $0.continueBlock != nil }
+            }
+            else if let continueStatement = statement.as(ContinueStmtSyntax.self) {
+                let target =
+                    continueStatement.label.map { label in jumps.last { $0.label == label.text } }
+                    ?? jumps.last { $0.continueBlock != nil }
                 if let block = target?.continueBlock {
                     link(current, block)
                 }
                 startUnreachable()
-            } else if statement.is(FallThroughStmtSyntax.self) {
+            }
+            else if statement.is(FallThroughStmtSyntax.self) {
                 if let target = fallthroughTargets.last, let target {
                     link(current, target)
                 }
                 startUnreachable()
-            } else if let guardStatement = statement.as(GuardStmtSyntax.self) {
+            }
+            else if let guardStatement = statement.as(GuardStmtSyntax.self) {
                 lowerGuard(guardStatement)
-            } else if let loop = statement.as(WhileStmtSyntax.self) {
+            }
+            else if let loop = statement.as(WhileStmtSyntax.self) {
                 lowerWhile(loop, label: label)
-            } else if let loop = statement.as(RepeatStmtSyntax.self) {
+            }
+            else if let loop = statement.as(RepeatStmtSyntax.self) {
                 lowerRepeat(loop, label: label)
-            } else if let loop = statement.as(ForStmtSyntax.self) {
+            }
+            else if let loop = statement.as(ForStmtSyntax.self) {
                 lowerFor(loop, label: label)
-            } else if let doStatement = statement.as(DoStmtSyntax.self) {
+            }
+            else if let doStatement = statement.as(DoStmtSyntax.self) {
                 lowerDo(doStatement, label: label)
-            } else {
+            }
+            else {
                 /* `defer` runs at the scope's exit, which this layout does not model; anything else is not laid out at all. */
                 opaque(Syntax(statement))
             }
@@ -643,13 +692,20 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
                 }
                 walk(Syntax(initializer.value))
                 if isLet, let pair = pairNames(binding.pattern), pair.body != nil || pair.response != nil,
-                    let call = CorrectnessRequireResponseStatusCheck.stripped(initializer.value).as(FunctionCallExprSyntax.self), producers.kind(of: call) == .async
+                    let call = CorrectnessRequireResponseStatusCheck.stripped(initializer.value).as(
+                        FunctionCallExprSyntax.self
+                    ), producers.kind(of: call) == .async
                 {
                     track(producer: Syntax(initializer.value), body: pair.body, response: pair.response)
                     continue
                 }
-                if isLet, let identifier = binding.pattern.as(IdentifierPatternSyntax.self), let alias = aliasTarget(initializer.value, inCondition: false) {
-                    bind(CorrectnessRequireResponseStatusCheck.plainName(identifier.identifier), .tracked(request: alias.request, role: alias.role))
+                if isLet, let identifier = binding.pattern.as(IdentifierPatternSyntax.self),
+                    let alias = aliasTarget(initializer.value, inCondition: false)
+                {
+                    bind(
+                        CorrectnessRequireResponseStatusCheck.plainName(identifier.identifier),
+                        .tracked(request: alias.request, role: alias.role),
+                    )
                     continue
                 }
                 bindPattern(Syntax(binding.pattern))
@@ -664,9 +720,11 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
                 guard element.label == nil else { return nil }
                 if let identifier = element.pattern.as(IdentifierPatternSyntax.self) {
                     names.append(CorrectnessRequireResponseStatusCheck.plainName(identifier.identifier))
-                } else if element.pattern.is(WildcardPatternSyntax.self) {
+                }
+                else if element.pattern.is(WildcardPatternSyntax.self) {
                     names.append(nil)
-                } else {
+                }
+                else {
                     return nil
                 }
             }
@@ -680,13 +738,19 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
         func aliasTarget(_ expression: ExprSyntax, inCondition: Bool) -> (request: Int, role: Role, cast: Bool)? {
             let inner = CorrectnessRequireResponseStatusCheck.stripped(expression)
             if inCondition, let reference = inner.as(DeclReferenceExprSyntax.self), reference.argumentNames == nil,
-                case .tracked(let request, let role)? = lookup(CorrectnessRequireResponseStatusCheck.plainName(reference.baseName))
+                case .tracked(let request, let role)? = lookup(
+                    CorrectnessRequireResponseStatusCheck.plainName(reference.baseName)
+                )
             {
                 return (request, role, false)
             }
             if let cast = inner.as(AsExprSyntax.self), producers.isHttpResponse(cast.type),
-                let reference = CorrectnessRequireResponseStatusCheck.stripped(cast.expression).as(DeclReferenceExprSyntax.self), reference.argumentNames == nil,
-                case .tracked(let request, .response)? = lookup(CorrectnessRequireResponseStatusCheck.plainName(reference.baseName))
+                let reference = CorrectnessRequireResponseStatusCheck.stripped(cast.expression).as(
+                    DeclReferenceExprSyntax.self
+                ), reference.argumentNames == nil,
+                case .tracked(let request, .response)? = lookup(
+                    CorrectnessRequireResponseStatusCheck.plainName(reference.baseName)
+                )
             {
                 return (request, .response, true)
             }
@@ -720,12 +784,15 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
             if let reference = node.as(DeclReferenceExprSyntax.self) {
                 if binding {
                     visited.insert(reference.id)
-                } else {
+                }
+                else {
                     visitReference(reference)
                 }
                 return
             }
-            if node.is(ExprSyntax.self), !node.is(PatternExprSyntax.self), !node.is(DeclReferenceExprSyntax.self), !binding {
+            if node.is(ExprSyntax.self), !node.is(PatternExprSyntax.self), !node.is(DeclReferenceExprSyntax.self),
+                !binding
+            {
                 walk(node)
                 return
             }
@@ -742,7 +809,8 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
                 link(current, checked)
                 blocks[checked].events.append(Event(request: request, use: .check, report: nil))
                 link(checked, failure)
-            } else {
+            }
+            else {
                 link(current, failure)
             }
             let next = newBlock()
@@ -753,36 +821,43 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
         func lowerConditions(_ conditions: ConditionElementListSyntax, failure: Int) {
             for element in conditions {
                 switch element.condition {
-                case .expression(let expression):
-                    walk(Syntax(expression))
-                    if expression.as(BooleanLiteralExprSyntax.self)?.literal.tokenKind != .keyword(.true) {
+                    case .expression(let expression):
+                        walk(Syntax(expression))
+                        if expression.as(BooleanLiteralExprSyntax.self)?.literal.tokenKind != .keyword(.true) {
+                            fail(to: failure, checking: nil)
+                        }
+                    case .availability:
                         fail(to: failure, checking: nil)
-                    }
-                case .availability:
-                    fail(to: failure, checking: nil)
-                case .optionalBinding(let optionalBinding):
-                    var alias: (request: Int, role: Role, cast: Bool)?
-                    if let initializer = optionalBinding.initializer {
-                        walk(Syntax(initializer.value))
-                        alias = aliasTarget(initializer.value, inCondition: true)
-                    } else if let identifier = optionalBinding.pattern.as(IdentifierPatternSyntax.self),
-                        case .tracked(let request, let role)? = lookup(CorrectnessRequireResponseStatusCheck.plainName(identifier.identifier))
-                    {
-                        /* `if let data`: a read of the outer name that binds the same body to the inner one. */
-                        requests[request].referenced = true
-                        alias = (request, role, false)
-                    }
-                    fail(to: failure, checking: alias?.cast == true ? alias?.request : nil)
-                    if let alias, let identifier = optionalBinding.pattern.as(IdentifierPatternSyntax.self) {
-                        bind(CorrectnessRequireResponseStatusCheck.plainName(identifier.identifier), .tracked(request: alias.request, role: alias.role))
-                    } else {
-                        bindPattern(Syntax(optionalBinding.pattern))
-                    }
-                case .matchingPattern(let matching):
-                    walk(Syntax(matching.initializer.value))
-                    walkPattern(Syntax(matching.pattern))
-                    fail(to: failure, checking: nil)
-                    bindPattern(Syntax(matching.pattern))
+                    case .optionalBinding(let optionalBinding):
+                        var alias: (request: Int, role: Role, cast: Bool)?
+                        if let initializer = optionalBinding.initializer {
+                            walk(Syntax(initializer.value))
+                            alias = aliasTarget(initializer.value, inCondition: true)
+                        }
+                        else if let identifier = optionalBinding.pattern.as(IdentifierPatternSyntax.self),
+                            case .tracked(let request, let role)? = lookup(
+                                CorrectnessRequireResponseStatusCheck.plainName(identifier.identifier)
+                            )
+                        {
+                            /* `if let data`: a read of the outer name that binds the same body to the inner one. */
+                            requests[request].referenced = true
+                            alias = (request, role, false)
+                        }
+                        fail(to: failure, checking: alias?.cast == true ? alias?.request : nil)
+                        if let alias, let identifier = optionalBinding.pattern.as(IdentifierPatternSyntax.self) {
+                            bind(
+                                CorrectnessRequireResponseStatusCheck.plainName(identifier.identifier),
+                                .tracked(request: alias.request, role: alias.role),
+                            )
+                        }
+                        else {
+                            bindPattern(Syntax(optionalBinding.pattern))
+                        }
+                    case .matchingPattern(let matching):
+                        walk(Syntax(matching.initializer.value))
+                        walkPattern(Syntax(matching.pattern))
+                        fail(to: failure, checking: nil)
+                        bindPattern(Syntax(matching.pattern))
                 }
             }
         }
@@ -798,12 +873,12 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
             link(current, join)
             current = elseEntry
             switch conditional.elseBody {
-            case .ifExpr(let nested):
-                lowerIf(nested, label: nil)
-            case .codeBlock(let block):
-                lowerBlock(block)
-            case nil:
-                break
+                case .ifExpr(let nested):
+                    lowerIf(nested, label: nil)
+                case .codeBlock(let block):
+                    lowerBlock(block)
+                case nil:
+                    break
             }
             jumps.removeLast()
             link(current, join)
@@ -846,7 +921,9 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
             current = bodyEntry
             let conditionBlock = newBlock()
             let exit = newBlock()
-            jumps.append(Jump(label: label, breakBlock: exit, continueBlock: conditionBlock, takesUnlabeledBreak: true))
+            jumps.append(
+                Jump(label: label, breakBlock: exit, continueBlock: conditionBlock, takesUnlabeledBreak: true)
+            )
             lowerBlock(loop.body)
             jumps.removeLast()
             link(current, conditionBlock)
@@ -906,23 +983,23 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
                 current = test
                 scopes.append([:])
                 switch switchCase.label {
-                case .default:
-                    link(current, bodyEntries[index])
-                case .case(let caseLabel):
-                    for item in caseLabel.caseItems {
-                        walkPattern(Syntax(item.pattern))
-                        bindPattern(Syntax(item.pattern))
-                        if let whereClause = item.whereClause {
-                            walk(Syntax(whereClause.condition))
+                    case .default:
+                        link(current, bodyEntries[index])
+                    case .case(let caseLabel):
+                        for item in caseLabel.caseItems {
+                            walkPattern(Syntax(item.pattern))
+                            bindPattern(Syntax(item.pattern))
+                            if let whereClause = item.whereClause {
+                                walk(Syntax(whereClause.condition))
+                            }
                         }
-                    }
-                    link(current, bodyEntries[index])
-                    /* The cases are exhaustive, so failing the last one leads nowhere. */
-                    if index + 1 < cases.count {
-                        let next = newBlock()
-                        link(current, next)
-                        test = next
-                    }
+                        link(current, bodyEntries[index])
+                        /* The cases are exhaustive, so failing the last one leads nowhere. */
+                        if index + 1 < cases.count {
+                            let next = newBlock()
+                            link(current, next)
+                            test = next
+                        }
                 }
                 current = bodyEntries[index]
                 fallthroughTargets.append(index + 1 < cases.count ? bodyEntries[index + 1] : nil)
@@ -988,33 +1065,43 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
         func walk(_ node: Syntax) {
             if node.is(ClosureExprSyntax.self) {
                 opaque(node)
-            } else if let conditional = node.as(IfExprSyntax.self) {
+            }
+            else if let conditional = node.as(IfExprSyntax.self) {
                 lowerIf(conditional, label: nil)
-            } else if let switchExpression = node.as(SwitchExprSyntax.self) {
+            }
+            else if let switchExpression = node.as(SwitchExprSyntax.self) {
                 lowerSwitch(switchExpression, label: nil)
-            } else if let access = node.as(MemberAccessExprSyntax.self) {
+            }
+            else if let access = node.as(MemberAccessExprSyntax.self) {
                 if let base = access.base {
                     walk(Syntax(base))
                 }
                 visited.insert(access.declName.id)
-            } else if let component = node.as(KeyPathPropertyComponentSyntax.self) {
+            }
+            else if let component = node.as(KeyPathPropertyComponentSyntax.self) {
                 visited.insert(component.declName.id)
-            } else if let reference = node.as(DeclReferenceExprSyntax.self) {
+            }
+            else if let reference = node.as(DeclReferenceExprSyntax.self) {
                 visitReference(reference)
-            } else if let attempt = node.as(TryExprSyntax.self) {
+            }
+            else if let attempt = node.as(TryExprSyntax.self) {
                 walk(Syntax(attempt.expression))
                 if attempt.questionOrExclamationMark == nil {
                     throwingPoint()
                 }
-            } else if let call = node.as(FunctionCallExprSyntax.self) {
+            }
+            else if let call = node.as(FunctionCallExprSyntax.self) {
                 for child in node.children(viewMode: .sourceAccurate) {
                     walk(child)
                 }
                 /* `fatalError` and `preconditionFailure` never return: the path ends here, and not at an exit. */
-                if let callee = call.calledExpression.as(DeclReferenceExprSyntax.self), ["fatalError", "preconditionFailure"].contains(callee.baseName.text) {
+                if let callee = call.calledExpression.as(DeclReferenceExprSyntax.self),
+                    ["fatalError", "preconditionFailure"].contains(callee.baseName.text)
+                {
                     startUnreachable()
                 }
-            } else {
+            }
+            else {
                 for child in node.children(viewMode: .sourceAccurate) {
                     walk(child)
                 }
@@ -1028,7 +1115,9 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
         func opaque(_ node: Syntax) {
             if let reference = node.as(DeclReferenceExprSyntax.self) {
                 visited.insert(reference.id)
-                if case .tracked(let request, _)? = lookup(CorrectnessRequireResponseStatusCheck.plainName(reference.baseName)) {
+                if case .tracked(let request, _)? = lookup(
+                    CorrectnessRequireResponseStatusCheck.plainName(reference.baseName)
+                ) {
                     requests[request].referenced = true
                     requests[request].dropped = true
                 }
@@ -1041,7 +1130,9 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
         func visitReference(_ reference: DeclReferenceExprSyntax) {
             visited.insert(reference.id)
             guard reference.argumentNames == nil,
-                case .tracked(let request, let role)? = lookup(CorrectnessRequireResponseStatusCheck.plainName(reference.baseName))
+                case .tracked(let request, let role)? = lookup(
+                    CorrectnessRequireResponseStatusCheck.plainName(reference.baseName)
+                )
             else { return }
             requests[request].referenced = true
             if let use = classify(reference, role: role) {
@@ -1058,18 +1149,18 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
                 return nil
             }
             switch role {
-            case .body:
-                return Self.isNilComparison(node) ? nil : .bodyRead
-            case .response:
-                if let cast = node.parent?.as(AsExprSyntax.self), Syntax(cast.expression).id == node.id {
-                    guard producers.isHttpResponse(cast.type) else { return .escape }
-                    let castNode = CorrectnessRequireResponseStatusCheck.outward(Syntax(cast))
-                    if Self.isConditionInitializer(castNode) || Self.isLetInitializer(castNode) {
-                        return nil
+                case .body:
+                    return Self.isNilComparison(node) ? nil : .bodyRead
+                case .response:
+                    if let cast = node.parent?.as(AsExprSyntax.self), Syntax(cast.expression).id == node.id {
+                        guard producers.isHttpResponse(cast.type) else { return .escape }
+                        let castNode = CorrectnessRequireResponseStatusCheck.outward(Syntax(cast))
+                        if Self.isConditionInitializer(castNode) || Self.isLetInitializer(castNode) {
+                            return nil
+                        }
+                        return Self.member(of: castNode)
                     }
-                    return Self.member(of: castNode)
-                }
-                return Self.member(of: node)
+                    return Self.member(of: node)
             }
         }
 
@@ -1080,14 +1171,17 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
 
         /* The initializer of `let name = ...`, the one plain declaration a cast is followed through. */
         static func isLetInitializer(_ node: Syntax) -> Bool {
-            guard let binding = node.parent?.as(InitializerClauseSyntax.self)?.parent?.as(PatternBindingSyntax.self), binding.pattern.is(IdentifierPatternSyntax.self),
+            guard let binding = node.parent?.as(InitializerClauseSyntax.self)?.parent?.as(PatternBindingSyntax.self),
+                binding.pattern.is(IdentifierPatternSyntax.self),
                 let declaration = binding.parent?.parent?.as(VariableDeclSyntax.self)
             else { return false }
-            return declaration.bindingSpecifier.tokenKind == .keyword(.let) && !CorrectnessRequireResponseStatusCheck.isDeferred(declaration)
+            return declaration.bindingSpecifier.tokenKind == .keyword(.let)
+                && !CorrectnessRequireResponseStatusCheck.isDeferred(declaration)
         }
 
         static func isNilComparison(_ node: Syntax) -> Bool {
-            guard let comparison = node.parent?.as(InfixOperatorExprSyntax.self), let operation = comparison.operator.as(BinaryOperatorExprSyntax.self),
+            guard let comparison = node.parent?.as(InfixOperatorExprSyntax.self),
+                let operation = comparison.operator.as(BinaryOperatorExprSyntax.self),
                 ["==", "!="].contains(operation.operator.text)
             else { return false }
             let other = Syntax(comparison.leftOperand).id == node.id ? comparison.rightOperand : comparison.leftOperand
@@ -1096,15 +1190,21 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
 
         /* A member read off the response: `statusCode` checks, the neutral ones say nothing, anything else hands it on. */
         static func member(of node: Syntax) -> Use? {
-            guard let access = node.parent?.as(MemberAccessExprSyntax.self), access.base.map({ Syntax($0).id == node.id }) == true else { return .escape }
+            guard let access = node.parent?.as(MemberAccessExprSyntax.self),
+                access.base.map({ Syntax($0).id == node.id }) == true
+            else { return .escape }
             let member = CorrectnessRequireResponseStatusCheck.plainName(access.declName.baseName)
             if member == "statusCode" {
                 return .check
             }
-            if CorrectnessRequireResponseStatusCheck.neutralProperties.contains(member), access.declName.argumentNames == nil {
+            if CorrectnessRequireResponseStatusCheck.neutralProperties.contains(member),
+                access.declName.argumentNames == nil
+            {
                 return nil
             }
-            if member == "value", let call = access.parent?.as(FunctionCallExprSyntax.self), Syntax(call.calledExpression).id == Syntax(access).id {
+            if member == "value", let call = access.parent?.as(FunctionCallExprSyntax.self),
+                Syntax(call.calledExpression).id == Syntax(access).id
+            {
                 return nil
             }
             return .escape
@@ -1115,7 +1215,11 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
         func analyze(_ root: Root, completion: FunctionCallExprSyntax?) -> [Report] {
             if let completion, let closure = CorrectnessRequireResponseStatusCheck.handler(of: completion) {
                 let names = Self.parameterNames(closure)
-                track(producer: Syntax(completion), body: names.first ?? nil, response: names.count > 1 ? names[1] : nil)
+                track(
+                    producer: Syntax(completion),
+                    body: names.first ?? nil,
+                    response: names.count > 1 ? names[1] : nil,
+                )
             }
             lowerItems(root.items)
             blocks[current].isFinal = true
@@ -1162,12 +1266,12 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
                 token.tokenKind == .wildcard ? nil : CorrectnessRequireResponseStatusCheck.plainName(token)
             }
             switch signature.parameterClause {
-            case .simpleInput(let parameters):
-                return parameters.map { named($0.name) }
-            case .parameterClause(let clause):
-                return clause.parameters.map { named($0.secondName ?? $0.firstName) }
-            case nil:
-                return []
+                case .simpleInput(let parameters):
+                    return parameters.map { named($0.name) }
+                case .parameterClause(let clause):
+                    return clause.parameters.map { named($0.secondName ?? $0.firstName) }
+                case nil:
+                    return []
             }
         }
 
@@ -1189,7 +1293,8 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
         func uncheckedReads(_ request: Int, reachable: [Bool]) -> [Syntax] {
             var starts: [Position] = []
             for (index, block) in blocks.enumerated() where reachable[index] {
-                for (position, event) in block.events.enumerated() where event.request == request && event.use == .declare {
+                for (position, event) in block.events.enumerated()
+                where event.request == request && event.use == .declare {
                     starts.append((index, position + 1))
                 }
             }
@@ -1201,12 +1306,14 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
                 guard event.use == .bodyRead else { return false }
                 candidates.append((block, position))
                 return true
-            } completeBlock: { _ in }
+            } completeBlock: { _ in
+            }
 
             var reports: [Syntax] = []
             var reported: Set<SyntaxIdentifier> = []
             for candidate in candidates {
-                guard let report = blocks[candidate.block].events[candidate.start].report, !reported.contains(report.id) else { continue }
+                guard let report = blocks[candidate.block].events[candidate.start].report, !reported.contains(report.id)
+                else { continue }
                 var unchecked = false
                 walkPaths([(candidate.block, candidate.start + 1)], reachable: reachable) { block, position in
                     let event = blocks[block].events[position]
@@ -1237,7 +1344,12 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
          on past an event; `completeBlock` runs for every block a path walks to its end. Each block is entered from its
          top at most once, which is enough because the state a path carries is only whether it is still going.
          */
-        func walkPaths(_ starts: [Position], reachable: [Bool], visitEvent: (Int, Int) -> Bool, completeBlock: (Int) -> Void) {
+        func walkPaths(
+            _ starts: [Position],
+            reachable: [Bool],
+            visitEvent: (Int, Int) -> Bool,
+            completeBlock: (Int) -> Void,
+        ) {
             var queue = starts
             var entered: Set<Int> = []
             var next = 0
@@ -1257,7 +1369,8 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
                     continue
                 }
                 completeBlock(position.block)
-                for successor in blocks[position.block].successors where reachable[successor] && !entered.contains(successor) {
+                for successor in blocks[position.block].successors
+                where reachable[successor] && !entered.contains(successor) {
                     entered.insert(successor)
                     queue.append((successor, 0))
                 }

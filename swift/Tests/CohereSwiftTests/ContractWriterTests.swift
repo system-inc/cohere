@@ -29,7 +29,16 @@ struct ContractWriterTests {
     @Test func findingsAreCountedFromWhatWasWritten() throws {
         let capture = Capture()
         let writer = Self.writer(into: capture)
-        let finding = FindingRecord(source: .rule, file: "/a.swift", line: 1, column: 1, severity: .error, rule: "r", messageId: "m", message: "x")
+        let finding = FindingRecord(
+            source: .rule,
+            file: "/a.swift",
+            line: 1,
+            column: 1,
+            severity: .error,
+            rule: "r",
+            messageId: "m",
+            message: "x",
+        )
         try writer.write(finding)
         try writer.write(finding)
         try Self.allPhases(writer)
@@ -47,7 +56,18 @@ struct ContractWriterTests {
     @Test func everyLineIsOneJsonObject() throws {
         let capture = Capture()
         let writer = Self.writer(into: capture)
-        try writer.write(FindingRecord(source: .rule, file: "/a.swift", line: 1, column: 1, severity: .error, rule: "r", messageId: "m", message: "two\nlines"))
+        try writer.write(
+            FindingRecord(
+                source: .rule,
+                file: "/a.swift",
+                line: 1,
+                column: 1,
+                severity: .error,
+                rule: "r",
+                messageId: "m",
+                message: "two\nlines",
+            )
+        )
         try Self.allPhases(writer)
         _ = try writer.finish(complete: true)
         for line in capture.lines {

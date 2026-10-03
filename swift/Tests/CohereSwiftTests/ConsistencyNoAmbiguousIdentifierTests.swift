@@ -13,7 +13,14 @@ import Testing
 struct ConsistencyNoAmbiguousIdentifierTests {
     static func findings(_ source: String) -> [FindingRecord] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
-        let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
+        let file = ParsedFile(
+            url: url,
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         return ConsistencyNoAmbiguousIdentifier().findings(in: file)
     }
 
@@ -39,7 +46,8 @@ struct ConsistencyNoAmbiguousIdentifierTests {
             """
         #expect(
             Self.positions(source) == [
-                "1:5", "2:5", "3:5", "4:5", "5:25", "6:26", "7:12", "7:26", "8:20", "9:18", "10:15", "11:8", "12:31", "13:5",
+                "1:5", "2:5", "3:5", "4:5", "5:25", "6:26", "7:12", "7:26", "8:20", "9:18", "10:15", "11:8", "12:31",
+                "13:5",
             ]
         )
     }
@@ -153,7 +161,11 @@ struct ConsistencyNoAmbiguousIdentifierTests {
             func clamp(_ t: Double) -> Double { do { return t } catch let e { return 0 } }
             let typed = { (a: Float, name: String) -> Float in a }
             """
-        #expect(Self.positions(source) == ["1:15", "2:12", "3:20", "4:13", "4:23", "6:25", "7:48", "8:9", "11:19", "11:35", "12:63", "13:16"])
+        #expect(
+            Self.positions(source) == [
+                "1:15", "2:12", "3:20", "4:13", "4:23", "6:25", "7:48", "8:9", "11:19", "11:35", "12:63", "13:16",
+            ]
+        )
     }
 
     /* Each of these looks like a comparator and is not one the Go rule would recognize. */

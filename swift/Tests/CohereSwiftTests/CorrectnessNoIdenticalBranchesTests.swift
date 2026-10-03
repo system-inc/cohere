@@ -17,8 +17,13 @@ struct CorrectnessNoIdenticalBranchesTests {
     /* Every finding as the text of its span, for a file the rule agrees to read, as the pipeline runs it. */
     static func findings(_ source: String) -> [String] {
         let file = ParsedFile(
-            url: URL(fileURLWithPath: "/fixture/Subject.swift"), targetName: "Fixture", targetKind: "library", source: source,
-            tree: Parser.parse(source: source), nodeCount: 0)
+            url: URL(fileURLWithPath: "/fixture/Subject.swift"),
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
         let rule = CorrectnessNoIdenticalBranches()
         let found = rule.findings(in: file)
         #expect(found.isEmpty || rule.applies(to: file), "the prefilter must never hide a finding")
@@ -78,7 +83,11 @@ struct CorrectnessNoIdenticalBranchesTests {
     }
 
     @Test func klingApiFiresOnBothBuildersBeforeTheFix() {
-        #expect(Self.findings(Self.klingApi(falseMode: "\"pro\"")) == [#"highQuality ? "pro" : "pro""#, #"highQuality ? "pro" : "pro""#])
+        #expect(
+            Self.findings(Self.klingApi(falseMode: "\"pro\"")) == [
+                #"highQuality ? "pro" : "pro""#, #"highQuality ? "pro" : "pro""#,
+            ]
+        )
     }
 
     @Test func klingApiIsSilentAfterTheFix() {
@@ -182,7 +191,8 @@ struct CorrectnessNoIdenticalBranchesTests {
                         self = .text(try container.decode(String.self))
                     }
                 """
-            ])
+            ]
+        )
     }
 
     @Test func bodyCatalogIsSilentAsWritten() {
@@ -220,7 +230,9 @@ struct CorrectnessNoIdenticalBranchesTests {
     }
 
     @Test func bodiesInspectorChainUnderAViewBuilderIsSilent() {
-        #expect(Self.findings(Self.bodiesInspector(declaration: "@ViewBuilder\nprivate var selected: some View")).isEmpty)
+        #expect(
+            Self.findings(Self.bodiesInspector(declaration: "@ViewBuilder\nprivate var selected: some View")).isEmpty
+        )
         #expect(Self.findings(Self.bodiesInspector(declaration: "var body: some View")).isEmpty)
     }
 
@@ -276,7 +288,8 @@ struct CorrectnessNoIdenticalBranchesTests {
                             reset()
                         }
                 """
-            ])
+            ]
+        )
     }
 
     @Test func oscParameterChainIsSilentMerged() {
@@ -292,7 +305,11 @@ struct CorrectnessNoIdenticalBranchesTests {
     /* Presence `Body/DanceMode.swift:98`, a getter that is one ternary: as written it differs; copied, the probe flag does nothing. */
     @Test func danceModeJoinDuration() {
         #expect(Self.findings("var joinDuration: TimeInterval { Self.joinProbe ? 0 : 0.55 }").isEmpty)
-        #expect(Self.findings("var joinDuration: TimeInterval { Self.joinProbe ? 0.55 : 0.55 }") == ["Self.joinProbe ? 0.55 : 0.55"])
+        #expect(
+            Self.findings("var joinDuration: TimeInterval { Self.joinProbe ? 0.55 : 0.55 }") == [
+                "Self.joinProbe ? 0.55 : 0.55"
+            ]
+        )
     }
 
     /* Presence `Stage/MotionSpotlightView.swift:352`: a ternary is one value of one type, so it is judged inside a builder too. */
@@ -309,7 +326,11 @@ struct CorrectnessNoIdenticalBranchesTests {
             }
             """
         #expect(Self.findings(source).isEmpty)
-        #expect(Self.findings(source.replacingOccurrences(of: "? 0 :", with: "? 0.12 :")) == ["self.isPopover ? 0.12 : 0.12"])
+        #expect(
+            Self.findings(source.replacingOccurrences(of: "? 0 :", with: "? 0.12 :")) == [
+                "self.isPopover ? 0.12 : 0.12"
+            ]
+        )
     }
 
     /*
@@ -334,9 +355,13 @@ struct CorrectnessNoIdenticalBranchesTests {
     // MARK: The original's cases, ported
 
     @Test func ifAndElseDoingTheSameThing() {
-        #expect(Self.findings("func run(ready: Bool) {\n    if ready {\n        start()\n    }\n    else {\n        start()\n    }\n}") == [
-            "if ready {\n        start()\n    }\n    else {\n        start()\n    }"
-        ])
+        #expect(
+            Self.findings(
+                "func run(ready: Bool) {\n    if ready {\n        start()\n    }\n    else {\n        start()\n    }\n}"
+            ) == [
+                "if ready {\n        start()\n    }\n    else {\n        start()\n    }"
+            ]
+        )
     }
 
     /* Structure, not text: line breaks, spacing and comments inside the branches do not count. */
@@ -367,32 +392,44 @@ struct CorrectnessNoIdenticalBranchesTests {
                 }
             }
             """
-        #expect(Self.findings(source) == [
-            "if ready { return } else { return }",
-            "if item > 1 { continue } else { continue }",
-            "if item > 2 { break } else { break }",
-            "if item > 3 { throw Failure.bad } else { throw Failure.bad }",
-        ])
+        #expect(
+            Self.findings(source) == [
+                "if ready { return } else { return }",
+                "if item > 1 { continue } else { continue }",
+                "if item > 2 { break } else { break }",
+                "if item > 3 { throw Failure.bad } else { throw Failure.bad }",
+            ]
+        )
     }
 
     /* Every branch of the chain is the same, so the finding covers the whole chain once. */
     @Test func anElseIfChainWhoseEveryBranchIsTheSame() {
-        #expect(Self.findings("func run(a: Bool, b: Bool) {\n    if a { start() }\n    else if b { start() }\n    else { start() }\n}") == [
-            "if a { start() }\n    else if b { start() }\n    else { start() }"
-        ])
+        #expect(
+            Self.findings(
+                "func run(a: Bool, b: Bool) {\n    if a { start() }\n    else if b { start() }\n    else { start() }\n}"
+            ) == [
+                "if a { start() }\n    else if b { start() }\n    else { start() }"
+            ]
+        )
     }
 
     /* Only `b` is ignored, so the finding starts at its `if`. */
     @Test func anElseIfChainWhoseLastConditionIsIgnored() {
-        #expect(Self.findings("func run(a: Bool, b: Bool) {\n    if a { stop() }\n    else if b { start() }\n    else { start() }\n}") == [
-            "if b { start() }\n    else { start() }"
-        ])
+        #expect(
+            Self.findings(
+                "func run(a: Bool, b: Bool) {\n    if a { stop() }\n    else if b { start() }\n    else { start() }\n}"
+            ) == [
+                "if b { start() }\n    else { start() }"
+            ]
+        )
     }
 
     @Test func ternaryChains() {
         #expect(Self.findings(#"let mode = a ? "pro" : b ? "pro" : "pro""#) == [#"a ? "pro" : b ? "pro" : "pro""#])
         #expect(Self.findings(#"let mode = a ? "std" : (b ? "pro" : "pro")"#) == [#"b ? "pro" : "pro""#])
-        #expect(Self.findings(#"let mode = a ? ("pro") : (b ? "pro" : "pro")"#) == [#"a ? ("pro") : (b ? "pro" : "pro")"#])
+        #expect(
+            Self.findings(#"let mode = a ? ("pro") : (b ? "pro" : "pro")"#) == [#"a ? ("pro") : (b ? "pro" : "pro")"#]
+        )
     }
 
     @Test func parenthesesAroundOneTernaryBranch() {
@@ -414,14 +451,22 @@ struct CorrectnessNoIdenticalBranchesTests {
 
     /* The rare `if` whose first branch holds the same `if` as its `else`: `a` is ignored, and the whole statement is the finding. */
     @Test func anIfWhoseElseIsTheSameIfAsItsBranch() {
-        #expect(Self.findings("func run(a: Bool, c: Bool) {\n    if a { if c { p() } else { q() } } else if c { p() } else { q() }\n}") == [
-            "if a { if c { p() } else { q() } } else if c { p() } else { q() }"
-        ])
+        #expect(
+            Self.findings(
+                "func run(a: Bool, c: Bool) {\n    if a { if c { p() } else { q() } } else if c { p() } else { q() }\n}"
+            ) == [
+                "if a { if c { p() } else { q() } } else if c { p() } else { q() }"
+            ]
+        )
     }
 
     /* Each condition still chooses between `start` and `stop`: this is `if a || b` written long. */
     @Test func twoEqualBranchesFollowedByADifferentOne() {
-        #expect(Self.findings("func run(a: Bool, b: Bool) {\n    if a { start() }\n    else if b { start() }\n    else { stop() }\n}").isEmpty)
+        #expect(
+            Self.findings(
+                "func run(a: Bool, b: Bool) {\n    if a { start() }\n    else if b { start() }\n    else { stop() }\n}"
+            ).isEmpty
+        )
     }
 
     @Test func chainsWithNoFinalElseAndUnequalNeighbours() {
@@ -488,7 +533,10 @@ struct CorrectnessNoIdenticalBranchesTests {
 
     /* Swift narrows nothing through a Boolean: `value` is the same `Any` in both branches, so the check is dead. */
     @Test func aTypeCheckConditionDoesNotNarrow() {
-        #expect(Self.findings("func run(value: Any) {\n    if value is String { show(value) } else { show(value) }\n}").count == 1)
+        #expect(
+            Self.findings("func run(value: Any) {\n    if value is String { show(value) } else { show(value) }\n}")
+                .count == 1
+        )
     }
 
     /* `if let name` gives the first branch a new `name` of another type, so the same call can mean two things. */
@@ -518,9 +566,13 @@ struct CorrectnessNoIdenticalBranchesTests {
 
     /* The widening stops at an `if let` whose branch reads its binding: there `value` is another declaration. */
     @Test func aBindingStopsTheWidening() {
-        #expect(Self.findings("func run(value: Int?, b: Bool) {\n    if let value { use(value) } else if b { use(value) } else { use(value) }\n}") == [
-            "if b { use(value) } else { use(value) }"
-        ])
+        #expect(
+            Self.findings(
+                "func run(value: Int?, b: Bool) {\n    if let value { use(value) } else if b { use(value) } else { use(value) }\n}"
+            ) == [
+                "if b { use(value) } else { use(value) }"
+            ]
+        )
     }
 
     /* A bound name beside a Boolean clause still keeps it silent, and so does a pattern's spelling of a name it does not bind: a miss written down. */
@@ -558,7 +610,11 @@ struct CorrectnessNoIdenticalBranchesTests {
 
     /* A default argument that captures the caller's line is not a difference the condition chooses. */
     @Test func copiedCrashesStillChooseNothing() {
-        #expect(Self.findings("func run(strict: Bool) {\n    if strict { fatalError(\"unreachable\") } else { fatalError(\"unreachable\") }\n}").count == 1)
+        #expect(
+            Self.findings(
+                "func run(strict: Bool) {\n    if strict { fatalError(\"unreachable\") } else { fatalError(\"unreachable\") }\n}"
+            ).count == 1
+        )
     }
 
     /* Swift reads a line break: `load` then `(next)` is two statements, where `load(next)` is one call, with the same tokens. */
@@ -656,8 +712,13 @@ struct CorrectnessNoIdenticalBranchesTests {
 
     @Test func theMessageNamesTheRepair() {
         let file = ParsedFile(
-            url: URL(fileURLWithPath: "/fixture/Subject.swift"), targetName: "Fixture", targetKind: "library", source: "let a = b ? 1 : 1",
-            tree: Parser.parse(source: "let a = b ? 1 : 1"), nodeCount: 0)
+            url: URL(fileURLWithPath: "/fixture/Subject.swift"),
+            targetName: "Fixture",
+            targetKind: "library",
+            source: "let a = b ? 1 : 1",
+            tree: Parser.parse(source: "let a = b ? 1 : 1"),
+            nodeCount: 0,
+        )
         let messages = CorrectnessNoIdenticalBranches().findings(in: file).map(\.message)
         #expect(messages.count == 1)
         #expect(messages.allSatisfy { $0.contains("Write the branch that was meant") && !$0.contains("\u{2014}") })

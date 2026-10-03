@@ -85,7 +85,7 @@ public struct ConsistencyNoBareThrow: FileRule {
                 rule: name,
                 messageId: "noBareThrow",
                 message:
-                    "This throws an NSError made up here, with the domain \(domain.trimmedDescription), which names no declared failure: a caller can match it only by repeating that string and the code, and nothing keeps the two in step. Declare the failure as a case of an error type of our own (an enum conforming to Error, and LocalizedError for its text) and throw that case, so a caller catches it by case."
+                    "This throws an NSError made up here, with the domain \(domain.trimmedDescription), which names no declared failure: a caller can match it only by repeating that string and the code, and nothing keeps the two in step. Declare the failure as a case of an error type of our own (an enum conforming to Error, and LocalizedError for its text) and throw that case, so a caller catches it by case.",
             )
         }
     }
@@ -100,8 +100,11 @@ public struct ConsistencyNoBareThrow: FileRule {
         }
 
         /* The thrown expression itself, the right side of a `??`, or a ternary's branches, through parentheses. */
-        static func adHocErrors(thrownBy expression: ExprSyntax) -> [(FunctionCallExprSyntax, StringLiteralExprSyntax)] {
-            if let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1, let only = tuple.elements.first, only.label == nil {
+        static func adHocErrors(thrownBy expression: ExprSyntax) -> [(FunctionCallExprSyntax, StringLiteralExprSyntax)]
+        {
+            if let tuple = expression.as(TupleExprSyntax.self), tuple.elements.count == 1,
+                let only = tuple.elements.first, only.label == nil
+            {
                 return adHocErrors(thrownBy: only.expression)
             }
             if let infix = expression.as(InfixOperatorExprSyntax.self) {
@@ -111,7 +114,9 @@ public struct ConsistencyNoBareThrow: FileRule {
             if let ternary = expression.as(TernaryExprSyntax.self) {
                 return adHocErrors(thrownBy: ternary.thenExpression) + adHocErrors(thrownBy: ternary.elseExpression)
             }
-            guard let call = expression.as(FunctionCallExprSyntax.self), isNSError(call.calledExpression), let domain = adHocDomain(call) else {
+            guard let call = expression.as(FunctionCallExprSyntax.self), isNSError(call.calledExpression),
+                let domain = adHocDomain(call)
+            else {
                 return []
             }
             return [(call, domain)]
@@ -122,7 +127,9 @@ public struct ConsistencyNoBareThrow: FileRule {
             if let reference = callee.as(DeclReferenceExprSyntax.self) {
                 return reference.baseName.text == "NSError" && reference.argumentNames == nil
             }
-            guard let member = callee.as(MemberAccessExprSyntax.self), member.declName.argumentNames == nil, let base = member.base else { return false }
+            guard let member = callee.as(MemberAccessExprSyntax.self), member.declName.argumentNames == nil,
+                let base = member.base
+            else { return false }
             if member.declName.baseName.text == "NSError" {
                 return base.as(DeclReferenceExprSyntax.self)?.baseName.text == "Foundation"
             }
@@ -131,12 +138,15 @@ public struct ConsistencyNoBareThrow: FileRule {
 
         /* The `domain:` argument when it is a string literal that does not spell one of the SDK's domains. */
         static func adHocDomain(_ call: FunctionCallExprSyntax) -> StringLiteralExprSyntax? {
-            guard let first = call.arguments.first, first.label?.text == "domain", let literal = first.expression.as(StringLiteralExprSyntax.self) else {
+            guard let first = call.arguments.first, first.label?.text == "domain",
+                let literal = first.expression.as(StringLiteralExprSyntax.self)
+            else {
                 return nil
             }
             /* An interpolated domain has no single value and is assembled here, so it is ad hoc whatever it spells. */
             if let value = literal.representedLiteralValue,
-                ConsistencyNoBareThrow.platformDomainPrefixes.contains(where: { value.hasPrefix($0) }) || value.hasSuffix(ConsistencyNoBareThrow.platformDomainSuffix)
+                ConsistencyNoBareThrow.platformDomainPrefixes.contains(where: { value.hasPrefix($0) })
+                    || value.hasSuffix(ConsistencyNoBareThrow.platformDomainSuffix)
             {
                 return nil
             }
