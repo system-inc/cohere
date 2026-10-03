@@ -362,6 +362,29 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 		forbidLines(t, output, "13 unused disable comments")
 	})
 
+	t.Run("dead disable comments are named under --coverage", func(t *testing.T) {
+		coverage := cleanCoverage()
+		coverage.UnusedSuppressions = 3
+		// Out of order, so the listing's sort is under test, and one blanket directive naming no rule.
+		coverage.DeadSuppressions = []program.DeadSuppression{
+			{File: "/repository/source/Zebra.ts", Line: 4, Rules: []string{"no-console"}},
+			{File: "/repository/source/Alpha.ts", Line: 40, Rules: []string{"eqeqeq", "no-var"}},
+			{File: "/repository/source/Alpha.ts", Line: 2},
+		}
+		detailed := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, WalkCost: "in 1s", Details: true})
+		requireLines(t, detailed,
+			"  dead disable comments (3): each silenced nothing while a rule it names ran\n"+
+				"    /repository/source/Alpha.ts:3 every rule\n"+
+				"    /repository/source/Alpha.ts:41 eqeqeq, no-var\n"+
+				"    /repository/source/Zebra.ts:5 no-console\n",
+		)
+
+		// The default report keeps the count and names no site: the sites are a detail.
+		output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, WalkCost: "in 1s"})
+		requireLines(t, output, "3 disable comments silenced nothing while their rule ran")
+		forbidLines(t, output, "Alpha.ts", "dead disable comments (")
+	})
+
 	t.Run("parity", func(t *testing.T) {
 		config := &configuration.Config{Rules: map[string]configuration.RuleSetting{
 			"quiet-rule":    {Severity: configuration.SeverityError},

@@ -146,6 +146,10 @@ type suppressionCoverage struct {
 	// reader to delete comments the gate still needed.
 	Dead          int
 	ForUnrunRules int
+
+	// DeadSites is where each dead directive sits, listed under `--coverage`, sorted by file and line.
+	// Nil for an engine that counts them without saying where.
+	DeadSites []program.DeadSuppression
 }
 
 // coverageSummary is everything the coverage block says, built by each engine from its own records
@@ -212,6 +216,7 @@ func classifyTypeScriptCoverage(
 			SuppressedWithoutReason: coverage.SuppressedWithoutReason,
 			Dead:                    coverage.UnusedSuppressions - coverage.UnusedSuppressionsForUnrunRules,
 			ForUnrunRules:           coverage.UnusedSuppressionsForUnrunRules,
+			DeadSites:               coverage.DeadSuppressions,
 		},
 	}
 
@@ -416,6 +421,31 @@ func writeCoverageDetails(out io.Writer, summary coverageSummary) {
 	if summary.Suppression != nil && summary.Suppression.ForUnrunRules > 0 {
 		fmt.Fprintf(out, "  suppressions: %d unused disable comments name only rules cohere has not ported yet, so nothing looked and they are not dead\n",
 			summary.Suppression.ForUnrunRules)
+	}
+	if summary.Suppression != nil && len(summary.Suppression.DeadSites) > 0 {
+		writeDeadSuppressions(out, summary.Suppression.DeadSites)
+	}
+}
+
+// writeDeadSuppressions names each disable comment that silenced nothing while a rule it names ran,
+// one per line as file:line and the rules it names, so the count on the files line can be acted on
+// from a whole-program run rather than hunted for one file at a time.
+func writeDeadSuppressions(out io.Writer, sites []program.DeadSuppression) {
+	sorted := append([]program.DeadSuppression(nil), sites...)
+	sort.Slice(sorted, func(left, right int) bool {
+		if sorted[left].File != sorted[right].File {
+			return sorted[left].File < sorted[right].File
+		}
+		return sorted[left].Line < sorted[right].Line
+	})
+	fmt.Fprintf(out, "  dead disable comments (%d): each silenced nothing while a rule it names ran\n", len(sorted))
+	for _, site := range sorted {
+		named := "every rule"
+		if len(site.Rules) > 0 {
+			named = strings.Join(site.Rules, ", ")
+		}
+		// The directive's line is zero-based; a reader's editor counts from one.
+		fmt.Fprintf(out, "    %s:%d %s\n", site.File, site.Line+1, named)
 	}
 }
 

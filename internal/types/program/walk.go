@@ -95,6 +95,13 @@ type Coverage struct {
 	// full run with every rule, so a caller running a filtered subset should not report it.
 	UnusedSuppressions int
 
+	// DeadSuppressions names each directive counted in UnusedSuppressions and not in
+	// UnusedSuppressionsForUnrunRules: one that silenced nothing while a rule it names ran. A count
+	// alone sends a reader linting files one at a time to find them, and a single file is the wrong
+	// tool, because without the whole program the type-aware rules go quiet and every directive for
+	// one of them reads as dead.
+	DeadSuppressions []DeadSuppression
+
 	// FilesCrashed names the files a rule panicked on, with the panic that ended each.
 	//
 	// Named rather than counted, because the panic message is the defect and a count of crashes is
@@ -529,6 +536,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			SuppressedWithoutReason:         suppressed.appliedNoReason,
 			UnusedSuppressions:              suppressed.unusedDirectives,
 			UnusedSuppressionsForUnrunRules: suppressed.unusedForUnrunRule,
+			DeadSuppressions:                suppressed.dead,
 
 			FilesCrashed:      fileCrashes,
 			RulesCrashed:      ruleCrashesAll,
@@ -919,7 +927,7 @@ func dispatchFile(
 		}
 	}
 
-	return visitedNodes, tally(directives, ranRule, resolution), ruleCrashes
+	return visitedNodes, tally(sourceFile.FileName(), directives, ranRule, resolution), ruleCrashes
 }
 
 // suppressionTally is what one file's directives did, summed across the run.
@@ -936,6 +944,17 @@ type suppressionTally struct {
 	// suppression the gate still needs. Reporting them as one number tells a reader to go delete
 	// comments that are load-bearing today.
 	unusedForUnrunRule int
+
+	// dead is where each unused directive outside unusedForUnrunRule sits.
+	dead []DeadSuppression
+}
+
+// DeadSuppression is one directive that silenced nothing while a rule it names ran: where it is, and
+// the rules it names (none for a blanket directive).
+type DeadSuppression struct {
+	File  string
+	Line  int
+	Rules []string
 }
 
 func (t *suppressionTally) add(other suppressionTally) {
@@ -943,6 +962,7 @@ func (t *suppressionTally) add(other suppressionTally) {
 	t.appliedNoReason += other.appliedNoReason
 	t.unusedDirectives += other.unusedDirectives
 	t.unusedForUnrunRule += other.unusedForUnrunRule
+	t.dead = append(t.dead, other.dead...)
 }
 
 // namesOnlyUnrunRules reports whether every rule a directive named is one this run did not run.
@@ -1000,7 +1020,7 @@ func bareRuleName(name string) string {
 // The reasonless count is per withheld finding rather than per directive, because that is the
 // number that answers the question being asked: how much of what cohere chose not to tell you was
 // silenced by someone who did not say why.
-func tally(directives *suppression.Index, ranRule map[string]bool, resolution configuration.Resolved) suppressionTally {
+func tally(fileName string, directives *suppression.Index, ranRule map[string]bool, resolution configuration.Resolved) suppressionTally {
 	counted := suppressionTally{}
 	for index, directive := range directives.Directives() {
 		applied := directives.AppliedCount(index)
@@ -1008,7 +1028,9 @@ func tally(directives *suppression.Index, ranRule map[string]bool, resolution co
 			counted.unusedDirectives++
 			if namesOnlyUnrunRules(directive, ranRule) && !namesOnlyOffRules(directive, resolution) {
 				counted.unusedForUnrunRule++
+				continue
 			}
+			counted.dead = append(counted.dead, DeadSuppression{File: fileName, Line: directive.Line, Rules: directive.Rules})
 			continue
 		}
 		counted.applied += applied
