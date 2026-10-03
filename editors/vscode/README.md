@@ -30,10 +30,14 @@ from there.
 
 ## Install
 
-From a checkout, link the folder into VS Code's extensions and reload the window:
+Install **cohere** from the Extensions view: it's published to the Visual Studio Marketplace for VS
+Code, and to Open VSX for Cursor, VSCodium and Windsurf. Both update it for you. The extension is
+versioned with cohere itself, so cohere 1.0.0 pairs with extension 1.0.0.
+
+A `.vsix` from a release installs the same way:
 
 ```sh
-ln -s ~/Projects/system/cohere/editors/vscode ~/.vscode/extensions/system-inc.cohere-0.0.1
+code --install-extension cohere-1.0.0.vsix
 ```
 
 Then set it as the formatter (`s doctor` writes these):
@@ -43,6 +47,10 @@ Then set it as the formatter (`s doctor` writes these):
 "editor.formatOnSave": true
 ```
 
+The extension runs cohere and does not bundle it. Install cohere in the project with
+`pnpm add -D @system-inc/cohere`. When no cohere is found, the first save in a project says so, names
+where it looked, and offers to copy that command. The file saves as typed.
+
 ## Test
 
 ```sh
@@ -50,4 +58,14 @@ node --test cohere-format.test.js                                  # resolution 
 COHERE_BINARY=/path/to/cohere node --test cohere-format.test.js     # plus a real save against the gate
 ```
 
-`extension.js` is the VS Code glue around `cohere-format.js` and is not covered by these tests.
+The extension itself is tested in a real VS Code, from its `.vsix`, in a profile with nothing else in
+it (macOS, VS Code in `/Applications`; it opens windows while it runs):
+
+```sh
+bash ../../.github/scripts/package-vscode-extension.sh 1.0.0 /tmp/vsix
+node test-vscode/run.js /tmp/vsix/cohere-1.0.0.vsix ~/Projects/ahra "$(command -v cohere)"
+```
+
+It saves a misformatted file in the project and requires the bytes on disk to equal what
+`cohere --fix --format` writes for the same text. Then it saves a file where no cohere can be found
+and requires it saved as typed.

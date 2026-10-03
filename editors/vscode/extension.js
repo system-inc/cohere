@@ -6,9 +6,15 @@
 
 const NodePath = require('node:path');
 const Vscode = require('vscode');
-const { formatWithCohere, resolveCohereBinary } = require('./cohere-format.js');
+const { cohereNotFoundMessage, formatWithCohere, installCommand, resolveCohereBinary } = require('./cohere-format.js');
+
+const copyInstallCommand = 'Copy install command';
 
 function activate(context) {
+    // Projects already told cohere is missing in this window. The message is the same on every save,
+    // so it is shown once rather than on each; every save still leaves the file unformatted.
+    const toldNotFound = new Set();
+
     const provider = {
         async provideDocumentFormattingEdits(document, _options, token) {
             if(document.uri.scheme !== 'file' || document.isUntitled) {
@@ -20,9 +26,15 @@ function activate(context) {
 
             const binary = resolveCohereBinary(projectDirectory);
             if(binary === undefined) {
-                Vscode.window.showErrorMessage(
-                    `cohere was not found: set COHERE_BINARY, install @system-inc/cohere in ${projectDirectory}, or put cohere on PATH`,
-                );
+                if(!toldNotFound.has(projectDirectory)) {
+                    toldNotFound.add(projectDirectory);
+                    // Not awaited: the save goes ahead as typed while the message is up.
+                    Vscode.window.showErrorMessage(cohereNotFoundMessage(projectDirectory), copyInstallCommand).then(function(choice) {
+                        if(choice === copyInstallCommand) {
+                            Vscode.env.clipboard.writeText(installCommand);
+                        }
+                    });
+                }
                 return [];
             }
 

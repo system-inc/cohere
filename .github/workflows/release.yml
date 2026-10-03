@@ -232,6 +232,11 @@ jobs:
                   # per run forever.
                   retention-days: 14
 
+            - name: Package the VS Code extension, versioned with this release
+              # One .vsix for both registries, built beside the npm packages so it rides the same tar to
+              # the publish job. The script stamps the version and checks the .vsix it made.
+              run: bash .github/scripts/package-vscode-extension.sh "${{ inputs.version }}" dist
+
             - name: Pack the staged packages for the jobs after this one
               # An artifact directory comes back without its executable bits, and a published package
               # whose binary cannot execute is the failure the launcher reports as "not executable" on
@@ -301,3 +306,36 @@ jobs:
                   done
 
                   npm publish dist/cohere --access public
+
+    publish-vscode-extension:
+        # After the cohere packages are on npm, so the extension never reaches a registry before the
+        # cohere it runs. `publish` already waits on every proof, so this does too.
+        needs: publish
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+
+        steps:
+            - uses: actions/download-artifact@v4
+              with:
+                  name: cohere-${{ inputs.version }}-tar
+
+            - name: Publish to the Visual Studio Marketplace and Open VSX
+              # The Marketplace serves VS Code; Open VSX serves Cursor, VSCodium and Windsurf. Each token
+              # is a secret Kirk creates: VSCE_PAT from Azure DevOps with Marketplace Manage scope for the
+              # system-inc publisher, OVSX_PAT from open-vsx.org. A missing one fails here by name rather
+              # than publishing to one registry and not the other without saying so.
+              env:
+                  VSCE_PAT: ${{ secrets.VSCE_PAT }}
+                  OVSX_PAT: ${{ secrets.OVSX_PAT }}
+              run: |
+                  tar -xf cohere-dist.tar
+                  vsix="dist/cohere-${{ inputs.version }}.vsix"
+                  for token in VSCE_PAT OVSX_PAT; do
+                      if [ -z "${!token}" ]; then
+                          echo "the $token secret is not set, so the extension was published to neither registry"
+                          exit 1
+                      fi
+                  done
+
+                  npx --yes @vscode/vsce@4.0.0 publish --packagePath "$vsix"
+                  npx --yes ovsx@1.2.0 publish "$vsix" --pat "$OVSX_PAT"

@@ -9,7 +9,14 @@ const NodeFileSystem = require('node:fs');
 const NodeOs = require('node:os');
 const NodePath = require('node:path');
 const NodeTest = require('node:test');
-const { formatWithCohere, resolveCohereBinary, saveArguments } = require('./cohere-format.js');
+const {
+    cohereNotFoundMessage,
+    environmentWithoutCohereOverride,
+    formatWithCohere,
+    installCommand,
+    resolveCohereBinary,
+    saveArguments,
+} = require('./cohere-format.js');
 
 function temporaryDirectory() {
     return NodeFileSystem.realpathSync(NodeFileSystem.mkdtempSync(NodePath.join(NodeOs.tmpdir(), 'cohere-vscode-')));
@@ -48,7 +55,9 @@ NodeTest.test('a save prints what the gate writes for the same text', { skip: pr
         compilerOptions: { strict: true, noEmit: true, module: 'esnext', moduleResolution: 'bundler', target: 'ES2022' },
         include: ['**/*.ts'],
     }));
-    NodeFileSystem.writeFileSync(NodePath.join(root, 'CohereSettings.json'), '{"rules":{"no-debugger":"error"}}');
+    // The two-file setup the README gives: cohere refuses to format under settings with no Nexus tier.
+    NodeFileSystem.writeFileSync(NodePath.join(root, 'CohereSettings.json'), '{"extends":"./NexusCohereSettings.json","rules":{"no-debugger":"error"}}');
+    NodeFileSystem.writeFileSync(NodePath.join(root, 'NexusCohereSettings.json'), '{"format":{"tabWidth":4,"singleQuote":true,"printWidth":120}}');
     const filePath = NodePath.join(root, 'Probe.ts');
     const onDisk = 'export const value = 1;\n';
     NodeFileSystem.writeFileSync(filePath, onDisk);
@@ -60,7 +69,14 @@ NodeTest.test('a save prints what the gate writes for the same text', { skip: pr
     NodeAssert.ok(!saved.text.includes('debugger') && saved.text.includes('const first = 1;'), saved.text);
 
     NodeFileSystem.writeFileSync(filePath, buffer);
-    const gate = NodeChildProcess.spawnSync(binary, [...saveArguments, filePath], { cwd: root, encoding: 'utf8' });
+    // Without the override, as the save runs it: a dispatcher handed COHERE_BINARY naming itself execs itself
+    // forever, which hung this test before the environment was stripped here too.
+    const gate = NodeChildProcess.spawnSync(binary, [...saveArguments, filePath], {
+        cwd: root,
+        encoding: 'utf8',
+        env: environmentWithoutCohereOverride(),
+        timeout: 600000,
+    });
     NodeAssert.equal(gate.status, 0, gate.stdout + gate.stderr);
     NodeAssert.equal(NodeFileSystem.readFileSync(filePath, 'utf8'), saved.text);
 });
@@ -71,4 +87,37 @@ NodeTest.test('a binary that fails is an error, not a silent save', { skip: proc
     NodeFileSystem.writeFileSync(failing, '#!/bin/sh\necho "formatter broke" >&2\nexit 1\n', { mode: 0o755 });
     const result = await formatWithCohere(failing, NodePath.join(root, 'Probe.ts'), 'x\n');
     NodeAssert.deepEqual(result, { error: 'formatter broke' });
+});
+
+NodeTest.test('not finding cohere says so, where it looked, and how to install it', function() {
+    const message = cohereNotFoundMessage('/work/project', { PATH: '/usr/bin' });
+    NodeAssert.ok(message.includes('was not formatted'), message);
+    NodeAssert.ok(message.includes('/work/project'), message);
+    NodeAssert.ok(message.includes(installCommand), message);
+    // A broken override names itself, since nothing else was looked at.
+    const overridden = cohereNotFoundMessage('/work/project', { COHERE_BINARY: '/nowhere/cohere' });
+    NodeAssert.ok(overridden.includes('COHERE_BINARY names /nowhere/cohere'), overridden);
+});
+
+NodeTest.test('cohere runs without the override, which would make a dispatcher exec itself', { skip: process.platform === 'win32' }, async function() {
+    NodeAssert.equal(environmentWithoutCohereOverride({ COHERE_BINARY: '/x', PATH: '/bin' }).COHERE_BINARY, undefined);
+
+    // End to end: a stand-in cohere that reports whether it inherited the override.
+    const root = temporaryDirectory();
+    const binary = NodePath.join(root, 'cohere');
+    NodeFileSystem.writeFileSync(binary, '#!/bin/sh\ncat > /dev/null\nprintf "override=%s" "${COHERE_BINARY-unset}"\n', { mode: 0o755 });
+    const saved = process.env.COHERE_BINARY;
+    process.env.COHERE_BINARY = binary;
+    try {
+        const result = await formatWithCohere(binary, NodePath.join(root, 'Probe.ts'), 'x\n');
+        NodeAssert.deepEqual(result, { text: 'override=unset' });
+    }
+    finally {
+        if(saved === undefined) {
+            delete process.env.COHERE_BINARY;
+        }
+        else {
+            process.env.COHERE_BINARY = saved;
+        }
+    }
 });

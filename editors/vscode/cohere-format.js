@@ -10,6 +10,12 @@ const NodePath = require('node:path');
 
 const cohereBinaryFileName = process.platform === 'win32' ? 'cohere.exe' : 'cohere';
 
+// The dispatcher's own override. Read here, and removed from the environment cohere runs in.
+const cohereBinaryOverrideVariable = 'COHERE_BINARY';
+
+// What a project runs to install cohere, said wherever cohere was not found.
+const installCommand = 'pnpm add -D @system-inc/cohere';
+
 // The arguments a save runs with: the gate's own, with no engine named, so a save formats with whatever
 // cohere's default is.
 const saveArguments = ['--fix', '--format'];
@@ -26,31 +32,56 @@ const saveArguments = ['--fix', '--format'];
  *   3. A cohere on PATH.
  */
 function resolveCohereBinary(projectDirectory, environment = process.env) {
-    const overridePath = environment.COHERE_BINARY;
+    const overridePath = environment[cohereBinaryOverrideVariable];
     if(overridePath !== undefined && overridePath !== '') {
         return NodeFileSystem.existsSync(overridePath) ? overridePath : undefined;
     }
+    return cohereCandidatePaths(projectDirectory, environment).find(function(candidate) {
+        return NodeFileSystem.existsSync(candidate);
+    });
+}
 
+/*
+ * Every place cohere is looked for after the override, in order: the launcher in node_modules/.bin at
+ * the project and each directory above it, then each PATH directory. One list for the search and for
+ * the message that says where the search looked, so the two cannot drift.
+ */
+function cohereCandidatePaths(projectDirectory, environment = process.env) {
+    const candidates = [];
     for(let directory = projectDirectory; ; directory = NodePath.dirname(directory)) {
-        const candidate = NodePath.join(directory, 'node_modules', '.bin', cohereBinaryFileName);
-        if(NodeFileSystem.existsSync(candidate)) {
-            return candidate;
-        }
+        candidates.push(NodePath.join(directory, 'node_modules', '.bin', cohereBinaryFileName));
         if(NodePath.dirname(directory) === directory) {
             break;
         }
     }
-
     for(const pathDirectory of (environment.PATH ?? '').split(NodePath.delimiter)) {
-        if(pathDirectory === '') {
-            continue;
-        }
-        const candidate = NodePath.resolve(pathDirectory, cohereBinaryFileName);
-        if(NodeFileSystem.existsSync(candidate)) {
-            return candidate;
+        if(pathDirectory !== '') {
+            candidates.push(NodePath.resolve(pathDirectory, cohereBinaryFileName));
         }
     }
-    return undefined;
+    return candidates;
+}
+
+/*
+ * What a save says when no cohere was found: that the file was not formatted, where cohere was looked
+ * for, and the command that installs it. Structure's `s c` says the same when it finds none
+ * (reportUnresolvableCohereBinary), so the two read alike.
+ */
+function cohereNotFoundMessage(projectDirectory, environment = process.env) {
+    const overridePath = environment[cohereBinaryOverrideVariable];
+    if(overridePath !== undefined && overridePath !== '') {
+        return `cohere was not found, so this file was not formatted: ${cohereBinaryOverrideVariable} names ${overridePath}, which does not exist.`;
+    }
+    return `cohere was not found, so this file was not formatted. Looked in ${projectDirectory}'s node_modules/.bin and above, then PATH. Install it in the project with: ${installCommand}`;
+}
+
+// The environment cohere runs in: this one without the override. The dispatcher honors the same
+// variable, so handing it down to the binary it names makes a dispatcher resolve to itself and exec in
+// a loop. Resolution has already happened by then.
+function environmentWithoutCohereOverride(environment = process.env) {
+    const childEnvironment = { ...environment };
+    delete childEnvironment[cohereBinaryOverrideVariable];
+    return childEnvironment;
 }
 
 /*
@@ -68,6 +99,7 @@ function formatWithCohere(binary, filePath, text, cancellation) {
     return new Promise(function(resolve) {
         const child = NodeChildProcess.spawn(binary, [...saveArguments, '--stdin-filepath', filePath], {
             cwd: NodePath.dirname(filePath),
+            env: environmentWithoutCohereOverride(),
         });
         const stdout = [];
         const stderr = [];
@@ -103,4 +135,11 @@ function formatWithCohere(binary, filePath, text, cancellation) {
     });
 }
 
-module.exports = { formatWithCohere, resolveCohereBinary, saveArguments };
+module.exports = {
+    cohereNotFoundMessage,
+    environmentWithoutCohereOverride,
+    formatWithCohere,
+    installCommand,
+    resolveCohereBinary,
+    saveArguments,
+};
