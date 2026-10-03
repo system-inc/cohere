@@ -8,6 +8,10 @@ import Foundation
  A value is a severity (`error`, `warning`, `off`) or an array whose first element is one, the shape the
  TypeScript config uses. Severities and strictness only, never allow lists or ignore names.
 
+ Formatting is not configured here. Swift has one house format built into the engine (`HouseSwiftFormat`),
+ so a `format` key, at the top level or in the `swift` block, is refused by name rather than read or
+ ignored: a setting that looks chosen and does nothing is worse than none.
+
  When the package has no config, every house rule runs at `error`. That is not the permissive default the
  TypeScript loader refuses, because every rule runs, and the note this carries says so on every run, so a
  missing config never reads as a configured clean tree. A config that exists and cannot be read is an
@@ -61,6 +65,12 @@ public struct RuleConfiguration: Equatable, Sendable {
         guard let document = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw ReadFailure(path: path, reason: "the top level is not an object")
         }
+        if document["format"] != nil {
+            throw ReadFailure(path: path, reason: formatKeyRefusal(named: "\"format\""))
+        }
+        if (document["swift"] as? [String: Any])?["format"] != nil {
+            throw ReadFailure(path: path, reason: formatKeyRefusal(named: "the swift block's \"format\""))
+        }
         guard let swiftBlock = document["swift"] else {
             return RuleConfiguration(
                 severities: [:],
@@ -79,5 +89,10 @@ public struct RuleConfiguration: Equatable, Sendable {
             severities[name] = severity
         }
         return RuleConfiguration(severities: severities, note: "")
+    }
+
+    /* Why a format key is refused, and what to do instead. */
+    static func formatKeyRefusal(named key: String) -> String {
+        "\(key) configures formatting, and Swift has one house format built into cohere-swift that no project's settings change; remove the key, and bring any setting it needs to the house format (HouseSwiftFormat.swift)"
     }
 }

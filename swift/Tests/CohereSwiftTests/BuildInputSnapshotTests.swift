@@ -24,7 +24,6 @@ struct BuildInputSnapshotTests {
             sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
             try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
             try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-            try PipelineControlTests.configuration.write(to: root.appendingPathComponent(".swift-format"), atomically: true, encoding: .utf8)
             try write(PipelineControlTests.cleanSource)
         }
 

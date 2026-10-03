@@ -120,7 +120,6 @@ struct UnusedImportsTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-unused-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try PipelineControlTests.configuration.write(to: root.appendingPathComponent(".swift-format"), atomically: true, encoding: .utf8)
         for (path, source) in files {
             let url = root.appendingPathComponent("Sources/\(path)")
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

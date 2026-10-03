@@ -41,7 +41,8 @@ final class SwiftFormatPass: @unchecked Sendable {
     }
 
     private static func run(_ file: ParsedFile) throws -> Outcome {
-        var configuration = Configuration()
+        /* The house format with its rule table rewritten: the layout settings are the house's, and only the wrapped rules run. */
+        var configuration = HouseSwiftFormat.configuration
         for rule in configuration.rules.keys {
             configuration.rules[rule] = false
         }

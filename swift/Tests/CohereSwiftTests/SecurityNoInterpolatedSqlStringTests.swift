@@ -599,7 +599,6 @@ struct SecurityNoInterpolatedSqlStringTests {
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
         try manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try PipelineControlTests.configuration.write(to: root.appendingPathComponent(".swift-format"), atomically: true, encoding: .utf8)
         for (name, source) in files {
             try source.write(to: sources.appendingPathComponent(name), atomically: true, encoding: .utf8)
         }

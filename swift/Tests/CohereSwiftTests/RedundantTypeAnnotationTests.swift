@@ -538,7 +538,6 @@ struct RedundantTypeAnnotationTests {
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
         try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try PipelineControlTests.configuration.write(to: root.appendingPathComponent(".swift-format"), atomically: true, encoding: .utf8)
         try Self.packageSource.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
 
         /* One run builds the package and writes its index. The rule is not registered here, so it is run by hand on what the run left. */

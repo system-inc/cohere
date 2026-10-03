@@ -12,7 +12,7 @@ import Foundation
 
  The swift-format pass itself lives in `SwiftFormatPass`, run once per file for every wrapped rule, with
  only those rules enabled and the pretty-printer off, so it is a rule walk, not a second format. Neither
- rule reads `.swift-format`: a house rule applies whatever the repository's formatter configuration turns
+ rule follows the house format's rule table: a house rule applies whatever the formatter's table turns
  off.
  */
 public struct SwiftFormatRule: FileRule {

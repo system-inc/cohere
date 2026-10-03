@@ -81,6 +81,15 @@ public struct Pipeline {
         let package = try PackageModel.load(root: root, scratchPath: Self.scratchPath(for: root), runner: runner, toolchain: toolchain)
         let fileSet = try FileSet.build(package: package)
         let scope = try FileScope.resolve(options: options, fileSet: fileSet, workingDirectory: workingDirectory)
+        /*
+         A `.swift-format` left at or above any file of ours refuses the run, whatever phases were asked for, as a
+         leftover Prettier config refuses a TypeScript run: Swift has one house format, and a file still there is
+         one that `Format.sh` or an editor reads and cohere never will.
+         */
+        let leftovers = HouseSwiftFormat.leftoverConfigurationFiles(above: fileSet.owned.map(\.url), boundary: repositoryRoot(of: root))
+        guard leftovers.isEmpty else {
+            throw RunFailure(description: leftovers.map(HouseSwiftFormat.refusal(of:)).joined(separator: "\n"))
+        }
         if !fileSet.note.isEmpty {
             FileHandle.standardError.write(Data("note: \(fileSet.note)\n".utf8))
         }
@@ -119,7 +128,6 @@ public struct Pipeline {
             ))
             try writer.write(PhaseRecord(name: .fix, outcome: .ran, elapsedMilliseconds: Self.milliseconds(since: fixStart)))
         } else {
-            let boundary = repositoryRoot(of: root)
             /*
              Fixers first, then the formatter over the fixed text, so the formatter has the last word on layout
              and a fixer's output is always formatted. Under `--no-fix` nothing is fixed: the fixable findings
@@ -154,7 +162,7 @@ public struct Pipeline {
                 }
             }
             let originals = Dictionary(parsed.files.map { ($0.url.path, $0.source) }, uniquingKeysWith: { first, _ in first })
-            let formatting = await FormatPhase(boundary: boundary).run(toFormat)
+            let formatting = await FormatPhase().run(toFormat)
             var rewritten: [FileSet.OwnedFile] = []
             var reformatted = 0
             var notFormatted: [String: Int] = [:]
@@ -178,11 +186,9 @@ public struct Pipeline {
                             severity: .error,
                             rule: "cohere-swift/consistency-require-formatting",
                             messageId: "notFormatted",
-                            message: "not formatted the way the nearest .swift-format says; a run without --no-fix rewrites it"
+                            message: "not formatted the house way; a run without --no-fix rewrites it"
                         ))
                     }
-                case let .declined(reason):
-                    notFormatted[reason, default: 0] += 1
                 case let .failed(reason):
                     notFormatted["the formatter failed: \(reason)", default: 0] += 1
                     complete = false
@@ -435,7 +441,8 @@ public struct Pipeline {
 
     /*
      The top of the git repository holding the package, or the package itself outside git: the highest
-     directory a `.swift-format` may apply from. Found by the `.git` on disk, the same walk the file set uses.
+     directory a leftover `.swift-format` is looked for in. Found by the `.git` on disk, the same walk the file
+     set uses.
      */
     private func repositoryRoot(of root: URL) -> URL {
         IgnoreRules.Repository.containing(root)?.root ?? root

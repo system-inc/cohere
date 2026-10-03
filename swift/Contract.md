@@ -150,7 +150,7 @@ Rendered, one finding per line. Newlines in `message` are collapsed to spaces, a
 /…/ByteRing.swift:159:61 - force unwrapping crashes on nil … [cohere-swift/force-unwrapping/forceUnwrap]
 /…/Broken.swift:3:23 - error: cannot convert value of type 'String' to specified type 'Int'
 /…/Warning.swift:2:9 - warning: variable 'neverMutated' was never mutated; consider changing to 'let' constant [#VariableNeverMutated]
-/…/Unformatted.swift:12:1 - not formatted as .swift-format says [cohere-swift/consistency-require-formatting/notFormatted]
+/…/Unformatted.swift:12:1 - not formatted the house way; a run without --no-fix rewrites it [cohere-swift/consistency-require-formatting/notFormatted]
 ```
 
 The compiler line is the TypeScript shape `file:line:col - error TS2322: message`. Swift
@@ -250,9 +250,10 @@ shader's constants), cases an enum's conformances or raw values may reach, and a
 
 The front door fills an `edit.Summary` from it and prints that summary's `String()`, then
 `format scope: <formatScope>`. Fixes and formatting are separate counts, as they are for
-TypeScript. A file the formatter declined (no `.swift-format` at or above it, for one) counts in
-`filesNotFormatted` with its reason. A formatter that declined everything therefore never reads
-like a formatter that found everything already correct.
+TypeScript. Every file in scope is formatted the house way. A file the formatter could not format
+(the formatter failed on it, or a file in scope does not parse, so nothing was rewritten) counts in
+`filesNotFormatted` with its reason. A formatter that formatted nothing therefore never reads like
+a formatter that found everything already correct.
 
 ### `types`
 
@@ -352,7 +353,7 @@ note goes to stderr, as it does for TypeScript.
 |---|---|---|
 | 0 | summary written, `findings` 0, `complete` true | exits 0 |
 | 1 | summary written, findings or an incomplete run | exits 1 |
-| 2 | the engine could not run: bad flag, contract mismatch, no package, toolchain missing | prints the engine's stderr, then `cohere: the Swift engine did not run, so nothing was checked`, exits 1 |
+| 2 | the engine could not run: bad flag, contract mismatch, no package, toolchain missing, refused config (a leftover `.swift-format`, a `format` key) | prints the engine's stderr, then `cohere: the Swift engine did not run, so nothing was checked`, exits 1 |
 | other, or killed | crash | `cohere: the Swift engine exited <code> without a summary, so nothing was checked`, exits 1 |
 
 An exit of 0 or 1 without a `summary` record is a crash. An exit code that disagrees with the
@@ -381,9 +382,20 @@ it where a run that did not finish prints green.
 ## Config
 
 Rules are configured in the `swift` block of `CohereSettings.json`. Keys are `cohere-swift/<rule>`,
-and values are severities and strictness options, never allow lists or ignore names. The formatter
-is configured by `.swift-format`, found at or above each file, so `Format.sh` and cohere read the
-same file and cannot disagree.
+and values are severities and strictness options, never allow lists or ignore names.
+
+**Formatting is not configured.** Swift has one house format, built into the engine
+(`Sources/CohereSwift/Format/HouseSwiftFormat.swift`, ruled 2026-10-03 in #mg4dgjm), the way
+TypeScript's Prettier options live in one block of the Nexus tier. Every file the engine owns is
+formatted with it, and nothing a repository carries changes it. Two things are refused by name, each
+with exit 2 before anything is checked, as a bad flag is:
+
+- A `.swift-format` at or above any file the engine owns, up to the repository root (the package
+  itself outside git). The refusal names each file and says to delete it, and to bring any setting it
+  needs to the house format instead. A `.swift-format` above the repository root belongs to someone
+  else and is not looked at.
+- A `format` key in the settings file, at the top level or in the `swift` block. The refusal names
+  the file and the key and says to remove it, and to bring any setting it needs to the house format.
 
 **Where the config lives.** The engine reads `CohereSettings.json` from beside `Package.swift`, or
 the file `--lint-config` names. When there is none, every house rule runs at `error`, and every run

@@ -202,7 +202,6 @@ struct FirstWhereTests {
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
         try PipelineControlTests.manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try PipelineControlTests.configuration.write(to: root.appendingPathComponent(".swift-format"), atomically: true, encoding: .utf8)
         try source.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
         let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
         _ = try await Pipeline(options: options, writer: ContractWriter { _ in }, workingDirectory: root).run()

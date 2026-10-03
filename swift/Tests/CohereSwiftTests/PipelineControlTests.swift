@@ -30,8 +30,6 @@ struct PipelineControlTests {
 
         """
 
-    static let configuration = #"{"version":1,"lineLength":120,"indentation":{"spaces":4}}"#
-
     static let cleanSource = """
         struct Control {
             let value: Int
@@ -67,7 +65,6 @@ struct PipelineControlTests {
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
         try manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try configuration.write(to: root.appendingPathComponent(".swift-format"), atomically: true, encoding: .utf8)
         try source.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
         for (name, contents) in otherFiles {
             try contents.write(to: sources.appendingPathComponent(name))
