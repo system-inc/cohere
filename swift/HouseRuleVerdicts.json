@@ -25,9 +25,9 @@
   },
   {
     "typeScriptRule": "base/no-bare-throw",
-    "verdict": "Port",
-    "swiftRule": null,
-    "reason": "Swift can only throw an Error-conforming type, but a hand-built `NSError(domain: \"X\", code: 1, userInfo: [...])` is the message-only error a caller cannot match (1 macos, 3 presence sites); the other side is that it is rare enough to call compiler-covered."
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/no-bare-throw",
+    "reason": null
   },
   {
     "typeScriptRule": "base/no-console",
