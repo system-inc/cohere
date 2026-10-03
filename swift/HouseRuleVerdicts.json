@@ -331,9 +331,9 @@
   },
   {
     "typeScriptRule": "nexus/correctness-require-response-status-check",
-    "verdict": "Port",
-    "swiftRule": null,
-    "reason": "URLSession does not throw on 4xx or 5xx, so decoding `data` from `URLSession.data(for:)` without reading `HTTPURLResponse.statusCode` is the same bug, though all 3 macos sites check today."
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/correctness-require-response-status-check",
+    "reason": null
   },
   {
     "typeScriptRule": "nexus/import-no-forbidden-source",
