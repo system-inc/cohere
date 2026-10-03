@@ -53,6 +53,7 @@ public enum RuleRegistry {
         NoDiscardedTryOptional(),
         SecurityNoInterpolatedShellCommand(),
         SecurityNoInterpolatedSqlString(),
+        ConcurrencyNoCheckThenWrite(),
     ]
 
     public static let packageRules: [any PackageRule] = [

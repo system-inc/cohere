@@ -115,9 +115,9 @@
   },
   {
     "typeScriptRule": "nexus/concurrency-no-check-then-write",
-    "verdict": "Port",
-    "swiftRule": null,
-    "reason": "A `while FileManager.default.fileExists(atPath:)` free-name loop followed by a `write(to:)` without `.withoutOverwriting` lets two writers claim one name, with 1 exact site and 2 helper variants in presence."
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/concurrency-no-check-then-write",
+    "reason": null
   },
   {
     "typeScriptRule": "nexus/concurrency-no-lost-update",
