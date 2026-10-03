@@ -373,9 +373,9 @@
   },
   {
     "typeScriptRule": "nexus/security-no-interpolated-shell-command",
-    "verdict": "Port",
-    "swiftRule": null,
-    "reason": "Interpolating a value into the string after `zsh -c` or `-lc` on a `Process` is the same injection, with real sites in both proving grounds (MemberLifecycle.swift:34 splices an unquoted home path)."
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/security-no-interpolated-shell-command",
+    "reason": null
   },
   {
     "typeScriptRule": "nexus/security-no-interpolated-sql-string",

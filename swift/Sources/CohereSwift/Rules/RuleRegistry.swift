@@ -50,6 +50,7 @@ public enum RuleRegistry {
         NoUnhandledThrowingTask(),
         RedundantTypeAnnotation(),
         NoDiscardedTryOptional(),
+        SecurityNoInterpolatedShellCommand(),
     ]
 
     public static let packageRules: [any PackageRule] = [
