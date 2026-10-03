@@ -36,15 +36,6 @@ var lenientOptionRules = map[string]bool{
 	"react/style-prop-object":       true,
 }
 
-// objectlessOptionRules take no options object upstream, only a mode string, and their decoders read
-// any value of another shape as the default, an object included. There is no key to refuse, so the
-// probe means nothing for them. Reading a wrong shape as the default is its own silent drop, of a
-// value rather than a key: #p9s1131. Remove each from here when its decoder refuses.
-var objectlessOptionRules = map[string]bool{
-	"@typescript-eslint/consistent-generic-constructors": true,
-	"@typescript-eslint/consistent-indexed-object-style": true,
-}
-
 // optionListModes are the first elements tried for a DecodeOptionList rule that refuses `[{}]`,
 // because its first element is a mode string and its object comes second. The first that decodes
 // with an empty object after it is the baseline.
@@ -56,7 +47,7 @@ func TestEveryDecoderRefusesAnUnknownTopLevelKey(t *testing.T) {
 	for _, registration := range rule.Registered() {
 		name := registration.Rule.Name
 		baseline, probe, decode := topLevelProbe(registration)
-		if decode == nil || objectlessOptionRules[name] {
+		if decode == nil {
 			continue
 		}
 		if _, err := decode(baseline); err != nil {

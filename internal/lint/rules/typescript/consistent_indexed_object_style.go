@@ -1,6 +1,8 @@
 package typescript
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -27,9 +29,14 @@ func DefaultConsistentIndexedObjectStyleSettings() ConsistentIndexedObjectStyleO
 // DecodeConsistentIndexedObjectStyleOptions reads the rule's configuration.
 //
 // The wire value is a bare STRING rather than an object, which is why this cannot use
-// `rule.DecodeOptionsInto` at all: there is no struct to decode into. An unrecognised value falls
-// back to the default rather than turning the rule off, because a typo in a config should not
-// silently disable a rule.
+// `rule.DecodeOptionsInto` at all: there is no struct to decode into. Empty input and `null` are a
+// rule configured as a bare `"error"`, and get upstream's default.
+//
+// Anything else is refused, naming the value. This read every value other than the two mode strings
+// as the default, an object and a misspelling included, on the reasoning that a typo should not
+// disable the rule. It did not disable it; it ran a mode nobody wrote, and the config loaded clean.
+// Upstream's schema is a string enum and refuses those at load, and the config layer now refuses a
+// decoder's error by rule name, so refusing is what tells the author (#p9s1131).
 func DecodeConsistentIndexedObjectStyleOptions(raw []byte) (any, error) {
 	options := DefaultConsistentIndexedObjectStyleSettings()
 
@@ -37,11 +44,15 @@ func DecodeConsistentIndexedObjectStyleOptions(raw []byte) (any, error) {
 	if trimmed == "" || trimmed == "null" {
 		return options, nil
 	}
-	// The value arrives JSON-encoded, so a string carries its quotes.
-	unquoted := strings.Trim(trimmed, `"`)
-	if unquoted == "index-signature" || unquoted == "record" {
-		options.Mode = unquoted
+
+	var mode string
+	if err := json.Unmarshal(raw, &mode); err != nil {
+		return options, fmt.Errorf(`expected a mode string, "record" or "index-signature", got %s`, trimmed)
 	}
+	if mode != "index-signature" && mode != "record" {
+		return options, fmt.Errorf(`mode %q is not "record" or "index-signature"`, mode)
+	}
+	options.Mode = mode
 	return options, nil
 }
 

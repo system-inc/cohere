@@ -496,9 +496,8 @@ func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(t *testing.T) {
 		{wire: `["type-annotation"]`, want: ConsistentGenericConstructorsTypeAnnotation},
 		{wire: `["constructor"]`, want: ConsistentGenericConstructorsConstructor},
 
-		// An unrecognised value falls back to the default rather than to an empty mode that matches
-		// no arm. Upstream's schema would have refused it before the rule ran.
-		{wire: `"nonsense"`, want: ConsistentGenericConstructorsConstructor},
+		// `null` is a bare severity too, and gets the default.
+		{wire: `null`, want: ConsistentGenericConstructorsConstructor},
 	}
 
 	for _, testCase := range cases {
@@ -523,4 +522,37 @@ func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(t *testing.T) {
 	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t,
 		ConsistentGenericConstructors, consistentGenericConstructorsFile,
 		"const a: Map<string, number> = new Map();\n", nil), "preferConstructor")
+}
+
+// TestConsistentGenericConstructorsDecoderRefusesAValueUpstreamRefuses pins the other half (#p9s1131).
+//
+// Each of these used to decode to the default constructor mode, so a config naming one loaded clean
+// and ran a mode nobody wrote. Upstream's schema is a string enum and refuses every one at load. The
+// error must name the value, because the config layer prefixes the rule's name and the value is the
+// half the author needs to find the line.
+func TestConsistentGenericConstructorsDecoderRefusesAValueUpstreamRefuses(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		wire, named string
+	}{
+		{wire: `"type-anotation"`, named: "type-anotation"},
+		{wire: `"Constructor"`, named: "Constructor"},
+		{wire: `{"anything": 1}`, named: "anything"},
+		{wire: `1`, named: "1"},
+		{wire: `true`, named: "true"},
+		{wire: `["type-anotation"]`, named: "type-anotation"},
+		{wire: `["constructor", "type-annotation"]`, named: "type-annotation"},
+		{wire: `[]`, named: "[]"},
+	} {
+		t.Run(testCase.wire, func(t *testing.T) {
+			_, err := DecodeConsistentGenericConstructorsOptions([]byte(testCase.wire))
+			if err == nil {
+				t.Fatalf("%s decoded, so the configured mode is silently not the one written", testCase.wire)
+			}
+			if !strings.Contains(err.Error(), testCase.named) {
+				t.Fatalf("%s was refused without naming %q: %v", testCase.wire, testCase.named, err)
+			}
+		})
+	}
 }

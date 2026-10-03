@@ -2,6 +2,8 @@ package typescript
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -37,46 +39,52 @@ func DefaultConsistentGenericConstructorsSettings() ConsistentGenericConstructor
 // Upstream's `meta.schema` is a one-element positional tuple holding a bare string, so the ESLint
 // spelling is `["error", "type-annotation"]`. cohere's config layer unwraps the
 // `[severity, options]` pair before dispatch, so a decoder here is handed the bare string rather than
-// an array. Both are accepted anyway, so a setting copied out of an ESLint config is read rather than
-// refused.
+// an array. A one-element array is accepted too, so a setting copied out of an ESLint config is read
+// rather than refused.
 //
 // The nil case matters more than it looks: a rule configured as a bare `"error"` is handed empty
 // input, and a decoder erroring there yields a zero-value struct whose Mode is the empty string,
-// matching neither arm and making the rule silently inert. The fallback to the default settings is
-// what keeps `"error"` meaning upstream's default rather than meaning nothing.
+// matching neither arm and making the rule silently inert. Empty input and `null` are upstream's
+// default.
+//
+// Anything else is refused, naming the value. This read an unknown mode, an object or a number as
+// the default, on the reasoning that a typo should not turn the rule off. It did not turn it off; it
+// turned it to a mode nobody wrote, and loaded clean while doing it. Upstream's schema is a string
+// enum and refuses all three at load, and the config layer now refuses a decoder's error by rule
+// name, so refusing is what tells the author (#p9s1131).
 func DecodeConsistentGenericConstructorsOptions(raw []byte) (any, error) {
 	options := DefaultConsistentGenericConstructorsSettings()
-	if len(raw) == 0 {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
 		return options, nil
 	}
 
 	// The spelling cohere actually delivers: the mode as a bare string.
 	var mode string
 	if err := json.Unmarshal(raw, &mode); err == nil {
-		options.Mode = consistentGenericConstructorsModeOf(mode)
-		return options, nil
+		return consistentGenericConstructorsOptionsFor(mode)
 	}
 
 	// The spelling an ESLint config is written in, accepted so a copied setting still works.
 	var modes []string
-	if err := json.Unmarshal(raw, &modes); err == nil && len(modes) > 0 {
-		options.Mode = consistentGenericConstructorsModeOf(modes[0])
-		return options, nil
+	if err := json.Unmarshal(raw, &modes); err == nil && len(modes) == 1 {
+		return consistentGenericConstructorsOptionsFor(modes[0])
 	}
 
-	return options, nil
+	return options, fmt.Errorf(`expected a mode string, "constructor" or "type-annotation", got %s`, trimmed)
 }
 
-// consistentGenericConstructorsModeOf maps upstream's wire spelling to the internal one.
-//
-// An unrecognised value falls back to the default rather than erroring, matching what the config
-// layer does elsewhere: a typo should not turn the rule off silently, and upstream's own schema
-// would have refused the value before it ever reached here.
-func consistentGenericConstructorsModeOf(mode string) ConsistentGenericConstructorsMode {
-	if mode == "type-annotation" {
-		return ConsistentGenericConstructorsTypeAnnotation
+// consistentGenericConstructorsOptionsFor maps upstream's wire spelling to the internal one, refusing
+// a spelling upstream's schema would refuse.
+func consistentGenericConstructorsOptionsFor(mode string) (any, error) {
+	switch mode {
+	case "constructor":
+		return ConsistentGenericConstructorsOptions{Mode: ConsistentGenericConstructorsConstructor}, nil
+	case "type-annotation":
+		return ConsistentGenericConstructorsOptions{Mode: ConsistentGenericConstructorsTypeAnnotation}, nil
 	}
-	return ConsistentGenericConstructorsConstructor
+	return DefaultConsistentGenericConstructorsSettings(),
+		fmt.Errorf(`mode %q is not "constructor" or "type-annotation"`, mode)
 }
 
 // ConsistentGenericConstructors enforces that a generic constructor call writes its type arguments on

@@ -794,8 +794,7 @@ func TestConsistentIndexedObjectStyleNeedsTheTypedHarness(t *testing.T) {
 // no struct to decode into and the decoder is hand-written for that reason rather than for the
 // default-inversion reason its siblings in this package have.
 //
-// An unrecognised value keeps the default rather than turning the rule off, which is the safe
-// direction: a typo in a config should not silently disable a rule.
+// Absent and null are a bare severity and get the default. Every other value is refused, below.
 func TestDecodeConsistentIndexedObjectStyleOptions(t *testing.T) {
 	t.Parallel()
 
@@ -808,7 +807,6 @@ func TestDecodeConsistentIndexedObjectStyleOptions(t *testing.T) {
 		{name: "null", raw: `null`, want: "record"},
 		{name: "record", raw: `"record"`, want: "record"},
 		{name: "indexSignature", raw: `"index-signature"`, want: "index-signature"},
-		{name: "unrecognised", raw: `"nonsense"`, want: "record"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -845,4 +843,35 @@ func TestConsistentIndexedObjectStyleFallsBackToTheDefaultOnNilOptions(t *testin
 	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, ConsistentIndexedObjectStyle,
 		consistentIndexedObjectStyleFile, record,
 		ConsistentIndexedObjectStyleOptions{Mode: "index-signature"}), "preferIndexSignature")
+}
+
+// TestDecodeConsistentIndexedObjectStyleOptionsRefusesAValueUpstreamRefuses pins the other half
+// (#p9s1131).
+//
+// Each of these used to decode to the default record mode, so a config naming one loaded clean and
+// ran a mode nobody wrote. Upstream's schema is a string enum and refuses every one at load. The
+// error names the value; the config layer prefixes the rule's name.
+func TestDecodeConsistentIndexedObjectStyleOptionsRefusesAValueUpstreamRefuses(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		raw, named string
+	}{
+		{raw: `"index-signatures"`, named: "index-signatures"},
+		{raw: `"Record"`, named: "Record"},
+		{raw: `{"anything": 1}`, named: "anything"},
+		{raw: `1`, named: "1"},
+		{raw: `true`, named: "true"},
+		{raw: `["record"]`, named: "record"},
+	} {
+		t.Run(testCase.raw, func(t *testing.T) {
+			_, err := DecodeConsistentIndexedObjectStyleOptions(json.RawMessage(testCase.raw))
+			if err == nil {
+				t.Fatalf("%s decoded, so the configured mode is silently not the one written", testCase.raw)
+			}
+			if !strings.Contains(err.Error(), testCase.named) {
+				t.Fatalf("%s was refused without naming %q: %v", testCase.raw, testCase.named, err)
+			}
+		})
+	}
 }
