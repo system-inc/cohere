@@ -1,10 +1,13 @@
 # cohere
 
-cohere type-checks, lints, fixes and formats a TypeScript codebase in one process, against one type
-graph. The TypeScript compiler builds the program once, and every phase reads that same graph:
-TypeScript's own diagnostics, the lint rules, their fixes, and the formatter. Keeping it to one
-process and one graph is what lets a codebase carry hundreds of rules without each one costing
-another pass over the code.
+cohere type-checks, lints, fixes and formats a TypeScript codebase in one process. The TypeScript
+compiler builds the program once, and that one type graph is what TypeScript's own diagnostics and
+every lint rule read, the rules in one walk of each file. The fix engine and the formatter run in the
+same process. Fixes re-read each file from disk and re-lint it until they stop landing, so they never
+apply to a stale copy. The formatter parses each TypeScript file it formats with the same TypeScript
+parser, and prints every file it formats with cohere's own printers. Keeping the rules on one graph in
+one walk is what lets a codebase carry hundreds of them without each one costing another pass over the
+code.
 
 ## Install
 
@@ -78,8 +81,9 @@ The keys:
   `NexusCohereSettings.json` of your own, so every
   project that extends it formats the same way; a `format` key in any other settings file is an
   error that names the file. It accepts `printWidth`, `tabWidth`, `useTabs`, `semi`,
-  `singleQuote`, `trailingComma`, `bracketSpacing`, `bracketSameLine`, `arrowParens` and
-  `endOfLine`. An option outside that list is an error, not something silently ignored, and
+  `singleQuote`, `trailingComma`, `bracketSpacing`, `bracketSameLine`, `arrowParens`, `endOfLine`,
+  and `ignore`, a list of paths the formatter leaves alone. An option outside that list is an error,
+  not something silently ignored, and
   `--format` refuses to run when your settings do not extend a Nexus tier holding a `format` block. Linting and fixing need no such file.
 
 The full reference, every key with an example, is [schema/CohereSettings.md](schema/CohereSettings.md).
@@ -140,8 +144,9 @@ root unless you name another).
 
 ## Caching
 
-cohere keeps its cache in `.cache/cohere` at the project root, plus TypeScript's incremental build
-information, so a run reuses what an earlier run already established. Add `.cache/` to your
+cohere keeps its cache in `.cache/cohere` at the project root, so a run reuses what an earlier run
+already established. When your tsconfig sets `incremental`, it also keeps TypeScript's build information
+where the tsconfig says, and a `--no-fix` run leaves that file untouched. Add `.cache/` to your
 `.gitignore`. `--no-cache` reads nothing from those caches and writes nothing to them; use it when
 you suspect the cache, or to time a run from scratch.
 
