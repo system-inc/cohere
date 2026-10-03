@@ -364,7 +364,7 @@ enum SqlReading {
                 }
             case .code:
                 previousToken = "\\()"
-            default:
+            case .doubleQuotes, .backquotes, .lineComment, .blockComment:
                 break
             }
         }
@@ -483,7 +483,7 @@ indirect enum ValueShape: Equatable {
         case .named(let name): Self.textTypes.contains(name)
         case .literal(let text): text.map { $0.contains("'") || $0.contains("\\") } ?? true
         case .optional(let wrapped): wrapped.canHoldQuote
-        default: false
+        case .sequence, .dictionary, .tuple: false
         }
     }
 
@@ -506,7 +506,7 @@ indirect enum ValueShape: Equatable {
         switch self {
         case .sequence(let element): element
         case .dictionary(let key, let value): .tuple([key, value])
-        default: nil
+        case .named, .literal, .optional, .tuple: nil
         }
     }
 
@@ -870,8 +870,8 @@ final class ValueTypes {
                 return nil
             }
             if let list = scope.as(CodeBlockItemListSyntax.self) {
-                for item in list.reversed() where item.endPosition <= child.position {
-                    if let binding = binding(named: name, inStatement: item.item) {
+                for statement in list.reversed() where statement.endPosition <= child.position {
+                    if let binding = binding(named: name, inStatement: statement.item) {
                         return binding
                     }
                 }
