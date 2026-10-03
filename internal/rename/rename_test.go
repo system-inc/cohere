@@ -504,7 +504,7 @@ func copyTree(t *testing.T, source string, destination string) {
 //
 // It is still worth guarding and worth testing, because `Plan` is an exported type: a caller can
 // hand `Apply` a plan it built itself, and a range off by one token writes the right characters into
-// the wrong place — which is the failure the README names as having removed an entire function with
+// the wrong place — which is the failure CONTRIBUTING.md names as having removed an entire function with
 // every existing assertion still passing. The test constructs that caller directly rather than
 // asserting the branch is unreachable, because "unreachable" is a verdict that expires the moment
 // someone adds a caller, and this package exports the type that makes one possible.

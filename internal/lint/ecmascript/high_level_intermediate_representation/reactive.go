@@ -422,7 +422,7 @@ func (r *reactivity) mark(id IdentifierId) {
 // itself, at any chain depth, so asking the checker at each binding returns exactly what the
 // side-map would have carried.
 //
-// This is the README's "fidelity is to what a rule DECIDES, not how it OBTAINS what it needs":
+// This is CONTRIBUTING.md's "fidelity is to what a rule DECIDES, not how it OBTAINS what it needs":
 // upstream needs the side-map because it has no checker to ask. Keeping it here would be a second
 // mechanism holding one fact, which is the redundancy that leaves a mutation sweep unable to see
 // either copy.
