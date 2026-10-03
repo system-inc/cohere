@@ -566,8 +566,11 @@ var Dependencies = rule.Rule{
 		relative := func(fileName string) (string, bool) {
 			for _, candidate := range roots {
 				path, err := filepath.Rel(candidate, fileName)
+				// Slashed before the test rather than after it: on Windows Rel answers `..\x`, which the
+				// `../` test let through, so every file outside the root was described as inside it.
+				path = filepath.ToSlash(path)
 				if err == nil && path != ".." && !strings.HasPrefix(path, "../") {
-					return filepath.ToSlash(path), true
+					return path, true
 				}
 			}
 			return "", false

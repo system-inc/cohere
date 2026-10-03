@@ -3,7 +3,7 @@ package react
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
+	"path"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
@@ -144,11 +144,12 @@ const dangerousPropertyName = "dangerouslySetInnerHTML"
 //
 // # The glob dialect, measured rather than assumed
 //
-// Upstream uses minimatch; this uses `filepath.Match`, which is already the glob in this tree
-// (`internal/prettier/enumerate.go`). They are different implementations, so the substitution was
+// Upstream uses minimatch; this uses `path.Match`, which is also the format walk's glob
+// (`internal/format/formatfiles/enumerate.go`). They are different implementations, so the substitution was
 // measured rather than argued: minimatch's answers were enumerated over 204 pattern-and-name pairs
 // covering every pattern the corpus uses plus the dotted, namespaced and character-class shapes this
-// rule can produce, and `filepath.Match` was run over the same table. **Zero disagreements.**
+// rule can produce, and `filepath.Match` was run over the same table, on Unix, where it is
+// `path.Match`. **Zero disagreements.**
 //
 // The probe asserted its verdicts rather than logging them, because a probe that only logs reports
 // `ok` while carrying disagreements. It was deleted after the measurement; the number is recorded
@@ -289,7 +290,7 @@ func isDomElementName(rendered string) bool {
 
 // matchesAnyPattern reports whether a rendered tag name matches any configured glob.
 //
-// `filepath.Match` stands in for minimatch. Measured equivalent over 204 pattern-and-name pairs
+// `path.Match` stands in for minimatch. Measured equivalent over 204 pattern-and-name pairs
 // covering every pattern the corpus uses and every tag shape this rule can produce, with zero
 // disagreements; see the rule's doc comment.
 //
@@ -302,7 +303,9 @@ func matchesAnyPattern(patterns []string, rendered string) bool {
 		return false
 	}
 	for _, pattern := range patterns {
-		if matched, err := filepath.Match(pattern, rendered); err == nil && matched {
+		// path.Match, which reads `\` as an escape on every platform. filepath.Match does not on
+		// Windows, so a pattern like `MUI\*` meant something else there than where it was measured.
+		if matched, err := path.Match(pattern, rendered); err == nil && matched {
 			return true
 		}
 	}

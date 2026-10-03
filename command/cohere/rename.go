@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/rename"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -101,7 +102,10 @@ func runRenameVerb(arguments []string) error {
 		if err != nil {
 			return err
 		}
-		position.FileName = resolved
+		// In the compiler's spelling, which is how the program names its files and what the anchor is
+		// matched against. On Windows Clean leaves `C:\work\a.ts`, which no program file's
+		// `C:/work/a.ts` equals, and every position was refused as not in the program.
+		position.FileName = tspath.NormalizePath(resolved)
 	} else {
 		// The bare-name form is sugar, and it refuses rather than guesses. A bare name is not a
 		// symbol: if three files each declare a local `err`, this has three valid answers and the

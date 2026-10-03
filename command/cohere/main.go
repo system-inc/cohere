@@ -554,7 +554,9 @@ func run() error {
 			wholeProgram := graph.ProjectFiles()
 			inProgram := make(map[string]struct{}, len(wholeProgram))
 			for _, sourceFile := range wholeProgram {
-				inProgram[sourceFile.FileName()] = struct{}{}
+				// Cleaned to the form the named paths have, which on Windows is the `\` the compiler's
+				// names do not use.
+				inProgram[filepath.Clean(sourceFile.FileName())] = struct{}{}
 			}
 			scope = writeScope.narrowTo(inProgram)
 

@@ -100,8 +100,12 @@ func applyProposedFixes(
 		if diagnostic.SourceFile == nil || len(diagnostic.Fixes) == 0 {
 			continue
 		}
-		fileName := diagnostic.SourceFile.FileName()
-		if !writable.Everything && !writable.includes(filepath.Clean(fileName)) {
+		// In the form the format scope holds, since both halves of the union below are keyed by it. The
+		// compiler names a file `C:/work/a.ts` and the walk `C:\work\a.ts` on Windows, and one file under
+		// both names was fixed under one and formatted under the other, from the text before its fixes.
+		// Clean converts the separators there and changes nothing elsewhere.
+		fileName := filepath.Clean(diagnostic.SourceFile.FileName())
+		if !writable.Everything && !writable.includes(fileName) {
 			withheld[fileName] = struct{}{}
 			continue
 		}

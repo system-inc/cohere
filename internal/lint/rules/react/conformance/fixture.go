@@ -203,6 +203,9 @@ func Load(root string) ([]Fixture, error) {
 		if err != nil {
 			return nil, err
 		}
+		// Slashed, because the stated divergences are keyed `new-mutability/error.x.js`, and on Windows
+		// Rel answers with `\`, so every lookup missed and a known divergence scored as a new one.
+		name = filepath.ToSlash(name)
 
 		sourceBytes, err := os.ReadFile(inputPath)
 		if err != nil {
