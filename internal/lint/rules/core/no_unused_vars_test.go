@@ -658,6 +658,8 @@ func TestNoUnusedVarsTreatsADecoratedClassOrParameterAsUsed(t *testing.T) {
 		{"a parameter declared only so its decorator records it", decorators + "export class Resolver {\n    tickets(@Argument('pagination') pagination: number): string { return 'ok'; }\n}\n", nil},
 		{"the same parameter without the decorator still reports", decorators + "export class Resolver {\n    tickets(pagination: number): string { return 'ok'; }\n}\n", []string{"pagination"}},
 		{"a decorated parameter does not exempt the undecorated one after it", decorators + "export class Resolver {\n    tickets(@Argument('pagination') pagination: number, extra: string): string { return 'ok'; }\n}\n", []string{"extra"}},
+		{"a decorated parameter shields the undecorated ones before it", decorators + "export class Resolver {\n    tickets(input: string, first: number, @Argument('context') context: object): string { return 'ok'; }\n}\n", nil},
+		{"under args all, the undecorated ones before it still report", decorators + "export class Resolver {\n    tickets(input: string, @Argument('context') context: object): string { return 'ok'; }\n}\n", []string{"input"}},
 		{"a decorated parameter is used even under args all", decorators + "export class Resolver {\n    tickets(@Argument('pagination') pagination: number, used: string): string { return used; }\n}\n", nil},
 	}
 	for _, testCase := range cases {

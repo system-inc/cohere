@@ -1726,6 +1726,12 @@ func isParameterBeforeAUsedOne(
 		if isStructurallyRequiredParameter(other.declaration) {
 			return true
 		}
+		// A later parameter carrying a decorator is used (see isExemptFromUnusedReport), so it shields
+		// the ones before it like any used parameter: `(_input, @Inject() context)` keeps `_input`,
+		// which holds the decorated parameter's position. Missing at 92059a9, found by api's Base pass.
+		if carriesDecorator(other.declaration) {
+			return true
+		}
 		// A later parameter with a default value shields the ones before it, as upstream's
 		// `isAfterLastUsedArg` does: it asks whether a later parameter has any reference, and a default
 		// is a write reference. So `(a, b, c = {})` with only `a` read reports `c`, as assigned and
