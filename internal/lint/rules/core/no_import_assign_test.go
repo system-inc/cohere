@@ -214,6 +214,14 @@ func TestNoImportAssignFiresOnCasesUpstreamOmits(t *testing.T) {
 		// like a correctly declined shadow, so a port using only the plain accessor stays silent
 		// here and looks right. Upstream's corpus has `({ bar: named9 } = foo)` but never the bare
 		// shorthand, so nothing above catches it.
+		// An import inside a `declare module` block binds there too, and the rule has always anchored
+		// it: the listener used to fire on every import declaration in the tree. Anchoring reads
+		// statements and module blocks rather than the whole tree (#9gcv6bf), and this pins that a
+		// module block is still read. A statement in an ambient block is a compile error, which is why
+		// neither corpus has one, and the rule reports the write all the same.
+		{"an import inside a declare module block",
+			"declare module 'x' { import named from 'mod'; named = 0; }", []string{"named"}},
+
 		{"a shorthand destructuring target on a named import",
 			"import {named} from 'mod'; ({named} = foo)", []string{"named"}},
 		{"a shorthand destructuring target on a default import",

@@ -93,85 +93,85 @@ var NoFuncAssign = rule.Rule{
 	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		reportWritesTo := func(node *ast.Node) {
-			// The engine hands every rule a nil checker when the program could not be built, and
-			// this rule can answer nothing without one.
-			if ctx.TypeChecker == nil {
-				return
-			}
-
-			// An anonymous function expression declares no name, so there is nothing to reassign.
-			// `var foo = function() { foo = bar; };` writes to the variable and upstream leaves it,
-			// and this is the line that keeps it clean. Arrow functions are not listened for at
-			// all, since they can never carry a name.
-			name := node.Name()
-			if name == nil || name.Kind != ast.KindIdentifier {
-				return
-			}
-
-			declaration := declarationAnchoredAt(ctx, name)
-			if declaration == nil {
-				return
-			}
-
-			// The whole file, not the function subtree. A write can sit before the declaration
-			// (`foo = bar; function foo() {}`), after it, or inside it, and hoisting makes all
-			// three the same binding. Anchoring the search on the file and the match on the symbol
-			// is what makes the position of the write irrelevant.
-			sourceFile := ast.GetSourceFileOfNode(node)
-			if sourceFile == nil {
-				return
-			}
-
-			var visit func(*ast.Node)
-			visit = func(current *ast.Node) {
-				if current == nil {
+		// Once per file, from the file node, rather than once per function. Each function used to walk
+		// the whole file for writes to its name, so a file of two hundred functions was walked two
+		// hundred times, which made this simple rule one of the tree's slowest (177ms on ahra). Every
+		// name is anchored first and the file is then walked once against all of them, which reports
+		// the same writes: an identifier resolves to one declaration, so it matches at most one anchor.
+		return rule.Listeners{
+			ast.KindSourceFile: func(node *ast.Node) {
+				// The engine hands every rule a nil checker when the program could not be built, and
+				// this rule can answer nothing without one.
+				if ctx.TypeChecker == nil {
 					return
 				}
-				// The function's own name needs no exclusion here. It is an identifier whose text
-				// matches and which resolves to this very declaration, so only the structural half
-				// declines it, and that is enough: the climb from a function name reaches the
-				// function itself, which is not an assignment.
-				//
-				// The text comparison is a pre-filter and not a discrimination. Symbol identity
-				// already implies it, since an identifier spelled differently cannot resolve to
-				// this declaration. It is here because it is far cheaper than a checker call and
-				// this walk visits every identifier in the file.
-				//
-				// A mutant removing it survived the whole suite, and that survival is the subsumed
-				// case rather than a blind spot: `resolvesToDeclaration` answers false for every
-				// identifier this line would have rejected, so no input can distinguish the two
-				// versions by what they report. The line stays for cost, not for correctness, and
-				// no fixture was added for it because a fixture asserting a performance guard
-				// asserts nothing.
-				if current.Kind == ast.KindIdentifier &&
-					current.Text() == name.Text() &&
-					reference.WritesToBinding(current) &&
-					resolvesToDeclaration(ctx, current, declaration) {
-					ctx.ReportNode(current, messageNoFuncAssign)
-				}
-				current.ForEachChild(func(child *ast.Node) bool {
-					visit(child)
-					return false
-				})
-			}
-			visit(sourceFile.AsNode())
-		}
-
-		// Both kinds, and they behave differently on purpose. A declaration's name is visible to
-		// the enclosing scope, so a write anywhere in the file can reach it. A function
-		// expression's name binds only inside its own body, so
-		// `var foo = function() {}; foo = bar;` writes to the variable and is clean while
-		// `var a = function foo() { foo = 123; };` writes to the function name and is not. Nothing
-		// here encodes that split: the checker resolves each write and the two cases fall out of
-		// the same code.
-		//
-		// Arrow functions are deliberately absent. They carry no name of their own, so
-		// `var foo = () => {}; foo = bar;` writes to the variable and upstream leaves it, which is
-		// what its `foo` pass case asserts.
-		return rule.Listeners{
-			ast.KindFunctionDeclaration: reportWritesTo,
-			ast.KindFunctionExpression:  reportWritesTo,
+				reportWritesToFunctionNames(ctx, node)
+			},
 		}
 	},
+}
+
+// reportWritesToFunctionNames reports every write to a name a function in the file declares.
+//
+// Both kinds of function anchor, and they behave differently on purpose. A declaration's name is
+// visible to the enclosing scope, so a write anywhere in the file can reach it. A function
+// expression's name binds only inside its own body, so `var foo = function() {}; foo = bar;` writes to
+// the variable and is clean while `var a = function foo() { foo = 123; };` writes to the function name
+// and is not. Nothing here encodes that split: the checker resolves each write and the two cases fall
+// out of the same code.
+//
+// Arrow functions are deliberately absent. They carry no name of their own, so
+// `var foo = () => {}; foo = bar;` writes to the variable and upstream leaves it, which is what its
+// `foo` pass case asserts. An anonymous function expression declares no name either, so
+// `var foo = function() { foo = bar; };` writes to the variable, and upstream leaves it too.
+//
+// The whole file is searched, not each function's subtree. A write can sit before the declaration
+// (`foo = bar; function foo() {}`), after it, or inside it, and hoisting makes all three the same
+// binding. Anchoring the search on the file and the match on the symbol is what makes the position of
+// the write irrelevant.
+func reportWritesToFunctionNames(ctx rule.Context, sourceFile *ast.Node) {
+	anchors := map[*ast.Node]bool{}
+	// The anchored names as text, so the second walk can decline nearly every identifier without a
+	// checker call. A pre-filter and not a discrimination: symbol identity already implies it, since an
+	// identifier spelled differently cannot resolve to one of these declarations.
+	anchoredNames := map[string]bool{}
+
+	var anchorFunctions func(*ast.Node)
+	anchorFunctions = func(current *ast.Node) {
+		if current.Kind == ast.KindFunctionDeclaration || current.Kind == ast.KindFunctionExpression {
+			if name := current.Name(); name != nil && name.Kind == ast.KindIdentifier {
+				if declaration := declarationAnchoredAt(ctx, name); declaration != nil {
+					anchors[declaration] = true
+					anchoredNames[name.Text()] = true
+				}
+			}
+		}
+		current.ForEachChild(func(child *ast.Node) bool {
+			anchorFunctions(child)
+			return false
+		})
+	}
+	anchorFunctions(sourceFile)
+	if len(anchors) == 0 {
+		return
+	}
+
+	var visit func(*ast.Node)
+	visit = func(current *ast.Node) {
+		// A function's own name needs no exclusion here. It is an identifier whose text matches and
+		// which resolves to its declaration, so only the structural half declines it, and that is
+		// enough: the climb from a function name reaches the function itself, which is not an
+		// assignment. The text test runs first because it is far cheaper than either half.
+		if current.Kind == ast.KindIdentifier &&
+			anchoredNames[current.Text()] &&
+			reference.WritesToBinding(current) &&
+			anchors[resolvedDeclarationOf(ctx, current)] {
+			ctx.ReportNode(current, messageNoFuncAssign)
+		}
+		current.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return false
+		})
+	}
+	visit(sourceFile)
 }

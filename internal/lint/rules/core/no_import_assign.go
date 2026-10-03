@@ -108,8 +108,13 @@ var NoImportAssign = rule.Rule{
 	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
+		// Once per file, from the file node, rather than once per import declaration. Each declaration
+		// used to walk the whole file for writes to its names, and nearly every file has several, so
+		// the file was walked once per import (198ms on ahra). Every import is anchored first and the
+		// file is then walked once against all of them, which reports the same writes: an identifier
+		// resolves to one declaration, so it matches at most one anchor.
 		return rule.Listeners{
-			ast.KindImportDeclaration: func(node *ast.Node) {
+			ast.KindSourceFile: func(node *ast.Node) {
 				// The engine hands every rule a nil checker when the program could not be built, and
 				// this rule can answer nothing without one. A mutant removing this survives the
 				// fixtures, because typescript-go tolerates a nil receiver on this path and returns no
@@ -118,115 +123,124 @@ var NoImportAssign = rule.Rule{
 				if ctx.TypeChecker == nil {
 					return
 				}
-
-				bindings := imports.BindingsOf(node)
-
-				// Anchor each local name on the declaration its own symbol reports, so both sides of
-				// the later comparison are answers to the same question. Asking the AST for one side
-				// and the checker for the other would compare two things that happen to agree today.
-				//
-				// The namespace set is tracked separately because the member and mutation-function
-				// shapes apply only to `import * as`. A default or named import is an ordinary
-				// value and mutating it is upstream's first ten clean cases.
-				anchors := map[*ast.Node]bool{}
-				namespaceAnchors := map[*ast.Node]bool{}
-				// The local names, kept as text so the file walk below can decline the overwhelming
-				// majority of identifiers without a checker call. This rule anchors on import
-				// declarations, which nearly every file in a real tree has, so the walk runs almost
-				// everywhere and its per-identifier cost is the rule's cost. The comparison is a
-				// pre-filter and not a discrimination: symbol identity already implies it, since an
-				// identifier spelled differently cannot resolve to one of these declarations.
-				anchoredNames := map[string]bool{}
-				anchor := func(name *ast.Node, isNamespace bool) {
-					if name == nil {
-						return
-					}
-					declaration := declarationAnchoredAt(ctx, name)
-					if declaration == nil {
-						return
-					}
-					anchors[declaration] = true
-					anchoredNames[name.Text()] = true
-					if isNamespace {
-						namespaceAnchors[declaration] = true
-					}
-				}
-
-				anchor(bindings.Default, false)
-				// `import { a as b }` binds `b`, and `Name()` on the specifier is the local name
-				// rather than the imported one. Upstream's `named12 as foo` case proves it matters:
-				// `foo = 0` reports and `named12 = 0` does not, because `named12` binds nothing.
-				for _, specifier := range bindings.Named {
-					anchor(specifier.Name(), false)
-				}
-				if bindings.Namespace != nil {
-					anchor(bindings.Namespace.Name(), true)
-				}
-
-				if len(anchors) == 0 {
-					// `import 'mod'` and `import {} from 'mod'`, both clean upstream and both reaching
-					// here with nothing to compare against. A mutant disabling this survives, and
-					// correctly so: with no anchors the walk below matches nothing either, since every
-					// name lookup and every identity lookup answers false. It stays because it skips a
-					// whole-file walk, and this rule anchors on import declarations, so a side-effect
-					// import in a large file would otherwise pay for a walk that cannot report.
-					return
-				}
-
-				sourceFile := ast.GetSourceFileOfNode(node)
-				if sourceFile == nil {
-					return
-				}
-
-				var visit func(*ast.Node)
-				visit = func(current *ast.Node) {
-					if current == nil {
-						return
-					}
-					if current.Kind == ast.KindIdentifier && anchoredNames[current.Text()] {
-						// The structural question first, and the checker only for an identifier that
-						// already sits somewhere a write happens. Both orders report the same findings,
-						// and the order matters for what the rule costs: this rule anchors on import
-						// declarations, so its walk runs in nearly every file in a real tree, while the
-						// structural tests are pure AST and the checker call takes a per-file lock.
-						//
-						// `blame` is the node to report, which differs by shape: a rebinding points at
-						// the identifier and a namespace property write points at the whole member
-						// expression, both matching upstream's snapshot.
-						var blame *ast.Node
-						needsNamespace := false
-						switch {
-						case reference.WritesToBinding(current):
-							blame = current
-						default:
-							// The namespace-only shapes, checked for any anchored name and then gated on
-							// the binding actually being a namespace import. `import mod from 'mod';
-							// mod.prop = 0` reaches here and is upstream's first clean case.
-							needsNamespace = true
-							if member := writesThroughMemberExpression(current); member != nil {
-								blame = member
-							} else if isArgumentOfWellKnownMutationFunction(ctx, current) {
-								blame = current
-							}
-						}
-
-						if blame != nil {
-							declaration := resolvedDeclarationOf(ctx, current)
-							if declaration != nil && anchors[declaration] &&
-								(!needsNamespace || namespaceAnchors[declaration]) {
-								ctx.ReportNode(blame, messageNoImportAssign)
-							}
-						}
-					}
-					current.ForEachChild(func(child *ast.Node) bool {
-						visit(child)
-						return false
-					})
-				}
-				visit(sourceFile.AsNode())
+				reportWritesToImports(ctx, node)
 			},
 		}
 	},
+}
+
+// reportWritesToImports reports every write to a binding an import declaration in the file creates.
+//
+// Every import declaration anchors, including one inside a `declare module` block, which can hold its
+// own.
+func reportWritesToImports(ctx rule.Context, sourceFile *ast.Node) {
+	// Anchor each local name on the declaration its own symbol reports, so both sides of the later
+	// comparison are answers to the same question. Asking the AST for one side and the checker for
+	// the other would compare two things that happen to agree today.
+	//
+	// The namespace set is tracked separately because the member and mutation-function shapes apply
+	// only to `import * as`. A default or named import is an ordinary value and mutating it is
+	// upstream's first ten clean cases.
+	anchors := map[*ast.Node]bool{}
+	namespaceAnchors := map[*ast.Node]bool{}
+	// The local names, kept as text so the file walk below can decline the overwhelming majority of
+	// identifiers without a checker call. The comparison is a pre-filter and not a discrimination:
+	// symbol identity already implies it, since an identifier spelled differently cannot resolve to one
+	// of these declarations.
+	anchoredNames := map[string]bool{}
+	anchor := func(name *ast.Node, isNamespace bool) {
+		if name == nil {
+			return
+		}
+		declaration := declarationAnchoredAt(ctx, name)
+		if declaration == nil {
+			return
+		}
+		anchors[declaration] = true
+		anchoredNames[name.Text()] = true
+		if isNamespace {
+			namespaceAnchors[declaration] = true
+		}
+	}
+
+	// An import declaration sits only among a file's statements or a module declaration's, so those are
+	// the only places visited: a whole-tree walk would read every expression to find none there.
+	var anchorImports func(*ast.Node)
+	anchorImports = func(current *ast.Node) {
+		switch current.Kind {
+		case ast.KindImportDeclaration:
+			bindings := imports.BindingsOf(current)
+			anchor(bindings.Default, false)
+			// `import { a as b }` binds `b`, and `Name()` on the specifier is the local name rather
+			// than the imported one. Upstream's `named12 as foo` case proves it matters: `foo = 0`
+			// reports and `named12 = 0` does not, because `named12` binds nothing.
+			for _, specifier := range bindings.Named {
+				anchor(specifier.Name(), false)
+			}
+			if bindings.Namespace != nil {
+				anchor(bindings.Namespace.Name(), true)
+			}
+		case ast.KindSourceFile, ast.KindModuleDeclaration, ast.KindModuleBlock:
+			current.ForEachChild(func(child *ast.Node) bool {
+				anchorImports(child)
+				return false
+			})
+		}
+	}
+	anchorImports(sourceFile)
+
+	// `import 'mod'` and `import {} from 'mod'`, both clean upstream, anchor nothing, and neither does
+	// a file with no imports. With no anchors the walk below can match nothing, so it is skipped.
+	if len(anchors) == 0 {
+		return
+	}
+
+	var visit func(*ast.Node)
+	visit = func(current *ast.Node) {
+		if current == nil {
+			return
+		}
+		if current.Kind == ast.KindIdentifier && anchoredNames[current.Text()] {
+			// The structural question first, and the checker only for an identifier that
+			// already sits somewhere a write happens. Both orders report the same findings,
+			// and the order matters for what the rule costs: this rule anchors on import
+			// declarations, so its walk runs in nearly every file in a real tree, while the
+			// structural tests are pure AST and the checker call takes a per-file lock.
+			//
+			// `blame` is the node to report, which differs by shape: a rebinding points at
+			// the identifier and a namespace property write points at the whole member
+			// expression, both matching upstream's snapshot.
+			var blame *ast.Node
+			needsNamespace := false
+			switch {
+			case reference.WritesToBinding(current):
+				blame = current
+			default:
+				// The namespace-only shapes, checked for any anchored name and then gated on
+				// the binding actually being a namespace import. `import mod from 'mod';
+				// mod.prop = 0` reaches here and is upstream's first clean case.
+				needsNamespace = true
+				if member := writesThroughMemberExpression(current); member != nil {
+					blame = member
+				} else if isArgumentOfWellKnownMutationFunction(ctx, current) {
+					blame = current
+				}
+			}
+
+			if blame != nil {
+				declaration := resolvedDeclarationOf(ctx, current)
+				if declaration != nil && anchors[declaration] &&
+					(!needsNamespace || namespaceAnchors[declaration]) {
+					ctx.ReportNode(blame, messageNoImportAssign)
+				}
+			}
+		}
+		current.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return false
+		})
+	}
+	visit(sourceFile)
 }
 
 // resolvedDeclarationOf reads the declaration node an identifier occurrence binds to.
