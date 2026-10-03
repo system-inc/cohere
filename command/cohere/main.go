@@ -382,6 +382,17 @@ func run() error {
 	// A test instrument: every file walked on a checker other than its own. See program.walkQueue.
 	graph.WalkOnForeignCheckers = os.Getenv("COHERE_TEST_FOREIGN_CHECKERS") != ""
 
+	// The checkers are created now, alongside the work before the walk, rather than by the walk's first
+	// lookup: 74 to 95ms on ahra that otherwise sits on the path to the first worker (#zqsdzbq, lever B).
+	// Upstream's pool creates them once, whoever asks first, so the walk and the types check just find
+	// them. Any phase that runs reads them.
+	if projectFiles := graph.ProjectFiles(); len(projectFiles) > 0 && (runFix || runTypes || runLint) {
+		go func() {
+			_, release := graph.Program.GetTypeCheckerForFile(ctx, projectFiles[0])
+			release()
+		}()
+	}
+
 	// The build saw every file the compiler read. The lint config is read by the command, not the
 	// compiler, so it is named here, with every file it extends: a base edited alone changes what runs.
 	declareRunCacheInputs(append(configuration.SourcesOnDisk(lintConfigSources(location.LintConfigFileName)), location.ConfigFileName)...)
