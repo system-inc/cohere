@@ -212,6 +212,10 @@ type reactivity struct {
 	// exempted from being marked even when they come out of a reactive hook call.
 	stable map[IdentifierId]bool
 
+	// notStable holds values the checker has already said are not stable, so a later round does
+	// not ask again. Made on first use, so a state built by hand needs no entry for it.
+	notStable map[IdentifierId]bool
+
 	// useRefResults holds every value that came from a direct `useRef` call in this function,
 	// including the bindings and loads it flows into. See `isStableType`.
 	useRefResults map[IdentifierId]bool
@@ -331,7 +335,6 @@ func (r *reactivity) visitBlock(block *BasicBlock, controlled map[BlockId]bool) 
 		}
 		r.recordHookResult(instruction)
 		r.recordStablePositions(instruction)
-		r.recordStable(instruction)
 
 		hasReactiveInput := false
 		EachPlace(instruction.Value, func(place Place, role PlaceRole) {
@@ -366,7 +369,7 @@ func (r *reactivity) visitBlock(block *BasicBlock, controlled map[BlockId]bool) 
 			eachInstructionLValue(instruction, func(place Place) {
 				// The stable exemption is what keeps a `useState` setter non-reactive even though
 				// it is destructured out of a hook call this pass has just marked reactive.
-				if r.stable[place.Identifier] {
+				if r.isStable(place.Identifier) {
 					return
 				}
 				r.mark(place.Identifier)
@@ -400,7 +403,7 @@ func (r *reactivity) mark(id IdentifierId) {
 	r.changed = true
 }
 
-// recordStable notes values whose identity React guarantees is stable across renders.
+// The stable exemption covers values whose identity React guarantees is stable across renders.
 //
 // This is upstream's `StableSidemap`, reduced to what the checker can answer. Upstream tracks two
 // kinds: a stable value itself (a setter, a ref object) and a CONTAINER of one (the tuple
@@ -493,15 +496,29 @@ func (r *reactivity) recordStablePositions(instruction *Instruction) {
 	}
 }
 
-func (r *reactivity) recordStable(instruction *Instruction) {
-	// Every value the instruction binds is asked of the checker directly. A destructured setter is
-	// bound by a Destructure whose pattern places are lvalues, so this reaches them without the
-	// pattern being walked here a second time.
-	eachInstructionLValue(instruction, func(place Place) {
-		if r.isStableType(place.Identifier) {
-			r.stable[place.Identifier] = true
-		}
-	})
+// isStable reports whether a value is exempt from being marked reactive.
+//
+// Asked only where the answer is read: when an instruction with a reactive input is about to mark
+// what it binds. Every value an instruction binds was asked of the checker on every round before,
+// and the exemption is read nowhere else, so a value with no reactive input never needed the
+// answer (#1pmwkmv change 4). A destructured setter is bound by a Destructure whose pattern places
+// are lvalues, so this reaches them without the pattern being walked a second time.
+func (r *reactivity) isStable(id IdentifierId) bool {
+	if r.stable[id] {
+		return true
+	}
+	if r.notStable[id] {
+		return false
+	}
+	if r.isStableType(id) {
+		r.stable[id] = true
+		return true
+	}
+	if r.notStable == nil {
+		r.notStable = map[IdentifierId]bool{}
+	}
+	r.notStable[id] = true
+	return false
 }
 
 // isStableType asks the checker whether a value is one React guarantees is identity-stable.
