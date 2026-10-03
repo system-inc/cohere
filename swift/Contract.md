@@ -267,6 +267,13 @@ makes the run incomplete. The types phase reads each file's serialized diagnosti
 the build's stdout, because an incremental build does not reprint warnings in files it did not
 recompile. So a file with no `.dia` is a file the engine cannot vouch for.
 
+`build` says in words how the records were had: a build into the scratch, the last build's records
+reused, or edited files checked in process. A run whose builds all succeeded may end it with what the
+scratch prune removed, as `; the scratch prune removed 6.9 MB: 226 index records no unit names`. The
+prune runs after such a build, at most once an hour per scratch. It removes the index store's records
+no unit names and the scratch of a package that is no longer local, each unused for an hour, and never
+touches a build in flight or the build descriptions, whose cache the build system bounds itself.
+
 **Only compiler errors cut lint off.** In TypeScript every diagnostic the checker reports is an
 error, so "any type diagnostic bails" and "any type error bails" were the same rule. In Swift they
 are not. A warning (`variable was never mutated`) is a finding and fails the run, but the code

@@ -119,6 +119,9 @@ struct TypesPhase {
         var targetDirectories: [(String, URL)] = []
         for build in builds {
             let result = try runner.run("swift", arguments(for: build, buildSystem: buildSystem), in: build.root)
+            if build.scratchPath != scratchPath {
+                ScratchPrune.markUsed(build.scratchPath)
+            }
             if !result.succeeded {
                 failedBuilds.append(result)
             }
@@ -142,12 +145,25 @@ struct TypesPhase {
         } else {
             BuildInputSnapshot.forget(scratchPath: scratchPath)
         }
-        return try read(
-            targetDirectories: targetDirectories,
-            failedBuilds: failedBuilds,
-            start: start,
-            build: "swift build --build-tests of \(builds.count) packages, scratch \(scratchPath.path)"
-        )
+        var build = "swift build --build-tests of \(builds.count) packages, scratch \(scratchPath.path)"
+        /* Only after every build succeeded, so no build of this run is still writing into the scratch. */
+        if failedBuilds.isEmpty {
+            let pruned = pruneScratch()
+            if !pruned.sentence.isEmpty {
+                build += "; \(pruned.sentence)"
+            }
+        }
+        return try read(targetDirectories: targetDirectories, failedBuilds: failedBuilds, start: start, build: build)
+    }
+
+    /* The scratch prune over every scratch this run built into (`ScratchPrune`). A store that cannot be opened is left as it is. */
+    private func pruneScratch() -> ScratchPrune.Outcome {
+        guard let library = try? IndexStore.toolchainLibraryPath(runner: runner) else { return ScratchPrune.Outcome() }
+        let stores = builds.compactMap { build -> (store: IndexStore, storePath: URL)? in
+            let storePath = IndexStore.storePath(scratchPath: build.scratchPath)
+            return (try? IndexStore(libraryPath: library, storePath: storePath)).map { ($0, storePath) }
+        }
+        return ScratchPrune.run(stores: stores, scratchPath: scratchPath, listedLocalPackages: Set(package.localPackages.map(\.root.lastPathComponent)))
     }
 
     /* The words the types record uses for a run that checked its edited files in process, so a reader can tell it from a build. */
