@@ -462,6 +462,11 @@ func DumpCacheTable(out io.Writer, path string, table *CacheTable, identity Cach
 		fmt.Fprintf(out, "  %s: recorded %s, exit %d, key %.12s, %d inputs (%d files, %d directories, %d absent), %d bytes of output, %d of errors\n",
 			name, time.Unix(0, run.RecordedUnixNanoseconds).Format(time.DateTime), run.ExitCode, run.Key,
 			len(run.Inputs), files, directories, absent, len(run.Output), len(run.Errors))
+		if changed := run.ChangedInput(); changed != nil {
+			fmt.Fprintf(out, "    now: would not replay, %v\n", changed)
+		} else {
+			fmt.Fprintln(out, "    now: every input as recorded, so it replays if the binary, flags and directory match")
+		}
 	}
 
 	fmt.Fprintf(out, "signatures: %d files\n", len(table.Signatures))

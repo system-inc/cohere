@@ -195,47 +195,38 @@ func RecordRunCache(key string, files []string, extraDirectories []string, absen
 			present = append(present, file)
 		}
 	}
+	inputs, err := signaturesOf(present)
+	if err != nil {
+		return nil, err
+	}
+
+	// The directory holding each file, so a file added beside one the run read is noticed. Only a file's:
+	// a directory the run listed is an input by its own signature, whose change time and inode already catch
+	// it being replaced, so its parent adds nothing. Recording the parent of the project's own directory made
+	// every replay depend on whatever else lives beside the project, ~/Projects on a developer's machine and
+	// the benchmark's work directory, where something is created all day (#r9jevk9).
 	directorySet := map[string]struct{}{}
-	for _, file := range files {
-		directorySet[filepath.Dir(file)] = struct{}{}
+	for _, input := range inputs {
+		if !input.Directory {
+			directorySet[filepath.Dir(input.Path)] = struct{}{}
+		}
 	}
 	for _, directory := range extraDirectories {
 		directorySet[directory] = struct{}{}
 	}
 	directories := make([]string, 0, len(directorySet))
 	for directory := range directorySet {
-		directories = append(directories, directory)
-	}
-	sort.Strings(directories)
-	for _, directory := range directories {
 		if !seen[directory] {
 			seen[directory] = true
-			present = append(present, directory)
+			directories = append(directories, directory)
 		}
 	}
-
-	// Statted in parallel, as Check does, each into its own slot, so the order and the first error are the
-	// ones a serial pass would give. About 17,000 stats on ahra: 64 to 79ms one at a time, under 20ms across
-	// workers (#a66sfmh), on the path between the report printing and the process exiting.
-	cache.Inputs = make([]RunCacheInput, len(present))
-	failures := make([]error, len(present))
-	workers := min(runtime.NumCPU(), 8)
-	var group sync.WaitGroup
-	for worker := range workers {
-		group.Add(1)
-		go func() {
-			defer group.Done()
-			for index := worker; index < len(present); index += workers {
-				cache.Inputs[index], failures[index] = signatureOf(present[index])
-			}
-		}()
+	sort.Strings(directories)
+	directoryInputs, err := signaturesOf(directories)
+	if err != nil {
+		return nil, err
 	}
-	group.Wait()
-	for _, err := range failures {
-		if err != nil {
-			return nil, err
-		}
-	}
+	cache.Inputs = append(inputs, directoryInputs...)
 	if !readSince.IsZero() {
 		// Files, and the directories holding them, where a file added mid-run beside the ones read would be
 		// missed. A directory only probed on the way to a node_modules or a package.json is left out: such
@@ -268,6 +259,32 @@ func RecordRunCache(key string, files []string, extraDirectories []string, absen
 	}
 
 	return cache, nil
+}
+
+// signaturesOf stats every path in parallel, as Check does, each into its own slot, so the order and the
+// first error are the ones a serial pass would give. About 17,000 stats on ahra: 64 to 79ms one at a time,
+// under 20ms across workers (#a66sfmh), on the path between the report printing and the process exiting.
+func signaturesOf(paths []string) ([]RunCacheInput, error) {
+	inputs := make([]RunCacheInput, len(paths))
+	failures := make([]error, len(paths))
+	workers := min(runtime.NumCPU(), 8)
+	var group sync.WaitGroup
+	for worker := range workers {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			for index := worker; index < len(paths); index += workers {
+				inputs[index], failures[index] = signatureOf(paths[index])
+			}
+		}()
+	}
+	group.Wait()
+	for _, err := range failures {
+		if err != nil {
+			return nil, err
+		}
+	}
+	return inputs, nil
 }
 
 // signatureOf stats one input. A path that vanished between the run and the record is an error rather
@@ -310,7 +327,13 @@ func (c *RunCache) Check(key string) error {
 		// an empty list is a manifest that was written wrong, not a run that read nothing.
 		return fmt.Errorf("%w: the manifest records no inputs", ErrRunCacheMiss)
 	}
+	return c.ChangedInput()
+}
 
+// ChangedInput reports the first recorded input whose signature no longer matches the disk, nil when every
+// one still does. It is Check without the key, so --cache-dump can say which input keeps a run from
+// replaying rather than leaving a miss silent (#r9jevk9).
+func (c *RunCache) ChangedInput() error {
 	workers := min(runtime.NumCPU(), 8)
 	var mismatch error
 	var once sync.Once
