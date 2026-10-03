@@ -12,7 +12,8 @@
 # builds. Everything else about the build is platform-independent.
 #
 # Proofs follow the build, and none of them builds anything. `swift-on-intel` runs the x64 Mac package
-# on an Intel Mac and `windows` runs the Windows package on Windows, the proofs the release runner
+# on an Intel Mac, `windows` runs the Windows package on Windows, and `clean-machine` installs the
+# macOS and Linux packages on fresh runners with no Go and no checkout: the proofs the release runner
 # cannot give. `publish` runs only after all of them, so the registry never receives a package a proof
 # refused, and the VS Code extension publishes after that.
 name: release
@@ -317,9 +318,61 @@ jobs:
                   go test ./internal/replace/ ./internal/format/formatfiles/ ./internal/types/program/ -count=1 \
                       -run 'TestFileReplacesAFileHeldOpenBriefly|TestIgnorePatternsCoverNestedPaths|TestASameSizeEditUnderARestoredModificationTimeIsAMiss'
 
+    # A clean machine, by construction: a fresh runner per platform, installing the packed packages
+    # into an empty project the way a user's npm install does, with no checkout of cohere and no Go.
+    # The runner images ship Go, so a `go` that fails loudly goes first on PATH: if cohere ever ran it,
+    # the check fails naming it, rather than passing on a toolchain no user has. The project has known
+    # findings, a type error, unformatted files and a CRLF file, and every exit code and message is
+    # checked (check-platform-package.sh). macOS and Linux here; Windows is the job above.
+    clean-machine:
+        needs: release
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - runner: macos-26
+                      platform: darwin-arm64
+                    - runner: ubuntu-latest
+                      platform: linux-x64
+                    - runner: ubuntu-24.04-arm
+                      platform: linux-arm64
+        runs-on: ${{ matrix.runner }}
+        timeout-minutes: 20
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  # The scripts and nothing else: what is under test is the install, not the tree.
+                  sparse-checkout: .github/scripts
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+
+            - uses: actions/download-artifact@v4
+              with:
+                  name: cohere-${{ inputs.version }}-tar
+
+            - name: Install the packages into an empty project and check it, with no Go
+              run: |
+                  tar -xf cohere-dist.tar
+
+                  nogo="$RUNNER_TEMP/no-go"
+                  mkdir -p "$nogo"
+                  printf '#!/bin/sh\necho "cohere ran go ($*), which no user'"'"'s machine has" >&2\nexit 97\n' > "$nogo/go"
+                  chmod 755 "$nogo/go"
+                  export PATH="$nogo:$PATH"
+                  unset GOROOT GOPATH GOFLAGS
+                  if go version 2> /dev/null; then
+                      echo "a working go is still first on PATH, so this would not prove cohere needs none"
+                      exit 1
+                  fi
+
+                  bash .github/scripts/check-platform-package.sh "${{ matrix.platform }}"
+
     publish:
         # After every proof, so a package one of them refused is never on the registry.
-        needs: [release, swift-on-intel, windows]
+        needs: [release, swift-on-intel, windows, clean-machine]
         if: ${{ inputs.publish }}
         runs-on: ubuntu-latest
         timeout-minutes: 15
@@ -340,14 +393,18 @@ jobs:
                   tar -xf cohere-dist.tar
                   echo "//registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN" > ~/.npmrc
 
-                  for package in dist/*/; do
+                  # Every path starts with ./ because npm reads `dist/cohere` as the GitHub repository
+                  # dist/cohere. Measured in a dry run: the six platform packages published, and then the
+                  # dispatcher, the one package a user installs, failed on a git clone, which would have
+                  # left a version half on the registry.
+                  for package in ./dist/*/; do
                       if [ "$(basename "$package")" = "cohere" ]; then
                           continue
                       fi
                       npm publish "$package" --access public
                   done
 
-                  npm publish dist/cohere --access public
+                  npm publish ./dist/cohere --access public
 
     publish-vscode-extension:
         # After the cohere packages are on npm, so the extension never reaches a registry before the

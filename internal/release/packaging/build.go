@@ -62,6 +62,12 @@ type Options struct {
 	// have, and an npm install does not set the quarantine attribute that Gatekeeper checks. What
 	// is not supported is an unsigned release that looks signed, so the state is always reported.
 	Signing Signing
+
+	// SwiftScratchDirectory is where SwiftPM builds the Swift engine. Empty means the user cache
+	// directory's cohere/release-swift-build, so a second release on one machine builds incrementally.
+	// Never inside OutputDirectory: the scratch is over a gigabyte, and everything in the output is
+	// packed into the artifact every proof downloads.
+	SwiftScratchDirectory string
 }
 
 // Result reports what a release build produced.
@@ -102,6 +108,12 @@ func Build(options Options) (Result, error) {
 	if err := requireReleaseVersion(options.Version); err != nil {
 		return Result{}, err
 	}
+
+	scratch, err := swiftScratchDirectory(options)
+	if err != nil {
+		return Result{}, err
+	}
+	options.SwiftScratchDirectory = scratch
 
 	// Read before the minimum is checked, though neither depends on the other, because a fixture can
 	// pin a compiler and cannot contain MinimumReleaseCommit. In the other order no test could reach
@@ -241,7 +253,7 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 		if err != nil {
 			return StagedPackage{}, err
 		}
-		if err := buildSwiftEngine(options.ModuleDirectory, filepath.Join(options.OutputDirectory, ".swift-build"), target, enginePath, engineCommit); err != nil {
+		if err := buildSwiftEngine(options.ModuleDirectory, options.SwiftScratchDirectory, target, enginePath, engineCommit); err != nil {
 			return StagedPackage{}, err
 		}
 		executables = append(executables, enginePath)
@@ -321,6 +333,32 @@ func buildDispatcherPackage(options Options) (StagedPackage, error) {
 	}
 
 	return StagedPackage{Name: DispatcherPackageName, Directory: directory}, nil
+}
+
+// swiftScratchDirectory resolves where SwiftPM builds the engine, and refuses a directory inside the
+// output, which the release packs and uploads whole: 1.3 GB of scratch beside 200 MB of packages, measured
+// on a full staging when the scratch was `<output>/.swift-build`.
+func swiftScratchDirectory(options Options) (string, error) {
+	scratch := options.SwiftScratchDirectory
+	if scratch == "" {
+		cache, err := os.UserCacheDir()
+		if err != nil {
+			return "", fmt.Errorf("finding a cache directory for the Swift engine's build: %w", err)
+		}
+		scratch = filepath.Join(cache, "cohere", "release-swift-build")
+	}
+	scratch, err := filepath.Abs(scratch)
+	if err != nil {
+		return "", err
+	}
+	output, err := filepath.Abs(options.OutputDirectory)
+	if err != nil {
+		return "", err
+	}
+	if relative, err := filepath.Rel(output, scratch); err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("the Swift engine's build directory %s is inside the output %s, which is packed and uploaded whole", scratch, output)
+	}
+	return scratch, nil
 }
 
 // SchemaDirectoryName is where the settings schemas sit, in the module and in the dispatcher package

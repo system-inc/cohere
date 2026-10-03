@@ -54,8 +54,10 @@ const FullCommandName = "cohere"
 // for it.
 const launcherRelativePath = "bin/" + FullCommandName
 
-// RepositoryURL is where the source lives, recorded in every published package.
-const RepositoryURL = "https://github.com/system-inc/cohere"
+// RepositoryURL is where the source lives, recorded in every published package. In npm's own form,
+// git+https with .git, because npm rewrites any other spelling at publish time and warns about it on
+// every package, which buries the warnings that matter.
+const RepositoryURL = "git+https://github.com/system-inc/cohere.git"
 
 // PlatformManifest is the package.json for one platform's binary package.
 //

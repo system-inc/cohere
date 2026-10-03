@@ -35,6 +35,7 @@ func run() error {
 	only := flag.String("only", "", "build just these platforms, comma separated, as os/arch")
 	signingIdentity := flag.String("signing-identity", "", "the macOS codesigning identity; unsigned when empty")
 	keychainProfile := flag.String("notary-profile", "", "the notarytool keychain profile; not notarized when empty")
+	swiftScratch := flag.String("swift-scratch", "", "where SwiftPM builds the Swift engine; the user cache directory when empty, never inside --output")
 	flag.Parse()
 
 	if *version == "" {
@@ -67,6 +68,8 @@ func run() error {
 		Version:         *version,
 		Targets:         targets,
 		Signing:         signing,
+
+		SwiftScratchDirectory: *swiftScratch,
 	})
 	if err != nil {
 		return err
