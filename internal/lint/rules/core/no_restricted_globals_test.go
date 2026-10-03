@@ -566,3 +566,53 @@ func TestNoRestrictedGlobalsJudgesOnlyValueReferences(t *testing.T) {
 		})
 	}
 }
+
+// TestNoRestrictedGlobalsSkipsAnotherModulesExportName pins the specifier half (#wajqfd1).
+//
+// `export { print as printGraphQlNode } from 'graphql'` in Base's GraphQlLibrary.ts:53 reported once
+// `print` joined the confusing-browser-globals list. The `print` there names graphql's export, not a
+// binding in this file, and it resolves to graphql's declaration file, so the shadow check saw a
+// name not declared in source. An import specifier's imported name is the same shape.
+//
+// Every row was measured on ESLint 10 with @typescript-eslint/parser restricting `print`: the
+// export-from and import rows are clean, and the firing rows report at the `print` they name. A
+// local `export { print }` with no `from` exports whatever `print` resolves to here, which is the
+// global, so it is a read and reports.
+func TestNoRestrictedGlobalsSkipsAnotherModulesExportName(t *testing.T) {
+	t.Parallel()
+
+	const graphql = "export declare function print(): string;\nexport declare const other: number;\n"
+	run := func(t *testing.T, source string) rule_testing.Result {
+		t.Helper()
+		return rule_testing.RunTypedFilesWithOptions(t, NoRestrictedGlobals, map[string]string{
+			"graphql.d.ts": graphql,
+			"a.ts":         source,
+		}, "a.ts", decodeNoRestrictedGlobalsOptionsForTest(t, `["print"]`))
+	}
+
+	silent := []struct{ name, source string }{
+		{"GraphQlLibrary.ts:53, an aliased export-from", "export { print as printGraphQlNode } from './graphql';\n"},
+		{"a plain export-from", "export { print } from './graphql';\n"},
+		{"an export-from renamed to the restricted name", "export { other as print } from './graphql';\n"},
+		{"an aliased import", "import { print as printNode } from './graphql';\nexport const printed = printNode();\n"},
+		{"a local export renamed to the restricted name", "const other = 1;\nexport { other as print };\n"},
+		{"a global exported under the restricted name", "export { undeclaredThing as print };\n"},
+	}
+	for _, testCase := range silent {
+		t.Run(testCase.name, func(t *testing.T) {
+			rule_testing.ExpectClean(t, run(t, testCase.source))
+		})
+	}
+
+	firing := []struct{ name, source string }{
+		{"a bare call", "print();\nexport {};\n"},
+		{"a local export of the global", "export { print };\n"},
+		{"a local export of the global, aliased", "export { print as printPage };\n"},
+		{"a local export of the global under its own name, reported once", "export { print as print };\n"},
+	}
+	for _, testCase := range firing {
+		t.Run(testCase.name, func(t *testing.T) {
+			rule_testing.ExpectFindings(t, run(t, testCase.source), "defaultMessage")
+		})
+	}
+}

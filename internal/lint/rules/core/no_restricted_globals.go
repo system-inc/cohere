@@ -461,6 +461,17 @@ func isNoRestrictedGlobalsValueReference(node *ast.Node) bool {
 	// The default, `{ label = name }`, is a real read and is still judged.
 	case ast.KindBindingElement:
 		return parent.AsBindingElement().PropertyName != node
+
+	// An import specifier's imported name, and any name in an export-from specifier, names another
+	// module's export rather than a binding in this file. It resolves to that module's declaration,
+	// which is a declaration file for any package, so the shadow check saw a name not declared in
+	// source: Base's `export { print as printGraphQlNode } from 'graphql'` reported once `print` was
+	// restricted (#wajqfd1). The local name an import introduces is declared here, so declining it
+	// too changes nothing.
+	case ast.KindImportSpecifier:
+		return false
+	case ast.KindExportSpecifier:
+		return noRestrictedGlobalsExportSpecifierReads(parent, node)
 	}
 	return true
 
@@ -471,8 +482,9 @@ func isNoRestrictedGlobalsValueReference(node *ast.Node) bool {
 	// import or export specifier, a type parameter. One declined a PROPERTY KEY: an object
 	// property, a class field, a method, either accessor, a signature member, an enum member.
 	// Every shape either arm could catch resolves to a symbol whose declaration is in this source
-	// file, so `identifierIsShadowed` already declines it. A destructuring key is the exception, and
-	// has its own arm above: it resolves to the destructured type's property, wherever that lives.
+	// file, so `identifierIsShadowed` already declines it. Two shapes are the exception, and each
+	// has its own arm above: a destructuring key resolves to the destructured type's property, and an
+	// imported or export-from name to the other module's export, wherever either lives.
 	//
 	// Measured rather than argued, because a single-site mutation structurally cannot see this.
 	// Neutralising either arm alone SURVIVED, and so did inverting the first, which reads as a
@@ -488,12 +500,23 @@ func isNoRestrictedGlobalsValueReference(node *ast.Node) bool {
 // declared right here in source, so the global read looked shadowed and went unreported: the exact
 // shape of WisdomGateItems.ts:304's bug, written as an object instead of a template. The value
 // symbol is the binding the shorthand reads; `no-global-assign` asks it for the same reason.
+//
+// A local export specifier is the same shape: `export { print }` reads `print`, and the plain accessor
+// answers with the specifier's own export symbol, declared right here. Its local target is the binding
+// it exports, which for an undeclared name is nothing, so the global read reports, as ESLint does.
 func noRestrictedGlobalsIsShadowed(ctx rule.Context, node *ast.Node) bool {
 	parent := node.Parent
-	if parent == nil || parent.Kind != ast.KindShorthandPropertyAssignment || parent.Name() != node {
-		return identifierIsShadowed(ctx, node)
+	switch {
+	case parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment && parent.Name() == node:
+		return noRestrictedGlobalsDeclaredInSource(ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent))
+	case parent != nil && parent.Kind == ast.KindExportSpecifier:
+		return noRestrictedGlobalsDeclaredInSource(ctx.TypeChecker.GetExportSpecifierLocalTargetSymbol(parent))
 	}
-	symbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent)
+	return identifierIsShadowed(ctx, node)
+}
+
+// noRestrictedGlobalsDeclaredInSource is identifierIsShadowed's test over a symbol already resolved.
+func noRestrictedGlobalsDeclaredInSource(symbol *ast.Symbol) bool {
 	if symbol == nil {
 		return false
 	}
@@ -503,6 +526,23 @@ func noRestrictedGlobalsIsShadowed(ctx rule.Context, node *ast.Node) bool {
 		}
 	}
 	return false
+}
+
+// noRestrictedGlobalsExportSpecifierReads reports whether this name in an export specifier reads a
+// binding of this file.
+//
+// An export-from specifier reads nothing here. A local one reads the name it exports, which is its
+// property name when it renames and its only name when it does not; the name it renames to is the
+// exported name, a new spelling rather than a read. ESLint 10 under @typescript-eslint/parser agrees
+// on each: `export { print }` and `export { print as printPage }` report, `export { other as print }`
+// and every export-from are clean.
+func noRestrictedGlobalsExportSpecifierReads(specifier *ast.Node, node *ast.Node) bool {
+	if declaration := ast.FindAncestorKind(specifier, ast.KindExportDeclaration); declaration != nil &&
+		declaration.AsExportDeclaration().ModuleSpecifier != nil {
+		return false
+	}
+	propertyName := specifier.AsExportSpecifier().PropertyName
+	return propertyName == nil || propertyName == node
 }
 
 // buildNoRestrictedGlobalsMessage renders whichever of the two messages the entry calls for.
