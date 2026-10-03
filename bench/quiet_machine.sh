@@ -2,11 +2,8 @@
 # The quiet-machine benchmark: how long `cohere` takes on a real project, cold, on an unchanged replay,
 # and after a one-file edit, measured so that the number means what it says.
 #
-# It measures a copy, never the project itself. The project's committed tree is extracted (its
-# submodules too, each at the commit the parent records) into a work directory, and the project's
-# node_modules are linked in rather than copied. So the input is named by commits, not by whatever was on
-# disk, nothing another session is editing can move the number, and the project's own cache is never
-# read or written. The copy is reused by later invocations at the same commits.
+# It measures a copy of the project pinned to its commits, never the project itself, with one cohere
+# engine for every run. pinned.zsh, which it shares with rivals.sh, says how and why.
 #
 # The command measured is plain `cohere`, the one a developer runs, so a warm run gets the caches a
 # developer's run would. That command may write, so the copy's files are hashed before the first run and
@@ -34,12 +31,9 @@
 #
 # Two times per run. `verdict` is what a developer waits for: the launcher returns when the engine has
 # its exit code, and the engine writes its cache afterwards. `settled` is when every process the run
-# started has exited, cache write included. The next run starts only after that.
-#
-# One engine for every run. The launcher rebuilds whenever a cohere commit lands, which during a working
-# session is every few minutes, so a benchmark run through it can measure two binaries and report one
-# number. The engine the launcher resolves at the start is copied beside the logs and run directly, with
-# the verdict descriptor the launcher would have given it, so the early return is still what is timed.
+# started has exited, cache write included. The next run starts only after that. The engine runs
+# directly with the verdict descriptor the launcher would have given it, so the early return is still
+# what is timed.
 #
 # usage: quiet_machine.sh [options]
 #   --project DIR      the project to copy (default ~/Projects/ahra)
@@ -55,7 +49,8 @@
 # Exit status: 0 when every mode has a quiet number, 3 when some mode has none, 1 when it could not
 # measure at all, including a copy that changed under it or a cohere that changed between runs.
 set -u
-zmodload zsh/datetime
+name=quiet_machine
+source ${0:A:h}/pinned.zsh
 
 project=$HOME/Projects/ahra
 runs=5
@@ -78,123 +73,25 @@ while (( $# > 0 )); do
     *) print -u2 "quiet_machine: unknown argument $1 (see the usage at the top of this script)"; exit 1 ;;
   esac
 done
+(( runs >= 1 )) || fail "--runs must be at least 1"
 
-fail() { print -u2 "quiet_machine: $*"; exit 1; }
-load() { sysctl -n vm.loadavg | awk '{print $2}'; }
-under_ceiling() { awk -v load=$1 -v ceiling=$ceiling 'BEGIN { exit !(load <= ceiling) }'; }
-
-project=${project:A}
-[[ -d $project/.git || -f $project/.git ]] || fail "$project is not a git checkout"
-whence -p $cohere > /dev/null || [[ -x $cohere ]] || fail "no cohere at $cohere"
-
-# The commits that name the input: the project's, then each submodule's as the parent records it.
-project_commit=$(git -C $project rev-parse HEAD) || fail "cannot read $project's HEAD"
-copy=$work/${project:t}-${project_commit[1,12]}
-
-# extract writes the tree of <repository> at <commit> into <destination>, then each submodule at the
-# commit that tree records. A submodule commit the local clone does not have stops the benchmark rather
-# than leaving a hole in the program.
-extract() {
-  local repository=$1 commit=$2 destination=$3
-  mkdir -p $destination
-  git -C $repository archive $commit | tar -x -C $destination || fail "extracting $repository at $commit"
-  git -C $repository ls-tree -r $commit | awk '$2 == "commit" { print $3 "\t" $4 }' |
-    while IFS=$'\t' read -r submodule_commit submodule_path; do
-      git -C $repository/$submodule_path cat-file -e "$submodule_commit^{commit}" 2> /dev/null ||
-        fail "$repository/$submodule_path does not have $submodule_commit, which $commit records"
-      print -u2 "  submodule $submodule_path at ${submodule_commit[1,12]}"
-      local within=${destination#$copy}
-      print "${within#/}${within:+/}$submodule_path at $submodule_commit" >> $copy/bench-submodules
-      extract $repository/$submodule_path $submodule_commit $destination/$submodule_path
-    done
-}
-
-# tree_hash is one hash over every file in the copy, the caches and linked node_modules aside, so a
-# copy that moved by a byte is caught.
-tree_hash() {
-  (cd $copy && find . -type f -not -path './.cache/*' -not -path './bench-ready' -print0 | sort -z |
-    xargs -0 shasum -a 256 | shasum -a 256 | awk '{print $1}')
-}
-
-if [[ -f $copy/bench-ready ]]; then
-  print -u2 "reusing the copy at $copy"
-  [[ $(tree_hash) == $(< $copy/bench-ready) ]] ||
-    fail "the copy at $copy no longer matches what was extracted; remove it and run again"
-else
-  [[ -e $copy ]] && fail "$copy exists but was never finished; remove it and run again"
-  print -u2 "extracting ${project:t} at ${project_commit[1,12]} into $copy"
-  extract $project $project_commit $copy
-  # Every package in the copy uses the project's installed dependencies, linked rather than copied.
-  (cd $copy && find . -name package.json -not -path '*/node_modules/*') | while read -r manifest; do
-    package=${manifest:h}
-    [[ -d $project/$package/node_modules ]] && ln -s $project/$package/node_modules $copy/$package/node_modules
-  done
-  tree_hash > $copy/bench-ready
-fi
+prepare_copy
 [[ -f $copy/$edit ]] || fail "no file $edit in the copy to edit"
-expected_tree=$(< $copy/bench-ready)
 
 logs=$copy/.cache/quiet-machine-$(date +%Y%m%d-%H%M%S)
 mkdir -p $logs
 runs_table=$logs/runs.tsv
-
-# Asking the launcher for its version is what makes it build the engine for the current commit, so the
-# newest engine in its binary cache is that one, and the two versions agreeing proves it.
-cohere_version=$(cd $copy && $cohere --version 2>&1) || fail "cohere --version failed: $cohere_version"
-launcher=$(whence -p $cohere || print ${cohere:A})
-if [[ ${launcher:A:t} == cohere-dispatch ]]; then
-  newest=(${launcher:A:h}/cohere-darwin-*(N.om[1]))
-  (( ${#newest} == 1 )) || fail "the launcher's binary cache at ${launcher:A:h} holds no engine"
-  engine_source=$newest[1]
-else
-  engine_source=${launcher:A}
-fi
-engine=$logs/cohere-engine
-cp $engine_source $engine
-[[ $(cd $copy && $engine --version 2>&1) == $cohere_version ]] ||
-  fail "the engine at $engine_source is not the build the launcher reports; run again once nothing is building"
+pin_engine $logs
 
 print "# quiet-machine benchmark, $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-print "# project  ${project:t} at $project_commit"
-[[ -f $copy/bench-submodules ]] && sed 's/^/#   submodule /' $copy/bench-submodules
-print "# machine  $(sysctl -n hw.model), $(sysctl -n machdep.cpu.brand_string), $cores cores," \
-  "$(( $(sysctl -n hw.memsize) / 1073741824 )) GB, macOS $(sw_vers -productVersion)"
-print "# cohere   $engine_source"
-print -- "$cohere_version" | sed 's/^/#   /'
+print_pinned_header
 print "# rounds   $runs, load ceiling $ceiling (one-minute), edit $edit"
-print "# copy     $copy"
 print
 
-# run_cohere runs the engine in the copy and sets verdict_seconds, settled_seconds and exit_code. It does
-# what the launcher does, hands the engine a descriptor to write its exit code to and takes the verdict
-# when that byte arrives, and then waits for the engine's whole process group, so a cache write still
-# running cannot overlap the next run.
+# run_cohere runs the pinned engine in the copy; see run_timed.
 run_cohere() {
   local log=$1; shift
-  local timing=$logs/timing
-  (cd $copy && perl -MPOSIX -MTime::HiRes=time -e '
-    my $timing = shift;
-    pipe(my $reader, my $writer) or die "pipe: $!";
-    my $started = time;
-    my $engine = fork() // die "fork: $!";
-    if ($engine == 0) {
-      setpgrp(0, 0);
-      POSIX::dup2(fileno($writer), 3) or die "dup2: $!";
-      $ENV{COHERE_VERDICT_FD} = 3;
-      exec(@ARGV) or die "exec: $!";
-    }
-    close $writer;
-    my $exit_code;
-    $exit_code = ord($verdict) if sysread($reader, my $verdict, 1) == 1;
-    my $answered = time;
-    waitpid($engine, 0);
-    $exit_code //= $? >> 8;
-    select(undef, undef, undef, 0.02) while kill(0, -$engine);
-    my $settled = time;
-    open(my $out, ">", $timing) or die "$timing: $!";
-    printf $out "%.3f %.3f %d\n", $answered - $started, $settled - $started, $exit_code;
-  ' $timing $engine "$@") > $log 2>&1 || fail "could not run the engine, see $log"
-  read -r verdict_seconds settled_seconds exit_code < $timing
+  run_timed $log $engine "$@"
 }
 
 # engine_total is the engine's own time for the run, in seconds: its `total` line, or on a replay its
@@ -212,12 +109,6 @@ cache_use() {
   else
     grep -oE '[0-9]+ of [0-9]+ files replayed from cache' $1 | awk '{ print "files " $1 "/" $3; found = 1 } END { if (!found) print "none" }'
   fi
-}
-
-wait_for_quiet() {
-  (( settle > 0 )) || return 0
-  local deadline=$(( EPOCHREALTIME + settle ))
-  until under_ceiling $(load) || (( EPOCHREALTIME > deadline )); do sleep 5; done
 }
 
 measure() {
