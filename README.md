@@ -126,7 +126,7 @@ root unless you name another).
 | `--rules` | print the rules cohere implements for your project's language, and exit |
 | `--rules-enabled` | print the rules your settings turn on for one file (`index.ts` unless you name one), with severity, and exit |
 | `--coverage` | name every rule under the coverage fact that describes it, not only count them |
-| `--timing` | report what each rule cost, most expensive first |
+| `--timing` | report what building the graph and each rule cost, most expensive rule first |
 | `--single-threaded` | use one type checker instead of several |
 | `--profile FILE` | write a Go CPU profile of the run to FILE |
 | `--cache-dump` | print what this project's cache holds, and exit |
