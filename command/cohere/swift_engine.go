@@ -179,9 +179,17 @@ func flagValue(name string) string {
 //
 // The file is `<root>/.cache/cohere/abbreviations-<hash>.json`, written once and then reused. The
 // name is the content's hash, so a file that exists already holds these bytes and is not read back.
-// A cohere with other words writes another name and removes the stale ones. The write is atomic, so a
-// run beside it never reads half a file. Under `--no-cache` nothing is written to `.cache`, as that
-// flag promises, and the file is a temporary one removed after the run instead.
+// A cohere with other words writes another name beside it. The write is atomic, so a run beside it
+// never reads half a file.
+//
+// Nothing is ever deleted. Two cohere builds with different words run on one root daily, a member's
+// development cohere beside the one a project pins, and each must find its file where it returned it.
+// Removing another's, even by age, races that: a file in use for a week is never rewritten, so it
+// looks as old as one nobody uses. Each version is about 12 KB, and the directory is the project's to
+// delete.
+//
+// Under `--no-cache` nothing is written to `.cache`, as that flag promises, and the file is a
+// temporary one removed after the run instead.
 func swiftVocabularyFile(root string, noCache bool) (string, func(), error) {
 	contents := nexus.AbbreviationsFile()
 
@@ -217,15 +225,8 @@ func swiftVocabularyFile(root string, noCache bool) (string, func(), error) {
 	if err := os.MkdirAll(cacheDirectory(root), 0o755); err != nil {
 		return "", nil, fmt.Errorf("creating %s for the Swift engine's abbreviation vocabulary: %w", cacheDirectory(root), err)
 	}
-	stale, _ := filepath.Glob(filepath.Join(cacheDirectory(root), "abbreviations-*.json"))
 	if err := edit.WriteAtomically(path, string(contents)); err != nil {
 		return "", nil, fmt.Errorf("writing the abbreviation vocabulary for the Swift engine to %s: %w", path, err)
-	}
-	for _, old := range stale {
-		// A run beside this one may have written the same name between the check and the glob.
-		if old != path {
-			os.Remove(old)
-		}
 	}
 	return path, keep, nil
 }

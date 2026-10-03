@@ -53,15 +53,16 @@ func TestSwiftVocabularyIsWrittenOnceAndReused(t *testing.T) {
 	}
 }
 
-// TestSwiftVocabularyReplacesAStaleOne is a cohere with other words: a file under another hash is removed
-// when this one writes its own, so one project's cache does not collect a vocabulary per cohere version.
-func TestSwiftVocabularyReplacesAStaleOne(t *testing.T) {
+// TestSwiftVocabularyLeavesAnotherCoheresAlone is two cohere builds with different words on one root, which
+// happens daily. The other one may have returned its file to an engine that has not opened it yet, so
+// writing this one's must not remove it.
+func TestSwiftVocabularyLeavesAnotherCoheresAlone(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(cacheDirectory(root), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	stale := filepath.Join(cacheDirectory(root), "abbreviations-000000000000.json")
-	if err := os.WriteFile(stale, []byte(`{"abbreviations":[]}`), 0o644); err != nil {
+	other := filepath.Join(cacheDirectory(root), "abbreviations-000000000000.json")
+	if err := os.WriteFile(other, []byte(`{"abbreviations":[]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -69,14 +70,14 @@ func TestSwiftVocabularyReplacesAStaleOne(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if path == stale {
-		t.Fatal("the stale file's name was taken as this vocabulary's")
-	}
-	if isRegularFile(stale) {
-		t.Fatal("the stale vocabulary was left beside the current one")
+	if path == other {
+		t.Fatal("another cohere's file was taken as this vocabulary's")
 	}
 	if !isRegularFile(path) {
-		t.Fatal("the current vocabulary was not written")
+		t.Fatal("this vocabulary was not written")
+	}
+	if !isRegularFile(other) {
+		t.Fatal("another cohere's vocabulary was removed while it could still be in use")
 	}
 }
 
