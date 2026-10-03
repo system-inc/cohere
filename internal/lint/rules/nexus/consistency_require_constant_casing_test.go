@@ -483,8 +483,10 @@ func TestConsistencyRequireConstantCasingReadsTheRealSitesThroughTheirType(t *te
 			nil,
 		},
 		{
-			// The other direction: the same client named as data is now told it holds a function.
-			"the same client named PascalCase",
+			// The other direction stays silent: the type only permits camelCase, never requires it, so a
+			// PascalCase callable from an imported factory is judged as the constant it may be. Base's
+			// Verify* decorators and GraphQlQuery are exactly this shape, used as `@VerifyEmail`.
+			"the same client named PascalCase, as a decorator would be",
 			map[string]string{
 				factoryPath: constantCasingGraphQlClientFactory,
 				"source/connected/ConnectedGraphQl.ts": "import { createGraphQlClient } from '../system/base/BaseGraphQlClient';\n" +
@@ -492,7 +494,7 @@ func TestConsistencyRequireConstantCasingReadsTheRealSitesThroughTheirType(t *te
 					"    name: 'Connected',\n    defaultApiUrl: 'https://api.connected.app/graphql',\n});\n",
 			},
 			"source/connected/ConnectedGraphQl.ts",
-			[]string{"requireCamelCaseFunction"},
+			nil,
 		},
 	}
 	for _, testCase := range cases {
@@ -586,7 +588,8 @@ func TestConsistencyRequireConstantCasingReadsWhatACallHandsBackThroughItsType(t
 
 		// An import is followed to what it is, not read from its casing.
 		{"an alias for an imported function", "import { numberCompact } from './Factories';\nexport const formatNumber = numberCompact;\n", nil},
-		{"an alias for an imported object", "import { defaultSettings } from './Factories';\nexport const settings = defaultSettings;\n", []string{"requirePascalCaseExported"}},
+		// The rule as it stood reads a camelCase imported name as a function, and that reading is kept.
+		{"an alias for an imported object", "import { defaultSettings } from './Factories';\nexport const settings = defaultSettings;\n", nil},
 
 		// A component is a function JSX needs capitalized: the compound and memo shapes from
 		// Structure's Dialog.tsx and TableVirtualizedRow.tsx.
