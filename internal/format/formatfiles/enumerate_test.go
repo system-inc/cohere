@@ -453,3 +453,106 @@ func TestANestedRepositoryDoesNotInheritItsHostsIgnorePatterns(t *testing.T) {
 		t.Errorf("the house list removed %d, want pnpm-lock.yaml", enumeration.IgnoredByLayer[HouseIgnoreLayer])
 	}
 }
+
+// survivorsOf is an enumeration's files, relative to root and slash separated.
+func survivorsOf(root string, enumeration Enumeration) map[string]bool {
+	survivors := map[string]bool{}
+	for _, file := range enumeration.Files {
+		relative, _ := filepath.Rel(root, file)
+		survivors[filepath.ToSlash(relative)] = true
+	}
+	return survivors
+}
+
+// TestTheWalkReadsGitsIgnoreRulesAsGitDoes: every .gitignore from the root down, each scoped to its own
+// directory, negation, and info/exclude, all counted under the one git layer (#ndtgy1w). A file below an
+// excluded directory stays out whatever a deeper negation says, as git never looks inside the directory.
+func TestTheWalkReadsGitsIgnoreRulesAsGitDoes(t *testing.T) {
+	root := settingsTree(t, `[]`, `[]`, map[string]string{
+		".git/info/exclude":   "local.ts\n",
+		".gitignore":          "*.gen.ts\n!keep.gen.ts\nvendor/\n",
+		"a.ts":                "export const a = 1;\n",
+		"local.ts":            "export const local = 1;\n",
+		"x.gen.ts":            "export const x = 1;\n",
+		"keep.gen.ts":         "export const keep = 1;\n",
+		"sub/.gitignore":      "!*.gen.ts\nscratch.ts\n",
+		"sub/y.gen.ts":        "export const y = 1;\n",
+		"sub/scratch.ts":      "export const scratch = 1;\n",
+		"sub/deep/scratch.ts": "export const deep = 1;\n",
+		"vendor/.gitignore":   "!lib.ts\n",
+		"vendor/lib.ts":       "export const lib = 1;\n",
+	})
+	enumeration, err := Enumerate(root, handlesEveryLanguage)
+	if err != nil {
+		t.Fatalf("enumerate: %v", err)
+	}
+	survivors := survivorsOf(root, enumeration)
+	for name, want := range map[string]bool{
+		"a.ts": true, "keep.gen.ts": true, "sub/y.gen.ts": true,
+		"local.ts": false, "x.gen.ts": false, "sub/scratch.ts": false, "sub/deep/scratch.ts": false, "vendor/lib.ts": false,
+	} {
+		if survivors[name] != want {
+			t.Errorf("%s offered %v, want %v (offered: %v)", name, survivors[name], want, enumeration.Files)
+		}
+	}
+	// local.ts, x.gen.ts, sub/scratch.ts, sub/deep/scratch.ts and the vendor directory.
+	if got := enumeration.IgnoredByLayer[GitignoreLayer]; got != 5 {
+		t.Errorf("the git layer removed %d, want 5", got)
+	}
+}
+
+// TestIgnoreFilesNamesEveryFileTheWalkReadOrLookedFor pins the list a cache replaying the walk reads
+// (#z661dek): the .gitignore of the root and of every directory entered, present or not, and info/exclude
+// when .git is a directory, present or not. A pruned directory's .gitignore is never read, so not listed.
+func TestIgnoreFilesNamesEveryFileTheWalkReadOrLookedFor(t *testing.T) {
+	root := settingsTree(t, `[]`, `[]`, map[string]string{
+		".git/HEAD":         "ref: refs/heads/main\n",
+		".gitignore":        "pruned/\n",
+		"a.ts":              "export const a = 1;\n",
+		"with/.gitignore":   "x.ts\n",
+		"with/b.ts":         "export const b = 1;\n",
+		"without/c.ts":      "export const c = 1;\n",
+		"pruned/.gitignore": "y.ts\n",
+		"pruned/d.ts":       "export const d = 1;\n",
+		"nested/.git":       "gitdir: ../.git/modules/nested\n",
+		"nested/.gitignore": "z.ts\n",
+		"nested/e.ts":       "export const e = 1;\n",
+	})
+	enumeration, err := Enumerate(root, handlesEveryLanguage)
+	if err != nil {
+		t.Fatalf("enumerate: %v", err)
+	}
+	var got []string
+	for _, file := range enumeration.IgnoreFiles {
+		relative, _ := filepath.Rel(root, file)
+		got = append(got, filepath.ToSlash(relative))
+	}
+	sort.Strings(got)
+	// nexus/ is the settings tier the fixture writes, a directory the walk enters like any other.
+	want := []string{".git/info/exclude", ".gitignore", "nexus/.gitignore", "with/.gitignore", "without/.gitignore"}
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Errorf("IgnoreFiles %v, want %v", got, want)
+	}
+}
+
+// TestTheHouseListReadsAsIgnoreFileLines: the format block's `ignore` is read with git's syntax relative to
+// the walk root, negation and anchoring included, and counted as its own layer.
+func TestTheHouseListReadsAsIgnoreFileLines(t *testing.T) {
+	root := settingsTree(t, `["*.json", "!keep.json", "/top.ts"]`, `[]`, map[string]string{
+		"a.json":     "{}\n",
+		"keep.json":  "{}\n",
+		"top.ts":     "export const top = 1;\n",
+		"sub/top.ts": "export const subTop = 1;\n",
+		"sub/b.json": "{}\n",
+	})
+	enumeration, err := Enumerate(root, handlesEveryLanguage)
+	if err != nil {
+		t.Fatalf("enumerate: %v", err)
+	}
+	survivors := survivorsOf(root, enumeration)
+	for name, want := range map[string]bool{"keep.json": true, "sub/top.ts": true, "a.json": false, "top.ts": false, "sub/b.json": false} {
+		if survivors[name] != want {
+			t.Errorf("%s offered %v, want %v (offered: %v)", name, survivors[name], want, enumeration.Files)
+		}
+	}
+}

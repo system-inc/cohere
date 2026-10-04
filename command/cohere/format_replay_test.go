@@ -95,3 +95,84 @@ func TestANoFixFormatRunReplaysUntilWhatItsWalkReadMoves(t *testing.T) {
 	write("library/inner.json", "{ \"c\":  3 }\n")
 	reports("a whitespace edit inside a nested repository", "inner.json")
 }
+
+// TestAnIgnoreFileTheWalkReadBreaksTheFormatReplay holds the replay to every git ignore file the format walk
+// reads (#z661dek), the two that no directory it records can see change.
+//
+// A nested .gitignore edited in place moves no directory's modification time, and .git/info/exclude sits in
+// .git/info, which the walk never lists. A replay keyed only on directories would print the old verdict over
+// either edit, so each is made from a replaying tree, must not replay, and must report what the edit changed.
+func TestAnIgnoreFileTheWalkReadBreaksTheFormatReplay(t *testing.T) {
+	binary := buildCohere(t)
+	home := t.TempDir()
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"tsconfig.json":            strings.Replace(fixScopeTsconfig, `"**/*.ts"`, `"*.ts"`, 1),
+		"CohereSettings.json":      "{ \"extends\": \"./NexusCohereSettings.json\", \"rules\": {} }\n",
+		"NexusCohereSettings.json": "{ \"format\": { \"ignore\": [\"tsconfig.json\"] } }\n",
+		".gitignore":               ".cache/\n",
+		".git/HEAD":                "ref: refs/heads/main\n",
+		"Tidy.ts":                  "export const tidy = 1;\n",
+		"quiet/.gitignore":         "loose.json\n",
+		"quiet/loose.json":         "{ \"b\":   2 }\n",
+		"stray.json":               "{ \"c\":   3 }\n",
+	})
+	run := func() (string, int) {
+		t.Helper()
+		command := exec.Command(binary, "--no-fix", "--format")
+		command.Dir = root
+		command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME=")
+		output, err := command.CombinedOutput()
+		if exitError, isExit := err.(*exec.ExitError); isExit {
+			return string(output), exitError.ExitCode()
+		}
+		if err != nil {
+			t.Fatalf("running cohere: %v\n%s", err, output)
+		}
+		return string(output), 0
+	}
+	replays := func(when string, reported string) {
+		t.Helper()
+		run()
+		output, _ := run()
+		if !strings.HasPrefix(output, "cached: ") || !strings.Contains(output, reported) {
+			t.Fatalf("%s: an unchanged tree did not replay its verdict naming %s:\n%s", when, reported, output)
+		}
+	}
+	fresh := func(when string) string {
+		t.Helper()
+		output, _ := run()
+		if strings.HasPrefix(output, "cached: ") {
+			t.Fatalf("%s: the run replayed the old verdict over a changed ignore file:\n%s", when, output)
+		}
+		return output
+	}
+	write := func(name string, contents string) {
+		t.Helper()
+		writeTree(t, root, map[string]string{name: contents})
+	}
+
+	replays("before any change", "stray.json")
+
+	// (a) A nested .gitignore stops ignoring an unformatted file. The edit is in place, so quiet/'s
+	// modification time does not move.
+	write("quiet/.gitignore", "\n")
+	if output := fresh("a nested .gitignore that stopped ignoring loose.json"); !strings.Contains(output, "loose.json") {
+		t.Fatalf("the run did not report loose.json once quiet/.gitignore stopped ignoring it:\n%s", output)
+	}
+	write("quiet/.gitignore", "loose.json\n")
+	replays("with quiet/.gitignore restored", "stray.json")
+
+	// (b) info/exclude appears and ignores the reported file. Nothing the walk lists holds it.
+	write(".git/info/exclude", "stray.json\n")
+	if output := fresh("info/exclude created to ignore stray.json"); strings.Contains(output, "stray.json") {
+		t.Fatalf("the run still reported stray.json, which info/exclude now ignores:\n%s", output)
+	}
+	if err := os.Remove(filepath.Join(root, ".git", "info", "exclude")); err != nil {
+		t.Fatal(err)
+	}
+	if output := fresh("info/exclude removed again"); !strings.Contains(output, "stray.json") {
+		t.Fatalf("the run did not report stray.json once info/exclude was gone:\n%s", output)
+	}
+	replays("with info/exclude removed", "stray.json")
+}

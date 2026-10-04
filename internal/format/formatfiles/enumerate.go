@@ -1,5 +1,5 @@
 // Package formatfiles decides which files a tree offers the formatter: the walk, its ignore layers
-// (`.gitignore`, the house list, the project's ignorePatterns), and an account of every file it did
+// (git's ignore files, the house list, the project's ignorePatterns), and an account of every file it did
 // not offer.
 package formatfiles
 
@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/gitignore"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 )
 
@@ -53,30 +54,34 @@ type Enumeration struct {
 	// which is how a cache replaying the walk knows the tree it walked is no longer the tree on disk.
 	Directories []string
 
+	// IgnoreFiles is every git ignore file the walk read or looked for, absolute paths, present or not:
+	// the `.gitignore` of the root and of each directory it entered, and `.git/info/exclude` when `.git`
+	// is a directory. An edit to one changes what the walk skips without moving any directory's
+	// modification time, so a cache replaying the walk reads them too. A pruned directory's file is not
+	// read, and not listed.
+	IgnoreFiles []string
+
 	// Files is what survived, absolute paths.
 	Files []string
 }
 
-// ignoreLayer is one ignore list and how its patterns are read.
+// ignoreLayer is one of the project's ignore lists after git's, and how its patterns are read.
 type ignoreLayer struct {
-	name     string
-	patterns []string
+	name string
 
-	// globsFrom, when set, reads the patterns as lint's globs, relative to this directory: the
-	// `ignorePatterns` layer. Otherwise they read as lines of an ignore file, relative to the walk root.
+	// lines, when set, is the house list: lines of an ignore file, read with git's syntax relative to the
+	// walk root. Otherwise globs are lint's globs, relative to globsFrom: the `ignorePatterns` layer.
+	lines     *gitignore.Patterns
+	globs     []string
 	globsFrom string
 }
 
-// covers reports whether a pattern in the layer covers a path, given relative to the walk root. A
-// directory is covered when the layer prunes it whole.
+// covers reports whether the layer excludes a path, given relative to the walk root. A directory is
+// covered when the layer prunes it whole.
 func (layer ignoreLayer) covers(root string, relative string, directory bool) bool {
-	if layer.globsFrom == "" {
-		for _, pattern := range layer.patterns {
-			if matchesIgnore(relative, pattern) || (directory && matchesIgnore(relative+"/", pattern)) {
-				return true
-			}
-		}
-		return false
+	if layer.lines != nil {
+		ignored, _ := layer.lines.Ignored(relative, directory)
+		return ignored
 	}
 
 	fromSettings, err := filepath.Rel(layer.globsFrom, filepath.Join(root, relative))
@@ -84,7 +89,7 @@ func (layer ignoreLayer) covers(root string, relative string, directory bool) bo
 		return false
 	}
 	fromSettings = filepath.ToSlash(fromSettings)
-	for _, pattern := range layer.patterns {
+	for _, pattern := range layer.globs {
 		// A glob prunes a directory only when it takes everything below it, `name/**` or `**`: lint
 		// matches files, and `*.code.js` matching a directory's name says nothing about its contents.
 		if directory && pattern != "**" && !strings.HasSuffix(pattern, "/**") {
@@ -97,122 +102,10 @@ func (layer ignoreLayer) covers(root string, relative string, directory bool) bo
 	return false
 }
 
-// readIgnoreFile reads one ignore file into patterns, dropping comments and blanks.
-//
-// A missing file is not an error: a repository need not have a .gitignore. It returns no patterns,
-// and the layer reports zero removals, which is visible in the enumeration rather than silent.
-func readIgnoreFile(path string) ([]string, error) {
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("reading ignore file %s: %w", path, err)
-	}
-	var patterns []string
-	for _, line := range strings.Split(string(contents), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		patterns = append(patterns, line)
-	}
-	return patterns, nil
-}
-
-// matchesIgnore reports whether a repo-relative path is covered by a pattern.
-//
-// This is a deliberate subset of gitignore semantics: a bare name matches any path segment, a
-// trailing slash matches a directory prefix, and a glob matches the base name. It is not a full
-// gitignore implementation and must not pretend to be one, because the cost of quietly
-// mis-implementing negation or double-star is a file silently missing, which is the failure this
-// package exists to prevent. Anything more exotic belongs in a real matcher.
-//
-// relative is slash-separated on every platform, and the globs are matched with path.Match, which reads
-// `/` as the separator and `\` as an escape everywhere, as gitignore does. filepath.Match on Windows
-// reads `\` as the separator instead, so `*` crossed `/` there.
-func matchesIgnore(relative string, pattern string) bool {
-	pattern = strings.TrimPrefix(pattern, "/")
-
-	// A trailing slash means "this directory". It may still contain a glob: `modules/*/data/` is
-	// both, and getting that wrong is expensive rather than academic. On this repository that one
-	// pattern covers an 8 GB directory, and failing to match it walked 130,584 files that git had
-	// already excluded.
-	if strings.HasSuffix(pattern, "/") {
-		directory := strings.TrimSuffix(pattern, "/")
-		if strings.ContainsAny(directory, "*?[") {
-			// Match the pattern against the same number of leading segments it has, so
-			// `modules/*/data` tests `modules/see/data` rather than the whole relative path.
-			segments := strings.Split(relative, "/")
-			wanted := len(strings.Split(directory, "/"))
-			if len(segments) >= wanted {
-				if matched, _ := path.Match(directory, strings.Join(segments[:wanted], "/")); matched {
-					return true
-				}
-			}
-			return false
-		}
-		return relative == directory ||
-			strings.HasPrefix(relative, pattern) || strings.Contains(relative, "/"+pattern)
-	}
-	if strings.ContainsAny(pattern, "*?[") {
-		if strings.Contains(pattern, "/") {
-			matched, _ := path.Match(pattern, relative)
-			return matched
-		}
-		matched, _ := path.Match(pattern, path.Base(relative))
-		return matched
-	}
-	if relative == pattern || strings.HasSuffix(relative, "/"+pattern) {
-		return true
-	}
-	return strings.HasPrefix(relative, pattern+"/") || strings.Contains(relative, "/"+pattern+"/")
-}
-
-// IgnoringLine names the first pattern in an ignore file that covers a path, given relative to the
-// file's directory, with the pattern's line number. It answers 0 when no pattern does or the file does
-// not exist.
-//
-// It applies the walk's own subset of gitignore semantics, the file itself and every directory above
-// it, so it says what the walk would skip. That is not always what git would say: a negation is read
-// as a pattern of its own rather than as an exception.
-func IgnoringLine(ignoreFile string, relative string) (int, string, error) {
-	contents, err := os.ReadFile(ignoreFile)
-	if os.IsNotExist(err) {
-		return 0, "", nil
-	}
-	if err != nil {
-		return 0, "", fmt.Errorf("reading ignore file %s: %w", ignoreFile, err)
-	}
-	relative = filepath.ToSlash(relative)
-	for index, line := range strings.Split(string(contents), "\n") {
-		pattern := strings.TrimSpace(line)
-		if pattern == "" || strings.HasPrefix(pattern, "#") {
-			continue
-		}
-		if matchesIgnore(relative, pattern) {
-			return index + 1, pattern, nil
-		}
-		for directory := pathDirectory(relative); directory != ""; directory = pathDirectory(directory) {
-			if matchesIgnore(directory, pattern) || matchesIgnore(directory+"/", pattern) {
-				return index + 1, pattern, nil
-			}
-		}
-	}
-	return 0, "", nil
-}
-
-// pathDirectory is a slash path's parent, or "" at the top.
-func pathDirectory(path string) string {
-	slash := strings.LastIndexByte(path, '/')
-	if slash < 0 {
-		return ""
-	}
-	return path[:slash]
-}
-
-// The names the walk's layers are counted under.
+// The names the walk's layers are counted under. GitignoreLayer counts every git ignore source together:
+// the `.gitignore` files from the root down and info/exclude.
 const (
+	GitignoreLayer      = ".gitignore"
 	HouseIgnoreLayer    = "format.ignore"
 	IgnorePatternsLayer = "ignorePatterns"
 )
@@ -222,8 +115,9 @@ const (
 // The walk is a function of the ignore layers and a file-type predicate, not of any engine, so the
 // native formatter enumerates without building a goja runtime it would never run.
 //
-// The layers, in order: the repository's `.gitignore`; the house list, the `ignore` key of the format
-// block in the Nexus tier; and the `ignorePatterns` of the CohereSettings.json governing root, the one
+// The layers, in order: git's ignore rules, read as git reads them (every `.gitignore` from the root down,
+// each scoped to its directory, and info/exclude; see internal/gitignore); the house list, the `ignore`
+// key of the format block in the Nexus tier, read with the same syntax; and the `ignorePatterns` of the CohereSettings.json governing root, the one
 // list lint and the format walk share, read as lint reads it. Each is counted separately so a
 // misconfigured layer shows as a suspicious zero rather than as a slightly smaller total. That is the
 // difference between a corpus that measures the tree and one that measures a smaller subject while
@@ -249,24 +143,37 @@ func Enumerate(root string, handles func(fileName string) bool) (Enumeration, er
 			leftover, formatoptions.ErrPrettierConfigRemains, formatoptions.NexusTierFileName)
 	}
 
-	gitignore, err := readIgnoreFile(filepath.Join(root, ".gitignore"))
+	matcher, err := gitignore.New(root)
 	if err != nil {
 		return enumeration, err
 	}
-	layers := []ignoreLayer{{name: ".gitignore", patterns: gitignore}}
+	enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, filepath.Join(root, gitignore.IgnoreFileName))
+	if information, statError := os.Stat(filepath.Join(root, ".git")); statError == nil && information.IsDir() {
+		enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, filepath.Join(root, filepath.FromSlash(gitignore.ExcludeFile)))
+	}
+	enumeration.IgnoredByLayer[GitignoreLayer] = 0
+	var layers []ignoreLayer
 	if resolution.HouseIgnoreDeclared {
-		layers = append(layers, ignoreLayer{name: HouseIgnoreLayer, patterns: resolution.HouseIgnore})
+		house, err := gitignore.CompilePatterns(resolution.HouseIgnore, HouseIgnoreLayer)
+		if err != nil {
+			return enumeration, err
+		}
+		layers = append(layers, ignoreLayer{name: HouseIgnoreLayer, lines: house})
 	}
 	if resolution.Source != "" && !repositoryBoundaryBetween(root, filepath.Dir(resolution.Source)) {
 		layers = append(layers, ignoreLayer{
 			name:      IgnorePatternsLayer,
-			patterns:  resolution.IgnorePatterns,
+			globs:     resolution.IgnorePatterns,
 			globsFrom: filepath.Dir(resolution.Source),
 		})
 	}
 	for _, layer := range layers {
 		enumeration.IgnoredByLayer[layer.name] = 0
 	}
+
+	// The matcher for each directory entered, by its path relative to root: an entry is asked about
+	// through its directory's matcher, which holds every ignore file from the root down to it.
+	scopes := map[string]*gitignore.Matcher{"": matcher}
 
 	walkError := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -276,10 +183,11 @@ func Enumerate(root string, handles func(fileName string) bool) (Enumeration, er
 		if relativeError != nil {
 			return nil
 		}
-		// Every ignore pattern is written with `/`, and matchesIgnore reads `/` as the separator. On
+		// Every ignore pattern is written with `/`, and the matchers read `/` as the separator. On
 		// Windows Rel answers with `\`, which no nested pattern would match: `dist`, `.next/` and
 		// `modules/*/data/` covered only the top level, and the walk formatted what they name.
 		relative = filepath.ToSlash(relative)
+		scope := scopes[parentOf(relative)]
 		if info.IsDir() {
 			// .git is never formatted and walking it is pure cost on a large repo.
 			if info.Name() == ".git" {
@@ -303,18 +211,32 @@ func Enumerate(root string, handles func(fileName string) bool) (Enumeration, er
 				enumeration.Directories = append(enumeration.Directories, path)
 				return nil
 			}
+			if ignored, _ := scope.Ignored(relative, true); ignored {
+				enumeration.IgnoredByLayer[GitignoreLayer]++
+				return filepath.SkipDir
+			}
 			for _, layer := range layers {
 				if layer.covers(root, relative, true) {
 					enumeration.IgnoredByLayer[layer.name]++
 					return filepath.SkipDir
 				}
 			}
+			entered, err := scope.Enter(relative)
+			if err != nil {
+				return err
+			}
+			scopes[relative] = entered
 			enumeration.Directories = append(enumeration.Directories, path)
+			enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, filepath.Join(path, gitignore.IgnoreFileName))
 			return nil
 		}
 
 		enumeration.Walked++
 
+		if ignored, _ := scope.Ignored(relative, false); ignored {
+			enumeration.IgnoredByLayer[GitignoreLayer]++
+			return nil
+		}
 		for _, layer := range layers {
 			if layer.covers(root, relative, false) {
 				enumeration.IgnoredByLayer[layer.name]++
@@ -363,17 +285,17 @@ func repositoryBoundaryBetween(root string, settingsDirectory string) bool {
 // NestedRepositoriesBelow finds every repository of its own below root, the outermost of each, relative
 // to root: what a corpus harness measures beside root, each as its own corpus.
 //
-// It checks a directory for a repository before pruning it, as Enumerate does, and prunes only by
-// root's .gitignore. The project's own lists (the house list, ignorePatterns) are not read: they say
+// It checks a directory for a repository before pruning it, as Enumerate does, and prunes only by git's
+// ignore rules, read as Enumerate reads them. The project's own lists (the house list, ignorePatterns) are not read: they say
 // what root formats, and a repository under a path root never formats is still a body of code a printer
 // can be measured on. Reading them is how ahra's `projects/**` hid five repositories from the
 // differential (#k6vebep).
 func NestedRepositoriesBelow(root string) ([]string, error) {
-	gitignore, err := readIgnoreFile(filepath.Join(root, ".gitignore"))
+	matcher, err := gitignore.New(root)
 	if err != nil {
 		return nil, err
 	}
-	layer := ignoreLayer{name: ".gitignore", patterns: gitignore}
+	scopes := map[string]*gitignore.Matcher{"": matcher}
 	var nested []string
 	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil || !entry.IsDir() {
@@ -390,9 +312,16 @@ func NestedRepositoriesBelow(root string) ([]string, error) {
 			nested = append(nested, relative)
 			return filepath.SkipDir
 		}
-		if layer.covers(root, filepath.ToSlash(relative), true) {
+		relative = filepath.ToSlash(relative)
+		scope := scopes[parentOf(relative)]
+		if ignored, _ := scope.Ignored(relative, true); ignored {
 			return filepath.SkipDir
 		}
+		entered, err := scope.Enter(relative)
+		if err != nil {
+			return err
+		}
+		scopes[relative] = entered
 		return nil
 	})
 	if walkError != nil {
@@ -433,4 +362,13 @@ func NestedRepositoryContaining(root string, fileName string) string {
 			return nested
 		}
 	}
+}
+
+// parentOf is a slash path's directory, "" for an entry of the root, as the matchers key directories.
+func parentOf(relative string) string {
+	parent := path.Dir(relative)
+	if parent == "." {
+		return ""
+	}
+	return parent
 }
