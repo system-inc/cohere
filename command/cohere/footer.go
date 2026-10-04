@@ -199,9 +199,6 @@ type overallFacts struct {
 	Failed []string
 	// Unfinished is the projects whose run did not finish, which checked nothing anyone can rely on.
 	Unfinished int
-	// NestedNotEntered is the nested repositories the run found and did not check. Ignored, dependency
-	// and build directories are left out on purpose and are not gaps; a nested repository is code.
-	NestedNotEntered int
 }
 
 // overallFooter renders the verdict line for a repository with several projects:
@@ -236,9 +233,6 @@ func overallFooter(facts overallFacts, style textStyle) string {
 	}
 	if facts.Unfinished > 0 {
 		line += " • ⚠ " + counted(facts.Unfinished, "project did not finish", "projects did not finish")
-	}
-	if facts.NestedNotEntered > 0 {
-		line += " • ⚠ " + counted(facts.NestedNotEntered, "nested repository not checked", "nested repositories not checked")
 	}
 	return line
 }

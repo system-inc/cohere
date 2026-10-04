@@ -402,12 +402,6 @@ func TestOverallFooterGolden(t *testing.T) {
 			facts: overallFacts{Total: 8100 * time.Millisecond, ProjectsByEngine: engines, Unfinished: 1},
 			want:  "✗ ☠️ 8.1s • 3 projects: 1 Swift, 2 TypeScript • ⚠ 1 project did not finish",
 		},
-		{
-			// Green, and still saying what it left unchecked.
-			name:  "a nested repository was not checked",
-			facts: overallFacts{Total: 8100 * time.Millisecond, ProjectsByEngine: engines, NestedNotEntered: 2},
-			want:  "✓ 💎 8.1s • 3 projects: 1 Swift, 2 TypeScript • ⚠ 2 nested repositories not checked",
-		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
