@@ -142,6 +142,10 @@
                 "severity": "error"
             },
             {
+                "name": "@typescript-eslint/consistent-type-definitions",
+                "severity": "off"
+            },
+            {
                 "name": "@typescript-eslint/consistent-type-exports",
                 "severity": "error"
             },
@@ -354,6 +358,10 @@
             {
                 "name": "@typescript-eslint/no-unsafe-return",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/no-unsafe-type-assertion",
+                "severity": "off"
             },
             {
                 "name": "@typescript-eslint/no-unsafe-unary-minus",
@@ -1517,6 +1525,10 @@
                 "severity": "error"
             },
             {
+                "name": "@typescript-eslint/consistent-type-definitions",
+                "severity": "off"
+            },
+            {
                 "name": "@typescript-eslint/consistent-type-exports",
                 "severity": "error"
             },
@@ -1729,6 +1741,10 @@
             {
                 "name": "@typescript-eslint/no-unsafe-return",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/no-unsafe-type-assertion",
+                "severity": "off"
             },
             {
                 "name": "@typescript-eslint/no-unsafe-unary-minus",
@@ -3336,6 +3352,10 @@
                 "severity": "error"
             },
             {
+                "name": "@typescript-eslint/consistent-type-definitions",
+                "severity": "off"
+            },
+            {
                 "name": "@typescript-eslint/consistent-type-exports",
                 "severity": "error"
             },
@@ -3553,6 +3573,10 @@
             {
                 "name": "@typescript-eslint/no-unsafe-return",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/no-unsafe-type-assertion",
+                "severity": "off"
             },
             {
                 "name": "@typescript-eslint/no-unsafe-unary-minus",
@@ -4968,6 +4992,10 @@
                 "severity": "error"
             },
             {
+                "name": "@typescript-eslint/consistent-type-definitions",
+                "severity": "off"
+            },
+            {
                 "name": "@typescript-eslint/consistent-type-exports",
                 "severity": "error"
             },
@@ -5180,6 +5208,10 @@
             {
                 "name": "@typescript-eslint/no-unsafe-return",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/no-unsafe-type-assertion",
+                "severity": "off"
             },
             {
                 "name": "@typescript-eslint/no-unsafe-unary-minus",
@@ -6594,6 +6626,10 @@
                 "severity": "error"
             },
             {
+                "name": "@typescript-eslint/consistent-type-definitions",
+                "severity": "off"
+            },
+            {
                 "name": "@typescript-eslint/consistent-type-exports",
                 "severity": "error"
             },
@@ -6806,6 +6842,10 @@
             {
                 "name": "@typescript-eslint/no-unsafe-return",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/no-unsafe-type-assertion",
+                "severity": "off"
             },
             {
                 "name": "@typescript-eslint/no-unsafe-unary-minus",
@@ -8010,6 +8050,10 @@
                 "severity": "error"
             },
             {
+                "name": "@typescript-eslint/consistent-type-definitions",
+                "severity": "off"
+            },
+            {
                 "name": "@typescript-eslint/consistent-type-exports",
                 "severity": "error"
             },
@@ -8222,6 +8266,10 @@
             {
                 "name": "@typescript-eslint/no-unsafe-return",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/no-unsafe-type-assertion",
+                "severity": "off"
             },
             {
                 "name": "@typescript-eslint/no-unsafe-unary-minus",

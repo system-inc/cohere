@@ -160,6 +160,8 @@
         "unicode-bom": "error",
         "no-useless-rename": "error",
         "strict": "error",
+        "@typescript-eslint/consistent-type-definitions": "off",
+        "@typescript-eslint/no-unsafe-type-assertion": "off",
         "nexus/consistency-no-property-alias": "error",
         "nexus/correctness-no-caller-data-mutation": "error",
         "no-restricted-properties": [
@@ -427,6 +429,8 @@
         "no-restricted-imports": "off"
     },
     "reasons": {
+        "@typescript-eslint/consistent-type-definitions": "Interface or type is a deliberate choice the house's Interface and Type name suffixes already mark, and converting one to the other changes behavior: an interface is not assignable to Record<string, unknown>, and interfaces merge declarations (#79aqact).",
+        "@typescript-eslint/no-unsafe-type-assertion": "On when the type-assertion waves (#tbk2vkj and its siblings) read 0 in every consumer: measured 2026-10-04 at ahra 947, www-phi-health 285, www-ahra-ai 232 and api 1,367 (#79aqact).",
         "nexus/correctness-no-process-exit-after-output": "Off on purpose, by @system_cohere's ruling of 2026-10-03 (#h1jwmmz). Its findings are true, but every process entry blocks stdout and stderr, which correctness-require-blocking-standard-streams requires, so an exit after a write has nothing queued to lose. Turn it on only for a project whose entries don't block.",
         "@typescript-eslint/unbound-method": "Measured, not a gap: 79 findings across the repos, none a defect. 52 are expect(mock.method) in tests, where the method is passed to the assertion, never called unbound (#smnjh4c).",
         "no-unused-private-class-members": "The core rule sees only #private names. @typescript-eslint/no-unused-private-class-members, on here, is the typed rule that supersedes it.",
