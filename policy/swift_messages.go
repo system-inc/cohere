@@ -43,6 +43,10 @@ func swiftMessagesSource(catalog *MessageCatalog, digest string) ([]byte, error)
 		for id := range catalog.templates[ruleName] {
 			ids = append(ids, id)
 		}
+		// A twin file whose messages are all TypeScript's names the Swift rule with nothing for it to render.
+		if len(ids) == 0 {
+			continue
+		}
 		sort.Strings(ids)
 		rules = append(rules, rule{name: ruleName, typeName: pascalCase(leaf), ids: ids})
 	}

@@ -154,3 +154,22 @@ func TestALongSignatureTakesOneParameterToALine(t *testing.T) {
 		}
 	}
 }
+
+// TestATwinWithNoSwiftMessageGetsNoType: a twin file whose messages are all TypeScript's names the Swift
+// rule, and generates nothing for it rather than an empty enum.
+func TestATwinWithNoSwiftMessageGetsNoType(t *testing.T) {
+	catalog, err := LoadMessages(fstest.MapFS{"consistency-no-thing.json": {Data: []byte(`{
+  "rules": { "TypeScript": "nexus/consistency-no-thing", "Swift": "cohere-swift/consistency-no-thing" },
+  "messages": { "thing": { "text": "A thing.", "languages": ["TypeScript"] } }
+}`)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := swiftMessagesSource(catalog, "digest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(source), "ConsistencyNoThing") {
+		t.Errorf("a Swift rule with no Swift message got a type:\n%s", source)
+	}
+}
