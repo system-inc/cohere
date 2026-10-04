@@ -117,6 +117,8 @@ type CacheTableIdentity struct {
 // half is enforced by TestCacheTableShapeIsPinnedToItsVersion; the meaning half is the reason each
 // section also keeps its own version.
 //
+// 9: run inputs carry ExistenceOnly, for a directory the run only asked whether it exists.
+//
 // 8: one file per section and per recorded run, each with its own header, which names its section.
 //
 // 7: findings entries carry their rules' notes.
@@ -131,7 +133,7 @@ type CacheTableIdentity struct {
 // design system's key.
 //
 // 2: findings entries carry shape-keyed rules and their fingerprint, and the table holds Signatures.
-const cacheTableVersion = 8
+const cacheTableVersion = 9
 
 // cacheTableMagic opens every file of the table, so a file that is not one is refused on its first field.
 const cacheTableMagic = "cohere cache table"

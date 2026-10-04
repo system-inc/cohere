@@ -101,6 +101,13 @@ type RunCacheInput struct {
 	// platform's stat does not give them.
 	ChangedNanoseconds int64
 	Inode              uint64
+
+	// ExistenceOnly is set on a directory the run only asked whether it exists (see InputRecorder.Inputs),
+	// which matches while it is still the same directory, by inode, whatever was added to it since. Module
+	// resolution asks it of every directory from the project up to the root, and on a busy machine /tmp and
+	// the like change many times a second: checked at full signature, they cost a replay on a tree nothing
+	// had touched (#q51f02a). A package.json or node_modules appearing in one is its own absent input.
+	ExistenceOnly bool
 }
 
 // runCacheVersion is bumped whenever the manifest's meaning changes, not only its shape.
@@ -174,13 +181,15 @@ func RunCacheKey(arguments []string, workingDirectory string, facts ...string) (
 //
 // The directory holding each file is added here too, so a caller cannot forget them and quietly ship
 // a cache blind to added files. extraDirectories adds more, and absent lists paths the run looked for
-// and did not find, which must stay absent for a hit.
+// and did not find, which must stay absent for a hit. probed lists present paths the run only asked
+// whether they exist; a directory among them that holds no file the run read and is not among
+// extraDirectories is recorded ExistenceOnly.
 //
 // readSince is when the run began reading its inputs. An input changed after it may have been read before
 // the change, so the stat taken here would sign the new bytes against a verdict computed from the old ones,
 // and the next run would replay that verdict over a tree it does not describe: a file saved in an editor
 // while cohere runs is exactly this. Such a run is not recorded. The zero time checks nothing.
-func RecordRunCache(key string, files []string, extraDirectories []string, absent []string, output []byte, exitCode int, readSince time.Time) (*RunCache, error) {
+func RecordRunCache(key string, files []string, extraDirectories []string, absent []string, probed []string, output []byte, exitCode int, readSince time.Time) (*RunCache, error) {
 	cache := &RunCache{Version: runCacheVersion, Key: key, Output: output, ExitCode: exitCode}
 
 	// One entry per path. A path can arrive as a file read, a directory listed, and the parent of
@@ -227,6 +236,19 @@ func RecordRunCache(key string, files []string, extraDirectories []string, absen
 		return nil, err
 	}
 	cache.Inputs = append(inputs, directoryInputs...)
+
+	// A directory only probed, holding nothing the run read and named by no caller, is kept for its existence.
+	probedSet := make(map[string]struct{}, len(probed))
+	for _, path := range probed {
+		probedSet[path] = struct{}{}
+	}
+	for index, input := range cache.Inputs {
+		_, onlyProbed := probedSet[input.Path]
+		_, needed := directorySet[input.Path]
+		if input.Directory && onlyProbed && !needed {
+			cache.Inputs[index].ExistenceOnly = true
+		}
+	}
 	if !readSince.IsZero() {
 		// Files, and the directories holding them, where a file added mid-run beside the ones read would be
 		// missed. A directory only probed on the way to a node_modules or a package.json is left out: such
@@ -239,7 +261,7 @@ func RecordRunCache(key string, files []string, extraDirectories []string, absen
 			}
 		}
 		for _, input := range cache.Inputs {
-			if input.Directory && !holdsARead[input.Path] {
+			if input.ExistenceOnly || input.Directory && !holdsARead[input.Path] {
 				continue
 			}
 			if max(input.ModifiedNanoseconds, input.ChangedNanoseconds) > readSince.UnixNano() {
@@ -378,6 +400,13 @@ func (input RunCacheInput) stillMatches() error {
 	}
 	if information.IsDir() != input.Directory {
 		return fmt.Errorf("%w: %s changed between file and directory", ErrRunCacheMiss, input.Path)
+	}
+	if input.ExistenceOnly {
+		// Still there and still the same directory, which is all the run asked of it.
+		if _, inode := changeTimeAndInode(input.Path, information); inode != input.Inode {
+			return fmt.Errorf("%w: %s was replaced", ErrRunCacheMiss, input.Path)
+		}
+		return nil
 	}
 	// A directory's size is filesystem bookkeeping and moves with its entries on some filesystems,
 	// so only its modification time decides. A file needs both.

@@ -35,40 +35,56 @@ type InputRecorder struct {
 	// cold. Dropping it is sound because the incremental path already guarantees identical findings
 	// warm or cold, so its contents cannot change the verdict being cached.
 	written map[string]bool
+
+	// depended is every path whose answer depended on more than its existence: a file read, a directory
+	// listed, a path statted. Every other present path was only asked whether it is there, and only that
+	// can change its answer (see Inputs).
+	depended map[string]bool
 }
 
 // NewInputRecorder returns an empty recorder.
 func NewInputRecorder() *InputRecorder {
-	return &InputRecorder{existed: map[string]bool{}, written: map[string]bool{}}
+	return &InputRecorder{existed: map[string]bool{}, written: map[string]bool{}, depended: map[string]bool{}}
 }
 
-func (r *InputRecorder) note(path string, present bool) {
+func (r *InputRecorder) note(path string, present bool, depended bool) {
 	if r == nil || path == "" {
 		return
 	}
 	r.mutex.Lock()
 	r.existed[path] = r.existed[path] || present
+	r.depended[path] = r.depended[path] || depended
 	r.mutex.Unlock()
 }
 
 // Inputs reports what the build depended on: paths that existed, and paths it looked for and did not
 // find. Anything the build itself wrote is excluded. Sorted so two recordings of one tree compare equal.
-func (r *InputRecorder) Inputs() (present []string, absent []string) {
+//
+// probed is the present paths the build only asked whether they exist, never read, listed or statted, a
+// subset of present. Module resolution asks that of every directory from the project up to the root, on its
+// way to a package.json or a node_modules, and the answer can only change by the path ceasing to be there.
+// See RecordRunCache, which records such a directory for its existence alone.
+func (r *InputRecorder) Inputs() (present []string, absent []string, probed []string) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	for path, existed := range r.existed {
 		if r.written[path] {
 			continue
 		}
-		if existed {
-			present = append(present, path)
-		} else {
+		switch {
+		case !existed:
 			absent = append(absent, path)
+		case !r.depended[path]:
+			present = append(present, path)
+			probed = append(probed, path)
+		default:
+			present = append(present, path)
 		}
 	}
 	sort.Strings(present)
 	sort.Strings(absent)
-	return present, absent
+	sort.Strings(probed)
+	return present, absent, probed
 }
 
 // recordingFS is a vfs.FS that reports each path it serves to an InputRecorder.
@@ -86,28 +102,30 @@ type recordingFS struct {
 // negative answer is followed by a stat: anything on disk in any form is recorded as present, with
 // its full signature, which also catches a file turning into a directory. Only a path that is
 // genuinely not there is recorded absent.
-func (f *recordingFS) noteAnswer(path string, positive bool) {
+//
+// depended says whether the answer depended on more than existence: a read, a listing or a stat.
+func (f *recordingFS) noteAnswer(path string, positive bool, depended bool) {
 	if !positive {
 		positive = f.FS.Stat(path) != nil
 	}
-	f.recorder.note(path, positive)
+	f.recorder.note(path, positive, depended)
 }
 
 func (f *recordingFS) FileExists(path string) bool {
 	exists := f.FS.FileExists(path)
-	f.noteAnswer(path, exists)
+	f.noteAnswer(path, exists, false)
 	return exists
 }
 
 func (f *recordingFS) ReadFile(path string) (string, bool) {
 	contents, ok := f.FS.ReadFile(path)
-	f.noteAnswer(path, ok)
+	f.noteAnswer(path, ok, true)
 	return contents, ok
 }
 
 func (f *recordingFS) DirectoryExists(path string) bool {
 	exists := f.FS.DirectoryExists(path)
-	f.noteAnswer(path, exists)
+	f.noteAnswer(path, exists, false)
 	return exists
 }
 
@@ -116,13 +134,13 @@ func (f *recordingFS) DirectoryExists(path string) bool {
 // ones the build read.
 func (f *recordingFS) GetAccessibleEntries(path string) vfs.Entries {
 	entries := f.FS.GetAccessibleEntries(path)
-	f.noteAnswer(path, f.FS.DirectoryExists(path))
+	f.noteAnswer(path, f.FS.DirectoryExists(path), true)
 	return entries
 }
 
 func (f *recordingFS) Stat(path string) vfs.FileInfo {
 	information := f.FS.Stat(path)
-	f.noteAnswer(path, information != nil)
+	f.noteAnswer(path, information != nil, true)
 	return information
 }
 
@@ -130,7 +148,7 @@ func (f *recordingFS) Realpath(path string) string {
 	resolved := f.FS.Realpath(path)
 	// Realpath answers for a missing path too, by returning it unchanged, so existence is asked
 	// rather than assumed. A probe recorded as present that is not would fail the record outright.
-	f.noteAnswer(path, false)
+	f.noteAnswer(path, false, false)
 	return resolved
 }
 

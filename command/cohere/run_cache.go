@@ -471,9 +471,9 @@ func finishRunCache(exitCode int) {
 
 // record captures this run, or returns nil when it cannot.
 func (session *runCacheSession) record(exitCode int) *program.RunCache {
-	present, absent := session.recorder.Inputs()
+	present, absent, probed := session.recorder.Inputs()
 	files := append(present, session.extraFiles...)
-	cache, err := program.RecordRunCache(session.key, files, session.extraDirectories, absent,
+	cache, err := program.RecordRunCache(session.key, files, session.extraDirectories, absent, probed,
 		session.stdout.buffer.Bytes(), exitCode, session.readSince)
 	if err != nil {
 		// Not recording is always safe. Said on stderr because a cache that silently never records is

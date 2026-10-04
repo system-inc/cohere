@@ -65,7 +65,7 @@ func TestDesignSystemReadsAreRunCacheInputs(t *testing.T) {
 		t.Fatalf("the design system did not load, so this proves nothing: %v", result.Err)
 	}
 
-	present, absent := recorder.Inputs()
+	present, absent, _ := recorder.Inputs()
 	hasSuffix := func(paths []string, suffix string) bool {
 		for _, path := range paths {
 			if strings.HasSuffix(path, suffix) {

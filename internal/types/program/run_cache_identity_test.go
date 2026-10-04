@@ -27,11 +27,11 @@ func TestARunIsNotRecordedOverAFileChangedWhileItRan(t *testing.T) {
 	if err := os.WriteFile(file, []byte("export const a = 2;\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := program.RecordRunCache("key", []string{file}, nil, nil, nil, 0, readSince); err == nil ||
+	if _, err := program.RecordRunCache("key", []string{file}, nil, nil, nil, nil, 0, readSince); err == nil ||
 		!strings.Contains(err.Error(), "a.ts changed after the run began reading") {
 		t.Fatalf("a run that began reading before a.ts was saved was recorded (%v)", err)
 	}
-	if _, err := program.RecordRunCache("key", []string{file}, nil, nil, nil, 0, time.Now()); err != nil {
+	if _, err := program.RecordRunCache("key", []string{file}, nil, nil, nil, nil, 0, time.Now()); err != nil {
 		t.Fatalf("a run that began reading after the save was refused: %v", err)
 	}
 }
@@ -44,7 +44,7 @@ func TestASameSizeEditUnderARestoredModificationTimeIsAMiss(t *testing.T) {
 	if err := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cache, err := program.RecordRunCache("key", []string{file}, nil, nil, nil, 0, time.Time{})
+	cache, err := program.RecordRunCache("key", []string{file}, nil, nil, nil, nil, 0, time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestADirectoryInputDoesNotMakeItsParentOne(t *testing.T) {
 	if err := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cache, err := program.RecordRunCache("key", []string{project, file}, nil, nil, nil, 0, time.Time{})
+	cache, err := program.RecordRunCache("key", []string{project, file}, nil, nil, nil, nil, 0, time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestTheCacheDumpNamesTheInputThatKeepsARunFromReplaying(t *testing.T) {
 	if err := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cache, err := program.RecordRunCache("key", []string{file}, nil, nil, nil, 0, time.Time{})
+	cache, err := program.RecordRunCache("key", []string{file}, nil, nil, nil, nil, 0, time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}
