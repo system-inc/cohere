@@ -20,6 +20,8 @@
     },
     "assertedMessageIds": [
         "callerDataMutation",
+        "mutatesUnknownParameter",
+        "mutatesWithoutReason",
         "processStateWithoutReason"
     ]
 }

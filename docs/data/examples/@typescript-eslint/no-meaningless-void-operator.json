@@ -5,6 +5,7 @@
         "source": "function foo() {}\nvoid foo();"
     },
     "assertedMessageIds": [
+        "meaninglessVoidOnNonCall",
         "meaninglessVoidOperator"
     ],
     "assertsFix": true,
