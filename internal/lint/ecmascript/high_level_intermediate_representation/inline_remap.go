@@ -161,7 +161,11 @@ func CopyNestedBodyInto(parent *Function, nested *Function, captures []Place) (*
 				Node:   source.Node,
 				Range:  source.Range,
 			}
-			copied.LValue.Identifier = remap.Identifiers[source.LValue.Identifier]
+			// Every place, the lvalue included, is mapped exactly once from its nested id. Mapping the
+			// lvalue here as well mapped it twice wherever a fresh parent id was also a nested id
+			// that the remap holds: `$26` became `$51` and then `$76`, a definition nothing reads and
+			// an id defined twice, so a memo callback whose ids overlapped the parent's fresh range
+			// lost its dependency and reported a memoization the compiler keeps (#p67vev4).
 			EachInstructionPlacePointer(copied, func(place *Place, role PlaceRole) {
 				if mapped, ok := remap.Identifiers[place.Identifier]; ok {
 					place.Identifier = mapped

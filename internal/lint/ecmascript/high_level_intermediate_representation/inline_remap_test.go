@@ -421,3 +421,79 @@ const branchingParentSource = `
 		return compute();
 	}
 `
+
+// overlappingIdsParentSource is a memo callback long enough that its own identifier ids run past the
+// first fresh id the parent mints for the copy, so some fresh parent id is also a nested id the remap
+// holds. That overlap is what a place mapped twice needs in order to land somewhere wrong; without
+// it a second mapping finds no entry and leaves the id alone. It is www's StackIngredients shape cut
+// down, a `||` default feeding a second `||` (#p67vev4).
+const overlappingIdsParentSource = `
+	import React from 'react';
+	declare const Day: { title: string }[];
+	declare const Night: { title: string }[];
+	export function useFilter(properties: { kind: 'A' | 'B' }) {
+		const value = React.useMemo(function() {
+			const x = properties.kind || 'A';
+			const y = x === 'A' || x === 'B';
+			return [y ? Day : Night];
+		}, [properties.kind]);
+		return value;
+	}
+`
+
+// TestCopyNestedBodyMapsEveryPlaceOnce pins that each copied place is mapped exactly once, from its
+// nested id. Mapping an lvalue a second time sent `$26` to `$51` and on to `$76`: a definition no
+// operand reads, an id defined twice in the parent, and an inferred dependency rooted at nothing, which
+// is how preserve-manual-memoization came to report a memoization React Compiler keeps (#p67vev4).
+func TestCopyNestedBodyMapsEveryPlaceOnce(t *testing.T) {
+	t.Parallel()
+
+	parent, nested, captures := loweredParentAndNested(t, overlappingIdsParentSource)
+	if parent == nil || nested == nil {
+		t.Fatal("the fixture produced no nested function, so this test asserts nothing about the copy")
+	}
+	remap, ok := CopyNestedBodyInto(parent, nested, captures)
+	if !ok {
+		t.Fatal("the copy declined; with a matching context and capture list it should not")
+	}
+
+	overlapping := false
+	for from, to := range remap.Identifiers {
+		if _, isNestedId := remap.Identifiers[to]; isNestedId && to != from {
+			overlapping = true
+			break
+		}
+	}
+	if !overlapping {
+		t.Fatal("no fresh parent id is also a nested id, so a place mapped twice would land where it " +
+			"should and this test could not fail; the fixture no longer overlaps the id ranges")
+	}
+
+	defined := map[IdentifierId]InstructionId{}
+	for _, block := range nested.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, sourceId := range block.Instructions {
+			source := nested.Instructions[sourceId]
+			copiedId, found := remap.Instructions[sourceId]
+			if source == nil || !found {
+				continue
+			}
+			copied := parent.Instructions[copiedId]
+			if want := remap.Identifiers[source.LValue.Identifier]; copied.LValue.Identifier != want {
+				t.Errorf("instruction %d defines identifier %d where the remap names %d for its nested "+
+					"lvalue %d; the lvalue was mapped more than once",
+					copiedId, copied.LValue.Identifier, want, source.LValue.Identifier)
+			}
+			if earlier, twice := defined[copied.LValue.Identifier]; twice {
+				t.Errorf("identifier %d is defined by instruction %d and again by instruction %d",
+					copied.LValue.Identifier, earlier, copiedId)
+			}
+			defined[copied.LValue.Identifier] = copiedId
+		}
+	}
+	if len(defined) == 0 {
+		t.Fatal("no copied instruction was checked, so the assertions above passed vacuously")
+	}
+}

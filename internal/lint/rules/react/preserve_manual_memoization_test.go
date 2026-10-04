@@ -892,3 +892,29 @@ function Component(props) {
 		})
 	}
 }
+
+// TestPreserveManualMemoizationStaysSilentWhereTheInlinedIdsOverlap is www's StackIngredients hook cut
+// down: a `||` default feeding a second `||`, then an allocation. React Compiler 1.0.0 compiles it and
+// react-hooks 7.1.1 is silent. Inlining the callback used to map some of its lvalues twice, so the
+// scope's inferred dependency rooted at a value nothing defined and the rule reported a memoization
+// the compiler keeps (#p67vev4). This row reports with the double mapping put back, and
+// TestCopyNestedBodyMapsEveryPlaceOnce pins the mapping itself.
+func TestPreserveManualMemoizationStaysSilentWhereTheInlinedIdsOverlap(t *testing.T) {
+	t.Parallel()
+
+	const source = `import React from 'react';
+declare const Day: { title: string }[];
+declare const Night: { title: string }[];
+interface P { kind: 'A' | 'B' }
+function useFilter(properties: P) {
+    const value = React.useMemo(function() {
+        const x = properties.kind || 'A';
+        const y = x === 'A' || x === 'B';
+        return [y ? Day : Night];
+    }, [properties.kind]);
+    return value;
+}
+export function Component(properties: P) { const items = useFilter(properties); return <div>{items.length}</div>; }
+`
+	rule_testing.ExpectClean(t, runPreserveManualMemoization(t, "overlap.tsx", source))
+}
