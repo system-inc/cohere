@@ -4,7 +4,9 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/literal"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -144,6 +146,9 @@ var messageMisleadingZeroWidthJoiner = rule.Message{
 // not known until it runs, and resolving a variable is a different rule's worth of machinery.
 var NoMisleadingCharacterClass = rule.Rule{
 	Name: "no-misleading-character-class",
+
+	// The string-literal type of a flags argument that is not itself a literal
+	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
@@ -192,7 +197,7 @@ func checkRegExpConstructorCall(ctx rule.Context, callee *ast.Node, arguments *a
 		return
 	}
 
-	flags, flagsKnown := regexConstructorFlags(arguments)
+	flags, flagsKnown := misleadingConstructorFlags(ctx, arguments)
 	if !flagsKnown {
 		return
 	}
@@ -389,6 +394,38 @@ func regexConstructorFlags(arguments *ast.NodeList) (string, bool) {
 		return "", false
 	}
 	return "", true
+}
+
+// misleadingConstructorFlags is the flags this rule checks a constructor call under, read as ESLint's
+// getStringIfConstant reads them. A literal is its text, as regexConstructorFlags reads it. Any other
+// argument is a value whose type is one string literal, `const flags = ""` for one, or else unknowable,
+// which declines the call, since it could hold a `u`. The checker answers which.
+//
+// regexConstructorFlags reads every other argument as no flags, which no-useless-backreference keeps,
+// since ESLint's version checks under `flags || ""`. Here that reading reported
+// `new RegExp("[👍]", flags)`, which ESLint's corpus pins as clean (#jjfa7qb), while
+// `const flags = ""; new RegExp("[👍]", flags)` still reports.
+func misleadingConstructorFlags(ctx rule.Context, arguments *ast.NodeList) (string, bool) {
+	if len(arguments.Nodes) < 2 {
+		return regexConstructorFlags(arguments)
+	}
+	flagsNode := ast.SkipParentheses(arguments.Nodes[1])
+	if flagsNode == nil {
+		return regexConstructorFlags(arguments)
+	}
+	switch flagsNode.Kind {
+	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression:
+		return regexConstructorFlags(arguments)
+	}
+	if ctx.TypeChecker == nil {
+		return "", false
+	}
+	flagsType := ctx.TypeChecker.GetTypeAtLocation(flagsNode)
+	if !type_checking.IsTypeFlagSet(flagsType, checker.TypeFlagsStringLiteral) {
+		return "", false
+	}
+	value, isString := flagsType.AsLiteralType().Value().(string)
+	return value, isString
 }
 
 // regexConstructorPattern returns the pattern text a constructor argument carries.
@@ -638,6 +675,12 @@ func misleadingSequenceFindings(sequence []misleadingCharacter) []pendingMislead
 	// The joiner detector reads three characters rather than two, because a joiner is only
 	// misleading when it actually joins: it needs something on each side, and neither side may be
 	// another joiner. `/[‍]/` is a class holding one joiner and means what it says.
+	//
+	// A chain of joins is one finding, as ESLint's zwj generator yields it: a join whose left
+	// character is the previous join's right one extends that sequence, so the family emoji
+	// 👨‍👩‍👦 reports once over all five characters rather than as two overlapping pairs. Reporting
+	// each pair was 11 of ESLint's corpus rows reading as extra (#jjfa7qb).
+	joinStart, joinEnd := -1, -1
 	for index := 1; index+1 < len(sequence); index++ {
 		if sequence[index].value != zeroWidthJoiner {
 			continue
@@ -645,7 +688,17 @@ func misleadingSequenceFindings(sequence []misleadingCharacter) []pendingMislead
 		if sequence[index-1].value == zeroWidthJoiner || sequence[index+1].value == zeroWidthJoiner {
 			continue
 		}
-		report(sequence[index-1], sequence[index+1], messageMisleadingZeroWidthJoiner)
+		if joinStart >= 0 && joinEnd == index-1 {
+			joinEnd = index + 1
+			continue
+		}
+		if joinStart >= 0 {
+			report(sequence[joinStart], sequence[joinEnd], messageMisleadingZeroWidthJoiner)
+		}
+		joinStart, joinEnd = index-1, index+1
+	}
+	if joinStart >= 0 {
+		report(sequence[joinStart], sequence[joinEnd], messageMisleadingZeroWidthJoiner)
 	}
 
 	for index := 1; index < len(sequence); index++ {

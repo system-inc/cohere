@@ -9724,7 +9724,7 @@
             "language": "TypeScript",
             "origin": "core",
             "upstreamName": "no-misleading-character-class",
-            "typeAware": false,
+            "typeAware": true,
             "messageIds": [
                 "combiningClassInCharacterClass",
                 "emojiModifierInCharacterClass",

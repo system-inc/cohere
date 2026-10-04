@@ -74,16 +74,16 @@ func TestNoMisleadingCharacterClassFires(t *testing.T) {
 		{"var r = /[\\uD83C\\uDDEF\\uD83C\\uDDF5]/u", []string{regional}},
 		{"var r = /[\\u{1F1EF}\\u{1F1F5}]/u", []string{regional}},
 		{"var r = /[👨‍👩‍👦]/", []string{joiner, joiner, withoutFlag, withoutFlag, withoutFlag}},
-		{"var r = /[👨‍👩‍👦]/u", []string{joiner, joiner}},
+		{"var r = /[👨‍👩‍👦]/u", []string{joiner}},
 		{"var r = /[👩‍👦]/u", []string{joiner}},
 		{"var r = /[👩‍👦][👩‍👦]/u", []string{joiner, joiner}},
-		{"var r = /[👨‍👩‍👦]foo[👨‍👩‍👦]/u", []string{joiner, joiner, joiner, joiner}},
-		{"var r = /[👨‍👩‍👦👩‍👦]/u", []string{joiner, joiner, joiner}},
-		{"var r = /[\\uD83D\\uDC68\\u200D\\uD83D\\uDC69\\u200D\\uD83D\\uDC66]/u", []string{joiner, joiner}},
-		{"var r = /[\\u{1F468}\\u{200D}\\u{1F469}\\u{200D}\\u{1F466}]/u", []string{joiner, joiner}},
+		{"var r = /[👨‍👩‍👦]foo[👨‍👩‍👦]/u", []string{joiner, joiner}},
+		{"var r = /[👨‍👩‍👦👩‍👦]/u", []string{joiner, joiner}},
+		{"var r = /[\\uD83D\\uDC68\\u200D\\uD83D\\uDC69\\u200D\\uD83D\\uDC66]/u", []string{joiner}},
+		{"var r = /[\\u{1F468}\\u{200D}\\u{1F469}\\u{200D}\\u{1F466}]/u", []string{joiner}},
 		{"var r = /[\\uD83D\\uDC68\\u200D\\uD83D\\uDC69]/u", []string{joiner}},
 		{"var r = /[\\u{1F468}\\u{200D}\\u{1F469}]/u", []string{joiner}},
-		{"var r = /[\\u{1F468}\\u{200D}\\u{1F469}\\u{200D}\\u{1F466}]foo[\\u{1F468}\\u{200D}\\u{1F469}\\u{200D}\\u{1F466}]/u", []string{joiner, joiner, joiner, joiner}},
+		{"var r = /[\\u{1F468}\\u{200D}\\u{1F469}\\u{200D}\\u{1F466}]foo[\\u{1F468}\\u{200D}\\u{1F469}\\u{200D}\\u{1F466}]/u", []string{joiner, joiner}},
 		{"var r = RegExp(\"[👍]\", \"\")", []string{withoutFlag}},
 		{"var r = new RegExp(\"[👍]\", \"\")", []string{withoutFlag}},
 		{"var r = new RegExp('[👍]', ``)", []string{withoutFlag}},
@@ -134,17 +134,17 @@ func TestNoMisleadingCharacterClassFires(t *testing.T) {
 		{"var r = new RegExp(\"[\\\\uD83C\\\\uDDEF\\\\uD83C\\\\uDDF5]\", \"u\")", []string{regional}},
 		{"var r = new RegExp(\"[\\\\u{1F1EF}\\\\u{1F1F5}]\", \"u\")", []string{regional}},
 		{"var r = new RegExp(\"[👨‍👩‍👦]\", \"\")", []string{joiner, joiner, withoutFlag, withoutFlag, withoutFlag}},
-		{"var r = new RegExp(\"[👨‍👩‍👦]\", \"u\")", []string{joiner, joiner}},
+		{"var r = new RegExp(\"[👨‍👩‍👦]\", \"u\")", []string{joiner}},
 		{"var r = new RegExp(\"[👩‍👦]\", \"u\")", []string{joiner}},
 		{"var r = new RegExp(\"[👩‍👦][👩‍👦]\", \"u\")", []string{joiner, joiner}},
-		{"var r = new RegExp(\"[👨‍👩‍👦]foo[👨‍👩‍👦]\", \"u\")", []string{joiner, joiner, joiner, joiner}},
-		{"var r = new RegExp(\"[👨‍👩‍👦👩‍👦]\", \"u\")", []string{joiner, joiner, joiner}},
-		{"var r = new RegExp(\"[\\\\uD83D\\\\uDC68\\\\u200D\\\\uD83D\\\\uDC69\\\\u200D\\\\uD83D\\\\uDC66]\", \"u\")", []string{joiner, joiner}},
-		{"var r = new RegExp(\"[\\\\u{1F468}\\\\u{200D}\\\\u{1F469}\\\\u{200D}\\\\u{1F466}]\", \"u\")", []string{joiner, joiner}},
+		{"var r = new RegExp(\"[👨‍👩‍👦]foo[👨‍👩‍👦]\", \"u\")", []string{joiner, joiner}},
+		{"var r = new RegExp(\"[👨‍👩‍👦👩‍👦]\", \"u\")", []string{joiner, joiner}},
+		{"var r = new RegExp(\"[\\\\uD83D\\\\uDC68\\\\u200D\\\\uD83D\\\\uDC69\\\\u200D\\\\uD83D\\\\uDC66]\", \"u\")", []string{joiner}},
+		{"var r = new RegExp(\"[\\\\u{1F468}\\\\u{200D}\\\\u{1F469}\\\\u{200D}\\\\u{1F466}]\", \"u\")", []string{joiner}},
 		{"var r = new globalThis.RegExp(\"[❇️]\", \"\")", []string{combining}},
 		{"var r = new globalThis.RegExp(\"[👶🏻]\", \"u\")", []string{emoji}},
 		{"var r = new globalThis.RegExp(\"[🇯🇵]\", \"\")", []string{withoutFlag, withoutFlag}},
-		{"var r = new globalThis.RegExp(\"[\\\\u{1F468}\\\\u{200D}\\\\u{1F469}\\\\u{200D}\\\\u{1F466}]\", \"u\")", []string{joiner, joiner}},
+		{"var r = new globalThis.RegExp(\"[\\\\u{1F468}\\\\u{200D}\\\\u{1F469}\\\\u{200D}\\\\u{1F466}]\", \"u\")", []string{joiner}},
 		{"/[\\ud83d\\u{dc4d}]/u", []string{escapedPair}},
 		{"/[\\u{d83d}\\udc4d]/u", []string{escapedPair}},
 		{"/[\\u{d83d}\\u{dc4d}]/u", []string{escapedPair}},
@@ -167,7 +167,7 @@ func TestNoMisleadingCharacterClassFires(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -235,7 +235,7 @@ func TestNoMisleadingCharacterClassStaysSilent(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase, func(t *testing.T) {
 			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile, testCase))
+				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile, testCase))
 		})
 	}
 }
@@ -264,7 +264,7 @@ func TestNoMisleadingCharacterClassTakesTheAllowEscapeDefault(t *testing.T) {
 		{"/[A\\u0301]/", []string{combining}},
 		{"/[👶\\u{1f3fb}]/u", []string{emoji}},
 		{"/[\\u{1F1EF}\\u{1F1F5}]/u", []string{regional}},
-		{"/[👨\\u200d👩\\u200d👦]/u", []string{joiner, joiner}},
+		{"/[👨\\u200d👩\\u200d👦]/u", []string{joiner}},
 		{"/[\\u00B7\\u0300-\\u036F]/u", []string{combining}},
 		{"/[\\n\\u0305]/", []string{combining}},
 		{"RegExp(\"[\\uD83D\\uDC4D]\")", []string{withoutFlag}},
@@ -276,7 +276,7 @@ func TestNoMisleadingCharacterClassTakesTheAllowEscapeDefault(t *testing.T) {
 	for _, testCase := range cleanOnlyWithTheOption {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -300,7 +300,7 @@ func TestNoMisleadingCharacterClassTakesTheAllowEscapeDefault(t *testing.T) {
 	for _, testCase := range reportedEitherWay {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -320,7 +320,7 @@ func TestNoMisleadingCharacterClassIsCleanHereRegardlessOfTheOption(t *testing.T
 	} {
 		t.Run(sourceText, func(t *testing.T) {
 			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile, sourceText))
+				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile, sourceText))
 		})
 	}
 }
@@ -366,7 +366,7 @@ func TestNoMisleadingCharacterClassPointsAtTheOffendingPair(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+			result := rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("wanted %d diagnostics, got %d", len(testCase.wantSpans),
@@ -406,7 +406,7 @@ func TestNoMisleadingCharacterClassSuggestsTheUnicodeFlag(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+			result := rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("wanted a diagnostic, got none")
@@ -439,7 +439,7 @@ func TestNoMisleadingCharacterClassSuggestsTheUnicodeFlag(t *testing.T) {
 func TestNoMisleadingCharacterClassNeverProposesAnAutomaticFix(t *testing.T) {
 	t.Parallel()
 
-	result := rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+	result := rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 		"var r = /[👍]/")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -458,7 +458,7 @@ func TestNoMisleadingCharacterClassNeverProposesAnAutomaticFix(t *testing.T) {
 		"var r = /[👍]{/",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
-			result := rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+			result := rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 				sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("wanted a diagnostic, got none")
@@ -480,7 +480,7 @@ func TestNoMisleadingCharacterClassDoesNotSuggestAFlagThatIsAlreadyThere(t *test
 
 	for _, sourceText := range []string{"var r = /[Á]/u", "var r = /[Á]/v"} {
 		t.Run(sourceText, func(t *testing.T) {
-			result := rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+			result := rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 				sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -590,7 +590,7 @@ func TestNoMisleadingCharacterClassCoversOurOwnDecisions(t *testing.T) {
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
 			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -701,7 +701,7 @@ func TestNoMisleadingCharacterClassCoversOurOwnDecisions(t *testing.T) {
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
 			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText))
 		})
 	}
