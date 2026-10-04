@@ -240,6 +240,12 @@
     "reason": "Only a closure declared `throws` can throw into the catch, and it must be called as `try callback(...)`, so Swift makes the hazard visible at the call; the other side is that it is still writable, and a narrow port could flag it (0 sites today)."
   },
   {
+    "typeScriptRule": "nexus/correctness-no-caller-data-mutation",
+    "verdict": "Compiler",
+    "swiftRule": null,
+    "reason": "A Swift parameter is a constant, and data types are values, so changing a caller's data takes `inout` and an `&` at the call site; a class reached through a parameter is a reference whose mutation is its API, the host-object case this rule exempts."
+  },
+  {
     "typeScriptRule": "nexus/correctness-no-collection-misuse",
     "verdict": "Compiler",
     "swiftRule": null,

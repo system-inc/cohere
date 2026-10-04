@@ -6762,7 +6762,10 @@
             "namespace": "nexus",
             "origin": "house",
             "category": "correctness",
-            "typeAware": true
+            "typeAware": true,
+            "swift": {
+                "verdict": "Compiler"
+            }
         },
         {
             "name": "nexus/correctness-no-collection-misuse",
