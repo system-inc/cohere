@@ -186,6 +186,11 @@ type Options struct {
 	// so they are not opened, and collects what this build read from disk. Nil reads everything from disk.
 	ContentPack *ContentPack
 
+	// LibraryParses, when set, serves the bundled lib files from one parse shared by every program built
+	// with it, rather than parsing them for each program. Nil parses them per program, as before. See
+	// LibraryParses.
+	LibraryParses *LibraryParses
+
 	// Timing, when set, is filled with what the build cost by part. Nil reads no clocks and wraps
 	// nothing, so a build nobody is timing costs what it did before this existed. See GraphTiming.
 	Timing *GraphTiming
@@ -463,6 +468,12 @@ func buildOnce(options Options) (*Graph, error) {
 	// was removed from ProgramOptions in the move to `microsoft/TypeScript` — the compiler now decides
 	// per file rather than taking a program-wide mode — so there is nothing to pass and nothing to
 	// preserve.
+	// With shared lib parses, every load goes through the sharing host, the graph's included, so anything
+	// that loads a file later shares as the build did.
+	if options.LibraryParses != nil {
+		compilerHost = &libraryParsesHost{CompilerHost: compilerHost, parses: options.LibraryParses}
+	}
+
 	// The program is built through a timing host when the build is timed, and the graph keeps the plain
 	// one either way, so nothing after the build reads through the instrument.
 	var programHost compiler.CompilerHost = compilerHost

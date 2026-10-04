@@ -19,7 +19,7 @@ import (
 // this test exercises the path production uses: bundled libs overlaid on osvfs, config resolution
 // through `extends`, and module resolution across files. A memory FS would prove a different code
 // path works.
-func writeProject(t *testing.T, files map[string]string) string {
+func writeProject(t testing.TB, files map[string]string) string {
 	t.Helper()
 
 	directory := t.TempDir()
