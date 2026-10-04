@@ -1000,23 +1000,6 @@
         "cc544edb9a0a": "span",
         "f32ce66981fd": "span"
     },
-    "prefer-const": {
-        "144065a8e160": "missing",
-        "163108b8667d": "missing",
-        "1f092eb44482": "missing",
-        "69d5c04c6422": "missing",
-        "71c4884e5926": "span",
-        "784f22dfa15c": "span",
-        "7cb3a2753c54": "missing",
-        "880c314aec58": "missing",
-        "baa249371984": "span",
-        "c6e4306f177e": "missing",
-        "d0369765dccd": "span",
-        "d0f30e5ffdcd": "span",
-        "e80e4cab2908": "missing",
-        "ee4d5059a44f": "span",
-        "f9d6ab4c3d8a": "span"
-    },
     "prefer-promise-reject-errors": {
         "68f83719ed32": "globals",
         "a25ca62b9654": "extra"

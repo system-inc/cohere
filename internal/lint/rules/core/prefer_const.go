@@ -88,8 +88,10 @@ type PreferConstOptions struct {
 //	valid:   let x; { x = 0; } foo(x);
 //	valid:   for (let x of [1,2,3]) { x = 0; }
 //	valid:   let predicate; [typeNode.returnType, ...predicate] = foo();
+//	valid:   let x; foo() || (x = 0);
 //	invalid: let x = 1; foo(x);
 //	invalid: let x; x = 0;
+//	invalid: let a; ({a} = obj);
 //	invalid: for (let x of [1,2,3]) { foo(x); }
 //	invalid: let { foo, bar } = baz;
 //
@@ -149,12 +151,22 @@ type PreferConstOptions struct {
 //	no initializer and exactly one write      `let x; x = 0;`
 //
 // The second needs more than a count, because `const` has to be initialized where it is declared.
-// A single write only converts when it sits in the same scope as the declaration and is not
-// conditional or repeated, so `let x; { x = 0; } foo(x);` and `let a; while (a = foo());` and
-// `let a; if (true) a = 0; foo(a);` are all clean upstream and all clean here. `unconditionalWrite`
-// is that test and it is deliberately a whitelist: it walks up from the write to the declaration's
-// own scope and refuses if anything on the way could run zero times or more than once. A construct
-// it has not been taught reads as conditional, which is the silent direction.
+// A single write only converts when it is an assignment that is a statement of its own, in the same
+// statement list as the declaration, so `let x; { x = 0; } foo(x);` and `let a; while (a = foo());`
+// and `let a; if (true) a = 0; foo(a);` and `let a; foo() || (a = 0);` are all clean upstream and
+// all clean here. `initializingAssignment` is that test, and it is ESLint's canBecomeVariableDeclaration:
+// the assignment could be rewritten into the declaration where it stands, and nowhere else could.
+//
+// A destructuring assignment converts too. `let a; ({a} = obj);` becomes `const {a} = obj;`, which is
+// why ESLint reports it, as long as the pattern could become a declaration's pattern: every target in it
+// a plain name, and every name either undeclared or a `let` beside this one in the same statement list.
+// A property target, a parameter or a binding from an enclosing scope cannot be declared there, so
+// `let predicate; [typeNode.returnType, predicate] = foo();` stays clean. ESLint asks the outer-scope
+// question of the pattern's top level only; this asks it at every depth, which can only fall silent.
+//
+// Where the finding points follows ESLint. With an initializer it names the declaration. Without one it
+// names the write, since that is the line that becomes the declaration, unless the binding is read
+// before that write, in which case it names the declaration, where the read-before-write is visible.
 //
 // A for-in or for-of head is its own shape. `for (let x of [1,2,3]) { foo(x); }` binds a fresh `x`
 // per iteration with no initializer to speak of, so zero writes is enough and upstream reports it.
@@ -167,7 +179,7 @@ type PreferConstOptions struct {
 // A binding written from a nested function is never reported, whatever the count. `let a; function
 // foo() { a = bar(); }` is clean upstream, and the reason is not stylistic: the write may run any
 // number of times including zero, and `const` cannot express it. The write detector sees these, and
-// `unconditionalWrite` refuses them at the function boundary.
+// `initializingAssignment` refuses them, since the write's statement is not in the declaration's list.
 //
 // A pattern whose bindings disagree is where the `destructuring` option lives, and the two answers
 // are both defensible. See PreferConstDestructuring.
@@ -251,8 +263,8 @@ var PreferConst = rule.Rule{
 						anyDeclined := false
 						forEachBoundName(declaration.AsVariableDeclaration().Name(),
 							func(boundName *ast.Node) {
-								if !bindingIsNeverReassigned(ctx, settings, sourceFile, boundName,
-									declaration, isLoopHead) {
+								if judgeConstCandidate(ctx, settings, sourceFile, boundName,
+									declaration, isLoopHead) == nil {
 									anyDeclined = true
 								}
 							})
@@ -275,8 +287,8 @@ var PreferConst = rule.Rule{
 					}
 					forEachBoundName(declaration.AsVariableDeclaration().Name(),
 						func(boundName *ast.Node) {
-							if !bindingIsNeverReassigned(ctx, settings, sourceFile, boundName,
-								declaration, isLoopHead) {
+							if judgeConstCandidate(ctx, settings, sourceFile, boundName,
+								declaration, isLoopHead) == nil {
 								listIsFixable = false
 							}
 						})
@@ -322,12 +334,12 @@ func reportConstCandidates(ctx rule.Context, settings PreferConstOptions,
 	isDestructuring := name.Kind == ast.KindObjectBindingPattern ||
 		name.Kind == ast.KindArrayBindingPattern
 
-	constable := make([]bool, len(boundNames))
+	candidates := make([]*constCandidate, len(boundNames))
 	allConstable := true
 	for index, boundName := range boundNames {
-		constable[index] = bindingIsNeverReassigned(ctx, settings, sourceFile, boundName,
-			declaration, isLoopHead)
-		if !constable[index] {
+		candidates[index] = judgeConstCandidate(ctx, settings, sourceFile, boundName, declaration,
+			isLoopHead)
+		if candidates[index] == nil {
 			allConstable = false
 		}
 	}
@@ -339,27 +351,47 @@ func reportConstCandidates(ctx rule.Context, settings PreferConstOptions,
 		return
 	}
 
-	for index, boundName := range boundNames {
-		if !constable[index] {
+	for _, candidate := range candidates {
+		if candidate == nil {
+			continue
+		}
+		// The same judgment for a destructuring assignment: under "all", a binding whose only write is
+		// a pattern reports only when every binding that pattern declares here could be const too,
+		// since the pattern moves into one declaration whole. `let a, b; ({a, b} = obj); b = 0;` names
+		// neither. ESLint groups by the assignment the same way.
+		if settings.Destructuring == PreferConstDestructuringAll && candidate.assignment != nil &&
+			!assignmentConvertsWhole(ctx, settings, sourceFile, candidate.assignment) {
 			continue
 		}
 		if listIsFixable && !*fixAlreadyOffered {
 			*fixAlreadyOffered = true
-			ctx.ReportNodeWithFixes(boundName, messagePreferConst, letKeywordToConst(ctx, list))
+			ctx.ReportNodeWithFixes(candidate.reportAt, messagePreferConst, letKeywordToConst(ctx, list))
 			continue
 		}
-		ctx.ReportNode(boundName, messagePreferConst)
+		ctx.ReportNode(candidate.reportAt, messagePreferConst)
 	}
 }
 
-// bindingIsNeverReassigned decides whether one bound name could have been declared `const`.
+// constCandidate is a binding that could have been declared `const`, and where to say so.
+type constCandidate struct {
+	// reportAt is the identifier the finding names: the declaration's name, or the single write that
+	// would become the declaration. See "Where the finding points" on PreferConst.
+	reportAt *ast.Node
+
+	// assignment is the destructuring assignment that carries the binding's only write, when that is
+	// how it is written. Under "all" the bindings that assignment declares answer together.
+	assignment *ast.Node
+}
+
+// judgeConstCandidate decides whether one bound name could have been declared `const`, and where a
+// finding about it points. Nil means it could not.
 //
-// The whole rule's judgment is here, and every branch that returns false is a place the rule
-// declines to speak. That asymmetry is deliberate: see the inversion note on PreferConst.
-func bindingIsNeverReassigned(ctx rule.Context, settings PreferConstOptions,
-	sourceFile *ast.SourceFile, boundName *ast.Node, declaration *ast.Node, isLoopHead bool) bool {
+// The whole rule's judgment is here, and every branch that returns nil is a place the rule declines
+// to speak. That asymmetry is deliberate: see the inversion note on PreferConst.
+func judgeConstCandidate(ctx rule.Context, settings PreferConstOptions, sourceFile *ast.SourceFile,
+	boundName *ast.Node, declaration *ast.Node, isLoopHead bool) *constCandidate {
 	if boundName == nil || boundName.Kind != ast.KindIdentifier {
-		return false
+		return nil
 	}
 
 	// Resolved through the checker rather than taken as the declarator node directly, so that both
@@ -367,7 +399,7 @@ func bindingIsNeverReassigned(ctx rule.Context, settings PreferConstOptions,
 	// checker for the other compares two things that happen to agree today.
 	anchor := declarationAnchoredAt(ctx, boundName)
 	if anchor == nil {
-		return false
+		return nil
 	}
 
 	writes := writesResolvingTo(ctx, sourceFile, boundName, anchor)
@@ -386,34 +418,48 @@ func bindingIsNeverReassigned(ctx rule.Context, settings PreferConstOptions,
 			boundary = writes[0].Pos()
 		}
 		if readsBeforePosition(ctx, sourceFile, boundName, anchor, boundary) {
-			return false
+			return nil
 		}
 	}
 
 	// A for-in/of head rebinds on every iteration and needs no initializer, so no writes at all is
-	// the whole test. `for (let x of [1,2,3]) { x = 0; }` has one and is correctly declined.
-	if isLoopHead {
-		return len(writes) == 0
-	}
-
-	if declaration.AsVariableDeclaration().Initializer != nil {
-		return len(writes) == 0
+	// the whole test. `for (let x of [1,2,3]) { x = 0; }` has one and is correctly declined. The same
+	// holds with an initializer, and both name the declaration.
+	if isLoopHead || declaration.AsVariableDeclaration().Initializer != nil {
+		if len(writes) != 0 {
+			return nil
+		}
+		return &constCandidate{reportAt: boundName}
 	}
 
 	// No initializer. A `const` must be initialized at its declaration, so exactly one write can
-	// stand in for the initializer and only where that write is guaranteed to run exactly once in
-	// the declaration's own scope.
+	// stand in for the initializer and only where that write could be rewritten into the declaration.
 	if len(writes) != 1 {
-		return false
+		return nil
 	}
 
 	// A read-write such as `x += 1` or `x++` cannot be the initializing write: it reads the binding
 	// before the declaration ever gave it a value. `let x; x += 1;` is clean upstream.
 	if !isWriteOnly(writes[0]) {
-		return false
+		return nil
 	}
 
-	return unconditionalWrite(writes[0], declaration)
+	assignment := initializingAssignment(ctx, writes[0], declaration)
+	if assignment == nil {
+		return nil
+	}
+	candidate := &constCandidate{reportAt: writes[0]}
+	if pattern := ast.SkipParentheses(assignment.AsBinaryExpression().Left); pattern.Kind == ast.KindArrayLiteralExpression ||
+		pattern.Kind == ast.KindObjectLiteralExpression {
+		candidate.assignment = assignment
+	}
+
+	// A read before the write moves the finding to the declaration, as ESLint does: the reader acting
+	// on it has to see that read, and it is at the declaration's end of the code, not the write's.
+	if readsBeforePosition(ctx, sourceFile, boundName, anchor, writes[0].Pos()) {
+		candidate.reportAt = boundName
+	}
+	return candidate
 }
 
 // writesResolvingTo collects every occurrence in the file that assigns to one declaration.
@@ -468,7 +514,11 @@ func readsBeforePosition(ctx rule.Context, sourceFile *ast.SourceFile, boundName
 		if current == nil || found {
 			return
 		}
+		// The declaration's own name resolves to the declaration too, and is not a read. Counting it
+		// made every uninitialized binding read before its write, so under the option `let x; x = 0;`
+		// went silent, and ESLint reports it.
 		if current.Kind == ast.KindIdentifier &&
+			current != boundName &&
 			current.Text() == boundName.Text() &&
 			current.Pos() < position &&
 			!reference.WritesToBinding(current) &&
@@ -525,60 +575,241 @@ func isWriteOnly(identifier *ast.Node) bool {
 	return false
 }
 
-// unconditionalWrite reports whether a single write is guaranteed to run exactly once in the
-// declaration's own scope.
+// initializingAssignment returns the assignment a single write makes, when that assignment could be
+// rewritten into the declaration where it stands, and nil when it could not.
 //
-// This is what stands in for oxc's ancestor walk over control-flow node kinds, and it is a
-// whitelist rather than a blacklist on purpose. oxc enumerates the constructs that make a write
-// conditional and treats anything unlisted as fine; that direction ships a false positive the first
-// time a construct is left out. This enumerates the constructs a write may pass through and treats
-// anything unlisted as conditional, so an unfamiliar shape costs a missed report instead.
+// That is ESLint's canBecomeVariableDeclaration, and it is a whitelist on purpose: the assignment must
+// be a plain `=`, the whole of its own expression statement, and that statement must sit directly in
+// the declaration's statement list. Anything else reads as conditional or repeated, which is the silent
+// direction. `let x; { x = 0; }` fails the list, `let a; while (a = foo());` and `let a; if (c) a = 0;`
+// fail the statement, and `let a; foo() || (a = 0);` and `let a; b = a = 0;` fail being the whole of
+// it. The last two used to report: the climb this replaces passed through any binary expression on the
+// way up, so a write a `||` guards read as unconditional.
 //
-// The climb stops at the declaration's own statement list. A write in a nested block, a loop body,
-// an `if` branch, a `switch` case, a `try`, or any function is refused, which is what makes
-// `let x; { x = 0; } foo(x);` and `let a; while (a = foo());` and `let a; function foo() { a =
-// bar(); }` clean.
-func unconditionalWrite(write *ast.Node, declaration *ast.Node) bool {
+// A destructuring assignment qualifies when its pattern could become a declaration's pattern. See
+// patternDeclaresOnlyNeighbors.
+func initializingAssignment(ctx rule.Context, write *ast.Node, declaration *ast.Node) *ast.Node {
 	declarationScope := enclosingStatementList(declaration)
 	if declarationScope == nil {
-		return false
+		return nil
 	}
 
-	// A write that arrives through a destructuring assignment target is refused outright. The
-	// reason is upstream's and it is about what the repair would have to produce: a `const` must be
-	// initialized where it is declared, and there is no way to spell "declare this const and give
-	// it the second element of that array" without moving the pattern up into the declaration,
-	// which is a restructuring rather than a keyword swap. Upstream reaches the same answer through
-	// three separate ancestor arms (a member expression anywhere in the target, an enclosing block,
-	// and a bare array expression) that between them refuse every destructuring shape its corpus
-	// carries; this refuses the category once, which is the quieter direction the inversion note
-	// asks for and which the whole `predicate` family of clean cases depends on.
-	if writeArrivesThroughDestructuring(write) {
-		return false
+	// No operator check: isWriteOnly has already refused every compound and logical assignment, and
+	// a mutant dropping one here survived the suite as the dead code it was.
+	assignment := assignmentWriting(write)
+	if assignment == nil {
+		return nil
 	}
 
-	for current := write; current != nil; current = current.Parent {
-		switch current.Kind {
-		case ast.KindIdentifier,
-			ast.KindBinaryExpression,
-			ast.KindParenthesizedExpression,
+	statement := assignment.Parent
+	for statement != nil && statement.Kind == ast.KindParenthesizedExpression {
+		statement = statement.Parent
+	}
+	if statement == nil || statement.Kind != ast.KindExpressionStatement ||
+		statement.Parent != declarationScope {
+		return nil
+	}
+
+	pattern := ast.SkipParentheses(assignment.AsBinaryExpression().Left)
+	if (pattern.Kind == ast.KindArrayLiteralExpression || pattern.Kind == ast.KindObjectLiteralExpression) &&
+		!patternDeclaresOnlyNeighbors(ctx, pattern, declarationScope) {
+		return nil
+	}
+	return assignment
+}
+
+// assignmentWriting returns the assignment that writes an identifier, climbing out of any destructuring
+// pattern the identifier is a target in, or nil when the write is not an assignment's.
+//
+// It is only asked about writes, so a property key or a shorthand's default, which are never written,
+// cannot arrive here and the wrappers need no test of which side the identifier is on. A for-in/of
+// target is a write that no assignment makes, and the climb ends at its head with nil.
+//
+// TypeScript's GetAssignmentTarget climbs the same wrappers but stops at a default: in `[a = 0] = xs`
+// it answers the `a = 0`, which is the element's default value and not an assignment anyone wrote. An
+// `=` standing where a pattern element goes is read here as the default it is and climbed past. If the
+// literal around it turns out not to be a pattern, as in `foo([a = 0])`, the climb ends at something
+// that is not an assignment and the answer is nil, which is right: that write is no statement a
+// declaration could replace.
+func assignmentWriting(write *ast.Node) *ast.Node {
+	child := write
+	for parent := write.Parent; parent != nil; child, parent = parent, parent.Parent {
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression,
 			ast.KindArrayLiteralExpression,
 			ast.KindObjectLiteralExpression,
 			ast.KindSpreadElement,
 			ast.KindSpreadAssignment,
 			ast.KindShorthandPropertyAssignment,
-			ast.KindPropertyAssignment,
-			ast.KindExpressionStatement:
-			// A plain assignment statement and the destructuring wrappers it may contain. Anything
-			// here runs exactly when its enclosing statement list runs.
+			ast.KindPropertyAssignment:
+			// Wrappers a target sits inside. The question is decided further up.
+
+		case ast.KindBinaryExpression:
+			binary := parent.AsBinaryExpression()
+			if binary.OperatorToken == nil || !ast.IsAssignmentOperator(binary.OperatorToken.Kind) ||
+				binary.Left != child {
+				return nil
+			}
+			if isPatternElementDefault(parent) {
+				continue
+			}
+			return parent
 
 		default:
-			// Reached the construct that holds the statement. It is the write's home only if it is
-			// the same one the declaration lives in.
-			return current == declarationScope
+			return nil
 		}
 	}
+	return nil
+}
+
+// isPatternElementDefault reports whether an `=` stands where an array element or a property's value
+// goes, which in a pattern makes it that element's default: `[a = 0]`, `{k: a = 0}`.
+func isPatternElementDefault(binary *ast.Node) bool {
+	if binary.AsBinaryExpression().OperatorToken.Kind != ast.KindEqualsToken || binary.Parent == nil {
+		return false
+	}
+	switch binary.Parent.Kind {
+	case ast.KindArrayLiteralExpression:
+		return true
+	case ast.KindPropertyAssignment:
+		return binary.Parent.Name() != binary
+	}
 	return false
+}
+
+// patternDeclaresOnlyNeighbors reports whether a destructuring assignment's pattern could move into a
+// declaration in this statement list unchanged.
+//
+// Every target must be a plain name, at any depth, since a declaration's pattern binds names and
+// nothing else: `[typeNode.returnType, predicate] = foo()` cannot become one. That is ESLint's
+// hasMemberExpressionAssignment, which also reads every depth. And every name must be one the new
+// declaration may declare: undeclared, or a `let` declared directly in the same statement list, which
+// the rewrite would fold in. A parameter, a `var`, an import, a function, or a binding from an
+// enclosing scope cannot be redeclared there. ESLint checks this only at the pattern's top level, and
+// for a `var` or a same-scope function it lets the name through; both are reported here as not
+// convertible, the silent direction, since the rewrite they invite does not compile.
+func patternDeclaresOnlyNeighbors(ctx rule.Context, pattern *ast.Node, declarationScope *ast.Node) bool {
+	return forEachAssignmentTarget(ctx, pattern, func(symbol *ast.Symbol) bool {
+		if !hasDeclaration(symbol) {
+			return true
+		}
+		return neighboringLet(ctx, symbol, declarationScope) != nil
+	})
+}
+
+// assignmentConvertsWhole reports whether every binding a destructuring assignment declares could be
+// const, which is what "all" asks of the pattern before naming any of them.
+func assignmentConvertsWhole(ctx rule.Context, settings PreferConstOptions, sourceFile *ast.SourceFile,
+	assignment *ast.Node) bool {
+	pattern := ast.SkipParentheses(assignment.AsBinaryExpression().Left)
+	return forEachAssignmentTarget(ctx, pattern, func(symbol *ast.Symbol) bool {
+		if !hasDeclaration(symbol) {
+			return true
+		}
+		// The pattern already passed patternDeclaresOnlyNeighbors, so every declared name in it is a
+		// `let` this file holds.
+		own := rule.DeclarationsIn(ctx.SourceFile, symbol)
+		if len(own) == 0 {
+			return false
+		}
+		declaration := own[0]
+		for declaration != nil && declaration.Kind != ast.KindVariableDeclaration {
+			declaration = declaration.Parent
+		}
+		if declaration == nil {
+			return false
+		}
+		return judgeConstCandidate(ctx, settings, sourceFile, own[0].Name(), declaration, false) != nil
+	})
+}
+
+// forEachAssignmentTarget calls back with the symbol each name in a destructuring pattern writes, and
+// answers false as soon as a target is not a plain name or the callback answers false.
+func forEachAssignmentTarget(ctx rule.Context, target *ast.Node, callback func(*ast.Symbol) bool) bool {
+	switch target.Kind {
+	case ast.KindParenthesizedExpression:
+		return forEachAssignmentTarget(ctx, target.AsParenthesizedExpression().Expression, callback)
+
+	case ast.KindArrayLiteralExpression:
+		for _, element := range target.AsArrayLiteralExpression().Elements.Nodes {
+			if element.Kind == ast.KindOmittedExpression {
+				continue
+			}
+			if !forEachAssignmentTarget(ctx, element, callback) {
+				return false
+			}
+		}
+		return true
+
+	case ast.KindObjectLiteralExpression:
+		for _, property := range target.AsObjectLiteralExpression().Properties.Nodes {
+			switch property.Kind {
+			case ast.KindShorthandPropertyAssignment:
+				// The name resolves to the property, so the value it writes is asked for separately.
+				if !callback(ctx.TypeChecker.GetShorthandAssignmentValueSymbol(property)) {
+					return false
+				}
+			case ast.KindPropertyAssignment:
+				if !forEachAssignmentTarget(ctx, property.AsPropertyAssignment().Initializer, callback) {
+					return false
+				}
+			case ast.KindSpreadAssignment:
+				if !forEachAssignmentTarget(ctx, property.AsSpreadAssignment().Expression, callback) {
+					return false
+				}
+			default:
+				return false
+			}
+		}
+		return true
+
+	case ast.KindSpreadElement:
+		return forEachAssignmentTarget(ctx, target.AsSpreadElement().Expression, callback)
+
+	case ast.KindBinaryExpression:
+		// A default: `[a = 0]`. The target is its left side.
+		binary := target.AsBinaryExpression()
+		if binary.OperatorToken.Kind != ast.KindEqualsToken {
+			return false
+		}
+		return forEachAssignmentTarget(ctx, binary.Left, callback)
+
+	case ast.KindIdentifier:
+		return callback(ctx.TypeChecker.GetSymbolAtLocation(target))
+	}
+	return false
+}
+
+// hasDeclaration reports whether a name resolves to something declared, here or in a lib. A name
+// nothing declares resolves to no symbol, or to one without declarations, and ESLint treats it as free
+// to declare. Asked through the shelf's file questions, which hand back no node of another file.
+func hasDeclaration(symbol *ast.Symbol) bool {
+	return rule.IsDeclaredInASourceFile(symbol) || rule.IsDeclaredOnlyInDeclarationFiles(symbol)
+}
+
+// neighboringLet returns a symbol's declaration when it is a `let` statement's binding in this file,
+// declared directly in the given statement list, and nil otherwise.
+//
+// A `let` cannot merge with another declaration, so its one declaration in this file is the whole of
+// it, and a name declared only elsewhere has none here.
+func neighboringLet(ctx rule.Context, symbol *ast.Symbol, declarationScope *ast.Node) *ast.Node {
+	own := rule.DeclarationsIn(ctx.SourceFile, symbol)
+	if len(own) == 0 {
+		return nil
+	}
+	declaration := own[0]
+	list := declaration.Parent
+	for list != nil && list.Kind != ast.KindVariableDeclarationList {
+		list = list.Parent
+	}
+	if list == nil || list.Flags&ast.NodeFlagsLet == 0 || list.Parent == nil ||
+		list.Parent.Kind != ast.KindVariableStatement {
+		return nil
+	}
+	if enclosingStatementList(declaration) != declarationScope {
+		return nil
+	}
+	return declaration
 }
 
 // enclosingStatementList returns the construct whose statement list directly holds a node.
@@ -616,47 +847,4 @@ func enclosingStatementList(node *ast.Node) *ast.Node {
 func letKeywordToConst(ctx rule.Context, list *ast.Node) rule.Fix {
 	keyword := rule.TokenRange(ctx.SourceFile, list)
 	return rule.ReplaceRange(core.NewTextRange(keyword.Pos(), keyword.Pos()+len("let")), "const")
-}
-
-// writeArrivesThroughDestructuring reports whether an identifier is written by being a target
-// inside an array or object destructuring assignment, rather than by a plain `x = value`.
-//
-// The climb is the same shape as the shelf write detector's and for the same reason: a target
-// nests, so `[, {foo: typeNode.returnType, ...predicate}] = foo()` reaches its assignment through
-// object, array and spread nodes in turn. Seeing any array or object literal on the way up to the
-// assignment operator is the whole test, because in an assignment target position those literals
-// are patterns rather than constructed values.
-func writeArrivesThroughDestructuring(write *ast.Node) bool {
-	sawPattern := false
-	child := write
-	for parent := write.Parent; parent != nil; parent = parent.Parent {
-		switch parent.Kind {
-		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
-			sawPattern = true
-
-		case ast.KindParenthesizedExpression,
-			ast.KindSpreadElement,
-			ast.KindSpreadAssignment,
-			ast.KindShorthandPropertyAssignment,
-			ast.KindPropertyAssignment:
-			// Wrappers a target sits inside. The question is decided further up.
-
-		case ast.KindBinaryExpression:
-			binary := parent.AsBinaryExpression()
-			if binary.OperatorToken == nil ||
-				!ast.IsAssignmentOperator(binary.OperatorToken.Kind) ||
-				ast.SkipParentheses(binary.Left) != child {
-				return false
-			}
-			return sawPattern
-
-		case ast.KindForInStatement, ast.KindForOfStatement:
-			return sawPattern && parent.AsForInOrOfStatement().Initializer == child
-
-		default:
-			return false
-		}
-		child = parent
-	}
-	return false
 }

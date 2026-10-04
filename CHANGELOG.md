@@ -82,3 +82,11 @@ chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
   file under `alwaysStrict`, so in a TypeScript program the leak is reported only in a JavaScript
   script. A script's top-level `var` or function declaration still reports, strict or not, since it is
   a global either way.
+- `prefer-const` reports where ESLint does. A `let` with no initializer is reported at its one write,
+  the line that would become the declaration, or at the declaration when something reads it before that
+  write. A destructuring assignment can be that write now (`let a; ({a} = obj);`), when every target in
+  its pattern is a plain name either undeclared or a `let` beside it, and under `"all"` the names one
+  assignment writes report together or not at all. A write that is only part of its statement, such as
+  `foo() || (x = 0)` or `y = x = 0`, is no longer taken for one that initializes, and under
+  `ignoreReadBeforeAssign` the declaration's own name no longer counts as a read, so `let x; x = 0;`
+  reports there too.

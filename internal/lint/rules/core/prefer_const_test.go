@@ -211,13 +211,12 @@ func TestPreferConstStaysSilent(t *testing.T) {
 		// A rest element in a destructuring assignment target. `ast.IsWriteAccess` returns FALSE
 		// for these, measured; without the spread arms in writesToBinding the rule reports `w` as
 		// never reassigned and offers a fix that produces a const it then writes to.
-		// These carry an INITIALIZER, and that is the whole point of them. Without one the
-		// binding takes the "no initializer, exactly one write" path, where unconditionalWrite
-		// refuses every destructuring write anyway and so masks whether the rest arm in
-		// writesToBinding works at all. With an initializer the test is `len(writes) == 0` and
-		// nothing else runs, so the rest arm is the only thing standing between correct code and a
-		// finding that rewrites it into a const it then writes to. A mutation stubbing
-		// isRestTargetOfAssignment to false survived the whole suite until these existed.
+		// These carry an INITIALIZER, and that is the whole point of them. With one the test is
+		// `len(writes) == 0` and nothing else runs, so the rest arm is the only thing standing
+		// between correct code and a finding that rewrites it into a const it then writes to. A
+		// mutation stubbing isRestTargetOfAssignment to false survived the whole suite until these
+		// existed. Without an initializer the same write is the one that initializes, and ESLint
+		// reports it: those shapes are in TestPreferConstReportsADestructuringWrite.
 		{"an initialized array rest target", "let w = 1; [...w] = [];"},
 		{"an initialized object rest target", "let w = 1; ({...w} = {});"},
 		{"an initialized rest after another element", "let w = 1; [a, ...w] = [];"},
@@ -234,13 +233,39 @@ func TestPreferConstStaysSilent(t *testing.T) {
 		{"an initialized parenthesized array rest target", "let w = 1; [...(w)] = [];"},
 		{"an initialized parenthesized object rest target", "let w = 1; ({...(w)} = {});"},
 
-		{"an array rest assignment target", "let w; [...w] = [];"},
-		{"an object rest assignment target", "let w; ({...w} = {});"},
-		{"an array rest after another element", "let w; [a, ...w] = [];"},
-		{"an object rest after another property", "let w; ({a, ...w} = {});"},
-		{"a rest nested inside a property value", "let w; ({ x: [...w] } = {});"},
-		{"a parenthesized array rest target", "let w; [...(w)] = [];"},
-		{"a parenthesized object rest target", "let w; ({...(w)} = {});"},
+		// An assignment that is not the whole of its statement runs only as its expression allows,
+		// and cannot become a declaration where it stands. The `||` and chained shapes reported
+		// before initializingAssignment, because the climb it replaced passed through any binary
+		// expression on the way up to the statement.
+		{"a write a logical or guards", "let x; foo() || (x = 0);"},
+		{"a write a logical and guards", "let x; foo() && (x = 0); bar(x);"},
+		{"a write inside a chained assignment", "let x; y = x = 0;"},
+		{"a write after a comma", "let x; foo(), x = 0;"},
+		{"a write under a label", "let x; label: x = 0;"},
+		{"a write as an argument", "let x; foo(x = 0);"},
+
+		// Destructuring assignments whose pattern cannot become a declaration here.
+		{"a destructuring write in a nested block", "let a; { [a] = xs; }"},
+		{"a destructuring write under an if", "let a; if (c) [a] = xs;"},
+		{"a destructuring write as a value", "let a; const b = [a] = xs;"},
+		{"a destructuring for-of target", "let a; for ({a} of xs) {}"},
+		{"an array destructuring for-of target", "let a; for ([a] of xs) {}"},
+		{"a default inside an array argument", "let a; foo([a = 0]);"},
+		{"a default inside a bare array", "let a; [a = 0];"},
+		// The first three and the import are departures from ESLint, which reads only the pattern's
+		// top level and lets a same-scope `var`, function or import through. Each fails toward
+		// silence, since the declaration ESLint's finding invites would redeclare the name.
+		{"a pattern writing a var too", "var v; let a; [a, v] = foo();"},
+		{"a pattern writing a function too", "function g() {} let a; [a, g] = foo();"},
+		{"a pattern writing an import too", "import { i } from 'm'; let a; [a, i] = foo();"},
+		{"a nested pattern writing an outer let", "let o; { let a; [[o, a]] = foo(); }"},
+		{"a pattern writing an outer let", "let o; { let a; [o, a] = foo(); }"},
+		{"a pattern writing a lib global", "let a; [a, escape] = xs;"},
+		{"a pattern writing a property in a default", "let a; [a = 0, o.p] = foo();"},
+		{"a pattern whose object rest is a property", "let a; ({a, ...o.p} = obj);"},
+		// A departure: ESLint's member test does not descend into an array's rest element, so it
+		// reports `a` here and invites `const [a, ...o.p] = xs`, which does not parse.
+		{"a pattern whose array rest is a property", "let a; [a, ...o.p] = xs;"},
 
 		// A postfix update, the shape no_ex_assign was missing entirely until today.
 		{"a postfix increment", "let w = 1; w++;"},
@@ -533,7 +558,6 @@ func TestPreferConstReportsAtTheBinding(t *testing.T) {
 	}{
 		{"a plain binding", "let x = 1; foo(x);", []string{"x"}},
 		{"a binding with a longer name", "let counter = 1; foo(counter);", []string{"counter"}},
-		{"an uninitialized binding", "let x; x = 0;", []string{"x"}},
 		{"a for-of head", "for (let x of [1,2,3]) { foo(x); }", []string{"x"}},
 		{"a for-in head", "for (let i in [1,2,3]) { foo(i); }", []string{"i"}},
 		{"each binding of a pattern", "let { foo, bar } = baz;", []string{"foo", "bar"}},
@@ -557,6 +581,126 @@ func TestPreferConstReportsAtTheBinding(t *testing.T) {
 			for index, want := range testCase.want {
 				if got := reportedTextOf(t, result, index); got != want {
 					t.Errorf("finding %d reported %q, want %q", index, got, want)
+				}
+			}
+		})
+	}
+}
+
+// TestPreferConstReportsAtTheWrite pins where an uninitialized binding's finding points.
+//
+// ESLint names the single write, since that is the line that becomes the declaration, and names the
+// declaration instead when something reads the binding before the write. The text alone cannot tell
+// the two apart in `let x; x = 0;`, so these assert offsets, counted off the literal.
+func TestPreferConstReportsAtTheWrite(t *testing.T) {
+	t.Parallel()
+
+	ignoring := PreferConstOptions{IgnoreReadBeforeAssign: true}
+	cases := []struct {
+		name       string
+		sourceText string
+		options    PreferConstOptions
+		want       []int
+	}{
+		{"the write", "let x; x = 0;", PreferConstOptions{}, []int{7}},
+		{"the write in a switch case", "switch (a) { case 0: let x; x = 0; }", PreferConstOptions{}, []int{28}},
+		{"the write in a static block", "class C { static { let a; a = 1; } }", PreferConstOptions{}, []int{26}},
+		{"the declaration, when a read comes first", "let x; foo(x); x = 0;", PreferConstOptions{}, []int{4}},
+		{"the declaration, when a closure reads first", "let x; function f() { x; } x = 0;", PreferConstOptions{}, []int{4}},
+		{"the write, after a read the write follows", "let x; x = 0; foo(x);", PreferConstOptions{}, []int{7}},
+		// A departure: ESLint leaves this, since a namespace body is not a block it knows, and reports
+		// the initialized `let` in the same place. The write converts here as in any block.
+		{"the write in a namespace", "namespace N { let x; x = 0; }", PreferConstOptions{}, []int{21}},
+
+		// The declaration's own name is not a read. Counting it silenced every uninitialized binding
+		// under the option, and ESLint reports this one.
+		{"the write, under ignoreReadBeforeAssign", "let x; x = 0;", ignoring, []int{7}},
+		{"the write in a function, under ignoreReadBeforeAssign", "(function() { let x; x = 1; })();", ignoring, []int{21}},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile, testCase.sourceText,
+				testCase.options)
+			if len(result.Diagnostics) != len(testCase.want) {
+				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.want))
+			}
+			for index, want := range testCase.want {
+				if got := result.Diagnostics[index].Range.Pos(); got != want {
+					t.Errorf("finding %d is at %d, want %d", index, got, want)
+				}
+			}
+		})
+	}
+
+	// Still read before its write under the option, so still silent there.
+	t.Run("a read before the write, under ignoreReadBeforeAssign", func(t *testing.T) {
+		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+			"let x; foo(x); x = 0;", ignoring))
+	})
+}
+
+// TestPreferConstReportsADestructuringWrite covers a binding whose only write is a destructuring
+// assignment that could become its declaration: `let a; ({a} = obj);` is `const {a} = obj;`.
+//
+// Each finding names the target inside the pattern, by offset. A pattern holding a name nothing
+// declares is still convertible, as ESLint has it: `returnType` below would be declared by the new
+// pattern, and a TypeScript file that writes an undeclared name already has a compile error to fix.
+func TestPreferConstReportsADestructuringWrite(t *testing.T) {
+	t.Parallel()
+
+	allMode := PreferConstOptions{Destructuring: PreferConstDestructuringAll}
+	cases := []struct {
+		name       string
+		sourceText string
+		options    PreferConstOptions
+		want       []int
+	}{
+		{"an object pattern", "let a; ({a} = obj);", PreferConstOptions{}, []int{9}},
+		{"an array pattern", "let a; [a] = xs;", PreferConstOptions{}, []int{8}},
+		{"an array default", "let a; [a = 0] = xs;", PreferConstOptions{}, []int{8}},
+		{"a property value with a default", "let a; ({k: a = 0} = o);", PreferConstOptions{}, []int{12}},
+		{"a shorthand with a default", "let a; ({a = 1} = o);", PreferConstOptions{}, []int{9}},
+		{"two lets in one pattern", "let a, b; ({a, b} = obj);", PreferConstOptions{}, []int{12, 15}},
+		{"two let statements in one pattern", "let a; let b; [a, b] = xs;", PreferConstOptions{}, []int{15, 18}},
+		{"a nested pattern", "let a, b; [a, [b]] = xs;", PreferConstOptions{}, []int{11, 15}},
+		{"a pattern holding an undeclared name", "let predicate; [, {foo:returnType, predicate}] = foo();", PreferConstOptions{}, []int{35}},
+		{"a pattern inside a for-of body", "for (const b of c) { let a; ({a} = b); }", PreferConstOptions{}, []int{30}},
+
+		// The rest shapes, which are writes the shelf's accessor once missed. Without an initializer
+		// the rest write is the initializing one.
+		{"an array rest target", "let w; [...w] = [];", PreferConstOptions{}, []int{11}},
+		{"an object rest target", "let w; ({...w} = {});", PreferConstOptions{}, []int{12}},
+		{"an array rest after an undeclared element", "let w; [a, ...w] = [];", PreferConstOptions{}, []int{14}},
+		{"an object rest after an undeclared property", "let w; ({a, ...w} = {});", PreferConstOptions{}, []int{15}},
+		{"a rest nested inside a property value", "let w; ({ x: [...w] } = {});", PreferConstOptions{}, []int{17}},
+		{"a parenthesized array rest target", "let w; [...(w)] = [];", PreferConstOptions{}, []int{12}},
+		{"a parenthesized object rest target", "let w; ({...(w)} = {});", PreferConstOptions{}, []int{13}},
+		{"a rest after a hole", "let w; [, [...w]] = [];", PreferConstOptions{}, []int{14}},
+
+		// Under "any" a pattern answers per binding, so the one written again stays a `let` and the
+		// other reports. Under "all" the pattern moves into one declaration whole, or not at all.
+		{"one binding written again, any", "let a, b; ({a, b} = obj); b = 0;", PreferConstOptions{}, []int{12}},
+		{"one binding written again, all", "let a, b; ({a, b} = obj); b = 0;", allMode, nil},
+		{"one binding initialized elsewhere, all", "let a; let b = 1; [a, b] = xs;", allMode, nil},
+		{"every binding converts, all", "let a, b; ({a, b} = obj);", allMode, []int{12, 15}},
+		{"a nested pattern where every binding converts, all", "let a, b; [a, [b]] = xs;", allMode, []int{11, 15}},
+		{"an undeclared name beside the binding, all", "let a; [a, u] = xs;", allMode, []int{8}},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile, testCase.sourceText,
+				testCase.options)
+			if len(result.Diagnostics) != len(testCase.want) {
+				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.want))
+			}
+			for index, want := range testCase.want {
+				if got := result.Diagnostics[index].Range.Pos(); got != want {
+					t.Errorf("finding %d is at %d, want %d", index, got, want)
+				}
+				if len(result.Diagnostics[index].Fixes) != 0 {
+					t.Errorf("finding %d offered a fix, and `const` cannot be spelled at a write", index)
 				}
 			}
 		})
@@ -710,14 +854,16 @@ func TestPreferConstUsesNodeIdentityNotDeclarationKind(t *testing.T) {
 func TestPreferConstSeesRestTargets(t *testing.T) {
 	t.Parallel()
 
+	// Initialized, so any write at all keeps the binding a `let`. Without an initializer the rest
+	// write would be the one that initializes it, which is a conversion ESLint reports.
 	written := []string{
-		"let w; [...w] = [];",
-		"let w; ({...w} = {});",
-		"let w; [a, ...w] = [];",
-		"let w; ({a, ...w} = {});",
-		"let w; ({ x: [...w] } = {});",
-		"let w; [, [...w]] = [];",
-		"let w; for ([...w] of pairs) {}",
+		"let w = []; [...w] = [];",
+		"let w = {}; ({...w} = {});",
+		"let w = []; [a, ...w] = [];",
+		"let w = {}; ({a, ...w} = {});",
+		"let w = []; ({ x: [...w] } = {});",
+		"let w = []; [, [...w]] = [];",
+		"let w = []; for ([...w] of pairs) {}",
 	}
 	for _, source := range written {
 		t.Run("written "+source, func(t *testing.T) {
