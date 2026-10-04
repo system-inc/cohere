@@ -75,10 +75,14 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(t *testing.T) {
 	// once more now that nothing around it moves, and only then must it replay. Its own table writes,
 	// between the replays, are what is under test; checked by listing the recorded inputs, none of them is
 	// under .cache.
-	run(first, "--no-fix")
+	// Each failure carries the runs' stderr: a run that was not recorded says why there, and that line is what
+	// tells a real miss from a slow machine (#q51f02a). Logged, so it shows only when the test fails.
+	if _, stderr := run(first, "--no-fix"); stderr != "" {
+		t.Logf("the recording run's stderr:\n%s", stderr)
+	}
 	for attempt := 1; attempt <= 2; attempt++ {
-		if output, _ := run(first, "--no-fix"); !strings.HasPrefix(output, "cached: ") {
-			t.Fatalf("replay %d missed with the table inside the project:\n%s", attempt, output)
+		if output, stderr := run(first, "--no-fix"); !strings.HasPrefix(output, "cached: ") {
+			t.Fatalf("replay %d missed with the table inside the project:\n%s\n--- stderr\n%s", attempt, output, stderr)
 		}
 	}
 
@@ -124,11 +128,11 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(t *testing.T) {
 	// see.
 	for _, arguments := range [][]string{{"--no-cache", "--no-fix", "--format"}, {"--no-cache", "--no-fix"}, {"--no-cache", "--lint"}, {"--no-cache", "--types"}, {"--no-cache", "--fix", "--format"}} {
 		before := snapshot()
-		output, _ := run(first, arguments...)
+		output, stderr := run(first, arguments...)
 		after := snapshot()
 		for path := range before {
 			if before[path] != after[path] {
-				t.Errorf("cohere %v changed %s", arguments, path)
+				t.Errorf("cohere %v changed %s\n--- output\n%s\n--- stderr\n%s", arguments, path, output, stderr)
 			}
 		}
 		if !cold.MatchString(output) {
