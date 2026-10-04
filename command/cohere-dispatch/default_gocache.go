@@ -35,7 +35,7 @@ func startBoundingDefaultGoCache(paths dispatch.Paths) {
 	trim := exec.Command(executable, boundDefaultGoCacheFlag)
 	trim.Dir = paths.ModuleDirectory
 	if err := trim.Start(); err != nil {
-		fmt.Fprintf(os.Stderr, "cohere: the default Go build cache was not bounded: %v\n", err)
+		dispatch.Report.Fail("cohere: the default Go build cache was not bounded: %v", err)
 		return
 	}
 	trim.Process.Release()

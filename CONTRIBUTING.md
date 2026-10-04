@@ -180,6 +180,11 @@ cohere --dev              # build the working tree instead, uncommitted edits (a
 cohere --dispatch-verbose # say so when a rebuild fires
 ```
 
+A default run's output is cohere's alone. While the launcher builds, a terminal shows one dim line that
+clears before cohere prints, and a pipe or a file gets nothing; what a prune or a trim removed goes to
+`.cache/cohere/prune.log`. `--verbose`, which the launcher reads on its way to cohere, or
+`--dispatch-verbose` print each step and each removal in full. A failure always prints.
+
 Anything the dispatcher does not own is forwarded to the real binary untouched.
 
 `--dev` is the explicit way to run uncommitted work, and it says so on every run. It builds to a

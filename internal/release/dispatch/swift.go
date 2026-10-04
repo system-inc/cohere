@@ -178,7 +178,7 @@ func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory stri
 		return fmt.Errorf("creating the binary cache directory: %w", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "cohere: building the Swift engine from %s (its sources or the toolchain changed; a cold build takes minutes)\n",
+	Report.Step("cohere: building the Swift engine from %s (its sources or the toolchain changed; a cold build takes minutes)",
 		packageDirectory)
 
 	// `--manifest-cache none`, because the manifest reads the tree's git state into the engine's

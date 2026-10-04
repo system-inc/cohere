@@ -21,7 +21,7 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "cohere: %v\n", err)
+		dispatch.Report.Fail("cohere: %v", err)
 		os.Exit(1)
 	}
 }
@@ -59,6 +59,9 @@ func run() error {
 		}
 	}
 parsed:
+	// The launcher's own lines print in full under its own flag or cohere's --verbose, which it forwards
+	// rather than owns; otherwise a build is one line on a terminal that clears before cohere prints.
+	dispatch.Report.SetVerbose(verbose || asksForVerbose(arguments))
 
 	if frozen {
 		binaryPath, err := resolveFrozenBinary()
@@ -73,7 +76,20 @@ parsed:
 		return err
 	}
 
+	dispatch.Report.Clear()
 	return execute(binaryPath, arguments, wait)
+}
+
+// asksForVerbose reports whether the arguments forwarded to cohere ask for its --verbose view, in any of
+// the spellings its flag package accepts.
+func asksForVerbose(arguments []string) bool {
+	for _, argument := range arguments {
+		switch argument {
+		case "--verbose", "-verbose", "--verbose=true", "-verbose=true":
+			return true
+		}
+	}
+	return false
 }
 
 // waitIsRequested reports whether the environment asks the dispatcher to wait for the engine to finish

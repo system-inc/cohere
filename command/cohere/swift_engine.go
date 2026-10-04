@@ -43,7 +43,11 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 		return 1, err
 	}
 
+	// Building the engine is a step the launcher's progress shows: in full under --verbose, otherwise one
+	// line on a terminal, cleared before the report (#ytqqv8v).
+	dispatch.Report.SetVerbose(given["verbose"] && flagValue("verbose") == "true")
 	binaryPath, sourceCommit, err := resolveSwiftEngineBinary(location, release.Current())
+	dispatch.Report.Clear()
 	if err != nil {
 		return 1, err
 	}
