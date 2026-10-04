@@ -51,6 +51,12 @@
                 ]
             }
         ],
+        "nexus/import-require-path-alias": [
+            "error",
+            {
+                "aliasesFromTsconfigPaths": true
+            }
+        ],
         "structure/boundary-no-project-theme-value": "error",
         "structure/consistency-require-organized-imports": "error",
         "structure/network-no-direct-fetch": "error",
