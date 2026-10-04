@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/control_flow_graph"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -35,7 +36,8 @@ func correctnessNoProcessExitAfterOutputMessage() rule.Message {
 //	valid:   for(const line of result.lines) console.log(line); process.exitCode = result.exitCode; return;
 //	valid:   if(!flag) process.exit(1); console.log('ready');
 //	valid:   process.stdout.write(output, function() { process.exit(0); });
-//	valid:   printReport(report); process.exit(0);
+//	invalid: function showHelp() { console.log(usage); } ... showHelp(); process.exit(0);
+//	valid:   printReport(report); process.exit(0);   (declared, so no body to read)
 //
 // # Where it came from
 //
@@ -80,15 +82,31 @@ func correctnessNoProcessExitAfterOutputMessage() rule.Message {
 //     pipe drain), none of which the source says. A write followed by an exit on one path is the hazard
 //     Node's documentation names, and it is the whole condition.
 //
-// # What "the same function" means
+// # What "the same function" means, and the one level of callee it reads
 //
-// The function the exit is in, and nothing it calls or defines. A write made inside a callee
-// (`printReport(report); process.exit(0);`) or inside a callback (`rows.forEach((row) =>
-// console.log(row)); process.exit(0);`) is not followed, and that exit is a missed finding here, never
-// a false one: proving that a callee writes, and writes before returning, would mean reading its
-// body. An exit inside a callback is judged in the callback alone, which is what keeps the correct
-// form silent: `process.stdout.write(output, function() { process.exit(0); })` exits only once the
-// write has been handed to the operating system.
+// The function the exit is in, plus one level of the functions it calls. A call counts as a write
+// when the checker resolves it to a function with a body whose own body, nested functions aside,
+// makes a write itself: `showHelp(); process.exit(0);` in ahra's AhraCommandLineInterface.ts and the
+// `reportFreshness(...)` exits in BackupCommandLineInterface.ts were the two real hazards the rule
+// missed before it read callees (#4pyyvfs). One level only, so a helper that prints through another
+// helper is still a missed finding. The callee is followed only where it can be read and only where
+// its body surely runs before the call returns, each refusal costing a finding and never adding one:
+//
+//   - **In this file or in a module.** A module's function is reachable only through an import, so its
+//     file is in the import closure the findings cache keys on, a dynamic `import()` included. A
+//     global script's function has no such edge, and a declaration file has no body.
+//   - **Not overloaded, not a generator, and awaited when async.** An overload's resolved declaration
+//     is a signature with no body. A generator's body runs only when it is iterated. An async body
+//     runs up to its first `await` and finishes later, so it counts only when the call is awaited
+//     directly.
+//   - **Not one that exits or never returns.** A callee declared `never`, or whose own body exits,
+//     leaves the caller's exit as possibly dead code, so it is not read as a write.
+//
+// A write inside a callback (`rows.forEach((row) => console.log(row)); process.exit(0);`) is still
+// not followed: the callback is not called by name, and nothing says when it runs. An exit inside a
+// callback is judged in the callback alone, which is what keeps the correct form silent:
+// `process.stdout.write(output, function() { process.exit(0); })` exits only once the write has been
+// handed to the operating system.
 //
 // # Where the graph says more than happens, and what the rule does about it
 //
@@ -175,6 +193,7 @@ type correctnessNoProcessExitAfterOutputRoot struct {
 }
 
 func correctnessNoProcessExitAfterOutputScanFile(ctx rule.Context, sourceFile *ast.Node) {
+	writers := correctnessNoProcessExitAfterOutputWriters{ctx: ctx, byDeclaration: map[*ast.Node]bool{}}
 	rootsByNode := map[*ast.Node]*correctnessNoProcessExitAfterOutputRoot{}
 	var roots []*correctnessNoProcessExitAfterOutputRoot
 	rootFor := func(call *ast.Node) *correctnessNoProcessExitAfterOutputRoot {
@@ -191,27 +210,39 @@ func correctnessNoProcessExitAfterOutputScanFile(ctx rule.Context, sourceFile *a
 		return root
 	}
 
-	var visit func(node *ast.Node) bool
-	visit = func(node *ast.Node) bool {
-		if node.Kind == ast.KindCallExpression {
-			if correctnessNoProcessExitAfterOutputIsExit(ctx, node) {
-				if root := rootFor(node); root != nil {
-					root.exits = append(root.exits, node)
-				}
-			} else if correctnessNoProcessExitAfterOutputIsWrite(ctx, node) {
-				if root := rootFor(node); root != nil {
-					root.hasWrite = true
-				}
+	// Two passes, exits first. Most files never call process.exit, and a call's callee is resolved
+	// only inside a root that holds an exit: asking the checker for every call's signature in every
+	// file took the rule's run on ahra from 2.5s to 4.2s.
+	var findExits func(node *ast.Node) bool
+	findExits = func(node *ast.Node) bool {
+		if node.Kind == ast.KindCallExpression && correctnessNoProcessExitAfterOutputIsExit(ctx, node) {
+			if root := rootFor(node); root != nil {
+				root.exits = append(root.exits, node)
 			}
 		}
-		node.ForEachChild(visit)
+		node.ForEachChild(findExits)
 		return false
 	}
-	sourceFile.ForEachChild(visit)
+	sourceFile.ForEachChild(findExits)
+	if len(roots) == 0 {
+		return
+	}
+
+	var findWrites func(node *ast.Node) bool
+	findWrites = func(node *ast.Node) bool {
+		if node.Kind == ast.KindCallExpression {
+			if root := rootsByNode[control_flow_graph.RootOf(node)]; root != nil && !root.hasWrite && writers.writes(node) {
+				root.hasWrite = true
+			}
+		}
+		node.ForEachChild(findWrites)
+		return false
+	}
+	sourceFile.ForEachChild(findWrites)
 
 	for _, root := range roots {
 		if len(root.exits) > 0 && root.hasWrite {
-			correctnessNoProcessExitAfterOutputAnalyzeRoot(ctx, root)
+			correctnessNoProcessExitAfterOutputAnalyzeRoot(ctx, root, writers)
 		}
 	}
 }
@@ -251,6 +282,110 @@ func correctnessNoProcessExitAfterOutputIsWrite(ctx rule.Context, call *ast.Node
 	stream := correctnessNoProcessExitAfterOutputMemberName(receiver)
 	return stream != nil && (stream.Text() == "stdout" || stream.Text() == "stderr") &&
 		correctnessNoProcessExitAfterOutputIsProcessMember(ctx, stream)
+}
+
+// correctnessNoProcessExitAfterOutputWriters answers whether a call writes, directly or through one
+// callee, remembering each callee's answer for the file.
+type correctnessNoProcessExitAfterOutputWriters struct {
+	ctx           rule.Context
+	byDeclaration map[*ast.Node]bool
+}
+
+// writes says whether a call writes to stdout or stderr itself, or runs a callee whose own body does.
+func (writers correctnessNoProcessExitAfterOutputWriters) writes(call *ast.Node) bool {
+	if correctnessNoProcessExitAfterOutputIsWrite(writers.ctx, call) {
+		return true
+	}
+	callee := writers.followedCallee(call)
+	if callee == nil {
+		return false
+	}
+	answer, known := writers.byDeclaration[callee]
+	if !known {
+		answer = correctnessNoProcessExitAfterOutputBodyWrites(writers.ctx, callee)
+		writers.byDeclaration[callee] = answer
+	}
+	return answer
+}
+
+// followedCallee is the function a call runs, when the rule reads its body: see the rule's doc
+// comment for each refusal. Nil means the call is not followed.
+func (writers correctnessNoProcessExitAfterOutputWriters) followedCallee(call *ast.Node) *ast.Node {
+	signature := writers.ctx.TypeChecker.GetResolvedSignature(call)
+	if signature == nil {
+		return nil
+	}
+	declaration := signature.Declaration()
+	if declaration == nil {
+		return nil
+	}
+	switch declaration.Kind {
+	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindMethodDeclaration:
+	default:
+		return nil
+	}
+	if declaration.Body() == nil {
+		return nil
+	}
+	file := ast.GetSourceFileOfNode(declaration)
+	// A declaration file needs no test of its own: it has no bodies, so the check above refused it
+	if file == nil || (file != writers.ctx.SourceFile && !ast.IsExternalModule(file)) {
+		return nil
+	}
+	flags := ast.GetFunctionFlags(declaration)
+	if flags&ast.FunctionFlagsGenerator != 0 {
+		return nil
+	}
+	if flags&ast.FunctionFlagsAsync != 0 && !correctnessNoProcessExitAfterOutputIsAwaited(call) {
+		return nil
+	}
+	returnType := writers.ctx.TypeChecker.GetReturnTypeOfSignature(signature)
+	if returnType != nil && returnType.Flags()&checker.TypeFlagsNever != 0 {
+		return nil
+	}
+	return declaration
+}
+
+// correctnessNoProcessExitAfterOutputIsAwaited says whether a call is the operand of an `await`,
+// through parentheses.
+func correctnessNoProcessExitAfterOutputIsAwaited(call *ast.Node) bool {
+	parent := call.Parent
+	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		parent = parent.Parent
+	}
+	return parent != nil && parent.Kind == ast.KindAwaitExpression
+}
+
+// correctnessNoProcessExitAfterOutputBodyWrites says whether a function's own body, nested functions
+// aside, makes a write and never exits. A body that exits is not read as a write: the caller's exit
+// after it may never run.
+func correctnessNoProcessExitAfterOutputBodyWrites(ctx rule.Context, function *ast.Node) bool {
+	wrote, exits := false, false
+	var visit func(node *ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if exits || control_flow_graph.IsRoot(node) {
+			return exits
+		}
+		if node.Kind == ast.KindCallExpression {
+			if correctnessNoProcessExitAfterOutputIsExit(ctx, node) {
+				exits = true
+				return true
+			}
+			if correctnessNoProcessExitAfterOutputIsWrite(ctx, node) {
+				wrote = true
+			}
+		}
+		node.ForEachChild(visit)
+		return exits
+	}
+	// An arrow's expression body is itself the thing to judge, not something to look inside
+	body := function.Body()
+	if body.Kind == ast.KindBlock {
+		body.ForEachChild(visit)
+	} else {
+		visit(body)
+	}
+	return wrote && !exits
 }
 
 // correctnessNoProcessExitAfterOutputMemberName is the identifier that names the member an
@@ -366,7 +501,11 @@ func correctnessNoProcessExitAfterOutputInCatchBinding(node *ast.Node, root *ast
 
 // correctnessNoProcessExitAfterOutputAnalyzeRoot builds one root's graph, walks it from the entry,
 // and reports each exit some path reaches having written.
-func correctnessNoProcessExitAfterOutputAnalyzeRoot(ctx rule.Context, root *correctnessNoProcessExitAfterOutputRoot) {
+func correctnessNoProcessExitAfterOutputAnalyzeRoot(
+	ctx rule.Context,
+	root *correctnessNoProcessExitAfterOutputRoot,
+	writers correctnessNoProcessExitAfterOutputWriters,
+) {
 	type builder = control_flow_graph.Builder[correctnessNoProcessExitAfterOutputEvent]
 	recorded := map[*ast.Node]bool{}
 	graph := control_flow_graph.Build(root.node, control_flow_graph.Hooks[correctnessNoProcessExitAfterOutputEvent]{
@@ -379,7 +518,7 @@ func correctnessNoProcessExitAfterOutputAnalyzeRoot(ctx rule.Context, root *corr
 				b.Emit(correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputExit, node: node})
 				return
 			}
-			if correctnessNoProcessExitAfterOutputIsWrite(ctx, node) && !correctnessNoProcessExitAfterOutputHoldsExit(ctx, node) {
+			if writers.writes(node) && !correctnessNoProcessExitAfterOutputHoldsExit(ctx, node) {
 				b.Emit(correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputWrite, node: node})
 			}
 		},

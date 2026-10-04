@@ -1,6 +1,8 @@
 package nexus
 
 import (
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -559,6 +561,145 @@ func TestCorrectnessNoProcessExitAfterOutputStaysSilent(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			rule_testing.ExpectClean(t, correctnessNoProcessExitAfterOutputRun(t, correctnessNoProcessExitAfterOutputSource(testCase.lines...)))
+		})
+	}
+}
+
+const correctnessNoProcessExitAfterOutputHelpFile = "/repository/source/Help.ts"
+
+const correctnessNoProcessExitAfterOutputScriptFile = "/repository/source/ScriptHelp.ts"
+
+// correctnessNoProcessExitAfterOutputHelpModule is a module the cases import a writer from, statically
+// and through `import()`, as BackupCommandLineInterface.ts reaches reportFreshness.
+var correctnessNoProcessExitAfterOutputHelpModule = correctnessNoProcessExitAfterOutputLines(
+	"export function showModuleHelp(): void { console.log('usage'); }",
+	"export function reportFreshness(): void { console.error('stale'); }",
+)
+
+// correctnessNoProcessExitAfterOutputScript is a global script, whose function no import reaches.
+var correctnessNoProcessExitAfterOutputScript = correctnessNoProcessExitAfterOutputLines(
+	"function showScriptHelp(): void { console.log('usage'); }",
+)
+
+// correctnessNoProcessExitAfterOutputRunWithHelpers runs the cases with the two helper files beside
+// them, under a tsconfig whose module detection is `auto`. The harness's default forces every file to
+// be a module, which would make the script a module too and leave its function unreachable for a
+// reason other than the one the script row tests.
+func correctnessNoProcessExitAfterOutputRunWithHelpers(t *testing.T, sourceText string) rule_testing.Result {
+	t.Helper()
+	return rule_testing.RunTypedFilesWithSetup(t, CorrectnessNoProcessExitAfterOutput, map[string]string{
+		correctnessNoProcessExitAfterOutputFile:           sourceText,
+		correctnessNoProcessExitAfterOutputNodeFile:       correctnessNoProcessExitAfterOutputNodeTypes,
+		correctnessNoProcessExitAfterOutputWebConsoleFile: correctnessNoProcessExitAfterOutputWebConsole,
+		correctnessNoProcessExitAfterOutputHelpFile:       correctnessNoProcessExitAfterOutputHelpModule,
+		correctnessNoProcessExitAfterOutputScriptFile:     correctnessNoProcessExitAfterOutputScript,
+	}, correctnessNoProcessExitAfterOutputFile, func(directory string) {
+		tsconfig := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], ` +
+			`"moduleDetection": "auto", "types": []}, "include": ["**/*.ts"]}`
+		if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(tsconfig), 0o644); err != nil {
+			t.Fatalf("writing the tsconfig: %v", err)
+		}
+	})
+}
+
+// TestCorrectnessNoProcessExitAfterOutputReadsOneCallee covers #4pyyvfs: a call counts as a write
+// when its callee's own body writes, one level down, where the body can be read and surely runs
+// before the call returns. The two hazards the rule missed are modelled first: `showHelp()` then
+// `exit(0)` in AhraCommandLineInterface.ts, and `reportFreshness(...)` reached through `import()` in
+// BackupCommandLineInterface.ts.
+func TestCorrectnessNoProcessExitAfterOutputReadsOneCallee(t *testing.T) {
+	t.Parallel()
+
+	fires := []struct {
+		name  string
+		lines []string
+	}{
+		{"a helper in this file, as showHelp", []string{
+			"function showHelp(): void { console.log('usage'); }",
+			"export function main(): void { showHelp(); process.exit(0); }",
+		}},
+		{"an arrow whose expression body writes", []string{
+			"const showUsage = (): void => console.log('usage');",
+			"export function main(): void { showUsage(); process.exit(0); }",
+		}},
+		{"a static method", []string{
+			"class Help { static show(): void { process.stderr.write('usage'); } }",
+			"export function main(): void { Help.show(); process.exit(1); }",
+		}},
+		{"an async helper awaited", []string{
+			"async function report(): Promise<void> { console.log('report'); }",
+			"export async function main(): Promise<void> { await report(); process.exit(0); }",
+		}},
+		{"a helper imported from a module", []string{
+			"import { showModuleHelp } from './Help';",
+			"export function main(): void { showModuleHelp(); process.exit(0); }",
+		}},
+		{"a helper reached through import(), as reportFreshness", []string{
+			"export async function main(): Promise<void> {",
+			"    const { reportFreshness } = await import('./Help');",
+			"    reportFreshness();",
+			"    process.exit(1);",
+			"}",
+		}},
+	}
+	for _, testCase := range fires {
+		t.Run(testCase.name, func(t *testing.T) {
+			exit := "process.exit(0)"
+			if strings.Contains(strings.Join(testCase.lines, "\n"), "process.exit(1)") {
+				exit = "process.exit(1)"
+			}
+			correctnessNoProcessExitAfterOutputExpect(t,
+				correctnessNoProcessExitAfterOutputRunWithHelpers(t, correctnessNoProcessExitAfterOutputSource(testCase.lines...)),
+				[]string{exit})
+		})
+	}
+
+	silent := []struct {
+		name  string
+		lines []string
+		want  []string
+	}{
+		{"a helper that prints only through another helper, two levels down", []string{
+			"function printUsage(): void { console.log('usage'); }",
+			"function showHelp(): void { printUsage(); }",
+			"export function main(): void { showHelp(); process.exit(0); }",
+		}, nil},
+		{"an async helper not awaited", []string{
+			"async function report(): Promise<void> { console.log('report'); }",
+			"export function main(): void { void report(); process.exit(0); }",
+		}, nil},
+		{"a generator, whose body runs only when iterated", []string{
+			"function* lines(): Generator<string> { console.log('first'); yield 'a'; }",
+			"export function main(): void { lines(); process.exit(0); }",
+		}, nil},
+		{"a helper declared never", []string{
+			"function fail(message: string): never { console.error(message); throw new Error(message); }",
+			"export function main(): void { if(flag) fail('bad'); process.exit(0); }",
+		}, nil},
+		// The helper's own exit is judged in the helper and reported there; the caller's exit after it
+		// may never run, so the call is not read as a write.
+		{"a helper that exits", []string{
+			"function bail(): void { console.error('bad'); process.exit(1); }",
+			"export function main(): void { bail(); process.exit(2); }",
+		}, []string{"process.exit(1)"}},
+		{"an overloaded helper, whose resolved declaration has no body", []string{
+			"function show(value: string): void;",
+			"function show(value: number): void;",
+			"function show(value: unknown): void { console.log(value); }",
+			"export function main(): void { show('usage'); process.exit(0); }",
+		}, nil},
+		{"a helper in a global script, which no import reaches", []string{
+			"export function main(): void { showScriptHelp(); process.exit(0); }",
+		}, nil},
+		{"a declared helper, with no body to read", []string{
+			"export function main(): void { printReport(); process.exit(0); }",
+		}, nil},
+	}
+	for _, testCase := range silent {
+		t.Run(testCase.name, func(t *testing.T) {
+			correctnessNoProcessExitAfterOutputExpect(t,
+				correctnessNoProcessExitAfterOutputRunWithHelpers(t, correctnessNoProcessExitAfterOutputSource(testCase.lines...)),
+				testCase.want)
 		})
 	}
 }

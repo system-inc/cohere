@@ -15,7 +15,8 @@ A call of `exit` on `NodeJS.Process` (as `process.exit`, through `import * as No
 'node:process'`, or an imported `exit`) reached, on some path through the enclosing function's control-flow
 graph, after a write to stdout or stderr in the same function: `console.log`, `info`, `debug`, `warn`,
 `error`, `trace`, `table`, `dir`, `dirxml` on the global console, or `write` on the process's own
-`stdout` / `stderr`. The fix is `process.exitCode = n` and a `return`, which lets the process end once the
+`stdout` / `stderr`, or a call of a function whose own body makes one of those writes (one level down,
+see below). The fix is `process.exitCode = n` and a `return`, which lets the process end once the
 output has drained.
 
 ## Why
@@ -28,10 +29,13 @@ between modules), so a long report can arrive cut with nothing saying so.
 
 ## What it declines, and why each is a missed finding rather than a false one
 
-- **Writes in a callee or a callback.** `showHelp(); process.exit(0);` and `rows.forEach((row) =>
-  console.log(row)); process.exit(0);` are not followed: proving a callee writes before it returns means
-  reading its body. `modules/ahra/AhraCommandLineInterface.ts` (`showHelp()` then `exit(0)`) and the
-  `reportFreshness` exits in `BackupCommandLineInterface.ts` are real hazards missed this way.
+- **Writes more than one callee down, or in a callback.** Since #4pyyvfs a call counts as a write when
+  its callee's own body writes: `showHelp(); process.exit(0);` reports. The callee is read only where it
+  can be and only where its body surely runs before the call returns: in this file or in a module (so the
+  findings cache, keyed on the import closure, sees its edits; a dynamic `import()` counts), with a body
+  (an overload's resolved declaration has none), not a generator, awaited directly when async, and neither
+  declared `never` nor exiting itself (then the caller's exit may never run). A helper that prints through
+  another helper, and `rows.forEach((row) => console.log(row)); process.exit(0);`, are still not followed.
 - **A write inside a `try`, the exit in its `catch`.** The graph runs the end of every `try` block into
   its `catch` (ESLint's shape), so a write there could be "followed" into the catch on a path where the
   write was the last thing that ran, or the thing that threw. A path entering a `catch` therefore forgets
@@ -41,6 +45,26 @@ between modules), so a long report can arrive cut with nothing saying so.
 - **The shape is the condition.** Whether bytes are still buffered at the exit depends on how much was
   written and what ran between (an `await` can let a pipe drain). The source cannot say, so a write then
   an exit on one path is the whole condition, as the task's precision line asks.
+
+## Reading one callee: what it added (#4pyyvfs)
+
+Measured 2026-10-04 on ahra with the rule forced on, cohere at main against the change, both cold: 1,017
+findings before, 1,029 after, 12 added and none lost. All 12 read in place, each true by the rule's
+condition, a helper that writes on a path into the exit:
+
+| site | the helper that writes |
+|---|---|
+| `libraries/structure/command-line/Structure.ts` 519, 875, 1238; `StructureCohere.ts` 145 | `reportUnresolvableCohereBinary()`, then `exit(1)` |
+| `libraries/structure/command-line/Structure.ts` 1627 | `runDoctorScript(...)`, which prints the doctor's output |
+| `modules/ahra/AhraCommandLineInterface.ts` 187 | `showHelp()`, then `exit(0)`, the first named hazard |
+| `modules/backup/BackupCommandLineInterface.ts` 58, 164 | `reportFreshness` and `reportTreeCoverage` through `import()`, the second |
+| `modules/os/lifecycle/AhraOsBootCommandLineInterface.ts` 263 | `printStaleAwokeSweepResult(...)` earlier in boot |
+| `modules/phi/PhiCommerceCommandLineInterface.ts` 388, 529 | an awaited `resolveSubscription(...)`, which prints why it found none |
+| `modules/porings/PoringsCommandLineInterface.ts` 179 | `cleanup()` writing to stdout in a `SIGINT` handler |
+
+Cost: the scan finds exits first and resolves a call's callee only inside a function that holds one,
+since resolving every call in every file took the rule from 2.5s to 4.2s of the run. As built, `--timing`
+puts the rule at 157ms of summed worker time against 62ms before, 0.6% of rule time.
 
 ## Reconciling with the research count
 
@@ -56,11 +80,12 @@ and stderr**. The two numbers measure different conditions:
   without reaching it: a usage block that prints and `return`s before a later exit, a write in a callback
   above the exit, a write on a branch that has already exited. The 113 between the two counts were not
   read one by one; every finding of the rule was.
-- Of the 1,009 exit calls in ahra's own files, 26 go unreported: exits in event callbacks with no write
-  of their own (`process.on('SIGINT', ...)`, `child.on('close', ...)`), exits after a callee prints
-  (`showHelp()`, `reportFreshness(...)`, `runLinkCommand(...)`), and `if(!subscription)
+- Of the 1,009 exit calls in ahra's own files, 26 went unreported on 2026-10-03: exits in event callbacks
+  with no write of their own (`process.on('SIGINT', ...)`, `child.on('close', ...)`), exits after a
+  callee prints (`showHelp()`, `reportFreshness(...)`, `runLinkCommand(...)`), and `if(!subscription)
   process.exit(1)` after a helper that printed the reason. All read; none is a write in the same function
-  that the rule missed.
+  that the rule missed. Reading one callee since reaches `showHelp()`, `reportFreshness(...)` and the
+  subscription helper (see above); `runLinkCommand(...)`'s exit is still unreported.
 
 ## The findings, read
 
