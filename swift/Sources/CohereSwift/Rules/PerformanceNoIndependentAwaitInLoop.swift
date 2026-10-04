@@ -112,9 +112,6 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
 
     public init() {}
 
-    static let message =
-        "This loop awaits once per item, so the items run one after another, yet nothing carries from one iteration to the next: each await is the item's own work, no local of the function is reassigned and no shared state is written, nothing leaves the loop on an awaited result or a thrown error, and nothing prints, logs or sleeps between iterations. Start them together with `withTaskGroup` (collect each result with its index when the order matters, since a group hands results back as they finish), with `async let` when the items are a fixed few, or with a bounded group when the collection can be large or the far side rate-limits."
-
     /* A flagged loop holds both words; nothing else can. */
     public func applies(to file: ParsedFile) -> Bool {
         file.source.contains("for") && file.source.contains("await")
@@ -132,6 +129,7 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
             let headerEnd = loop.whereClause.map { Syntax($0) } ?? Syntax(loop.sequence)
             let start = file.locations.location(for: loop.forKeyword.positionAfterSkippingLeadingTrivia)
             let end = file.locations.location(for: headerEnd.endPositionBeforeTrailingTrivia)
+            let message = RuleMessages.PerformanceNoIndependentAwaitInLoop.independentAwaitInLoop()
             return FindingRecord(
                 source: .rule,
                 file: file.url.path,
@@ -141,8 +139,8 @@ public struct PerformanceNoIndependentAwaitInLoop: FileRule {
                 endColumn: end.column,
                 severity: .error,
                 rule: name,
-                messageId: "independentAwaitInLoop",
-                message: Self.message,
+                messageId: message.id,
+                message: message.text,
             )
         }
     }

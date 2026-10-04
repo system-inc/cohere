@@ -73,9 +73,11 @@ public struct ConsistencyRequireMatchingFileName: FileRule {
                 file.finding(
                     at: declared.token,
                     rule: name,
-                    messageId: "fileNotNamedForType",
-                    message:
-                        "This file is \(fileName) and declares \(declared.name). Name it \(declared.name).swift, so a reader looking for \(declared.name) opens it without a search.",
+                    message: RuleMessages.ConsistencyRequireMatchingFileName.requireMatchingFileName(
+                        typeName: declared.name,
+                        fileName: fileName,
+                        alternative: .none,
+                    ),
                 )
             )
         }
@@ -99,13 +101,23 @@ public struct ConsistencyRequireMatchingFileName: FileRule {
             }
             let suggestion =
                 "\(extended.name.split(separator: ".").first.map(String.init) ?? extended.name)+Purpose.swift"
-            let message =
+            let placement =
                 declaredName.map {
-                    "An extension of \(extended.name) in the file for \($0). Extensions of another type belong in that type's own file, such as \(suggestion), so everything added to \(extended.name) is found together."
+                    RuleMessages.ConsistencyRequireMatchingFileName.Placement.besideType(
+                        extendedName: extended.name,
+                        typeName: $0,
+                        suggestion: suggestion,
+                    )
                 }
-                ?? "This file is \(fileName) and extends \(extended.name). Name it \(suggestion) after what it adds, so everything added to \(extended.name) is found together."
+                ?? .withoutType(fileName: fileName, extendedName: extended.name, suggestion: suggestion)
             findings.append(
-                file.finding(at: extended.token, rule: name, messageId: "extensionOutsideItsFile", message: message)
+                file.finding(
+                    at: extended.token,
+                    rule: name,
+                    message: RuleMessages.ConsistencyRequireMatchingFileName.extensionOutsideItsFile(
+                        placement: placement
+                    ),
+                )
             )
         }
         return findings

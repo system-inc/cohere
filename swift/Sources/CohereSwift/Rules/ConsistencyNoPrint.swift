@@ -45,9 +45,7 @@ public struct ConsistencyNoPrint: FileRule {
             file.finding(
                 at: call,
                 rule: name,
-                messageId: "print",
-                message:
-                    "print in \(kind) writes to a stdout nobody reads. Log through os.Logger, so the message lands in the unified log with a subsystem, a category and a level.",
+                message: RuleMessages.ConsistencyNoPrint.consistencyNoConsole(kind: kind),
             )
         }
     }

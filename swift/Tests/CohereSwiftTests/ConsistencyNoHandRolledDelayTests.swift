@@ -84,7 +84,7 @@ struct ConsistencyNoHandRolledDelayTests {
         let tryOptional = Self.findings("func f() async {\n    try? await Task.sleep(for: .seconds(1))\n    work()\n}")
         #expect(
             tryOptional.map(\.message) == [
-                "This try? await Task.sleep is the house's Task.sleepUnlessCancelled written out by hand: Task.sleep throws only CancellationError, so the try? does nothing but let the pause end early when the task is cancelled, which is all the primitive does. Write await Task.sleepUnlessCancelled with the same duration (declared once per project, in Task+SleepUnlessCancelled.swift, taking for: or nanoseconds:), so the pause reads as a plain pause and the one place that says why cancellation is let go says it for every call. A do/catch with an empty catch around the sleep is the same pause spelled longer, not the repair."
+                "This try? await Task.sleep is a hand-rolled Task.sleepUnlessCancelled. Task.sleep throws only CancellationError, so the try? does nothing but let the pause end early when the task is cancelled, which is all the primitive does. Write await Task.sleepUnlessCancelled with the same duration (declared once per project, in Task+SleepUnlessCancelled.swift, taking for: or nanoseconds:), so the pause reads as a plain pause and the one place that says why cancellation is let go says it for every call. A do/catch with an empty catch around the sleep is the same pause spelled longer, not the repair."
             ]
         )
         let doCatch = Self.findings(

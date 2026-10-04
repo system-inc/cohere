@@ -76,7 +76,10 @@ struct CorrectnessNoWriteOnlyCollectionTests {
         let lines = source.split(separator: "\n", omittingEmptySubsequences: false).map { Array($0.utf8) }
         return found.map { finding in
             #expect(finding.messageId == "writeOnlyCollection")
-            #expect(finding.message == CorrectnessNoWriteOnlyCollection.message)
+            #expect(
+                finding.message
+                    == "This collection is only ever added to: every use of it puts something in or takes something out, and nothing reads what it holds. The work that fills it is thrown away. Either the code that was meant to read it is missing (a value kept for the result and never copied in), or the collection is dead and should be deleted along with its writes."
+            )
             #expect(finding.fixes.isEmpty && finding.suggestions.isEmpty, "the rule never fixes")
             guard let endLine = finding.endLine, let endColumn = finding.endColumn, endLine == finding.line else {
                 return "spans lines"

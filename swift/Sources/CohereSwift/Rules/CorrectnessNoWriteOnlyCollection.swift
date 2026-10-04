@@ -98,9 +98,6 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
 
     public init() {}
 
-    static let message =
-        "This collection is only ever added to: every use of it puts something in or takes something out, and nothing reads what it holds. The work that fills it is thrown away. Either the code that was meant to read it is missing (a value kept for the result and never copied in), or the collection is dead and should be deleted along with its writes."
-
     /* Every flagged binding is a `var`, and its type is spelled with a bracket or one of the three names. */
     public func applies(to file: ParsedFile) -> Bool {
         file.source.contains("var")
@@ -117,7 +114,11 @@ public struct CorrectnessNoWriteOnlyCollection: TypedFileRule {
         return collector.bindings.compactMap { variable, binding, token in
             guard let kind = reader.kind(of: binding), reader.isOnlyWritten(token, declaredBy: variable, kind: kind)
             else { return nil }
-            return file.finding(at: token, rule: name, messageId: "writeOnlyCollection", message: Self.message)
+            return file.finding(
+                at: token,
+                rule: name,
+                message: RuleMessages.CorrectnessNoWriteOnlyCollection.writeOnlyCollection(),
+            )
         }
     }
 

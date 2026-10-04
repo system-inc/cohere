@@ -84,21 +84,13 @@ public struct ConsistencyNoHandRolledDelay: FileRule {
         let visitor = Visitor(viewMode: .sourceAccurate)
         visitor.walk(file.tree)
         return visitor.found.map { found in
-            found.isDoCatch
-                ? file.finding(
-                    at: found.node,
-                    rule: name,
-                    messageId: "handRolledDelayDoCatch",
-                    message:
-                        "This do/catch around Task.sleep, with nothing in the catch, is the house's Task.sleepUnlessCancelled written out by hand: Task.sleep throws only CancellationError, so the catch does nothing but let the pause end early when the task is cancelled, which is all the primitive does. Write await Task.sleepUnlessCancelled with the same duration (declared once per project, in Task+SleepUnlessCancelled.swift, taking for: or nanoseconds:), so the pause reads as a plain pause and the one place that says why cancellation is let go says it for every call.",
-                )
-                : file.finding(
-                    at: found.node,
-                    rule: name,
-                    messageId: "handRolledDelay",
-                    message:
-                        "This try? await Task.sleep is the house's Task.sleepUnlessCancelled written out by hand: Task.sleep throws only CancellationError, so the try? does nothing but let the pause end early when the task is cancelled, which is all the primitive does. Write await Task.sleepUnlessCancelled with the same duration (declared once per project, in Task+SleepUnlessCancelled.swift, taking for: or nanoseconds:), so the pause reads as a plain pause and the one place that says why cancellation is let go says it for every call. A do/catch with an empty catch around the sleep is the same pause spelled longer, not the repair.",
-                )
+            file.finding(
+                at: found.node,
+                rule: name,
+                message: found.isDoCatch
+                    ? RuleMessages.ConsistencyNoHandRolledDelay.handRolledDelayDoCatch()
+                    : RuleMessages.ConsistencyNoHandRolledDelay.handRolledDelay(),
+            )
         }
     }
 

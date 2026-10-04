@@ -16,6 +16,12 @@ import Testing
  */
 @Suite(.serialized)
 struct CorrectnessRequireResponseStatusCheckTests {
+    /* The words each finding carries, pinned here so a generator that drops or mangles them fails. */
+    static let bodyMessage =
+        "This reads the body of the response URLSession returned on a path where its statusCode is never read. URLSession does not throw on an HTTP error, so a 401 or 500 error page arrives here as data and is decoded, returned or kept as if the request had succeeded. Cast the response to HTTPURLResponse and check statusCode before trusting the body, and throw or return the failure when it is not a success."
+    static let discardMessage =
+        "This takes the response URLSession returned and drops it. Its status goes with it. URLSession does not throw on an HTTP error, so a request that fails with a 400 or 500 runs on as if it had succeeded. Keep the response, cast it to HTTPURLResponse and check statusCode, and throw or return the failure when it is not a success."
+
     static let dataFor =
         "s:So12NSURLSessionC10FoundationE4data3for8delegateAC4DataV_So13NSURLResponseCtAC10URLRequestV_So0A12TaskDelegate_pSgtYaKF"
     static let dataFrom =
@@ -81,10 +87,10 @@ struct CorrectnessRequireResponseStatusCheckTests {
             switch finding.messageId {
                 case "bodyReadWithoutStatusCheck":
                     kind = "body"
-                    #expect(finding.message == CorrectnessRequireResponseStatusCheck.bodyMessage)
+                    #expect(finding.message == Self.bodyMessage)
                 case "responseDiscarded":
                     kind = "discard"
-                    #expect(finding.message == CorrectnessRequireResponseStatusCheck.discardMessage)
+                    #expect(finding.message == Self.discardMessage)
                 default:
                     kind = "unknown \(finding.messageId)"
             }

@@ -68,13 +68,10 @@ public struct ConsistencyNoStutteringName: FileRule {
         let visitor = Visitor(viewMode: .sourceAccurate)
         visitor.walk(file.tree)
         return visitor.found.map { member in
-            let word = Self.spelling(member)
-            return file.finding(
+            file.finding(
                 at: member,
                 rule: name,
-                messageId: "stutteringName",
-                message:
-                    "\"\(word).\(word)\" stutters, which means the name is carrying nothing: it repeats the field instead of saying which \(word) this is. Rename the value for what it holds, the type it came back as or whatever distinguishes it from another \(word) in this scope, so a reader forty lines down does not have to find the declaration.",
+                message: RuleMessages.ConsistencyNoStutteringName.stutteringName(name: Self.spelling(member)),
             )
         }
     }

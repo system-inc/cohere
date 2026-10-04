@@ -111,9 +111,11 @@ public struct ConsistencyNoBooleanOutcome: FileRule {
             var finding = file.finding(
                 at: flag.start,
                 rule: name,
-                messageId: "booleanOutcome",
-                message:
-                    "\(flag.name): Bool on \(declaration.kind.rawValue) \(declaration.name) collapses every way the operation can turn out into one bit, at the moment the distinction is cheapest to keep, and leaves the reader to know which other fields hold for which value of it. Return a named outcome instead: an enum with a case for each way the operation can turn out and the payload on the case that carries it, or Result, or a throw for the failure. Suggested name: \(Self.suggestedName(declaration.name))Outcome.",
+                message: RuleMessages.ConsistencyNoBooleanOutcome.booleanOutcome(
+                    flagName: flag.name,
+                    declaration: "\(declaration.kind.rawValue) \(declaration.name)",
+                    suggested: Self.suggestedName(declaration.name),
+                ),
             )
             /* The field's name through its type, short of a trailing comma or an observer's block. */
             let end = flag.end.endLocation(converter: file.locations)

@@ -85,10 +85,6 @@ public struct ConsistencyNoPropertyAlias: FileRule {
 
     public init() {}
 
-    static func message(local: String, reach: String) -> String {
-        "`\(local)` is a pure alias for `\(reach)`: it is read once, and nothing runs between its declaration and that read. Write `\(reach)` where `\(local)` is read and delete the declaration, so the value keeps the object it came from and a naked local still means this scope made it."
-    }
-
     /* Every flagged declaration is a `let`. */
     public func applies(to file: ParsedFile) -> Bool {
         file.source.contains("let")
@@ -100,8 +96,10 @@ public struct ConsistencyNoPropertyAlias: FileRule {
             var finding = file.finding(
                 at: candidate.binding,
                 rule: name,
-                messageId: "noPropertyAlias",
-                message: Self.message(local: candidate.local.text, reach: candidate.reach.trimmedDescription),
+                message: RuleMessages.ConsistencyNoPropertyAlias.noPropertyAlias(
+                    name: candidate.local.text,
+                    reach: candidate.reach.trimmedDescription,
+                ),
             )
             /* The binding ends at its value, before the comma that joins it to the next binding of the same `let`. */
             let end = candidate.reach.endLocation(converter: file.locations)

@@ -18,6 +18,18 @@
       "languages": [
         "TypeScript"
       ]
+    },
+    "alwaysUseLowerCamelCase": {
+      "text": "{{swiftFormatFinding}}. Swift spells values in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name is a word boundary camel case already marks.",
+      "languages": [
+        "Swift"
+      ]
+    },
+    "incumbentFailed": {
+      "text": "swift-format's {{incumbentRule}} could not run on this file, so it was not checked: {{error}}",
+      "languages": [
+        "Swift"
+      ]
     }
   }
 }

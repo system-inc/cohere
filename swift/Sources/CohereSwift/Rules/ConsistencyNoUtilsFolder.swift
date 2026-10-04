@@ -55,8 +55,10 @@ public struct ConsistencyNoUtilsFolder: FileRule {
             findings.append(
                 finding(
                     in: file,
-                    messageId: "noUnderscoreUtils",
-                    message: "Folder name \"\(folder)\" is not allowed. Use \"\(replacement)\" instead.",
+                    message: RuleMessages.ConsistencyNoUtilsFolder.noUnderscoreUtils(
+                        folder: folder,
+                        replacement: replacement,
+                    ),
                 )
             )
         }
@@ -66,8 +68,7 @@ public struct ConsistencyNoUtilsFolder: FileRule {
             findings.append(
                 finding(
                     in: file,
-                    messageId: "noUtils",
-                    message: "Folder name \"\(folder)\" is not allowed. Use \"\(replacement)\" instead.",
+                    message: RuleMessages.ConsistencyNoUtilsFolder.noUtils(folder: folder, replacement: replacement),
                 )
             )
         }
@@ -84,7 +85,7 @@ public struct ConsistencyNoUtilsFolder: FileRule {
     }
 
     /* A zero-width finding at the very start of the file, the place the Go rule reports a misplaced file. */
-    private func finding(in file: ParsedFile, messageId: String, message: String) -> FindingRecord {
+    private func finding(in file: ParsedFile, message: RuleMessages.Message) -> FindingRecord {
         FindingRecord(
             source: .rule,
             file: file.url.path,
@@ -94,8 +95,8 @@ public struct ConsistencyNoUtilsFolder: FileRule {
             endColumn: 1,
             severity: .error,
             rule: name,
-            messageId: messageId,
-            message: message,
+            messageId: message.id,
+            message: message.text,
         )
     }
 }

@@ -720,7 +720,10 @@ struct CorrectnessNoIdenticalBranchesTests {
             nodeCount: 0,
         )
         let messages = CorrectnessNoIdenticalBranches().findings(in: file).map(\.message)
-        #expect(messages.count == 1)
-        #expect(messages.allSatisfy { $0.contains("Write the branch that was meant") && !$0.contains("\u{2014}") })
+        #expect(
+            messages == [
+                "Every branch of this conditional does the same thing, so its condition chooses nothing: the code runs the same way whether it is true or false. Usually one branch was meant to differ and a copy was never edited (highQuality ? \"pro\" : \"pro\"). Write the branch that was meant, or, if both really are the same, drop the conditional and keep one copy."
+            ]
+        )
     }
 }

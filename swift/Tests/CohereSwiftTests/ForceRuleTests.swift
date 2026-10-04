@@ -82,6 +82,17 @@ struct ForceRuleTests {
         #expect(Self.findings(ForceCast(), source).isEmpty)
     }
 
+    /* The id and text come from the catalog; pinned here as literals so a generator bug cannot pass. */
+    @Test func forceCastMessage() {
+        let found = Self.findings(ForceCast(), "let view = item as! NSView")
+        #expect(found.map(\.messageId) == ["forceCast"])
+        #expect(
+            found.map(\.message) == [
+                "as! crashes the process when the value is not that type. Use as? and say what happens when it is not."
+            ]
+        )
+    }
+
     @Test func implicitlyUnwrappedOptionalsAreFound() {
         let source = """
             var window: NSWindow!

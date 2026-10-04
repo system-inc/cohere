@@ -61,8 +61,8 @@ struct ConsistencyNoIsoStringDateCutTests {
         "components": [components],
     ]
 
-    /* Every finding as the text of its span and its message id. */
-    static func findings(_ source: String, resolving: [String: [String]] = foundation) -> [String] {
+    /* Every finding the rule makes on a source, its names resolved as the suite's comment describes. */
+    static func records(_ source: String, resolving: [String: [String]] = foundation) -> [FindingRecord] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
         let file = ParsedFile(
             url: url,
@@ -92,8 +92,13 @@ struct ConsistencyNoIsoStringDateCutTests {
         let rule = ConsistencyNoIsoStringDateCut()
         let found = rule.findings(in: file, symbols: FileSymbols(occurrences, ownedModules: ["AhraOSPresence"]))
         #expect(found.isEmpty || rule.applies(to: file), "the prefilter must never hide a finding")
+        return found
+    }
+
+    /* Every finding as the text of its span and its message id. */
+    static func findings(_ source: String, resolving: [String: [String]] = foundation) -> [String] {
         let lines = source.split(separator: "\n", omittingEmptySubsequences: false).map { Array($0.utf8) }
-        return found.map { finding in
+        return records(source, resolving: resolving).map { finding in
             #expect(finding.fixes.isEmpty && finding.suggestions.isEmpty, "the rule never fixes")
             guard let endLine = finding.endLine, let endColumn = finding.endColumn, endLine == finding.line else {
                 return "spans lines"
@@ -377,6 +382,65 @@ struct ConsistencyNoIsoStringDateCutTests {
             """
         let found = Self.findings(source)
         #expect(found == [expected], "\(found)")
+    }
+
+    /* A source for each shape, from the cases below: a cut, a date-only style, a confined date-only formatter. */
+    static let everyMessageSources = [
+        """
+        import Foundation
+
+        func render(_ date: Date) -> Any {
+            ISO8601DateFormatter().string(from: date).prefix(10)
+        }
+
+        """,
+        """
+        import Foundation
+
+        func render(_ date: Date) -> Any {
+            date.formatted(.iso8601.year().month().day())
+        }
+
+        """,
+        """
+        import Foundation
+
+        func dayStamp(_ date: Date) -> String {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withFullDate]
+            return formatter.string(from: date)
+        }
+
+        """,
+    ]
+
+    /* Each shape's message, checked against a literal rather than the rule's own text. */
+    @Test func eachShapeNamesItsRenderingAndTheRepair() {
+        let found = Self.everyMessageSources.flatMap { Self.records($0) }
+        #expect(
+            found.map(\.message) == [
+                "This cuts an ISO 8601 timestamp down to its date part. ISO 8601 formatting is UTC unless it is given a time zone, so the cut is the UTC calendar day whether or not that was the day meant, and in Utah the UTC day turns over at 5 pm in winter and 6 pm in summer: an evening run gets tomorrow. Format the day itself and say the zone: Date.ISO8601FormatStyle(timeZone: .current).year().month().day() when the local day is meant, or timeZone: .gmt when the UTC day is.",
+                "This formats a date as its ISO 8601 calendar day without naming a time zone. Date.ISO8601FormatStyle is UTC unless it is given one, so this is the UTC day whether or not that was the day meant, and in Utah the UTC day turns over at 5 pm in winter and 6 pm in summer: an evening run gets tomorrow. Say the zone: Date.ISO8601FormatStyle(timeZone: .current) when the local day is meant, or timeZone: .gmt when the UTC day is.",
+                "This formats a date as its ISO 8601 calendar day without naming a time zone. ISO8601DateFormatter is UTC unless its timeZone is set, so this is the UTC day whether or not that was the day meant, and in Utah the UTC day turns over at 5 pm in winter and 6 pm in summer: an evening run gets tomorrow. Say the zone: set the formatter's timeZone to .current when the local day is meant, or to .gmt when the UTC day is.",
+            ]
+        )
+        #expect(found.map(\.rule) == Array(repeating: "cohere-swift/consistency-no-iso-string-date-cut", count: 3))
+    }
+
+    /*
+     The finding a user sees is the catalog's entry (policy/messages/consistency-no-iso-string-date-cut.json), id and
+     text, so an edited entry reaches the finding once regenerated. The literals above pin the words; this pins where
+     they come from.
+     */
+    @Test func eachFindingIsTheCatalogsMessage() {
+        let found = Self.everyMessageSources.flatMap { Self.records($0) }
+        let messages = [
+            RuleMessages.ConsistencyNoIsoStringDateCut.isoStringCutToDate(),
+            RuleMessages.ConsistencyNoIsoStringDateCut.isoDateWithoutTimeZone(renderer: .formatStyle),
+            RuleMessages.ConsistencyNoIsoStringDateCut.isoDateWithoutTimeZone(renderer: .dateFormatter),
+        ]
+        #expect(found.map(\.messageId) == messages.map(\.id))
+        #expect(found.map(\.message) == messages.map(\.text))
     }
 
     /* A timestamp held in a local `let`, cut later, as the TypeScript rule follows a `const` (its migration stamp). */

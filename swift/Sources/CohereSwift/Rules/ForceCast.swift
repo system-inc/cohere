@@ -23,13 +23,7 @@ public struct ForceCast: FileRule {
         let visitor = Visitor(viewMode: .sourceAccurate)
         visitor.walk(file.tree)
         return visitor.found.map { mark in
-            file.finding(
-                at: mark,
-                rule: name,
-                messageId: "forceCast",
-                message:
-                    "as! crashes the process when the value is not that type. Use as? and say what happens when it is not.",
-            )
+            file.finding(at: mark, rule: name, message: RuleMessages.ForceCast.forceCast())
         }
     }
 

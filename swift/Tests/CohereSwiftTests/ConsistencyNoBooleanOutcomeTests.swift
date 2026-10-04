@@ -252,7 +252,7 @@ struct ConsistencyNoBooleanOutcomeTests {
         )
         #expect(
             message == [
-                "success: Bool on struct ClaudeCallResultInterface collapses every way the operation can turn out into one bit, at the moment the distinction is cheapest to keep, and leaves the reader to know which other fields hold for which value of it. Return a named outcome instead: an enum with a case for each way the operation can turn out and the payload on the case that carries it, or Result, or a throw for the failure. Suggested name: ClaudeCallOutcome."
+                "success: Bool on struct ClaudeCallResultInterface collapses every outcome into one bit, at the moment the distinction is cheapest to keep. It also leaves the reader to know which other fields hold for which value of the flag. Return a named outcome instead: an enum with a case for each way the operation can turn out and the payload on the case that carries it, or Result, or a throw for the failure. Suggested name: ClaudeCallOutcome."
             ]
         )
         #expect(

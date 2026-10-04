@@ -142,15 +142,6 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
         "url", "mimeType", "expectedContentLength", "textEncodingName", "suggestedFilename", "allHeaderFields",
     ]
 
-    static let bodyMessageId = "bodyReadWithoutStatusCheck"
-    static let discardMessageId = "responseDiscarded"
-
-    static let bodyMessage =
-        "This uses the body URLSession returned on a path where the response's statusCode is never read. URLSession does not throw on an HTTP error, so a 401 or 500 error page arrives here as data and is decoded, returned or kept as if the request had succeeded. Cast the response to HTTPURLResponse and check statusCode before trusting the body, and throw or return the failure when it is not a success."
-
-    static let discardMessage =
-        "This drops the response URLSession returned, and its status with it. URLSession does not throw on an HTTP error, so a request that fails with a 400 or 500 runs on as if it had succeeded. Keep the response, cast it to HTTPURLResponse and check statusCode, and throw or return the failure when it is not a success."
-
     /* Every tracked method's name holds one of these, and a call names its method. */
     public func applies(to file: ParsedFile) -> Bool {
         file.source.contains("data") || file.source.contains("upload") || file.source.contains("bytes")
@@ -200,8 +191,9 @@ public struct CorrectnessRequireResponseStatusCheck: TypedFileRule {
                 file.finding(
                     at: report.node,
                     rule: name,
-                    messageId: report.discarded ? Self.discardMessageId : Self.bodyMessageId,
-                    message: report.discarded ? Self.discardMessage : Self.bodyMessage,
+                    message: report.discarded
+                        ? RuleMessages.CorrectnessRequireResponseStatusCheck.responseDiscarded()
+                        : RuleMessages.CorrectnessRequireResponseStatusCheck.bodyReadWithoutStatusCheck(),
                 )
             }
     }

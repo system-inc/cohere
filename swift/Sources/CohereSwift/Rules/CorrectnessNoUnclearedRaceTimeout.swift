@@ -89,14 +89,9 @@ public struct CorrectnessNoUnclearedRaceTimeout: FileRule {
             file.finding(
                 at: found.child,
                 rule: name,
-                messageId: "unclearedRaceTimeout",
-                message: Self.message(group: found.group),
+                message: RuleMessages.CorrectnessNoUnclearedRaceTimeout.unclearedRaceTimeout(group: found.group),
             )
         }
-    }
-
-    static func message(group: String) -> String {
-        "This child only sleeps and then gives up, racing the group's other work for the first result, but nothing cancels the group once that result is in. A task group waits for every child before it returns, so when the work wins the caller still sits out the whole timeout, and a timeout that returns rather than throws bounds nothing, since the group then waits for the work too. Call \(group).cancelAll() once the first result is in (a defer { \(group).cancelAll() } at the top of the group's body covers every path), so the losing child is cancelled and its sleep ends at once."
     }
 
     /* Collects every lost timeout child, with the name its group goes by. */

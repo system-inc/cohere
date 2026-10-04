@@ -104,9 +104,10 @@ public struct ConsistencyNoAmbiguousIdentifier: FileRule {
                 return file.finding(
                     at: token,
                     rule: name,
-                    messageId: "noAmbiguousE",
-                    message:
-                        "Variable named \"e\" is too ambiguous\(inference.contextHint). It is the one name that could be an error or an event, and a reader has to find the declaration to learn which. Use \"\(inference.suggestedName)\" or a more descriptive name.",
+                    message: RuleMessages.ConsistencyNoAmbiguousIdentifier.noAmbiguousE(
+                        context: inference.context,
+                        suggestedName: inference.suggestedName,
+                    ),
                 )
             }
             /* A sort comparator is one place a and b read correctly. */
@@ -120,9 +121,7 @@ public struct ConsistencyNoAmbiguousIdentifier: FileRule {
             return file.finding(
                 at: token,
                 rule: name,
-                messageId: "noSingleLetter",
-                message:
-                    "Single-letter identifier \"\(spelled)\" is not descriptive enough. The name is read everywhere it is used and declared only once, so the saving is at the declaration and the cost is at every call site.",
+                message: RuleMessages.ConsistencyNoAmbiguousIdentifier.noSingleLetter(name: spelled),
             )
         }
     }
@@ -313,14 +312,14 @@ public struct ConsistencyNoAmbiguousIdentifier: FileRule {
     /* The suggestion and the reason for it, said in the message so a reader can disagree with the reasoning and not only the verdict. */
     struct Inference {
         let suggestedName: String
-        let contextHint: String
+        let context: RuleMessages.ConsistencyNoAmbiguousIdentifier.Context
     }
 
     static func inferEventOrError(_ token: TokenSyntax) -> Inference {
         if isCaughtError(token) {
-            return Inference(suggestedName: "error", contextHint: " (appears to be an error)")
+            return Inference(suggestedName: "error", context: .error)
         }
-        let event = Inference(suggestedName: "event", contextHint: " (appears to be an event)")
+        let event = Inference(suggestedName: "event", context: .event)
         var current = token.parent
         while let node = current {
             if let parent = node.parent {
@@ -350,7 +349,7 @@ public struct ConsistencyNoAmbiguousIdentifier: FileRule {
             }
             current = node.parent
         }
-        return Inference(suggestedName: "event", contextHint: " (context unclear)")
+        return Inference(suggestedName: "event", context: .unclear)
     }
 
     /*

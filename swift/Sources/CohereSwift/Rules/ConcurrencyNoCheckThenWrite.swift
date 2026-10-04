@@ -188,10 +188,6 @@ public struct ConcurrencyNoCheckThenWrite: TypedFileRule {
     /* How deep a comparison reads through `let`s and nested expressions. A chain this long is never written by hand; past it the paths are not proven equal. */
     static let depthLimit = 16
 
-    static func message(write: String) -> String {
-        "This loop looks for a file name that is free, and the `\(write)` after it creates that file in a separate step, so two saves running at once (two tasks, or two processes) can both find the same name free and the second silently replaces the first's file. Claim the name in the step that creates the file: `data.write(to: url, options: .withoutOverwriting)` (or `FileManager.moveItem` from a temporary file) fails with `CocoaError.fileWriteFileExists` when the name is taken, so try the next name on that error instead of checking first."
-    }
-
     /* Every flagged loop holds a `fileExists` check, and every write the rule knows is a `write` or a `createFile`. */
     public func applies(to file: ParsedFile) -> Bool {
         file.source.contains("fileExists") && (file.source.contains("write") || file.source.contains("createFile"))
@@ -208,8 +204,9 @@ public struct ConcurrencyNoCheckThenWrite: TypedFileRule {
             return file.finding(
                 at: race.check,
                 rule: name,
-                messageId: "checkThenWrite",
-                message: Self.message(write: Self.spelledName(of: race.write)),
+                message: RuleMessages.ConcurrencyNoCheckThenWrite.checkThenWrite(
+                    write: Self.spelledName(of: race.write)
+                ),
             )
         }
     }

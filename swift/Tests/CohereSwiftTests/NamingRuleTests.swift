@@ -177,6 +177,16 @@ struct NamingRuleTests {
         #expect(Self.flagged(SwiftFormatRule.requireLowerCamelCase, source) == ["max_bytes:2", "LoadAll:3"])
     }
 
+    /* swift-format's text, made a sentence, then the house's reason, filed under the catalog's id. */
+    @Test func lowerCamelCaseSaysSwiftFormatsWordsAndTheReason() {
+        let findings = SwiftFormatRule.requireLowerCamelCase.findings(in: Self.file("let max_bytes = 1"))
+        #expect(findings.map(\.messageId) == ["alwaysUseLowerCamelCase"])
+        #expect(
+            findings.first?.message
+                == "Rename the constant 'max_bytes' using lowerCamelCase. Swift spells values in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name is a word boundary camel case already marks."
+        )
+    }
+
     @Test func leadingUnderscoresAreSwiftFormatsOwnRule() {
         #expect(
             Self.flagged(SwiftFormatRule.noLeadingUnderscores, "let _cache = 1\nlet _ = 2\nfunc _reset() {}\n") == [

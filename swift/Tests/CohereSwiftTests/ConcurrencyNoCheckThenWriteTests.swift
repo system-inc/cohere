@@ -50,8 +50,8 @@ struct ConcurrencyNoCheckThenWriteTests {
         "appending": appendingPath,
     ]
 
-    /* Every finding as the text of its span and the message's named write. */
-    static func findings(_ source: String, resolving: [String: String] = foundation) -> [String] {
+    /* Every finding the rule makes on a source, its names resolved as the suite's comment describes. */
+    static func records(_ source: String, resolving: [String: String] = foundation) -> [FindingRecord] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
         let file = ParsedFile(
             url: url,
@@ -78,8 +78,13 @@ struct ConcurrencyNoCheckThenWriteTests {
         let rule = ConcurrencyNoCheckThenWrite()
         let found = rule.findings(in: file, symbols: FileSymbols(occurrences, ownedModules: ["Control"]))
         #expect(found.isEmpty || rule.applies(to: file), "the prefilter must never hide a finding")
+        return found
+    }
+
+    /* Every finding as the text of its span and the message's named write. */
+    static func findings(_ source: String, resolving: [String: String] = foundation) -> [String] {
         let lines = source.split(separator: "\n", omittingEmptySubsequences: false).map { Array($0.utf8) }
-        return found.map { finding in
+        return records(source, resolving: resolving).map { finding in
             #expect(finding.messageId == "checkThenWrite")
             #expect(finding.fixes.isEmpty && finding.suggestions.isEmpty, "the rule never fixes")
             guard let endLine = finding.endLine, let endColumn = finding.endColumn, endLine == finding.line else {
@@ -91,7 +96,8 @@ struct ConcurrencyNoCheckThenWriteTests {
                     "write(to:)", "write(to:options:)", "write(to:atomically:encoding:)",
                     "write(toFile:atomically:encoding:)", "createFile(atPath:contents:)",
                 ]
-                .first { finding.message == ConcurrencyNoCheckThenWrite.message(write: $0) } ?? "unnamed"
+                .first { finding.message == RuleMessages.ConcurrencyNoCheckThenWrite.checkThenWrite(write: $0).text }
+                ?? "unnamed"
             return "\(span) | \(named)"
         }
     }
@@ -700,6 +706,29 @@ struct ConcurrencyNoCheckThenWriteTests {
 
             """
         #expect(Self.findings(source).isEmpty)
+    }
+
+    /* The message names the write and the repair; checked against a literal rather than the rule's own text. */
+    @Test func theMessageNamesTheWriteAndTheRepair() {
+        let found = Self.records(Self.shape(Self.freeNameLoop + "\n    try data.write(to: url)"))
+        #expect(
+            found.map(\.message) == [
+                "This loop looks for a file name that is free, and the `write(to:)` after it creates that file in a separate step, so two saves running at once (in this process or in two) can both find the same name free and the second silently overwrites the first. Claim the name in the step that creates the file: `data.write(to: url, options: .withoutOverwriting)` (or `FileManager.moveItem` from a temporary file) fails with `CocoaError.fileWriteFileExists` when the name is taken, so try the next name on that error instead of checking first."
+            ]
+        )
+        #expect(found.map(\.rule) == ["cohere-swift/concurrency-no-check-then-write"])
+    }
+
+    /*
+     The finding a user sees is the catalog's entry (policy/messages/concurrency-no-check-then-write.json), id and text,
+     so an edited entry reaches the finding once regenerated. The literal above pins the words; this pins where they
+     come from.
+     */
+    @Test func theFindingIsTheCatalogsMessage() {
+        let found = Self.records(Self.shape(Self.freeNameLoop + "\n    try data.write(to: url)"))
+        let message = RuleMessages.ConcurrencyNoCheckThenWrite.checkThenWrite(write: "write(to:)")
+        #expect(found.map(\.messageId) == [message.id])
+        #expect(found.map(\.message) == [message.text])
     }
 
     /* The prefilter holds every flagged file and declines a file with no check. */

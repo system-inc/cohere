@@ -137,18 +137,14 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
         case dateOnlyStyle
         case dateOnlyFormatter
 
-        var messageId: String {
-            self == .cut ? "isoStringCutToDate" : "isoDateWithoutTimeZone"
-        }
-
-        var message: String {
+        var message: RuleMessages.Message {
             switch self {
                 case .cut:
-                    "This cuts an ISO 8601 timestamp down to its date part. ISO 8601 formatting is UTC unless it is given a time zone, so the cut is the UTC calendar day whether or not that was the day meant, and in Utah the UTC day turns over at 5 pm in winter and 6 pm in summer: an evening run gets tomorrow. Format the day itself and say the zone: Date.ISO8601FormatStyle(timeZone: .current).year().month().day() when the local day is meant, or timeZone: .gmt when the UTC day is."
+                    RuleMessages.ConsistencyNoIsoStringDateCut.isoStringCutToDate()
                 case .dateOnlyStyle:
-                    "This formats a date as its ISO 8601 calendar day without naming a time zone. Date.ISO8601FormatStyle is UTC unless it is given one, so this is the UTC day whether or not that was the day meant, and in Utah the UTC day turns over at 5 pm in winter and 6 pm in summer: an evening run gets tomorrow. Say the zone: Date.ISO8601FormatStyle(timeZone: .current) when the local day is meant, or timeZone: .gmt when the UTC day is."
+                    RuleMessages.ConsistencyNoIsoStringDateCut.isoDateWithoutTimeZone(renderer: .formatStyle)
                 case .dateOnlyFormatter:
-                    "This formats a date as its ISO 8601 calendar day without naming a time zone. ISO8601DateFormatter is UTC unless its timeZone is set, so this is the UTC day whether or not that was the day meant, and in Utah the UTC day turns over at 5 pm in winter and 6 pm in summer: an evening run gets tomorrow. Say the zone: set the formatter's timeZone to .current when the local day is meant, or to .gmt when the UTC day is."
+                    RuleMessages.ConsistencyNoIsoStringDateCut.isoDateWithoutTimeZone(renderer: .dateFormatter)
             }
         }
     }
@@ -162,7 +158,7 @@ public struct ConsistencyNoIsoStringDateCut: TypedFileRule {
         let visitor = Visitor(reader: Reader(file: file, symbols: symbols))
         visitor.walk(file.tree)
         return visitor.found.map { node, shape in
-            file.finding(at: node, rule: name, messageId: shape.messageId, message: shape.message)
+            file.finding(at: node, rule: name, message: shape.message)
         }
     }
 

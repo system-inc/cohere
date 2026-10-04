@@ -570,10 +570,9 @@ struct ConsistencyNoPropertyAliasTests {
             in: Self.parsed(Self.subject("        let count = self.count\n        use(count)"))
         )
         #expect(findings.count == 1)
-        #expect(findings.first?.message.contains("`count` is a pure alias for `self.count`") == true)
         #expect(
-            findings.first?.message.contains("Write `self.count` where `count` is read and delete the declaration")
-                == true
+            findings.first?.message
+                == "`count` is a pure alias for `self.count`. It is read once, and nothing runs between its declaration and that read. Write `self.count` where `count` is read and delete the declaration, so the value keeps the object it came from and a naked local still means this scope made it."
         )
     }
 }

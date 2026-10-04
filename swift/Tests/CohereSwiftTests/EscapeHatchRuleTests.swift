@@ -51,6 +51,23 @@ struct EscapeHatchRuleTests {
         #expect(Self.lines(ConsistencyNoPrint(), "debugPrint(value)\n") == [1])
     }
 
+    /* The finding is filed under TypeScript's id for the same defect, and says which kind of target nobody reads. */
+    @Test func printSaysWhoseStdoutNobodyReads() {
+        let library = ConsistencyNoPrint().findings(in: Self.file("print(\"loaded\")\n"))
+        let app = ConsistencyNoPrint().findings(in: Self.file("print(\"tapped\")\n", kind: "application"))
+        #expect(library.map(\.messageId) == ["consistencyNoConsole"])
+        #expect(
+            library.map(\.message) == [
+                "Do not call 'print'. In a library it writes to a stdout nobody reads. Log through os.Logger, so the message lands in the unified log with a subsystem, a category and a level."
+            ]
+        )
+        #expect(
+            app.map(\.message) == [
+                "Do not call 'print'. In an app it writes to a stdout nobody reads. Log through os.Logger, so the message lands in the unified log with a subsystem, a category and a level."
+            ]
+        )
+    }
+
     @Test func escapeHatchesNeedACommentDirectlyAbove() {
         let source = """
             final class Bare: @unchecked Sendable {}

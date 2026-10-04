@@ -9,6 +9,12 @@
       "languages": [
         "TypeScript"
       ]
+    },
+    "forceCast": {
+      "text": "as! crashes the process when the value is not that type. Use as? and say what happens when it is not.",
+      "languages": [
+        "Swift"
+      ]
     }
   }
 }

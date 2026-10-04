@@ -14,6 +14,10 @@ import Testing
  silence (actor isolation, shared state, an uncaught `try`).
  */
 struct PerformanceNoIndependentAwaitInLoopTests {
+    /* The words a finding carries, pinned here so a generator that drops or mangles them fails. */
+    static let message =
+        "This loop awaits once per item, so the items run one after another, yet nothing carries from one iteration to the next: each await is the item's own work, no local of the function is reassigned and no shared state is written, nothing leaves the loop on an awaited result or a thrown error, and nothing prints, logs or sleeps between iterations. Start them together with `withTaskGroup` (collect each result with its index when the order matters, since a group hands results back as they finish), with `async let` when the items are a fixed few, or with a bounded group when the collection can be large or the far side rate-limits."
+
     /* The text of every finding's span, after checking what every finding must be. */
     static func spans(_ source: String) -> [String] {
         let file = ParsedFile(
@@ -30,7 +34,7 @@ struct PerformanceNoIndependentAwaitInLoopTests {
         for finding in findings {
             #expect(finding.rule == "cohere-swift/performance-no-independent-await-in-loop")
             #expect(finding.messageId == "independentAwaitInLoop")
-            #expect(finding.message == PerformanceNoIndependentAwaitInLoop.message)
+            #expect(finding.message == Self.message)
             #expect(finding.fixes.isEmpty && finding.suggestions.isEmpty, "the rule never fixes")
         }
         let lines = source.split(separator: "\n", omittingEmptySubsequences: false).map { Array($0.utf8) }
@@ -653,7 +657,7 @@ struct PerformanceNoIndependentAwaitInLoopTests {
     }
 
     @Test func theMessageNamesTheRepairsAndCarriesNoEmDash() {
-        let message = PerformanceNoIndependentAwaitInLoop.message
+        let message = Self.message
         for phrase in ["withTaskGroup", "with its index", "async let", "bounded"] {
             #expect(message.contains(phrase), "the message should mention \(phrase)")
         }

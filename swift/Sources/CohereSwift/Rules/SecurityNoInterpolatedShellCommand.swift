@@ -104,9 +104,6 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
      */
     static let depthLimit = 16
 
-    static let message =
-        "This command string is run by a shell, and a value built into it is not a literal, so the shell parses that value as code: a `\"`, `'` or space in it breaks the command, and a `$(...)` or backtick in it runs. Quoting it by hand is one escape away from the same bug. Keep the script literal and pass the value after it as its own argument, which the shell reads as `$1` and never parses (`[\"-c\", \"cd \\\"$1\\\" && make\", \"zsh\", path]`), or run the program directly with no shell (`currentDirectoryURL` in place of a `cd`)."
-
     /* Every argument list here is labeled or assigned `arguments`, and every shell's name holds `sh`. */
     public func applies(to file: ParsedFile) -> Bool {
         file.source.contains("arguments") && file.source.contains("sh")
@@ -143,7 +140,11 @@ public struct SecurityNoInterpolatedShellCommand: TypedFileRule {
             else {
                 return nil
             }
-            return file.finding(at: script, rule: name, messageId: "interpolatedShellCommand", message: Self.message)
+            return file.finding(
+                at: script,
+                rule: name,
+                message: RuleMessages.SecurityNoInterpolatedShellCommand.interpolatedShellCommand(),
+            )
         }
     }
 

@@ -34,7 +34,7 @@ struct FileShapeRuleTests {
         let source = "enum PolicyAbbreviations {}\n"
         let rule = ConsistencyRequireMatchingFileName()
         #expect(Self.messages(rule, "PolicyAbbreviations.generated.swift", source).isEmpty)
-        #expect(Self.messages(rule, "Policy.generated.swift", source) == ["fileNotNamedForType"])
+        #expect(Self.messages(rule, "Policy.generated.swift", source) == ["requireMatchingFileName"])
         #expect(Self.messages(rule, "PolicyAbbreviations.swift", source).isEmpty)
     }
 
@@ -43,7 +43,9 @@ struct FileShapeRuleTests {
         let source = "struct Pane {}\nfinal class Box {}\nactor Worker {}\nprotocol Drawable {}\n"
         #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Pane.swift", source).isEmpty)
         #expect(
-            Self.messages(ConsistencyRequireMatchingFileName(), "Utilities.swift", source) == ["fileNotNamedForType"]
+            Self.messages(ConsistencyRequireMatchingFileName(), "Utilities.swift", source) == [
+                "requireMatchingFileName"
+            ]
         )
         /* The main type need not come first: the one the file is named for is its own. */
         #expect(
@@ -73,14 +75,14 @@ struct FileShapeRuleTests {
     @Test func aPurposeFilesPrivateHelperStaysAtAnySize() {
         #expect(Self.besidePurpose("private " + Self.structSource("Row", lines: 200)).isEmpty)
         #expect(Self.besidePurpose("private final class Helper {}\nfileprivate actor Worker {}\n").isEmpty)
-        #expect(Self.besidePurpose("final class Box {}\n") == ["fileNotNamedForType"])
-        #expect(Self.besidePurpose("protocol Drawable {}\n") == ["fileNotNamedForType"])
+        #expect(Self.besidePurpose("final class Box {}\n") == ["requireMatchingFileName"])
+        #expect(Self.besidePurpose("protocol Drawable {}\n") == ["requireMatchingFileName"])
     }
 
     /* Small means at most 30 lines: 30 stays, 31 does not. */
     @Test func aSmallValueTypeStaysAtTheLimitAndNotPastIt() {
         #expect(Self.besidePurpose(Self.structSource("Row", lines: 30)).isEmpty)
-        #expect(Self.besidePurpose(Self.structSource("Row", lines: 31)) == ["fileNotNamedForType"])
+        #expect(Self.besidePurpose(Self.structSource("Row", lines: 31)) == ["requireMatchingFileName"])
         #expect(Self.besidePurpose("enum Mode { case idle, busy }\n").isEmpty)
     }
 
@@ -88,8 +90,8 @@ struct FileShapeRuleTests {
     @Test func theAttachedCommentAndAttributesAreCounted() {
         let body = Self.structSource("Row", lines: 28)
         #expect(Self.besidePurpose("\n/* Why. */\n@frozen\n" + body).isEmpty)
-        #expect(Self.besidePurpose("\n/*\n Why.\n */\n@frozen\n" + body) == ["fileNotNamedForType"])
-        #expect(Self.besidePurpose("\n/// Why.\n/// More.\n@frozen\n" + body) == ["fileNotNamedForType"])
+        #expect(Self.besidePurpose("\n/*\n Why.\n */\n@frozen\n" + body) == ["requireMatchingFileName"])
+        #expect(Self.besidePurpose("\n/// Why.\n/// More.\n@frozen\n" + body) == ["requireMatchingFileName"])
         #expect(Self.besidePurpose("\n/*\n Header.\n */\n\n@frozen\n" + body).isEmpty)
     }
 
@@ -115,7 +117,30 @@ struct FileShapeRuleTests {
     @Test func aFileNotNamedForItsTypeIsReported() {
         #expect(
             Self.messages(ConsistencyRequireMatchingFileName(), "Utilities.swift", "final class Pane {}\n") == [
-                "fileNotNamedForType"
+                "requireMatchingFileName"
+            ]
+        )
+    }
+
+    /* The words of each finding: the misnamed file under TypeScript's id, and an extension placed beside a type or alone. */
+    @Test func eachFindingSaysWhereItBelongs() {
+        let rule = ConsistencyRequireMatchingFileName()
+        let misnamed = rule.findings(in: Self.file("Utilities.swift", "final class Pane {}\n"))
+        #expect(
+            misnamed.map(\.message) == [
+                "`Pane` is the first type declared in `Utilities.swift`, and the file is not named for it. Name it `Pane.swift`, so a reader looking for `Pane` opens it without a search."
+            ]
+        )
+        let beside = rule.findings(in: Self.file("Pane.swift", "struct Pane {}\nextension String {}\n"))
+        #expect(
+            beside.map(\.message) == [
+                "An extension of String in the file for Pane. Extensions of another type belong in that type's own file, such as String+Purpose.swift, so everything added to String is found together."
+            ]
+        )
+        let alone = rule.findings(in: Self.file("Helpers.swift", "extension String {}\n"))
+        #expect(
+            alone.map(\.message) == [
+                "This file is Helpers.swift and extends String. Name it String+Purpose.swift after what it adds, so everything added to String is found together."
             ]
         )
     }
