@@ -40,7 +40,7 @@ func reference(ruleNames []string) string {
 	write("when the root stylesheet imports tailwindcss. The run's first lines name each set and its evidence.\n\n")
 	write("A file of your own chooses its sets, turns rules off or changes their options, and may set its own format\n")
 	write("block. A file that names no `cohere:` set keeps the house stack, detected the same way, and applies its own\n")
-	write("rules and format on top:\n\n")
+	write("rules on top, and its own format block, if any, instead of the house format:\n\n")
 	write("```json\n{\n    \"$schema\": %s,\n    \"extends\": \"%s\",\n    \"rules\": { \"no-debugger\": \"off\" },\n    \"format\": {}\n}\n```\n\n", examples["$schema"], formatoptions.NexusTierSetName)
 	write("A format block is applied over Prettier's defaults, so `{}` means Prettier's defaults; without one, the house\n")
 	write("format applies. A project that extends a `cohere:system-inc/*` set is one of ours: its format comes only from\n")

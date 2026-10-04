@@ -10,7 +10,7 @@ when the root stylesheet imports tailwindcss. The run's first lines name each se
 
 A file of your own chooses its sets, turns rules off or changes their options, and may set its own format
 block. A file that names no `cohere:` set keeps the house stack, detected the same way, and applies its own
-rules and format on top:
+rules on top, and its own format block, if any, instead of the house format:
 
 ```json
 {
