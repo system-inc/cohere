@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -285,6 +286,10 @@ func TestSwiftRunRefusesBrokenStreams(t *testing.T) {
 		{"a summary whose exit code disagrees with its own findings", replace(findings, last, strings.Replace(findings[last], `"exitCode":1`, `"exitCode":0`, 1)), 0, "summary says exit 0"},
 		{"an engine whose exit disagrees with its summary", findings, 0, "said it would exit 1"},
 		{"a summary missing its fields", replace(findings, last, `{"kind":"summary"}`), 1, "missing findings"},
+		// changedFiles, additive within contract 3: "N cohered" is the list, so the list must be the count.
+		{"a changed-file list shorter than its count", replace(findings, 2, strings.Replace(findings[2], `"filesRewritten":1`, `"filesRewritten":2`, 1)), 1, "counts 2 files rewritten and lists 1"},
+		{"a file listed twice", replace(findings, 2, strings.Replace(strings.Replace(findings[2], `"filesRewritten":1`, `"filesRewritten":2`, 1), `"formatted":true}]`, `"formatted":true},{"file":"/project/Sources/Example/ByteRing.swift","fixedBy":{},"formatted":true}]`, 1)), 1, "lists /project/Sources/Example/ByteRing.swift twice"},
+		{"a file nothing changed", replace(findings, 2, strings.Replace(strings.Replace(findings[2], `{"cohere-swift/legacy-constructors":1}`, `{}`, 1), `"formatted":true`, `"formatted":false`, 1)), 1, "rewritten by no fix and not by the formatter"},
 		// Contract 2's unreadable record: a summary may not call the run complete over one, and it has one place.
 		{"a summary claiming complete over an unreadable file", replace(unreadable, len(unreadable)-1, `{"kind":"summary","findings":0,"complete":true,"exitCode":0}`), 0, "calls the run complete"},
 		{"an unreadable record after a phase", append(append(append([]string(nil), unreadable[:5]...), unreadable[2]), unreadable[5:]...), 1, "after phase fix"},
@@ -427,4 +432,31 @@ func TestSwiftEngineArguments(t *testing.T) {
 	if _, _, err := swiftEngineArguments(location, map[string]bool{"explain": true}, value, nil); err == nil || !strings.Contains(err.Error(), "--explain") {
 		t.Errorf("--explain was not refused by name: %v", err)
 	}
+}
+
+// TestSwiftRunListsTheFilesItRewrote: a fix record with its list fills the run summary the footer counts as
+// cohered, each path relative to the package, with the fixes by rule. A record from an engine before the list
+// has none, and the summary is left unlisted, never set to no files, so the footer prints no cohered count.
+func TestSwiftRunListsTheFilesItRewrote(t *testing.T) {
+	activeSummary = runSummary{}
+	if _, _, err := renderRecords(t, swiftModeCheck, contractFixture(t, "Findings.jsonl"), 1); err != nil {
+		t.Fatal(err)
+	}
+	want := []changedFile{{Path: "Sources/Example/ByteRing.swift", Fixed: true, Formatted: true, FixedBy: map[string]int{"cohere-swift/legacy-constructors": 1}}}
+	if !reflect.DeepEqual(activeSummary.Changed, want) {
+		t.Errorf("the summary lists %+v, expected %+v", activeSummary.Changed, want)
+	}
+	if activeSummary.cohered() != 1 {
+		t.Errorf("cohered %d, expected the one file listed", activeSummary.cohered())
+	}
+
+	activeSummary = runSummary{}
+	output, _, err := renderRecords(t, swiftModeCheck, contractFixture(t, "Clean.jsonl"), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if activeSummary.Changed != nil {
+		t.Errorf("a stream with no list set the summary to %+v; it is not listed, not empty", activeSummary.Changed)
+	}
+	forbidLines(t, output, "cohered")
 }
