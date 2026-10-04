@@ -49,17 +49,38 @@ func DecodeNoMeaninglessVoidOperatorOptions(raw []byte) (any, error) {
 	return options, nil
 }
 
-// NoMeaninglessVoidOperator flags `void` applied to something that is already void or undefined.
+// NoMeaninglessVoidOperator flags `void` that discards nothing: applied to something other than a
+// call, or to a call that already returns void or undefined.
 //
-//	valid:   function bar(x: number) { void x; }        the value discarded is a number
-//	valid:   const a = void 0;                          `0` is a number, so this discards something
-//	valid:   function bar(x: never) { void x; }         unless checkNever is on
-//	invalid: function foo() {} void foo();              foo() is already void
+//	valid:   declare function bar(): number; void bar();  the value discarded is a call's number
+//	valid:   const a = void 0;                            the undefined idiom
+//	valid:   void (x = 1);                                an assignment, so the expression is undefined
+//	valid:   declare const p: Promise<void>; void p;      a thenable, left to no-floating-promises
+//	invalid: declare let x: number; void x;               not a call, so nothing returned is discarded
+//	invalid: function foo() {} void foo();                foo() is already void
 //	invalid: void (() => {})();
 //
 // `void` exists to say "this expression returns something and I am deliberately throwing it away".
 // Applied to an expression that already evaluates to `void` or `undefined` it says nothing, so the
 // reader is left looking for a discarded value that was never there.
+//
+// # A non-call discards nothing a caller produced (8.71)
+//
+// typescript-eslint 8.71 added `meaninglessVoidOnNonCall`. `void value;` evaluates a name and throws
+// it away, which does nothing, and it is usually a leftover: a variable kept "used" for a linter, or
+// a read meant to force something that the React Compiler then erases. Structure's Time.tsx had
+// exactly that, a `void tickCount` the compiler dropped, so the clock never ticked (#bab6yg0).
+//
+// Before deciding, the argument is unwrapped the way upstream unwraps it: through parentheses (which
+// ESTree drops), `as`, `!`, `satisfies`, `<T>`, and to the last expression of a comma sequence. An
+// instantiation such as `make<string>` is not unwrapped, so it is a non-call. Three non-calls are
+// left alone: the literal `0` (`void 0` is the undefined idiom), an assignment (`() => void (x = 1)`
+// returns undefined on purpose), and a thenable, because no-floating-promises asks for `void p`.
+// The repair removes the operator only where the void is a whole statement, since anywhere else
+// the expression's value changes from undefined to the argument's.
+//
+// The type test below then runs only on a call, which is also new in 8.71: `void x` with `x: void`
+// is now a non-call finding rather than a "used on void" one.
 //
 // # Two branches, and the SAME repair is a fix in one and a suggestion in the other
 //
@@ -154,6 +175,34 @@ var NoMeaninglessVoidOperator = rule.Rule{
 				voidKeyword := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())
 				removal := core.NewTextRange(voidKeyword.Pos(), rule.TokenRange(ctx.SourceFile, argument).Pos())
 
+				inner := unwrapVoidArgument(argument)
+				if !isDiscardedCall(inner) {
+					if inner.Kind == ast.KindNumericLiteral && inner.Text() == "0" {
+						// `void 0` is the undefined idiom. The parser renders a literal's text as
+						// its canonical decimal, so `0x0` and `0.0` arrive as "0" too, as upstream's
+						// `value === 0` reads them. `0n` and `-0` are not this literal and report.
+						return
+					}
+					if ast.IsAssignmentExpression(inner, false) {
+						// `void (x = value)` makes the expression undefined on purpose, compound
+						// and logical assignment included.
+						return
+					}
+					if type_checking.IsThenableType(ctx.TypeChecker, argument, argumentType) {
+						// Left to no-floating-promises, which asks for exactly this.
+						return
+					}
+					if isWholeStatement(node) {
+						ctx.ReportNodeWithFixes(node, buildMeaninglessVoidOnNonCallMessage(),
+							rule.RemoveRange(removal))
+						return
+					}
+					// Anywhere else the void's undefined is the value, so removing it would change
+					// what the expression evaluates to.
+					ctx.ReportNode(node, buildMeaninglessVoidOnNonCallMessage())
+					return
+				}
+
 				// Upstream interpolates `checker.typeToString(argType)`, which is this method
 				// rather than the shelf's `GetTypeName`.
 				//
@@ -191,6 +240,55 @@ var NoMeaninglessVoidOperator = rule.Rule{
 			},
 		}
 	},
+}
+
+// unwrapVoidArgument is upstream's `unwrapVoidArgument`, which looks through what does not change
+// which expression is being discarded.
+//
+// ESTree drops parentheses and keeps the rest as nodes, so parentheses are one more arm here. A comma
+// sequence is a binary expression in our tree, nested to the left, so its last expression is the
+// right operand, and a nested sequence unwraps again on the next turn. An instantiation expression
+// is deliberately absent, as it is upstream: `make<string>` names a function without calling it.
+func unwrapVoidArgument(node *ast.Node) *ast.Node {
+	current := node
+	for {
+		switch current.Kind {
+		case ast.KindParenthesizedExpression, ast.KindAsExpression, ast.KindNonNullExpression,
+			ast.KindSatisfiesExpression, ast.KindTypeAssertionExpression:
+			current = current.Expression()
+		case ast.KindBinaryExpression:
+			binary := current.AsBinaryExpression()
+			if binary.OperatorToken.Kind != ast.KindCommaToken {
+				return current
+			}
+			current = binary.Right
+		default:
+			return current
+		}
+	}
+}
+
+// isDiscardedCall answers upstream's `inner.type === CallExpression`.
+//
+// `import(...)` is a CallExpression in our tree and an ImportExpression in ESTree, so it is a non-call
+// here as it is upstream. Either way it is a thenable and stays silent, but the branch it takes is
+// upstream's.
+func isDiscardedCall(node *ast.Node) bool {
+	return node.Kind == ast.KindCallExpression && !ast.IsImportCall(node)
+}
+
+// isWholeStatement answers upstream's `node.parent.type === ExpressionStatement`, looking through
+// the parentheses ESTree drops, so `(void x);` is a statement as it is upstream.
+func isWholeStatement(node *ast.Node) bool {
+	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
+	return parent != nil && parent.Kind == ast.KindExpressionStatement
+}
+
+func buildMeaninglessVoidOnNonCallMessage() rule.Message {
+	return rule.Message{
+		Id:          "meaninglessVoidOnNonCall",
+		Description: "void operator is useless here; it should only discard a call's return value",
+	}
 }
 
 func buildMeaninglessVoidOperatorMessage(typeName string) rule.Message {
