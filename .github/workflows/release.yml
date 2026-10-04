@@ -82,6 +82,11 @@ jobs:
               # A release is not the place to discover a formatting or vet failure. These are the
               # same checks the repository is gated by, run first so a bad tree never reaches the
               # signing keys.
+              env:
+                  # The cross-compile guard builds every release target here, where a link-time failure
+                  # would otherwise first show up in the release itself. A local `go test` only
+                  # type-checks them, which costs no build cache (#nkbfkvn).
+                  COHERE_CROSS_COMPILE: build
               run: |
                   # Prove the check looked at something before trusting that it found nothing.
                   #

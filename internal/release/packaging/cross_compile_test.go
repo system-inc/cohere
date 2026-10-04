@@ -1,10 +1,30 @@
 package release
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"golang.org/x/tools/go/packages"
 )
+
+// crossCompileVariable chooses how TestEveryReleaseTargetCompiles proves the targets. Unset, it
+// type-checks cohere for each one from source. Set to "build", it builds each one as the release does,
+// which release.yml sets.
+//
+// Measured on private caches (#nkbfkvn), for all six targets: building costs 17.1 GB of Go cache cold,
+// and 5.5 GB more after one real line in internal/lint/rule, because every package that imports it
+// recompiles six times. Type-checking from source costs 12 MB cold and nothing after the same edit, in
+// about five seconds, since nothing is compiled. `go vet` per target was no better than building, at
+// 2.7 GB cold for one target: it compiles every dependency for its export data. Building on every
+// local `go test ./...` was most of the 25 GB an hour that filled the disk on 2026-10-03.
+//
+// Type-checking catches what the Windows break was, a call to something one platform does not define,
+// and any type error in a file only one platform compiles. What only a build catches, a link-time
+// failure, is left to the build release.yml runs.
+const crossCompileVariable = "COHERE_CROSS_COMPILE"
 
 // TestEveryReleaseTargetCompiles builds cohere for every platform a release ships, so a target that
 // stops compiling fails `go test` instead of the next release.
@@ -18,27 +38,89 @@ import (
 // dropped or renamed platform stops being checked without anything failing. It compiles through
 // goBuildCommand, the same command the release runs, for the same reason.
 //
-// Measured on an M-series Mac: about a minute per target the first time a toolchain sees it, then
-// zero to six seconds warm, because the build cache is kept per GOOS and GOARCH. The gate runs plain
-// `go test ./...`, so it always runs this; `-short` skips it for a quick local loop and says so.
+// Locally it type-checks rather than builds, and release.yml asks for the build; crossCompileVariable
+// says why, with the measurements. `-short` skips it for a quick local loop and says so.
 func TestEveryReleaseTargetCompiles(t *testing.T) {
 	t.Parallel()
 
 	if testing.Short() {
-		t.Skipf("NOT MEASURED: -short skips cross-compiling cohere for the %d release targets, so a platform that no longer builds would pass here", len(Targets))
+		t.Skipf("NOT MEASURED: -short skips checking cohere for the %d release targets, so a platform that no longer builds would pass here", len(Targets))
+	}
+	mode := os.Getenv(crossCompileVariable)
+	if mode != "" && mode != "build" {
+		t.Fatalf("%s is %q; it is unset to type-check each target, or \"build\" to build each one", crossCompileVariable, mode)
 	}
 
 	moduleDirectory := filepath.Join("..", "..", "..")
 
 	for _, target := range Targets {
 		t.Run(target.String(), func(t *testing.T) {
+			if mode != "build" {
+				// One after another: a type-check holds about 900 MB, and six at once is not worth five
+				// seconds.
+				if problems := typeCheckTarget(moduleDirectory, target); len(problems) > 0 {
+					t.Fatalf("cohere does not type-check for %s, so a release would fail there:\n%s", target, strings.Join(problems, "\n"))
+				}
+				return
+			}
 			t.Parallel()
-
 			command := goBuildCommand(moduleDirectory, target, strings.Join(StripFlags, " "), filepath.Join(t.TempDir(), target.BinaryFileName()))
 			if output, err := command.CombinedOutput(); err != nil {
 				t.Fatalf("cohere does not compile for %s, so a release would fail there: %v\n%s", target, err, output)
 			}
 		})
+	}
+}
+
+// typeCheckTarget type-checks the package the release builds, and everything it imports, from source as
+// target would compile it, and returns every error, or none. Nothing is compiled, so nothing is written
+// to the build cache.
+func typeCheckTarget(moduleDirectory string, target Target) []string {
+	loaded, err := packages.Load(&packages.Config{
+		// Syntax and type information for every dependency is what makes go/packages type-check them all
+		// from source rather than reading export data, which it would have to compile first.
+		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedImports |
+			packages.NeedDeps | packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo,
+		Dir: moduleDirectory,
+		Env: append(os.Environ(), "GOOS="+target.GoOperatingSystem, "GOARCH="+target.GoArchitecture, "CGO_ENABLED=0"),
+	}, "./command/cohere")
+	if err != nil {
+		return []string{err.Error()}
+	}
+	var problems []string
+	checked := 0
+	packages.Visit(loaded, nil, func(pkg *packages.Package) {
+		checked++
+		for _, problem := range pkg.Errors {
+			problems = append(problems, problem.Error())
+		}
+	})
+	if checked == 0 {
+		return []string{fmt.Sprintf("nothing was loaded for %s, so nothing was checked", target)}
+	}
+	return problems
+}
+
+// TestTypeCheckCatchesAPlatformOnlyBreak is the known-dirty control for the local path: the darwin-only
+// call the build control below uses, and a type error only a windows file holds, both fail the
+// windows type-check and neither fails darwin's.
+func TestTypeCheckCatchesAPlatformOnlyBreak(t *testing.T) {
+	t.Parallel()
+
+	directory := t.TempDir()
+	writeFile(t, filepath.Join(directory, "go.mod"), "module crosscompile\n\ngo 1.21\n")
+	writeFile(t, filepath.Join(directory, "command", "cohere", "main.go"), "package main\n\nfunc main() { onlyOnDarwin() }\n")
+	writeFile(t, filepath.Join(directory, "command", "cohere", "only_darwin.go"), "package main\n\nfunc onlyOnDarwin() {}\n")
+	writeFile(t, filepath.Join(directory, "command", "cohere", "broken_windows.go"), "package main\n\nvar broken int = \"text\"\n")
+
+	if problems := typeCheckTarget(directory, Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}); len(problems) > 0 {
+		t.Fatalf("the control does not type-check even for darwin, so it cannot show anything: %v", problems)
+	}
+	problems := strings.Join(typeCheckTarget(directory, Target{GoOperatingSystem: "windows", GoArchitecture: "amd64"}), "\n")
+	for _, want := range []string{"onlyOnDarwin", "broken_windows.go"} {
+		if !strings.Contains(problems, want) {
+			t.Errorf("the windows type-check did not report %s: %q", want, problems)
+		}
 	}
 }
 
