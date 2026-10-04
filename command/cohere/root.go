@@ -69,6 +69,10 @@ type projectLocation struct {
 	// LintConfigFileName is the absolute path of the lint config.
 	LintConfigFileName string
 
+	// LintConfigFileNameGiven is whether `--lint-config` named it. A named file that is missing is an
+	// error; the default one missing is zero config, the house stack (#bfxz13m).
+	LintConfigFileNameGiven bool
+
 	// ArgumentBase is the directory a path typed on the command line resolves against.
 	ArgumentBase string
 
@@ -146,6 +150,7 @@ func locateProject(request locationRequest) (projectLocation, error) {
 		}
 	}
 
+	location.LintConfigFileNameGiven = request.LintConfigFileNameGiven
 	if request.LintConfigFileNameGiven {
 		location.LintConfigFileName = absoluteFrom(base, request.LintConfigFileName)
 	} else {

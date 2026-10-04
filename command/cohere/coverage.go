@@ -120,9 +120,9 @@ type ruleCoverageEntry struct {
 	// (rule.NoListenerKind). That is the dead-rule signal these notes were invented for, so it prints in
 	// full by default.
 	NeedsAction bool
-	// OffWithoutReason marks a rule the config turns off at top level with no file saying why. An off
-	// with no reason is an allowance, so it prints by default while the configs carrying one are given
-	// their reasons.
+	// OffWithoutReason marks a rule the config turns off at top level with no file saying why. Inside our
+	// tiers the loader refuses one, so this is a project outside them going its own way (#bfxz13m): it is
+	// counted by default and named under `--coverage`, so the choice stays visible.
 	OffWithoutReason bool
 }
 
@@ -427,7 +427,7 @@ func writeCoverageDetails(out io.Writer, summary coverageSummary) {
 				details = append(append([]string(nil), details...), "declares no reason to register none, so it checked nothing")
 			}
 			if entry.OffWithoutReason {
-				details = append(append([]string(nil), details...), "off with no reason, so it reads as an allowance")
+				details = append(append([]string(nil), details...), "off with no reason given")
 			}
 			if len(details) > 0 {
 				line += " (" + strings.Join(details, ", ") + ")"
@@ -764,6 +764,17 @@ func writeOverrideReasons(out io.Writer, lintConfig *configuration.Config) {
 	}
 }
 
+// offWithoutReasonCount is how many rules the settings turn off with no reason given.
+func (s coverageSummary) offWithoutReasonCount() int {
+	count := 0
+	for _, entry := range s.Entries {
+		if entry.OffWithoutReason {
+			count++
+		}
+	}
+	return count
+}
+
 // writeCoverageNotes is the part of the coverage block after the two counted lines: crashed files in
 // full, then the rules that need action by default or every rule once with details.
 func writeCoverageNotes(out io.Writer, summary coverageSummary, details bool) {
@@ -784,11 +795,10 @@ func writeCoverageNotes(out io.Writer, summary coverageSummary, details bool) {
 	for _, line := range skipLines(skips) {
 		fmt.Fprintf(out, "  skipped: %s\n", line)
 	}
+	if offWithoutReason := summary.offWithoutReasonCount(); offWithoutReason > 0 {
+		fmt.Fprintf(out, "  off with no reason: %d rule%s your settings turn off without saying why; cohere --coverage names them\n", offWithoutReason, plural(offWithoutReason))
+	}
 	for _, entry := range summary.Entries {
-		if entry.OffWithoutReason {
-			fmt.Fprintf(out, "  off with no reason: rule %s is turned off and no settings file says why, so it reads as an allowance; give the file that turns it off a \"reasons\" entry\n",
-				entry.Name)
-		}
 		if !entry.NeedsAction {
 			continue
 		}

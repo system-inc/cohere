@@ -44,49 +44,51 @@ formatting out.
 
 ## CohereSettings.json
 
-cohere reads `CohereSettings.json` at the project root. The house rules ship inside cohere as rule
-sets, and the formatting options come with `cohere:typescript`, so a minimal setup is one file:
+With no settings file, cohere applies the house stack, each set where the code shows it fits:
+
+- `cohere:typescript` on every file.
+- `cohere:react` on each file that imports `react` or a `react-` package, or contains JSX.
+- `cohere:next` on each file that imports `next`, and, once anything does, on Next's own files: everything
+  under `app/` and `pages/`, and `middleware`, `instrumentation` and `next.config`.
+- `cohere:tailwind` on every file when the root stylesheet the Tailwind rules find (`app/globals.css` and
+  the others) imports `tailwindcss`. Without one, its rules are skipped by name.
+
+package.json is never the evidence: a dependency the code never imports applies nothing. The run's
+`sets:` line names each set and why. The house format applies too, so the first run rewrites files into
+the house style.
+
+To go your own way, write a `CohereSettings.json`. One that names no `cohere:` set keeps the detected
+stack and applies its own rules and format on top:
 
 ```json
 {
-    "extends": "cohere:typescript",
-    "rules": { "no-debugger": "error" },
-    "ignorePatterns": ["dist/**"]
+    "rules": { "no-continue": "off", "eqeqeq": ["error", "smart"] },
+    "format": {}
 }
 ```
 
-A React and Next.js project composes the sets it uses, each of which sits on `cohere:typescript`:
-`"extends": ["cohere:react", "cohere:next", "cohere:tailwind"]`. A rule belongs to one set, and a rule
-two sets that do not extend each other both configure is an error naming both.
+An `"off"` there needs no reason, and `--coverage` names each one. A `format` block applies over
+Prettier's defaults, so `{}` means Prettier's defaults. A file that names sets in `extends` chooses them
+instead, and they apply to every file: `"extends": ["cohere:react", "cohere:next"]`.
 
-A project with a tier of its own extends a file instead, and that tier, `NexusCohereSettings.json`,
-holds the format block:
-
-```json
-{
-    "format": { "tabWidth": 4, "singleQuote": true, "printWidth": 120 }
-}
-```
+A project that extends a `cohere:system-inc/*` set is one of ours, and stays strict: every off says why
+under `reasons`, every departure from an inherited ruling says why under `departures`, and the format
+comes only from the Nexus tier, so a `format` block anywhere else in the chain is refused.
 
 The keys:
 
-- `extends`: a rule set cohere carries (`cohere:<name>`), or a path to another settings file, or a list
-  of them, applied first and in order, so a shared base can hold most of the configuration.
-- `rules`: each rule's severity, `"off"`, `"warn"` or `"error"`, with options where a rule takes
-  them.
+- `extends`: a rule set cohere carries (`cohere:<name>`), a path to another settings file, or a list of
+  them, applied first and in order. A rule two sets that don't extend each other both configure is an
+  error naming both.
+- `rules`: each rule's severity, `"off"`, `"warn"` or `"error"`, with options where a rule takes them.
 - `overrides`: a list of `{ "files": [...], "rules": {...} }` blocks that change rules for matching
   paths.
 - `ignorePatterns`: paths cohere never checks.
-- `departures`: for each rule this file sets differently from the file it extends, the reason why.
-  cohere reports them, so a departure stays visible rather than becoming a quiet exception.
-- `format`: the formatter's options. It belongs only in the Nexus tier, `cohere:typescript` or a
-  `NexusCohereSettings.json` of your own, so every
-  project that extends it formats the same way; a `format` key in any other settings file is an
-  error that names the file. It accepts `printWidth`, `tabWidth`, `useTabs`, `semi`,
-  `singleQuote`, `trailingComma`, `bracketSpacing`, `bracketSameLine`, `arrowParens`, `endOfLine`,
-  and `ignore`, a list of paths the formatter leaves alone. An option outside that list is an error,
-  not something silently ignored, and
-  `--format` refuses to run when your settings do not extend a Nexus tier holding a `format` block. Linting and fixing need no such file.
+- `reasons` and `departures`: why this file turns a rule off, or sets it differently from the file it
+  extends. Required in our tiers, optional elsewhere. cohere prints them, so a choice stays visible.
+- `format`: the formatter's options, `printWidth`, `tabWidth`, `useTabs`, `semi`, `singleQuote`,
+  `trailingComma`, `bracketSpacing`, `bracketSameLine`, `arrowParens`, `endOfLine`, and `ignore`, a list
+  of paths the formatter leaves alone. An option outside that list is an error.
 
 The full reference, every key with an example, is [schema/CohereSettings.md](schema/CohereSettings.md).
 It is generated from the loader itself, along with two JSON schemas an editor can validate against

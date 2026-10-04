@@ -125,6 +125,13 @@ type Config struct {
 	// pins none. Only the project's own file may pin: a set is read by every project that extends it,
 	// and a range there would decide for all of them which release they run.
 	CohereVersion *VersionRange
+
+	// ruleWriters is the source that turned each rule key on or set it: the file or set that wrote it at
+	// top level, the one that declared the plugin for a plugin default, or the one whose override names it.
+	ruleWriters map[string]string
+
+	// house is the per-file dispatch of a zero-config configuration, nil for one that names its sets.
+	house *houseSets
 }
 
 // Departure is one rule a configuration sets differently from the file it extends, and why.
@@ -146,17 +153,30 @@ func (c *Config) OffReasonFor(ruleName string) (OffReason, bool) {
 	if c == nil {
 		return OffReason{}, false
 	}
-	if offReason, found := c.OffReasons[ruleName]; found {
+	if offReason, found := lookupByReach(c.OffReasons, ruleName); found {
 		return offReason, true
 	}
-	keys := make([]string, 0, len(c.OffReasons))
-	for key := range c.OffReasons {
+	// Under zero config, a rule a per-file set turns on is off wherever the set does not fit, and the set
+	// says why. Asked only after the chain's own reasons, so a project's own off keeps its own.
+	if c.house != nil && !c.TurnsOffAtTopLevel(ruleName) {
+		return lookupByReach(c.house.gatedReasons, ruleName)
+	}
+	return OffReason{}, false
+}
+
+// lookupByReach finds ruleName's entry by its own key, or else by the first key, sorted, that reaches it.
+func lookupByReach(reasons map[string]OffReason, ruleName string) (OffReason, bool) {
+	if offReason, found := reasons[ruleName]; found {
+		return offReason, true
+	}
+	keys := make([]string, 0, len(reasons))
+	for key := range reasons {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
 		if KeyReachesRule(key, ruleName) {
-			return c.OffReasons[key], true
+			return reasons[key], true
 		}
 	}
 	return OffReason{}, false
@@ -344,6 +364,24 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	return loadLayers(layers, root, registeredNames)
+}
+
+// loadLayers merges a chain already read, outermost base first, the project's own file last.
+//
+// # Reasons are required inside our tiers, and of our own sets
+//
+// A chain that reaches a `cohere:system-inc/*` set is one of ours (InOurTiers), and every off and every
+// departure in it says why, or the load is refused. Outside our tiers a project goes its own way
+// (#bfxz13m): its own file may turn a rule off or change its options with no reason, and coverage
+// counts each unreasoned off by rule so the choice stays visible. The sets cohere carries are ours
+// wherever they are read, so an off or a departure written in one is held to a reason in every chain.
+func loadLayers(layers []configLayer, root string, registeredNames []string) (*Config, error) {
+	layerPaths := make([]string, 0, len(layers))
+	for _, layer := range layers {
+		layerPaths = append(layerPaths, layer.path)
+	}
+	inOurTiers := InOurTiers(layerPaths)
 
 	loaded := &Config{
 		Rules:      map[string]RuleSetting{},
@@ -352,6 +390,7 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 		OffReasons: map[string]OffReason{},
 	}
 	declaredPlugins := map[string]bool{}
+	pluginDeclaredBy := map[string]string{}
 	reach := newRuleReach(registeredNames)
 	ancestors := ancestorsByLayer(layers)
 	// Which layer last wrote each top-level rule, so a rule two unrelated sets both configure is caught.
@@ -376,6 +415,7 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 		// whichever order Go's map iteration happened to yield them.
 		fromBases := maps.Clone(loaded.Rules)
 		departed := map[string]bool{}
+		holdsToReasons := inOurTiers || IsSet(layer.path)
 		if err := checkReasons(layer); err != nil {
 			return nil, err
 		}
@@ -400,15 +440,20 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 					setting.Options = inherited.Options
 				}
 				if !sameRuleSetting(setting, inherited) {
-					departed[name] = true
 					reason := strings.TrimSpace(layer.raw.Departures[name])
-					if reason == "" {
+					switch {
+					case reason != "":
+						departed[name] = true
+						loaded.Departures[name] = Departure{File: layer.path, Reason: reason}
+					case holdsToReasons:
 						return nil, fmt.Errorf("lint config %s sets %q differently from the file it extends "+
 							"and gives no reason: name it under \"departures\" with why this project "+
 							"differs, or remove the line so the house ruling applies",
 							layer.path, name)
 					}
-					loaded.Departures[name] = Departure{File: layer.path, Reason: reason}
+					// Outside our tiers a departure with no reason is the project's own choice. It is not
+					// recorded as one, since a departure prints with its reason, and an off among them still
+					// counts in coverage as an off with no reason.
 				}
 				// The inherited key goes only when the new one reaches every rule it did: a respelling.
 				// A twin keeps its own key, or the rule only the inherited key reached would be left
@@ -440,6 +485,7 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 		for _, plugin := range layer.raw.Plugins {
 			if !declaredPlugins[plugin] {
 				declaredPlugins[plugin] = true
+				pluginDeclaredBy[plugin] = layer.path
 				loaded.Plugins = append(loaded.Plugins, plugin)
 			}
 		}
@@ -479,8 +525,11 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 				if sameRuleSetting(compared, inherited) {
 					continue
 				}
-				departed[name] = true
 				reason := strings.TrimSpace(layer.raw.Departures[name])
+				if reason == "" && !holdsToReasons {
+					continue
+				}
+				departed[name] = true
 				if reason == "" {
 					return nil, fmt.Errorf("lint config %s overrides %q for every file (%s) differently from the "+
 						"file it extends and gives no reason: an override that matches every file is a "+
@@ -500,15 +549,24 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 		}
 	}
 
-	if err := refuseUnreasonedOffs(loaded, writtenBy); err != nil {
+	if err := refuseUnreasonedOffs(loaded, writtenBy, inOurTiers); err != nil {
 		return nil, err
 	}
 
 	// Applied after every layer's rules, and reading them: an explicit line is a decision and a
 	// default is not, so `RulesFromPlugins` skips any rule already named. Seeding before would let a
 	// default overwrite a deliberate `off`.
+	loaded.ruleWriters = maps.Clone(writtenBy)
 	for name, setting := range RulesFromPlugins(loaded.Plugins, loaded.Rules) {
 		loaded.Rules[name] = setting
+		loaded.ruleWriters[name] = pluginDeclaredBy[pluginContributing(name)]
+	}
+	for _, override := range loaded.Overrides {
+		for name := range override.Rules {
+			if _, written := loaded.ruleWriters[name]; !written {
+				loaded.ruleWriters[name] = override.File
+			}
+		}
 	}
 
 	if own := layers[len(layers)-1]; own.present["cohere"] {
@@ -849,13 +907,19 @@ func checkReasons(layer configLayer) error {
 // and repositories were given their reasons; once every one carried a reason, the standard became a
 // refusal so it cannot rot back (#2qq4yr7). The error names each rule and the file that turned it off, so
 // the fix is one entry under that file's "reasons".
-func refuseUnreasonedOffs(loaded *Config, writtenBy map[string]string) error {
+//
+// Inside our tiers, and in the sets cohere carries. Outside them an off in the project's own files is
+// its choice to make (#bfxz13m), and coverage counts it rather than the load refusing it.
+func refuseUnreasonedOffs(loaded *Config, writtenBy map[string]string, inOurTiers bool) error {
 	var unreasoned []string
 	for name, setting := range loaded.Rules {
 		if setting.Severity != SeverityOff {
 			continue
 		}
 		if _, reasoned := loaded.OffReasons[name]; reasoned {
+			continue
+		}
+		if !inOurTiers && !IsSet(writtenBy[name]) {
 			continue
 		}
 		unreasoned = append(unreasoned, fmt.Sprintf("%q in %s", name, writtenBy[name]))
@@ -913,7 +977,7 @@ var ignoredTopLevelKeys = map[string]string{
 
 	"settings": "per-plugin configuration for the JavaScript plugins above, and it is the entry " +
 		"most worth re-reading. `settings.better-tailwindcss.entryPoint` names this repository's " +
-		"root stylesheet, and `findTailwindEntryPoint` does not read it -- it probes a hardcoded " +
+		"root stylesheet, and the Tailwind rules' `FindEntryPoint` does not read it -- it probes a hardcoded " +
 		"candidate list whose first entry is that same path. All three repositories we lint hit " +
 		"that first candidate, so the divergence is latent rather than live: there is no known " +
 		"case of it producing a wrong answer, and a project whose stylesheet is elsewhere gets a " +

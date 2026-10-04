@@ -11,11 +11,21 @@ changed in cohere outside the sets is written under the same heading.
 The first release. It carries these rule sets:
 
 - `cohere:next`, 22 rules on
-- `cohere:react`, 76 rules on
-- `cohere:system-inc/base`, 20 rules on
-- `cohere:system-inc/structure`, 36 rules on
+- `cohere:react`, 88 rules on
+- `cohere:system-inc/base`, 21 rules on
+- `cohere:system-inc/structure`, 27 rules on
 - `cohere:tailwind`, 12 rules on
-- `cohere:typescript`, 232 rules on
+- `cohere:typescript`, 270 rules on
+
+Zero config: a project with no `CohereSettings.json`, or one that names no `cohere:` set, gets the house
+stack, each set where the code shows it fits. `cohere:typescript` applies to every file, `cohere:react`
+to each file that imports react or contains JSX, `cohere:next` to each file that imports next or is one
+of Next's own files, and `cohere:tailwind` to every file when the root stylesheet imports `tailwindcss`.
+package.json is never the evidence, and the run's `sets:` line names each set and why. Outside the
+`cohere:system-inc/*` sets, an `"off"` needs no reason and `--coverage` names each one. Inside them,
+every off and departure still says why. `nexus/import-no-forbidden-source`, `no-restricted-properties`
+(JSON.parse) and `no-restricted-globals` (Buffer) moved from `cohere:typescript` to the
+`cohere:system-inc/*` sets, since their advice names our own libraries.
 
 Formatting: a project that configures nothing formats with the house block `cohere:typescript` carries
 (tab width 4, single quotes, print width 120). A project outside the `cohere:system-inc/*` sets may set

@@ -52,7 +52,7 @@ func TestAFixToARecordedFileIsFormatted(t *testing.T) {
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{
 		"tsconfig.json":            fixScopeTsconfig,
-		"CohereSettings.json":      `{"extends":"./NexusCohereSettings.json"}`,
+		"CohereSettings.json":      `{"extends":"./NexusCohereSettings.json","rules":{"no-debugger":"off"}}`,
 		"NexusCohereSettings.json": `{"format":{"ignore":[]}}`,
 		"Producer.ts":              "export function value(): number {\n  debugger;\n  return 1;\n}\n",
 	})

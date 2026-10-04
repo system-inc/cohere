@@ -104,7 +104,8 @@ func TestABareSeverityKeepsTheInheritedOptionsAndATupleReplacesThem(t *testing.T
 // The guard this whole change exists for. Each case is the drift #rkm5a31 measured, written as the
 // overlay that would have hidden it.
 func TestADepartureFromAnInheritedRulingMustSayWhy(t *testing.T) {
-	base := `{"rules": {"no-implied-eval": "error", "guard-for-in": "off", "eqeqeq": ["error", {"null": "ignore"}]},
+	withOurTierForTest(t)
+	base := `{"extends": "cohere:system-inc/test", "rules": {"no-implied-eval": "error", "guard-for-in": "off", "eqeqeq": ["error", {"null": "ignore"}]},
 		"reasons": {"guard-for-in": "nexus/consistency-no-for-in replaces it"}}`
 
 	// The positive case first, so every refusal below is shown to come from the guard under test
@@ -185,6 +186,7 @@ func TestADepartureFromAnInheritedRulingMustSayWhy(t *testing.T) {
 // because the resolver's own matching is one-way and this check must not be.
 func TestADepartureCannotHideBehindAnotherSpelling(t *testing.T) {
 	// Only the bare name is registered, so the two spellings reach one rule: a respelling.
+	withOurTierForTest(t)
 	registered := []string{"consistency-no-enum"}
 	cases := []struct {
 		name    string
@@ -199,7 +201,7 @@ func TestADepartureCannotHideBehindAnotherSpelling(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			undeclared := writeConfigs(t, map[string]string{
-				"base.json":           `{"rules": {"` + testCase.base + `": "error"}}`,
+				"base.json":           `{"extends": "cohere:system-inc/test", "rules": {"` + testCase.base + `": "error"}}`,
 				"CohereSettings.json": `{"extends": "./base.json", "rules": {"` + testCase.project + `": "off"}}`,
 			})
 			if _, err := LoadFor(filepath.Join(undeclared, "CohereSettings.json"), registered); err == nil ||
@@ -395,7 +397,8 @@ func TestABaseMayCarryOnlyKeysWhoseReadersFollowTheChain(t *testing.T) {
 // `["**/*.ts", "**/*.tsx"]` block turned off thirteen rulings the Nexus tier holds at error, and with
 // only top-level entries checked it would have loaded with no reason and printed nothing.
 func TestAWholeTreeOverrideDepartsLikeATopLevelRule(t *testing.T) {
-	base := `{"rules": {"no-const-assign": "error", "no-var": "error"}}`
+	withOurTierForTest(t)
+	base := `{"extends": "cohere:system-inc/test", "rules": {"no-const-assign": "error", "no-var": "error"}}`
 	wholeTree := `"overrides": [{"files": ["**/*.ts", "**/*.tsx"], "rules": {"no-const-assign": "off", "no-var": "error"}}]`
 
 	t.Run("without a reason it is refused", func(t *testing.T) {
@@ -497,8 +500,9 @@ func TestATwinRuleKeepsItsOwnKeyWhenAProjectWritesTheOther(t *testing.T) {
 
 	// The control, so the departure demand is shown to come from the shared ruling: with no reason the
 	// same project is refused.
+	withOurTierForTest(t)
 	undeclared := writeConfigs(t, map[string]string{
-		"base.json":           `{"rules": {"@typescript-eslint/no-invalid-this": "error"}}`,
+		"base.json":           `{"extends": "cohere:system-inc/test", "rules": {"@typescript-eslint/no-invalid-this": "error"}}`,
 		"CohereSettings.json": `{"extends": "./base.json", "rules": {"no-invalid-this": "off"}}`,
 	})
 	if _, err := LoadFor(filepath.Join(undeclared, "CohereSettings.json"), registered); err == nil {

@@ -815,10 +815,8 @@ func findingsCacheKey(graph *program.Graph, location projectLocation) ([sha256.S
 	facts := []string{}
 	// Every file in the lint config's extends chain, as the tsconfig's chain is below: a base edited
 	// alone changes which rules run and with what options.
-	lintConfigFiles, err := configuration.SourcesOf(location.LintConfigFileName)
-	if err != nil {
-		return [sha256.Size]byte{}, err
-	}
+	// Under zero config they are the house sets and the project's own file when it has one.
+	lintConfigFiles := houseSources(location)
 	// An embedded set is hashed by its text, read the way the loader reads it, as a file is.
 	for _, lintConfigFile := range lintConfigFiles {
 		contents, err := configuration.SourceContents(lintConfigFile)
@@ -826,6 +824,11 @@ func findingsCacheKey(graph *program.Graph, location projectLocation) ([sha256.S
 			return [sha256.Size]byte{}, err
 		}
 		facts = append(facts, fmt.Sprintf("lint-config %s=%x", lintConfigFile, sha256.Sum256(contents)))
+	}
+	// Under zero config which sets a file gets is decided by the whole program, so a file can change sets
+	// without its own bytes changing, when another file starts importing next.
+	if fingerprint := graph.LintConfig.DetectionFingerprint(); fingerprint != "" {
+		facts = append(facts, "house-sets="+fingerprint)
 	}
 	compilerFacts, err := compilerOptionsFacts(graph, location)
 	if err != nil {

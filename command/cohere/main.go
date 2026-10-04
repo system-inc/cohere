@@ -223,6 +223,9 @@ func run() error {
 			}
 			lintConfigPath = absoluteFrom(absoluteFrom(workingDirectory, *directory), *lintConfigFileName)
 		}
+		if locateError == nil && usesHouseSets(location) {
+			return errHouseSetsPerFile
+		}
 		lintConfig, err := configuration.LoadFor(lintConfigPath, registeredRuleNames())
 		if err != nil {
 			return fmt.Errorf("reading %s: %w", lintConfigPath, err)
@@ -585,6 +588,7 @@ func run() error {
 			return err
 		}
 		lintConfig = loaded
+		writeSetsLine(os.Stdout, lintConfig)
 		// The run cache's second layer, attached once the config is known and before anything walks.
 		attachFindingsCache(graph, location)
 	}
@@ -1153,7 +1157,7 @@ func configureLint(graph *program.Graph, location projectLocation) (*configurati
 	// A config that cannot be read is a hard failure and never a permissive default. Linting
 	// everything with nothing configured produces output indistinguishable from a clean run, and
 	// that exact confusion is what this tool exists to make impossible.
-	lintConfig, err := configuration.LoadFor(location.LintConfigFileName, registeredRuleNames())
+	lintConfig, err := loadLintConfig(graph, location)
 	if err != nil {
 		return nil, fmt.Errorf("loading the lint config: %w", err)
 	}

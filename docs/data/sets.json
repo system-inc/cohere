@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 292,
+        "rulesOn": 289,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -786,10 +786,6 @@
                 "severity": "error"
             },
             {
-                "name": "nexus/import-no-forbidden-source",
-                "severity": "error"
-            },
-            {
                 "name": "nexus/import-require-module-alias",
                 "severity": "error"
             },
@@ -1111,87 +1107,8 @@
                 "severity": "off"
             },
             {
-                "name": "no-restricted-globals",
-                "severity": "error",
-                "options": [
-                    {
-                        "name": "Buffer",
-                        "message": "`Buffer` is the Node global, and it does not exist on Cloudflare Workers, which is why @cloudflare/workers-types declares it `any`: nothing read through it is checked. Use the byte helpers in @nexus/source/encoding/ByteEncoding instead: utf8ToBytes / bytesToUtf8, base64ToBytes / bytesToBase64, base64UrlToBytes / bytesToBase64Url, hexToBytes / bytesToHex, concatenateBytes, utf8ByteLength, byteView, and `new Uint8Array(length)` for Buffer.alloc. A Buffer a Node API hands back (readFileSync, cipher.update) is already typed; keep using it as the Uint8Array it is.."
-                    },
-                    "addEventListener",
-                    "blur",
-                    "close",
-                    "closed",
-                    "confirm",
-                    "defaultStatus",
-                    "defaultstatus",
-                    "event",
-                    "external",
-                    "find",
-                    "focus",
-                    "frameElement",
-                    "frames",
-                    "history",
-                    "innerHeight",
-                    "innerWidth",
-                    "length",
-                    "location",
-                    "locationbar",
-                    "menubar",
-                    "moveBy",
-                    "moveTo",
-                    "name",
-                    "onblur",
-                    "onerror",
-                    "onfocus",
-                    "onload",
-                    "onresize",
-                    "onunload",
-                    "open",
-                    "opener",
-                    "opera",
-                    "outerHeight",
-                    "outerWidth",
-                    "pageXOffset",
-                    "pageYOffset",
-                    "parent",
-                    "print",
-                    "removeEventListener",
-                    "resizeBy",
-                    "resizeTo",
-                    "screen",
-                    "screenLeft",
-                    "screenTop",
-                    "screenX",
-                    "screenY",
-                    "scroll",
-                    "scrollbars",
-                    "scrollBy",
-                    "scrollTo",
-                    "scrollX",
-                    "scrollY",
-                    "self",
-                    "status",
-                    "statusbar",
-                    "stop",
-                    "toolbar",
-                    "top"
-                ]
-            },
-            {
                 "name": "no-restricted-imports",
                 "severity": "off"
-            },
-            {
-                "name": "no-restricted-properties",
-                "severity": "error",
-                "options": [
-                    {
-                        "object": "JSON",
-                        "property": "parse",
-                        "message": "`JSON.parse` returns `any`, and that `any` flows unchecked into every read downstream, which is where most no-unsafe findings come from. Parse through @nexus/source/structured-text/json/Json instead: `parseJsonOrThrow(text, context, isValue)` with a guard from @nexus/source/validation/Guard when the code reads fields, or `parseJson(text, context)` and handle its 'Invalid' outcome where bad input already falls back. Name the source in `context`. For a deep clone, use `structuredClone`."
-                    }
-                ]
             },
             {
                 "name": "no-return-assign",
@@ -1497,7 +1414,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 358,
+        "rulesOn": 355,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2188,10 +2105,6 @@
                 "severity": "error"
             },
             {
-                "name": "nexus/import-no-forbidden-source",
-                "severity": "error"
-            },
-            {
                 "name": "nexus/import-require-module-alias",
                 "severity": "error"
             },
@@ -2513,87 +2426,8 @@
                 "severity": "off"
             },
             {
-                "name": "no-restricted-globals",
-                "severity": "error",
-                "options": [
-                    {
-                        "name": "Buffer",
-                        "message": "`Buffer` is the Node global, and it does not exist on Cloudflare Workers, which is why @cloudflare/workers-types declares it `any`: nothing read through it is checked. Use the byte helpers in @nexus/source/encoding/ByteEncoding instead: utf8ToBytes / bytesToUtf8, base64ToBytes / bytesToBase64, base64UrlToBytes / bytesToBase64Url, hexToBytes / bytesToHex, concatenateBytes, utf8ByteLength, byteView, and `new Uint8Array(length)` for Buffer.alloc. A Buffer a Node API hands back (readFileSync, cipher.update) is already typed; keep using it as the Uint8Array it is.."
-                    },
-                    "addEventListener",
-                    "blur",
-                    "close",
-                    "closed",
-                    "confirm",
-                    "defaultStatus",
-                    "defaultstatus",
-                    "event",
-                    "external",
-                    "find",
-                    "focus",
-                    "frameElement",
-                    "frames",
-                    "history",
-                    "innerHeight",
-                    "innerWidth",
-                    "length",
-                    "location",
-                    "locationbar",
-                    "menubar",
-                    "moveBy",
-                    "moveTo",
-                    "name",
-                    "onblur",
-                    "onerror",
-                    "onfocus",
-                    "onload",
-                    "onresize",
-                    "onunload",
-                    "open",
-                    "opener",
-                    "opera",
-                    "outerHeight",
-                    "outerWidth",
-                    "pageXOffset",
-                    "pageYOffset",
-                    "parent",
-                    "print",
-                    "removeEventListener",
-                    "resizeBy",
-                    "resizeTo",
-                    "screen",
-                    "screenLeft",
-                    "screenTop",
-                    "screenX",
-                    "screenY",
-                    "scroll",
-                    "scrollbars",
-                    "scrollBy",
-                    "scrollTo",
-                    "scrollX",
-                    "scrollY",
-                    "self",
-                    "status",
-                    "statusbar",
-                    "stop",
-                    "toolbar",
-                    "top"
-                ]
-            },
-            {
                 "name": "no-restricted-imports",
                 "severity": "off"
-            },
-            {
-                "name": "no-restricted-properties",
-                "severity": "error",
-                "options": [
-                    {
-                        "object": "JSON",
-                        "property": "parse",
-                        "message": "`JSON.parse` returns `any`, and that `any` flows unchecked into every read downstream, which is where most no-unsafe findings come from. Parse through @nexus/source/structured-text/json/Json instead: `parseJsonOrThrow(text, context, isValue)` with a guard from @nexus/source/validation/Guard when the code reads fields, or `parseJson(text, context)` and handle its 'Invalid' outcome where bad input already falls back. Name the source in `context`. For a deep clone, use `structuredClone`."
-                    }
-                ]
             },
             {
                 "name": "no-return-assign",
@@ -3255,7 +3089,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 289,
+        "rulesOn": 288,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -4190,10 +4024,6 @@
             },
             {
                 "name": "nexus/correctness-require-response-status-check",
-                "severity": "error"
-            },
-            {
-                "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
             {
@@ -6655,7 +6485,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 282,
+        "rulesOn": 279,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -7394,10 +7224,6 @@
                 "severity": "error"
             },
             {
-                "name": "nexus/import-no-forbidden-source",
-                "severity": "error"
-            },
-            {
                 "name": "nexus/import-require-module-alias",
                 "severity": "error"
             },
@@ -7719,87 +7545,8 @@
                 "severity": "off"
             },
             {
-                "name": "no-restricted-globals",
-                "severity": "error",
-                "options": [
-                    {
-                        "name": "Buffer",
-                        "message": "`Buffer` is the Node global, and it does not exist on Cloudflare Workers, which is why @cloudflare/workers-types declares it `any`: nothing read through it is checked. Use the byte helpers in @nexus/source/encoding/ByteEncoding instead: utf8ToBytes / bytesToUtf8, base64ToBytes / bytesToBase64, base64UrlToBytes / bytesToBase64Url, hexToBytes / bytesToHex, concatenateBytes, utf8ByteLength, byteView, and `new Uint8Array(length)` for Buffer.alloc. A Buffer a Node API hands back (readFileSync, cipher.update) is already typed; keep using it as the Uint8Array it is.."
-                    },
-                    "addEventListener",
-                    "blur",
-                    "close",
-                    "closed",
-                    "confirm",
-                    "defaultStatus",
-                    "defaultstatus",
-                    "event",
-                    "external",
-                    "find",
-                    "focus",
-                    "frameElement",
-                    "frames",
-                    "history",
-                    "innerHeight",
-                    "innerWidth",
-                    "length",
-                    "location",
-                    "locationbar",
-                    "menubar",
-                    "moveBy",
-                    "moveTo",
-                    "name",
-                    "onblur",
-                    "onerror",
-                    "onfocus",
-                    "onload",
-                    "onresize",
-                    "onunload",
-                    "open",
-                    "opener",
-                    "opera",
-                    "outerHeight",
-                    "outerWidth",
-                    "pageXOffset",
-                    "pageYOffset",
-                    "parent",
-                    "print",
-                    "removeEventListener",
-                    "resizeBy",
-                    "resizeTo",
-                    "screen",
-                    "screenLeft",
-                    "screenTop",
-                    "screenX",
-                    "screenY",
-                    "scroll",
-                    "scrollbars",
-                    "scrollBy",
-                    "scrollTo",
-                    "scrollX",
-                    "scrollY",
-                    "self",
-                    "status",
-                    "statusbar",
-                    "stop",
-                    "toolbar",
-                    "top"
-                ]
-            },
-            {
                 "name": "no-restricted-imports",
                 "severity": "off"
-            },
-            {
-                "name": "no-restricted-properties",
-                "severity": "error",
-                "options": [
-                    {
-                        "object": "JSON",
-                        "property": "parse",
-                        "message": "`JSON.parse` returns `any`, and that `any` flows unchecked into every read downstream, which is where most no-unsafe findings come from. Parse through @nexus/source/structured-text/json/Json instead: `parseJsonOrThrow(text, context, isValue)` with a guard from @nexus/source/validation/Guard when the code reads fields, or `parseJson(text, context)` and handle its 'Invalid' outcome where bad input already falls back. Name the source in `context`. For a deep clone, use `structuredClone`."
-                    }
-                ]
             },
             {
                 "name": "no-return-assign",
@@ -8098,7 +7845,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 270,
+        "rulesOn": 267,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8789,10 +8536,6 @@
                 "severity": "error"
             },
             {
-                "name": "nexus/import-no-forbidden-source",
-                "severity": "error"
-            },
-            {
                 "name": "nexus/import-require-module-alias",
                 "severity": "error"
             },
@@ -9114,87 +8857,8 @@
                 "severity": "off"
             },
             {
-                "name": "no-restricted-globals",
-                "severity": "error",
-                "options": [
-                    {
-                        "name": "Buffer",
-                        "message": "`Buffer` is the Node global, and it does not exist on Cloudflare Workers, which is why @cloudflare/workers-types declares it `any`: nothing read through it is checked. Use the byte helpers in @nexus/source/encoding/ByteEncoding instead: utf8ToBytes / bytesToUtf8, base64ToBytes / bytesToBase64, base64UrlToBytes / bytesToBase64Url, hexToBytes / bytesToHex, concatenateBytes, utf8ByteLength, byteView, and `new Uint8Array(length)` for Buffer.alloc. A Buffer a Node API hands back (readFileSync, cipher.update) is already typed; keep using it as the Uint8Array it is.."
-                    },
-                    "addEventListener",
-                    "blur",
-                    "close",
-                    "closed",
-                    "confirm",
-                    "defaultStatus",
-                    "defaultstatus",
-                    "event",
-                    "external",
-                    "find",
-                    "focus",
-                    "frameElement",
-                    "frames",
-                    "history",
-                    "innerHeight",
-                    "innerWidth",
-                    "length",
-                    "location",
-                    "locationbar",
-                    "menubar",
-                    "moveBy",
-                    "moveTo",
-                    "name",
-                    "onblur",
-                    "onerror",
-                    "onfocus",
-                    "onload",
-                    "onresize",
-                    "onunload",
-                    "open",
-                    "opener",
-                    "opera",
-                    "outerHeight",
-                    "outerWidth",
-                    "pageXOffset",
-                    "pageYOffset",
-                    "parent",
-                    "print",
-                    "removeEventListener",
-                    "resizeBy",
-                    "resizeTo",
-                    "screen",
-                    "screenLeft",
-                    "screenTop",
-                    "screenX",
-                    "screenY",
-                    "scroll",
-                    "scrollbars",
-                    "scrollBy",
-                    "scrollTo",
-                    "scrollX",
-                    "scrollY",
-                    "self",
-                    "status",
-                    "statusbar",
-                    "stop",
-                    "toolbar",
-                    "top"
-                ]
-            },
-            {
                 "name": "no-restricted-imports",
                 "severity": "off"
-            },
-            {
-                "name": "no-restricted-properties",
-                "severity": "error",
-                "options": [
-                    {
-                        "object": "JSON",
-                        "property": "parse",
-                        "message": "`JSON.parse` returns `any`, and that `any` flows unchecked into every read downstream, which is where most no-unsafe findings come from. Parse through @nexus/source/structured-text/json/Json instead: `parseJsonOrThrow(text, context, isValue)` with a guard from @nexus/source/validation/Guard when the code reads fields, or `parseJson(text, context)` and handle its 'Invalid' outcome where bad input already falls back. Name the source in `context`. For a deep clone, use `structuredClone`."
-                    }
-                ]
             },
             {
                 "name": "no-return-assign",

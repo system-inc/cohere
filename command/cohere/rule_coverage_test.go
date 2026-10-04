@@ -516,9 +516,9 @@ func TestAnOverrideWithAReasonPrintsByDefault(t *testing.T) {
 }
 
 // An off says why beside the rule wherever coverage names it, so whoever reads `--coverage` judges the
-// decision with its reason in front of them (#2qq4yr7). An off no file explains is an allowance, so it
-// prints on a default run; the reasoned one beside it does not.
-func TestAnOffPrintsItsReasonAndAnUnreasonedOffPrintsByDefault(t *testing.T) {
+// decision with its reason in front of them (#2qq4yr7). An off no file explains loads only outside our
+// tiers, where it is the project's choice (#bfxz13m): a default run counts it, and `--coverage` names it.
+func TestAnOffPrintsItsReasonAndAnUnreasonedOffIsCountedByDefault(t *testing.T) {
 	root := "/repository"
 	rules := []rule.Rule{{Name: "prefer-arrow-callback"}, {Name: "no-continue"}}
 	coverage := program.Coverage{
@@ -542,14 +542,14 @@ func TestAnOffPrintsItsReasonAndAnUnreasonedOffPrintsByDefault(t *testing.T) {
 
 	output := renderLintReport(report)
 	requireLines(t, output,
-		"  off with no reason: rule no-continue is turned off and no settings file says why",
+		"  off with no reason: 1 rule your settings turn off without saying why; cohere --coverage names them\n",
 	)
-	forbidLines(t, output, "off with no reason: rule prefer-arrow-callback")
+	forbidLines(t, output, "prefer-arrow-callback", "no-continue")
 
 	report.Details = true
 	requireLines(t, renderLintReport(report),
 		"    prefer-arrow-callback (40 files, off because we write function callbacks on purpose)\n",
-		"    no-continue (40 files, off with no reason, so it reads as an allowance)\n",
+		"    no-continue (40 files, off with no reason given)\n",
 	)
 }
 

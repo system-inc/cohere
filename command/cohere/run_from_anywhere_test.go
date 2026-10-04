@@ -36,8 +36,8 @@ func fixtureProject(t *testing.T) string {
 	writeTree(t, root, map[string]string{
 		"tsconfig.json":       incrementalFixtureConfig,
 		"CohereSettings.json": `{"rules":{}}`,
-		"index.ts":            "export const value: number = 1;\n",
-		"sub/deeper/Thing.ts": "export const thing: number = 2;\n",
+		"index.ts":            "export const value = 1;\n",
+		"sub/deeper/Thing.ts": "export const thing = 2;\n",
 		".gitignore":          "tsconfig.tsbuildinfo\n",
 	})
 	return root
