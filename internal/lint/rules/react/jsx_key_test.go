@@ -266,6 +266,14 @@ func TestJsxKeyStaysSilent(t *testing.T) {
 		{"map with non fn", "[1,2,3].map(x);", ""},
 		{"Array.from second non fn", "Array.from([1,2,3], someFn);", ""},
 		{"fragment long form key", "[<React.Fragment key={1}></React.Fragment>];", ""},
+		// A keyed element in parentheses, at each position an iterator callback reaches it. ESLint's
+		// parser keeps no paren node, so these read as bare elements there; here the check skipped the
+		// paren to see an element and then read the paren's attributes, and reported a missing key on
+		// all 103 such sites in ahra and www (#ge8899e). Each measured silent on eslint-plugin-react 7.37.5.
+		{"keyed element in a parenthesized arrow body", "[1,2,3].map((x) => (<div key={x}>{x}</div>));", ""},
+		{"keyed elements in parenthesized arms of a returned conditional", "[1,2,3].map(function(x) { return c ? (<div key={x} />) : (<span key={x} />); });", ""},
+		{"keyed elements in parenthesized arms of an arrow conditional", "[1,2,3].map((x) => c ? (<div key={x} />) : (<span key={x} />));", ""},
+		{"keyed element doubly parenthesized", "[1,2,3].map((x) => ((<div key={x} />)));", ""},
 	}
 
 	for _, testCase := range cases {
@@ -318,6 +326,9 @@ func TestJsxKeySpans(t *testing.T) {
 		{"missingArrayKey skips the keyed sibling", "[<App key={0}/>, <App />];", "",
 			[]string{"<App />"}},
 		{"missingIterKey points at the element", "[1,2,3].map(x => <App />);", "",
+			[]string{"<App />"}},
+		// The element inside the parentheses, not the paren, which is where ESLint's column is.
+		{"missingIterKey points inside a paren", "[1,2,3].map(x => (<App />));", "",
 			[]string{"<App />"}},
 
 		// The container, not the element. This is the collection arm.

@@ -288,6 +288,12 @@ var JsxKey = rule.Rule{
 		// checkIteratorElement is upstream's function of the same name, and it is the ONLY place
 		// the two iterator messages are produced.
 		checkIteratorElement := func(node *ast.Node) {
+			// Skipped once, here, so the element reaches every check below and its finding sits on
+			// the element rather than on the paren, where ESLint's is. Skipping only in the kind test
+			// let `map(x => (<A key={x} />))` pass as an element and then read the paren's attributes,
+			// which are none: 103 keyed elements reported as missing a key across ahra and www
+			// (#ge8899e).
+			node = skipParenthesesSafely(node)
 			if node == nil {
 				return
 			}
