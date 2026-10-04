@@ -9402,7 +9402,7 @@
             "language": "TypeScript",
             "origin": "core",
             "upstreamName": "no-invalid-regexp",
-            "typeAware": false,
+            "typeAware": true,
             "messageIds": [
                 "invalidRegexp"
             ],
