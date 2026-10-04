@@ -196,6 +196,22 @@ would pay that repeatedly, so it does not vary. `GOCACHE` is pinned inside `.cac
 other Go work neither shares it nor evicts it — Go's default cache trims entries unused for about
 five days, which would quietly turn a warm rebuild into a cold one.
 
+**Neither cache is bounded by Go, so the launcher bounds both.** Go trims by age alone, five days
+unused, and developing cohere filled the default cache far faster: on 2026-10-03 it regrew 223 GB in
+nine hours and filled the disk (#3sgjy0h), most of it `TestEveryReleaseTargetCompiles` building cohere
+for six platforms on every `go test ./...`, until `3dc6e70` made it type-check them instead.
+`internal/release/gocache` trims a cache of its least recently used entries once it is over a cap,
+down to three quarters of it. The launcher trims its own cache after each build, at 32 GB, and on any
+run at most every ten minutes starts a background copy of itself that trims the default cache, the one
+every plain `go build`, `go test` and `go vet` fills, at 48 GB. The run pays one stat for that and
+never waits on the walk. What either removed is logged to `.cache/cohere/prune.log`.
+
+**No trim removes an entry used in the last 90 minutes**, so a burst can stand above the cap by what it
+wrote inside that window. Go marks an entry used at most once an hour, so within the hour, age cannot
+tell an entry nobody wants from one a running build is reading, and removing one of those fails the
+build with `could not import ... no such file`, which reads as a compile error. A gate that trimmed
+young entries to hold a burst under the cap did exactly that.
+
 **A missing binary is a loud error, never a fallback.** With no Go toolchain the dispatcher runs the
 binary shipped for the platform, and if there is none it exits non-zero naming the platform and
 everywhere it looked. There is deliberately no path where it execs something that might do nothing:

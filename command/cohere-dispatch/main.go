@@ -27,6 +27,10 @@ func main() {
 }
 
 func run() error {
+	if len(os.Args) == 2 && os.Args[1] == boundDefaultGoCacheFlag {
+		return boundDefaultGoCache()
+	}
+
 	// The dispatcher owns exactly four flags and forwards everything else. They are matched
 	// positionally at the front rather than with the flag package, because flag.Parse would stop at
 	// the first argument it does not recognize and swallow flags meant for the real binary.
@@ -165,6 +169,7 @@ func resolveBinary(development bool, verbose bool) (string, error) {
 	}
 
 	paths := dispatch.DefaultPaths(moduleDirectory)
+	startBoundingDefaultGoCache(paths)
 
 	if development {
 		binaryPath, built, err := dispatch.ResolveWorkingTree(paths, "./command/cohere")
