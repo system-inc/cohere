@@ -121,6 +121,10 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 // phaseTimes is where the time went: the graph, then each phase that spent time, in pipeline order,
 // formatting after fixing. A phase that did not run is left out, so 🧹 appears only when `--unused` ran
 // it; one that reused another's walk says so instead of claiming a time of its own.
+//
+// Formatting happens inside the fix phase, each file formatted once its fixes converge, so the fix
+// phase's time holds it. 🪄 is the phase less the time a format was in flight, and 💅 that time, so the
+// two add up to the phase (see formatClock).
 func phaseTimes(graph time.Duration, records []phaseRecord, formatting time.Duration) []string {
 	var times []string
 	if graph > 0 {
@@ -133,7 +137,11 @@ func phaseTimes(graph time.Duration, records []phaseRecord, formatting time.Dura
 			}
 			switch record.Outcome {
 			case outcomeRan, outcomeChecked:
-				times = append(times, phaseGlyphs[name]+" "+footerSeconds(record.Elapsed))
+				elapsed := record.Elapsed
+				if name == phaseFix {
+					elapsed = max(elapsed-formatting, 0)
+				}
+				times = append(times, phaseGlyphs[name]+" "+footerSeconds(elapsed))
 			case outcomeReused:
 				times = append(times, phaseGlyphs[name]+" in "+phaseGlyphs[phaseFix])
 			}

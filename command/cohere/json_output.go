@@ -71,7 +71,8 @@ type summaryJSON struct {
 	GraphSeconds  float64     `json:"graphSeconds"`
 	Rules         int         `json:"rules"`
 	Phases        []phaseJSON `json:"phases"`
-	// FormattingSeconds is how long formatting took, absent when it did not run.
+	// FormattingSeconds is the part of the fix phase's seconds with a format in flight, absent when no
+	// formatter ran.
 	FormattingSeconds float64  `json:"formattingSeconds,omitempty"`
 	Cache             cacheUse `json:"cache"`
 	TypeErrors        int      `json:"typeErrors"`

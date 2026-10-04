@@ -200,7 +200,8 @@ pipe, a file or `NO_COLOR` gets no color codes at all.
 
 `--phases` puts where the time went first inside the parentheses: 🕸 building the graph (read, parse,
 bind), 🪄 fixing, 💅 formatting, 🔷 the type check, 👑 lint, and 🧹 unused when `--unused` ran. A phase
-that did not run is left out. To make that a project's default, set it in `CohereSettings.json`:
+that did not run is left out. Each file is formatted once its fixes settle, so the two interleave: 💅 is
+the time a format was running and 🪄 the rest of the fix phase, and together they are its time. To make that a project's default, set it in `CohereSettings.json`:
 
 ```json
 { "output": { "phases": true } }

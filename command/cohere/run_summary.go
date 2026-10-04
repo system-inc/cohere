@@ -37,7 +37,8 @@ type runSummary struct {
 	Phases []phaseRecord
 	// Rules is the rules that ran.
 	Rules int
-	// Formatting is how long formatting took when it ran, zero when it did not.
+	// Formatting is the part of the fix phase's time with a format in flight, zero when no formatter ran.
+	// The fix phase's own time holds it; the footer shows 🪄 as the rest.
 	Formatting time.Duration
 
 	Cache cacheUse

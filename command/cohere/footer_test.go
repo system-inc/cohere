@@ -13,13 +13,14 @@ var (
 	colored = textStyle{color: true}
 )
 
-// cleanSummary is a green cold run: every phase ran, formatting included, every file checked fresh.
+// cleanSummary is a green cold run: every phase ran, formatting included, every file checked fresh. The
+// fix phase's 0.7s holds formatting's 0.3s, as a run's does.
 func cleanSummary() runSummary {
 	return runSummary{
 		Total: 2400 * time.Millisecond,
 		Graph: 900 * time.Millisecond,
 		Phases: []phaseRecord{
-			{Name: phaseFix, Outcome: outcomeRan, Elapsed: 400 * time.Millisecond},
+			{Name: phaseFix, Outcome: outcomeRan, Elapsed: 700 * time.Millisecond},
 			{Name: phaseTypes, Outcome: outcomeRan, Elapsed: 600 * time.Millisecond},
 			{Name: phaseLint, Outcome: outcomeRan, Elapsed: 1100 * time.Millisecond},
 			{Name: phaseUnused, Outcome: outcomeSkipped, Detail: "not requested"},
@@ -37,7 +38,7 @@ func warmSummary(summary *runSummary) {
 	summary.Total = 700 * time.Millisecond
 	summary.Graph = 200 * time.Millisecond
 	summary.Phases = []phaseRecord{
-		{Name: phaseFix, Outcome: outcomeRan, Elapsed: 100 * time.Millisecond},
+		{Name: phaseFix, Outcome: outcomeRan, Elapsed: 120 * time.Millisecond},
 		{Name: phaseTypes, Outcome: outcomeRan, Elapsed: 400 * time.Millisecond},
 		{Name: phaseLint, Outcome: outcomeRan, Elapsed: 200 * time.Millisecond},
 	}
@@ -133,7 +134,7 @@ func TestFooterGolden(t *testing.T) {
 				summary.Phases[3] = phaseRecord{Name: phaseUnused, Outcome: outcomeRan, Elapsed: 300 * time.Millisecond}
 			},
 			options: footerOptions{Phases: true},
-			want:    "✓ 💎 2.4s (🕸 0.9s • 🪄 0.4s • 👑 1.1s • 🧹 0.3s • 480 rules • 3,926 checked) • ⚠ 🔷 types not checked",
+			want:    "✓ 💎 2.4s (🕸 0.9s • 🪄 0.7s • 👑 1.1s • 🧹 0.3s • 480 rules • 3,926 checked) • ⚠ 🔷 types not checked",
 		},
 		{
 			name: "with --phases, lint reused the fix walk",
@@ -142,7 +143,7 @@ func TestFooterGolden(t *testing.T) {
 				summary.Phases[2] = phaseRecord{Name: phaseLint, Outcome: outcomeReused, Detail: "the fix phase's walk"}
 			},
 			options: footerOptions{Phases: true},
-			want:    "✓ 💎 2.4s (🕸 0.9s • 🪄 0.4s • 🔷 0.6s • 👑 in 🪄 • 480 rules • 3,926 checked)",
+			want:    "✓ 💎 2.4s (🕸 0.9s • 🪄 0.7s • 🔷 0.6s • 👑 in 🪄 • 480 rules • 3,926 checked)",
 		},
 		{
 			name:    "warm, with --verbose: the nodes walked",

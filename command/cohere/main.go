@@ -787,9 +787,10 @@ func run() error {
 		}
 
 		fixStart := time.Now()
+		formatting := newFormatClock()
 		fixSummary, fixWalk, err := applyProposedFixes(
 			ctx, graph, fixFiles, fixRules,
-			scopedTransform(record.observe(formatTransform(formatter), optionsFingerprintOf(formatter)), scope),
+			formatting.timing(scopedTransform(record.observe(formatTransform(formatter), optionsFingerprintOf(formatter)), scope)),
 			scope.formatCandidates(),
 			writeScope,
 			repositoryRoot,
@@ -797,6 +798,10 @@ func run() error {
 			mutate,
 		)
 		fixDuration := time.Since(fixStart)
+		// With no formatter the transform only declines each file, which is not formatting.
+		if formatter != nil {
+			activeSummary.Formatting = formatting.Total()
+		}
 		if err != nil {
 			// The bail condition here is a failure to produce valid output, never a finding. A fixer
 			// that cannot write a parseable file means the edit was malformed and everything after it

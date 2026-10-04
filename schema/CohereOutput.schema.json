@@ -62,7 +62,7 @@
                         }
                     }
                 },
-                "formattingSeconds": { "type": "number", "description": "How long formatting took. Absent when it did not run." },
+                "formattingSeconds": { "type": "number", "description": "The part of the fix phase's seconds with a format in flight; the fix phase's seconds include it. Absent when no formatter ran." },
                 "cache": {
                     "type": "object",
                     "additionalProperties": false,
