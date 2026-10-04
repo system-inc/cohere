@@ -3,19 +3,20 @@ package nexus
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const consistencyNoForInId = "forIn"
 
-var consistencyNoForInMessage = rule.Message{
-	Id: consistencyNoForInId,
-	Description: "Iterate an object with `for (const [key, value] of Object.entries(object))`, or " +
-		"`Object.keys(object)` when only the key matters, rather than `for...in`. `for...in` walks the " +
-		"prototype chain, so it needs a guard to be correct, and a guard is a line someone forgets; it " +
-		"also hands back every key as a bare `string`, which is why these loops grow `key as keyof typeof " +
-		"object` casts to read the value. `Object.entries` returns own keys only, with the value already " +
-		"in hand, so there is nothing to guard and nothing to cast, and every loop over an object has one " +
-		"shape.",
+// consistencyNoForInText is the rule's message, whose wording lives in
+// `policy/messages/consistency-no-for-in.json`.
+var consistencyNoForInText = policy.MessageOf("nexus/consistency-no-for-in", consistencyNoForInId)
+
+func consistencyNoForInMessage() rule.Message {
+	return rule.Message{
+		Id:          consistencyNoForInId,
+		Description: consistencyNoForInText.Render(nil),
+	}
 }
 
 // ConsistencyNoForIn bans the `for...in` statement.
@@ -60,7 +61,7 @@ var ConsistencyNoForIn = rule.Rule{
 			// Keyed on the `for...in` kind alone. `for...of` shares `ForInOrOfStatement` in this
 			// parser, and a listener on the shared shape would report every `for...of` in the tree.
 			ast.KindForInStatement: func(node *ast.Node) {
-				ctx.ReportNode(node, consistencyNoForInMessage)
+				ctx.ReportNode(node, consistencyNoForInMessage())
 			},
 		}
 	},

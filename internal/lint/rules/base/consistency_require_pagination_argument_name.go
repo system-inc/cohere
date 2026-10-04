@@ -5,14 +5,18 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messagePaginationDecoratorInvalidName = rule.Message{
-	Id: "invalidName",
-	Description: "A GraphQlArgument of PaginationInput type must be named \"pagination\", or end " +
-		"with \"Pagination\" when a query takes more than one paginator and the names have to be " +
-		"told apart. A caller reads the argument name to know which paginator it is driving, and " +
-		"a name outside that convention makes them guess.",
+// consistencyRequirePaginationArgumentNameText is the rule's message, whose wording lives in
+// `policy/messages/consistency-require-pagination-argument-name.json`.
+var consistencyRequirePaginationArgumentNameText = policy.MessageOf("base/consistency-require-pagination-argument-name", "invalidName")
+
+func messagePaginationDecoratorInvalidName() rule.Message {
+	return rule.Message{
+		Id:          consistencyRequirePaginationArgumentNameText.Id,
+		Description: consistencyRequirePaginationArgumentNameText.Render(nil),
+	}
 }
 
 // paginationInputTypeName matches the base type and every `@PaginationInputFor` subclass.
@@ -146,7 +150,7 @@ func checkPaginationDecorator(ctx rule.Context, node *ast.Node) {
 	if name == "pagination" || paginationArgumentName.MatchString(name) {
 		return
 	}
-	ctx.ReportNode(reported, messagePaginationDecoratorInvalidName)
+	ctx.ReportNode(reported, messagePaginationDecoratorInvalidName())
 }
 
 // isAPaginationArgument says whether a decorated parameter is a paginator.

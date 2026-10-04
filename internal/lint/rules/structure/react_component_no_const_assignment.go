@@ -5,22 +5,23 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/module"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-// messageNoConstAssignment names the component and what to write instead.
+// reactComponentNoConstAssignmentText is the rule's message, whose wording lives in
+// `policy/messages/react-component-no-const-assignment.json`.
+var reactComponentNoConstAssignmentText = policy.MessageOf("structure/react-component-no-const-assignment", "noConstAssignment")
+
+// messageNoConstAssignment names the component and what to write instead. The declaration to write is
+// one value, code the rule builds, since whether it is exported changes the code and not the wording.
 func messageNoConstAssignment(identifierName string, isExported bool) rule.Message {
 	prefix := ""
 	if isExported {
 		prefix = "export "
 	}
 	return rule.Message{
-		Id: "noConstAssignment",
-		Description: "This declares a component as a const holding a function. Write " +
-			"`" + prefix + "function " + identifierName + "()` instead. A function declaration is " +
-			"hoisted, so helpers can be ordered for reading rather than for initialization; it " +
-			"carries its own name, so it survives in a stack trace and in React DevTools without a " +
-			"displayName; and it puts the name where a reader scanning the left margin finds it, " +
-			"rather than behind a const whose value happens to be a function.",
+		Id:          reactComponentNoConstAssignmentText.Id,
+		Description: reactComponentNoConstAssignmentText.Render(map[string]string{"declaration": prefix + "function " + identifierName + "()"}),
 	}
 }
 
