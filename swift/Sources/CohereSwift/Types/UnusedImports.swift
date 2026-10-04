@@ -231,21 +231,32 @@ struct UnusedImports {
         return finder.found
     }
 
-    /* The edit that removes the import's whole line: the declaration, the newline that ends it, and its leading trivia. */
+    /*
+     The edit that removes the import's line: its indentation, the declaration, a trailing `//` comment, and the
+     newline that ends it. It starts after the leading trivia, never in it: on a file's first import that trivia is
+     the whole file header, and below a line that ends in a comment it begins with that line's newline, so a range
+     reaching back from it took the line above. Both deleted what no finding named. Where code shares the line,
+     only the declaration goes.
+     */
     static func removal(of node: ImportDeclSyntax, in file: ParsedFile) -> FindingRecord.Edit {
         let utf8 = Array(file.source.utf8)
-        var start = node.position.utf8Offset
-        while start > 0 && utf8[start - 1] != UInt8(ascii: "\n") {
-            start -= 1
+        let start = node.positionAfterSkippingLeadingTrivia.utf8Offset
+        let end = node.endPositionBeforeTrailingTrivia.utf8Offset
+        let blank: (UInt8) -> Bool = { $0 == UInt8(ascii: " ") || $0 == UInt8(ascii: "\t") }
+        var lineStart = start
+        while lineStart > 0 && blank(utf8[lineStart - 1]) {
+            lineStart -= 1
         }
-        var end = node.endPositionBeforeTrailingTrivia.utf8Offset
-        while end < utf8.count && utf8[end] != UInt8(ascii: "\n") {
-            end += 1
+        var lineEnd = end
+        while lineEnd < utf8.count && utf8[lineEnd] != UInt8(ascii: "\n") {
+            lineEnd += 1
         }
-        if end < utf8.count {
-            end += 1
+        let rest = utf8[end..<lineEnd].drop(while: blank)
+        guard lineStart == 0 || utf8[lineStart - 1] == UInt8(ascii: "\n"), rest.isEmpty || rest.starts(with: "//".utf8)
+        else {
+            return FindingRecord.Edit(start: start, end: end, text: "")
         }
-        return FindingRecord.Edit(start: start, end: end, text: "")
+        return FindingRecord.Edit(start: lineStart, end: lineEnd < utf8.count ? lineEnd + 1 : lineEnd, text: "")
     }
 
     /*

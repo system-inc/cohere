@@ -1,4 +1,6 @@
 import Foundation
+import SwiftParser
+import SwiftSyntax
 import Testing
 
 @testable import CohereSwift
@@ -215,5 +217,47 @@ struct UnusedImportsTests {
         )
         /* A report, not a gate: nothing it found is a finding. */
         #expect(run.findings == 0, "unused-import findings must be unused records, never finding records")
+    }
+
+    /* The source with the removal of the import naming `module` applied. */
+    static func removing(_ module: String, from source: String) throws -> String {
+        let file = ParsedFile(
+            url: URL(fileURLWithPath: "/fixture/Subject.swift"),
+            targetName: "Fixture",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 0,
+        )
+        let node = try #require(
+            file.tree.statements.compactMap { $0.item.as(ImportDeclSyntax.self) }
+                .first { $0.path.trimmedDescription == module }
+        )
+        let edit = UnusedImports.removal(of: node, in: file)
+        var bytes = Array(source.utf8)
+        bytes.replaceSubrange(edit.start..<edit.end, with: Array(edit.text.utf8))
+        return String(decoding: bytes, as: UTF8.self)
+    }
+
+    /*
+     The removal takes the import's own line and nothing else. On ahraos-macos it started in the leading trivia,
+     so a file's first import took the file header with it (AhraOsMain.swift, 18 lines), and an import below
+     `import AhraOsCore // DevFlags` took that line too (MetalTerminalPane.swift).
+     */
+    @Test func removalTakesOnlyTheImportsLine() throws {
+        #expect(
+            try Self.removing("AhraOsCore", from: "//\n//  Main.swift\n//\n\nimport AhraOsCore\nimport AppKit\n")
+                == "//\n//  Main.swift\n//\n\nimport AppKit\n"
+        )
+        #expect(
+            try Self.removing("AppKit", from: "import AhraOsCore // DevFlags\nimport AppKit\nimport SwiftUI\n")
+                == "import AhraOsCore // DevFlags\nimport SwiftUI\n"
+        )
+        #expect(
+            try Self.removing("AhraOsCore", from: "import AhraOsCore // DevFlags\nimport AppKit\n")
+                == "import AppKit\n"
+        )
+        #expect(try Self.removing("AppKit", from: "import Foundation\nimport AppKit") == "import Foundation\n")
+        #expect(try Self.removing("AppKit", from: "import AppKit; let x = 1\n") == "; let x = 1\n")
     }
 }
