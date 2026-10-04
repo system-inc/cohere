@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 271,
+        "rulesOn": 272,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -709,6 +709,10 @@
             },
             {
                 "name": "nexus/correctness-no-uncleared-race-timeout",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-blocking-standard-streams",
                 "severity": "error"
             },
             {
@@ -1416,7 +1420,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 335,
+        "rulesOn": 336,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2030,6 +2034,10 @@
             },
             {
                 "name": "nexus/correctness-no-uncleared-race-timeout",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-blocking-standard-streams",
                 "severity": "error"
             },
             {
@@ -3089,7 +3097,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 267,
+        "rulesOn": 268,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -3953,6 +3961,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-require-blocking-standard-streams",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/correctness-require-child-process-error-listener",
                 "severity": "error"
             },
@@ -4759,7 +4771,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 277,
+        "rulesOn": 278,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5494,6 +5506,10 @@
             },
             {
                 "name": "nexus/correctness-no-uncleared-race-timeout",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-blocking-standard-streams",
                 "severity": "error"
             },
             {
@@ -6330,7 +6346,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 261,
+        "rulesOn": 262,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6992,6 +7008,10 @@
             },
             {
                 "name": "nexus/correctness-no-uncleared-race-timeout",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-blocking-standard-streams",
                 "severity": "error"
             },
             {
@@ -7692,7 +7712,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 249,
+        "rulesOn": 250,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8306,6 +8326,10 @@
             },
             {
                 "name": "nexus/correctness-no-uncleared-race-timeout",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-blocking-standard-streams",
                 "severity": "error"
             },
             {
