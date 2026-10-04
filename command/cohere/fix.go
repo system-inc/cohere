@@ -402,6 +402,10 @@ func proposalsForText(
 	graph *program.Graph,
 	rules []rule.Rule,
 ) ([]edit.Proposal, error) {
+	// No rules propose nothing, and need no graph to say so: `--format-only` has neither.
+	if len(rules) == 0 {
+		return nil, nil
+	}
 	rooted := fileName
 	if !tspath.IsRootedDiskPath(rooted) {
 		rooted = "/" + rooted

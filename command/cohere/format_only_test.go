@@ -137,3 +137,37 @@ func removeForTest(t *testing.T, fileName string) {
 		t.Fatal(err)
 	}
 }
+
+// TestFormatOnlyBuildsNoGraph: `--format-only` reads the disk, never the program (#m0dktbn). Its tsconfig
+// here cannot build a program at all (kept out of the format scope, so only a build would read it), so a
+// whole run fails building the graph, and a format-only run must not notice: it checks, formats and says
+// it built no graph.
+func TestFormatOnlyBuildsNoGraph(t *testing.T) {
+	binary := buildCohere(t)
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"tsconfig.json":            "{ \"compilerOptions\": \n",
+		"CohereSettings.json":      "{ \"extends\": \"./NexusCohereSettings.json\" }\n",
+		"NexusCohereSettings.json": "{ \"format\": { \"ignore\": [\"tsconfig.json\"] } }\n",
+		".gitignore":               ".cache/\n",
+		"Tidy.ts":                  "export const tidy = 1;\n",
+	})
+	if output, code := runCohere(t, binary, root, "--no-fix"); code == 0 || !strings.Contains(output, "building the type graph") {
+		t.Fatalf("the tsconfig built a program, so this test proves nothing, exit %d:\n%s", code, output)
+	}
+
+	output, code := runCohere(t, binary, root, "--no-fix", "--format-only")
+	if code != 0 || !strings.Contains(output, "graph not built: --format-only reads the disk, not the program") ||
+		strings.Contains(output, "graph built in") || !strings.Contains(output, "no graph built (formatting reads none)") {
+		t.Fatalf("--format-only built the graph or did not say it did not, exit %d:\n%s", code, output)
+	}
+
+	writeTree(t, root, map[string]string{"Ugly.ts": "export const ugly   =   1;\n"})
+	output, code = runCohere(t, binary, root, "--no-fix", "--format-only")
+	if code == 0 || !strings.Contains(output, filepath.Join(root, "Ugly.ts")+":1:1 - --fix would rewrite this file: format") {
+		t.Fatalf("with no graph, an unformatted file was not reported, exit %d:\n%s", code, output)
+	}
+	if output, code = runCohere(t, binary, root, "--format-only", "Ugly.ts"); code != 0 || readForTest(t, filepath.Join(root, "Ugly.ts")) != "export const ugly = 1;\n" {
+		t.Fatalf("with no graph, the writing run did not format the named file, exit %d:\n%s", code, output)
+	}
+}

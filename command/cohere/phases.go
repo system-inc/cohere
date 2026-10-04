@@ -128,6 +128,10 @@ type pipelineReport struct {
 	filesInScope   int
 	filesInProgram int
 
+	// graphSkipped is a run that built no graph on purpose (`--format-only`), so the accounting says so
+	// rather than reporting a zero-length build.
+	graphSkipped bool
+
 	// processStart is when the process began, as close to it as a Go program can observe.
 	//
 	// Recorded so the phase line can state its own completeness. Summing the phases and calling it
@@ -433,6 +437,17 @@ func (r *pipelineReport) writeAccounting(out io.Writer) {
 	}
 	if r.graphNotBuilt {
 		fmt.Fprintf(invocationOutput(out), "  total %s — %s\n", round(total), graphNotBuiltSentence)
+		return
+	}
+	if r.graphSkipped {
+		phases := time.Duration(0)
+		for _, record := range r.records {
+			if record.Outcome == outcomeRan || record.Outcome == outcomeChecked {
+				phases += record.Elapsed
+			}
+		}
+		fmt.Fprintf(invocationOutput(out), "  total %s — no graph built (formatting reads none), phases %s, %s outside any phase\n",
+			round(total), round(phases), round(max(total-phases, 0)))
 		return
 	}
 	accounted := r.graph

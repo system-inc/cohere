@@ -407,43 +407,60 @@ func run() error {
 	if *showTiming {
 		graphTiming = &program.GraphTiming{}
 	}
-	buildStart := time.Now()
-	contentPack := openContentPack(location.Root)
-	contentPackOpened := time.Since(buildStart)
-	graph, err := program.Build(program.Options{
-		ConfigFileName:   location.ConfigFileName,
-		CurrentDirectory: location.Root,
-		SingleThreaded:   *singleThreaded,
-		Inputs:           runCacheInputs,
-		ContentPack:      contentPack,
-		Timing:           graphTiming,
-	})
-	if err != nil {
-		// A program that fails to build is a loud failure and never an empty result. An empty file list
-		// is indistinguishable from a clean tree, and that confusion is what let the gate this replaces
-		// print green over zero files for days.
-		return fmt.Errorf("building the type graph: %w", err)
+	// `--format-only` builds no graph (#m0dktbn). Formatting reads the disk, never the program: its scope is
+	// the format walk, it asks no rule for a fix, and no type check or lint runs, so the build was about
+	// 250ms of every commit gate spent on a program nothing read. Without it graph stays nil and the
+	// project files empty, and every use below is on a path `--format-only` does not take.
+	var graph *program.Graph
+	var buildDuration, contentPackOpened time.Duration
+	if *formatOnly {
+		// The run cache records a run only once its inputs are declared. The format walk declares its own
+		// (declareFormatWalk), settings chain included, so there is nothing else to name: the run reads no
+		// tsconfig and no lint config.
+		declareRunCacheInputs()
+	} else {
+		buildStart := time.Now()
+		contentPack := openContentPack(location.Root)
+		contentPackOpened = time.Since(buildStart)
+		built, err := program.Build(program.Options{
+			ConfigFileName:   location.ConfigFileName,
+			CurrentDirectory: location.Root,
+			SingleThreaded:   *singleThreaded,
+			Inputs:           runCacheInputs,
+			ContentPack:      contentPack,
+			Timing:           graphTiming,
+		})
+		if err != nil {
+			// A program that fails to build is a loud failure and never an empty result. An empty file list
+			// is indistinguishable from a clean tree, and that confusion is what let the gate this replaces
+			// print green over zero files for days.
+			return fmt.Errorf("building the type graph: %w", err)
+		}
+		graph = built
+		buildDuration = time.Since(buildStart)
+		// A test instrument: every file walked on a checker other than its own. See program.walkQueue.
+		graph.WalkOnForeignCheckers = os.Getenv("COHERE_TEST_FOREIGN_CHECKERS") != ""
+
+		// The checkers are created now, alongside the work before the walk, rather than by the walk's first
+		// lookup: 74 to 95ms on ahra that otherwise sits on the path to the first worker (#zqsdzbq, lever B).
+		// Upstream's pool creates them once, whoever asks first, so the walk and the types check just find
+		// them. Any phase that runs reads them.
+		if projectFiles := graph.ProjectFiles(); len(projectFiles) > 0 && (runFix || runTypes || runLint) {
+			go func() {
+				_, release := graph.Program.GetTypeCheckerForFile(ctx, projectFiles[0])
+				release()
+			}()
+		}
+
+		// The build saw every file the compiler read. The lint config is read by the command, not the
+		// compiler, so it is named here, with every file it extends: a base edited alone changes what runs.
+		declareRunCacheInputs(append(configuration.SourcesOnDisk(lintConfigSources(location.LintConfigFileName)), location.ConfigFileName)...)
 	}
-	buildDuration := time.Since(buildStart)
-	// A test instrument: every file walked on a checker other than its own. See program.walkQueue.
-	graph.WalkOnForeignCheckers = os.Getenv("COHERE_TEST_FOREIGN_CHECKERS") != ""
 
-	// The checkers are created now, alongside the work before the walk, rather than by the walk's first
-	// lookup: 74 to 95ms on ahra that otherwise sits on the path to the first worker (#zqsdzbq, lever B).
-	// Upstream's pool creates them once, whoever asks first, so the walk and the types check just find
-	// them. Any phase that runs reads them.
-	if projectFiles := graph.ProjectFiles(); len(projectFiles) > 0 && (runFix || runTypes || runLint) {
-		go func() {
-			_, release := graph.Program.GetTypeCheckerForFile(ctx, projectFiles[0])
-			release()
-		}()
+	var projectFiles []*ast.SourceFile
+	if graph != nil {
+		projectFiles = graph.ProjectFiles()
 	}
-
-	// The build saw every file the compiler read. The lint config is read by the command, not the
-	// compiler, so it is named here, with every file it extends: a base edited alone changes what runs.
-	declareRunCacheInputs(append(configuration.SourcesOnDisk(lintConfigSources(location.LintConfigFileName)), location.ConfigFileName)...)
-
-	projectFiles := graph.ProjectFiles()
 	wholeProgramCount := len(projectFiles)
 
 	// A named path narrows every phase below, because this slice is what they are handed. The type
@@ -477,15 +494,20 @@ func run() error {
 			return err
 		}
 		writeScope = scope
-		lintScope, projectFiles = narrowToClosure(graph, scope, projectFiles)
+		if graph != nil {
+			lintScope, projectFiles = narrowToClosure(graph, scope, projectFiles)
+		}
 	}
 
-	if lintScope.Everything {
+	switch {
+	case graph == nil:
+		fmt.Fprintln(invocationOutput(os.Stdout), "graph not built: --format-only reads the disk, not the program")
+	case lintScope.Everything:
 		fmt.Fprintf(invocationOutput(os.Stdout),
 			"graph built in %s — %d files in the program, %d of them ours\n",
 			round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
 		)
-	} else {
+	default:
 		// Both numbers, because a reader who sees only the narrowed count cannot tell a scoped run
 		// from a tree that shrank, and those want opposite reactions.
 		// The scope's own count is the paths it enumerated, which is not the number checked: a named
@@ -511,7 +533,7 @@ func run() error {
 		}
 	}
 
-	if graphTiming != nil {
+	if graphTiming != nil && graph != nil {
 		printGraphTiming(os.Stdout, graphTiming, buildDuration, contentPackOpened)
 	}
 
@@ -521,6 +543,7 @@ func run() error {
 		processStart:   processStart,
 		filesInScope:   len(projectFiles),
 		filesInProgram: wholeProgramCount,
+		graphSkipped:   graph == nil,
 		rootNote:       location.rootNote(),
 		cacheOff:       cacheOff,
 	}
