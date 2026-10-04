@@ -78,6 +78,18 @@ func RunTypedWithOptions(t *testing.T, subject rule.Rule, fileName string, sourc
 	return RunTypedFilesWithOptions(t, subject, map[string]string{fileName: sourceText}, fileName, options)
 }
 
+// RunTypedVerbatimWithOptions is RunTypedWithOptions writing the source exactly as given, with no trim.
+//
+// For a source whose offsets are someone else's: an ESLint corpus row records where ESLint reported
+// in the row's own bytes, and FixtureText's trim moved a finding at the start or end of the file, in
+// both directions (#jjfa7qb). Hand-written fixtures keep the trim, which is what lets them be indented
+// backquoted literals.
+func RunTypedVerbatimWithOptions(t *testing.T, subject rule.Rule, fileName string, sourceText string, options any) Result {
+	t.Helper()
+	files := map[string]string{fileName: sourceText}
+	return runTypedFiles(t, subject, files, fileName, fixedOptions(options), nil, true)
+}
+
 // RunTypedFiles runs a rule against one file of a multi-file program.
 //
 // Several type questions can only be asked across a module boundary: whether an imported symbol is
@@ -111,7 +123,7 @@ func RunTypedFilesWithSetup(
 	setup func(directory string),
 ) Result {
 	t.Helper()
-	return runTypedFiles(t, subject, files, subjectFileName, fixedOptions(nil), setup)
+	return runTypedFiles(t, subject, files, subjectFileName, fixedOptions(nil), setup, false)
 }
 
 // RunTypedFilesWithSetupAndOptions is RunTypedFilesWithSetup for a rule that also reads
@@ -130,7 +142,7 @@ func RunTypedFilesWithSetupAndOptions(
 	setup func(directory string),
 ) Result {
 	t.Helper()
-	return runTypedFiles(t, subject, files, subjectFileName, fixedOptions(options), setup)
+	return runTypedFiles(t, subject, files, subjectFileName, fixedOptions(options), setup, false)
 }
 
 // RunTypedFilesWithOptionsFor is RunTypedFilesWithSetup for a rule whose options name the fixture's
@@ -151,7 +163,7 @@ func RunTypedFilesWithOptionsFor(
 	optionsFor func(directory string) any,
 ) Result {
 	t.Helper()
-	return runTypedFiles(t, subject, files, subjectFileName, optionsFor, func(string) {})
+	return runTypedFiles(t, subject, files, subjectFileName, optionsFor, func(string) {}, false)
 }
 
 // fixedOptions is an options value that does not depend on where the fixture was written.
@@ -170,7 +182,7 @@ func RunTypedFilesWithOptions(
 	options any,
 ) Result {
 	t.Helper()
-	return runTypedFiles(t, subject, files, subjectFileName, fixedOptions(options), nil)
+	return runTypedFiles(t, subject, files, subjectFileName, fixedOptions(options), nil, false)
 }
 
 // runTypedFiles is the body both public forms share.
@@ -181,6 +193,7 @@ func runTypedFiles(
 	subjectFileName string,
 	optionsFor func(directory string) any,
 	setup func(directory string),
+	verbatim bool,
 ) Result {
 	t.Helper()
 
@@ -237,7 +250,7 @@ func runTypedFiles(
 		}
 		graph = built
 	} else {
-		built, cachedDirectory, err := buildCachedProgram(files, subjectFileName)
+		built, cachedDirectory, err := buildCachedProgram(files, subjectFileName, verbatim)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}

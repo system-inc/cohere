@@ -107,7 +107,7 @@ func cacheRoot() (string, error) {
 // The file names are sorted so a caller's map iteration order cannot split one program into two
 // cache entries, and each field is length-prefixed so that no combination of names and contents can
 // be spelled two ways and collide.
-func programCacheKey(files map[string]string, subjectFileName string) string {
+func programCacheKey(files map[string]string, subjectFileName string, verbatim bool) string {
 	names := make([]string, 0, len(files))
 	for name := range files {
 		names = append(names, name)
@@ -116,6 +116,7 @@ func programCacheKey(files map[string]string, subjectFileName string) string {
 
 	hash := sha256.New()
 	fmt.Fprintf(hash, "subject:%d:%s\n", len(subjectFileName), subjectFileName)
+	fmt.Fprintf(hash, "verbatim:%t\n", verbatim)
 	for _, name := range names {
 		fmt.Fprintf(hash, "file:%d:%s:%d:%s\n", len(name), name, len(files[name]), files[name])
 	}
@@ -127,8 +128,8 @@ func programCacheKey(files map[string]string, subjectFileName string) string {
 // The returned directory is where the fixture was written, for a caller that needs to name a path
 // inside it. It is owned by the cache and must not be modified: another test is very likely holding
 // the same graph.
-func buildCachedProgram(files map[string]string, subjectFileName string) (*program.Graph, string, error) {
-	key := programCacheKey(files, subjectFileName)
+func buildCachedProgram(files map[string]string, subjectFileName string, verbatim bool) (*program.Graph, string, error) {
+	key := programCacheKey(files, subjectFileName, verbatim)
 
 	programCacheMutex.Lock()
 	entry, found := programCache[key]
@@ -141,14 +142,14 @@ func buildCachedProgram(files map[string]string, subjectFileName string) (*progr
 	// Outside the map lock, so one slow build does not stall every other fixture, and `sync.Once`
 	// still guarantees exactly one build per key even when several tests race for the same one.
 	entry.once.Do(func() {
-		entry.graph, entry.directory, entry.buildErr = buildProgramInto(key, files, subjectFileName)
+		entry.graph, entry.directory, entry.buildErr = buildProgramInto(key, files, subjectFileName, verbatim)
 	})
 
 	return entry.graph, entry.directory, entry.buildErr
 }
 
 // buildProgramInto writes one fixture set to its own directory under the cache root and builds it.
-func buildProgramInto(key string, files map[string]string, subjectFileName string) (*program.Graph, string, error) {
+func buildProgramInto(key string, files map[string]string, subjectFileName string, verbatim bool) (*program.Graph, string, error) {
 	root, err := cacheRoot()
 	if err != nil {
 		return nil, "", fmt.Errorf("creating the fixture cache root: %w", err)
@@ -164,7 +165,11 @@ func buildProgramInto(key string, files map[string]string, subjectFileName strin
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return nil, "", fmt.Errorf("creating the fixture directory for %s: %w", name, err)
 		}
-		if err := os.WriteFile(path, []byte(FixtureText(contents)), 0o644); err != nil {
+		text := FixtureText(contents)
+		if verbatim {
+			text = contents
+		}
+		if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
 			return nil, "", fmt.Errorf("writing the fixture %s: %w", name, err)
 		}
 	}

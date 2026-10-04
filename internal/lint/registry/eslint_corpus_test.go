@@ -125,36 +125,54 @@ func corpusVerdict(t *testing.T, registration rule.Registration, row eslintCorpu
 	var result rule_testing.Result
 	ran := false
 	t.Run(row.key(), func(t *testing.T) {
-		result = rule_testing.RunTypedWithOptions(t, registration.Rule, "Case.ts", row.Code, decoded)
+		result = rule_testing.RunTypedVerbatimWithOptions(t, registration.Rule, "Case.ts", row.Code, decoded)
 		ran = true
 	})
 	if !ran {
 		return "harness"
 	}
 
-	byteOffset := utf16ToByteOffsets(row.Code)
-	expected := make([]string, 0, len(row.ESLint))
-	for _, finding := range row.ESLint {
-		start, end := byteOffset[int(finding[1].(float64))], byteOffset[int(finding[2].(float64))]
-		expected = append(expected, corpusPlace(start, end))
-	}
-	// The harness writes the file trimmed, so cohere's offsets are in the trimmed text and are moved
-	// back by what the trim took off the front before they compare.
+	// The row is written verbatim, so cohere's offsets are into the row's own bytes, with one
+	// exception: the compiler's reader drops a leading byte order mark, so the file cohere sees is the
+	// row without it. ESLint's offsets are moved into that same text. ESLint counts columns after the
+	// mark, and the extractor counted line starts with it, so a finding on the first line is already an
+	// offset into the text without the mark, and one on a later line is one unit past it.
 	//
 	// The places compare as offsets and not as text. Comparing the text alone read a finding on the
 	// wrong occurrence of the same text as agreement: ESLint reports prefer-const at the write in
 	// `let x; x = 0;` and the port at the declaration, both slices are `x`, and the row agreed even
 	// across two lines (#jjfa7qb). TestCorpusVerdictComparesPlaces plants that shape.
-	source := rule_testing.FixtureText(row.Code)
-	leading := len(row.Code) - len(strings.TrimLeft(row.Code, " \t\r\n"))
+	code := row.Code
+	firstLineEnd := -1
+	if strings.HasPrefix(code, "\ufeff") {
+		code = strings.TrimPrefix(code, "\ufeff")
+		firstLineEnd = utf16LineBreakEnd(row.Code)
+	}
+	if result.SourceFile.Text() != code {
+		return "harness"
+	}
+	byteOffset := utf16ToByteOffsets(code)
+	expected := make([]string, 0, len(row.ESLint))
+	for _, finding := range row.ESLint {
+		start, end := int(finding[1].(float64)), int(finding[2].(float64))
+		if firstLineEnd >= 0 {
+			if start >= firstLineEnd {
+				start--
+			}
+			if end >= firstLineEnd {
+				end--
+			}
+		}
+		expected = append(expected, corpusPlace(byteOffset[start], byteOffset[end]))
+	}
 	reported := make([]string, 0, len(result.Diagnostics))
 	for _, diagnostic := range result.Diagnostics {
 		start, end := diagnostic.Range.Pos(), diagnostic.Range.End()
-		if start < 0 || end > len(source) || start > end {
+		if start < 0 || end > len(code) || start > end {
 			reported = append(reported, fmt.Sprintf("<range %d-%d>", start, end))
 			continue
 		}
-		reported = append(reported, corpusPlace(start+leading, end+leading))
+		reported = append(reported, corpusPlace(start, end))
 	}
 	sort.Strings(expected)
 	sort.Strings(reported)
@@ -172,6 +190,29 @@ func corpusVerdict(t *testing.T, registration rule.Registration, row eslintCorpu
 	default:
 		return "missing"
 	}
+}
+
+// utf16LineBreakEnd is the UTF-16 offset just past the first line break, as the extractor counts line
+// starts, or one past the end when there is none.
+func utf16LineBreakEnd(code string) int {
+	units := 0
+	runes := []rune(code)
+	for index, character := range runes {
+		switch character {
+		case '\r':
+			if index+1 < len(runes) && runes[index+1] == '\n' {
+				return units + 2
+			}
+			return units + 1
+		case '\n', '\u2028', '\u2029':
+			return units + 1
+		}
+		units++
+		if character > 0xFFFF {
+			units++
+		}
+	}
+	return units + 1
 }
 
 // corpusPlace names a finding by where it is, as byte offsets into the row's code.
@@ -298,42 +339,53 @@ func TestUTF16OffsetsBecomeByteOffsets(t *testing.T) {
 // TestCorpusVerdictComparesPlaces plants the shape a text-only comparison read as agreement, and its
 // twin.
 //
-// The probe reports the first `x` in `let x; x = 0;`, at bytes 4 to 5. A row whose ESLint finding is
-// the second `x`, at 7 to 8, has the same text and a different place, and must not agree: it is a span
-// gap. The twin, whose finding is at 4 to 5, must agree. A leading blank line moves both, so the
-// trimmed fixture's offsets are shown to be mapped back.
+// The probe reports one occurrence of `x` in `let x; x = 0;`. A row whose ESLint finding is the other
+// `x` has the same text and a different place, and must not agree: it is a span gap. Its twin names
+// the same `x` and must agree. Behind a leading blank line, which the corpus no longer trims, both
+// still hold. Behind a byte order mark, which the compiler's reader drops, ESLint's offset on the first
+// line is already past the mark and one on a later line is not, so both lines are planted.
 func TestCorpusVerdictComparesPlaces(t *testing.T) {
 	t.Parallel()
 
-	probe := rule.Registration{Rule: rule.Rule{
-		Name: "corpus-place-probe",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
-			reported := false
-			return rule.Listeners{
-				ast.KindIdentifier: func(node *ast.Node) {
-					if !reported && node.Text() == "x" {
-						reported = true
-						ctx.ReportNode(node, rule.Message{Id: "probe", Description: "The first x."})
-					}
-				},
-			}
-		},
-	}}
+	probe := func(occurrence int) rule.Registration {
+		return rule.Registration{Rule: rule.Rule{
+			Name: "corpus-place-probe",
+			Run: func(ctx rule.Context, options any) rule.Listeners {
+				seen := 0
+				return rule.Listeners{
+					ast.KindIdentifier: func(node *ast.Node) {
+						if node.Text() != "x" {
+							return
+						}
+						seen++
+						if seen == occurrence {
+							ctx.ReportNode(node, rule.Message{Id: "probe", Description: "One x."})
+						}
+					},
+				}
+			},
+		}}
+	}
 
 	cases := []struct {
-		name  string
-		code  string
-		start float64
-		want  string
+		name       string
+		code       string
+		occurrence int
+		start      float64
+		want       string
 	}{
-		{"same text, another place", "let x; x = 0;", 7, "span"},
-		{"same text, the same place", "let x; x = 0;", 4, "agree"},
-		{"after a trimmed blank line, another place", "\nlet x; x = 0;", 8, "span"},
-		{"after a trimmed blank line, the same place", "\nlet x; x = 0;", 5, "agree"},
+		{"same text, another place", "let x; x = 0;", 1, 7, "span"},
+		{"same text, the same place", "let x; x = 0;", 1, 4, "agree"},
+		{"behind a blank line, another place", "\nlet x; x = 0;", 1, 8, "span"},
+		{"behind a blank line, the same place", "\nlet x; x = 0;", 1, 5, "agree"},
+		{"behind a mark, the first line", "\ufefflet x; x = 0;", 1, 4, "agree"},
+		{"behind a mark, the first line, another place", "\ufefflet x; x = 0;", 1, 7, "span"},
+		{"behind a mark, a later line", "\ufefflet x;\nx = 0;", 2, 8, "agree"},
+		{"behind a mark, a later line, another place", "\ufefflet x;\nx = 0;", 1, 8, "span"},
 	}
 	for _, testCase := range cases {
-		row := eslintCorpusRow{Code: testCase.code, ESLint: [][3]any{{"useConst", testCase.start, testCase.start + 1}}}
-		if verdict := corpusVerdict(t, probe, row); verdict != testCase.want {
+		row := eslintCorpusRow{Code: testCase.code, ESLint: [][3]any{{"probe", testCase.start, testCase.start + 1}}}
+		if verdict := corpusVerdict(t, probe(testCase.occurrence), row); verdict != testCase.want {
 			t.Errorf("%s: the verdict is %q, want %q", testCase.name, verdict, testCase.want)
 		}
 	}

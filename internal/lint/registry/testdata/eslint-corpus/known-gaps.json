@@ -214,34 +214,6 @@
     "id-length": {
         "549199ae55a5": "span"
     },
-    "max-lines": {
-        "03f9e79bba0c": "span",
-        "058df14c8887": "span",
-        "2db22ad1475d": "span",
-        "464e6995f802": "span",
-        "4d26a50855ab": "span",
-        "4f49046778df": "missing",
-        "537246a82930": "span",
-        "76a62af6ed15": "span",
-        "7c86e9819aeb": "span",
-        "7dc0e736768a": "span",
-        "7e3d229385a7": "missing",
-        "7f1b6b913f54": "span",
-        "86027098f499": "span",
-        "86cbddc124b3": "span",
-        "8d3b80324f47": "span",
-        "930790ab48f2": "span",
-        "94936b065b4f": "span",
-        "95e171cb65e4": "span",
-        "9ab45d55c6f6": "span",
-        "9da542a0d316": "span",
-        "a87c449313c1": "span",
-        "ca326e98682d": "span",
-        "e1b9e5e547e5": "span",
-        "e3fbf7da089a": "span",
-        "e74187c848a0": "span",
-        "fff9856c1d78": "span"
-    },
     "no-async-promise-executor": {
         "005d1d11add6": "globals",
         "31f1dabb8178": "extra",
@@ -1189,8 +1161,7 @@
     "unicode-bom": {
         "0e42ef14ca94": "extra",
         "19885cb5c7bb": "missing",
-        "cd1ccacafa34": "missing",
-        "de5578befadd": "span"
+        "cd1ccacafa34": "missing"
     },
     "use-isnan": {
         "687a41a8c83b": "globals"
