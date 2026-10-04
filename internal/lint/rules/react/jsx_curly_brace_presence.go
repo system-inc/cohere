@@ -409,8 +409,13 @@ func jsxCurlyBracePresenceLintUnnecessary(
 		// Whitespace is the one thing a container can express that bare markup cannot, so a
 		// whitespace-only value keeps its braces. In an attribute the test is only that; in a child
 		// any leading or trailing whitespace at all is enough, because JSX would trim it.
+		//
+		// The attribute test is upstream's `isWhiteSpaceLiteral`, whose `node.value &&` makes an
+		// EMPTY string not whitespace, so `label={''}` reports and repairs to `label=""`. Testing
+		// the value against `/^\s*$/` alone, which an empty string satisfies, silenced it: ESLint
+		// reported two sites in www-phi-health that this did not (#t5dwy1t).
 		if inAttribute {
-			if jsxCurlyBracePresenceIsAllWhitespace(value) {
+			if jsxCurlyBracePresenceIsWhitespaceLiteral(expression) {
 				return
 			}
 		} else if jsxCurlyBracePresenceHasEdgeWhitespace(value) {

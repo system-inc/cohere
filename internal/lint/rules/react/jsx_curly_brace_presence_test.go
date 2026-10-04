@@ -903,3 +903,33 @@ func TestJsxCurlyBracePresenceUsesJavaScriptWhitespaceWhenTrimming(t *testing.T)
 	rule_testing.ExpectFixedSource(t, result,
 		"<App>\n  {\"a\"}\n{\""+nextLine+"\"}\n  {\"b\"}\n</App>")
 }
+
+// An empty string in braces is unnecessary in every position, and in an attribute it repairs to an
+// empty attribute value. Upstream's whitespace-literal test reads an empty value as falsy, so it is
+// not the whitespace an attribute keeps its braces for. The attribute arm once tested the value
+// against `/^\s*$/` alone, which an empty string satisfies, and fell silent where ESLint reported
+// two sites in www-phi-health (#t5dwy1t). Every row was run through 7.37.5 first, and the expected
+// repair is what that run wrote.
+func TestJsxCurlyBracePresenceReportsAnEmptyString(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		source string
+		fixed  string
+	}{
+		{`<X label={''} />`, `<X label="" />`},
+		{`<div className={""} />`, `<div className="" />`},
+		{"<X label={``} />", `<X label="" />`},
+		{`<div>{''}</div>`, `<div></div>`},
+		{`<div>x{''}</div>`, `<div>x</div>`},
+	} {
+		result := jsxCurlyBracePresenceRun(t, testCase.source, "")
+		rule_testing.ExpectFindings(t, result, "UnnecessaryCurly")
+		rule_testing.ExpectFixedSource(t, result, testCase.fixed)
+	}
+
+	// The nearest shapes that keep their braces: a value that is only whitespace, and a template
+	// holding an expression.
+	rule_testing.ExpectClean(t, jsxCurlyBracePresenceRun(t, `<X label={' '} />`, ""))
+	rule_testing.ExpectClean(t, jsxCurlyBracePresenceRun(t, "<X label={`${b}`} />", ""))
+}
