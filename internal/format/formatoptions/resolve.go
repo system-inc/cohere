@@ -1,12 +1,14 @@
 package formatoptions
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 
 	"github.com/system-inc/cohere/internal/lint/configuration"
 )
@@ -103,33 +105,144 @@ func PrettierDefaults() Options {
 // Resolve finds the CohereSettings.json governing directory and applies its format block over
 // Prettier's defaults.
 func Resolve(directory string) (Resolution, error) {
+	return NewResolver().Resolve(directory)
+}
+
+// Resolver resolves directories for one run, remembering each directory's answer so a tree of many
+// directories walks each ancestor once, and sharing every settings file's chain across runs (see
+// chainOf).
+//
+// A directory's answer is kept for the Resolver's life, which is one run: a Prettier config or a
+// settings file appearing mid-run is not seen until the next one. Measured on ahra's 3,926 program
+// files (#mtf2sxt): 888 directories resolving afresh re-read and re-parsed one of 3 chains each, about
+// 1.8ms and 2.6 megabytes a directory, most of the formatter's processor time.
+type Resolver struct {
+	mutex       sync.Mutex
+	byDirectory map[string]resolved
+}
+
+// resolved is one directory's answer, a refusal included, since a refusal is as much the answer for
+// every directory below it as options are.
+type resolved struct {
+	resolution Resolution
+	err        error
+}
+
+// NewResolver starts a Resolver that remembers nothing yet.
+func NewResolver() *Resolver {
+	return &Resolver{byDirectory: map[string]resolved{}}
+}
+
+// Resolve answers as the package's Resolve does, from memory where it can.
+func (resolver *Resolver) Resolve(directory string) (Resolution, error) {
 	absolute, err := filepath.Abs(directory)
 	if err != nil {
 		return Resolution{}, err
 	}
+	answer := resolver.resolve(absolute)
+	return answer.resolution, answer.err
+}
 
-	// Old config is refused wherever the walk up meets it, up to and including the directory whose
-	// settings win: cohere never reads it, so keeping it is a second statement of the options that
-	// nothing checks.
-	for current := absolute; ; current = filepath.Dir(current) {
-		leftover, found, err := prettierConfigIn(current)
+func (resolver *Resolver) resolve(directory string) resolved {
+	resolver.mutex.Lock()
+	known, present := resolver.byDirectory[directory]
+	resolver.mutex.Unlock()
+	if present {
+		return known
+	}
+
+	answer := resolver.resolveHere(directory)
+	resolver.mutex.Lock()
+	resolver.byDirectory[directory] = answer
+	resolver.mutex.Unlock()
+	return answer
+}
+
+// resolveHere is one step of the walk up. Old config is refused wherever the walk meets it, up to and
+// including the directory whose settings win: cohere never reads it, so keeping it is a second
+// statement of the options that nothing checks. A directory with neither answers as its parent does.
+func (resolver *Resolver) resolveHere(directory string) resolved {
+	leftover, found, err := prettierConfigIn(directory)
+	if err != nil {
+		return resolved{err: err}
+	}
+	if found {
+		return resolved{err: fmt.Errorf("%s: %w; delete it, since cohere formats with the format block in the Nexus tier (%s)",
+			leftover, ErrPrettierConfigRemains, NexusTierFileName)}
+	}
+
+	path := filepath.Join(directory, SettingsFileName)
+	if _, err := os.Stat(path); err == nil {
+		resolution, err := chainOf(path)
+		return resolved{resolution: resolution, err: err}
+	}
+
+	parent := filepath.Dir(directory)
+	if parent == directory {
+		return resolved{resolution: Resolution{Options: PrettierDefaults()}}
+	}
+	return resolver.resolve(parent)
+}
+
+// chains is every settings file's resolution this process has read, keyed by the settings file, each
+// kept with the contents of the files its chain was read from.
+var chains = struct {
+	mutex  sync.Mutex
+	byPath map[string]chainEntry
+}{byPath: map[string]chainEntry{}}
+
+type chainEntry struct {
+	resolution Resolution
+
+	// files is the contents of each source on disk the resolution was read from. The embedded sets
+	// cannot change under a running binary and are not kept.
+	files map[string][]byte
+}
+
+// chainOf is resolveChain, remembered. A remembered resolution is used only while every file of its
+// chain still reads byte for byte what it was resolved from, so an edit anywhere in the chain, its
+// `extends` included, is a fresh resolution. Reading a chain's few files back costs far less than
+// parsing them, the settings files being small beside the rule sets they extend. A refusal is not
+// remembered: it ends the run.
+func chainOf(path string) (Resolution, error) {
+	chains.mutex.Lock()
+	entry, present := chains.byPath[path]
+	chains.mutex.Unlock()
+	if present && entry.stillReads() {
+		return entry.resolution, nil
+	}
+
+	sources, err := configuration.SourcesOf(path)
+	if err != nil {
+		return Resolution{}, err
+	}
+	files := map[string][]byte{}
+	for _, source := range configuration.SourcesOnDisk(sources) {
+		contents, err := os.ReadFile(source)
 		if err != nil {
 			return Resolution{}, err
 		}
-		if found {
-			return Resolution{}, fmt.Errorf("%s: %w; delete it, since cohere formats with the format block in the Nexus tier (%s)",
-				leftover, ErrPrettierConfigRemains, NexusTierFileName)
-		}
+		files[source] = contents
+	}
+	resolution, err := resolveChain(path)
+	if err != nil {
+		return Resolution{}, err
+	}
+	chains.mutex.Lock()
+	chains.byPath[path] = chainEntry{resolution: resolution, files: files}
+	chains.mutex.Unlock()
+	return resolution, nil
+}
 
-		path := filepath.Join(current, SettingsFileName)
-		if _, err := os.Stat(path); err == nil {
-			return resolveChain(path)
-		}
-
-		if parent := filepath.Dir(current); parent == current {
-			return Resolution{Options: PrettierDefaults()}, nil
+// stillReads reports whether every file of the chain reads what it did when the entry was made.
+func (entry chainEntry) stillReads() bool {
+	for source, recorded := range entry.files {
+		contents, err := os.ReadFile(source)
+		if err != nil || !bytes.Equal(contents, recorded) {
+			return false
 		}
 	}
+	return true
 }
 
 // NexusTierFileName is the one file in a chain that may hold the format block: the Nexus tier, which

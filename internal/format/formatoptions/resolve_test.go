@@ -2,6 +2,7 @@ package formatoptions
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -332,5 +333,128 @@ func TestADroppedKeyCanNeverReachPrettiersDefaults(t *testing.T) {
 	}
 	if resolution.Options == PrettierDefaults() {
 		t.Fatal("old config with no settings reached Prettier's defaults")
+	}
+}
+
+// resolveUnremembered is Resolve as it was before the Resolver: every directory walks to its settings
+// and reads the chain afresh. The reference the remembered path is held to.
+func resolveUnremembered(directory string) (Resolution, error) {
+	for current := directory; ; current = filepath.Dir(current) {
+		leftover, found, err := prettierConfigIn(current)
+		if err != nil {
+			return Resolution{}, err
+		}
+		if found {
+			return Resolution{}, fmt.Errorf("%s: %w; delete it, since cohere formats with the format block in the Nexus tier (%s)",
+				leftover, ErrPrettierConfigRemains, NexusTierFileName)
+		}
+		path := filepath.Join(current, SettingsFileName)
+		if _, err := os.Stat(path); err == nil {
+			return resolveChain(path)
+		}
+		if parent := filepath.Dir(current); parent == current {
+			return Resolution{Options: PrettierDefaults()}, nil
+		}
+	}
+}
+
+// TestAResolverAnswersAsResolveDidOnOurTrees: one Resolver, shared across every directory of a real
+// tree as a format run shares it, answers each directory exactly as the unremembered walk does:
+// options, source, both ignore lists, and every refusal word for word (ahra's projects/www-ahra-ai,
+// with its prettier key, is one). Reads files as text only.
+//
+// Off unless COHERE_RESOLVE_TREES lists the trees, separated as PATH is: the reference walks every
+// directory afresh, and on 2026-10-04 ahra's 90,798 directories, www's 1,075 and api's 835 took 317s,
+// all identical, 437 of them refusals.
+func TestAResolverAnswersAsResolveDidOnOurTrees(t *testing.T) {
+	trees := filepath.SplitList(os.Getenv("COHERE_RESOLVE_TREES"))
+	if len(trees) == 0 {
+		t.Skip("COHERE_RESOLVE_TREES names no tree")
+	}
+	skipped := map[string]bool{".git": true, "node_modules": true, ".cache": true, ".next": true, "data": true, "dist": true}
+	for _, root := range trees {
+		t.Run(root, func(t *testing.T) {
+			resolver := NewResolver()
+			directories, refusals := 0, 0
+			walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+				if err != nil || !entry.IsDir() {
+					return nil
+				}
+				if skipped[entry.Name()] {
+					return filepath.SkipDir
+				}
+				directories++
+				remembered, rememberedError := resolver.Resolve(path)
+				reference, referenceError := resolveUnremembered(path)
+				if fmt.Sprint(rememberedError) != fmt.Sprint(referenceError) {
+					t.Fatalf("%s: the Resolver answered %v, the walk %v", path, rememberedError, referenceError)
+				}
+				if referenceError != nil {
+					refusals++
+					return nil
+				}
+				if fmt.Sprintf("%+v", remembered) != fmt.Sprintf("%+v", reference) {
+					t.Fatalf("%s: the Resolver answered %+v, the walk %+v", path, remembered, reference)
+				}
+				return nil
+			})
+			if walkError != nil {
+				t.Fatal(walkError)
+			}
+			if directories < 50 {
+				t.Fatalf("compared only %d directories under %s, so the comparison measured nothing", directories, root)
+			}
+			t.Logf("%d directories identical, %d of them refusals", directories, refusals)
+		})
+	}
+}
+
+// TestAnEditAnywhereInTheChainIsSeen: a remembered chain is used only while its files read what they
+// did, so a later run sees an edit to the Nexus tier and to the project's own `extends`, even one that
+// leaves the file's size unchanged.
+func TestAnEditAnywhereInTheChainIsSeen(t *testing.T) {
+	root := t.TempDir()
+	nexusTier := filepath.Join(root, "nexus", NexusTierFileName)
+	writeFile(t, nexusTier, `{"format": {"printWidth": 120}}`)
+	writeFile(t, filepath.Join(root, "other", NexusTierFileName), `{"format": {"printWidth": 90}}`)
+	settings := filepath.Join(root, SettingsFileName)
+	writeFile(t, settings, `{"extends": "./nexus/`+NexusTierFileName+`"}`)
+
+	width := func() int {
+		t.Helper()
+		resolution, err := NewResolver().Resolve(filepath.Join(root, "source"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resolution.Options.PrintWidth
+	}
+	if got := width(); got != 120 {
+		t.Fatalf("print width %d, want the Nexus tier's 120", got)
+	}
+
+	writeFile(t, nexusTier, `{"format": {"printWidth": 100}}`)
+	if got := width(); got != 100 {
+		t.Fatalf("after the Nexus tier changed to 100 at the same size, a run read %d", got)
+	}
+
+	writeFile(t, settings, `{"extends": "./other/`+NexusTierFileName+`"}`)
+	if got := width(); got != 90 {
+		t.Fatalf("after the project's extends moved to another tier, a run read %d, want 90", got)
+	}
+}
+
+// TestARememberedParentDoesNotAnswerForAChildWithLeftoverConfig: a Resolver that already knows a
+// directory's options still walks a child that holds old Prettier config, and refuses it.
+func TestARememberedParentDoesNotAnswerForAChildWithLeftoverConfig(t *testing.T) {
+	root := t.TempDir()
+	project(t, root, houseBlock)
+	writeFile(t, filepath.Join(root, "packages", "inner", ".prettierrc"), `{"printWidth": 120}`)
+
+	resolver := NewResolver()
+	if _, err := resolver.Resolve(filepath.Join(root, "packages")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolver.Resolve(filepath.Join(root, "packages", "inner", "source")); !errors.Is(err, ErrPrettierConfigRemains) {
+		t.Fatalf("a child with a leftover resolved through its remembered parent: %v", err)
 	}
 }
