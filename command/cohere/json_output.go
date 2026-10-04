@@ -79,9 +79,12 @@ type summaryJSON struct {
 	FilesFixed        int      `json:"filesFixed"`
 	FilesFormatted    int      `json:"filesFormatted"`
 	WouldChange       int      `json:"wouldChange"`
-	FilesCohered      int      `json:"filesCohered"`
-	FilesCached       int      `json:"filesCached"`
-	Nodes             int      `json:"nodes"`
+	// Cohered is the files rewritten; Checked and Cached split FilesInScope between fresh and cached.
+	Cohered      int `json:"cohered"`
+	FilesInScope int `json:"filesInScope"`
+	Checked      int `json:"checked"`
+	Cached       int `json:"cached"`
+	Nodes        int `json:"nodes"`
 	// Gaps is every way the run fell short of checking everything. A reader deciding whether a green run
 	// can be trusted reads this, not the verdict alone.
 	Gaps runGaps `json:"gaps"`
@@ -126,8 +129,10 @@ func summaryAsJSON(summary runSummary) summaryJSON {
 		FilesFixed:        summary.filesFixed(),
 		FilesFormatted:    summary.filesFormatted(),
 		WouldChange:       summary.WouldChange,
-		FilesCohered:      summary.FilesCohered,
-		FilesCached:       summary.FilesCached,
+		Cohered:           summary.cohered(),
+		FilesInScope:      summary.FilesInScope,
+		Checked:           summary.FilesChecked,
+		Cached:            summary.FilesCached,
 		Nodes:             summary.Nodes,
 		Gaps:              summary.Gaps,
 	}

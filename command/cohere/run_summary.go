@@ -1,6 +1,9 @@
 package main
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // runFinding is one finding, a rule's or a type error, whose rule is then its TypeScript code (TS2322).
 // Both views print the same fields: the human line `path:line:col severity rule message`, and `--json`.
@@ -42,21 +45,39 @@ type runSummary struct {
 	TypeErrors int
 	Findings   int
 
-	// Changed is each file the run rewrote, by fixing, formatting or both. WouldChange is the files a
-	// `--no-fix` run found a fix or formatting would rewrite, which fail it.
+	// Changed is each file the run rewrote, by fixing, formatting or both: the files it cohered, the
+	// brand's verb for altering. WouldChange is the files a `--no-fix` run found a fix or formatting
+	// would rewrite, which fail it.
 	Changed     []changedFile
 	WouldChange int
 
-	// FilesCohered is the files this run checked fresh, and FilesCached the files whose results came from
-	// the cache; together they are the files in scope. Cohered is the brand's verb, and the split is the
-	// point: a warm run that cohered three files and took the rest from the cache must not read like one
-	// that checked them all again.
-	FilesCohered int
+	// FilesInScope is every file the run was to account for. FilesChecked is the ones it examined fresh,
+	// and FilesCached the ones the cache answered for, so the two add up to FilesInScope; countsAgree
+	// holds them to it. The split is the point: a warm run that checked three files and took the rest
+	// from the cache must not read like one that checked them all again.
+	FilesInScope int
+	FilesChecked int
 	FilesCached  int
-	// Nodes is the syntax nodes walked this run, so only in the cohered files.
+	// Nodes is the syntax nodes walked this run, so only in the checked files.
 	Nodes int
 
 	Gaps runGaps
+}
+
+// cohered is the files the run rewrote, which is what the 🪄 and 💅 lines above the footer list.
+func (summary runSummary) cohered() int {
+	return len(summary.Changed)
+}
+
+// countsAgree checks that checked and cached add up to every file in scope, so neither count can drift
+// from the other unnoticed. The other invariant, that the cohered count is the number of 🪄 and 💅 lines,
+// holds by construction, since both come from Changed, and a test pins it.
+func (summary runSummary) countsAgree() error {
+	if summary.FilesChecked+summary.FilesCached != summary.FilesInScope {
+		return fmt.Errorf("%d checked and %d cached do not add up to the %d files in scope",
+			summary.FilesChecked, summary.FilesCached, summary.FilesInScope)
+	}
+	return nil
 }
 
 // changedFile is one file the run rewrote.
@@ -67,11 +88,6 @@ type changedFile struct {
 	Formatted bool
 	// FixedBy counts the fixes applied, by the rule that made them.
 	FixedBy map[string]int
-}
-
-// files is every file the run accounted for, checked fresh or from the cache.
-func (summary runSummary) files() int {
-	return summary.FilesCohered + summary.FilesCached
 }
 
 // filesFixed and filesFormatted count the changed files of each kind; a file can be both.
@@ -108,8 +124,8 @@ type cacheUse struct {
 // runGaps is every way a run fell short of checking everything. Each is said in the footer even when
 // the run is green.
 type runGaps struct {
-	// FilesInScope is set when a run was narrowed to some of the program's files.
-	FilesInScope int `json:"filesInScope"`
+	// ProgramFiles is the program's size when the run was narrowed to fewer of its files, zero otherwise.
+	ProgramFiles int `json:"programFiles"`
 	CrashedFiles int `json:"crashedFiles"`
 	// RulesSkippingEverything is the rules that declined every file they were offered.
 	RulesSkippingEverything int  `json:"rulesSkippingEverything"`

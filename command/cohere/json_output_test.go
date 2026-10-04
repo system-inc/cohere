@@ -51,7 +51,7 @@ func TestJSONSummary(t *testing.T) {
 	for key, want := range map[string]any{
 		"kind": "summary", "schemaVersion": float64(outputSchemaVersion), "verdict": "fail", "seconds": 0.7,
 		"findings": float64(2), "filesFixed": float64(1), "filesFormatted": float64(2),
-		"filesCohered": float64(3), "filesCached": float64(3923), "formattingSeconds": 0.02,
+		"cohered": float64(2), "checked": float64(3), "cached": float64(3923), "filesInScope": float64(3926), "rules": float64(480), "formattingSeconds": 0.02,
 	} {
 		if decoded[key] != want {
 			t.Errorf("summary %s = %v, want %v", key, decoded[key], want)

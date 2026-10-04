@@ -7,24 +7,29 @@ import (
 	"time"
 )
 
-// The footer is the one line a default run ends with, after its findings: the verdict, where the time
-// went, and how much was checked. Everything else a run can say is under `--verbose`.
+// The footer is the one line a default run ends with, after its findings: the verdict, how long it took,
+// what it found and changed, and how much it covered. Everything else a run can say is under `--verbose`.
 //
-//	✓ 💎 0.7s (480 rules • 3.9K files • 2.4M nodes)
-//	✓ 💎 0.05s (480 rules • 3.9K files)
-//	✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3.9K files • 2.4M nodes)
+//	✓ 💎 2.4s (480 rules • 3.9K checked)                           cold: every file checked fresh
+//	✓ 💎 0.7s (480 rules • 3 checked • 3.9K cached)               three files edited, all clean
+//	✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3.9K cached)   two rewritten, listed above
+//	✓ 💎 0.05s (480 rules • 3.9K cached)                          nothing changed
+//	✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3 checked • 3.9K cached)
 //
-// In the parentheses, the rules that ran, the files in scope, and the nodes walked this run, which a
-// replay walked none of. With `--phases`, or `"output": { "phases": true }` in the settings, where the
-// time went comes first inside them:
+// The words are the brand's. Cohered is altered: the files cohere rewrote, fixed or formatted, the same
+// files the 🪄 and 💅 lines above the footer list, said only when there were any. Checked is the files
+// examined fresh this run, and cached the ones the cache answered for; together they are every file in
+// scope. A count of zero is left out. In order: the verdict and time, what was found, what was cohered,
+// the parentheses, and anything the run did not check.
 //
-//	✓ 💎 0.7s (🕸 0.2s • 🪄 0.1s • 💅 0.02s • 🔷 0.4s • 👑 0.2s • 480 rules • 3.9K files • 2.4M nodes)
+// With `--phases`, or `"output": { "phases": true }` in the settings, where the time went comes first
+// inside the parentheses:
 //
-// Under `--verbose` the footer also says how the files were checked: how many this run cohered (the
-// brand's verb, checked fresh) against how many the cache answered for, or that the run was replayed.
+//	✓ 💎 0.7s (🕸 0.2s • 🪄 0.1s • 💅 0.02s • 🔷 0.4s • 👑 0.2s • 480 rules • 3 checked • 3.9K cached)
 //
-//	✓ 💎 0.7s • 3 files cohered • 3.9K cached (480 rules • 3.9K files • 2.4M nodes)
-//	✓ 💎 0.05s • replayed (480 rules • 3.9K files)
+// `--verbose`'s footer adds the nodes walked and says when the whole run was replayed:
+//
+//	✓ 💎 0.05s • replayed (480 rules • 3.9K cached)
 //
 // It renders a runSummary and decides nothing: what ran, what was found and what went unchecked are the
 // summary's, so this file only says them.
@@ -51,7 +56,7 @@ var phaseGlyphs = map[phaseName]string{
 type footerOptions struct {
 	// Phases puts where the time went first inside the parentheses.
 	Phases bool
-	// Verbose says how the files were checked: cohered against cached, or replayed.
+	// Verbose adds the nodes walked, and says when the whole run was replayed.
 	Verbose bool
 }
 
@@ -75,15 +80,11 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 		line += " • " + style.red(counted(summary.WouldChange, "file would change", "files would change"))
 	}
 
-	if options.Verbose {
-		if summary.Cache.Replayed {
-			line += " • replayed"
-		} else {
-			line += " • " + counted(summary.FilesCohered, "file cohered", "files cohered")
-			if summary.FilesCached > 0 {
-				line += " • " + abbreviated(summary.FilesCached) + " cached"
-			}
-		}
+	if cohered := summary.cohered(); cohered > 0 {
+		line += " • " + abbreviated(cohered) + " cohered"
+	}
+	if options.Verbose && summary.Cache.Replayed {
+		line += " • replayed"
 	}
 
 	var inside []string
@@ -94,10 +95,13 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 	if summary.Rules > 0 {
 		inside = append(inside, counted(summary.Rules, "rule", "rules"))
 	}
-	if files := summary.files(); files > 0 {
-		inside = append(inside, counted(files, "file", "files"))
+	if summary.FilesChecked > 0 {
+		inside = append(inside, abbreviated(summary.FilesChecked)+" checked")
 	}
-	if summary.Nodes > 0 {
+	if summary.FilesCached > 0 {
+		inside = append(inside, abbreviated(summary.FilesCached)+" cached")
+	}
+	if options.Verbose && summary.Nodes > 0 {
 		inside = append(inside, counted(summary.Nodes, "node", "nodes"))
 	}
 	if len(inside) > 0 {
@@ -148,8 +152,8 @@ func uncheckedMarkers(summary runSummary) []string {
 	if gaps.NothingToCheck {
 		markers = append(markers, "⚠ no files to check")
 	}
-	if gaps.FilesInScope > 0 && gaps.FilesInScope < summary.files() {
-		markers = append(markers, fmt.Sprintf("⚠ only %s of the files", abbreviated(gaps.FilesInScope)))
+	if gaps.ProgramFiles > summary.FilesInScope && summary.FilesInScope > 0 {
+		markers = append(markers, fmt.Sprintf("⚠ only %s of %s files", abbreviated(summary.FilesInScope), abbreviated(gaps.ProgramFiles)))
 	}
 	for _, name := range phaseOrder {
 		for _, record := range summary.Phases {

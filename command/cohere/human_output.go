@@ -14,7 +14,7 @@ import (
 //	  💅 modules/pensieve/Recall.ts
 //	🪄   modules/data/DataSync.ts     no-useless-default-assignment
 //	app/os/Session.ts:12:5 error nexus/consistency-no-abbreviated-identifier `ctx` is ...
-//	✗ ☠️ 0.8s • 3 cohered (🪄 0.1s • 💅 0.02s • 🔷 0.4s • 👑 0.2s) 3.9K cached → 1 finding
+//	✗ ☠️ 0.8s • 1 finding • 3 cohered (480 rules • 3 checked • 3.9K cached)
 
 // textStyle colors text for a terminal, and does nothing when the output is not one or NO_COLOR is set,
 // so a log, a pipe or a reader who asked for no color gets no escape codes at all.

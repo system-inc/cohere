@@ -46,7 +46,7 @@ A run prints the files it rewrote, then its findings, then one line:
 🪄💅 app/os/SessionRow.tsx      prefer-const ×2, prefer-nullish-coalescing
   💅 modules/pensieve/Recall.ts
 app/os/Session.ts:12:5 error nexus/consistency-no-abbreviated-identifier `ctx` is an abbreviation.
-✗ ☠️ 0.8s • 1 finding (480 rules • 3.9K files • 2.4M nodes)
+✗ ☠️ 0.8s • 1 finding • 2 cohered (480 rules • 3 checked • 3.9K cached)
 ```
 
 See [Output](#output) for what that line says, and for `--verbose` and `--json`.
@@ -154,13 +154,24 @@ A run prints three things, in order:
   the path, then the rules whose fixes it took, with a count past one. Past 20 files it says how many
   more, and `--verbose` lists them all.
 - **Its findings,** one per line, as `path:line:col severity rule message`.
-- **One footer line:** the verdict (✓ 💎 or ✗ ☠️), how long the run took, what it found, and in the
-  parentheses the rules that ran, the files in scope and the syntax nodes it walked.
+- **One footer line:** the verdict (✓ 💎 or ✗ ☠️), how long the run took, what it found, how many files
+  it cohered, and in the parentheses how much it covered.
 
 ```
-✓ 💎 0.7s (480 rules • 3.9K files • 2.4M nodes)
-✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3.9K files • 2.4M nodes)
+✓ 💎 2.4s (480 rules • 3.9K checked)
+✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3.9K cached)
+✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3 checked • 3.9K cached)
 ```
+
+The words mean exactly this:
+- **cohered:** files cohere rewrote, fixed or formatted, which are the files listed above the footer.
+  Shown only when there were any.
+- **checked:** files examined fresh in this run.
+- **cached:** files the cache answered for, unchanged since a run that checked them. Checked and cached
+  together are every file in scope.
+- **rules:** the rules that ran.
+
+A count of zero is left out, so a cold run shows no `cached` and a run with nothing changed no `checked`.
 
 Anything the run did not check is in the footer even when it passes, so a green line never hides a
 gap: `✓ 💎 2.4s (…) • ⚠ 1 file crashed`. The same goes for a phase that could not run, a rule that
@@ -181,8 +192,8 @@ that did not run is left out. To make that a project's default, set it in `Coher
 free.
 
 `--verbose` prints everything a run can say: each phase and why any did not run, the coverage summary,
-overrides, skips, notes, memory and the total. Its footer also says how many files this run checked
-fresh against how many the cache answered for, or that the run was replayed whole.
+overrides, skips, notes, memory and the total. Its footer adds the syntax nodes the run walked, and
+says when the whole run was replayed from the cache.
 
 `--json` is for a program to read. It prints newline-delimited JSON, one object per line, each with a
 `kind`: a `finding` per finding, a `fixed` and a `formatted` per rewritten file, and a `summary` last.

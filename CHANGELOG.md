@@ -24,7 +24,7 @@ means Prettier's defaults. A project that extends a `cohere:system-inc/*` set ta
 chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
 
 Output, changed: a run prints the files it rewrote, its findings as `path:line:col severity rule
-message`, and one footer line, `✓ 💎 0.7s (480 rules • 3.9K files • 2.4M nodes)`, which names
+message`, and one footer line, `✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3.9K cached)`, which names
 anything the run did not check even when it passes. `--verbose` prints everything a run printed
 before, `--phases` (or `"output": { "phases": true }` in `CohereSettings.json`) adds the phase
 timings to the footer, and `--json` prints newline-delimited JSON described by
