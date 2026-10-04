@@ -171,6 +171,9 @@ type coverageSummary struct {
 	RuleCrashes  []coverageRuleCrash
 	FilesIgnored int
 	Suppression  *suppressionCoverage
+	// Notes is what rules counted rather than reported (rule.Context.Note), summed across files: rule
+	// name to note key to count. Listed under `--coverage`, so an exemption reads as a number.
+	Notes map[string]map[string]int
 }
 
 // count is how many rules a category holds, named or not.
@@ -442,6 +445,52 @@ func writeCoverageDetails(out io.Writer, summary coverageSummary) {
 	if summary.Suppression != nil && len(summary.Suppression.DeadSites) > 0 {
 		writeDeadSuppressions(out, summary.Suppression.DeadSites)
 	}
+	if len(summary.Notes) > 0 {
+		writeRuleNotes(out, summary.Notes)
+	}
+}
+
+// sumRuleNotes adds each file's notes together, by rule and key.
+func sumRuleNotes(notes map[string]program.RuleNotes) map[string]map[string]int {
+	summed := map[string]map[string]int{}
+	for _, fileNotes := range notes {
+		for ruleName, counts := range fileNotes {
+			if summed[ruleName] == nil {
+				summed[ruleName] = map[string]int{}
+			}
+			for key, count := range counts {
+				summed[ruleName][key] += count
+			}
+		}
+	}
+	return summed
+}
+
+// writeRuleNotes lists what each rule counted rather than reported, by rule and then by key, each with
+// its count over the run. A `@processState` tag lands here as the type and how many writes it exempted,
+// so a tag on a widely used type shows up as a number someone reads rather than as a silence.
+func writeRuleNotes(out io.Writer, notes map[string]map[string]int) {
+	ruleNames := make([]string, 0, len(notes))
+	total := 0
+	for ruleName, counts := range notes {
+		ruleNames = append(ruleNames, ruleName)
+		for _, count := range counts {
+			total += count
+		}
+	}
+	sort.Strings(ruleNames)
+	fmt.Fprintf(out, "  notes (%d): what rules counted rather than reported\n", total)
+	for _, ruleName := range ruleNames {
+		fmt.Fprintf(out, "    %s\n", ruleName)
+		keys := make([]string, 0, len(notes[ruleName]))
+		for key := range notes[ruleName] {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			fmt.Fprintf(out, "      %s: %d\n", key, notes[ruleName][key])
+		}
+	}
 }
 
 // writeDeadSuppressions names each disable comment that silenced nothing while a rule it names ran,
@@ -577,6 +626,7 @@ func writeLintReport(out io.Writer, report lintReport) {
 	)
 
 	summary := classifyTypeScriptCoverage(report.Rules, coverage, report.LintConfig)
+	summary.Notes = sumRuleNotes(report.Result.Notes)
 	fmt.Fprintln(out, summary.coverageCountedLine())
 	fmt.Fprintln(out, summary.coverageFilesLine(report.Details))
 	writeParityCoverage(out, report.Rules, report.LintConfig)

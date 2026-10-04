@@ -552,3 +552,34 @@ func TestAnOffPrintsItsReasonAndAnUnreasonedOffPrintsByDefault(t *testing.T) {
 		"    no-continue (40 files, off with no reason, so it reads as an allowance)\n",
 	)
 }
+
+// What rules counted rather than reported is listed under `--coverage`, summed across files and sorted
+// by rule and key, so a `@processState` tag reads as its type and how many writes it exempted (#dz42gce).
+// A default run counts and names nothing of it: it is a fact to read, not an action.
+func TestCoverageListsWhatRulesNoted(t *testing.T) {
+	coverage := program.Coverage{
+		RulesOffered:   map[string]int{"nexus/correctness-no-caller-data-mutation": 2},
+		RulesListening: map[string]int{"nexus/correctness-no-caller-data-mutation": 2},
+	}
+	result := program.Result{
+		Coverage: coverage,
+		Notes: map[string]program.RuleNotes{
+			"/project/Hub.ts":    {"nexus/correctness-no-caller-data-mutation": {"HubInterface in /project/Hub.ts": 3}},
+			"/project/Helper.ts": {"nexus/correctness-no-caller-data-mutation": {"HubInterface in /project/Hub.ts": 2, "AnotherHubInterface in /project/Another.ts": 1}},
+		},
+	}
+	rules := []rule.Rule{{Name: "nexus/correctness-no-caller-data-mutation"}}
+
+	detailed := renderLintReport(lintReport{Result: result, Rules: rules, WalkCost: "in 1s", Details: true})
+	requireLines(t, detailed,
+		"  notes (6): what rules counted rather than reported\n"+
+			"    nexus/correctness-no-caller-data-mutation\n"+
+			"      AnotherHubInterface in /project/Another.ts: 1\n"+
+			"      HubInterface in /project/Hub.ts: 5\n",
+	)
+
+	plain := renderLintReport(lintReport{Result: result, Rules: rules, WalkCost: "in 1s"})
+	if strings.Contains(plain, "notes (") {
+		t.Errorf("a default run listed notes:\n%s", plain)
+	}
+}
