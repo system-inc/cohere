@@ -14044,7 +14044,7 @@
             "namespace": "structure",
             "origin": "house",
             "category": "consistency",
-            "typeAware": false,
+            "typeAware": true,
             "messageIds": [
                 "noPropertyAlias"
             ],

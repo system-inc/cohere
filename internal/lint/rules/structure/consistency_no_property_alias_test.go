@@ -8,6 +8,9 @@ import (
 
 const propertyAliasFile = "/repository/source/Thing.ts"
 
+// Every case runs through the typed harness, because four exemptions ask the checker and production
+// always has one.
+//
 // The first two cases are the shapes of the only two live violations in the ahra tree, both of
 // which carry an `eslint-disable-next-line` for this rule. They are the closest thing to an answer
 // key this rule has: it is ours, so there is no upstream corpus, and the tree reports zero findings
@@ -22,10 +25,6 @@ func TestConsistencyNoPropertyAliasFires(t *testing.T) {
 	}{
 		{"the real Run.ts shape", "export function run(options: OptionsInterface) {\n    const onOutputLine = options.onOutputLine;\n    return onOutputLine;\n}\n"},
 		{"the real TrackedPromise shape", "export function run(tracked: TrackedInterface) {\n    const promise = tracked.promise;\n    return promise;\n}\n"},
-		// The Run.ts shape, where the reach is through a cast. The cast is the reason the alias
-		// exists (it narrows once for four later reads), which is why the site carries a disable
-		// comment rather than being rewritten, and it must still be seen as an alias.
-		{"a reach through a cast", "export function run(options: OptionsInterface) {\n    const onOutputLine = (options as ProgramOptionsInterface).onOutputLine;\n    return onOutputLine;\n}\n"},
 		{"a nested reach", "export function run(state: StateInterface) {\n    const value = state.inner.value;\n    return value;\n}\n"},
 		{"a long reach with no call anywhere in it", "export function run(a: AInterface) {\n    const value = a.one.two.three.value;\n    return value;\n}\n"},
 		{"inside an arrow function", "export const Run = (options: OptionsInterface) => {\n    const timeout = options.timeout;\n    return timeout;\n};\n"},
@@ -44,11 +43,24 @@ func TestConsistencyNoPropertyAliasFires(t *testing.T) {
 		{"a different property is written", "export class Runner {\n    server: ServerInterface | undefined;\n    other: number = 0;\n    stop() {\n        const server = this.server;\n        this.other = 1;\n        close(server);\n    }\n}\n"},
 		{"a longer reach through the local is written", "export function run(state: StateInterface) {\n    const inner = state.inner;\n    state.inner.value = 1;\n    return inner;\n}\n"},
 		{"a let only read", "export function run(options: OptionsInterface) {\n    let label = options.label;\n    use(label);\n    return label;\n}\n"},
+		// The four of #r28b8he, from the side that must still report: a plain property is not a
+		// getter, a local read only in its own function keeps no narrowing a closure would lose, a
+		// narrowed local read nowhere nested is still an alias, and an annotation naming the
+		// source's own type does no work.
+		{"a plain property, not a getter", "class Account {\n    email = '';\n}\nexport function run(account: Account) {\n    const email = account.email;\n    return email;\n}\n"},
+		{"read in a closure with no narrowing", "class Runner {\n    server: { close(): void } | undefined;\n    stop(queue: (callback: () => void) => void) {\n        const server = this.server;\n        queue(function() {\n            use(server);\n        });\n    }\n}\ndeclare function use(value: unknown): void;\nexport { Runner };\n"},
+		{"narrowed but read only in its own function", "class Runner {\n    server: { close(): void } | undefined;\n    stop() {\n        if(this.server) {\n            const server = this.server;\n            server.close();\n        }\n    }\n}\nexport { Runner };\n"},
+		{"an annotation naming the source's own type", "interface Options {\n    timeout: number;\n}\nexport function run(options: Options) {\n    const timeout: number = options.timeout;\n    return timeout;\n}\n"},
+		// A member name that shares the local's spelling is not the local (#r28b8he). Each of these was
+		// read as one by a walk matching names, which exempted an alias the reach replaces exactly.
+		{"a closure reads the property, not the narrowed local", "class Runner {\n    server: { close(): void } | undefined;\n    stop(queue: (callback: () => void) => void) {\n        if(this.server) {\n            const server = this.server;\n            server.close();\n            queue(() => use(this.server));\n        }\n    }\n}\ndeclare function use(value: unknown): void;\nexport { Runner };\n"},
+		{"a later read of the property is not a read of the snapshot", "class Runner {\n    httpServer: { close(): void } | undefined;\n    stop() {\n        const httpServer = this.httpServer;\n        use(httpServer);\n        this.httpServer = undefined;\n        use(this.httpServer);\n    }\n}\ndeclare function use(value: unknown): void;\nexport { Runner };\n"},
+		{"a dependency array naming another object's property of that name", "export function run(options: OptionsInterface, other: OptionsInterface) {\n    const secret = options.secret;\n    useMemo(function() {\n        return 1;\n    }, [other.secret]);\n    return secret;\n}\n"},
 		{"an array argument to something that is not a hook", "export function run(options: OptionsInterface) {\n    const secret = options.secret;\n    notAHook(function() {\n        return 1;\n    }, [secret]);\n    return secret;\n}\n"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ConsistencyNoPropertyAlias, propertyAliasFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, ConsistencyNoPropertyAlias, propertyAliasFile, testCase.sourceText),
 				"noPropertyAlias")
 		})
 	}
@@ -110,6 +122,17 @@ func TestConsistencyNoPropertyAliasStaysSilent(t *testing.T) {
 		{"a let updated by a compound assignment", "export function run(options: OptionsInterface) {\n    let total = options.total;\n    total += 1;\n    return total;\n}\n"},
 		{"a let written by destructuring", "export function run(options: OptionsInterface) {\n    let cursor = options.cursor;\n    [cursor] = next();\n    return cursor;\n}\n"},
 		{"a var reassigned", "export function run(options: OptionsInterface) {\n    var limit = options.limit;\n    limit = 10;\n    return limit;\n}\n"},
+		// The four of #r28b8he, locals the function makes.
+		// A cast in the chain is a narrowed binding; this was the Run.ts shape, which reported and
+		// carried a disable comment until the ruling on #zh8mpvp.
+		{"a reach through a cast", "export function run(options: OptionsInterface) {\n    const onOutputLine = (options as ProgramOptionsInterface).onOutputLine;\n    return onOutputLine;\n}\n"},
+		{"a reach through an angle-bracket cast, deeper", "export function run(value: unknown) {\n    const size = (<ShapeInterface>value).inner.size;\n    return size;\n}\n"},
+		{"a getter source", "class Account {\n    get email() {\n        return 'a@b.c';\n    }\n}\nexport function run(account: Account) {\n    const email = account.email;\n    return email;\n}\n"},
+		{"a getter above the property", "class Configuration {\n    get runtime() {\n        return { mode: 'test' };\n    }\n}\nexport function run(configuration: Configuration) {\n    const mode = configuration.runtime.mode;\n    return mode;\n}\n"},
+		{"a narrowing a closure would lose", "class Runner {\n    server: { close(): void } | undefined;\n    stop(queue: (callback: () => void) => void) {\n        if(this.server) {\n            const server = this.server;\n            queue(function() {\n                server.close();\n            });\n        }\n    }\n}\nexport { Runner };\n"},
+		{"a narrowing of an object above, read in an arrow", "interface Holder {\n    inner?: { value: number };\n}\nexport function run(holder: Holder, queue: (callback: () => void) => void) {\n    if(holder.inner) {\n        const value = holder.inner.value;\n        queue(() => use(value));\n    }\n}\ndeclare function use(value: unknown): void;\n"},
+		{"an annotation widening to unknown", "interface Event {\n    data: any;\n}\nexport function run(event: Event) {\n    const data: unknown = event.data;\n    return data;\n}\n"},
+		{"an annotation giving a readonly view", "interface Registry {\n    modules: string[];\n}\nexport function run(registry: Registry) {\n    const modules: readonly string[] = registry.modules;\n    return modules;\n}\n"},
 		{"read in a useEffect dependency array", "export function run(options: OptionsInterface) {\n    const timeout = options.timeout;\n    React.useEffect(function() {\n        report(timeout);\n    }, [timeout]);\n}\n"},
 		{"read in a bare hook dependency array", "export function run(options: OptionsInterface) {\n    const timeout = options.timeout;\n    useMemo(function() {\n        return timeout;\n    }, [timeout]);\n}\n"},
 		{"read inside a longer reach in a dependency array", "export function run(options: OptionsInterface) {\n    const settings = options.settings;\n    useMemo(function() {\n        return 1;\n    }, [settings.value]);\n}\n"},
@@ -118,7 +141,7 @@ func TestConsistencyNoPropertyAliasStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistencyNoPropertyAlias, propertyAliasFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, ConsistencyNoPropertyAlias, propertyAliasFile, testCase.sourceText))
 		})
 	}
 }

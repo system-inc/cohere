@@ -21,7 +21,7 @@ var consistencyNoPropertyAliasText = policy.MessageOf("structure/consistency-no-
 //	valid:   const Foo = Bar.Foo              // module scope, a re-export shape rather than an alias
 //	invalid: function run() { const promise = tracked.promise; return promise; }
 //
-// Six exemptions, each of which is a real judgment rather than a narrowing for safety.
+// Ten exemptions, each of which is a real judgment rather than a narrowing for safety.
 //
 // **A chain containing a call is caching, not aliasing.** `Intl.DateTimeFormat().resolvedOptions()`
 // costs something to evaluate, so a local holding its result is doing work a reach would repeat.
@@ -54,8 +54,34 @@ var consistencyNoPropertyAliasText = policy.MessageOf("structure/consistency-no-
 //
 // Both read names, not symbols, within the enclosing function, as the hook exemption does, so a
 // nested binding of the same name counts too. Structure's ESLint twin decides the same two.
+//
+// Four more are locals the function makes, which Reach Over Alias allows, ruled on api's report
+// for #zh8mpvp and ported in #r28b8he. Three of them ask the checker, which is why the rule declares
+// it; without one they cannot be told apart from an alias, and it reports.
+//
+// **A cast in the chain is a narrowed binding.** `const cause = (error as RpcError).cause`: a reach
+// would repeat the cast at every read, and whether the cast should exist is
+// no-unsafe-type-assertion's question, not this one's (9 sites).
+//
+// **A getter in the chain computes.** `const email = account.email` over `get email()` runs the
+// getter once; a reach runs it at every read and may not get the same value back. A getter anywhere
+// in the chain counts, so `configuration.runtime.mode` over `get runtime()` does too (21 sites).
+//
+// **A narrowing the local keeps and a closure would lose.** After `if (this.server)`, the local
+// `server` is the narrowed type, and a callback reading `this.server` sees the declared type again,
+// because TypeScript drops a property path's narrowing inside a function. Exempt when the local is
+// read inside a nested function and a property link of the chain has a type at the declaration other
+// than its declared one (5 sites).
+//
+// **An annotation that does work.** `const value: unknown = event.data` over a DOM `any`, or a
+// `readonly` view of a mutable list, gives the local a type the reach does not have. Exempt when the
+// local's annotated type differs from its initializer's (3 sites).
 var ConsistencyNoPropertyAlias = rule.Rule{
 	Name: "structure/consistency-no-property-alias",
+	// Asked whether a link is a getter, what a link's declared and narrowed types are, and what an
+	// annotation names. The getter question reads an imported declaration, so the findings key on the
+	// closure's contents, the default; the release guard refuses a shapes claim here.
+	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableDeclaration: func(node *ast.Node) {
@@ -122,6 +148,23 @@ var ConsistencyNoPropertyAlias = rule.Rule{
 
 				if isSnapshotTakenBeforeItsSourceIsWritten(enclosing, node, localName, name, initializer) {
 					return
+				}
+
+				if chainContainsTypeAssertion(access.Expression) {
+					return
+				}
+
+				if ctx.TypeChecker != nil {
+					if chainReadsAGetter(ctx, initializer) {
+						return
+					}
+					if isReadInsideANestedFunction(enclosing, localName, name) && chainIsNarrowed(ctx, initializer) {
+						return
+					}
+					if declaration.Type != nil &&
+						ctx.TypeChecker.GetTypeFromTypeNode(declaration.Type) != ctx.TypeChecker.GetTypeAtLocation(initializer) {
+						return
+					}
 				}
 
 				sourceText := rule.TokenRange(ctx.SourceFile, access.Expression)
@@ -250,7 +293,7 @@ func arrayMentions(array *ast.Node, localName string, declarationName *ast.Node)
 		if node == nil || mentioned {
 			return false
 		}
-		if node.Kind == ast.KindIdentifier && node != declarationName && node.Text() == localName {
+		if referencesTheLocal(node, localName, declarationName) {
 			mentioned = true
 			return true
 		}
@@ -271,8 +314,7 @@ func isWrittenAfterItsDeclaration(enclosing *ast.Node, localName string, declara
 		if node == nil || written {
 			return false
 		}
-		if node.Kind == ast.KindIdentifier && node != declarationName && node.Text() == localName &&
-			reference.WritesToBinding(node) {
+		if referencesTheLocal(node, localName, declarationName) && reference.WritesToBinding(node) {
 			written = true
 			return true
 		}
@@ -297,8 +339,8 @@ func isSnapshotTakenBeforeItsSourceIsWritten(enclosing *ast.Node, declaration *a
 		if node == nil {
 			return false
 		}
-		if node.Kind == ast.KindIdentifier && node != declarationName && node.Text() == localName &&
-			!reference.WritesToBinding(node) && node.End() > lastRead {
+		if referencesTheLocal(node, localName, declarationName) && !reference.WritesToBinding(node) &&
+			node.End() > lastRead {
 			lastRead = node.End()
 		}
 		node.ForEachChild(findLastRead)
@@ -397,4 +439,115 @@ func sameReach(first *ast.Node, second *ast.Node) bool {
 			sameReach(first.AsPropertyAccessExpression().Expression, second.AsPropertyAccessExpression().Expression)
 	}
 	return false
+}
+
+// chainContainsTypeAssertion reports whether the object side of a reach casts, at any depth:
+// `(error as RpcError).cause`, `(<Shape>value).inner.size`.
+func chainContainsTypeAssertion(expression *ast.Node) bool {
+	for current := expression; current != nil; {
+		switch current.Kind {
+		case ast.KindAsExpression, ast.KindTypeAssertionExpression:
+			return true
+		case ast.KindPropertyAccessExpression:
+			current = current.AsPropertyAccessExpression().Expression
+		case ast.KindElementAccessExpression:
+			current = current.AsElementAccessExpression().Expression
+		case ast.KindParenthesizedExpression, ast.KindNonNullExpression:
+			current = current.Expression()
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+// propertyLinks is the reach and every property access above it, through what does not change the
+// value reached.
+func propertyLinks(initializer *ast.Node) []*ast.Node {
+	var links []*ast.Node
+	for current := unwrapReach(initializer); current != nil && current.Kind == ast.KindPropertyAccessExpression; {
+		links = append(links, current)
+		current = unwrapReach(current.AsPropertyAccessExpression().Expression)
+	}
+	return links
+}
+
+// chainReadsAGetter reports whether a property link of the reach resolves to a get accessor.
+func chainReadsAGetter(ctx rule.Context, initializer *ast.Node) bool {
+	for _, link := range propertyLinks(initializer) {
+		symbol := ctx.TypeChecker.GetSymbolAtLocation(link.AsPropertyAccessExpression().Name())
+		if symbol == nil {
+			continue
+		}
+		if symbol.Flags&ast.SymbolFlagsGetAccessor != 0 {
+			return true
+		}
+		for _, declaration := range symbol.Declarations {
+			if declaration.Kind == ast.KindGetAccessor {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// chainIsNarrowed reports whether a property link of the reach has a type at the declaration other
+// than its declared type, which is a narrowing a closure reading the link would not see.
+func chainIsNarrowed(ctx rule.Context, initializer *ast.Node) bool {
+	for _, link := range propertyLinks(initializer) {
+		symbol := ctx.TypeChecker.GetSymbolAtLocation(link.AsPropertyAccessExpression().Name())
+		if symbol == nil {
+			continue
+		}
+		if ctx.TypeChecker.GetTypeOfSymbol(symbol) != ctx.TypeChecker.GetTypeAtLocation(link) {
+			return true
+		}
+	}
+	return false
+}
+
+// isReadInsideANestedFunction reports whether the local is read inside a function within the one
+// that declares it.
+func isReadInsideANestedFunction(enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
+	found := false
+	var walk func(node *ast.Node) bool
+	walk = func(node *ast.Node) bool {
+		if node == nil || found {
+			return false
+		}
+		if referencesTheLocal(node, localName, declarationName) && !reference.WritesToBinding(node) &&
+			scope.EnclosingFunctionLike(node) != enclosing {
+			found = true
+			return true
+		}
+		node.ForEachChild(walk)
+		return found
+	}
+	walk(enclosing)
+	return found
+}
+
+// referencesTheLocal reports whether an identifier is a reference by the local's name: not the
+// declaration itself, and not a name that only shares the spelling, which is the name half of a
+// member access (`this.server`), a declaration's own name, or a destructuring key. A shorthand
+// property (`{ server }`) reads the binding and counts.
+//
+// Names, not symbols, within the enclosing function, as every walk in this rule reads them. Without
+// the member-name test a later `this.server` stood in for a read of a local `server`, which could
+// exempt an alias the reach would replace exactly (#r28b8he).
+func referencesTheLocal(node *ast.Node, localName string, declarationName *ast.Node) bool {
+	if node.Kind != ast.KindIdentifier || node == declarationName || node.Text() != localName {
+		return false
+	}
+	parent := node.Parent
+	if parent == nil || parent.Kind == ast.KindShorthandPropertyAssignment {
+		return true
+	}
+	if parent.Name() == node {
+		return false
+	}
+	if parent.Kind == ast.KindBindingElement && parent.AsBindingElement().PropertyName == node {
+		return false
+	}
+	return true
 }
