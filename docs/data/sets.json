@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 288,
+        "rulesOn": 289,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -663,6 +663,10 @@
             },
             {
                 "name": "nexus/consistency-no-multiline-arrow-function",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-no-property-alias",
                 "severity": "error"
             },
             {
@@ -1466,7 +1470,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 354,
+        "rulesOn": 355,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2034,6 +2038,10 @@
             },
             {
                 "name": "nexus/consistency-no-multiline-arrow-function",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-no-property-alias",
                 "severity": "error"
             },
             {
@@ -3193,7 +3201,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 284,
+        "rulesOn": 285,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -4004,6 +4012,10 @@
             },
             {
                 "name": "nexus/consistency-no-multiline-arrow-function",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-no-property-alias",
                 "severity": "error"
             },
             {
@@ -6526,7 +6538,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 278,
+        "rulesOn": 279,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -7142,6 +7154,10 @@
             },
             {
                 "name": "nexus/consistency-no-multiline-arrow-function",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-no-property-alias",
                 "severity": "error"
             },
             {
@@ -7938,7 +7954,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 266,
+        "rulesOn": 267,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8506,6 +8522,10 @@
             },
             {
                 "name": "nexus/consistency-no-multiline-arrow-function",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-no-property-alias",
                 "severity": "error"
             },
             {

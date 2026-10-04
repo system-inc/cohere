@@ -52,7 +52,6 @@
             }
         ],
         "structure/boundary-no-project-theme-value": "error",
-        "nexus/consistency-no-property-alias": "error",
         "structure/consistency-require-organized-imports": "error",
         "structure/network-no-direct-fetch": "error",
         "structure/network-no-forbidden-import": "error",
