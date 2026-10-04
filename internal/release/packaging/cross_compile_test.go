@@ -11,8 +11,8 @@ import (
 )
 
 // crossCompileVariable chooses how TestEveryReleaseTargetCompiles proves the targets. Unset, it
-// type-checks cohere for each one from source. Set to "build", it builds each one as the release does,
-// which release.yml sets.
+// type-checks cohere for each one from source, here and in release.yml. Set to "build", it builds each one
+// as the release does, for whoever wants that proof from a test.
 //
 // Measured on private caches (#nkbfkvn), for all six targets: building costs 17.1 GB of Go cache cold,
 // and 5.5 GB more after one real line in internal/lint/rule, because every package that imports it
@@ -23,7 +23,9 @@ import (
 //
 // Type-checking catches what the Windows break was, a call to something one platform does not define,
 // and any type error in a file only one platform compiles. What only a build catches, a link-time
-// failure, is left to the build release.yml runs.
+// failure, is left to release.yml's staging, which builds all six right after its tests and fails on
+// any that does not build. Asking the test to build them there as well cost a three-core runner 600
+// seconds and a timeout (dry run 37238149770), for a proof staging gives anyway.
 const crossCompileVariable = "COHERE_CROSS_COMPILE"
 
 // TestEveryReleaseTargetCompiles builds cohere for every platform a release ships, so a target that
@@ -38,8 +40,8 @@ const crossCompileVariable = "COHERE_CROSS_COMPILE"
 // dropped or renamed platform stops being checked without anything failing. It compiles through
 // goBuildCommand, the same command the release runs, for the same reason.
 //
-// Locally it type-checks rather than builds, and release.yml asks for the build; crossCompileVariable
-// says why, with the measurements. `-short` skips it for a quick local loop and says so.
+// It type-checks rather than builds, locally and in release.yml; crossCompileVariable says why, with the
+// measurements. `-short` skips it for a quick local loop and says so.
 func TestEveryReleaseTargetCompiles(t *testing.T) {
 	t.Parallel()
 

@@ -43,9 +43,10 @@ jobs:
         # macos-26 for Xcode 26 and Swift 6.3, the oldest stable toolchain the engine's Package.swift
         # (tools 6.2) builds with. Never the xcode-27 preview image: a release is not built on a beta.
         runs-on: macos-26
-        # Two cold Swift engine builds, one per Mac architecture, took 16 and 13 minutes on an M-series
-        # desk machine, and a runner is slower. 45 was sized for the Go cross-compile alone.
-        timeout-minutes: 90
+        # The module check, then two cold Swift engine builds (16 and 13 minutes on an M-series desk
+        # machine, and a runner is slower), then the proofs. The dry run 37238149770 spent 34 minutes in
+        # the module check alone before its tests hit Go's default timeout, so 90 left no room.
+        timeout-minutes: 150
 
         # Secrets are lifted to job-level environment variables because the `secrets` context is not
         # available in an `if:` conditional — referencing it there is a parse-time error
@@ -82,11 +83,10 @@ jobs:
               # A release is not the place to discover a formatting or vet failure. These are the
               # same checks the repository is gated by, run first so a bad tree never reaches the
               # signing keys.
-              env:
-                  # The cross-compile guard builds every release target here, where a link-time failure
-                  # would otherwise first show up in the release itself. A local `go test` only
-                  # type-checks them, which costs no build cache (#nkbfkvn).
-                  COHERE_CROSS_COMPILE: build
+              # The cross-compile guard only type-checks the targets here, as it does locally. The build
+              # proof is "Stage every platform package", which builds all six right after and fails the
+              # job on any that does not build, so building them inside a test as well cost the runner
+              # 600 seconds for nothing (dry run 37238149770).
               run: |
                   # Prove the check looked at something before trusting that it found nothing.
                   #
@@ -124,7 +124,10 @@ jobs:
                   fi
 
                   go vet ./command/... ./internal/...
-                  go test ./command/... ./internal/...
+                  # Go's default is 10 minutes per package, and on the runner five packages passed it in
+                  # dry run 37238149770 (the slowest, command/cohere, takes 4.5 minutes on a 16-core
+                  # desk machine). 30 minutes is room for a three-core runner, and still a ceiling.
+                  go test -timeout 30m ./command/... ./internal/...
 
             - name: Import the signing certificate
               # Skipped when the secret is absent, so a fork or a contributor without credentials
