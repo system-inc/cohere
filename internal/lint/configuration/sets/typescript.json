@@ -433,7 +433,7 @@
         "guard-for-in": "nexus/consistency-no-for-in bans for...in outright, guarded or not, so there is no loop left for this rule to guard.",
         "no-invalid-this": "@typescript-eslint/no-invalid-this, on here, is the same rule taught TypeScript's this parameters.",
         "require-atomic-updates": "It flags any write after an await to something read before it, and on ahra none of its 39 findings was a read-modify-write. nexus/concurrency-no-lost-update replaces it, firing only when the written value is computed from the same location read before the suspension.",
-        "no-loop-func": "Block-scoped let and const already give each iteration its own binding, and no-var forbids the var that shared one, so the bug it guards is a var-era one.",
+        "no-loop-func": "It cannot tell a closure that runs inside the iteration from one that runs after it, or a flag shared on purpose from a stale capture: of 15 findings across ahra and api (11 and 4), none was a defect, and no-var already removes the var-era form (#bchhqdc).",
         "@typescript-eslint/no-dynamic-delete": "Taste wearing a correctness badge: TypeScript already owns the real hazard.",
         "@typescript-eslint/prefer-enum-initializers": "nexus/consistency-no-enum bans enums, so this could only fire inside a construct already refused.",
         "@typescript-eslint/prefer-literal-enum-member": "nexus/consistency-no-enum bans enums, so this could only fire inside a construct already refused.",
