@@ -9,8 +9,8 @@ enum RuleMessages {
         let text: String
     }
 
-    /* SHA-256 of every .json file in policy/messages/, each one's name and bytes in name order, which a test recomputes from the files on disk. */
-    static let sourceDigest = "d28da0c00bc1a87047dd92a2ac7e27681e6f03573c74421e81ef1f3b79647996"
+    /* SHA-256 of the messages that reach Swift, resolved, which a test recomputes from policy/messages/ on disk. */
+    static let sourceDigest = "9abd5925ed7a50524ebad3a534997cad0a005e94ed2285bb68fa1936e5c72ae8"
 
     /* Every message here, as `Rule.id`, for the test that fails on one no rule renders. */
     static let all = [

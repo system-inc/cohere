@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"io/fs"
 	"sort"
 	"strings"
 )
@@ -20,13 +19,14 @@ import (
 // its choice at the call.
 //
 // What drifts is caught twice: TestSwiftFilesAreCurrent here, and a Swift test that recomputes
-// RuleMessages.sourceDigest from policy/messages/ on disk.
+// RuleMessages.sourceDigest from policy/messages/ on disk. The digest covers only what reaches Swift
+// (swiftMessagesDigest), so a TypeScript-only edit leaves the generated file alone.
 
 // swiftLineLength is the house Swift format's line length (HouseSwiftFormat.swift).
 const swiftLineLength = 120
 
-// swiftMessagesSource is RuleMessages.generated.swift for the catalog, carrying digest as the files it
-// was read from.
+// swiftMessagesSource is RuleMessages.generated.swift for the catalog, carrying digest as what it was
+// generated from.
 func swiftMessagesSource(catalog *MessageCatalog, digest string) ([]byte, error) {
 	type rule struct {
 		name     string
@@ -54,7 +54,7 @@ func swiftMessagesSource(catalog *MessageCatalog, digest string) ([]byte, error)
 	source.WriteString("enum RuleMessages {\n")
 	source.WriteString("    /* A finding's message: the id the catalog files it under, and its text. */\n")
 	source.WriteString("    struct Message: Equatable, Sendable {\n        let id: String\n        let text: String\n    }\n\n")
-	source.WriteString("    /* SHA-256 of every .json file in policy/messages/, each one's name and bytes in name order, which a test recomputes from the files on disk. */\n")
+	source.WriteString("    /* SHA-256 of the messages that reach Swift, resolved, which a test recomputes from policy/messages/ on disk. */\n")
 	fmt.Fprintf(&source, "    static let sourceDigest = \"%s\"\n\n", digest)
 	source.WriteString("    /* Every message here, as `Rule.id`, for the test that fails on one no rule renders. */\n")
 	var entries []string
@@ -263,25 +263,54 @@ func pascalCase(name string) string {
 	return result.String()
 }
 
-// messagesDigest is SHA-256 over every `.json` file at the root of files, each file's name, a zero
-// byte, its bytes and a zero byte, in name order: what RuleMessages.sourceDigest records and the Swift
-// test recomputes.
-func messagesDigest(files fs.FS) (string, error) {
-	names, err := fs.Glob(files, "*.json")
-	if err != nil {
-		return "", err
-	}
-	sort.Strings(names)
-	hash := sha256.New()
-	for _, name := range names {
-		data, err := fs.ReadFile(files, name)
-		if err != nil {
-			return "", err
+// swiftMessagesDigest is SHA-256 over what reaches Swift and nothing else, so a TypeScript-only edit
+// leaves RuleMessages.generated.swift byte-identical. For each Swift rule in name order, and each of its
+// messages in id order: the rule, the id and the resolved text (its Swift terms and string phrases in
+// place), then each object phrase the text picks from, in name order, as `<<name>>` and each option's
+// name and text in name order. Every field ends with a zero byte. The Swift test resolves the files on
+// disk the same way and compares.
+func swiftMessagesDigest(catalog *MessageCatalog) string {
+	var rules []string
+	for ruleName, language := range catalog.languages {
+		if language == MessageLanguageSwift {
+			rules = append(rules, ruleName)
 		}
-		hash.Write([]byte(name))
-		hash.Write([]byte{0})
-		hash.Write(data)
+	}
+	sort.Strings(rules)
+	hash := sha256.New()
+	field := func(text string) {
+		hash.Write([]byte(text))
 		hash.Write([]byte{0})
 	}
-	return hex.EncodeToString(hash.Sum(nil)), nil
+	for _, ruleName := range rules {
+		ids := make([]string, 0, len(catalog.templates[ruleName]))
+		for id := range catalog.templates[ruleName] {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		for _, id := range ids {
+			template := catalog.templates[ruleName][id]
+			field(ruleName)
+			field(id)
+			field(template.text)
+			phrases := make([]string, 0, len(template.options))
+			for phrase := range template.options {
+				phrases = append(phrases, phrase)
+			}
+			sort.Strings(phrases)
+			for _, phrase := range phrases {
+				field("<<" + phrase + ">>")
+				options := make([]string, 0, len(template.options[phrase]))
+				for name := range template.options[phrase] {
+					options = append(options, name)
+				}
+				sort.Strings(options)
+				for _, name := range options {
+					field(name)
+					field(template.options[phrase][name])
+				}
+			}
+		}
+	}
+	return hex.EncodeToString(hash.Sum(nil))
 }
