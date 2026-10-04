@@ -14,18 +14,20 @@ var topLevelDescriptions = map[string]string{
 		"configuration and a project states only what differs. A base two entries share is read once, " +
 		"outermost.",
 
-	"rules": "Each rule's severity, or [severity, ...options] for a rule that takes options. A rule this file " +
-		"sets differently from the file it extends must be named under departures with the reason, and a rule " +
-		"it turns off otherwise says why under reasons.",
+	"rules": "Each rule's severity, or [severity, ...options] for a rule that takes options. Inside our tiers (a " +
+		"chain extending a cohere:system-inc set), a rule this file sets differently from the file it extends must be " +
+		"named under departures with the reason, and a rule it turns off otherwise says why under reasons. Outside " +
+		"them, turning a rule off needs no reason, and coverage counts each unreasoned off by rule.",
 
 	"departures": "For each rule this file sets differently from the file it extends, the reason why, in a " +
-		"sentence. cohere reports every departure on every run, so it stays visible rather than becoming a " +
-		"quiet exception. An entry that departs from nothing is refused.",
+		"sentence. Required inside our tiers, optional outside them. cohere reports every departure on every run, " +
+		"so it stays visible rather than becoming a quiet exception. An entry that departs from nothing is refused.",
 
-	"reasons": "For each rule this file turns off in its own rules, why, in a sentence. cohere prints the reason " +
-		"beside the rule wherever coverage names it, so an off reads as a decision rather than an allowance, and " +
-		"refuses to load an off no file explains. An off that departs from the file it extends says why under " +
-		"departures instead. An entry for a rule this file does not turn off is refused.",
+	"reasons": "For each rule this file turns off in its own rules, why, in a sentence. Required inside our tiers, " +
+		"where cohere refuses to load an off no file explains, and optional outside them. cohere prints the reason " +
+		"beside the rule wherever coverage names it, so an off reads as a decision rather than an allowance. An off " +
+		"that departs from the file it extends says why under departures instead. An entry for a rule this file " +
+		"does not turn off is refused.",
 
 	"overrides": "Blocks that change rules for the paths their globs match, applied in order after the base " +
 		"rules, a later block winning.",
@@ -48,10 +50,12 @@ var topLevelDescriptions = map[string]string{
 	"settings": "Per-plugin settings carried for the JavaScript tools that still read this file. Allowed only " +
 		"in the file cohere reads first, never in a file another extends, and nothing in cohere reads it.",
 
-	FormatKey: "The formatter's options and the house ignore list. Only the Nexus tier holds this block, " +
-		formatoptions.NexusTierFileName + " or the rule set cohere carries as " + formatoptions.NexusTierSetName +
-		": a format key in any other settings file is refused, naming the file, so every repository formats " +
-		"the same way. An option outside this list is refused rather than ignored.",
+	FormatKey: "The formatter's options and the house ignore list. With no block anywhere in the chain, cohere " +
+		"formats with the house block " + formatoptions.NexusTierSetName + " carries. Outside our tiers, the most " +
+		"derived settings file with a block decides, applied over Prettier's defaults, so {} means Prettier's " +
+		"defaults, and its ignore replaces the house list when it has one. In a chain extending a cohere:system-inc " +
+		"set, only the Nexus tier holds this block, and a format key in any other file is refused, naming the file. " +
+		"An option outside this list is refused rather than ignored.",
 }
 
 var overrideDescriptions = map[string]string{
