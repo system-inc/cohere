@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 276,
+        "rulesOn": 277,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -705,6 +705,10 @@
             },
             {
                 "name": "nexus/correctness-no-identical-branches",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-import-cycle-load-time-read",
                 "severity": "error"
             },
             {
@@ -1436,7 +1440,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 340,
+        "rulesOn": 341,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2046,6 +2050,10 @@
             },
             {
                 "name": "nexus/correctness-no-identical-branches",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-import-cycle-load-time-read",
                 "severity": "error"
             },
             {
@@ -3129,7 +3137,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 272,
+        "rulesOn": 273,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -3989,6 +3997,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-no-import-cycle-load-time-read",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/correctness-no-leaked-number-render",
                 "severity": "error"
             },
@@ -4819,7 +4831,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 282,
+        "rulesOn": 283,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5550,6 +5562,10 @@
             },
             {
                 "name": "nexus/correctness-no-identical-branches",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-import-cycle-load-time-read",
                 "severity": "error"
             },
             {
@@ -6410,7 +6426,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 266,
+        "rulesOn": 267,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -7068,6 +7084,10 @@
             },
             {
                 "name": "nexus/correctness-no-identical-branches",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-import-cycle-load-time-read",
                 "severity": "error"
             },
             {
@@ -7792,7 +7812,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 254,
+        "rulesOn": 255,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8402,6 +8422,10 @@
             },
             {
                 "name": "nexus/correctness-no-identical-branches",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-import-cycle-load-time-read",
                 "severity": "error"
             },
             {
