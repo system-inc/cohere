@@ -127,3 +127,30 @@ func TestOneEditReachesBothEngines(t *testing.T) {
 		t.Errorf("the Swift function does not carry the edit:\n%s", source)
 	}
 }
+
+// TestALongSignatureTakesOneParameterToALine: past the house format's 120 columns, the signature breaks
+// as the format breaks it, so the formatter leaves the generated file as written.
+func TestALongSignatureTakesOneParameterToALine(t *testing.T) {
+	catalog, err := LoadMessages(fstest.MapFS{"consistency-no-thing.json": {Data: []byte(`{
+  "rules": { "Swift": "cohere-swift/consistency-no-thing" },
+  "messages": {
+    "thing": { "text": "{{target}} lacks {{features}}; add {{settings}} because {{reasons}}, {{explanation}}." },
+    "short": { "text": "{{target}} is short." }
+  }
+}`)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := swiftMessagesSource(catalog, "digest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"        static func thing(\n            target: String,\n            features: String,\n            settings: String,\n            reasons: String,\n            explanation: String,\n        ) -> Message {",
+		"        static func short(target: String) -> Message {",
+	} {
+		if !strings.Contains(string(source), want) {
+			t.Errorf("the source does not hold %q:\n%s", want, source)
+		}
+	}
+}

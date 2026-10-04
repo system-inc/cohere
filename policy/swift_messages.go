@@ -22,6 +22,9 @@ import (
 // What drifts is caught twice: TestSwiftFilesAreCurrent here, and a Swift test that recomputes
 // RuleMessages.sourceDigest from policy/messages/ on disk.
 
+// swiftLineLength is the house Swift format's line length (HouseSwiftFormat.swift).
+const swiftLineLength = 120
+
 // swiftMessagesSource is RuleMessages.generated.swift for the catalog, carrying digest as the files it
 // was read from.
 func swiftMessagesSource(catalog *MessageCatalog, digest string) ([]byte, error) {
@@ -133,7 +136,12 @@ func writeSwiftMessage(source *bytes.Buffer, id string, template messageTemplate
 		source.WriteString("        }\n\n")
 	}
 
-	fmt.Fprintf(source, "        static func %s(%s) -> Message {\n", id, strings.Join(parameters, ", "))
+	// A signature past the house format's 120 columns takes one parameter to a line, as the format breaks it.
+	signature := fmt.Sprintf("        static func %s(%s) -> Message {", id, strings.Join(parameters, ", "))
+	if len(signature) > swiftLineLength {
+		signature = fmt.Sprintf("        static func %s(\n            %s,\n        ) -> Message {", id, strings.Join(parameters, ",\n            "))
+	}
+	source.WriteString(signature + "\n")
 	for _, phrase := range phraseNames {
 		options := template.options[phrase]
 		optionNames := make([]string, 0, len(options))

@@ -10,13 +10,31 @@ enum RuleMessages {
     }
 
     /* SHA-256 of every .json file in policy/messages/, each one's name and bytes in name order, which a test recomputes from the files on disk. */
-    static let sourceDigest = "445a85674d16ba891fd27721b6b686d81ad1973c85a1759227da8e872efdf907"
+    static let sourceDigest = "d28da0c00bc1a87047dd92a2ac7e27681e6f03573c74421e81ef1f3b79647996"
 
     /* Every message here, as `Rule.id`, for the test that fails on one no rule renders. */
     static let all = [
+        "ConcurrencyRequireEscapeHatchReason.escapeHatchWithoutReason",
         "ConsistencyNoBareThrow.bareThrow",
+        "CorrectnessNoDefaultForOwnedEnum.noDefaultForOwnedEnum",
+        "CorrectnessNoDiscardedTryOptional.discardedTryOptional",
+        "CorrectnessNoDiscardedTryOptional.discardedTryOptionalInClosure",
         "SecurityNoInterpolatedSqlString.interpolatedSqlString",
+        "ToolchainRequireStrictMemorySafety.strictMemorySafetyMissing",
+        "ToolchainRequireSwift6LanguageMode.languageModeBelowSix",
+        "ToolchainRequireUpcomingFeatures.upcomingFeatureMissing",
     ]
+
+    /* cohere-swift/concurrency-require-escape-hatch-reason */
+    enum ConcurrencyRequireEscapeHatchReason {
+        static func escapeHatchWithoutReason(spelling: String) -> Message {
+            Message(
+                id: "escapeHatchWithoutReason",
+                text:
+                    #"\#(spelling) tells the compiler to trust this code instead of checking it. Say why that is safe in a comment directly above the declaration, so the next reader can check the reasoning the compiler no longer does."#,
+            )
+        }
+    }
 
     /* cohere-swift/consistency-no-bare-throw */
     enum ConsistencyNoBareThrow {
@@ -29,6 +47,36 @@ enum RuleMessages {
         }
     }
 
+    /* cohere-swift/correctness-no-default-for-owned-enum */
+    enum CorrectnessNoDefaultForOwnedEnum {
+        static func noDefaultForOwnedEnum(enumName: String) -> Message {
+            Message(
+                id: "noDefaultForOwnedEnum",
+                text:
+                    #"This default answers for every case of \#(enumName), including any added later, so the compiler can no longer say this switch does not handle a new one. List the remaining cases instead."#,
+            )
+        }
+    }
+
+    /* cohere-swift/correctness-no-discarded-try-optional */
+    enum CorrectnessNoDiscardedTryOptional {
+        static func discardedTryOptional() -> Message {
+            Message(
+                id: "discardedTryOptional",
+                text:
+                    #"This try? throws the error away and keeps nothing, so a failure here is invisible. Use do/catch, and say in the catch why the failure can be ignored if it can."#,
+            )
+        }
+
+        static func discardedTryOptionalInClosure() -> Message {
+            Message(
+                id: "discardedTryOptionalInClosure",
+                text:
+                    #"This try? is the whole body of a closure whose result goes nowhere (it returns nothing, or it is the value of a task nobody keeps), so the error is thrown away unseen. Use do/catch inside the closure, and say in the catch why the failure can be ignored if it can."#,
+            )
+        }
+    }
+
     /* cohere-swift/security-no-interpolated-sql-string */
     enum SecurityNoInterpolatedSqlString {
         static func interpolatedSqlString() -> Message {
@@ -36,6 +84,44 @@ enum RuleMessages {
                 id: "interpolatedSqlString",
                 text:
                     #"This value is written between the single quotes of a SQL string, so a quote in it ends the string early: the query breaks on ordinary input like O'Brien, and a crafted value runs as SQL. Bind it as a parameter instead (WHERE name = ? with the value in the parameters beside the statement). Where the query cannot take parameters, give the value a type that cannot hold a quote (an integer, a closed enum's case), or escape it in place by doubling backslashes and quotes: .replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "''")."#,
+            )
+        }
+    }
+
+    /* cohere-swift/toolchain-require-strict-memory-safety */
+    enum ToolchainRequireStrictMemorySafety {
+        static func strictMemorySafetyMissing(target: String) -> Message {
+            Message(
+                id: "strictMemorySafetyMissing",
+                text:
+                    #"\#(target) does not compile under strict memory safety. Add .strictMemorySafety() to its swiftSettings, so every unsafe construct is visible where it is used; then replace each flagged site with a safe API where one exists, and mark unsafe only what must be."#,
+            )
+        }
+    }
+
+    /* cohere-swift/toolchain-require-swift-6-language-mode */
+    enum ToolchainRequireSwift6LanguageMode {
+        static func languageModeBelowSix(target: String, languageMode: String) -> Message {
+            Message(
+                id: "languageModeBelowSix",
+                text:
+                    #"\#(target) compiles in Swift \#(languageMode) language mode. Swift 6 is required: it makes data-race safety a compile error instead of a warning nobody reads. Set .swiftLanguageMode(.v6) on the target, or remove the setting that lowers it."#,
+            )
+        }
+    }
+
+    /* cohere-swift/toolchain-require-upcoming-features */
+    enum ToolchainRequireUpcomingFeatures {
+        static func upcomingFeatureMissing(
+            target: String,
+            features: String,
+            settings: String,
+            reasons: String,
+        ) -> Message {
+            Message(
+                id: "upcomingFeatureMissing",
+                text:
+                    #"\#(target) does not enable \#(features). Add \#(settings) to its swiftSettings. \#(reasons)."#,
             )
         }
     }

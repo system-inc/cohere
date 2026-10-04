@@ -30,9 +30,9 @@ public struct ConcurrencyRequireEscapeHatchReason: FileRule {
             return file.finding(
                 at: hatch.node,
                 rule: name,
-                messageId: "escapeHatchWithoutReason",
-                message:
-                    "\(hatch.spelling) tells the compiler to trust this code instead of checking it. Say why that is safe in a comment directly above the declaration, so the next reader can check the reasoning the compiler no longer does.",
+                message: RuleMessages.ConcurrencyRequireEscapeHatchReason.escapeHatchWithoutReason(
+                    spelling: hatch.spelling
+                ),
             )
         }
     }

@@ -22,13 +22,14 @@ public struct ToolchainRequireSwiftSixLanguageMode: PackageRule {
         package.targets
             .filter { PackageModel.isOlderLanguageMode($0.languageMode, "6") }
             .map { target in
-                let message =
-                    "\(target.name) compiles in Swift \(target.languageMode) language mode. Swift 6 is required: it makes data-race safety a compile error instead of a warning nobody reads. Set .swiftLanguageMode(.v6) on the target, or remove the setting that lowers it."
+                let message = RuleMessages.ToolchainRequireSwift6LanguageMode.languageModeBelowSix(
+                    target: target.name,
+                    languageMode: target.languageMode,
+                )
                 if let manifest, let declaration = TargetNameFinder.find(target.name, in: manifest.tree) {
                     return manifest.finding(
                         at: declaration,
                         rule: name,
-                        messageId: "languageModeBelowSix",
                         message: message,
                     )
                 }
@@ -40,8 +41,8 @@ public struct ToolchainRequireSwiftSixLanguageMode: PackageRule {
                     column: 1,
                     severity: .error,
                     rule: name,
-                    messageId: "languageModeBelowSix",
-                    message: message,
+                    messageId: message.id,
+                    message: message.text,
                 )
             }
     }

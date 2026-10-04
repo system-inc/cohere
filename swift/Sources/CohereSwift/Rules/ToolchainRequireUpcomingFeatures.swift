@@ -49,13 +49,16 @@ public struct ToolchainRequireUpcomingFeatures: PackageRule {
                 guard !missing.isEmpty else { return nil }
                 let settings = missing.map { ".enableUpcomingFeature(\"\($0.feature)\")" }.joined(separator: ", ")
                 let reasons = missing.map { "\($0.feature): \($0.reason)" }.joined(separator: "; ")
-                let message =
-                    "\(target.name) does not enable \(missing.map(\.feature).joined(separator: " and ")). Add \(settings) to its swiftSettings. \(reasons)."
+                let message = RuleMessages.ToolchainRequireUpcomingFeatures.upcomingFeatureMissing(
+                    target: target.name,
+                    features: missing.map(\.feature).joined(separator: " and "),
+                    settings: settings,
+                    reasons: reasons,
+                )
                 if let manifest, let declaration = TargetNameFinder.find(target.name, in: manifest.tree) {
                     return manifest.finding(
                         at: declaration,
                         rule: name,
-                        messageId: "upcomingFeatureMissing",
                         message: message,
                     )
                 }
@@ -67,8 +70,8 @@ public struct ToolchainRequireUpcomingFeatures: PackageRule {
                     column: 1,
                     severity: .error,
                     rule: name,
-                    messageId: "upcomingFeatureMissing",
-                    message: message,
+                    messageId: message.id,
+                    message: message.text,
                 )
             }
     }

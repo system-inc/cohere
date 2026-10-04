@@ -100,9 +100,9 @@ public struct CorrectnessNoDefaultForOwnedEnum: TypedFileRule {
             return file.finding(
                 at: candidate.defaultKeyword,
                 rule: name,
-                messageId: "noDefaultForOwnedEnum",
-                message:
-                    "This default answers for every case of \(element.enumName), including any added later, so the compiler can no longer say this switch does not handle a new one. List the remaining cases instead.",
+                message: RuleMessages.CorrectnessNoDefaultForOwnedEnum.noDefaultForOwnedEnum(
+                    enumName: element.enumName
+                ),
             )
         }
     }

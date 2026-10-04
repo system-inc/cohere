@@ -81,16 +81,12 @@ public struct CorrectnessNoDiscardedTryOptional: TypedFileRule {
                 ? file.finding(
                     at: mark.mark,
                     rule: name,
-                    messageId: "discardedTryOptionalInClosure",
-                    message:
-                        "This try? is the whole body of a closure whose result goes nowhere (it returns nothing, or it is the value of a task nobody keeps), so the error is thrown away unseen. Use do/catch inside the closure, and say in the catch why the failure can be ignored if it can.",
+                    message: RuleMessages.CorrectnessNoDiscardedTryOptional.discardedTryOptionalInClosure(),
                 )
                 : file.finding(
                     at: mark.mark,
                     rule: name,
-                    messageId: "discardedTryOptional",
-                    message:
-                        "This try? throws the error away and keeps nothing, so a failure here is invisible. Use do/catch, and say in the catch why the failure can be ignored if it can.",
+                    message: RuleMessages.CorrectnessNoDiscardedTryOptional.discardedTryOptional(),
                 )
         }
     }
