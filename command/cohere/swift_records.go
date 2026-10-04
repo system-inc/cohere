@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -120,6 +121,17 @@ type swiftFixRecord struct {
 	FilesNotFormatted   int            `json:"filesNotFormatted"`
 	NotFormattedReasons map[string]int `json:"notFormattedReasons"`
 	FormatScope         string         `json:"formatScope"`
+	// ChangedFiles is every file the phase wrote, once each. Additive within contract 3: an engine from
+	// before it sends none, which is "not listed", never "no files changed", so it is a pointer.
+	ChangedFiles *[]swiftChangedFile `json:"changedFiles"`
+}
+
+// swiftChangedFile is one file the fix phase wrote: its fixes by the rule that made them, and whether the
+// formatter changed it.
+type swiftChangedFile struct {
+	File      string         `json:"file"`
+	FixedBy   map[string]int `json:"fixedBy"`
+	Formatted bool           `json:"formatted"`
 }
 
 type swiftTypesRecord struct {
@@ -545,7 +557,54 @@ func (r *swiftRun) acceptFix(record *swiftFixRecord) error {
 	}
 	fmt.Fprintln(accountOutput(r.out), summary.String())
 	fmt.Fprintf(accountOutput(r.out), "format scope: %s\n", record.FormatScope)
+
+	// An engine from before the list sends none, and the run then states the counts alone: the footer
+	// leaves out a cohered count it was not given, rather than print a zero it does not know.
+	if record.ChangedFiles == nil {
+		return nil
+	}
+	changed, err := r.changedFiles(*record.ChangedFiles, record.FilesRewritten)
+	if err != nil {
+		return err
+	}
+	activeSummary.Changed = changed
+	printChangedFiles(r.out, changed)
 	return nil
+}
+
+// changedFiles turns the fix record's list into the summary's, each path relative to the package root as a
+// TypeScript run's are. It refuses a list whose length differs from the count the record states, a file
+// named twice, and a file that neither a fix nor the formatter changed, since "N cohered" must be the list.
+func (r *swiftRun) changedFiles(files []swiftChangedFile, rewritten int) ([]changedFile, error) {
+	if len(files) != rewritten {
+		return nil, fmt.Errorf("the fix record counts %d files rewritten and lists %d", rewritten, len(files))
+	}
+	root := ""
+	if r.project != nil {
+		root = r.project.Root
+	}
+	seen := map[string]bool{}
+	changed := make([]changedFile, 0, len(files))
+	for _, file := range files {
+		if seen[file.File] {
+			return nil, fmt.Errorf("the fix record lists %s twice", file.File)
+		}
+		seen[file.File] = true
+		if len(file.FixedBy) == 0 && !file.Formatted {
+			return nil, fmt.Errorf("the fix record lists %s as rewritten by no fix and not by the formatter", file.File)
+		}
+		path := file.File
+		if relative, err := filepath.Rel(root, file.File); root != "" && err == nil && !strings.HasPrefix(relative, "..") {
+			path = relative
+		}
+		changed = append(changed, changedFile{
+			Path:      path,
+			Fixed:     len(file.FixedBy) > 0,
+			Formatted: file.Formatted,
+			FixedBy:   file.FixedBy,
+		})
+	}
+	return changed, nil
 }
 
 func (r *swiftRun) acceptTypes(record *swiftTypesRecord) error {
