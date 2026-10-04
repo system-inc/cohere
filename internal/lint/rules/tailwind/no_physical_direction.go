@@ -6,7 +6,12 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
+
+// tailwindNoPhysicalDirectionText is the rule's message, whose wording lives in
+// `policy/messages/tailwind-no-physical-direction.json`.
+var tailwindNoPhysicalDirectionText = policy.MessageOf("structure/tailwind-no-physical-direction", "useLogicalClass")
 
 // messagePhysicalDirection names both the class and its replacement.
 //
@@ -14,11 +19,8 @@ import (
 // documentation; "use `ms-4` instead of `ml-4`" is the edit.
 func messagePhysicalDirection(original string, replacement string) rule.Message {
 	return rule.Message{
-		Id: "useLogicalClass",
-		Description: "The class \"" + original + "\" names a physical side, so it points the same " +
-			"way regardless of reading direction and lays out backwards in a right-to-left locale. " +
-			"Use \"" + replacement + "\", which is defined relative to the start and end of the " +
-			"line rather than to left and right, so one class is correct in every locale.",
+		Id:          tailwindNoPhysicalDirectionText.Id,
+		Description: tailwindNoPhysicalDirectionText.Render(map[string]string{"original": original, "replacement": replacement}),
 	}
 }
 

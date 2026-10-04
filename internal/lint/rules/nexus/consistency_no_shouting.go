@@ -6,17 +6,19 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
+
+// consistencyNoShoutingText is the rule's message, whose wording lives in
+// `policy/messages/consistency-no-shouting.json`.
+var consistencyNoShoutingText = policy.MessageOf("nexus/consistency-no-shouting", "shoutingInComment")
 
 // messageShoutingInComment names the tokens it saw, because a finding that says only "this comment
 // shouts" makes the reader rescan a paragraph to find which word tripped it.
 func messageShoutingInComment(tokens []string) rule.Message {
 	return rule.Message{
-		Id: "shoutingInComment",
-		Description: quotedTokenList(tokens) + " in a comment reads as shouting, and the register " +
-			"spreads: the next reader mirrors it, so emphasis on everything becomes emphasis on nothing. " +
-			"If it is code, put it in backticks. If it is a point, make it in a normal voice, and if the " +
-			"sentence needed the volume to land, it probably needed the reason instead.",
+		Id:          consistencyNoShoutingText.Id,
+		Description: consistencyNoShoutingText.Render(map[string]string{"tokens": quotedTokenList(tokens)}),
 	}
 }
 

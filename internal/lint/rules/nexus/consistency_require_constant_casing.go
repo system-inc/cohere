@@ -10,6 +10,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // ConsistencyRequireConstantCasingOptions names exported constants a framework or library reads
@@ -21,17 +22,21 @@ type ConsistencyRequireConstantCasingOptions struct {
 	FrameworkConstantNames []string `json:"frameworkConstantNames"`
 }
 
+// The rule's messages, whose wording lives in `policy/messages/consistency-require-constant-casing.json`.
 // The reasoning behind each message is the part that ports. A rule that says only what is wrong gets
 // disabled the first time it is inconvenient; one that says why gets fixed.
-const constantCasingScopeReasoning = "const already signals immutability, so casing signals scope " +
-	"instead: PascalCase means the value crosses files, camelCase means this file made it."
+var (
+	constantCasingRequirePascalCaseExportedText = policy.MessageOf("nexus/consistency-require-constant-casing", "requirePascalCaseExported")
+	constantCasingDropUnimportedExportText      = policy.MessageOf("nexus/consistency-require-constant-casing", "dropUnimportedExport")
+	constantCasingRequireCamelCaseLocalText     = policy.MessageOf("nexus/consistency-require-constant-casing", "requireCamelCaseLocal")
+	constantCasingRequireCamelCaseFunctionText  = policy.MessageOf("nexus/consistency-require-constant-casing", "requireCamelCaseFunction")
+	constantCasingRequireCamelCaseInstanceText  = policy.MessageOf("nexus/consistency-require-constant-casing", "requireCamelCaseInstance")
+)
 
 func messageRequirePascalCaseExported(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id: "requirePascalCaseExported",
-		Description: "Constant \"" + name + "\" is exported and should be PascalCase (\"" +
-			suggestion + "\"). " + constantCasingScopeReasoning + " A camelCase export reads local " +
-			"at every call site while being importable from anywhere.",
+		Id:          constantCasingRequirePascalCaseExportedText.Id,
+		Description: constantCasingRequirePascalCaseExportedText.Render(map[string]string{"name": name, "suggestion": suggestion}),
 	}
 }
 
@@ -45,43 +50,29 @@ func messageRequirePascalCaseExported(name string, suggestion string) rule.Messa
 // imported from another repository this run cannot see.
 func messageDropUnimportedExport(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id: "dropUnimportedExport",
-		Description: "Constant \"" + name + "\" is exported, and nothing in this program imports it. " +
-			"Drop the `export`: its camelCase is already right for a file-local constant. " +
-			constantCasingScopeReasoning + " If something outside this program does import it, make " +
-			"it PascalCase (\"" + suggestion + "\") instead.",
+		Id:          constantCasingDropUnimportedExportText.Id,
+		Description: constantCasingDropUnimportedExportText.Render(map[string]string{"name": name, "suggestion": suggestion}),
 	}
 }
 
 func messageRequireCamelCaseLocal(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id: "requireCamelCaseLocal",
-		Description: "Constant \"" + name + "\" is file-local and should be camelCase (\"" +
-			suggestion + "\"). " + constantCasingScopeReasoning + " A PascalCase local sends the " +
-			"reader looking for an import that is not there.",
+		Id:          constantCasingRequireCamelCaseLocalText.Id,
+		Description: constantCasingRequireCamelCaseLocalText.Render(map[string]string{"name": name, "suggestion": suggestion}),
 	}
 }
 
 func messageRequireCamelCaseFunction(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id: "requireCamelCaseFunction",
-		Description: "Constant \"" + name + "\" holds a function and should be camelCase (\"" +
-			suggestion + "\"), even though it is exported. A function is named for what it does " +
-			"and it is called, so \"" + suggestion + "(...)\" reads as an action while \"" + name +
-			"(...)\" reads as a constructor. PascalCase is reserved for exported data and for " +
-			"components, which JSX needs capitalized.",
+		Id:          constantCasingRequireCamelCaseFunctionText.Id,
+		Description: constantCasingRequireCamelCaseFunctionText.Render(map[string]string{"name": name, "suggestion": suggestion}),
 	}
 }
 
 func messageRequireCamelCaseInstance(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id: "requireCamelCaseInstance",
-		Description: "Constant \"" + name + "\" holds an instance and should be camelCase (\"" +
-			suggestion + "\"), even though it is exported. Casing carries two signals and they " +
-			"collide here: PascalCase is the older, louder claim that a name is a type, so a " +
-			"PascalCase instance reads as its own class. An instance is a thing that acts, and \"" +
-			suggestion + ".method()\" says so at the call site. Exported data structures like Map " +
-			"and Set keep PascalCase, because they hold rather than act.",
+		Id:          constantCasingRequireCamelCaseInstanceText.Id,
+		Description: constantCasingRequireCamelCaseInstanceText.Render(map[string]string{"name": name, "suggestion": suggestion}),
 	}
 }
 

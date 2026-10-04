@@ -5,18 +5,22 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
+
+// consistencyNoHandBuiltDeclaredErrorText is the rule's message, whose wording lives in
+// `policy/messages/consistency-no-hand-built-declared-error.json`.
+var consistencyNoHandBuiltDeclaredErrorText = policy.MessageOf("base/consistency-no-hand-built-declared-error", "consistencyNoHandBuiltDeclaredError")
 
 // messageNoHandBuiltDeclaredError is the rule's single finding.
 //
 // The wording is the original's, which names the three tiers by their real spellings rather than
 // describing them, because the reader's next action is to type one of them.
-var messageNoHandBuiltDeclaredError = rule.Message{
-	Id: "consistencyNoHandBuiltDeclaredError",
-	Description: "Do not build a BaseError that names a declared failure. Call the tier that " +
-		"declares it: 'AccountModule.error(identifier, data, cause)', 'ApiWorker.error(...)', or " +
-		"'Base.error(...)'. The status comes from the declaration, so writing it here is how one " +
-		"failure ends up answering two.",
+func messageNoHandBuiltDeclaredError() rule.Message {
+	return rule.Message{
+		Id:          consistencyNoHandBuiltDeclaredErrorText.Id,
+		Description: consistencyNoHandBuiltDeclaredErrorText.Render(nil),
+	}
 }
 
 // ConsistencyNoHandBuiltDeclaredError flags `new BaseError(..., { identifier })`.
@@ -102,7 +106,7 @@ var ConsistencyNoHandBuiltDeclaredError = rule.Rule{
 
 				// The finding points at the whole `new` expression, which is the original's
 				// `node`, rather than at the option that triggered it.
-				ctx.ReportNode(node, messageNoHandBuiltDeclaredError)
+				ctx.ReportNode(node, messageNoHandBuiltDeclaredError())
 			},
 		}
 	},

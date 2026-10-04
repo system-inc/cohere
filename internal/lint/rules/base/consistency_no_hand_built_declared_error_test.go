@@ -158,9 +158,9 @@ func TestNoHandBuiltDeclaredErrorFires(t *testing.T) {
 			if gotSpan != testCase.wantSpan {
 				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
-			if diagnostic.Message.Description != messageNoHandBuiltDeclaredError.Description {
+			if diagnostic.Message.Description != messageNoHandBuiltDeclaredError().Description {
 				t.Fatalf("message: expected %q, got %q",
-					messageNoHandBuiltDeclaredError.Description, diagnostic.Message.Description)
+					messageNoHandBuiltDeclaredError().Description, diagnostic.Message.Description)
 			}
 		})
 	}

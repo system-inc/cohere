@@ -4,21 +4,22 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageNoAnchorElement = rule.Message{
-	Id: "noAnchorElement",
-	Description: "This is a raw <a> element. Use the Link component from " +
-		"@structure/source/components/navigation/Link instead. Link is where client-side " +
-		"navigation, prefetching, and the external-link handling live, so an <a> written directly " +
-		"does a full page load and drops all of it, and it does so without failing anything.",
+// The two rules' messages, whose wording lives in `policy/messages/react-element-no-anchor.json` and
+// `policy/messages/react-element-no-horizontal-rule.json`.
+var (
+	reactElementNoAnchorText         = policy.MessageOf("structure/react-element-no-anchor", "noAnchorElement")
+	reactElementNoHorizontalRuleText = policy.MessageOf("structure/react-element-no-horizontal-rule", "noHrElement")
+)
+
+func messageNoAnchorElement() rule.Message {
+	return rule.Message{Id: reactElementNoAnchorText.Id, Description: reactElementNoAnchorText.Render(nil)}
 }
 
-var messageNoHorizontalRuleElement = rule.Message{
-	Id: "noHrElement",
-	Description: "This is a raw <hr> element. Use the HorizontalRule component from " +
-		"@structure/source/components/layout/HorizontalRule instead, so a change to how a divider " +
-		"looks lands everywhere at once rather than in the files somebody remembered.",
+func messageNoHorizontalRuleElement() rule.Message {
+	return rule.Message{Id: reactElementNoHorizontalRuleText.Id, Description: reactElementNoHorizontalRuleText.Render(nil)}
 }
 
 // ReactElementNoAnchor flags a raw <a> element outside the Link component's own implementation.
@@ -33,7 +34,7 @@ var ReactElementNoAnchor = rule.Rule{
 		if fileContext.IsLinkComponentFile {
 			return nil
 		}
-		return intrinsicElementListeners(ctx, "a", messageNoAnchorElement)
+		return intrinsicElementListeners(ctx, "a", messageNoAnchorElement())
 	},
 }
 
@@ -49,7 +50,7 @@ var ReactElementNoHorizontalRule = rule.Rule{
 		if fileContext.IsHorizontalRuleComponentFile {
 			return nil
 		}
-		return intrinsicElementListeners(ctx, "hr", messageNoHorizontalRuleElement)
+		return intrinsicElementListeners(ctx, "hr", messageNoHorizontalRuleElement())
 	},
 }
 
