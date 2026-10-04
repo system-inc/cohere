@@ -20,7 +20,7 @@ func TestAReplaysFooterIsTheReplays(t *testing.T) {
 
 	replayed := replayedSummary(recorded, 50*time.Millisecond)
 	got := footer(replayed, plain, footerOptions{})
-	want := "✗ ☠️ 0.05s • 2 findings (480 rules • 3.9K cached) • ⚠ 1 file crashed"
+	want := "✗ ☠️ 0.05s • 2 findings (480 rules • 3,926 cached) • ⚠ 1 file crashed"
 	if got != want {
 		t.Errorf("the replay's footer:\n got  %s\n want %s", got, want)
 	}

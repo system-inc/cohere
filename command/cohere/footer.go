@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -10,26 +11,26 @@ import (
 // The footer is the one line a default run ends with, after its findings: the verdict, how long it took,
 // what it found and changed, and how much it covered. Everything else a run can say is under `--verbose`.
 //
-//	✓ 💎 2.4s (480 rules • 3.9K checked)                           cold: every file checked fresh
-//	✓ 💎 0.7s (480 rules • 3 checked • 3.9K cached)               three files edited, all clean
-//	✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3.9K cached)   two rewritten, listed above
-//	✓ 💎 0.05s (480 rules • 3.9K cached)                          nothing changed
-//	✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3 checked • 3.9K cached)
+//	✓ 💎 2.4s (480 rules • 3,926 checked)                          cold: every file checked fresh
+//	✓ 💎 0.7s (480 rules • 3 checked • 3,923 cached)               three files edited, all clean
+//	✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3,923 cached)   two rewritten, listed above
+//	✓ 💎 0.05s (480 rules • 3,926 cached)                          nothing changed
+//	✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3 checked • 3,923 cached)
 //
 // The words are the brand's. Cohered is altered: the files cohere rewrote, fixed or formatted, the same
 // files the 🪄 and 💅 lines above the footer list, said only when there were any. Checked is the files
 // examined fresh this run, and cached the ones the cache answered for; together they are every file in
-// scope. A count of zero is left out. In order: the verdict and time, what was found, what was cohered,
-// the parentheses, and anything the run did not check.
+// scope. A count is exact, its thousands grouped, and a count of zero is left out. In order: the verdict
+// and time, what was found, what was cohered, the parentheses, and anything the run did not check.
 //
 // With `--phases`, or `"output": { "phases": true }` in the settings, where the time went comes first
 // inside the parentheses:
 //
-//	✓ 💎 0.7s (🕸 0.2s • 🪄 0.1s • 💅 0.02s • 🔷 0.4s • 👑 0.2s • 480 rules • 3 checked • 3.9K cached)
+//	✓ 💎 0.7s (🕸 0.2s • 🪄 0.1s • 💅 0.02s • 🔷 0.4s • 👑 0.2s • 480 rules • 3 checked • 3,923 cached)
 //
 // `--verbose`'s footer adds the nodes walked and says when the whole run was replayed:
 //
-//	✓ 💎 0.05s • replayed (480 rules • 3.9K cached)
+//	✓ 💎 0.05s • replayed (480 rules • 3,926 cached)
 //
 // It renders a runSummary and decides nothing: what ran, what was found and what went unchecked are the
 // summary's, so this file only says them.
@@ -81,7 +82,7 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 	}
 
 	if cohered := summary.cohered(); cohered > 0 {
-		line += " • " + abbreviated(cohered) + " cohered"
+		line += " • " + grouped(cohered) + " cohered"
 	}
 	if options.Verbose && summary.Cache.Replayed {
 		line += " • replayed"
@@ -96,10 +97,10 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 		inside = append(inside, counted(summary.Rules, "rule", "rules"))
 	}
 	if summary.FilesChecked > 0 {
-		inside = append(inside, abbreviated(summary.FilesChecked)+" checked")
+		inside = append(inside, grouped(summary.FilesChecked)+" checked")
 	}
 	if summary.FilesCached > 0 {
-		inside = append(inside, abbreviated(summary.FilesCached)+" cached")
+		inside = append(inside, grouped(summary.FilesCached)+" cached")
 	}
 	if options.Verbose && summary.Nodes > 0 {
 		inside = append(inside, counted(summary.Nodes, "node", "nodes"))
@@ -153,7 +154,7 @@ func uncheckedMarkers(summary runSummary) []string {
 		markers = append(markers, "⚠ no files to check")
 	}
 	if gaps.ProgramFiles > summary.FilesInScope && summary.FilesInScope > 0 {
-		markers = append(markers, fmt.Sprintf("⚠ only %s of %s files", abbreviated(summary.FilesInScope), abbreviated(gaps.ProgramFiles)))
+		markers = append(markers, fmt.Sprintf("⚠ only %s of %s files", grouped(summary.FilesInScope), grouped(gaps.ProgramFiles)))
 	}
 	for _, name := range phaseOrder {
 		for _, record := range summary.Phases {
@@ -253,27 +254,29 @@ func footerSeconds(duration time.Duration) string {
 	}
 }
 
-// abbreviated is a count as the footer says it: 999, 1K, 1.2K, 120K, 3.4M.
-func abbreviated(count int) string {
-	if count < 1000 {
-		return fmt.Sprintf("%d", count)
+// grouped is a count as the footer says it, exact, with its thousands grouped: 999, 1,000, 3,893,
+// 1,234,567. Exact, because a count is read to see how much was checked, and an abbreviation rounds that
+// away. Only the human view groups; `--json` prints the integer.
+func grouped(count int) string {
+	digits := strconv.Itoa(count)
+	sign := ""
+	if count < 0 {
+		sign, digits = "-", digits[1:]
 	}
-	value, unit := float64(count)/1000, "K"
-	if count >= 999_950 {
-		value, unit = float64(count)/1_000_000, "M"
+	var builder strings.Builder
+	for index, digit := range digits {
+		if index > 0 && (len(digits)-index)%3 == 0 {
+			builder.WriteByte(',')
+		}
+		builder.WriteRune(digit)
 	}
-	// One decimal below 100, none above, and none when it would be `.0`.
-	text := fmt.Sprintf("%.1f", value)
-	if value >= 99.95 {
-		text = fmt.Sprintf("%.0f", value)
-	}
-	return strings.TrimSuffix(text, ".0") + unit
+	return sign + builder.String()
 }
 
-// counted is a count with its noun, singular or plural, abbreviated past 999.
+// counted is a count with its noun, singular or plural, grouped past 999.
 func counted(count int, singular, pluralNoun string) string {
 	if count == 1 {
 		return "1 " + singular
 	}
-	return abbreviated(count) + " " + pluralNoun
+	return grouped(count) + " " + pluralNoun
 }

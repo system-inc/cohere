@@ -57,7 +57,7 @@ A run prints the files it rewrote, then its findings, then one line:
 🪄💅 app/os/SessionRow.tsx      prefer-const ×2, prefer-nullish-coalescing
   💅 modules/pensieve/Recall.ts
 app/os/Session.ts:12:5 error nexus/consistency-no-abbreviated-identifier `ctx` is an abbreviation.
-✗ ☠️ 0.8s • 1 finding • 2 cohered (480 rules • 3 checked • 3.9K cached)
+✗ ☠️ 0.8s • 1 finding • 2 cohered (480 rules • 3 checked • 3,923 cached)
 ```
 
 See [Output](#output) for what that line says, and for `--verbose` and `--json`.
@@ -175,9 +175,9 @@ A run prints three things, in order:
   it cohered, and in the parentheses how much it covered.
 
 ```
-✓ 💎 2.4s (480 rules • 3.9K checked)
-✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3.9K cached)
-✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3 checked • 3.9K cached)
+✓ 💎 2.4s (480 rules • 3,926 checked)
+✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3,923 cached)
+✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3 checked • 3,923 cached)
 ```
 
 The words mean exactly this:
@@ -188,7 +188,8 @@ The words mean exactly this:
   together are every file in scope.
 - **rules:** the rules that ran.
 
-A count of zero is left out, so a cold run shows no `cached` and a run with nothing changed no `checked`.
+A count is exact, with its thousands grouped (`3,923`); `--json` gives the plain integer. A count of zero
+is left out, so a cold run shows no `cached` and a run with nothing changed no `checked`.
 
 Anything the run did not check is in the footer even when it passes, so a green line never hides a
 gap: `✓ 💎 2.4s (…) • ⚠ 1 file crashed`. The same goes for a phase that could not run, a rule that

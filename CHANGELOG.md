@@ -50,10 +50,11 @@ chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
   beside what fixing would, and exits nonzero on either. `--no-format` leaves formatting out of all three.
   `--format` keeps its meaning and changes nothing on those runs, since they already format.
 - The default output: a run prints the files it rewrote, its findings as `path:line:col severity rule
-  message`, and one footer line, `✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3.9K cached)`, which
-  names anything the run did not check even when it passes. `--verbose` prints everything a run printed
-  before, notes included, and `--phases` (or `"output": { "phases": true }` in `CohereSettings.json`) adds the phase
-  timings to the footer. Exit codes are unchanged.
+  message`, and one footer line, `✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3,923 cached)`, whose
+  counts are exact and which names anything the run did not check even when it passes. `--verbose`
+  prints everything a run printed before, notes included, and `--phases` (or
+  `"output": { "phases": true }` in `CohereSettings.json`) adds the phase timings to the footer. Exit
+  codes are unchanged.
 - `getter-return` checks TypeScript files, as ESLint does where a config turns it on there. It used to
   skip every `.ts` and `.tsx` file. It also reports what ESLint reports: a bare `return;` at the
   statement (`expected`), and a getter that falls off the end at its head, from the property to the
