@@ -11,11 +11,22 @@ changed in cohere outside the sets is written under the same heading.
 The first release. It carries these rule sets:
 
 - `cohere:next`, 22 rules on
-- `cohere:react`, 76 rules on
-- `cohere:system-inc/base`, 20 rules on
-- `cohere:system-inc/structure`, 36 rules on
+- `cohere:react`, 88 rules on
+- `cohere:system-inc/base`, 24 rules on
+- `cohere:system-inc/structure`, 31 rules on
 - `cohere:tailwind`, 12 rules on
-- `cohere:typescript`, 232 rules on
+- `cohere:typescript`, 268 rules on
+
+Zero config: a project with no `CohereSettings.json`, or one that names no `cohere:` set, gets the house
+stack, each set where the code shows it fits. `cohere:typescript` applies to every file, `cohere:react`
+to each file that imports react or contains JSX, `cohere:next` to each file that imports next or is one
+of Next's own files, and `cohere:tailwind` to every file when the root stylesheet imports `tailwindcss`.
+package.json is never the evidence, and the run's `sets:` line names each set and why. Outside the
+`cohere:system-inc/*` sets, an `"off"` needs no reason and `--coverage` names each one. Inside them,
+every off and departure still says why. `nexus/import-no-forbidden-source`,
+`nexus/boundary-no-nexus-outside-import` and `no-restricted-properties` (JSON.parse) moved from
+`cohere:typescript` to the `cohere:system-inc/*` sets, and those sets add Buffer to
+`no-restricted-globals`, since that advice names our own libraries.
 
 Formatting: a project that configures nothing formats with the house block `cohere:typescript` carries
 (tab width 4, single quotes, print width 120). A project outside the `cohere:system-inc/*` sets may set
@@ -23,9 +34,23 @@ its own `format` block in `CohereSettings.json`, applied over Prettier's default
 means Prettier's defaults. A project that extends a `cohere:system-inc/*` set takes its format from that
 chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
 
-Output, changed: a run prints the files it rewrote, its findings as `path:line:col severity rule
-message`, and one footer line, `✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3.9K cached)`, which names
-anything the run did not check even when it passes. `--verbose` prints everything a run printed
-before, `--phases` (or `"output": { "phases": true }` in `CohereSettings.json`) adds the phase
-timings to the footer, and `--json` prints newline-delimited JSON described by
-`schema/CohereOutput.schema.json`. Exit codes are unchanged.
+### Added
+
+- Mixed repositories: a run checks the project it starts in and every project below it, each TypeScript
+  program and Swift package with its own engine, in parallel, in one report whose exit code is the worst
+  of theirs. Finding them never enters what `.gitignore` ignores, `node_modules`, `.build`, `.cache`,
+  `testdata` or a nested repository. `--directory` or a path still narrows the run to one project.
+- `--json` prints newline-delimited JSON for a program to read, a line per finding and per rewritten file
+  and a summary last, described by `schema/CohereOutput.schema.json`.
+
+### Changed
+
+- A bare `cohere` formats too: it type-checks, lints, applies fixes and formats in one call. `--fix`
+  applies fixes and formats, running no other phase, and `--no-fix` reports what formatting would change
+  beside what fixing would, and exits nonzero on either. `--no-format` leaves formatting out of all three.
+  `--format` keeps its meaning and changes nothing on those runs, since they already format.
+- The default output: a run prints the files it rewrote, its findings as `path:line:col severity rule
+  message`, and one footer line, `✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3.9K cached)`, which
+  names anything the run did not check even when it passes. `--verbose` prints everything a run printed
+  before, and `--phases` (or `"output": { "phases": true }` in `CohereSettings.json`) adds the phase
+  timings to the footer. Exit codes are unchanged.

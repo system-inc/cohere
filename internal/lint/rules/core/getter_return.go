@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/descriptor"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -212,146 +212,19 @@ func getterHeadRange(file *ast.SourceFile, node *ast.Node, body *ast.Node) core.
 	return core.NewTextRange(start, end)
 }
 
-// isGetterFunction answers whether this function-like node is in getter position.
+// isGetterFunction answers whether this function-like node is in getter position: a `get` accessor in
+// a class or object literal, or the `get` of a property descriptor, which the `descriptor` shelf
+// recognizes and `no-setter-return` shares for `set`.
 //
-// Two of the three shapes are a parent-kind check. The third, a property descriptor, is the one
-// that carries all the structure, and it is why upstream's `is_wanted_node` walks five levels of
-// parent: `Object.defineProperty(o, "k", { get: fn })` puts the descriptor one call argument away,
-// while `Object.defineProperties(o, { k: { get: fn } })` nests it one level deeper again.
+// The descriptor's `Object` is matched by spelling here, since this rule runs without the checker and
+// only on JavaScript files.
 func isGetterFunction(node *ast.Node) bool {
 	if node.Kind == ast.KindGetAccessor {
 		// A `get` accessor is a getter in both a class and an object literal, and there is no
 		// other thing it can be.
 		return true
 	}
-
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
-
-	// The remaining shapes all reach the function through a `get:` property of an object literal.
-	// A method declaration written `{ get() {} }` is a PropertyAssignment's sibling rather than
-	// its value, so both spellings are handled.
-	var propertyName string
-	var propertyHolder *ast.Node
-	switch {
-	case parent.Kind == ast.KindPropertyAssignment:
-		propertyName = getterPropertyKeyName(parent.AsPropertyAssignment().Name())
-		propertyHolder = parent.Parent
-	case node.Kind == ast.KindMethodDeclaration && parent.Kind == ast.KindObjectLiteralExpression:
-		propertyName = getterPropertyKeyName(node.AsMethodDeclaration().Name())
-		propertyHolder = parent
-	default:
-		return false
-	}
-
-	if propertyName != "get" || propertyHolder == nil ||
-		propertyHolder.Kind != ast.KindObjectLiteralExpression {
-		return false
-	}
-	return isPropertyDescriptorObject(propertyHolder)
-}
-
-// getterPropertyKeyName returns the key a property names when that is knowable statically.
-//
-// The accept set is the identifier, string and template spellings, and it is stated rather than
-// inherited. A descriptor's key is nearly always the plain identifier `get`; the quoted and template
-// spellings reach the same property and upstream's corpus writes both. Numerics are excluded because
-// this compares against one fixed non-numeric name, so accepting them could change no verdict.
-//
-// A computed key naming a variable is declined by the shelf whatever the accept set says, since the
-// property it names is whatever the variable holds.
-func getterPropertyKeyName(name *ast.Node) string {
-	text, _ := property.Name(name, property.Named|property.Quoted|property.Templated)
-	return text
-}
-
-// isPropertyDescriptorObject answers whether this object literal is being passed somewhere that
-// treats it as a property descriptor.
-//
-// Two arrangements reach one, and upstream handles both by counting parents. Counting kinds instead
-// is what is done here, because the parent count changes with parenthesization while the shape does
-// not, and upstream needs a second five-level walk precisely to recover from that.
-//
-//	Object.defineProperty(o, "k", DESC)          the descriptor is a call argument
-//	Object.defineProperties(o, { k: DESC })      the descriptor is a property of a call argument
-//	Object.create(o, { k: DESC })                same
-func isPropertyDescriptorObject(descriptor *ast.Node) bool {
-	container := descriptor.Parent
-	if container == nil {
-		return false
-	}
-
-	// `{ k: { get: fn } }`: step out through the property to the object literal that is the
-	// argument. One step only, since no watched method nests deeper than this.
-	if container.Kind == ast.KindPropertyAssignment {
-		container = container.Parent
-		if container == nil || container.Kind != ast.KindObjectLiteralExpression {
-			return false
-		}
-		container = container.Parent
-	}
-	if container == nil {
-		return false
-	}
-
-	call := skipParenthesesUpward(container)
-	if call == nil || call.Kind != ast.KindCallExpression {
-		return false
-	}
-	return isDescriptorDefiningCall(call.AsCallExpression().Expression)
-}
-
-// skipParenthesesUpward walks out of any parentheses wrapping a node.
-//
-// `(Object?.defineProperty)(o, "k", { get: fn })` is three of upstream's fail cases, and without
-// this the parenthesized callee shifts every parent index and the descriptor stops being found.
-func skipParenthesesUpward(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.Parent
-	}
-	return node
-}
-
-// isDescriptorDefiningCall answers whether a callee is one of the four methods that take a property
-// descriptor.
-//
-// The list is upstream's and is closed on purpose: `foo.defineProperty(...)` is a pass case there,
-// because a method with the right name on the wrong object is not the platform builtin and its
-// second argument means whatever that library says it means.
-func isDescriptorDefiningCall(callee *ast.Node) bool {
-	callee = skipParenthesesDownward(callee)
-	if callee == nil {
-		return false
-	}
-	// `Object?.defineProperty(...)` parses with the optional chain on the access itself, so the
-	// property access is reached the same way; the question is only whether the shim models it as
-	// a distinct node kind. Both spellings land on a PropertyAccessExpression here.
-	if callee.Kind != ast.KindPropertyAccessExpression {
-		return false
-	}
-	access := callee.AsPropertyAccessExpression()
-	object := skipParenthesesDownward(access.Expression)
-	if object == nil || object.Kind != ast.KindIdentifier {
-		return false
-	}
-	member := getterPropertyKeyName(access.Name())
-	switch object.Text() {
-	case "Object":
-		return member == "defineProperty" || member == "defineProperties" || member == "create"
-	case "Reflect":
-		return member == "defineProperty"
-	}
-	return false
-}
-
-// skipParenthesesDownward unwraps parentheses around an expression.
-func skipParenthesesDownward(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
-	}
-	return node
+	return descriptor.IsFunctionUnder(node, "get", func(*ast.Node) bool { return true }, descriptor.AnyArgument)
 }
 
 // bodyDefinitelyExits answers whether every path through a statement leaves the enclosing function.

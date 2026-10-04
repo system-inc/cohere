@@ -19,6 +19,11 @@ import (
 // If one of two patterns is stale, the other still makes the block run somewhere and a block-level
 // check passes while half the intended scope is absent. A pattern that reaches only globally ignored
 // files is also a no-op, so ignored files are not part of the population.
+//
+// An override a set cohere carries wrote is left out. Its patterns are shapes any project may or may
+// not have (`**/*.generated.*`), not paths in this one, so a project with no generated file is not a
+// broken config, and refusing it would make every outsider's zero-config run fail on the house's
+// patterns rather than its own.
 func (c *Config) ValidateSelectors(fileNames []string) error {
 	lintable := make([]string, 0, len(fileNames))
 	for _, fileName := range fileNames {
@@ -36,6 +41,9 @@ func (c *Config) ValidateSelectors(fileNames []string) error {
 	}
 	var misses []miss
 	for overrideIndex, override := range c.Overrides {
+		if IsSet(override.File) {
+			continue
+		}
 		if len(override.Files) == 0 {
 			misses = append(misses, miss{override: overrideIndex, empty: true})
 			continue

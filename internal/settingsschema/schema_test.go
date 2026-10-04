@@ -80,7 +80,9 @@ var keyFixtures = map[string]map[string]string{
 
 // TestTheSchemaHasExactlyTheKeysTheLoaderAccepts is the test the schema exists for, in both directions,
 // against the loader's behavior rather than its tables. Every key the Nexus schema names loads; a key it
-// lacks is refused; the project schema is the same less `format`, which the formatter refuses there.
+// lacks is refused; the project schema names the same keys. Its `format` is optional and decides outside
+// our tiers, and in a chain extending a cohere:system-inc set the formatter refuses it, which a schema
+// cannot see, so the description says so.
 func TestTheSchemaHasExactlyTheKeysTheLoaderAccepts(t *testing.T) {
 	files := built(t)
 	nexusKeys, err := SchemaKeys(files[NexusSchemaPath])
@@ -118,21 +120,16 @@ func TestTheSchemaHasExactlyTheKeysTheLoaderAccepts(t *testing.T) {
 		t.Errorf("loader keys %v, Nexus schema keys %v", loaderKeys, nexusKeys)
 	}
 
-	var withoutFormat []string
-	for _, key := range nexusKeys {
-		if key != FormatKey {
-			withoutFormat = append(withoutFormat, key)
-		}
+	if strings.Join(projectKeys, ",") != strings.Join(nexusKeys, ",") {
+		t.Errorf("project schema keys %v, want the Nexus schema's: %v", projectKeys, nexusKeys)
 	}
-	if strings.Join(projectKeys, ",") != strings.Join(withoutFormat, ",") {
-		t.Errorf("project schema keys %v, want the Nexus schema's less format: %v", projectKeys, withoutFormat)
+	outsider := filepath.Dir(writeSettings(t, map[string]string{"CohereSettings.json": `{"format": {"tabWidth": 2}}`}))
+	if resolution, err := formatoptions.Resolve(outsider); err != nil || resolution.Options.TabWidth != 2 {
+		t.Errorf("an outsider's format block did not decide (%+v, %v), so the project schema is wrong to name format", resolution.Options, err)
 	}
-	root := filepath.Dir(writeSettings(t, map[string]string{
-		"NexusCohereSettings.json": `{"format": {"tabWidth": 4}}`,
-		"CohereSettings.json":      `{"extends": "./NexusCohereSettings.json", "format": {"tabWidth": 2}}`,
-	}))
-	if _, err := formatoptions.Resolve(root); err == nil {
-		t.Error("a project file carrying format resolved, so the project schema is wrong to leave format out")
+	ours := filepath.Dir(writeSettings(t, map[string]string{"CohereSettings.json": `{"extends": "cohere:system-inc/structure", "format": {"tabWidth": 2}}`}))
+	if _, err := formatoptions.Resolve(ours); err == nil {
+		t.Error("a format block in a chain extending cohere:system-inc/structure resolved, so the description is wrong to say it is refused")
 	}
 }
 

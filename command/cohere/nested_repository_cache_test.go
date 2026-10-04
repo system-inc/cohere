@@ -42,14 +42,14 @@ func TestANestedRepositoryEditReachesItsImportersWarm(t *testing.T) {
 		}
 	}
 
-	// Event is a literal in the finding state, which a string union makes redundant, and a number otherwise.
-	const withFinding = "export type Event = 'alarm';\n"
-	const withoutFinding = "export type Event = number;\n"
+	// EventType is a literal in the finding state, which a string union makes redundant, and a number otherwise.
+	const withFinding = "export type EventType = 'alarm';\n"
+	const withoutFinding = "export type EventType = number;\n"
 	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source","libraries"]}`)
 	write("CohereSettings.json", `{"rules":{"@typescript-eslint/no-redundant-type-constituents":"error"}}`)
 	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
 	write(".gitignore", ".cache/\nnode_modules/\n")
-	write("source/Use.ts", "import type { Event } from '../libraries/base/Event';\nexport type Either = string | Event;\n")
+	write("source/Use.ts", "import type { EventType } from '../libraries/base/Event';\nexport type EitherType = string | EventType;\n")
 	write("libraries/base/Event.ts", withoutFinding)
 	write("libraries/base/package.json", `{"name":"base","private":true,"type":"module"}`)
 	nested := filepath.Join(root, "libraries", "base")
@@ -62,9 +62,11 @@ func TestANestedRepositoryEditReachesItsImportersWarm(t *testing.T) {
 
 	finding := regexp.MustCompile(`(?m)^\S+:\d+:\d+ - .*$`)
 	findings := func(output string) string { return strings.Join(finding.FindAllString(output, -1), "\n") }
+	// Lint findings across a nested repository are the subject, so formatting is left out of every run: the
+	// fixture's settings are written unformatted, and their would-change findings are not what it counts.
 	run := func(arguments ...string) string {
 		t.Helper()
-		output, _ := runCohere(t, binary, root, arguments...)
+		output, _ := runCohere(t, binary, root, append(arguments, "--no-format")...)
 		return output
 	}
 

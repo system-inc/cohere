@@ -2,6 +2,7 @@ package core
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/descriptor"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -32,8 +33,8 @@ import (
 // Upstream reaches for `ctx.scoping()` here, which usually means the algorithm lives in the semantic
 // layer and the rule file is a thin caller. It does not mean that in this case. The two things it
 // asks a scope are `is_set_accessor` and `is_function`, and both are properties of the enclosing
-// syntactic construct rather than of any name binding. Nothing here resolves an identifier, so
-// nothing here needs the checker.
+// syntactic construct rather than of any name binding. A setter accessor resolves no identifier;
+// only the descriptor family below asks the checker, and only whether `Object` is the global.
 //
 // That was measured rather than reasoned. A throwaway probe ran this exact ancestry walk under the
 // untyped harness against all 142 of upstream's cases, asserting the per-input diagnostic counts
@@ -47,24 +48,52 @@ import (
 // `return` inside an `if` inside a `try` inside a setter is still the setter's, which is why this
 // walks instead of reading one parent.
 //
-// # The gap upstream leaves open, reproduced rather than improved on
+// # Setters declared through property descriptors
 //
-// ESLint also catches setters declared through property descriptors, as in
-// `Object.defineProperty(foo, 'bar', { set(val) { return 1; } })`. Upstream carries all twenty-four
-// of those as commented-out fail cases and forty related clean cases, so it knows about the family
-// and does not implement it. This does not implement it either.
+// ESLint also reports a setter declared through a property descriptor:
+// `Object.defineProperty(foo, 'bar', { set(val) { return 1; } })`, and the same under
+// `Object.defineProperties`, `Object.create` and `Reflect.defineProperty`. The port this rule followed
+// left that family out, so ESLint's 23 descriptor rows read as missing (#jjfa7qb). ESLint wrote the
+// rule and is right on first principles too: the descriptor's `set` is called by the same assignment
+// and its value is discarded the same way.
 //
-// That is a deliberate divergence from ESLint and it is worth stating, because the forty clean
-// fixtures make it look tested when what they pin is the absence. Closing it would need the piece
-// this rule otherwise does without: `Object` in that call has to be the global rather than a local
-// shadowing it, which is a name-resolution question and would pull in the checker along with the
-// per-file lock it takes. Upstream's own clean list contains `let Object; Object.defineProperty(...)`
-// for precisely that reason.
+// The recognition is the `descriptor` shelf's, shared with `getter-return`. Here it asks the checker
+// whether `Object` or `Reflect` is the global, because ESLint's corpus pins
+// `let Object; Object.defineProperty(foo, 'bar', { set(val) { return 1; } })` as clean: a local with
+// the global's spelling is somebody else's method. An arrow written `set: val => val` returns its
+// expression body, so that body is what reports, where ESLint reports it.
 var NoSetterReturn = rule.Rule{
 	Name: "no-setter-return",
 
+	// Whether the `Object` or `Reflect` of a descriptor call is the global
+	NeedsTypeChecker: true,
+
 	Run: func(ctx rule.Context, options any) rule.Listeners {
+		isGlobal := func(identifier *ast.Node) bool {
+			return ctx.TypeChecker != nil && rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(identifier))
+		}
+		report := func(node *ast.Node) {
+			ctx.ReportNode(node, rule.Message{
+				Id: "noSetterReturn",
+				Description: "This returns a value from a setter, and the language discards " +
+					"it: an assignment evaluates to the value assigned, never to what the " +
+					"setter returned, so nothing can ever read this. Either the value is dead " +
+					"and the return should be bare, or it was meant to reach a caller and this " +
+					"is a bug that stays silent at runtime.",
+			})
+		}
+
 		return rule.Listeners{
+			// `set: val => val` in a descriptor returns its expression body
+			ast.KindArrowFunction: func(node *ast.Node) {
+				body := node.AsArrowFunction().Body
+				if body == nil || body.Kind == ast.KindBlock {
+					return
+				}
+				if descriptor.IsFunctionUnder(node, "set", isGlobal, descriptor.DescriptorArgument) {
+					report(body)
+				}
+			},
 			ast.KindReturnStatement: func(node *ast.Node) {
 				statement := node.AsReturnStatement()
 				// A bare `return` is control flow rather than a value, and every setter in
@@ -73,42 +102,26 @@ var NoSetterReturn = rule.Rule{
 					return
 				}
 
-				if enclosingSetAccessor(node) == nil {
+				function := enclosingFunction(node)
+				if function == nil {
 					return
 				}
-
-				ctx.ReportNode(node, rule.Message{
-					Id: "noSetterReturn",
-					Description: "This returns a value from a setter, and the language discards " +
-						"it: an assignment evaluates to the value assigned, never to what the " +
-						"setter returned, so nothing can ever read this. Either the value is dead " +
-						"and the return should be bare, or it was meant to reach a caller and this " +
-						"is a bug that stays silent at runtime.",
-				})
+				if ast.IsSetAccessorDeclaration(function) || descriptor.IsFunctionUnder(function, "set", isGlobal, descriptor.DescriptorArgument) {
+					report(node)
+				}
 			},
 		}
 	},
 }
 
-// enclosingSetAccessor returns the setter this node returns from, or nil if it returns from anything
-// else.
+// enclosingFunction returns the function-like node a `return` binds to, or nil at top level.
 //
 // The first function-like ancestor wins, because that is what a `return` binds to. Reaching a setter
 // first means the value is discarded; reaching any other function first means the `return` belongs to
 // that function and is somebody else's business, even when a setter encloses it further up.
 //
-// A top-level `return` reaches neither and answers nil, which is upstream's behavior on the four
-// clean cases that return outside any function at all.
-func enclosingSetAccessor(node *ast.Node) *ast.Node {
-	return ast.FindAncestorOrQuit(node.Parent, func(ancestor *ast.Node) ast.FindAncestorResult {
-		if ast.IsSetAccessorDeclaration(ancestor) {
-			return ast.FindAncestorTrue
-		}
-		// Every other function-like construct is its own return target. This arm is what keeps a
-		// nested function, arrow, getter, method, or constructor inside a setter from reporting.
-		if ast.IsFunctionLike(ancestor) {
-			return ast.FindAncestorQuit
-		}
-		return ast.FindAncestorFalse
-	})
+// A top-level `return` reaches none and answers nil, which keeps the four clean cases that return
+// outside any function at all clean.
+func enclosingFunction(node *ast.Node) *ast.Node {
+	return ast.FindAncestor(node.Parent, ast.IsFunctionLike)
 }

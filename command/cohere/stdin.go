@@ -21,13 +21,14 @@ type stdinRequest struct {
 	Location         projectLocation
 	WorkingDirectory string
 	FilePath         string
-	Format           bool
+	NoFormat         bool
 	MaxPasses        int
 	SingleThreaded   bool
 }
 
-// runStdin answers what `cohere --fix [--format] <path>` would write for one file, computed from the
-// buffer on stdin instead of the file on disk, and writes it to stdout. Nothing is written to disk.
+// runStdin answers what `cohere --fix <path>` (fixes and format, or fixes alone with --no-format) would
+// write for one file, computed from the buffer on stdin instead of the file on disk, and writes it to
+// stdout. Nothing is written to disk.
 //
 // It exists for the editor's save hook (editors/vscode), which formats the buffer before the save
 // lands so the document never reloads and undo keeps working. The answer has to be the gate's answer,
@@ -58,7 +59,8 @@ func runStdin(ctx context.Context, request stdinRequest, input io.Reader, output
 	}
 	path = filepath.Clean(path)
 
-	formatter, err := configuredFormatter(request.Format)
+	// The gate's own decision: formatting by default, left out by --no-format.
+	formatter, err := configuredFormatter(!request.NoFormat)
 	if err != nil {
 		return err
 	}

@@ -28,7 +28,8 @@ const (
 	ReferencePath     = "schema/CohereSettings.md"
 )
 
-// FormatKey is the top-level key only the Nexus tier may carry.
+// FormatKey is the formatter's block: optional in a project's settings, which it decides outside our tiers,
+// and required in the Nexus tier.
 const FormatKey = "format"
 
 // Build renders every generated file, keyed by its path relative to the module root.
@@ -53,13 +54,10 @@ func Build(ruleNames []string) (map[string][]byte, error) {
 	return files, nil
 }
 
-// document is one schema: the project's, which has no `format`, or the Nexus tier's, which requires it.
+// document is one schema: the project's, where `format` is optional, or the Nexus tier's, which requires it.
 func document(ruleNames []string, nexusTier bool) (map[string]any, error) {
 	properties := map[string]any{}
 	for _, key := range configuration.TopLevelKeys() {
-		if key.Name == FormatKey && !nexusTier {
-			continue
-		}
 		description, described := topLevelDescriptions[key.Name]
 		if !described {
 			return nil, fmt.Errorf("settingsschema: the loader accepts %q and nothing describes it; add it to topLevelDescriptions", key.Name)
@@ -78,12 +76,12 @@ func document(ruleNames []string, nexusTier bool) (map[string]any, error) {
 	}
 
 	title := "CohereSettings.json"
-	summary := "cohere's settings for one repository: what it checks, how strictly, and which paths it never touches. " +
-		"The formatter's options live in the Nexus tier this file extends, never here."
+	summary := "cohere's settings for one repository: what it checks, how strictly, how it formats, and which paths it " +
+		"never touches. With no file at all, cohere applies the house stack and the house format."
 	if nexusTier {
 		title = "NexusCohereSettings.json"
-		summary = "The Nexus tier every repository's settings extend. It is the one file that holds the format block, " +
-			"so every project formats the same way."
+		summary = "The Nexus tier our repositories' settings reach. In a chain extending a cohere:system-inc set it is the " +
+			"one file that holds the format block, so every one of our repositories formats the same way."
 	}
 	schema := map[string]any{
 		"$schema":              "https://json-schema.org/draft/2020-12/schema",

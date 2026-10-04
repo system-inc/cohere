@@ -78,7 +78,7 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	}
 
 	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`)
-	write("CohereSettings.json", `{"rules":{"no-debugger":"error","no-var":"error"}}`)
+	write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`)
 	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
 	write(".gitignore", ".cache/\nnode_modules/\n")
 	write("source/a.ts", "export const a: number = 1;\n")
@@ -104,6 +104,9 @@ func TestRunCacheEndToEnd(t *testing.T) {
 		if !cached {
 			command.Args = append(command.Args, "--no-cache")
 		}
+		// What the cache notices is the subject here, not formatting: the fixture's JSON is written unformatted
+		// on purpose, and a run that formats it is a run that writes, which is never recorded.
+		command.Args = append(command.Args, "--no-format")
 		command.Env = environment
 		output, err := command.CombinedOutput()
 		if err == nil {
@@ -212,22 +215,24 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			func() { write("source/nested/b.ts", "import { a } from \"../a\";\nexport const b = a + 1;\n") }},
 		{"the lint config changed", false, nil,
 			func() {
-				write("CohereSettings.json", `{"rules":{"no-debugger":"error","no-var":"error","prefer-const":"error"}}`)
+				write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error","prefer-const":"error"}}`)
 			},
-			func() { write("CohereSettings.json", `{"rules":{"no-debugger":"error","no-var":"error"}}`) }},
+			func() {
+				write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`)
+			}},
 		// Only the base is edited, and it is untracked, so git reports the same changed files before and
 		// after and the scope fact cannot see it. The run cache's declared inputs and the findings
 		// cache's key must each name every file in the extends chain, or both replay the old verdict.
 		{"a base the lint config extends changed", false,
 			func() {
-				write("lint/base.json", `{"rules":{"no-debugger":"error","no-var":"error"}}`)
-				write("CohereSettings.json", `{"extends":"./lint/base.json","rules":{}}`)
+				write("lint/base.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`)
+				write("CohereSettings.json", `{"extends":"./lint/base.json","rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off"}}`)
 			},
 			func() {
-				write("lint/base.json", `{"rules":{"no-debugger":"error","no-var":"error","prefer-const":"error"}}`)
+				write("lint/base.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error","prefer-const":"error"}}`)
 			},
 			func() {
-				write("CohereSettings.json", `{"rules":{"no-debugger":"error","no-var":"error"}}`)
+				write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`)
 				remove("lint")
 			}},
 		{"the tsconfig changed", false, nil,
@@ -286,7 +291,9 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			if !isReplay(next) {
 				t.Fatalf("the run after that did not replay the new truth:\n%s", next)
 			}
-			if !provenance.MatchString(keepLines(next, "cached: ")) {
+			// Under zero config the sets line comes first, and it replays as it was: which sets applied is the
+			// tree's verdict, not this run's.
+			if !provenance.MatchString(keepLines(next, "cached: ", "sets: ")) {
 				t.Fatalf("the replay printed the fix line as though the fix phase had just run:\n%s", next)
 			}
 			if replayBody(next) != verdict(cold) || nextExit != coldExit {
@@ -391,7 +398,8 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			}
 			return nil
 		})
-		if dump, _ := run(true, "--cache-dump"); !strings.Contains(dump, "runs: ") || !strings.Contains(dump, "(bare): recorded ") {
+		// Every run here leaves formatting out (see run), so the bare run is recorded as `--no-format`.
+		if dump, _ := run(true, "--cache-dump"); !strings.Contains(dump, "runs: ") || !strings.Contains(dump, "--no-format: recorded ") {
 			t.Fatalf("--cache-dump did not show the bare run it just recorded:\n%s", dump)
 		}
 		for _, table := range tables {

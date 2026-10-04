@@ -40,7 +40,7 @@ func TestTheContentPackServesAReplacedDeclarationFresh(t *testing.T) {
 	write("CohereSettings.json", `{"rules":{"@typescript-eslint/no-redundant-type-constituents":"error"}}`)
 	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
 	write(".gitignore", ".cache/\nnode_modules/\n")
-	write("source/Use.ts", "import type { Event } from 'events-package';\nexport type Either = string | Event;\n")
+	write("source/Use.ts", "import type { Event } from 'events-package';\nexport type EitherType = string | Event;\n")
 	write("node_modules/events-package/package.json", `{"name":"events-package","types":"index.d.ts"}`)
 	declaration := filepath.Join(root, "node_modules", "events-package", "index.d.ts")
 	write("node_modules/events-package/index.d.ts", withoutFinding)

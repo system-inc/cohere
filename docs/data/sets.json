@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 292,
+        "rulesOn": 290,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -162,6 +162,15 @@
             {
                 "name": "@typescript-eslint/default-param-last",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/dot-notation",
+                "severity": "error",
+                "options": [
+                    {
+                        "allowProtectedClassPropertyAccess": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/init-declarations",
@@ -554,6 +563,10 @@
                 "severity": "error"
             },
             {
+                "name": "dot-notation",
+                "severity": "off"
+            },
+            {
                 "name": "eqeqeq",
                 "severity": "error"
             },
@@ -627,10 +640,6 @@
             },
             {
                 "name": "nexus/boundary-no-internal-import",
-                "severity": "error"
-            },
-            {
-                "name": "nexus/boundary-no-nexus-outside-import",
                 "severity": "error"
             },
             {
@@ -779,10 +788,6 @@
             },
             {
                 "name": "nexus/correctness-require-response-status-check",
-                "severity": "error"
-            },
-            {
-                "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
             {
@@ -1110,10 +1115,6 @@
                 "name": "no-restricted-globals",
                 "severity": "error",
                 "options": [
-                    {
-                        "name": "Buffer",
-                        "message": "`Buffer` is the Node global, and it does not exist on Cloudflare Workers, which is why @cloudflare/workers-types declares it `any`: nothing read through it is checked. Use the byte helpers in @nexus/source/encoding/ByteEncoding instead: utf8ToBytes / bytesToUtf8, base64ToBytes / bytesToBase64, base64UrlToBytes / bytesToBase64Url, hexToBytes / bytesToHex, concatenateBytes, utf8ByteLength, byteView, and `new Uint8Array(length)` for Buffer.alloc. A Buffer a Node API hands back (readFileSync, cipher.update) is already typed; keep using it as the Uint8Array it is.."
-                    },
                     "addEventListener",
                     "blur",
                     "close",
@@ -1177,17 +1178,6 @@
             {
                 "name": "no-restricted-imports",
                 "severity": "off"
-            },
-            {
-                "name": "no-restricted-properties",
-                "severity": "error",
-                "options": [
-                    {
-                        "object": "JSON",
-                        "property": "parse",
-                        "message": "`JSON.parse` returns `any`, and that `any` flows unchecked into every read downstream, which is where most no-unsafe findings come from. Parse through @nexus/source/structured-text/json/Json instead: `parseJsonOrThrow(text, context, isValue)` with a guard from @nexus/source/validation/Guard when the code reads fields, or `parseJson(text, context)` and handle its 'Invalid' outcome where bad input already falls back. Name the source in `context`. For a deep clone, use `structuredClone`."
-                    }
-                ]
             },
             {
                 "name": "no-return-assign",
@@ -1493,7 +1483,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 358,
+        "rulesOn": 356,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -1560,6 +1550,15 @@
             {
                 "name": "@typescript-eslint/default-param-last",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/dot-notation",
+                "severity": "error",
+                "options": [
+                    {
+                        "allowProtectedClassPropertyAccess": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/init-declarations",
@@ -1952,6 +1951,10 @@
                 "severity": "error"
             },
             {
+                "name": "dot-notation",
+                "severity": "off"
+            },
+            {
                 "name": "eqeqeq",
                 "severity": "error"
             },
@@ -2025,10 +2028,6 @@
             },
             {
                 "name": "nexus/boundary-no-internal-import",
-                "severity": "error"
-            },
-            {
-                "name": "nexus/boundary-no-nexus-outside-import",
                 "severity": "error"
             },
             {
@@ -2177,10 +2176,6 @@
             },
             {
                 "name": "nexus/correctness-require-response-status-check",
-                "severity": "error"
-            },
-            {
-                "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
             {
@@ -2508,10 +2503,6 @@
                 "name": "no-restricted-globals",
                 "severity": "error",
                 "options": [
-                    {
-                        "name": "Buffer",
-                        "message": "`Buffer` is the Node global, and it does not exist on Cloudflare Workers, which is why @cloudflare/workers-types declares it `any`: nothing read through it is checked. Use the byte helpers in @nexus/source/encoding/ByteEncoding instead: utf8ToBytes / bytesToUtf8, base64ToBytes / bytesToBase64, base64UrlToBytes / bytesToBase64Url, hexToBytes / bytesToHex, concatenateBytes, utf8ByteLength, byteView, and `new Uint8Array(length)` for Buffer.alloc. A Buffer a Node API hands back (readFileSync, cipher.update) is already typed; keep using it as the Uint8Array it is.."
-                    },
                     "addEventListener",
                     "blur",
                     "close",
@@ -2575,17 +2566,6 @@
             {
                 "name": "no-restricted-imports",
                 "severity": "off"
-            },
-            {
-                "name": "no-restricted-properties",
-                "severity": "error",
-                "options": [
-                    {
-                        "object": "JSON",
-                        "property": "parse",
-                        "message": "`JSON.parse` returns `any`, and that `any` flows unchecked into every read downstream, which is where most no-unsafe findings come from. Parse through @nexus/source/structured-text/json/Json instead: `parseJsonOrThrow(text, context, isValue)` with a guard from @nexus/source/validation/Guard when the code reads fields, or `parseJson(text, context)` and handle its 'Invalid' outcome where bad input already falls back. Name the source in `context`. For a deep clone, use `structuredClone`."
-                    }
-                ]
             },
             {
                 "name": "no-return-assign",
@@ -3404,6 +3384,15 @@
                 "severity": "error"
             },
             {
+                "name": "@typescript-eslint/dot-notation",
+                "severity": "error",
+                "options": [
+                    {
+                        "allowProtectedClassPropertyAccess": true
+                    }
+                ]
+            },
+            {
                 "name": "@typescript-eslint/init-declarations",
                 "severity": "off"
             },
@@ -3945,6 +3934,10 @@
                 "severity": "error"
             },
             {
+                "name": "dot-notation",
+                "severity": "off"
+            },
+            {
                 "name": "eqeqeq",
                 "severity": "error"
             },
@@ -4178,10 +4171,6 @@
             },
             {
                 "name": "nexus/correctness-require-response-status-check",
-                "severity": "error"
-            },
-            {
-                "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
             {
@@ -4990,7 +4979,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 297,
+        "rulesOn": 298,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5057,6 +5046,15 @@
             {
                 "name": "@typescript-eslint/default-param-last",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/dot-notation",
+                "severity": "error",
+                "options": [
+                    {
+                        "allowProtectedClassPropertyAccess": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/init-declarations",
@@ -5515,6 +5513,10 @@
             {
                 "name": "default-param-last",
                 "severity": "error"
+            },
+            {
+                "name": "dot-notation",
+                "severity": "off"
             },
             {
                 "name": "eqeqeq",
@@ -6639,7 +6641,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 282,
+        "rulesOn": 280,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6706,6 +6708,15 @@
             {
                 "name": "@typescript-eslint/default-param-last",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/dot-notation",
+                "severity": "error",
+                "options": [
+                    {
+                        "allowProtectedClassPropertyAccess": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/init-declarations",
@@ -7146,6 +7157,10 @@
                 "severity": "error"
             },
             {
+                "name": "dot-notation",
+                "severity": "off"
+            },
+            {
                 "name": "eqeqeq",
                 "severity": "error"
             },
@@ -7219,10 +7234,6 @@
             },
             {
                 "name": "nexus/boundary-no-internal-import",
-                "severity": "error"
-            },
-            {
-                "name": "nexus/boundary-no-nexus-outside-import",
                 "severity": "error"
             },
             {
@@ -7371,10 +7382,6 @@
             },
             {
                 "name": "nexus/correctness-require-response-status-check",
-                "severity": "error"
-            },
-            {
-                "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
             {
@@ -7702,10 +7709,6 @@
                 "name": "no-restricted-globals",
                 "severity": "error",
                 "options": [
-                    {
-                        "name": "Buffer",
-                        "message": "`Buffer` is the Node global, and it does not exist on Cloudflare Workers, which is why @cloudflare/workers-types declares it `any`: nothing read through it is checked. Use the byte helpers in @nexus/source/encoding/ByteEncoding instead: utf8ToBytes / bytesToUtf8, base64ToBytes / bytesToBase64, base64UrlToBytes / bytesToBase64Url, hexToBytes / bytesToHex, concatenateBytes, utf8ByteLength, byteView, and `new Uint8Array(length)` for Buffer.alloc. A Buffer a Node API hands back (readFileSync, cipher.update) is already typed; keep using it as the Uint8Array it is.."
-                    },
                     "addEventListener",
                     "blur",
                     "close",
@@ -7769,17 +7772,6 @@
             {
                 "name": "no-restricted-imports",
                 "severity": "off"
-            },
-            {
-                "name": "no-restricted-properties",
-                "severity": "error",
-                "options": [
-                    {
-                        "object": "JSON",
-                        "property": "parse",
-                        "message": "`JSON.parse` returns `any`, and that `any` flows unchecked into every read downstream, which is where most no-unsafe findings come from. Parse through @nexus/source/structured-text/json/Json instead: `parseJsonOrThrow(text, context, isValue)` with a guard from @nexus/source/validation/Guard when the code reads fields, or `parseJson(text, context)` and handle its 'Invalid' outcome where bad input already falls back. Name the source in `context`. For a deep clone, use `structuredClone`."
-                    }
-                ]
             },
             {
                 "name": "no-return-assign",
@@ -8078,7 +8070,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 270,
+        "rulesOn": 268,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8145,6 +8137,15 @@
             {
                 "name": "@typescript-eslint/default-param-last",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/dot-notation",
+                "severity": "error",
+                "options": [
+                    {
+                        "allowProtectedClassPropertyAccess": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/init-declarations",
@@ -8537,6 +8538,10 @@
                 "severity": "error"
             },
             {
+                "name": "dot-notation",
+                "severity": "off"
+            },
+            {
                 "name": "eqeqeq",
                 "severity": "error"
             },
@@ -8610,10 +8615,6 @@
             },
             {
                 "name": "nexus/boundary-no-internal-import",
-                "severity": "error"
-            },
-            {
-                "name": "nexus/boundary-no-nexus-outside-import",
                 "severity": "error"
             },
             {
@@ -8762,10 +8763,6 @@
             },
             {
                 "name": "nexus/correctness-require-response-status-check",
-                "severity": "error"
-            },
-            {
-                "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
             {
@@ -9093,10 +9090,6 @@
                 "name": "no-restricted-globals",
                 "severity": "error",
                 "options": [
-                    {
-                        "name": "Buffer",
-                        "message": "`Buffer` is the Node global, and it does not exist on Cloudflare Workers, which is why @cloudflare/workers-types declares it `any`: nothing read through it is checked. Use the byte helpers in @nexus/source/encoding/ByteEncoding instead: utf8ToBytes / bytesToUtf8, base64ToBytes / bytesToBase64, base64UrlToBytes / bytesToBase64Url, hexToBytes / bytesToHex, concatenateBytes, utf8ByteLength, byteView, and `new Uint8Array(length)` for Buffer.alloc. A Buffer a Node API hands back (readFileSync, cipher.update) is already typed; keep using it as the Uint8Array it is.."
-                    },
                     "addEventListener",
                     "blur",
                     "close",
@@ -9160,17 +9153,6 @@
             {
                 "name": "no-restricted-imports",
                 "severity": "off"
-            },
-            {
-                "name": "no-restricted-properties",
-                "severity": "error",
-                "options": [
-                    {
-                        "object": "JSON",
-                        "property": "parse",
-                        "message": "`JSON.parse` returns `any`, and that `any` flows unchecked into every read downstream, which is where most no-unsafe findings come from. Parse through @nexus/source/structured-text/json/Json instead: `parseJsonOrThrow(text, context, isValue)` with a guard from @nexus/source/validation/Guard when the code reads fields, or `parseJson(text, context)` and handle its 'Invalid' outcome where bad input already falls back. Name the source in `context`. For a deep clone, use `structuredClone`."
-                    }
-                ]
             },
             {
                 "name": "no-return-assign",

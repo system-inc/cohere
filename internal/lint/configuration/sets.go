@@ -51,6 +51,11 @@ func InOurTiers(sources []string) bool {
 	return false
 }
 
+// InOurTiers reports whether this configuration's chain reaches one of our tier sets. See InOurTiers.
+func (c *Config) InOurTiers() bool {
+	return c != nil && InOurTiers(c.Sources)
+}
+
 // SourceContents returns the bytes of one source in a configuration's chain: an embedded set's text,
 // or a file's.
 //

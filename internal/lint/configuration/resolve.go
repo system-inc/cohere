@@ -168,7 +168,12 @@ func KeyReachesRule(key string, ruleName string) bool {
 // is how both ESLint and oxlint resolve, and matching them exactly is the whole point: cohere cannot
 // be diffed honestly against the gate it replaces while the two disagree about which rules were
 // even supposed to run.
+//
+// Under zero config the file resolves through the variant of the house stack it gets (see house.go).
 func (c *Config) Resolve(path string) Resolved {
+	if c.house != nil {
+		return c.house.variantFor(path).Resolve(path)
+	}
 	relative := c.relativePath(path)
 
 	for _, pattern := range c.IgnorePatterns {

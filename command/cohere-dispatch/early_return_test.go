@@ -110,12 +110,24 @@ func buildDispatcherAndEngine(t *testing.T) (dispatcher string, engine string) {
 
 // writeEarlyReturnProject writes a small project with one lint rule on, plus the given files, and returns
 // its root.
+//
+// The settings are written formatted, as the formatter leaves them: a bare run formats (#b1sjy7b), so a
+// fixture whose own JSON the formatter would rewrite turns every clean run into one that exits 1 on it.
 func writeEarlyReturnProject(t *testing.T, extra map[string]string) string {
 	root := t.TempDir()
 	files := map[string]string{
-		"tsconfig.json":            `{"compilerOptions":{"target":"ES2022","module":"esnext","moduleResolution":"bundler","strict":true,"noEmit":true},"include":["**/*.ts"]}`,
-		"CohereSettings.json":      `{"extends":"./NexusCohereSettings.json","rules":{"no-debugger":"error"}}`,
-		"NexusCohereSettings.json": `{"format":{}}`,
+		"tsconfig.json": "{\n" +
+			"  \"compilerOptions\": {\n" +
+			"    \"target\": \"ES2022\",\n" +
+			"    \"module\": \"esnext\",\n" +
+			"    \"moduleResolution\": \"bundler\",\n" +
+			"    \"strict\": true,\n" +
+			"    \"noEmit\": true\n" +
+			"  },\n" +
+			"  \"include\": [\"**/*.ts\"]\n" +
+			"}\n",
+		"CohereSettings.json":      "{ \"extends\": \"./NexusCohereSettings.json\", \"rules\": { \"no-debugger\": \"error\" } }\n",
+		"NexusCohereSettings.json": "{ \"format\": {} }\n",
 	}
 	for name, contents := range extra {
 		files[name] = contents

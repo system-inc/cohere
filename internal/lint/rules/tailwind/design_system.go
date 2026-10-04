@@ -176,7 +176,7 @@ func loadDesignSystemThrough(program rule.Program, fileSystem *rule.RecordingFS)
 	// the read set the findings cache keys the Tailwind rules on.
 	fileExists := fileSystem.FileExists
 
-	entryPoint := findTailwindEntryPoint(projectRoot, fileExists)
+	entryPoint := FindEntryPoint(projectRoot, fileExists)
 	if entryPoint == "" {
 		return DesignSystemResult{Err: fmt.Errorf("%w: looked under %s", ErrNoTailwindEntryPoint, projectRoot)}
 	}
@@ -246,11 +246,13 @@ var tailwindEntryPointCandidates = []string{
 	filepath.Join("app", "theme.css"),
 }
 
-// findTailwindEntryPoint returns the project's root stylesheet, or empty when there is none.
+// FindEntryPoint returns the project's root stylesheet, or empty when there is none.
 //
 // fileExists answers for files only, never directories. The design system asks the program's
-// filesystem, so the run cache records each probe; see loadDesignSystemForProgram.
-func findTailwindEntryPoint(projectRoot string, fileExists func(path string) bool) string {
+// filesystem, so the run cache records each probe; see loadDesignSystemForProgram. Exported for zero
+// config's detection of cohere:tailwind (internal/lint/housesets), which must find the same stylesheet
+// the rules then read, so there is one search rather than two that could disagree.
+func FindEntryPoint(projectRoot string, fileExists func(path string) bool) string {
 	for _, candidate := range tailwindEntryPointCandidates {
 		path := filepath.Join(projectRoot, candidate)
 		if fileExists(path) {
