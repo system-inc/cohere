@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/system-inc/cohere/internal/format/formatfiles"
 	"github.com/system-inc/cohere/internal/types/program"
@@ -99,7 +100,7 @@ func TestTheProjectReadsItsLibrariesDrift(t *testing.T) {
 	}
 	before := treeSnapshot(t, root)
 
-	check, err := checkNestedRepositories(engine, root)
+	check, err := checkNestedRepositories(engine, root, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,9 +132,9 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(t *testing.T) {
 	engine.enumerate = func(walkRoot string) (formatfiles.Enumeration, error) {
 		return formatfiles.Enumerate(walkRoot, engine.Handles)
 	}
-	check := func(label string, wantFormatted int, wantDrift ...string) {
+	check := func(label string, wantChecked int, wantDrift ...string) {
 		t.Helper()
-		result, err := checkNestedRepositories(engine, root)
+		result, err := checkNestedRepositories(engine, root, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -145,8 +146,8 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(t *testing.T) {
 		if strings.Join(got, ", ") != strings.Join(wantDrift, ", ") {
 			t.Fatalf("%s: drift %v, want %v", label, got, wantDrift)
 		}
-		if result.Files != 4 || result.Formatted != wantFormatted {
-			t.Fatalf("%s: %d files, %d formatted, want 4 files and %d formatted", label, result.Files, result.Formatted, wantFormatted)
+		if result.Files != 4 || result.Checked != wantChecked {
+			t.Fatalf("%s: %d files, %d checked, want 4 files and %d checked", label, result.Files, result.Checked, wantChecked)
 		}
 	}
 	drifted := []string{"library/inner/Deep.ts", "library/source/Thing.ts"}
@@ -229,6 +230,84 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(t *testing.T) {
 	check("an entry under another formatter's key", 3, drifted...)
 	vouch(key, options+" changed")
 	check("an entry under other options", 2, drifted...)
+
+	// `--format-all` reads every nested file: an entry vouching for Thing.ts's misformatted bytes, under
+	// this formatter's key and options, says nothing to it.
+	vouch(key, options)
+	all, err := checkNestedRepositories(engine, root, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if all.Checked != 4 || len(all.Drift) != 2 {
+		t.Fatalf("--format-all checked %d of 4 files and found %d drifted, want 4 and 2 (the record's word taken for Thing.ts)", all.Checked, len(all.Drift))
+	}
+}
+
+// TestASignedEntryStillReadsAnEditedFile is the positive control through the record's cheap path. An
+// entry signed with its file's size and modification time vouches for the file without reading it, so
+// an edit, which moves both, must send the file back through the formatter.
+func TestASignedEntryStillReadsAnEditedFile(t *testing.T) {
+	root := nestedTree(t)
+	library := filepath.Join(root, "library")
+	if err := os.MkdirAll(cacheDirectory(library), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	engine := prettierLike()
+	engine.enumerate = func(walkRoot string) (formatfiles.Enumeration, error) {
+		return formatfiles.Enumerate(walkRoot, engine.Handles)
+	}
+	// Older than the second a fresh write is left unsigned for.
+	tidy := filepath.Join(library, "source", "Tidy.ts")
+	past := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(tidy, past, past); err != nil {
+		t.Fatal(err)
+	}
+	drifted := func() []string {
+		t.Helper()
+		check, err := checkNestedRepositories(engine, root, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		names := []string{}
+		for _, drift := range check.Drift {
+			names = append(names, filepath.Base(drift.FileName))
+		}
+		return names
+	}
+
+	// Recorded, then signed on the next check, which finds its bytes on record.
+	drifted()
+	drifted()
+	if entry := readFormatSection(library).Entries[tidy]; entry.ModifiedNanoseconds != past.UnixNano() {
+		t.Fatalf("Tidy.ts was not signed with its modification time: %+v", entry)
+	}
+
+	writeTree(t, root, map[string]string{"library/source/Tidy.ts": "export const tidy   =   1\n"})
+	if got := strings.Join(drifted(), ", "); got != "Deep.ts, Thing.ts, Tidy.ts" {
+		t.Fatalf("an edit to a signed file was taken on the record's word: drift %s", got)
+	}
+}
+
+// TestTheNestedLineSaysWhatItRead: the files the formatter checked and the files taken on the record's
+// word are counted apart, and "would change" is said only of checked files.
+func TestTheNestedLineSaysWhatItRead(t *testing.T) {
+	for _, testCase := range []struct {
+		check nestedDriftCheck
+		want  string
+	}{
+		{nestedDriftCheck{Repositories: 2, Files: 2073},
+			"nested repositories: 2 read, 2073 files: none checked by the formatter, all 2073 taken on their record's word as formatted at their current bytes"},
+		{nestedDriftCheck{Repositories: 2, Files: 2073, Checked: 2073, Drift: make([]nestedDrift, 3)},
+			"nested repositories: 2 read, 2073 files: 2073 checked by the formatter, 3 would change under their own run"},
+		{nestedDriftCheck{Repositories: 2, Files: 2073, Checked: 23, Drift: make([]nestedDrift, 1)},
+			"nested repositories: 2 read, 2073 files: 23 checked by the formatter, 1 would change under their own run; 2050 taken on their record's word as formatted at their current bytes"},
+		{nestedDriftCheck{},
+			"nested repositories: 0 read, 0 files: 0 checked by the formatter, 0 would change under their own run"},
+	} {
+		if got := nestedSummary(testCase.check); got != testCase.want {
+			t.Errorf("got  %s\nwant %s", got, testCase.want)
+		}
+	}
 }
 
 // TestALibraryIsFormattedFromItsOwnRootAndReadFromItsProject is the ruling end to end, through the
@@ -267,7 +346,7 @@ func TestALibraryIsFormattedFromItsOwnRootAndReadFromItsProject(t *testing.T) {
 	// says its fix was not applied.
 	before := treeSnapshot(t, root)
 	output, code := runCohere(t, binary, root, "--no-fix", "--format")
-	if code == 0 || !strings.Contains(output, "nested repositories: 1 read, 2 files (2 not on record as formatted), 1 would change under their own run") ||
+	if code == 0 || !strings.Contains(output, "nested repositories: 1 read, 2 files: 2 checked by the formatter, 1 would change under their own run") ||
 		!strings.Contains(output, "1 fix not applied: in nested repository library") ||
 		!strings.Contains(output, filepath.Join(library, "Inner.ts")+":1:1 - the formatter would rewrite this file in nested repository library") {
 		t.Fatalf("the project's check did not report the library's drift, exit %d:\n%s", code, output)
@@ -305,8 +384,14 @@ func TestALibraryIsFormattedFromItsOwnRootAndReadFromItsProject(t *testing.T) {
 	// The library's run left its record in the library, and the project's check reads it, so nothing in
 	// the library is formatted again.
 	output, _ = runCohere(t, binary, root, "--no-fix", "--format")
-	if !strings.Contains(output, "nested repositories: 1 read, 2 files (0 not on record as formatted), 0 would change under their own run") {
+	if !strings.Contains(output, "nested repositories: 1 read, 2 files: none checked by the formatter, all 2 taken on their record's word as formatted at their current bytes") {
 		t.Fatalf("the library is still reported, or formatted again, after its own run formatted it:\n%s", output)
+	}
+
+	// `--format-all` reads every nested file whatever the record says.
+	output, _ = runCohere(t, binary, root, "--no-fix", "--format-all")
+	if !strings.Contains(output, "nested repositories: 1 read, 2 files: 2 checked by the formatter, 0 would change under their own run\n") {
+		t.Fatalf("--format-all took the library's record's word:\n%s", output)
 	}
 	if !strings.Contains(output, filepath.Join(root, "Producer.ts")+":1:1 - --fix would rewrite this file") {
 		t.Fatalf("the project's own drift went missing:\n%s", output)
@@ -317,7 +402,7 @@ func TestALibraryIsFormattedFromItsOwnRootAndReadFromItsProject(t *testing.T) {
 	writeTree(t, root, map[string]string{"library/Inner.ts": "export const inner   =   1;\n"})
 	for _, label := range []string{"the check after the plant", "the check after that"} {
 		output, code = runCohere(t, binary, root, "--no-fix", "--format")
-		if code == 0 || !strings.Contains(output, "nested repositories: 1 read, 2 files (1 not on record as formatted), 1 would change under their own run") ||
+		if code == 0 || !strings.Contains(output, "nested repositories: 1 read, 2 files: 1 checked by the formatter, 1 would change under their own run; 1 taken on their record's word as formatted at their current bytes") ||
 			!strings.Contains(output, filepath.Join(library, "Inner.ts")+":1:1 - the formatter would rewrite this file in nested repository library") {
 			t.Fatalf("%s did not report the planted misformat, exit %d:\n%s", label, code, output)
 		}

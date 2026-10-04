@@ -81,9 +81,10 @@ type nestedDriftCheck struct {
 	Repositories int
 	Files        int
 
-	// Formatted is how many of those files were not on their repository's record as formatted at their
-	// current bytes, and so went through the formatter.
-	Formatted int
+	// Checked is how many of those files went through the formatter: under `--format-all` every one, and
+	// otherwise the ones not on their repository's record as formatted at their current bytes. The rest
+	// were taken on the record's word, and the summary says so rather than counting them as read.
+	Checked int
 
 	// Walks is each repository's walk, for the caller to declare to the run cache, and Notes is what the
 	// caller prints to stderr. Both are handed back rather than acted on here, because the check runs
@@ -122,7 +123,7 @@ func nestedFormatRecord(repositoryRoot string) *formatRecord {
 // nobody running here. Each submodule is walked as a run rooted there would walk it, with its own ignore
 // layers. Only the formatter is asked: a fix in a library's code is a finding the project's lint already
 // reports, at its position, so repeating it here would count one problem twice.
-func checkNestedRepositories(engine formatEngine, root string) (nestedDriftCheck, error) {
+func checkNestedRepositories(engine formatEngine, root string, formatAll bool) (nestedDriftCheck, error) {
 	var check nestedDriftCheck
 
 	pending, err := declaredBelow(root, "")
@@ -157,8 +158,13 @@ func checkNestedRepositories(engine formatEngine, root string) (nestedDriftCheck
 		// point of this formatter under these options, so skipping it cannot hide drift.
 		record := nestedFormatRecord(repositoryRoot)
 		transform := record.observe(formatTransform(engine), engine.OptionsFingerprint)
-		unformatted := record.unformatted(enumeration.Files, engine.OptionsFingerprint)
-		check.Formatted += len(unformatted)
+		// `--format-all` is every file, nested ones included: the record says nothing about which files it
+		// reads, and only learns from what the formatter sees, as at the top level.
+		unformatted := enumeration.Files
+		if !formatAll {
+			unformatted = record.unformatted(enumeration.Files, engine.OptionsFingerprint)
+		}
+		check.Checked += len(unformatted)
 		for index, outcome := range formatNestedFiles(transform, unformatted) {
 			if outcome.err != nil {
 				return check, fmt.Errorf("formatting %s in nested repository %s: %w", unformatted[index], relative, outcome.err)
@@ -190,10 +196,10 @@ type nestedCheckResult struct {
 // answer will arrive. The check reads only the nested repositories and writes only their records, and a
 // run that checks writes nothing at all, so the two share no state; run one after the other, the check
 // was a second walk and format the whole run waited for.
-func startNestedCheck(engine formatEngine, root string) <-chan nestedCheckResult {
+func startNestedCheck(engine formatEngine, root string, formatAll bool) <-chan nestedCheckResult {
 	answer := make(chan nestedCheckResult, 1)
 	go func() {
-		check, err := checkNestedRepositories(engine, root)
+		check, err := checkNestedRepositories(engine, root, formatAll)
 		answer <- nestedCheckResult{check: check, err: err}
 	}()
 	return answer
@@ -256,6 +262,24 @@ func declaredBelow(root string, relative string) ([]string, error) {
 	}
 	sort.Strings(paths)
 	return paths, nil
+}
+
+// nestedSummary is the check's line: what it read, split into the files the formatter checked and the
+// files taken on their record's word, with what would change stated only of the checked ones. A check
+// that took every file on the record's word says so, never a bare "0 would change" about files it did not
+// read.
+func nestedSummary(check nestedDriftCheck) string {
+	line := fmt.Sprintf("nested repositories: %d read, %d files: ", check.Repositories, check.Files)
+	onRecord := check.Files - check.Checked
+	switch {
+	case check.Checked == 0 && onRecord > 0:
+		return line + fmt.Sprintf("none checked by the formatter, all %d taken on their record's word as formatted at their current bytes", onRecord)
+	case onRecord == 0:
+		return line + fmt.Sprintf("%d checked by the formatter, %d would change under their own run", check.Checked, len(check.Drift))
+	default:
+		return line + fmt.Sprintf("%d checked by the formatter, %d would change under their own run; %d taken on their record's word as formatted at their current bytes",
+			check.Checked, len(check.Drift), onRecord)
+	}
 }
 
 // printNestedDrift reports each drifted file as a finding, in the shape every other finding prints,

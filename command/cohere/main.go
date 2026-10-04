@@ -651,7 +651,7 @@ func run() error {
 		// paths has said which files it is about. It starts here, beside the fix phase, and is joined below.
 		var nestedCheck <-chan nestedCheckResult
 		if !mutate && formatter != nil && writeScope.Everything {
-			nestedCheck = startNestedCheck(formatter, repositoryRoot)
+			nestedCheck = startNestedCheck(formatter, repositoryRoot, *formatAll)
 		}
 
 		fixStart := time.Now()
@@ -721,8 +721,7 @@ func run() error {
 				}
 				printNestedDrift(os.Stdout, nested)
 				findings += len(nested.Drift)
-				fmt.Fprintf(provenanceOutput(os.Stdout), "nested repositories: %d read, %d files (%d not on record as formatted), %d would change under their own run\n",
-					nested.Repositories, nested.Files, nested.Formatted, len(nested.Drift))
+				fmt.Fprintln(provenanceOutput(os.Stdout), nestedSummary(nested))
 			}
 			report.recordChecked(phaseFix, fixDuration, len(fixSummary.ChangedFiles))
 		}
