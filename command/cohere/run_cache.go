@@ -537,6 +537,12 @@ func finishRunCache(exitCode int) {
 
 // record captures this run, or returns nil when it cannot.
 func (session *runCacheSession) record(exitCode int) *program.RunCache {
+	// A replay renders its footer from the summary, so a run that recorded none would replay a verdict with
+	// no footer. Refused here, once, rather than resting on every verdict path remembering writeRunEnd.
+	if session.summary == nil {
+		session.note("a run that recorded no summary is not recorded: its replay would print a verdict with no footer")
+		return nil
+	}
 	present, absent, probed := session.recorder.Inputs()
 	files := append(present, session.extraFiles...)
 	cache, err := program.RecordRunCache(session.key, files, session.extraDirectories, absent, probed,

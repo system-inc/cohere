@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -50,4 +51,23 @@ func isTheReplaysFooter(footerLine string, recorded runSummary) error {
 		return fmt.Errorf("the footer says files were rewritten: %s", footerLine)
 	}
 	return nil
+}
+
+// TestARunWithNoSummaryIsNotRecorded is the guard that makes a replay without a footer impossible: a run
+// that recorded no summary is refused at record, and says so, rather than being stored for a replay that
+// would print a verdict with no footer.
+func TestARunWithNoSummaryIsNotRecorded(t *testing.T) {
+	directory := t.TempDir()
+	sent := verdictSent
+	verdictSent = true // so the note is kept beside the table, where the test can read it
+	defer func() { verdictSent = sent }()
+
+	session := &runCacheSession{directory: directory}
+	if recorded := session.record(0); recorded != nil {
+		t.Fatalf("a run with no summary was recorded: %+v", recorded)
+	}
+	notes, err := os.ReadFile(previousNotesPath(directory))
+	if err != nil || !strings.Contains(string(notes), "recorded no summary") {
+		t.Errorf("refusing the record said nothing (%v): %q", err, notes)
+	}
 }

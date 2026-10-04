@@ -122,7 +122,8 @@ func writeRunEnd(report *pipelineReport, out io.Writer) {
 	if report.filesInScope > 0 && report.filesInScope < report.filesInProgram {
 		summary.Gaps.ProgramFiles = report.filesInProgram
 	}
-	if label := os.Getenv(projectLabelVariable); label != "" && label != "." {
+	// In a repository with several projects each is its own run, told its path, the root's as ".".
+	if label := os.Getenv(projectLabelVariable); label != "" {
 		summary.Label = label
 	}
 	recordRunSummary(summary)

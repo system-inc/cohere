@@ -130,9 +130,12 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 	}
 	group.Wait()
 
+	// In the default view a project's own run ends on its footer, which leads with its path, so the projects
+	// follow one another with no heading between them; `--verbose` keeps the sections and their account.
+	account := accountOutput(out)
 	worst := 0
 	for _, checked := range runs {
-		fmt.Fprintf(out, "%s\n", sectionHeading(checked.project))
+		fmt.Fprintf(account, "%s\n", sectionHeading(checked.project))
 		out.Write(checked.output)
 		if len(checked.output) > 0 && checked.output[len(checked.output)-1] != '\n' {
 			fmt.Fprintln(out)
@@ -140,25 +143,46 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 		if checked.err != nil {
 			fmt.Fprintf(out, "cohere: the %s run did not finish: %v\n", checked.project.Engine, checked.err)
 		}
-		fmt.Fprintln(out)
+		fmt.Fprintln(account)
 		if checked.exitCode > worst {
 			worst = checked.exitCode
 		}
 	}
 
-	fmt.Fprintf(out, "projects under %s:\n", found.Root)
+	fmt.Fprintf(account, "projects under %s:\n", found.Root)
 	for _, checked := range runs {
 		verdict := "green"
 		if checked.exitCode != 0 {
 			verdict = fmt.Sprintf("failed, exit %d", checked.exitCode)
 		}
-		fmt.Fprintf(out, "  %s (%s): %s in %s\n", projectLabel(checked.project), checked.project.Engine, verdict, round(checked.elapsed))
+		fmt.Fprintf(account, "  %s (%s): %s in %s\n", projectLabel(checked.project), checked.project.Engine, verdict, round(checked.elapsed))
 	}
 	for _, note := range found.notes() {
-		fmt.Fprintf(out, "  %s\n", note)
+		fmt.Fprintf(account, "  %s\n", note)
 	}
-	fmt.Fprintln(out, summaryLine(found, runs))
+	fmt.Fprintln(account, summaryLine(found, runs))
+	// The overall verdict, last, in the human views. Under `--json` each project's own summary line, with its
+	// label, is the record, and a program reads the worst from them.
+	if activeOutput.Mode != outputJSON {
+		fmt.Fprintln(out, overallFooter(overallFactsOf(runs, time.Since(processStart)), activeOutput.Style))
+	}
 	return worst
+}
+
+// overallFactsOf is what the overall verdict says of the projects' runs: how many of each engine, the ones
+// that failed with their exits, and the ones whose run did not finish, which checked nothing.
+func overallFactsOf(runs []projectRun, total time.Duration) overallFacts {
+	facts := overallFacts{Total: total, ProjectsByEngine: map[string]int{}}
+	for _, checked := range runs {
+		facts.ProjectsByEngine[string(checked.project.Engine)]++
+		switch {
+		case checked.err != nil:
+			facts.Unfinished++
+		case checked.exitCode != 0:
+			facts.Failed = append(facts.Failed, fmt.Sprintf("%s (exit %d)", projectLabel(checked.project), checked.exitCode))
+		}
+	}
+	return facts
 }
 
 // runProject runs one project's check as a child and keeps everything it printed.

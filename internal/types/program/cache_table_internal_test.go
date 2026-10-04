@@ -172,15 +172,16 @@ func TestTheSingleFileTableIsRemovedUnread(t *testing.T) {
 // version is a silent partial read of every old table. Changing a field means bumping cacheTableVersion
 // and pinning the new shape under it, and this test says so when it is forgotten.
 var pinnedCacheTableShapes = map[int]string{
-	1: "3db631dcfd27db51bf5c9e29a4a0ac41a7ba30dc90aeb8712037e057a516effb",
-	2: "30d879299d079a880679687f46936674d9ecd124a5916a1ea76ff210d6e67873",
-	3: "c01be7eecead0ab5c95964ed45cb149bcfd0883b2130a21e39d8d25e3c1d3622",
-	4: "f215adaa07ccb0ee6926835db75c04bc8d9b001003eefac84388b95e1f85e9e9",
-	5: "850508d7af486cc0b05eab3dd93ac299e60b678a00ff30e8702f98210505949f",
-	6: "cc48115e6624c13b4d674cf5c0d4c47da536f02516afdd5575344321ce77dc2b",
-	7: "efe906781bbaf6e01d9c195c2b08f8cb9f5e855fdb445bfc5b2edcdada8d4ada",
-	8: "b75bba7c7483bb48bb6fc5c8e2d2b38a3d337fbddb67d95ce423069807772e5e",
-	9: "51a0ac42299c64e9c01ee4daae5e05482437993bec1ae5cb730a7dda7e7f592b",
+	1:  "3db631dcfd27db51bf5c9e29a4a0ac41a7ba30dc90aeb8712037e057a516effb",
+	2:  "30d879299d079a880679687f46936674d9ecd124a5916a1ea76ff210d6e67873",
+	3:  "c01be7eecead0ab5c95964ed45cb149bcfd0883b2130a21e39d8d25e3c1d3622",
+	4:  "f215adaa07ccb0ee6926835db75c04bc8d9b001003eefac84388b95e1f85e9e9",
+	5:  "850508d7af486cc0b05eab3dd93ac299e60b678a00ff30e8702f98210505949f",
+	6:  "cc48115e6624c13b4d674cf5c0d4c47da536f02516afdd5575344321ce77dc2b",
+	7:  "efe906781bbaf6e01d9c195c2b08f8cb9f5e855fdb445bfc5b2edcdada8d4ada",
+	8:  "b75bba7c7483bb48bb6fc5c8e2d2b38a3d337fbddb67d95ce423069807772e5e",
+	9:  "51a0ac42299c64e9c01ee4daae5e05482437993bec1ae5cb730a7dda7e7f592b",
+	10: "295b6d55fc54d1269471e40676b04b3876baac62a8779c23d79e0c9f1118481c",
 }
 
 func TestCacheTableShapeIsPinnedToItsVersion(t *testing.T) {
