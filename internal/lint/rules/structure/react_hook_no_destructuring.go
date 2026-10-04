@@ -5,14 +5,16 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/scope"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageNoDestructuringInHook = rule.Message{
-	Id: "noDestructuringInHook",
-	Description: "This destructures inside a custom hook. Store the value in a variable and read " +
-		"its properties instead. A hook's returned object is the thing callers pass around and " +
-		"log, and destructuring inside the hook breaks the chain between a value and where it came " +
-		"from: a reader seeing a bare name has to find which of several calls produced it.",
+// reactHookNoDestructuringText is the rule's message, whose wording lives in
+// `policy/messages/react-hook-no-destructuring.json`.
+var reactHookNoDestructuringText = policy.MessageOf("structure/react-hook-no-destructuring", "noDestructuringInHook")
+
+// messageNoDestructuringInHook is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageNoDestructuringInHook() rule.Message {
+	return rule.Message{Id: reactHookNoDestructuringText.Id, Description: reactHookNoDestructuringText.Render(nil)}
 }
 
 // ReactHookNoDestructuring flags object destructuring inside a custom hook's body.
@@ -63,7 +65,7 @@ var ReactHookNoDestructuring = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(name, messageNoDestructuringInHook)
+				ctx.ReportNode(name, messageNoDestructuringInHook())
 			},
 		}
 	},

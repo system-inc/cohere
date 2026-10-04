@@ -4,16 +4,16 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messagePageStateRemounts = rule.Message{
-	Id: "pageStateRemounts",
-	Description: "State held in a page.tsx resets on every navigation. The App Router remounts " +
-		"the page component on router.push (vercel/next.js#48004), so a filter, a draft, or a " +
-		"scroll position kept here silently disappears when the user navigates and comes back. " +
-		"Nothing errors and nothing warns; the value is just gone. Host it in a context provider " +
-		"in the route's layout.tsx, which is not remounted, or disable this rule on the line if " +
-		"resetting on navigation is what you want.",
+// nextNoPageStateText is the rule's message, whose wording lives in
+// `policy/messages/next-no-page-state.json`.
+var nextNoPageStateText = policy.MessageOf("structure/next-no-page-state", "pageStateRemounts")
+
+// messagePageStateRemounts is the finding, rendered when it is reported so the text comes from the current catalog.
+func messagePageStateRemounts() rule.Message {
+	return rule.Message{Id: nextNoPageStateText.Id, Description: nextNoPageStateText.Render(nil)}
 }
 
 // pageStateHookNames are the hooks that hold state across renders.
@@ -73,7 +73,7 @@ var NextNoPageState = rule.Rule{
 				switch callee.Kind {
 				case ast.KindIdentifier:
 					if pageStateHookNames[callee.Text()] {
-						ctx.ReportNode(callee, messagePageStateRemounts)
+						ctx.ReportNode(callee, messagePageStateRemounts())
 					}
 
 				case ast.KindPropertyAccessExpression:
@@ -84,7 +84,7 @@ var NextNoPageState = rule.Rule{
 					// The receiver must be React. `Store.useState` is somebody's own accessor and
 					// has nothing to do with the App Router's remounting.
 					if react.IsNamespacedMember(callee, func(name string) bool { return pageStateHookNames[name] }) {
-						ctx.ReportNode(callee, messagePageStateRemounts)
+						ctx.ReportNode(callee, messagePageStateRemounts())
 					}
 				}
 			},

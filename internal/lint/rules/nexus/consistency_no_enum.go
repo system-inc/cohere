@@ -3,12 +3,14 @@ package nexus
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageNoEnum = rule.Message{
-	Id: "noEnum",
-	Description: "TypeScript enum is banned. Use `as const` with the Kind and KindType pattern instead: " +
-		"`export const FooKind = { A: 'A' } as const; export type FooKindType = (typeof FooKind)[keyof typeof FooKind];`",
+// consistencyNoEnumText is the rule's message, whose wording lives in `policy/messages/consistency-no-enum.json`.
+var consistencyNoEnumText = policy.MessageOf("nexus/consistency-no-enum", "noEnum")
+
+func messageNoEnum() rule.Message {
+	return rule.Message{Id: "noEnum", Description: consistencyNoEnumText.Render(nil)}
 }
 
 // ConsistencyNoEnum bans TypeScript's enum keyword, including const enum.
@@ -36,7 +38,7 @@ var ConsistencyNoEnum = rule.Rule{
 				if target == nil {
 					target = node
 				}
-				ctx.ReportNode(target, messageNoEnum)
+				ctx.ReportNode(target, messageNoEnum())
 			},
 		}
 	},

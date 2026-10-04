@@ -4,15 +4,16 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageNoDisplayNameAssignment = rule.Message{
-	Id: "noDisplayNameAssignment",
-	Description: "This assigns displayName by hand. A function component already carries its own " +
-		"name and DevTools reads it, so the assignment is a second copy of the name that a rename " +
-		"does not update: rename the component and the tree still shows the old label, with " +
-		"nothing failing. The one case that needs it is a wrapper returning an anonymous " +
-		"component, and that is exempt.",
+// reactComponentNoDisplayNameText is the rule's message, whose wording lives in
+// `policy/messages/react-component-no-display-name.json`.
+var reactComponentNoDisplayNameText = policy.MessageOf("structure/react-component-no-display-name", "noDisplayNameAssignment")
+
+// messageNoDisplayNameAssignment is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageNoDisplayNameAssignment() rule.Message {
+	return rule.Message{Id: reactComponentNoDisplayNameText.Id, Description: reactComponentNoDisplayNameText.Render(nil)}
 }
 
 // anonymousComponentWrapperNames are the wrappers whose result carries no name of its own.
@@ -88,7 +89,7 @@ var ReactComponentNoDisplayName = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(node, messageNoDisplayNameAssignment)
+				ctx.ReportNode(node, messageNoDisplayNameAssignment())
 			},
 		}
 	},

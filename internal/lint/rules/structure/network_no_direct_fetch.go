@@ -3,16 +3,16 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageNoDirectFetch = rule.Message{
-	Id: "noDirectFetch",
-	Description: "This calls `fetch` directly. Every network request goes through NetworkService " +
-		"instead, which is where retries, timeouts, error shaping, authentication headers and " +
-		"cache invalidation live. A direct call gets none of them and fails differently from every " +
-		"other request in the application, which is the kind of inconsistency that only shows up " +
-		"under a flaky connection. NetworkService.ts itself is exempt, since it is the one place " +
-		"the raw primitive is allowed.",
+// networkNoDirectFetchText is the rule's message, whose wording lives in
+// `policy/messages/network-no-direct-fetch.json`.
+var networkNoDirectFetchText = policy.MessageOf("structure/network-no-direct-fetch", "noDirectFetch")
+
+// messageNoDirectFetch is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageNoDirectFetch() rule.Message {
+	return rule.Message{Id: networkNoDirectFetchText.Id, Description: networkNoDirectFetchText.Render(nil)}
 }
 
 // NetworkNoDirectFetch flags a direct call to fetch.
@@ -50,7 +50,7 @@ var NetworkNoDirectFetch = rule.Rule{
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if isFetchCallee(node.AsCallExpression().Expression) {
-					ctx.ReportNode(node, messageNoDirectFetch)
+					ctx.ReportNode(node, messageNoDirectFetch())
 				}
 			},
 		}

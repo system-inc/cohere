@@ -6,17 +6,20 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const consistencyNoReturnVoidId = "returnVoid"
 
-var consistencyNoReturnVoidMessage = rule.Message{
-	Id: consistencyNoReturnVoidId,
-	Description: "`return void <expression>;` folds two statements into one: it runs the expression, throws " +
-		"its value away, and exits. Write the expression as its own statement, then `return;`. The `void` " +
-		"operator is how this codebase marks a promise dropped on purpose, so spending it to squeeze a " +
-		"`console.log` into a return makes the reader stop and work out which of the two is meant, and it " +
-		"hides a second statement inside a line that looks like an exit.",
+// consistencyNoReturnVoidText is the rule's message, whose wording lives in
+// `policy/messages/consistency-no-return-void.json`.
+var consistencyNoReturnVoidText = policy.MessageOf("nexus/consistency-no-return-void", consistencyNoReturnVoidId)
+
+func consistencyNoReturnVoidMessage() rule.Message {
+	return rule.Message{
+		Id:          consistencyNoReturnVoidId,
+		Description: consistencyNoReturnVoidText.Render(nil),
+	}
 }
 
 // ConsistencyNoReturnVoid bans `return void <expression>;`.
@@ -83,10 +86,10 @@ var ConsistencyNoReturnVoid = rule.Rule{
 
 				replacement, fixable := consistencyNoReturnVoidReplacement(ctx, node, voidExpression)
 				if !fixable {
-					ctx.ReportNode(node, consistencyNoReturnVoidMessage)
+					ctx.ReportNode(node, consistencyNoReturnVoidMessage())
 					return
 				}
-				ctx.ReportNodeWithFixes(node, consistencyNoReturnVoidMessage, ctx.ReplaceNode(node, replacement))
+				ctx.ReportNodeWithFixes(node, consistencyNoReturnVoidMessage(), ctx.ReplaceNode(node, replacement))
 			},
 		}
 	},

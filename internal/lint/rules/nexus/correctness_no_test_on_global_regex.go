@@ -7,18 +7,20 @@ import (
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const correctnessNoTestOnGlobalRegexId = "globalRegexTest"
 
-var correctnessNoTestOnGlobalRegexMessage = rule.Message{
-	Id: correctnessNoTestOnGlobalRegexId,
-	Description: "`.test()` on a regex with the `g` flag is stateful: a match leaves `lastIndex` past it, and " +
-		"the next `.test()` on the same regex starts searching from there, so the same input can answer " +
-		"true and then false. This regex outlives one call (it is shared by every call of the function, " +
-		"or every turn of the loop), so that next call happens. `.test()` never needs `g`: drop the flag, " +
-		"or give the `.test()` its own regex without it when another use (`replace`, `matchAll`) needs `g`. " +
-		"Resetting `lastIndex` by hand is the patch for a flag the call does not need.",
+// correctnessNoTestOnGlobalRegexText is the rule's message, whose wording lives in
+// `policy/messages/correctness-no-test-on-global-regex.json`.
+var correctnessNoTestOnGlobalRegexText = policy.MessageOf("nexus/correctness-no-test-on-global-regex", correctnessNoTestOnGlobalRegexId)
+
+func correctnessNoTestOnGlobalRegexMessage() rule.Message {
+	return rule.Message{
+		Id:          correctnessNoTestOnGlobalRegexId,
+		Description: correctnessNoTestOnGlobalRegexText.Render(nil),
+	}
 }
 
 // CorrectnessNoTestOnGlobalRegex reports `.test()` on a `g` regex that the call reaches more than once.
@@ -130,7 +132,7 @@ func correctnessNoTestOnGlobalRegexCheck(ctx rule.Context, node *ast.Node) {
 	if correctnessNoTestOnGlobalRegexIsPositioned(ctx, symbol) {
 		return
 	}
-	ctx.ReportNode(node, correctnessNoTestOnGlobalRegexMessage)
+	ctx.ReportNode(node, correctnessNoTestOnGlobalRegexMessage())
 }
 
 // correctnessNoTestOnGlobalRegexIsRegExpMember says whether a symbol is a member of the default

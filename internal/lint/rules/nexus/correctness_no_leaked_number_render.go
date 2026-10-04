@@ -7,16 +7,20 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const correctnessNoLeakedNumberRenderId = "leakedNumberRender"
 
-var correctnessNoLeakedNumberRenderMessage = rule.Message{
-	Id: correctnessNoLeakedNumberRenderId,
-	Description: "This operand is a number, and `&&` hands back its own value when it is falsy, so when it is " +
-		"`0` (or `NaN`) React renders that number as text where nothing was meant to appear. Test the " +
-		"condition you mean instead, such as `count > 0 &&` or `count !== undefined &&`, so the operand " +
-		"is a boolean.",
+// correctnessNoLeakedNumberRenderText is the rule's message, whose wording lives in
+// `policy/messages/correctness-no-leaked-number-render.json`.
+var correctnessNoLeakedNumberRenderText = policy.MessageOf("nexus/correctness-no-leaked-number-render", correctnessNoLeakedNumberRenderId)
+
+func correctnessNoLeakedNumberRenderMessage() rule.Message {
+	return rule.Message{
+		Id:          correctnessNoLeakedNumberRenderId,
+		Description: correctnessNoLeakedNumberRenderText.Render(nil),
+	}
 }
 
 // CorrectnessNoLeakedNumberRender reports an `&&` in a JSX child whose falsy operand is typed as a
@@ -170,7 +174,7 @@ func correctnessNoLeakedNumberRenderFalsy(ctx rule.Context, expression *ast.Node
 		}
 	}
 	if correctnessNoLeakedNumberRenderCanLeak(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(expression)) {
-		ctx.ReportNode(expression, correctnessNoLeakedNumberRenderMessage)
+		ctx.ReportNode(expression, correctnessNoLeakedNumberRenderMessage())
 	}
 }
 
