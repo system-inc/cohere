@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 272,
+        "rulesOn": 273,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -637,6 +637,10 @@
             },
             {
                 "name": "nexus/consistency-no-hand-rolled-delay",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-no-iso-string-date-cut",
                 "severity": "error"
             },
             {
@@ -1420,7 +1424,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 336,
+        "rulesOn": 337,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -1962,6 +1966,10 @@
             },
             {
                 "name": "nexus/consistency-no-hand-rolled-delay",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-no-iso-string-date-cut",
                 "severity": "error"
             },
             {
@@ -3097,7 +3105,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 268,
+        "rulesOn": 269,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -3882,6 +3890,10 @@
             },
             {
                 "name": "nexus/consistency-no-hand-rolled-delay",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-no-iso-string-date-cut",
                 "severity": "error"
             },
             {
@@ -4771,7 +4783,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 278,
+        "rulesOn": 279,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5408,6 +5420,10 @@
             },
             {
                 "name": "nexus/consistency-no-hand-rolled-delay",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-no-iso-string-date-cut",
                 "severity": "error"
             },
             {
@@ -6346,7 +6362,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 262,
+        "rulesOn": 263,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6936,6 +6952,10 @@
             },
             {
                 "name": "nexus/consistency-no-hand-rolled-delay",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-no-iso-string-date-cut",
                 "severity": "error"
             },
             {
@@ -7712,7 +7732,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 250,
+        "rulesOn": 251,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8254,6 +8274,10 @@
             },
             {
                 "name": "nexus/consistency-no-hand-rolled-delay",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-no-iso-string-date-cut",
                 "severity": "error"
             },
             {

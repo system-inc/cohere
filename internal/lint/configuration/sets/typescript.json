@@ -150,6 +150,7 @@
         "nexus/security-no-interpolated-shell-command": "error",
         "nexus/security-no-interpolated-sql-string": "error",
         "nexus/correctness-require-blocking-standard-streams": "error",
+        "nexus/consistency-no-iso-string-date-cut": "error",
         "unicode-bom": "error",
         "no-useless-rename": "off",
         "strict": "off",
