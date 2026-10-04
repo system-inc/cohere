@@ -206,7 +206,7 @@ func iframeMissingSandboxInvalidValue(value string) rule.Message {
 // verdict as validating it, since `""` is in the allowed list. Both routes are clean and the corpus
 // asserts it twice.
 //
-// # The dangerous pair reports only on a same-origin frame, which is where cohere leaves upstream
+// # The dangerous pair is silent only on a provably cross-origin frame, which is where cohere leaves upstream
 //
 // Upstream reports `allow-scripts allow-same-origin` on every iframe. The escape it warns about
 // needs both tokens AND a framed document in the framing page's own origin, since only then can
@@ -216,13 +216,19 @@ func iframeMissingSandboxInvalidValue(value string) rule.Message {
 // `HomePagePodcastSection.tsx:46`, `PodcastEpisodePlayer.tsx:71` and `YouTubeEmbed.tsx:23`, all
 // `youtube-nocookie.com`, were findings upstream would raise and none of them is a defect.
 //
-// So the combination reports only when the frame is PROVABLY same-origin, and silence is the answer
-// to everything else (`iframeMissingSandboxFrame`): a relative `src`, an absent one (`about:blank`
-// inherits the parent), an `about:`, `blob:` or `javascript:` URL, or any `srcDoc`, which takes the
-// parent's origin and wins over `src`. A template is read from its head, a non-literal from its
-// type's string and template literal constituents, and a spread after the last `src` makes the
-// rendered `src` unknown. The invalid-token and missing-attribute reports are untouched and remain
-// exactly upstream's.
+// So the combination is silent only when the frame is PROVABLY cross-origin, and reports on
+// everything else, same-origin or unknown, by @system_cohere_lint's ruling of 2026-10-04 (#3rxx2y9):
+// a dynamic `src` that resolves same-origin is exactly the case the warning exists for, so silence on
+// an unknown origin is the wrong default for a security rule. Provably cross-origin is a `src` whose
+// text fixes an origin other than the page's: an `http:` or `https:` URL or a protocol-relative
+// `//host` with its host complete, a `data:` URL (an opaque origin matches nothing), or another
+// scheme no page is served from. The text is the literal's, a template's head, the initializer of a
+// `const` it names, or every string and template literal constituent of its type
+// (`iframeMissingSandboxFrame`). A relative `src`, an absent one (`about:blank` inherits the parent),
+// an `about:`, `blob:` or `javascript:` URL, and any `srcDoc`, which takes the parent's origin and
+// wins over `src`, are same-origin. A plain `string`, a template whose head stops before the host is
+// complete, a bare `src` and a spread after the last `src` are unknown. Both report. The
+// invalid-token and missing-attribute reports are untouched and remain exactly upstream's.
 var IframeMissingSandbox = rule.Rule{
 	Name: "react/iframe-missing-sandbox",
 
@@ -237,9 +243,9 @@ var IframeMissingSandbox = rule.Rule{
 		// then the invalid pairing. Upstream reports every unknown token separately and the
 		// combination once, in that order, which is what the two-finding corpus case pins.
 		//
-		// `sameOrigin` is asked only once both dangerous tokens are present, because answering it can
+		// `reportsPair` is asked only once both dangerous tokens are present, because answering it can
 		// cost a checker query and almost no sandbox carries the pair.
-		validateSandboxValue := func(reported *ast.Node, value string, sameOrigin func() bool) {
+		validateSandboxValue := func(reported *ast.Node, value string, reportsPair func() bool) {
 			allowScripts := false
 			allowSameOrigin := false
 			// Upstream splits on a single space, not on runs of whitespace, so a double space
@@ -257,7 +263,7 @@ var IframeMissingSandbox = rule.Rule{
 					allowSameOrigin = true
 				}
 			}
-			if allowScripts && allowSameOrigin && sameOrigin() {
+			if allowScripts && allowSameOrigin && reportsPair() {
 				ctx.ReportNode(reported, messageIframeMissingSandboxInvalidCombination)
 			}
 		}
@@ -277,7 +283,7 @@ var IframeMissingSandbox = rule.Rule{
 			if attributes != nil && attributes.Kind == ast.KindJsxAttributes {
 				properties := attributes.AsJsxAttributes().Properties
 				if properties != nil {
-					sameOrigin := func() bool {
+					reportsPair := func() bool {
 						var frame iframeMissingSandboxFrame
 						for _, property := range properties.Nodes {
 							attributeName, named := jsx.AttributeName(property)
@@ -293,7 +299,7 @@ var IframeMissingSandbox = rule.Rule{
 								frame.sourceDocument = true
 							}
 						}
-						return frame.provablySameOrigin(ctx)
+						return !frame.provablyCrossOrigin(ctx)
 					}
 					for _, property := range properties.Nodes {
 						attributeName, named := jsx.AttributeName(property)
@@ -307,7 +313,7 @@ var IframeMissingSandbox = rule.Rule{
 						// clears `sandboxFound`.
 						initializer := property.AsJsxAttribute().Initializer
 						if initializer != nil && initializer.Kind == ast.KindStringLiteral {
-							validateSandboxValue(node, initializer.Text(), sameOrigin)
+							validateSandboxValue(node, initializer.Text(), reportsPair)
 						}
 					}
 				}
@@ -350,7 +356,7 @@ var IframeMissingSandbox = rule.Rule{
 				if len(arguments.Nodes) > 1 && arguments.Nodes[1].Kind == ast.KindObjectLiteralExpression {
 					properties := arguments.Nodes[1].AsObjectLiteralExpression().Properties
 					if properties != nil {
-						sameOrigin := func() bool {
+						reportsPair := func() bool {
 							var frame iframeMissingSandboxFrame
 							for _, property := range properties.Nodes {
 								// A quoted key supplies `src` at runtime as surely as a bare one does,
@@ -377,7 +383,7 @@ var IframeMissingSandbox = rule.Rule{
 									}
 								}
 							}
-							return frame.provablySameOrigin(ctx)
+							return !frame.provablyCrossOrigin(ctx)
 						}
 						for _, property := range properties.Nodes {
 							// Upstream requires `x.type === 'Property'` and reads `x.key.name`,
@@ -398,7 +404,7 @@ var IframeMissingSandbox = rule.Rule{
 							if property.Kind == ast.KindPropertyAssignment {
 								initializer := property.AsPropertyAssignment().Initializer
 								if initializer != nil && initializer.Kind == ast.KindStringLiteral {
-									validateSandboxValue(node, initializer.Text(), sameOrigin)
+									validateSandboxValue(node, initializer.Text(), reportsPair)
 								}
 							}
 						}
@@ -414,8 +420,8 @@ var IframeMissingSandbox = rule.Rule{
 }
 
 // iframeMissingSandboxFrame gathers, in member order, what an iframe's props say about where its
-// document comes from, so the dangerous pair is reported only when the frame provably shares the
-// framing page's origin.
+// document comes from, so the dangerous pair is silent only when the frame provably loads another
+// origin.
 //
 // Order matters because React lets a later prop replace an earlier one: `src` written after a spread
 // is the `src` that renders, and `src` written before one may not be.
@@ -445,22 +451,15 @@ func (frame *iframeMissingSandboxFrame) opaque() {
 	frame.opaqueAfterSource = true
 }
 
-// provablySameOrigin answers whether the framed document shares the framing page's origin.
-//
-// Only a yes reports, so every shape this cannot read stays silent. An absent `src` is a yes: the
-// frame is `about:blank`, which inherits the parent's origin, and a blank frame with both tokens
-// is the pattern where a page writes untrusted markup into the frame itself.
-func (frame *iframeMissingSandboxFrame) provablySameOrigin(ctx rule.Context) bool {
-	if frame.sourceDocument {
-		return true
-	}
-	if frame.opaqueAfterSource {
+// provablyCrossOrigin answers whether the framed document provably loads an origin other than the
+// framing page's. Only a yes keeps the pair silent, so every shape this cannot read reports: a
+// `srcDoc` and an absent `src` (`about:blank`) are the page's own origin, and a bare `src` or a
+// spread after the last one leaves the rendered `src` unknown.
+func (frame *iframeMissingSandboxFrame) provablyCrossOrigin(ctx rule.Context) bool {
+	if frame.sourceDocument || frame.opaqueAfterSource || !frame.sourceSeen {
 		return false
 	}
-	if !frame.sourceSeen {
-		return true
-	}
-	return iframeMissingSandboxValueIsSameOrigin(ctx, frame.sourceValue)
+	return iframeMissingSandboxValueIsCrossOrigin(ctx, frame.sourceValue, true)
 }
 
 // iframeMissingSandboxJsxValue unwraps a JSX attribute's initializer to the expression it holds, or
@@ -475,85 +474,132 @@ func iframeMissingSandboxJsxValue(initializer *ast.Node) *ast.Node {
 	return initializer
 }
 
-// iframeMissingSandboxValueIsSameOrigin decides a `src` value from its text when it has one, and from
-// its type when it does not.
+// iframeMissingSandboxValueIsCrossOrigin decides a `src` value from its text when it has one, from a
+// `const` binding's initializer when it names one, and from its type otherwise.
 //
 // A template expression is decided from its head alone, which is how all three real embeds in phi
 // web are written: `https://www.youtube-nocookie.com/embed/${id}?rel=0` fixes its origin before the
-// first substitution. Anything else asks the checker, and only a string literal or template literal
-// type constituent can answer; a plain `string` proves nothing and stays silent. One same-origin
-// constituent is enough to report, since the value can be that one.
-func iframeMissingSandboxValueIsSameOrigin(ctx rule.Context, value *ast.Node) bool {
+// first substitution. PodcastEpisodePlayer passes that template through a `const`, so a const's
+// initializer is read once, never a chain of them. Anything else asks the checker, and every string
+// literal or template literal constituent must be cross-origin; a plain `string` proves nothing, and
+// one constituent that is not provably cross-origin is enough to report, since the value can be it.
+func iframeMissingSandboxValueIsCrossOrigin(ctx rule.Context, value *ast.Node, followConst bool) bool {
 	if value == nil {
 		return false
 	}
+	value = ast.SkipParentheses(value)
 	switch value.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		return iframeMissingSandboxUrlIsSameOrigin(value.Text(), true)
+		return iframeMissingSandboxClassifyUrl(value.Text(), true) == iframeMissingSandboxOriginCross
 	case ast.KindTemplateExpression:
-		return iframeMissingSandboxUrlIsSameOrigin(value.AsTemplateExpression().Head.Text(), false)
+		return iframeMissingSandboxClassifyUrl(value.AsTemplateExpression().Head.Text(), false) == iframeMissingSandboxOriginCross
 	}
 	if ctx.TypeChecker == nil {
 		return false
+	}
+	if followConst && ast.IsIdentifier(value) {
+		if symbol := ctx.TypeChecker.GetSymbolAtLocation(value); symbol != nil && symbol.ValueDeclaration != nil &&
+			ast.IsVariableDeclaration(symbol.ValueDeclaration) &&
+			ast.GetCombinedNodeFlags(symbol.ValueDeclaration)&ast.NodeFlagsConst != 0 {
+			if initializer := symbol.ValueDeclaration.Initializer(); initializer != nil &&
+				iframeMissingSandboxValueIsCrossOrigin(ctx, initializer, false) {
+				return true
+			}
+		}
 	}
 	valueType := ctx.TypeChecker.GetTypeAtLocation(value)
 	if valueType == nil {
 		return false
 	}
-	for _, constituent := range type_checking.UnionTypeParts(valueType) {
-		if type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsStringLiteral) {
+	parts := type_checking.UnionTypeParts(valueType)
+	if len(parts) == 0 {
+		return false
+	}
+	for _, constituent := range parts {
+		switch {
+		case type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsStringLiteral):
 			text, _ := constituent.AsLiteralType().Value().(string)
-			if iframeMissingSandboxUrlIsSameOrigin(text, true) {
-				return true
+			if iframeMissingSandboxClassifyUrl(text, true) != iframeMissingSandboxOriginCross {
+				return false
 			}
-		}
-		if type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsTemplateLiteral) {
-			if iframeMissingSandboxUrlIsSameOrigin(constituent.AsTemplateLiteralType().Texts()[0], false) {
-				return true
+		case type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsTemplateLiteral):
+			if iframeMissingSandboxClassifyUrl(constituent.AsTemplateLiteralType().Texts()[0], false) != iframeMissingSandboxOriginCross {
+				return false
 			}
+		default:
+			return false
 		}
 	}
-	return false
+	return true
 }
 
-// iframeMissingSandboxUrlIsSameOrigin decides whether URL text provably loads a document in the
-// framing page's origin. `complete` is false for a prefix, the head of a template, whose
-// substitution may still change what the text means.
+// iframeMissingSandboxOrigin is what URL text proves about the framed document's origin.
+type iframeMissingSandboxOrigin int
+
+const (
+	iframeMissingSandboxOriginUnknown iframeMissingSandboxOrigin = iota
+	iframeMissingSandboxOriginSame
+	iframeMissingSandboxOriginCross
+)
+
+// iframeMissingSandboxClassifyUrl decides what URL text proves about the framed document's origin.
+// `complete` is false for a prefix, the head of a template, whose substitution may still change what
+// the text means.
 //
-// A relative reference resolves against the page, so it is same-origin. So are the three schemes
-// whose documents inherit their creator's origin: `about:` (`about:blank`, `about:srcdoc`), `blob:`
-// and `javascript:`. An `http:` or `https:` URL and a protocol-relative `//host` are silent: their
-// host is almost always someone else's, and the rule cannot know the page's own host to tell the
-// rare same-host absolute URL apart. `data:` is silent because its document gets an opaque origin
-// that matches nothing, and so is every other scheme, since none can be proven.
+// Same-origin: a relative reference, which resolves against the page, and the three schemes whose
+// documents inherit their creator's origin, `about:` (`about:blank`, `about:srcdoc`), `blob:` and
+// `javascript:`. Cross-origin: an `http:` or `https:` URL, or a protocol-relative `//host`, whose host
+// is complete, read as another origin than the page's since the rule cannot know the page's own host;
+// a `data:` URL, whose document gets an opaque origin that matches nothing; and every other scheme,
+// since no page is served from one. Unknown: a prefix that stops before any of that is settled, such
+// as `https://${host}` or a lone `/` that may become `//host`.
 //
-// The URL parser drops tabs and newlines anywhere, strips leading spaces and controls, and reads a
-// backslash as a slash, so `\\host` and `/\nhost` are protocol-relative too. The text is normalised
-// the same way first.
-func iframeMissingSandboxUrlIsSameOrigin(text string, complete bool) bool {
+// The URL parser drops tabs and newlines anywhere, strips leading spaces and controls, reads a
+// backslash as a slash, and ignores how many slashes follow a special scheme, so `\\host` and
+// `/\nhost` are protocol-relative too. The text is normalised the same way first.
+func iframeMissingSandboxClassifyUrl(text string, complete bool) iframeMissingSandboxOrigin {
 	text = strings.TrimLeftFunc(text, func(character rune) bool { return character <= ' ' })
 	text = strings.NewReplacer("\t", "", "\n", "", "\r", "", `\`, "/").Replace(strings.ToLower(text))
-	if strings.HasPrefix(text, "//") {
-		return false
+	if rest, isProtocolRelative := strings.CutPrefix(text, "//"); isProtocolRelative {
+		return iframeMissingSandboxHostOrigin(rest, complete)
 	}
 	end := strings.IndexAny(text, ":/?#")
 	if end == -1 {
-		// A bare reference like `embed.html` is relative. A prefix with no delimiter yet is not
-		// decided: `${scheme}` may still follow it.
-		return complete
+		// A bare reference like `embed.html` is relative. A prefix with no delimiter yet is not decided:
+		// `${scheme}` may still follow it.
+		if complete {
+			return iframeMissingSandboxOriginSame
+		}
+		return iframeMissingSandboxOriginUnknown
 	}
 	if text[end] == ':' && iframeMissingSandboxIsScheme(text[:end]) {
-		switch text[:end] {
+		switch scheme := text[:end]; scheme {
 		case "about", "blob", "javascript":
-			return true
+			return iframeMissingSandboxOriginSame
+		case "http", "https":
+			return iframeMissingSandboxHostOrigin(strings.TrimLeft(text[end+1:], "/"), complete)
 		}
-		return false
+		return iframeMissingSandboxOriginCross
 	}
-	if end == 0 && text == "/" {
+	if end == 0 && text == "/" && !complete {
 		// A lone slash becomes protocol-relative if the substitution after it starts with another.
-		return complete
+		return iframeMissingSandboxOriginUnknown
 	}
-	return true
+	return iframeMissingSandboxOriginSame
+}
+
+// iframeMissingSandboxHostOrigin decides the text after an absolute URL's scheme or a protocol-relative
+// `//`: cross-origin once its host is complete, which a delimiter proves in a prefix, and unknown before.
+func iframeMissingSandboxHostOrigin(rest string, complete bool) iframeMissingSandboxOrigin {
+	end := strings.IndexAny(rest, "/?#")
+	host := rest
+	if end != -1 {
+		host = rest[:end]
+	}
+	if host == "" || (end == -1 && !complete) {
+		return iframeMissingSandboxOriginUnknown
+	}
+	return iframeMissingSandboxOriginCross
 }
 
 // iframeMissingSandboxIsScheme reports whether text is a valid URL scheme: a letter, then letters,
