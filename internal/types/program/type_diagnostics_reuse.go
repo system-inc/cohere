@@ -95,6 +95,10 @@ type TypeDiagnosticsReuse struct {
 	mutex    sync.Mutex
 	recorded *TypesSection
 	replayed int
+
+	// replayedFiles is the files whose semantic diagnostics this run took from the section, by file name, so
+	// a run scoped to some of the program can say how many of those it replayed (ReplayedAmong).
+	replayedFiles map[string]struct{}
 }
 
 // NewTypeDiagnosticsReuse wraps what the table held, which may be nil, for a run whose compiler options
@@ -120,6 +124,21 @@ func (r *TypeDiagnosticsReuse) Replayed() int {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	return r.replayed
+}
+
+// ReplayedAmong is how many of files had their semantic diagnostics taken from the section. The check
+// covers the whole program whatever the run's scope, so Replayed counts files a scoped run never reports
+// on, and a line saying "3955 of 1 files" read as nonsense (#rxqptqp).
+func (r *TypeDiagnosticsReuse) ReplayedAmong(files []*ast.SourceFile) int {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	count := 0
+	for _, sourceFile := range files {
+		if _, replayed := r.replayedFiles[sourceFile.FileName()]; replayed {
+			count++
+		}
+	}
+	return count
 }
 
 // Recorded is the section this run leaves for the next, nil when it recorded nothing.
@@ -176,7 +195,7 @@ func (g *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (
 	var replayed []*ast.Diagnostic
 	var toCheck []*ast.SourceFile
 	entries := make(map[string]TypesEntry, len(projectFiles))
-	replayedFiles := 0
+	replayedFiles := map[string]struct{}{}
 	for _, sourceFile := range projectFiles {
 		entry, found := stored.Entries[sourceFile.FileName()]
 		if found && entry.Fingerprint == fingerprints[sourceFile.Path()] {
@@ -184,7 +203,7 @@ func (g *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (
 				replayed = append(replayed, diagnostic.diagnostic(sourceFile))
 			}
 			entries[sourceFile.FileName()] = entry
-			replayedFiles++
+			replayedFiles[sourceFile.FileName()] = struct{}{}
 			continue
 		}
 		toCheck = append(toCheck, sourceFile)
@@ -208,8 +227,13 @@ func (g *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (
 	// retired graph's check describes bytes the fixer replaced, and its graph's successor records instead;
 	// asked under the mutex, so a retired check finishing late can never overwrite what the successor
 	// recorded.
+	//
+	// The replayed files too: a retired check finishing after its successor would otherwise leave the old
+	// graph's count on the types line.
 	reuse.mutex.Lock()
-	reuse.replayed = replayedFiles
+	if !g.Retired() {
+		reuse.replayed, reuse.replayedFiles = len(replayedFiles), replayedFiles
+	}
 	if ctx.Err() == nil && !g.Retired() {
 		reuse.recorded = &TypesSection{Version: typesSectionVersion, Key: reuse.key, Entries: entries}
 	}

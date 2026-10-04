@@ -111,7 +111,9 @@ func TestTypeDiagnosticsReplayOnAScopedRun(t *testing.T) {
 	}
 
 	typeError := regexp.MustCompile(`(?m)^\S+:\d+:\d+ - error TS\d+: .*$`)
-	replayed := regexp.MustCompile(`files' semantic diagnostics replayed from cache`)
+	// The clause counts the files the line reports on, never the whole program the check covered: a scoped run
+	// once read "3955 of 1 files" (#rxqptqp).
+	replayed := regexp.MustCompile(`; (\d+) of (\d+) files' semantic diagnostics replayed from cache`)
 	scoped := []string{"--types", "source/b.ts"}
 	runCohere(t, binary, root, scoped...)
 
@@ -132,8 +134,17 @@ func TestTypeDiagnosticsReplayOnAScopedRun(t *testing.T) {
 			t.Fatalf("%s: warm reports %d type errors and cold %d, want %d\n--- warm\n%s\n--- cold\n%s",
 				step.name, len(warmErrors), len(coldErrors), step.wantErrors, warm, cold)
 		}
-		if !replayed.MatchString(warm) {
-			t.Fatalf("%s: the scoped run replayed no file's semantic diagnostics, so it proves nothing about replaying:\n%s", step.name, warm)
+		clause := replayed.FindStringSubmatch(warm)
+		if clause != nil {
+			replayedCount, _ := strconv.Atoi(clause[1])
+			total, _ := strconv.Atoi(clause[2])
+			if replayedCount > total || total != 1 {
+				t.Errorf("%s: the replay clause counts %d of %d files on a run scoped to one:\n%s", step.name, replayedCount, total, warm)
+			}
+		}
+		// A body edit leaves the scoped file's shape fingerprint where it was, so its one file replays.
+		if step.name == "a body edit" && (clause == nil || clause[1] != "1") {
+			t.Fatalf("%s: the scoped run did not replay its one file, so it proves nothing about replaying:\n%s", step.name, warm)
 		}
 	}
 }

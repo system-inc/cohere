@@ -808,9 +808,12 @@ func run() error {
 		}
 		findings += len(typeDiagnostics)
 
+		// Counted among the files reported on: the check covers the whole program whatever the scope.
 		replayedClause := ""
 		if check.replayed > 0 {
-			replayedClause = fmt.Sprintf("; %d of %d files' semantic diagnostics replayed from cache", check.replayed, len(projectFiles))
+			if inScope := check.reuse.ReplayedAmong(projectFiles); inScope > 0 {
+				replayedClause = fmt.Sprintf("; %d of %d files' semantic diagnostics replayed from cache", inScope, len(projectFiles))
+			}
 		}
 		fmt.Fprintf(invocationOutput(os.Stdout),
 			"types: %d diagnostics over %d files in %s%s\n",
