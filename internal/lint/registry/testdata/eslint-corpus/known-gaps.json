@@ -277,22 +277,13 @@
     },
     "no-constant-binary-expression": {
         "03d595d9fd45": "missing",
-        "0ccc6015ba4c": "extra",
         "2f59c6e0b01e": "missing",
-        "3bbec815084d": "extra",
-        "4141fef3f19a": "extra",
         "509b362122fd": "extra",
         "576acf616c5e": "span",
-        "67a07f95af63": "extra",
         "7f4e22f2a619": "missing",
-        "832c9b58c60e": "extra",
-        "96326863fa44": "extra",
-        "a30737eee459": "extra",
         "ba50f3b58ae3": "extra",
-        "bc36f7594f5f": "extra",
         "cac8870c2dd1": "span",
         "cddc00757f75": "missing",
-        "d696e6f61f8a": "extra",
         "ed91c8e881c9": "missing"
     },
     "no-constant-condition": {

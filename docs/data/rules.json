@@ -8273,7 +8273,7 @@
             "language": "TypeScript",
             "origin": "core",
             "upstreamName": "no-constant-binary-expression",
-            "typeAware": false,
+            "typeAware": true,
             "options": {
                 "elements": "one"
             },
