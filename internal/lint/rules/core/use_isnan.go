@@ -36,12 +36,26 @@ var comparisonOperators = map[ast.Kind]bool{
 // A `case NaN:` never matches for the same reason `=== NaN` is never true, so the default is the
 // one that catches the defect rather than the one that is quieter.
 //
-// EnforceForIndexOf is present because the config sets it and a decoded option that silently
-// vanishes is worse than one that is read: `list.indexOf(NaN)` always returns -1, since indexOf uses
-// strict equality. It is false here, matching the configuration.
+// EnforceForIndexOf reports `list.indexOf(NaN)` and `list.lastIndexOf(NaN)`, which always return -1
+// because both search with strict equality. Default false, as upstream's. It was decoded and never
+// read until #6esg2nx, so a config turning it on changed nothing.
 type UseIsNaNOptions struct {
 	EnforceForSwitchCase *bool `json:"enforceForSwitchCase"`
 	EnforceForIndexOf    bool  `json:"enforceForIndexOf"`
+}
+
+// buildIndexOfNaNMessage is upstream's indexOfNaN, naming the method.
+func buildIndexOfNaNMessage(methodName string) rule.Message {
+	replacement := "findIndex"
+	if methodName == "lastIndexOf" {
+		replacement = "findLastIndex"
+	}
+	return rule.Message{
+		Id: "indexOfNaN",
+		Description: "`" + methodName + "` cannot find NaN, so this call returns -1 whatever the array " +
+			"holds. It searches with strict equality, and NaN is not equal to itself. Search with " +
+			"Number.isNaN instead: `" + replacement + "(Number.isNaN)`.",
+	}
 }
 
 var messageCaseWithNaN = rule.Message{
@@ -85,7 +99,8 @@ var UseIsNaN = rule.Rule{
 		// rule gets the strict reading when the config says nothing, so a misconfiguration cannot
 		// quietly disable half the rule.
 		enforceForSwitchCase := true
-		if settings, hasSettings := rule.OptionsAs[UseIsNaNOptions](options); hasSettings && settings.EnforceForSwitchCase != nil {
+		settings, hasSettings := rule.OptionsAs[UseIsNaNOptions](options)
+		if hasSettings && settings.EnforceForSwitchCase != nil {
 			enforceForSwitchCase = *settings.EnforceForSwitchCase
 		}
 
@@ -117,6 +132,27 @@ var UseIsNaN = rule.Rule{
 				}
 			},
 
+			// Upstream's checkCallExpression: a method named `indexOf` or `lastIndexOf`, by a static
+			// name (`.indexOf`, `['indexOf']`, `` [`indexOf`] ``, through `?.` and parentheses), called
+			// with one or two arguments, the first of them NaN. A third argument is not the array
+			// method's signature and is left alone, and so is a spread, which may not be NaN at all.
+			// ESLint 10.8.1's 73 rows for this option replay through here; see the test.
+			ast.KindCallExpression: func(node *ast.Node) {
+				if !settings.EnforceForIndexOf {
+					return
+				}
+				call := node.AsCallExpression()
+				methodName := staticMethodName(ast.SkipParentheses(call.Expression))
+				if methodName != "indexOf" && methodName != "lastIndexOf" {
+					return
+				}
+				arguments := call.Arguments.Nodes
+				if len(arguments) == 0 || len(arguments) > 2 || !isNaNReference(arguments[0]) {
+					return
+				}
+				ctx.ReportNode(node, buildIndexOfNaNMessage(methodName))
+			},
+
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
 				if binary.OperatorToken == nil || !comparisonOperators[binary.OperatorToken.Kind] {
@@ -128,6 +164,23 @@ var UseIsNaN = rule.Rule{
 			},
 		}
 	},
+}
+
+// staticMethodName is the name a member callee reads by, when the source spells it out: `.name`, or a
+// string or substitution-free template in brackets. Anything computed answers "".
+func staticMethodName(callee *ast.Node) string {
+	switch callee.Kind {
+	case ast.KindPropertyAccessExpression:
+		if name := callee.Name(); name != nil && name.Kind == ast.KindIdentifier {
+			return name.Text()
+		}
+	case ast.KindElementAccessExpression:
+		argument := ast.SkipParentheses(callee.AsElementAccessExpression().ArgumentExpression)
+		if argument != nil && (argument.Kind == ast.KindStringLiteral || argument.Kind == ast.KindNoSubstitutionTemplateLiteral) {
+			return argument.Text()
+		}
+	}
+	return ""
 }
 
 // isNaNReference reports whether an expression names NaN, bare or through Number.
@@ -164,8 +217,27 @@ func isNaNReference(node *ast.Node) bool {
 		name := access.Name()
 		return name != nil && name.Text() == "NaN"
 
+	case ast.KindElementAccessExpression:
+		// `Number['NaN']` is the same read in brackets, which upstream's isSpecificMemberAccess
+		// accepts through its static property name.
+		access := node.AsElementAccessExpression()
+		if access.Expression == nil || access.Expression.Kind != ast.KindIdentifier || access.Expression.Text() != "Number" {
+			return false
+		}
+		argument := ast.SkipParentheses(access.ArgumentExpression)
+		return argument != nil && (argument.Kind == ast.KindStringLiteral || argument.Kind == ast.KindNoSubstitutionTemplateLiteral) &&
+			argument.Text() == "NaN"
+
 	case ast.KindParenthesizedExpression:
 		return isNaNReference(node.AsParenthesizedExpression().Expression)
+
+	case ast.KindBinaryExpression:
+		// A sequence's value is its last expression, so `(sideEffect(), NaN)` is NaN. Upstream's
+		// isNaNIdentifier reads a SequenceExpression's last element for every check, the comparison
+		// and the switch as well as indexOf.
+		binary := node.AsBinaryExpression()
+		return binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindCommaToken &&
+			isNaNReference(binary.Right)
 	}
 	return false
 }
