@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 290,
+        "rulesOn": 292,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -1345,6 +1345,13 @@
                 "severity": "error"
             },
             {
+                "name": "object-shorthand",
+                "severity": "error",
+                "options": [
+                    "properties"
+                ]
+            },
+            {
                 "name": "one-var",
                 "severity": "error",
                 "options": [
@@ -1402,6 +1409,10 @@
             },
             {
                 "name": "prefer-spread",
+                "severity": "error"
+            },
+            {
+                "name": "prefer-template",
                 "severity": "error"
             },
             {
@@ -1482,7 +1493,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 356,
+        "rulesOn": 358,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2732,6 +2743,13 @@
                 "severity": "error"
             },
             {
+                "name": "object-shorthand",
+                "severity": "error",
+                "options": [
+                    "properties"
+                ]
+            },
+            {
                 "name": "one-var",
                 "severity": "error",
                 "options": [
@@ -2789,6 +2807,10 @@
             },
             {
                 "name": "prefer-spread",
+                "severity": "error"
+            },
+            {
+                "name": "prefer-template",
                 "severity": "error"
             },
             {
@@ -3225,7 +3247,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 287,
+        "rulesOn": 289,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -4722,6 +4744,13 @@
                 "severity": "error"
             },
             {
+                "name": "object-shorthand",
+                "severity": "error",
+                "options": [
+                    "properties"
+                ]
+            },
+            {
                 "name": "one-var",
                 "severity": "error",
                 "options": [
@@ -4779,6 +4808,10 @@
             },
             {
                 "name": "prefer-spread",
+                "severity": "error"
+            },
+            {
+                "name": "prefer-template",
                 "severity": "error"
             },
             {
@@ -4957,7 +4990,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 295,
+        "rulesOn": 297,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6337,6 +6370,13 @@
                 "severity": "error"
             },
             {
+                "name": "object-shorthand",
+                "severity": "error",
+                "options": [
+                    "properties"
+                ]
+            },
+            {
                 "name": "one-var",
                 "severity": "error",
                 "options": [
@@ -6394,6 +6434,10 @@
             },
             {
                 "name": "prefer-spread",
+                "severity": "error"
+            },
+            {
+                "name": "prefer-template",
                 "severity": "error"
             },
             {
@@ -6595,7 +6639,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 280,
+        "rulesOn": 282,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -7893,6 +7937,13 @@
                 "severity": "error"
             },
             {
+                "name": "object-shorthand",
+                "severity": "error",
+                "options": [
+                    "properties"
+                ]
+            },
+            {
                 "name": "one-var",
                 "severity": "error",
                 "options": [
@@ -7950,6 +8001,10 @@
             },
             {
                 "name": "prefer-spread",
+                "severity": "error"
+            },
+            {
+                "name": "prefer-template",
                 "severity": "error"
             },
             {
@@ -8023,7 +8078,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 268,
+        "rulesOn": 270,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -9273,6 +9328,13 @@
                 "severity": "error"
             },
             {
+                "name": "object-shorthand",
+                "severity": "error",
+                "options": [
+                    "properties"
+                ]
+            },
+            {
                 "name": "one-var",
                 "severity": "error",
                 "options": [
@@ -9330,6 +9392,10 @@
             },
             {
                 "name": "prefer-spread",
+                "severity": "error"
+            },
+            {
+                "name": "prefer-template",
                 "severity": "error"
             },
             {

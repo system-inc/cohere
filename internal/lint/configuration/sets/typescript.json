@@ -161,6 +161,8 @@
         "unicode-bom": "error",
         "no-useless-rename": "error",
         "strict": "error",
+        "prefer-template": "error",
+        "object-shorthand": ["error", "properties"],
         "@typescript-eslint/consistent-type-definitions": "off",
         "@typescript-eslint/no-unsafe-type-assertion": "off",
         "nexus/consistency-no-property-alias": "error",
