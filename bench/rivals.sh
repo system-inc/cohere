@@ -22,8 +22,12 @@
 #     rules.
 #   - oxlint runs its default rules plus every type-aware rule those defaults enable. Not the project's
 #     rules either, and neither rival's findings are comparable to cohere's.
-#   - Prettier gets the project's Prettier options and its Tailwind plugin; oxfmt gets the options it
-#     shares with Prettier and no plugin. tsc gets the project's tsconfig.
+#   - Both formatters get the options cohere formats with, the format block of cohere's TypeScript set
+#     read at the engine's commit, so all three format to the same width, indent, quotes and semicolons.
+#     Prettier also gets its Tailwind plugin, pointed at the project's own Tailwind entry point and class
+#     functions; oxfmt gets no plugin. Both check exactly the files the project's tsconfig puts in the
+#     program, less the format block's ignores, named one by one, so neither formats a file cohere would
+#     not. tsc gets the project's tsconfig.
 #   - A project whose house format is not stock Prettier's fails both format checks on many files. That
 #     does not shorten the run: a check formats every file to compare it. Exit codes are printed so a
 #     failing check is never mistaken for a passing one.
@@ -50,6 +54,8 @@
 #   --work DIR         where the copies live (default $TMPDIR/cohere-quiet-machine, shared with
 #                      quiet_machine.sh so both measure the same copy)
 #   --tools DIR        where the rivals are installed (default <work>/rival-tools)
+#   --only TOOLS       measure only these tools, comma-separated (cohere, oxlint, oxfmt, eslint,
+#                      prettier, tsc); a stack left with none is skipped
 # The versions installed are the defaults below; edit them here, since every one is part of the result.
 #
 # Exit status: 0 when every stack and mode has a quiet number, 3 when one has none, 1 when it could not
@@ -65,6 +71,7 @@ settle=0
 cohere=cohere
 work=${TMPDIR:-/tmp}/cohere-quiet-machine
 tools=
+only=(cohere oxlint oxfmt eslint prettier tsc)
 rivals=(
   oxlint@1.86.0 oxlint-tsgolint@7.0.2003 oxfmt@0.71.0
   eslint@10.8.1 typescript-eslint@8.67.0 typescript@6.0.3 prettier@3.9.6 prettier-plugin-tailwindcss@0.8.1
@@ -79,6 +86,7 @@ while (( $# > 0 )); do
     --cohere) cohere=$2; shift 2 ;;
     --work) work=$2; shift 2 ;;
     --tools) tools=$2; shift 2 ;;
+    --only) only=(${(s:,:)2}); shift 2 ;;
     *) fail "unknown argument $1 (see the usage at the top of this script)" ;;
   esac
 done
@@ -110,19 +118,37 @@ tsgolint_binary=($tools/node_modules/@oxlint-tsgolint/*/tsgolint(N))
 # Each run writes the configurations it gives the rivals, from the project's own settings, beside its
 # logs, except ESLint's, which has to sit in the tools directory to import typescript-eslint from it.
 # Paths in them are absolute, because each is read from outside the project it describes.
-# Prettier's plugins are resolved in the tools directory: by name it would find the project's own, which
-# are built against the project's Prettier.
-(cd $copy && node -e '
+#
+# The format options are cohere's own, from the cohere checkout the engine was built from, at the commit
+# it reports, so the rivals format exactly as cohere does on this run. The Tailwind plugin is resolved in
+# the tools directory, since by name it would find the project's own, built against another Prettier.
+cohere_checkout=${engine_source:h:h:h:h}
+cohere_commit=$(print -- "$cohere_version" | awk '$1 == "commit:" { print $2 }')
+format_set=$(git -C $cohere_checkout show $cohere_commit:internal/lint/configuration/sets/typescript.json) ||
+  fail "cannot read cohere's TypeScript set at $cohere_commit in $cohere_checkout"
+(cd $copy && print -r -- "$format_set" | node -e '
   const [copy, logs, tools] = process.argv.slice(1);
   const fs = require("fs");
-  const prettier = require("./package.json").prettier ?? {};
-  const shared = ["printWidth", "tabWidth", "useTabs", "semi", "singleQuote", "trailingComma", "bracketSpacing", "arrowParens", "endOfLine"];
-  fs.writeFileSync(logs + "/oxfmtrc.json", JSON.stringify(Object.fromEntries(shared.filter((key) => key in prettier).map((key) => [key, prettier[key]]))));
-  const absolute = { ...prettier };
-  if (absolute.tailwindStylesheet) absolute.tailwindStylesheet = copy + "/" + absolute.tailwindStylesheet.replace(/^\.\//, "");
-  absolute.plugins = (absolute.plugins ?? []).map((plugin) => require.resolve(plugin, { paths: [tools] }));
-  fs.writeFileSync(logs + "/prettierrc.json", JSON.stringify(absolute));
-' $copy $logs $tools) || fail "could not read the project's Prettier options, or resolve its plugins in $tools"
+  const format = JSON.parse(fs.readFileSync(0, "utf8")).format;
+  if (!format) throw new Error("cohere'\''s TypeScript set has no format block");
+  const { ignore = [], ...options } = format;
+  fs.writeFileSync(logs + "/oxfmtrc.json", JSON.stringify(options));
+  fs.writeFileSync(logs + "/format-ignore.txt", ignore.join("\n") + "\n");
+  const tailwind = JSON.parse(fs.readFileSync("CohereSettings.json", "utf8")).settings?.["better-tailwindcss"] ?? {};
+  const prettier = { ...options, plugins: [require.resolve("prettier-plugin-tailwindcss", { paths: [tools] })] };
+  if (tailwind.entryPoint) prettier.tailwindStylesheet = copy + "/" + tailwind.entryPoint.replace(/^\.\//, "");
+  if (tailwind.callees) prettier.tailwindFunctions = tailwind.callees;
+  fs.writeFileSync(logs + "/prettierrc.json", JSON.stringify(prettier));
+' $copy $logs $tools) || fail "could not write the formatters' options"
+# The files: the program the project's tsconfig defines, its own files only, less the format ignores.
+(cd $copy && $bin/tsc -p tsconfig.json --listFilesOnly) | awk -v root=$copy/ 'index($0, root) == 1 && $0 !~ /\/node_modules\// { print substr($0, length(root) + 1) }' |
+  while read -r file; do
+    skip=
+    for pattern in ${(f)"$(< $logs/format-ignore.txt)"}; do [[ ${file:t} == ${~pattern} ]] && skip=1; done
+    [[ -z $skip ]] && print -r -- $file
+  done > $logs/format-files.txt
+format_file_count=$(wc -l < $logs/format-files.txt | tr -d ' ')
+(( format_file_count > 0 )) || fail "the project's tsconfig names no files to format"
 # The ignores are the project tsconfig's excludes, so ESLint lints the files the type checker covers.
 cat > $tools/eslint.config.mjs <<EOF
 import { defineConfig } from 'eslint/config';
@@ -146,7 +172,10 @@ print "# rivals benchmark, $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 print_pinned_header
 print "# rivals   ${(j:, :)rivals}"
 print "#          from $tools"
-print "#          oxfmt options $(< $logs/oxfmtrc.json)"
+print "#          format options $(< $logs/oxfmtrc.json), from cohere's TypeScript set at $cohere_commit"
+print "#          prettier $(< $logs/prettierrc.json)"
+print "#          formatters check $format_file_count files, the tsconfig's program less the format ignores"
+print "#          measuring ${(j:, :)only}"
 print "#          eslint: typescript-eslint recommendedTypeChecked, $tools/eslint.config.mjs"
 print "# rounds   $runs, load ceiling $ceiling (one-minute)"
 print
@@ -159,16 +188,18 @@ tool_commands() {
     cohere-warm) print "cohere\t$engine --no-fix --format" ;;
     oxc-*)
       print "oxlint\tenv OXLINT_TSGOLINT_PATH=$tsgolint_binary[1] $bin/oxlint --type-aware --type-check"
-      print "oxfmt\t$bin/oxfmt --check -c $logs/oxfmtrc.json" ;;
+      print "oxfmt\t$bin/oxfmt --check -c $logs/oxfmtrc.json @FILES" ;;
     eslint-cold)
       print "eslint\t$bin/eslint --config $tools/eslint.config.mjs ."
-      print "prettier\t$bin/prettier --check . --config $logs/prettierrc.json"
+      print "prettier\t$bin/prettier --check --config $logs/prettierrc.json @FILES"
       print "tsc\t$bin/tsc --noEmit --incremental false" ;;
     eslint-warm)
       print "eslint\t$bin/eslint --config $tools/eslint.config.mjs . --cache --cache-location $logs/eslint-cache/"
-      print "prettier\t$bin/prettier --check . --config $logs/prettierrc.json --cache --cache-location $logs/prettier-cache"
+      print "prettier\t$bin/prettier --check --config $logs/prettierrc.json --cache --cache-location $logs/prettier-cache @FILES"
       print "tsc\t$bin/tsc --noEmit --incremental --tsBuildInfoFile $logs/tsc.tsbuildinfo" ;;
-  esac
+  esac | while IFS=$'\t' read -r tool command; do
+    (( ${only[(Ie)$tool]} )) && print -r -- "$tool"$'\t'"$command"
+  done
 }
 
 # run_stack runs each tool of a stack and sets stack_seconds to their sum and stack_exits to their exit
@@ -179,7 +210,11 @@ run_stack() {
   tool_commands $stack $mode | while IFS=$'\t' read -r tool command; do
     local log=$logs/$stack-$mode-$round-$tool.log
     [[ -z $label ]] && log=$logs/$stack-$mode-$round-$tool.prime.log
-    run_timed $log ${(z)command}
+    # `@FILES` stands for the formatters' file list, one argument per file.
+    local -a words=(${(z)command})
+    local at=${words[(Ie)@FILES]}
+    (( at )) && words[$at,$at]=(${(f)"$(< $logs/format-files.txt)"})
+    run_timed $log $words
     stack_seconds=$(( stack_seconds + settled_seconds ))
     stack_exits+=($exit_code)
     [[ -n $label ]] && printf '%s\t%s\t%d\t%s\t%.3f\t%d\n' $stack $mode $round $tool $settled_seconds $exit_code >> $logs/tools.tsv
@@ -205,7 +240,9 @@ for round in $(seq 1 $runs); do
   # Rotated, so no stack always runs first, or always runs after the heaviest.
   order=(${stacks[$(( (round - 1) % 3 + 1 )),-1]} ${stacks[1,$(( (round - 1) % 3 ))]})
   for mode in cold warm; do
-    for stack in $order; do measure $stack $mode $round; done
+    for stack in $order; do
+      [[ -n $(tool_commands $stack $mode) ]] && measure $stack $mode $round
+    done
   done
 done
 
@@ -224,6 +261,7 @@ for stack in $stacks; do
   for mode in cold warm; do
     quiet_runs=($(awk -F'\t' -v stack=$stack -v mode=$mode '$1 == stack && $2 == mode && $8 == "quiet" { print $4 }' $runs_table | sort -n))
     loaded_runs=($(awk -F'\t' -v stack=$stack -v mode=$mode '$1 == stack && $2 == mode && $8 == "loaded" { print $4 }' $runs_table | sort -n))
+    (( ${#quiet_runs} + ${#loaded_runs} > 0 )) || continue
     if (( ${#quiet_runs} > 0 )); then
       printf '  %-6s %-4s quiet best %s, median %s, worst %s (%d of %d runs quiet)\n' $stack $mode \
         $quiet_runs[1] $quiet_runs[$(( (${#quiet_runs} + 1) / 2 ))] $quiet_runs[-1] ${#quiet_runs} $runs
