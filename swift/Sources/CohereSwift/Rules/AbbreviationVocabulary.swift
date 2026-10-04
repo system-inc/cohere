@@ -24,9 +24,10 @@ public struct AbbreviationVocabulary: Sendable {
         var abbreviation: String
         var expansion: String
         var advice: String
-        var whole: (messageId: String, style: String)?
-        var prefix: (messageId: String, phase: String, style: String)?
-        var suffix: (messageId: String, advice: String, matcher: String, replacement: String)?
+        /* The whole form's style, when the word is judged as a whole name. */
+        var whole: String?
+        var prefix: (phase: String, style: String)?
+        var suffix: (advice: String, matcher: String, replacement: String)?
         var segment: Bool
     }
 
@@ -36,14 +37,19 @@ public struct AbbreviationVocabulary: Sendable {
         public var abbreviation: String
         public var messageId: String
         public var message: String
+
+        /* A finding whose id and text come from the house catalog: the four shapes every word reports in, shared with TypeScript. */
+        init(form: String, abbreviation: String, message: RuleMessages.Message) {
+            self.form = form
+            self.abbreviation = abbreviation
+            self.messageId = message.id
+            self.message = message.text
+        }
     }
 
     struct LoadFailure: Error, CustomStringConvertible {
         var description: String
     }
-
-    static let reasoning =
-        "A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call site by a reader who has to expand the abbreviation themselves and hope they expanded it the way the author meant."
 
     private(set) var wholeByName: [String: Entry] = [:]
     private(set) var earlyPrefixes: [Entry] = []
@@ -139,7 +145,7 @@ public struct AbbreviationVocabulary: Sendable {
         )
         var needsExpansion = entry.segment
         if let whole = object["whole"] as? [String: Any] {
-            try refuseUnknownKeys(in: whole, allowed: ["messageId", "style"], context: "\(context) whole")
+            try refuseUnknownKeys(in: whole, allowed: ["style"], context: "\(context) whole")
             let style = whole["style"] as? String ?? ""
             switch style {
                 case "orDescriptive", "plain": needsExpansion = true
@@ -148,10 +154,10 @@ public struct AbbreviationVocabulary: Sendable {
                     throw LoadFailure(description: "\(context): whole style is advice and the entry has none")
                 default: throw LoadFailure(description: "\(context): unknown whole style \"\(style)\"")
             }
-            entry.whole = (try messageId(of: whole, context: "\(context) whole"), style)
+            entry.whole = style
         }
         if let prefix = object["prefix"] as? [String: Any] {
-            try refuseUnknownKeys(in: prefix, allowed: ["messageId", "phase", "style"], context: "\(context) prefix")
+            try refuseUnknownKeys(in: prefix, allowed: ["phase", "style"], context: "\(context) prefix")
             let phase = prefix["phase"] as? String ?? ""
             guard phase == "early" || phase == "late" else {
                 throw LoadFailure(description: "\(context): unknown prefix phase \"\(phase)\"")
@@ -164,12 +170,12 @@ public struct AbbreviationVocabulary: Sendable {
                     throw LoadFailure(description: "\(context): prefix style is advice and the entry has none")
                 default: throw LoadFailure(description: "\(context): unknown prefix style \"\(style)\"")
             }
-            entry.prefix = (try messageId(of: prefix, context: "\(context) prefix"), phase, style)
+            entry.prefix = (phase, style)
         }
         if let suffix = object["suffix"] as? [String: Any] {
             try refuseUnknownKeys(
                 in: suffix,
-                allowed: ["messageId", "advice", "matcher", "replacement"],
+                allowed: ["advice", "matcher", "replacement"],
                 context: "\(context) suffix",
             )
             let matcher = suffix["matcher"] as? String ?? ""
@@ -181,7 +187,7 @@ public struct AbbreviationVocabulary: Sendable {
             if advice.isEmpty && replacement.isEmpty {
                 needsExpansion = true
             }
-            entry.suffix = (try messageId(of: suffix, context: "\(context) suffix"), advice, matcher, replacement)
+            entry.suffix = (advice, matcher, replacement)
         }
         guard entry.whole != nil || entry.prefix != nil || entry.suffix != nil || entry.segment else {
             throw LoadFailure(description: "\(context): no form, so the entry judges nothing")
@@ -195,13 +201,6 @@ public struct AbbreviationVocabulary: Sendable {
             throw LoadFailure(description: "\(context): a form suggests the expansion and the entry has none")
         }
         return entry
-    }
-
-    private static func messageId(of form: [String: Any], context: String) throws -> String {
-        guard let identifier = form["messageId"] as? String, !identifier.isEmpty else {
-            throw LoadFailure(description: "\(context) has no messageId")
-        }
-        return identifier
     }
 
     private static func refuseUnknownKeys(in object: [String: Any], allowed: Set<String>, context: String) throws {
@@ -222,7 +221,7 @@ public struct AbbreviationVocabulary: Sendable {
         }
         if let entry = wholeByName[name], let whole = entry.whole {
             let advice: String
-            switch whole.style {
+            switch whole {
                 case "advice": advice = entry.advice
                 case "plain": advice = "Use \"\(entry.expansion)\"."
                 default: advice = "Use \"\(entry.expansion)\" or a more descriptive name."
@@ -230,8 +229,7 @@ public struct AbbreviationVocabulary: Sendable {
             return Finding(
                 form: "whole",
                 abbreviation: entry.abbreviation,
-                messageId: whole.messageId,
-                message: Self.abbreviated(name, advice),
+                message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedIdentifier(name: name, advice: advice),
             )
         }
         let bytes = Array(name.utf8)
@@ -252,8 +250,7 @@ public struct AbbreviationVocabulary: Sendable {
                     return Finding(
                         form: "suffix",
                         abbreviation: entry.abbreviation,
-                        messageId: "noMsSuffix",
-                        message: Self.millisecondMessage(name, suggestion),
+                        message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.millisecondSuffix(name: name, suggestion: suggestion),
                     )
                 }
                 continue
@@ -268,8 +265,7 @@ public struct AbbreviationVocabulary: Sendable {
             return Finding(
                 form: "suffix",
                 abbreviation: entry.abbreviation,
-                messageId: suffix.messageId,
-                message: "Identifier \"\(name)\" should not end with \"\(word)\". \(advice) \(Self.reasoning)",
+                message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedSuffix(name: name, suffix: word, advice: advice),
             )
         }
         for entry in latePrefixes {
@@ -296,8 +292,7 @@ public struct AbbreviationVocabulary: Sendable {
             return Finding(
                 form: "segment",
                 abbreviation: entry.abbreviation,
-                messageId: "noWordSegment",
-                message: "Identifier \"\(name)\" abbreviates \"\(shown)\". Use \"\(suggestion)\". \(Self.reasoning)",
+                message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedWordSegment(name: name, word: shown, suggestion: suggestion),
             )
         }
         return nil
@@ -314,30 +309,20 @@ public struct AbbreviationVocabulary: Sendable {
             return Finding(
                 form: "prefix",
                 abbreviation: entry.abbreviation,
-                messageId: prefix.messageId,
-                message: Self.abbreviated(entry.abbreviation, entry.advice),
+                message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedIdentifier(name: entry.abbreviation, advice: entry.advice),
             )
         }
         let suggestion = entry.expansion + name.dropFirst(entry.abbreviation.count)
         return Finding(
             form: "prefix",
             abbreviation: entry.abbreviation,
-            messageId: prefix.messageId,
-            message: Self.abbreviated(name, "Use \"\(suggestion)\"."),
+            message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedIdentifier(name: name, advice: "Use \"\(suggestion)\"."),
         )
     }
 
     /* Whether an allowed segment in the name holds this abbreviation's letters, which exempts `db` from an `InnoDb` name's early prefix. */
     private func allowedSegmentHolds(_ name: String, _ abbreviation: String) -> Bool {
         allowedSegments.contains { name.contains($0) && $0.lowercased().contains(abbreviation) }
-    }
-
-    static func abbreviated(_ name: String, _ advice: String) -> String {
-        "Identifier \"\(name)\" should not be abbreviated. \(advice) \(reasoning)"
-    }
-
-    static func millisecondMessage(_ name: String, _ suggestion: String) -> String {
-        "Identifier \"\(name)\" should not abbreviate milliseconds as \"Ms\". Use \"\(suggestion)\", which is how the rest of the tree spells a millisecond value: \"durationInMilliseconds\" outnumbers \"durationMs\" more than two to one for the identical value, so the rename follows what the codebase already decided rather than introducing a third spelling."
     }
 
     /* The first `[a-z]Ms($|[A-Z])`, as the range from the lowercase letter to the end of `Ms`. */

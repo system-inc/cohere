@@ -67,10 +67,6 @@ type abbreviationEntry struct {
 
 // abbreviationWholeForm judges a name that is the abbreviation entire.
 type abbreviationWholeForm struct {
-	// MessageId is retired: a finding's id names its shape, from policy/messages. The field is
-	// accepted only until policy/Abbreviations.json drops it, which the second engine to stop
-	// reading it does (#xd6f0n6).
-	MessageId string `json:"messageId"`
 	// Style is "orDescriptive" (use the expansion or a more descriptive name), "plain" (use the
 	// expansion), or "advice" (the entry's advice).
 	Style string `json:"style"`
@@ -78,10 +74,6 @@ type abbreviationWholeForm struct {
 
 // abbreviationPrefixForm judges a camelCase name that begins with the abbreviation.
 type abbreviationPrefixForm struct {
-	// MessageId is retired: a finding's id names its shape, from policy/messages. The field is
-	// accepted only until policy/Abbreviations.json drops it, which the second engine to stop
-	// reading it does (#xd6f0n6).
-	MessageId string `json:"messageId"`
 	// Phase is "early", judged before any suffix, or "late", judged after them.
 	Phase string `json:"phase"`
 	// Style is empty for a rename to the expansion, or "advice" for the entry's advice.
@@ -90,10 +82,6 @@ type abbreviationPrefixForm struct {
 
 // abbreviationSuffixForm judges a name that ends with the abbreviation capitalized.
 type abbreviationSuffixForm struct {
-	// MessageId is retired: a finding's id names its shape, from policy/messages. The field is
-	// accepted only until policy/Abbreviations.json drops it, which the second engine to stop
-	// reading it does (#xd6f0n6).
-	MessageId string `json:"messageId"`
 	// Advice replaces the rename suggestion.
 	Advice string `json:"advice"`
 	// Matcher replaces the plain suffix test. The only one is "millisecondWord".

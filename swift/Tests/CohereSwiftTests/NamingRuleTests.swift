@@ -54,9 +54,9 @@ struct NamingRuleTests {
     @Test func everyFormIsJudged() throws {
         let vocabulary = try Self.vocabulary()
         var judged = 0
-        for (word, entry) in vocabulary.wholeByName {
+        for word in vocabulary.wholeByName.keys {
             #expect(
-                vocabulary.find(word)?.form == "whole" && vocabulary.find(word)?.messageId == entry.whole?.messageId,
+                vocabulary.find(word)?.form == "whole" && vocabulary.find(word)?.messageId == "abbreviatedIdentifier",
                 "whole \(word)",
             )
             judged += 1
@@ -64,7 +64,7 @@ struct NamingRuleTests {
         for entry in vocabulary.earlyPrefixes + vocabulary.latePrefixes {
             let name = entry.abbreviation + "Widget"
             #expect(
-                vocabulary.find(name)?.form == "prefix" && vocabulary.find(name)?.messageId == entry.prefix?.messageId,
+                vocabulary.find(name)?.form == "prefix" && vocabulary.find(name)?.messageId == "abbreviatedIdentifier",
                 "prefix \(name)",
             )
             judged += 1
@@ -86,9 +86,9 @@ struct NamingRuleTests {
     }
 
     @Test(arguments: [
-        ("themeVarsVar", "noWordSegment", #"Use "themeVariablesVar"."#),
-        ("timeoutMsRef", "noMsSuffix", #"Use "timeoutInMillisecondsRef""#),
-        ("dbVal", "noDb", #"Use "databaseVal"."#),
+        ("themeVarsVar", "abbreviatedWordSegment", #"Use "themeVariablesVar"."#),
+        ("timeoutMsRef", "millisecondSuffix", #"Use "timeoutInMillisecondsRef""#),
+        ("dbVal", "abbreviatedIdentifier", #"Use "databaseVal"."#),
     ])
     func orderIsObservableWhereItMatters(name: String, messageId: String, advice: String) throws {
         let finding = try #require(try Self.vocabulary().find(name))
@@ -105,14 +105,15 @@ struct NamingRuleTests {
     }
 
     @Test(arguments: [
-        #"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "suffx": {"messageId": "x"}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "suffx": {}}]}"#,
         #"{"abbreviations": [{"abbreviation": "val", "expansion": "value"}]}"#,
-        #"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"messageId": "x", "style": "loud"}}]}"#,
-        #"{"abbreviations": [{"abbreviation": "val", "whole": {"messageId": "x", "style": "plain"}}]}"#,
-        #"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "prefix": {"messageId": "x", "phase": "middle"}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"style": "loud"}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "whole": {"style": "plain"}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "prefix": {"phase": "middle"}}]}"#,
         #"{"abbreviations": [{"abbreviation": "Val", "expansion": "value", "segment": {}}]}"#,
         #"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "segment": {}}, {"abbreviation": "val", "expansion": "value", "segment": {}}]}"#,
-        #"{"abbreviations": [{"abbreviation": "ms", "expansion": "m", "suffix": {"messageId": "x", "matcher": "seconds"}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "ms", "expansion": "m", "suffix": {"matcher": "seconds"}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"messageId": "noVal", "style": "plain"}}]}"#,
     ])
     func aMalformedFileIsRefused(file: String) {
         #expect(throws: (any Error).self) { try AbbreviationVocabulary.load(data: Data(file.utf8)) }

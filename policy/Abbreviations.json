@@ -4,183 +4,182 @@
         {
             "abbreviation": "prop",
             "expansion": "property",
-            "whole": { "messageId": "noProp", "style": "orDescriptive" },
-            "prefix": { "messageId": "noProp", "phase": "late" },
-            "suffix": { "messageId": "noPropSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "props",
             "expansion": "properties",
-            "whole": { "messageId": "noProps", "style": "orDescriptive" },
-            "prefix": { "messageId": "noProps", "phase": "late" },
-            "suffix": { "messageId": "noPropsSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "param",
             "expansion": "parameter",
-            "whole": { "messageId": "noParam", "style": "orDescriptive" },
-            "prefix": { "messageId": "noParam", "phase": "late" },
-            "suffix": { "messageId": "noParamSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "params",
             "expansion": "parameters",
-            "whole": { "messageId": "noParams", "style": "orDescriptive" },
-            "prefix": { "messageId": "noParams", "phase": "late" },
-            "suffix": { "messageId": "noParamsSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "ms",
             "expansion": "milliseconds",
             "reason": "A millisecond unit read as a camelCase word: a lowercase letter before it, and the end of the name or the next word after, so `maximumAgeMsHalf` counts while `SMS`, `LLMs` and `msgText` do not. The tree spells the unit `InMilliseconds`, more than two to one over `Ms` for the identical value.",
-            "suffix": { "messageId": "noMsSuffix", "matcher": "millisecondWord", "replacement": "InMilliseconds" }
+            "suffix": { "matcher": "millisecondWord", "replacement": "InMilliseconds" }
         },
         {
             "abbreviation": "ref",
             "expansion": "reference",
-            "whole": { "messageId": "noRef", "style": "orDescriptive" },
-            "prefix": { "messageId": "noRef", "phase": "late" },
-            "suffix": { "messageId": "noRefSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "config",
             "expansion": "configuration",
-            "whole": { "messageId": "noConfig", "style": "orDescriptive" },
-            "prefix": { "messageId": "noConfig", "phase": "late" },
-            "suffix": { "messageId": "noConfigSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "idx",
             "expansion": "index",
-            "whole": { "messageId": "noIdx", "style": "orDescriptive" },
-            "prefix": { "messageId": "noIdx", "phase": "late" },
-            "suffix": { "messageId": "noIdxSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "arg",
             "expansion": "argument",
             "advice": "Use \"argument\", \"commandArgument\", or a more descriptive name.",
             "reason": "The whole word and the prefix give advice rather than one rename, because the right name depends on what the argument is.",
-            "whole": { "messageId": "noArg", "style": "advice" },
-            "prefix": { "messageId": "noArg", "phase": "late", "style": "advice" },
-            "suffix": { "messageId": "noArgSuffix" }
+            "whole": { "style": "advice" },
+            "prefix": { "phase": "late", "style": "advice" },
+            "suffix": {}
         },
         {
             "abbreviation": "args",
             "expansion": "arguments",
             "advice": "Use \"arguments\", \"commandArguments\", \"commandLineArguments\", or a more descriptive name.",
             "reason": "`arguments` is a reserved binding, so the whole word and the prefix give advice rather than the bare expansion.",
-            "whole": { "messageId": "noArgs", "style": "advice" },
-            "prefix": { "messageId": "noArgs", "phase": "late", "style": "advice" },
-            "suffix": { "messageId": "noArgsSuffix" }
+            "whole": { "style": "advice" },
+            "prefix": { "phase": "late", "style": "advice" },
+            "suffix": {}
         },
         {
             "abbreviation": "acc",
             "advice": "Pick a name that describes what is being accumulated, \"total\", \"sum\", \"groupedItems\", or whatever fits the reduce.",
             "reason": "A reduce accumulator has no single expansion: the right name is whatever it accumulates.",
-            "whole": { "messageId": "noAcc", "style": "advice" }
+            "whole": { "style": "advice" }
         },
         {
             "abbreviation": "char",
             "expansion": "character",
-            "whole": { "messageId": "noChar", "style": "orDescriptive" },
-            "prefix": { "messageId": "noChar", "phase": "late" },
-            "suffix": { "messageId": "noCharSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "fn",
             "advice": "Use \"callback\", \"handler\", \"factory\", or a more descriptive name.",
             "reason": "A function wants a role rather than an expansion: `function` names the kind, not the job.",
-            "whole": { "messageId": "noFn", "style": "advice" },
-            "prefix": { "messageId": "noFn", "phase": "late", "style": "advice" },
+            "whole": { "style": "advice" },
+            "prefix": { "phase": "late", "style": "advice" },
             "suffix": {
-                "messageId": "noFnSuffix",
                 "advice": "Use a more descriptive name, drop the \"Fn\" suffix or rename to a role like \"Handler\", \"Callback\", \"Factory\"."
             }
         },
         {
             "abbreviation": "str",
             "expansion": "string",
-            "whole": { "messageId": "noStr", "style": "orDescriptive" },
-            "prefix": { "messageId": "noStr", "phase": "late" },
-            "suffix": { "messageId": "noStrSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "val",
             "expansion": "value",
-            "whole": { "messageId": "noVal", "style": "orDescriptive" },
-            "prefix": { "messageId": "noVal", "phase": "late" },
-            "suffix": { "messageId": "noValSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "arr",
             "expansion": "array",
-            "whole": { "messageId": "noArr", "style": "orDescriptive" },
-            "prefix": { "messageId": "noArr", "phase": "late" },
-            "suffix": { "messageId": "noArrSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "obj",
             "expansion": "object",
-            "whole": { "messageId": "noObj", "style": "orDescriptive" },
-            "prefix": { "messageId": "noObj", "phase": "late" },
-            "suffix": { "messageId": "noObjSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "num",
             "expansion": "number",
-            "whole": { "messageId": "noNum", "style": "orDescriptive" },
-            "prefix": { "messageId": "noNum", "phase": "late" },
-            "suffix": { "messageId": "noNumSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "res",
             "expansion": "response",
-            "whole": { "messageId": "noRes", "style": "orDescriptive" },
-            "prefix": { "messageId": "noRes", "phase": "late" },
-            "suffix": { "messageId": "noResSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "err",
             "expansion": "error",
-            "whole": { "messageId": "noErr", "style": "orDescriptive" },
-            "prefix": { "messageId": "noErr", "phase": "late" },
-            "suffix": { "messageId": "noErrSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "req",
             "expansion": "request",
-            "whole": { "messageId": "noReq", "style": "orDescriptive" },
-            "prefix": { "messageId": "noReq", "phase": "late" },
-            "suffix": { "messageId": "noReqSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "msg",
             "expansion": "message",
-            "whole": { "messageId": "noMsg", "style": "orDescriptive" },
-            "prefix": { "messageId": "noMsg", "phase": "late" },
-            "suffix": { "messageId": "noMsgSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "min",
             "expansion": "minimum",
-            "whole": { "messageId": "noMin", "style": "orDescriptive" },
-            "prefix": { "messageId": "noMin", "phase": "late" },
-            "suffix": { "messageId": "noMinSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "max",
             "expansion": "maximum",
-            "whole": { "messageId": "noMax", "style": "orDescriptive" },
-            "prefix": { "messageId": "noMax", "phase": "late" },
-            "suffix": { "messageId": "noMaxSuffix" }
+            "whole": { "style": "orDescriptive" },
+            "prefix": { "phase": "late" },
+            "suffix": {}
         },
         {
             "abbreviation": "ctx",
             "expansion": "context",
             "reason": "An early prefix: judged before any suffix, so a name starting with it reports the prefix even when it also ends with an abbreviation.",
-            "whole": { "messageId": "noCtx", "style": "plain" },
-            "prefix": { "messageId": "noCtx", "phase": "early" }
+            "whole": { "style": "plain" },
+            "prefix": { "phase": "early" }
         },
         {
             "abbreviation": "cwd",
@@ -216,40 +215,40 @@
         {
             "abbreviation": "db",
             "expansion": "database",
-            "whole": { "messageId": "noDb", "style": "plain" },
-            "prefix": { "messageId": "noDb", "phase": "early" },
+            "whole": { "style": "plain" },
+            "prefix": { "phase": "early" },
             "segment": {}
         },
         {
             "abbreviation": "tx",
             "expansion": "transaction",
-            "whole": { "messageId": "noTx", "style": "plain" },
-            "prefix": { "messageId": "noTx", "phase": "early" },
+            "whole": { "style": "plain" },
+            "prefix": { "phase": "early" },
             "segment": {}
         },
         {
             "abbreviation": "opts",
             "expansion": "options",
-            "whole": { "messageId": "noOpts", "style": "plain" },
-            "prefix": { "messageId": "noOpts", "phase": "early" }
+            "whole": { "style": "plain" },
+            "prefix": { "phase": "early" }
         },
         {
             "abbreviation": "cur",
             "expansion": "current",
-            "whole": { "messageId": "noCur", "style": "plain" },
-            "prefix": { "messageId": "noCur", "phase": "early" }
+            "whole": { "style": "plain" },
+            "prefix": { "phase": "early" }
         },
         {
             "abbreviation": "pct",
             "expansion": "percent",
-            "whole": { "messageId": "noPct", "style": "plain" },
-            "prefix": { "messageId": "noPct", "phase": "early" }
+            "whole": { "style": "plain" },
+            "prefix": { "phase": "early" }
         },
         {
             "abbreviation": "prev",
             "expansion": "previous",
-            "whole": { "messageId": "noPrev", "style": "plain" },
-            "prefix": { "messageId": "noPrev", "phase": "early" }
+            "whole": { "style": "plain" },
+            "prefix": { "phase": "early" }
         },
         {
             "abbreviation": "vars",

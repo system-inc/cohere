@@ -8,28 +8,16 @@
   },
   "messages": {
     "abbreviatedIdentifier": {
-      "text": "Identifier \"{{name}}\" should not be abbreviated. {{advice}} <<reasoning>>",
-      "languages": [
-        "TypeScript"
-      ]
+      "text": "Identifier \"{{name}}\" should not be abbreviated. {{advice}} <<reasoning>>"
     },
     "abbreviatedSuffix": {
-      "text": "Identifier \"{{name}}\" should not end with \"{{suffix}}\". {{advice}} <<reasoning>>",
-      "languages": [
-        "TypeScript"
-      ]
+      "text": "Identifier \"{{name}}\" should not end with \"{{suffix}}\". {{advice}} <<reasoning>>"
     },
     "millisecondSuffix": {
-      "text": "Identifier \"{{name}}\" should not abbreviate milliseconds as \"Ms\". Use \"{{suggestion}}\", which is how the rest of the tree spells a millisecond value: \"durationInMilliseconds\" outnumbers \"durationMs\" more than two to one for the identical value, so the rename follows what the codebase already decided rather than introducing a third spelling.",
-      "languages": [
-        "TypeScript"
-      ]
+      "text": "Identifier \"{{name}}\" should not abbreviate milliseconds as \"Ms\". Use \"{{suggestion}}\", which is how the rest of the tree spells a millisecond value: \"durationInMilliseconds\" outnumbers \"durationMs\" more than two to one for the identical value, so the rename follows what the codebase already decided rather than introducing a third spelling."
     },
     "abbreviatedWordSegment": {
-      "text": "Identifier \"{{name}}\" abbreviates \"{{word}}\". Use \"{{suggestion}}\". <<reasoning>>",
-      "languages": [
-        "TypeScript"
-      ]
+      "text": "Identifier \"{{name}}\" abbreviates \"{{word}}\". Use \"{{suggestion}}\". <<reasoning>>"
     }
   }
 }

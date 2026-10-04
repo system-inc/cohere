@@ -139,14 +139,15 @@ func TestAbbreviationVocabularyRefusesAMalformedFile(t *testing.T) {
 		name string
 		file string
 	}{
-		{"a misspelled form", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "suffx": {"messageId": "x"}}]}`},
+		{"a misspelled form", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "suffx": {}}]}`},
 		{"an entry with no form", `{"abbreviations": [{"abbreviation": "val", "expansion": "value"}]}`},
-		{"an unknown whole style", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"messageId": "x", "style": "loud"}}]}`},
-		{"a rename with no expansion", `{"abbreviations": [{"abbreviation": "val", "whole": {"messageId": "x", "style": "plain"}}]}`},
-		{"an unknown prefix phase", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "prefix": {"messageId": "x", "phase": "middle"}}]}`},
+		{"an unknown whole style", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"style": "loud"}}]}`},
+		{"a rename with no expansion", `{"abbreviations": [{"abbreviation": "val", "whole": {"style": "plain"}}]}`},
+		{"an unknown prefix phase", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "prefix": {"phase": "middle"}}]}`},
 		{"an uppercase abbreviation", `{"abbreviations": [{"abbreviation": "Val", "expansion": "value", "segment": {}}]}`},
 		{"a duplicate entry", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "segment": {}}, {"abbreviation": "val", "expansion": "value", "segment": {}}]}`},
-		{"an unknown matcher", `{"abbreviations": [{"abbreviation": "ms", "expansion": "m", "suffix": {"messageId": "x", "matcher": "seconds"}}]}`},
+		{"an unknown matcher", `{"abbreviations": [{"abbreviation": "ms", "expansion": "m", "suffix": {"matcher": "seconds"}}]}`},
+		{"a retired per-word messageId", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"messageId": "noVal", "style": "plain"}}]}`},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

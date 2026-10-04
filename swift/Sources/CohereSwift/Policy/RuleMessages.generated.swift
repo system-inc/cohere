@@ -10,7 +10,7 @@ enum RuleMessages {
     }
 
     /* SHA-256 of the messages that reach Swift, resolved, which a test recomputes from policy/messages/ on disk. */
-    static let sourceDigest = "78ca3f2d26b6652a2081c4665afe7b0b77602dbfd3d0892c1a3156f291fcc051"
+    static let sourceDigest = "61435a5fb4d922e644b6286e3835d882b44ed395354cb7849537c58cd06a6f4a"
 
     /* Every message here, as `Rule.id`, for the test that fails on one no rule renders. */
     static let all = [
@@ -19,6 +19,10 @@ enum RuleMessages {
         "ConcurrencyNoCheckThenWrite.checkThenWrite",
         "ConcurrencyNoLostUpdate.lostUpdate",
         "ConcurrencyRequireEscapeHatchReason.escapeHatchWithoutReason",
+        "ConsistencyNoAbbreviatedIdentifier.abbreviatedIdentifier",
+        "ConsistencyNoAbbreviatedIdentifier.abbreviatedSuffix",
+        "ConsistencyNoAbbreviatedIdentifier.abbreviatedWordSegment",
+        "ConsistencyNoAbbreviatedIdentifier.millisecondSuffix",
         "ConsistencyNoAmbiguousIdentifier.noAmbiguousE",
         "ConsistencyNoAmbiguousIdentifier.noSingleLetter",
         "ConsistencyNoBareThrow.bareThrow",
@@ -108,6 +112,41 @@ enum RuleMessages {
                 id: "escapeHatchWithoutReason",
                 text:
                     #"\#(spelling) tells the compiler to trust this code instead of checking it. Say why that is safe in a comment directly above the declaration, so the next reader can check the reasoning the compiler no longer does."#,
+            )
+        }
+    }
+
+    /* cohere-swift/consistency-no-abbreviated-identifier */
+    enum ConsistencyNoAbbreviatedIdentifier {
+        static func abbreviatedIdentifier(name: String, advice: String) -> Message {
+            Message(
+                id: "abbreviatedIdentifier",
+                text:
+                    #"Identifier "\#(name)" should not be abbreviated. \#(advice) A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call site by a reader who has to expand the abbreviation themselves and hope they expanded it the way the author meant."#,
+            )
+        }
+
+        static func abbreviatedSuffix(name: String, suffix: String, advice: String) -> Message {
+            Message(
+                id: "abbreviatedSuffix",
+                text:
+                    #"Identifier "\#(name)" should not end with "\#(suffix)". \#(advice) A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call site by a reader who has to expand the abbreviation themselves and hope they expanded it the way the author meant."#,
+            )
+        }
+
+        static func abbreviatedWordSegment(name: String, word: String, suggestion: String) -> Message {
+            Message(
+                id: "abbreviatedWordSegment",
+                text:
+                    #"Identifier "\#(name)" abbreviates "\#(word)". Use "\#(suggestion)". A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call site by a reader who has to expand the abbreviation themselves and hope they expanded it the way the author meant."#,
+            )
+        }
+
+        static func millisecondSuffix(name: String, suggestion: String) -> Message {
+            Message(
+                id: "millisecondSuffix",
+                text:
+                    #"Identifier "\#(name)" should not abbreviate milliseconds as "Ms". Use "\#(suggestion)", which is how the rest of the tree spells a millisecond value: "durationInMilliseconds" outnumbers "durationMs" more than two to one for the identical value, so the rename follows what the codebase already decided rather than introducing a third spelling."#,
             )
         }
     }
