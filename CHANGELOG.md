@@ -15,7 +15,7 @@ The first release. It carries these rule sets:
 - `cohere:system-inc/base`, 24 rules on
 - `cohere:system-inc/structure`, 31 rules on
 - `cohere:tailwind`, 12 rules on
-- `cohere:typescript`, 267 rules on
+- `cohere:typescript`, 268 rules on
 
 Zero config: a project with no `CohereSettings.json`, or one that names no `cohere:` set, gets the house
 stack, each set where the code shows it fits. `cohere:typescript` applies to every file, `cohere:react`

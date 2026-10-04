@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 289,
+        "rulesOn": 290,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -165,7 +165,12 @@
             },
             {
                 "name": "@typescript-eslint/dot-notation",
-                "severity": "off"
+                "severity": "error",
+                "options": [
+                    {
+                        "allowProtectedClassPropertyAccess": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/init-declarations",
@@ -556,6 +561,10 @@
             {
                 "name": "default-param-last",
                 "severity": "error"
+            },
+            {
+                "name": "dot-notation",
+                "severity": "off"
             },
             {
                 "name": "eqeqeq",
@@ -1474,7 +1483,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 355,
+        "rulesOn": 356,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -1544,7 +1553,12 @@
             },
             {
                 "name": "@typescript-eslint/dot-notation",
-                "severity": "off"
+                "severity": "error",
+                "options": [
+                    {
+                        "allowProtectedClassPropertyAccess": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/init-declarations",
@@ -1935,6 +1949,10 @@
             {
                 "name": "default-param-last",
                 "severity": "error"
+            },
+            {
+                "name": "dot-notation",
+                "severity": "off"
             },
             {
                 "name": "eqeqeq",
@@ -3209,7 +3227,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 288,
+        "rulesOn": 289,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -3367,7 +3385,12 @@
             },
             {
                 "name": "@typescript-eslint/dot-notation",
-                "severity": "off"
+                "severity": "error",
+                "options": [
+                    {
+                        "allowProtectedClassPropertyAccess": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/init-declarations",
@@ -3909,6 +3932,10 @@
             {
                 "name": "default-param-last",
                 "severity": "error"
+            },
+            {
+                "name": "dot-notation",
+                "severity": "off"
             },
             {
                 "name": "eqeqeq",
@@ -4952,7 +4979,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 297,
+        "rulesOn": 298,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5022,7 +5049,12 @@
             },
             {
                 "name": "@typescript-eslint/dot-notation",
-                "severity": "off"
+                "severity": "error",
+                "options": [
+                    {
+                        "allowProtectedClassPropertyAccess": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/init-declarations",
@@ -5481,6 +5513,10 @@
             {
                 "name": "default-param-last",
                 "severity": "error"
+            },
+            {
+                "name": "dot-notation",
+                "severity": "off"
             },
             {
                 "name": "eqeqeq",
@@ -6605,7 +6641,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 279,
+        "rulesOn": 280,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6675,7 +6711,12 @@
             },
             {
                 "name": "@typescript-eslint/dot-notation",
-                "severity": "off"
+                "severity": "error",
+                "options": [
+                    {
+                        "allowProtectedClassPropertyAccess": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/init-declarations",
@@ -7114,6 +7155,10 @@
             {
                 "name": "default-param-last",
                 "severity": "error"
+            },
+            {
+                "name": "dot-notation",
+                "severity": "off"
             },
             {
                 "name": "eqeqeq",
@@ -8025,7 +8070,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 267,
+        "rulesOn": 268,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8095,7 +8140,12 @@
             },
             {
                 "name": "@typescript-eslint/dot-notation",
-                "severity": "off"
+                "severity": "error",
+                "options": [
+                    {
+                        "allowProtectedClassPropertyAccess": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/init-declarations",
@@ -8486,6 +8536,10 @@
             {
                 "name": "default-param-last",
                 "severity": "error"
+            },
+            {
+                "name": "dot-notation",
+                "severity": "off"
             },
             {
                 "name": "eqeqeq",

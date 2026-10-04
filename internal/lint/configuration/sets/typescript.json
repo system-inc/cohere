@@ -223,7 +223,13 @@
         "prefer-template": "error",
         "object-shorthand": ["error", "properties"],
         "@typescript-eslint/consistent-type-definitions": "off",
-        "@typescript-eslint/dot-notation": "off",
+        "@typescript-eslint/dot-notation": [
+            "error",
+            {
+                "allowProtectedClassPropertyAccess": true
+            }
+        ],
+        "dot-notation": "off",
         "@typescript-eslint/no-unsafe-type-assertion": "off",
         "nexus/consistency-no-property-alias": "error",
         "nexus/correctness-no-caller-data-mutation": "error",
@@ -419,7 +425,7 @@
         "no-restricted-imports": "off"
     },
     "reasons": {
-        "@typescript-eslint/dot-notation": "Ported in #hfrxejr. On with allowProtectedClassPropertyAccess, replacing the core dot-notation, once #qv7evaa reads 0 in both engines (#79aqact).",
+        "dot-notation": "@typescript-eslint/dot-notation runs in its place: the same check, reading types, so a protected member reached through brackets, which TypeScript allows from a subclass or a test, is not reported (#qv7evaa, #79aqact).",
         "@typescript-eslint/consistent-type-definitions": "Interface or type is a deliberate choice the house's Interface and Type name suffixes already mark, and converting one to the other changes behavior: an interface is not assignable to Record<string, unknown>, and interfaces merge declarations (#79aqact).",
         "@typescript-eslint/no-unsafe-type-assertion": "On when the type-assertion waves (#tbk2vkj and its siblings) read 0 in every consumer: measured 2026-10-04 at ahra 947, www-phi-health 285, www-ahra-ai 232 and api 1,367 (#79aqact).",
         "nexus/correctness-no-process-exit-after-output": "Off on purpose, by @system_cohere's ruling of 2026-10-03 (#h1jwmmz). Its findings are true, but every process entry blocks stdout and stderr, which correctness-require-blocking-standard-streams requires, so an exit after a write has nothing queued to lose. Turn it on only for a project whose entries don't block.",
