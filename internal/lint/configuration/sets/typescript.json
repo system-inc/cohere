@@ -390,6 +390,10 @@
         "nexus/consistency-no-boolean-outcome": "error",
         "@typescript-eslint/no-inferrable-types": "error",
         "@typescript-eslint/prefer-regexp-exec": "error",
+        "one-var": [
+            "error",
+            "never"
+        ],
         "prefer-arrow-callback": "off",
         "no-inline-comments": "off",
         "prefer-destructuring": "off",

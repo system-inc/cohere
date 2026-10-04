@@ -11419,7 +11419,33 @@
                 "splitRequires",
                 "splitUninitialized"
             ],
-            "fixKind": "fix"
+            "fixKind": "fix",
+            "sets": [
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ]
         },
         {
             "name": "operator-assignment",

@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 270,
+        "rulesOn": 271,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -1279,6 +1279,13 @@
                 "severity": "error"
             },
             {
+                "name": "one-var",
+                "severity": "error",
+                "options": [
+                    "never"
+                ]
+            },
+            {
                 "name": "operator-assignment",
                 "severity": "error"
             },
@@ -1409,7 +1416,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 334,
+        "rulesOn": 335,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2593,6 +2600,13 @@
                 "severity": "error"
             },
             {
+                "name": "one-var",
+                "severity": "error",
+                "options": [
+                    "never"
+                ]
+            },
+            {
                 "name": "operator-assignment",
                 "severity": "error"
             },
@@ -3075,7 +3089,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 266,
+        "rulesOn": 267,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -4506,6 +4520,13 @@
                 "severity": "error"
             },
             {
+                "name": "one-var",
+                "severity": "error",
+                "options": [
+                    "never"
+                ]
+            },
+            {
                 "name": "operator-assignment",
                 "severity": "error"
             },
@@ -4738,7 +4759,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 276,
+        "rulesOn": 277,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6043,6 +6064,13 @@
                 "severity": "error"
             },
             {
+                "name": "one-var",
+                "severity": "error",
+                "options": [
+                    "never"
+                ]
+            },
+            {
                 "name": "operator-assignment",
                 "severity": "error"
             },
@@ -6302,7 +6330,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 260,
+        "rulesOn": 261,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -7534,6 +7562,13 @@
                 "severity": "error"
             },
             {
+                "name": "one-var",
+                "severity": "error",
+                "options": [
+                    "never"
+                ]
+            },
+            {
                 "name": "operator-assignment",
                 "severity": "error"
             },
@@ -7657,7 +7692,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 248,
+        "rulesOn": 249,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8839,6 +8874,13 @@
             {
                 "name": "no-with",
                 "severity": "error"
+            },
+            {
+                "name": "one-var",
+                "severity": "error",
+                "options": [
+                    "never"
+                ]
             },
             {
                 "name": "operator-assignment",
