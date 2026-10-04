@@ -10,13 +10,14 @@ enum RuleMessages {
     }
 
     /* SHA-256 of the messages that reach Swift, resolved, which a test recomputes from policy/messages/ on disk. */
-    static let sourceDigest = "393063eee6233162b77a0cd726def21a0c3169554129b85a1b543d8e38505af7"
+    static let sourceDigest = "78ca3f2d26b6652a2081c4665afe7b0b77602dbfd3d0892c1a3156f291fcc051"
 
     /* Every message here, as `Rule.id`, for the test that fails on one no rule renders. */
     static let all = [
         "AlwaysUseLowerCamelCase.alwaysUseLowerCamelCase",
         "AlwaysUseLowerCamelCase.incumbentFailed",
         "ConcurrencyNoCheckThenWrite.checkThenWrite",
+        "ConcurrencyNoLostUpdate.lostUpdate",
         "ConcurrencyRequireEscapeHatchReason.escapeHatchWithoutReason",
         "ConsistencyNoAmbiguousIdentifier.noAmbiguousE",
         "ConsistencyNoAmbiguousIdentifier.noSingleLetter",
@@ -76,6 +77,26 @@ enum RuleMessages {
                 id: "checkThenWrite",
                 text:
                     #"This loop looks for a file name that is free, and the `\#(write)` after it creates that file in a separate step, so two saves running at once (in this process or in two) can both find the same name free and the second silently overwrites the first. Claim the name in the step that creates the file: `data.write(to: url, options: .withoutOverwriting)` (or `FileManager.moveItem` from a temporary file) fails with `CocoaError.fileWriteFileExists` when the name is taken, so try the next name on that error instead of checking first."#,
+            )
+        }
+    }
+
+    /* cohere-swift/concurrency-no-lost-update */
+    enum ConcurrencyNoLostUpdate {
+        enum SuspendedRead {
+            case variable(target: String)
+        }
+
+        static func lostUpdate(suspendedRead: SuspendedRead) -> Message {
+            let suspendedReadText =
+                switch suspendedRead {
+                    case .variable(let target):
+                        #"`\#(target)` as it was before an await, and the function is suspended in between, so anything else that changes `\#(target)` during the suspension (another call on this actor, another task on the main actor) is overwritten by this line. Read `\#(target)` after the suspension, or keep the whole read, compute and write on one side of it."#
+                }
+            return Message(
+                id: "lostUpdate",
+                text:
+                    #"This write loses updates. Its new value is computed from \#(suspendedReadText)"#,
             )
         }
     }

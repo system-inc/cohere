@@ -18,8 +18,9 @@ struct RuleMessagesTests {
      The digest the generator records (policy/swift_messages.go, swiftMessagesDigest), recomputed here from the files
      on disk by a resolver of its own: for each Swift rule and each of its messages, the rule, the id and the text with
      its Swift terms and string phrases in place, then each object phrase it picks from as `<<name>>` with each
-     option's name and text. Every field ends with a zero byte, and everything is in name order. A message whose
-     `languages` leave out Swift does not reach it, so a TypeScript-only edit changes nothing here.
+     option's name and its Swift text. Every field ends with a zero byte, and everything is in name order. A message
+     whose `languages` leave out Swift does not reach it, nor does an option with no Swift text, so a TypeScript-only
+     edit changes nothing here.
      */
     static func digestOnDisk() throws -> String {
         let directory = repositoryRoot.appendingPathComponent("policy/messages")
@@ -43,8 +44,11 @@ struct RuleMessagesTests {
                     if let shared = phraseValue as? String {
                         text = text.replacingOccurrences(of: "<<\(phrase)>>", with: shared)
                     }
-                    else if let options = phraseValue as? [String: String] {
-                        picked[phrase] = options
+                    else if let options = phraseValue as? [String: Any] {
+                        /* An option is text for every language, or text by language; one with no Swift text does not reach Swift. */
+                        picked[phrase] = options.compactMapValues { option in
+                            option as? String ?? (option as? [String: String])?["Swift"]
+                        }
                     }
                 }
                 var fields = [rule, id, text]

@@ -108,10 +108,6 @@ public struct ConcurrencyNoLostUpdate: FileRule {
 
     public init() {}
 
-    static func message(target: String) -> String {
-        "This write loses updates. Its new value is computed from `\(target)` as it was before an await, and the function is suspended in between, so anything else that changes `\(target)` during the suspension (another call on this actor, another task on the main actor) is overwritten by this line. Read `\(target)` after the suspension, or keep the whole read, compute and write on one side of it."
-    }
-
     /* Every flagged function owns an `await`, and a `for await` is spelled with one too. */
     public func applies(to file: ParsedFile) -> Bool {
         file.source.contains("await")
@@ -130,8 +126,9 @@ public struct ConcurrencyNoLostUpdate: FileRule {
                     file.finding(
                         at: write,
                         rule: name,
-                        messageId: "lostUpdate",
-                        message: Self.message(target: write.leftOperand.trimmedDescription),
+                        message: RuleMessages.ConcurrencyNoLostUpdate.lostUpdate(
+                            suspendedRead: .variable(target: write.leftOperand.trimmedDescription)
+                        ),
                     )
                 )
             }
