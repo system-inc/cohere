@@ -69,10 +69,24 @@ func applyProposedFixes(
 	// set ("nothing to walk"), which bailed the phase before the format candidates below were ever
 	// formatted, so naming a .md, .css, .json or .graphql formatted nothing. The empty result is not
 	// handed on as a walk: the caller reuses it only when projectFiles is non-empty.
+	// Counted on the way into the formatter, so a checkout git wrote with CRLF is named once below rather
+	// than left to read as a tree of unformatted files.
+	var lineEndings crlfFiles
+	if transform != nil {
+		transform = lineEndings.observing(transform)
+	}
+
+	// The format pass starts now, beside the walk and the type check, rather than after them (#679s763).
+	// Every format candidate is formatted as if no rule proposed anything for it; after the walk, a result
+	// is kept only for a file the walk proposed nothing for and whose bytes are the ones the walk read,
+	// and every other file takes the path it always took. See speculateFormat.
+	speculation := speculateFormat(formatCandidates, transform, maxPasses)
+
 	var result program.Result
 	if len(projectFiles) > 0 {
 		walked, err := graph.Walk(ctx, projectFiles, rules)
 		if err != nil {
+			speculation.wait()
 			return edit.Summary{}, program.Result{}, fmt.Errorf("collecting proposals: %w", err)
 		}
 		reportForeignCheckers(graph, walked, len(projectFiles))
@@ -155,6 +169,7 @@ func applyProposedFixes(
 	}
 
 	if len(candidates) == 0 {
+		speculation.wait()
 		// An empty run still reports its population, so "nothing proposed a fix" cannot be confused
 		// with "the fixer never ran".
 		summary := edit.Summarize(nil)
@@ -207,14 +222,10 @@ func applyProposedFixes(
 		return proposalsForText(fileName, text, graph, rules)
 	}
 
-	// Counted on the way into the formatter, so a checkout git wrote with CRLF is named once below rather
-	// than left to read as a tree of unformatted files.
-	var lineEndings crlfFiles
-	if transform != nil {
-		transform = lineEndings.observing(transform)
-	}
-
-	attempts := formatInParallel(fileNames, byFileName, func(fileName string) (edit.FileResult, error) {
+	// A speculative result stands for a file only where the parallel pass below would have computed the
+	// same one: no proposal, and the bytes the walk read. The rest are formatted here, as before.
+	speculated := speculation.keepable(byFileName, graph)
+	attempts := formatInParallel(fileNames, byFileName, speculated, func(fileName string) (edit.FileResult, error) {
 		return process(fileName, propose(fileName, refuseToRelint), transform, maxPasses)
 	})
 
@@ -282,13 +293,22 @@ type formatAttempt struct {
 // before anything is written and leaves the file to the serial loop. That loop then does exactly what it
 // always did, in the same order, so the run's findings, its summary and what it writes are the serial
 // run's, and only the already-formatted majority moved.
-func formatInParallel(fileNames []string, byFileName map[string][]edit.Proposal, process func(string) (edit.FileResult, error)) []formatAttempt {
+//
+// speculated holds what speculateFormat already computed for some of those files, which is taken as their
+// attempt rather than computed again.
+func formatInParallel(fileNames []string, byFileName map[string][]edit.Proposal, speculated map[string]formatAttempt,
+	process func(string) (edit.FileResult, error)) []formatAttempt {
 	attempts := make([]formatAttempt, len(fileNames))
 	next := make(chan int, len(fileNames))
 	for index, fileName := range fileNames {
-		if len(byFileName[fileName]) == 0 {
-			next <- index
+		if len(byFileName[fileName]) != 0 {
+			continue
 		}
+		if attempt, found := speculated[fileName]; found {
+			attempts[index] = attempt
+			continue
+		}
+		next <- index
 	}
 	close(next)
 
@@ -540,4 +560,115 @@ func walkNode(node *ast.Node, listeners rule.Listeners) {
 		walkNode(child, listeners)
 		return false
 	})
+}
+
+// formatSpeculation is the format pass begun before the walk: one attempt per format candidate, computed as
+// formatInParallel computes a file with no proposals, and kept or discarded once the walk is over.
+type formatSpeculation struct {
+	done     chan struct{}
+	attempts map[string]formatAttempt
+	// read is the text each attempt was computed from, so a result is kept only for those exact bytes.
+	read map[string]string
+}
+
+// speculateFormat starts formatting every candidate at once, on its own workers, and returns at once.
+//
+// The walk leaves cores idle: its workers wait on their checker's lock about half the time (#zqsdzbq), and
+// the type check shares those checkers. Formatting needs no checker and no program, only each file's text
+// and the options its directory resolves to, so it can fill that idle time rather than run after the walk.
+// Measured on ahra (#679s763), the pass after the walk was 0.5 to 0.6s of a 3.2s cold run, and starting it
+// early takes about 0.17s off: the rest is the type check, which then sets the run (speculationWorkers).
+//
+// It never writes. Each attempt goes through edit.CheckFile, and only a file its formatting left unchanged is
+// kept, which is the common case: on a cold run nearly every file is already formatted. A file the printer
+// changed is discarded, whether it came back refused (a TypeScript file, whose rules would be asked about the
+// printed text) or simply changed (a markdown, css or json file, which has none), and is left to the path
+// after the walk, which writes it. A file the walk then proposes a fix for, or whose bytes are not
+// the ones the walk read, is discarded too (keepable), so what is kept is exactly what formatInParallel would
+// have computed, and everything else is computed as it always was.
+func speculateFormat(candidates []string, transform edit.Transform, maxPasses int) *formatSpeculation {
+	speculation := &formatSpeculation{done: make(chan struct{}), attempts: map[string]formatAttempt{}, read: map[string]string{}}
+	workers := speculationWorkers()
+	if transform == nil || len(candidates) == 0 || workers == 0 {
+		close(speculation.done)
+		return speculation
+	}
+	next := make(chan string, len(candidates))
+	for _, fileName := range candidates {
+		next <- fileName
+	}
+	close(next)
+	var mutex sync.Mutex
+	var group sync.WaitGroup
+	for range workers {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			for fileName := range next {
+				first := true
+				unproposed := func(_ string, _ string) ([]edit.Proposal, error) {
+					if first {
+						first = false
+						return nil, nil
+					}
+					return refuseToRelint("", "")
+				}
+				result, err := edit.CheckFile(fileName, unproposed, transform, maxPasses)
+				// Only an unchanged result is final this early. A changed one is left to the path after the
+				// walk, which writes it, or re-lints it where its type has rules: a markdown, css or json file
+				// the printer changed comes back changed rather than refused, and keeping it would report a
+				// rewrite that this check, which writes nothing, never made.
+				if errors.Is(err, errRelintRefused) || err == nil && result.Changed {
+					continue
+				}
+				mutex.Lock()
+				speculation.attempts[fileName] = formatAttempt{result: result, err: err, done: true}
+				speculation.read[fileName] = result.Text
+				mutex.Unlock()
+			}
+		}()
+	}
+	go func() {
+		group.Wait()
+		close(speculation.done)
+	}()
+	return speculation
+}
+
+// speculationWorkers is how many files speculateFormat formats at once: a quarter of the cores, and none
+// when the parallel pass is off. The walk and the type check have every core besides, and the type check is
+// what a cold run waits on once formatting has left the critical path. Measured on ahra (#679s763), load 7 to
+// 15, interleaved: 4 workers 3.02s median against 3.19s without speculating, 8 workers 3.12s and 16 workers
+// 3.13s, the type check slowing from 1.6s to 2.2s as more formatting competed with it.
+func speculationWorkers() int {
+	if parallelFormatWorkers() == 0 {
+		return 0
+	}
+	return max(runtime.GOMAXPROCS(0)/4, 1)
+}
+
+// wait returns once every attempt is in.
+func (speculation *formatSpeculation) wait() {
+	<-speculation.done
+}
+
+// keepable waits for the speculation and returns the attempts that stand: a file no rule proposed a fix for,
+// whose bytes, where the walk read the file, are the bytes the attempt read. A result whose file has a
+// proposal describes text the fixes will replace, and one read from other bytes than the walk's would pair
+// the walk's findings with formatting of a different file.
+func (speculation *formatSpeculation) keepable(byFileName map[string][]edit.Proposal, graph *program.Graph) map[string]formatAttempt {
+	speculation.wait()
+	kept := make(map[string]formatAttempt, len(speculation.attempts))
+	for fileName, attempt := range speculation.attempts {
+		if len(byFileName[fileName]) != 0 {
+			continue
+		}
+		if attempt.err == nil && graph != nil && graph.Program != nil {
+			if sourceFile := graph.Program.GetSourceFile(fileName); sourceFile != nil && sourceFile.Text() != speculation.read[fileName] {
+				continue
+			}
+		}
+		kept[fileName] = attempt
+	}
+	return kept
 }

@@ -125,7 +125,7 @@ func TestFormatInParallelLeavesTheRulesToTheSerialPath(t *testing.T) {
 	attempted := map[string]bool{}
 	var mutex sync.Mutex
 
-	attempts := formatInParallel(fileNames, byFileName, func(fileName string) (edit.FileResult, error) {
+	attempts := formatInParallel(fileNames, byFileName, nil, func(fileName string) (edit.FileResult, error) {
 		mutex.Lock()
 		attempted[fileName] = true
 		mutex.Unlock()
@@ -149,5 +149,34 @@ func TestFormatInParallelLeavesTheRulesToTheSerialPath(t *testing.T) {
 	}
 	if !attempts[3].done || attempts[3].result.FileName != "/d.md" || attempts[3].err != nil {
 		t.Errorf("a file with nothing to ask was not done: %+v", attempts[3])
+	}
+}
+
+// A speculative format result stands only where the parallel pass after the walk would have computed the
+// same one (#679s763): for a file the walk proposed nothing for, and for the bytes the walk read. A result
+// computed from other bytes than the program holds, a file edited between the two reads, is discarded, and so
+// is one for a file with a proposal; the file then takes the path it always took.
+func TestASpeculativeFormatResultStandsOnlyForTheWalksBytes(t *testing.T) {
+	graph, directory := buildNarrowFixtureGraph(t, map[string]string{"A.ts": "export const a = 1;\n"})
+	fileName := filepath.Join(directory, "A.ts")
+	speculation := func(read string) *formatSpeculation {
+		done := make(chan struct{})
+		close(done)
+		return &formatSpeculation{
+			done:     done,
+			attempts: map[string]formatAttempt{fileName: {result: edit.FileResult{FileName: fileName, Text: read}, done: true}},
+			read:     map[string]string{fileName: read},
+		}
+	}
+
+	if _, kept := speculation("export const a = 1;\n").keepable(nil, graph)[fileName]; !kept {
+		t.Fatal("a result computed from the walk's own bytes was discarded, so nothing below is about the bytes")
+	}
+	if _, kept := speculation("export const a = 2;\n").keepable(nil, graph)[fileName]; kept {
+		t.Error("a result computed from other bytes than the walk read was kept")
+	}
+	proposals := map[string][]edit.Proposal{fileName: {{RuleName: "no-debugger"}}}
+	if _, kept := speculation("export const a = 1;\n").keepable(proposals, graph)[fileName]; kept {
+		t.Error("a result for a file the walk proposed a fix for was kept")
 	}
 }
