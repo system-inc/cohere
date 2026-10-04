@@ -624,21 +624,12 @@
         "fec700298c6e": "options"
     },
     "no-obj-calls": {
-        "006cfa9d36be": "globals",
-        "18dc2dba60d1": "missing",
-        "27f703b39565": "missing",
-        "5dcf3559577a": "missing",
-        "6925429f632b": "missing",
-        "72258de458da": "missing",
-        "7c81feb83058": "missing",
-        "7de240cad9f7": "missing",
-        "898031db2aac": "missing",
-        "9d29f6cac2fd": "globals",
-        "b3d14c6636e7": "globals",
-        "b6952db945cc": "missing",
-        "c47a573c0def": "globals",
-        "cb8355ea3e03": "missing",
-        "d78cba8e7d5e": "globals"
+        "2f079d882ef7": "globals",
+        "631d86fa5f17": "globals",
+        "86b6d92aa9a3": "globals",
+        "8d768a15fdb0": "globals",
+        "97597dcbc9b8": "globals",
+        "eb2ce0ee2380": "globals"
     },
     "no-object-constructor": {
         "4316bd511337": "missing"
