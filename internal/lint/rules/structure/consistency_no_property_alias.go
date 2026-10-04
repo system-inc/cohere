@@ -71,7 +71,11 @@ var consistencyNoPropertyAliasText = policy.MessageOf("structure/consistency-no-
 // `server` is the narrowed type, and a callback reading `this.server` sees the declared type again,
 // because TypeScript drops a property path's narrowing inside a function. Exempt when the local is
 // read inside a nested function and a property link of the chain has a type at the declaration other
-// than its declared one (5 sites).
+// than its declared one (5 sites). The narrowing can also come after the declaration, on the local
+// itself: `const mention = response.mention; if (!mention) throw ...;` then a callback reading
+// `mention`. TypeScript keeps a const local's narrowing in the closure and drops the path's, so a
+// closure read whose type there is not the local's declared type is exempt too (#55sfn9q, api's
+// ProductPrivilegedService.ts:280 and SocialResponseGraphQlPrivilegedService.ts:172).
 //
 // **An annotation that does work.** `const value: unknown = event.data` over a DOM `any`, or a
 // `readonly` view of a mutable list, gives the local a type the reach does not have. Exempt when the
@@ -159,6 +163,9 @@ var ConsistencyNoPropertyAlias = rule.Rule{
 						return
 					}
 					if isReadInsideANestedFunction(enclosing, localName, name) && chainIsNarrowed(ctx, initializer) {
+						return
+					}
+					if isNarrowedWhereAClosureReadsIt(ctx, enclosing, localName, name) {
 						return
 					}
 					if declaration.Type != nil &&
@@ -550,4 +557,31 @@ func referencesTheLocal(node *ast.Node, localName string, declarationName *ast.N
 		return false
 	}
 	return true
+}
+
+// isNarrowedWhereAClosureReadsIt reports whether the local is read inside a nested function at a type
+// other than its declared one, which is a narrowing of the local the closure keeps and a reach of the
+// property path inside that closure would lose.
+func isNarrowedWhereAClosureReadsIt(ctx rule.Context, enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
+	symbol := ctx.TypeChecker.GetSymbolAtLocation(declarationName)
+	if symbol == nil {
+		return false
+	}
+	declared := ctx.TypeChecker.GetTypeOfSymbol(symbol)
+	found := false
+	var walk func(node *ast.Node) bool
+	walk = func(node *ast.Node) bool {
+		if node == nil || found {
+			return false
+		}
+		if referencesTheLocal(node, localName, declarationName) && !reference.WritesToBinding(node) &&
+			scope.EnclosingFunctionLike(node) != enclosing && ctx.TypeChecker.GetTypeAtLocation(node) != declared {
+			found = true
+			return true
+		}
+		node.ForEachChild(walk)
+		return found
+	}
+	walk(enclosing)
+	return found
 }
