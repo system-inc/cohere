@@ -69,8 +69,11 @@ type Regex struct {
 }
 
 // New makes a node with its properties in the order given, key then value.
+//
+// The properties are allocated at their final length, rather than grown one Set at a time: growing them
+// was 3.5M of the conversion's 11.9M allocations on ahra's 3,926 program files (#k8cht0w).
 func New(nodeType string, start int, end int, keysAndValues ...any) *Node {
-	node := &Node{nodeType: nodeType, Range: [2]int{start, end}}
+	node := &Node{nodeType: nodeType, Range: [2]int{start, end}, properties: make([]property, 0, len(keysAndValues)/2)}
 	for index := 0; index+1 < len(keysAndValues); index += 2 {
 		node.Set(keysAndValues[index].(string), keysAndValues[index+1])
 	}
