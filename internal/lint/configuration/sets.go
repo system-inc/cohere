@@ -30,6 +30,27 @@ func IsSet(source string) bool {
 	return strings.HasPrefix(source, SetPrefix)
 }
 
+// OurTierPrefix names the sets that make a configuration one of ours: `cohere:system-inc/structure`,
+// `cohere:system-inc/base`.
+const OurTierPrefix = SetPrefix + "system-inc/"
+
+// InOurTiers reports whether a configuration's chain (its sources, as SourcesOf returns them) reaches
+// one of our tier sets.
+//
+// One predicate for the two readers that change behavior on it (#bfxz13m). Inside our tiers the lint
+// loader refuses an off or a departure with no reason, and the format resolver takes the format block
+// from the Nexus tier alone. Outside them a project goes its own way: an off needs no reason and its
+// own `format` block applies. Two predicates would let a project be strict for one reader and free for
+// the other.
+func InOurTiers(sources []string) bool {
+	for _, source := range sources {
+		if strings.HasPrefix(source, OurTierPrefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // SourceContents returns the bytes of one source in a configuration's chain: an embedded set's text,
 // or a file's.
 //
