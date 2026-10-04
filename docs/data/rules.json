@@ -10046,7 +10046,8 @@
             "upstreamName": "no-obj-calls",
             "typeAware": true,
             "messageIds": [
-                "noObjCalls"
+                "unexpectedCall",
+                "unexpectedRefCall"
             ],
             "sets": [
                 {

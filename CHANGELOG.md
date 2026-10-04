@@ -71,3 +71,9 @@ chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
   count, `errorClassNames` names more, a throw inside an arrow function or static block is no longer
   examined, parentheses are read through, and options that are not an object literal are left alone.
   The repair is a suggestion now, not a fix, since attaching a cause changes what the error carries.
+- `no-obj-calls` matches ESLint. `Temporal` counts, and a call reaches the namespace object however
+  ESLint's reference tracker would follow it: through a name it was copied into, a default value, an
+  object pattern, a conditional or logical expression, a comma, parentheses, a type assertion, or a
+  global object with a constant computed key (`globalThis["JSON"]`). A local named `globalThis` is not
+  taken for the global, and a file that writes to a global is not checked for it. The ids are ESLint's:
+  `unexpectedCall`, and `unexpectedRefCall` when the callee is another name.

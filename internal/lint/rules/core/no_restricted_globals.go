@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -256,8 +256,8 @@ func checkNoRestrictedGlobalReference(ctx rule.Context, node *ast.Node,
 
 	// The bare-reference half, which is upstream's `Program` listener.
 	if _, restricted := settings.Globals[node.Text()]; restricted &&
-		isNoRestrictedGlobalsValueReference(node) &&
-		!noRestrictedGlobalsIsShadowed(ctx, node) {
+		reference.IsValueReference(node) &&
+		!rule.IsDeclaredInASourceFile(reference.ReadSymbol(ctx.TypeChecker, node)) {
 		ctx.ReportNode(node, buildNoRestrictedGlobalsMessage(node.Text(), settings))
 		return
 	}
@@ -405,155 +405,6 @@ func isNoRestrictedGlobalsObjectName(name string, settings NoRestrictedGlobalsSe
 		}
 	}
 	return false
-}
-
-// isNoRestrictedGlobalsValueReference says whether an identifier is a value reference rather than
-// something that merely spells the same name.
-//
-// Two separate exclusions live here and both are load bearing.
-//
-// A TYPE POSITION is upstream's `TYPE_NODES` check. Measured, its five ESTree kinds are three of
-// ours: `KindTypeReference` covers a plain annotation, an `implements` clause and an `extends`
-// clause alike, `KindTypeQuery` is `typeof X`, and `KindQualifiedName` is `NS.Test`.
-//
-// A NAME THAT IS NOT A REFERENCE AT ALL is not something upstream has to exclude, because its
-// scope analysis only ever hands it references. Walking identifiers directly means meeting the
-// declaration's own name, a property key, a member's property half, an import or export specifier,
-// and a label, none of which is a reference to anything. Upstream's clean `foo.bar` restricting
-// `bar` is the case that states the member half, and `import foo from 'bar'` restricting `foo` is
-// the one that states the specifier.
-func isNoRestrictedGlobalsValueReference(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
-
-	// A declaration's own name introduces it rather than reading it. In a source file the shadow
-	// check declines it anyway, since the symbol is declared right there; in a declaration file it
-	// sees only a declaration file, so Base's photon_rs_bg.d.ts:41 reported the parameter `top` of a
-	// declared function. A shorthand property and a local export specifier are declarations whose
-	// name is also a read, so they stay judged, each resolved to what it reads by the shadow check.
-	if ast.IsDeclarationName(node) && parent.Kind != ast.KindShorthandPropertyAssignment &&
-		parent.Kind != ast.KindExportSpecifier {
-		return false
-	}
-
-	switch parent.Kind {
-	// Upstream's TYPE_NODES.
-	case ast.KindTypeReference, ast.KindTypeQuery, ast.KindQualifiedName:
-		return false
-
-	// The property half of a member access. `foo.bar` restricting `bar` is one of upstream's clean
-	// cases, and the object half must still be checked, which is why this compares rather than
-	// declining the whole kind.
-	case ast.KindPropertyAccessExpression:
-		return parent.AsPropertyAccessExpression().Name() != node
-
-	// A label is not a value.
-	case ast.KindLabeledStatement, ast.KindBreakStatement, ast.KindContinueStatement:
-		return false
-
-	// An intrinsic JSX tag, `<stop>` or `<my-element>`, is named by HTML rather than read from scope;
-	// a capitalized tag is a component and reads its binding, so it is still judged. ESLint's parser
-	// gives a JSX name its own node type, so this exclusion is free there and has to be written here,
-	// where a tag is a plain identifier: the svg `<stop>` reported three times per gradient (#g5b8q7e).
-	case ast.KindJsxOpeningElement, ast.KindJsxSelfClosingElement, ast.KindJsxClosingElement:
-		return !scanner.IsIntrinsicJsxName(node.Text())
-
-	// A JSX attribute name is the component's spelling, never a reference.
-	case ast.KindJsxAttribute:
-		return false
-
-	// The key half of a destructuring pattern, `{ open: externalOpen }`, names a property of the
-	// object being destructured. The shadow check cannot decline it the way it declines an object
-	// literal's key: the key resolves to that object type's property, which lives in a declaration
-	// file whenever the type does. Collapsible.tsx:43 destructures Radix's props and reported `open`.
-	// The default, `{ label = name }`, is a real read and is still judged.
-	case ast.KindBindingElement:
-		return parent.AsBindingElement().PropertyName != node
-
-	// An import specifier's imported name, and any name in an export-from specifier, names another
-	// module's export rather than a binding in this file. It resolves to that module's declaration,
-	// which is a declaration file for any package, so the shadow check saw a name not declared in
-	// source: Base's `export { print as printGraphQlNode } from 'graphql'` reported once `print` was
-	// restricted (#wajqfd1). The local name an import introduces is declared here, so declining it
-	// too changes nothing.
-	case ast.KindImportSpecifier:
-		return false
-	case ast.KindExportSpecifier:
-		return noRestrictedGlobalsExportSpecifierReads(parent, node)
-	}
-	return true
-
-	// TWO arms were written here first and both were left out, as subsumed by the shadow check at the
-	// call site rather than by anything in this function.
-	//
-	// One declined a name being INTRODUCED: a variable, a parameter, a function or class name, an
-	// import or export specifier, a type parameter. One declined a PROPERTY KEY: an object
-	// property, a class field, a method, either accessor, a signature member, an enum member.
-	// Every shape either arm could catch resolves to a symbol whose declaration is in this source
-	// file, so `identifierIsShadowed` already declines it. That held only in a source file: in a
-	// declaration file nothing is declared in source, so the declaration-name test above came back. Two shapes are the exception, and each
-	// has its own arm above: a destructuring key resolves to the destructured type's property, and an
-	// imported or export-from name to the other module's export, wherever either lives.
-	//
-	// Measured rather than argued, because a single-site mutation structurally cannot see this.
-	// Neutralising either arm alone SURVIVED, and so did inverting the first, which reads as a
-	// fixture gap and is not one. Two things settled it. Neutralising an arm together with the
-	// shadow check fails 22 lines, which is the pairing that identifies a guard redundant with
-	// another site. And driving the rule over sixteen declaration shapes and seven property-key
-	// shapes gave byte-identical output with the arm present and with it neutralised.
-}
-
-// noRestrictedGlobalsIsShadowed is identifierIsShadowed, except for a shorthand property.
-//
-// `{ status }` reads `status`, and the plain accessor answers with the literal's own property,
-// declared right here in source, so the global read looked shadowed and went unreported: the exact
-// shape of WisdomGateItems.ts:304's bug, written as an object instead of a template. The value
-// symbol is the binding the shorthand reads; `no-global-assign` asks it for the same reason.
-//
-// A local export specifier is the same shape: `export { print }` reads `print`, and the plain accessor
-// answers with the specifier's own export symbol, declared right here. Its local target is the binding
-// it exports, which for an undeclared name is nothing, so the global read reports, as ESLint does.
-func noRestrictedGlobalsIsShadowed(ctx rule.Context, node *ast.Node) bool {
-	parent := node.Parent
-	switch {
-	case parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment && parent.Name() == node:
-		return noRestrictedGlobalsDeclaredInSource(ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent))
-	case parent != nil && parent.Kind == ast.KindExportSpecifier:
-		return noRestrictedGlobalsDeclaredInSource(ctx.TypeChecker.GetExportSpecifierLocalTargetSymbol(parent))
-	}
-	return identifierIsShadowed(ctx, node)
-}
-
-// noRestrictedGlobalsDeclaredInSource is identifierIsShadowed's test over a symbol already resolved.
-func noRestrictedGlobalsDeclaredInSource(symbol *ast.Symbol) bool {
-	if symbol == nil {
-		return false
-	}
-	for _, declaration := range symbol.Declarations {
-		if file := ast.GetSourceFileOfNode(declaration); file != nil && !file.IsDeclarationFile {
-			return true
-		}
-	}
-	return false
-}
-
-// noRestrictedGlobalsExportSpecifierReads reports whether this name in an export specifier reads a
-// binding of this file.
-//
-// An export-from specifier reads nothing here. A local one reads the name it exports, which is its
-// property name when it renames and its only name when it does not; the name it renames to is the
-// exported name, a new spelling rather than a read. ESLint 10 under @typescript-eslint/parser agrees
-// on each: `export { print }` and `export { print as printPage }` report, `export { other as print }`
-// and every export-from are clean.
-func noRestrictedGlobalsExportSpecifierReads(specifier *ast.Node, node *ast.Node) bool {
-	if declaration := ast.FindAncestorKind(specifier, ast.KindExportDeclaration); declaration != nil &&
-		declaration.AsExportDeclaration().ModuleSpecifier != nil {
-		return false
-	}
-	propertyName := specifier.AsExportSpecifier().PropertyName
-	return propertyName == nil || propertyName == node
 }
 
 // buildNoRestrictedGlobalsMessage renders whichever of the two messages the entry calls for.
