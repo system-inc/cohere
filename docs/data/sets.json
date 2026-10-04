@@ -369,7 +369,12 @@
             },
             {
                 "name": "@typescript-eslint/no-unused-vars",
-                "severity": "error"
+                "severity": "error",
+                "options": [
+                    {
+                        "ignoreRestSiblings": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/no-useless-default-assignment",
@@ -1731,7 +1736,12 @@
             },
             {
                 "name": "@typescript-eslint/no-unused-vars",
-                "severity": "error"
+                "severity": "error",
+                "options": [
+                    {
+                        "ignoreRestSiblings": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/no-useless-default-assignment",
@@ -3542,7 +3552,12 @@
             },
             {
                 "name": "@typescript-eslint/no-unused-vars",
-                "severity": "error"
+                "severity": "error",
+                "options": [
+                    {
+                        "ignoreRestSiblings": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/no-useless-default-assignment",
@@ -5156,7 +5171,12 @@
             },
             {
                 "name": "@typescript-eslint/no-unused-vars",
-                "severity": "error"
+                "severity": "error",
+                "options": [
+                    {
+                        "ignoreRestSiblings": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/no-useless-default-assignment",
@@ -6764,7 +6784,12 @@
             },
             {
                 "name": "@typescript-eslint/no-unused-vars",
-                "severity": "error"
+                "severity": "error",
+                "options": [
+                    {
+                        "ignoreRestSiblings": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/no-useless-default-assignment",
@@ -8167,7 +8192,12 @@
             },
             {
                 "name": "@typescript-eslint/no-unused-vars",
-                "severity": "error"
+                "severity": "error",
+                "options": [
+                    {
+                        "ignoreRestSiblings": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/no-useless-default-assignment",

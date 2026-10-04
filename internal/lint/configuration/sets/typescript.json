@@ -38,7 +38,7 @@
         "@typescript-eslint/no-unsafe-function-type": "error",
         "@typescript-eslint/no-unsafe-unary-minus": "error",
         "@typescript-eslint/no-unused-expressions": "error",
-        "@typescript-eslint/no-unused-vars": "error",
+        "@typescript-eslint/no-unused-vars": ["error", { "ignoreRestSiblings": true }],
         "@typescript-eslint/no-useless-empty-export": "error",
         "@typescript-eslint/no-wrapper-object-types": "error",
         "@typescript-eslint/prefer-as-const": "error",
@@ -427,7 +427,7 @@
     "reasons": {
         "nexus/correctness-no-process-exit-after-output": "Off on purpose, by @system_cohere's ruling of 2026-10-03 (#h1jwmmz). Its findings are true, but every process entry blocks stdout and stderr, which correctness-require-blocking-standard-streams requires, so an exit after a write has nothing queued to lose. Turn it on only for a project whose entries don't block.",
         "@typescript-eslint/unbound-method": "Measured, not a gap: 79 findings across the repos, none a defect. 52 are expect(mock.method) in tests, where the method is passed to the assertion, never called unbound (#smnjh4c).",
-        "@typescript-eslint/no-meaningless-void-operator": "Held for a fix wave. typescript-eslint 8.71, now pinned in every repo, adds a check (meaninglessVoidOnNonCall) that reports void on a plain binding, which cohere reports as well since c0862ea1 (#89d8yk5). Both engines read 0 in ahra's modules; Structure's 5 left discard rest siblings and go once no-unused-vars honors ignoreRestSiblings (#6qxs15e), and api's 12 are listed (#t87dmk5).",
+        "@typescript-eslint/no-meaningless-void-operator": "Held for a fix wave. typescript-eslint 8.71, now pinned in every repo, adds a check (meaninglessVoidOnNonCall) that reports void on a plain binding, which cohere reports as well since c0862ea1 (#89d8yk5). Both engines read 0 in ahra's modules; Structure's 5 left only discard rest siblings, which no-unused-vars now ignores (ignoreRestSiblings, #6qxs15e), so they go next, and api's 12 are listed (#t87dmk5).",
         "no-unused-private-class-members": "The core rule sees only #private names. @typescript-eslint/no-unused-private-class-members, on here, is the typed rule that supersedes it.",
         "guard-for-in": "nexus/consistency-no-for-in bans for...in outright, guarded or not, so there is no loop left for this rule to guard.",
         "no-invalid-this": "@typescript-eslint/no-invalid-this, on here, is the same rule taught TypeScript's this parameters.",
