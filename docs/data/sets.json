@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 286,
+        "rulesOn": 287,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -699,6 +699,10 @@
             },
             {
                 "name": "nexus/correctness-no-callback-in-parse-try",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-caller-data-mutation",
                 "severity": "error"
             },
             {
@@ -1462,7 +1466,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 352,
+        "rulesOn": 353,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2066,6 +2070,10 @@
             },
             {
                 "name": "nexus/correctness-no-callback-in-parse-try",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-caller-data-mutation",
                 "severity": "error"
             },
             {
@@ -3185,7 +3193,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 282,
+        "rulesOn": 283,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -4036,6 +4044,10 @@
             },
             {
                 "name": "nexus/correctness-no-callback-in-parse-try",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-caller-data-mutation",
                 "severity": "error"
             },
             {
@@ -4897,7 +4909,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 291,
+        "rulesOn": 292,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5622,6 +5634,10 @@
             },
             {
                 "name": "nexus/correctness-no-callback-in-parse-try",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-caller-data-mutation",
                 "severity": "error"
             },
             {
@@ -6510,7 +6526,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 276,
+        "rulesOn": 277,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -7162,6 +7178,10 @@
             },
             {
                 "name": "nexus/correctness-no-callback-in-parse-try",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-caller-data-mutation",
                 "severity": "error"
             },
             {
@@ -7918,7 +7938,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 264,
+        "rulesOn": 265,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8522,6 +8542,10 @@
             },
             {
                 "name": "nexus/correctness-no-callback-in-parse-try",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-caller-data-mutation",
                 "severity": "error"
             },
             {

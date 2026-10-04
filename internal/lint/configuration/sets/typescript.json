@@ -160,6 +160,7 @@
         "unicode-bom": "error",
         "no-useless-rename": "error",
         "strict": "error",
+        "nexus/correctness-no-caller-data-mutation": "error",
         "no-restricted-properties": [
             "error",
             {
