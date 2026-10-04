@@ -3,6 +3,7 @@ package base
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // ConsistencyNoConsole flags every `console.*` access in source.
@@ -150,11 +151,13 @@ var ConsistencyNoConsole = rule.Rule{
 	},
 }
 
+// consistencyNoConsoleText is the rule's message, whose wording lives in
+// `policy/messages/consistency-no-console.json`.
+var consistencyNoConsoleText = policy.MessageOf("base/consistency-no-console", "consistencyNoConsole")
+
 func buildNoConsoleMessage(methodName string) rule.Message {
 	return rule.Message{
-		Id: "consistencyNoConsole",
-		Description: "Do not call 'console." + methodName + "'. Reach the tier that owns this failure and " +
-			"call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or " +
-			"'.log.debug(message)' for a line that never becomes one.",
+		Id:          consistencyNoConsoleText.Id,
+		Description: consistencyNoConsoleText.Render(map[string]string{"methodName": methodName}),
 	}
 }

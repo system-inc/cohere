@@ -1,0 +1,14 @@
+{
+  "rules": {
+    "TypeScript": "structure/consistency-no-property-alias",
+    "Swift": "cohere-swift/consistency-no-property-alias"
+  },
+  "messages": {
+    "noPropertyAlias": {
+      "text": "`{{name}}` is a pure alias for `{{object}}.{{name}}`. Reach for the property directly, so the value keeps the object it came from and a naked local still means this scope created it. Allowed only when the local is read inside a hook dependency array.",
+      "languages": [
+        "TypeScript"
+      ]
+    }
+  }
+}

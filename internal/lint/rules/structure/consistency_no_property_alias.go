@@ -1,20 +1,15 @@
 package structure
 
 import (
-	"fmt"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/scope"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageNoPropertyAlias = rule.Message{
-	Id: "noPropertyAlias",
-	Description: "This declaration renames a property onto a local of the same name, so the value " +
-		"loses the object it came from. The reach form carries its own provenance and reads the " +
-		"same in any window; the alias form makes a reader scroll to find where the value " +
-		"originated. A naked local should mean this scope created it.",
-}
+// consistencyNoPropertyAliasText is the rule's message, whose wording lives in
+// `policy/messages/consistency-no-property-alias.json`.
+var consistencyNoPropertyAliasText = policy.MessageOf("structure/consistency-no-property-alias", "noPropertyAlias")
 
 // ConsistencyNoPropertyAlias flags `const x = object.x`, a local that exists only to rename a
 // property onto a shorter, less-anchored name.
@@ -110,13 +105,8 @@ var ConsistencyNoPropertyAlias = rule.Rule{
 				objectText := ctx.SourceFile.Text()[sourceText.Pos():sourceText.End()]
 
 				ctx.ReportNode(node, rule.Message{
-					Id: messageNoPropertyAlias.Id,
-					Description: fmt.Sprintf(
-						"`%s` is a pure alias for `%s.%s`. Reach for the property directly, so the "+
-							"value keeps the object it came from and a naked local still means this "+
-							"scope created it. %s",
-						localName, objectText, localName,
-						"Allowed only when the local is read inside a hook dependency array."),
+					Id:          consistencyNoPropertyAliasText.Id,
+					Description: consistencyNoPropertyAliasText.Render(map[string]string{"name": localName, "object": objectText}),
 				})
 			},
 		}

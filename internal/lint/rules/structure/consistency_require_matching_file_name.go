@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // messageRequireMatchingFileName names the component, the file, and the rename.
@@ -14,19 +15,29 @@ import (
 // The second option is offered only when the file's own name could be a component's, because
 // advising `function financeFloorView` to satisfy `financeFloorView.tsx` would trade this finding
 // for a component nobody can render as JSX.
+// consistencyRequireMatchingFileNameText is the rule's message, whose wording lives in
+// `policy/messages/consistency-require-matching-file-name.json`, with the second rename as the
+// `alternative` phrase.
+var (
+	consistencyRequireMatchingFileNameText            = policy.MessageOf("structure/consistency-require-matching-file-name", "requireMatchingFileName")
+	consistencyRequireMatchingFileNameRenameComponent = consistencyRequireMatchingFileNameText.Option("alternative", "renameComponent")
+	consistencyRequireMatchingFileNameNoAlternative   = consistencyRequireMatchingFileNameText.Option("alternative", "none")
+)
+
 func messageRequireMatchingFileName(componentName string, fileName string, fileBaseName string) rule.Message {
-	description := "`" + componentName + "` is the only component in `" + fileName + "`, and the " +
-		"file is not named for it. With one component per file, the file name is how a reader finds " +
-		"a component and the component name is how they know what a file holds, and that only works " +
-		"as an index when the two match exactly, case included. Rename the file to `" + componentName +
-		path.Ext(fileName) + "`"
+	values := map[string]string{
+		"componentName":     componentName,
+		"fileName":          fileName,
+		"componentFileName": componentName + path.Ext(fileName),
+	}
+	alternative := consistencyRequireMatchingFileNameNoAlternative
 	if react.IsLikelyComponentName(fileBaseName) && isIdentifierText(fileBaseName) {
-		description += ", or rename the component to `" + fileBaseName + "` if the file's name is the " +
-			"right one"
+		values["fileBaseName"] = fileBaseName
+		alternative = consistencyRequireMatchingFileNameRenameComponent
 	}
 	return rule.Message{
-		Id:          "requireMatchingFileName",
-		Description: description + ".",
+		Id:          consistencyRequireMatchingFileNameText.Id,
+		Description: consistencyRequireMatchingFileNameText.Render(values, alternative),
 	}
 }
 
