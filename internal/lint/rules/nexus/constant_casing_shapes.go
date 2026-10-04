@@ -25,6 +25,9 @@ var dataStructureConstructors = map[string]bool{
 	"Float32Array": true, "Float64Array": true, "BigInt64Array": true, "BigUint64Array": true,
 	"ArrayBuffer": true, "SharedArrayBuffer": true, "DataView": true, "URL": true,
 	"URLSearchParams": true, "Headers": true, "TextEncoder": true, "TextDecoder": true,
+	// A boxed string holds one value and acts on nothing; it is here for the classes that extend it
+	// (#w26f1b0).
+	"String": true,
 }
 
 // unwrapAssertions peels the type-level wrappers that do not change what a value is.

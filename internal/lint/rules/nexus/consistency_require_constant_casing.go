@@ -263,7 +263,7 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 				// An instance takes camelCase whatever its reach, so it is judged here rather than
 				// falling through to the exported/local split below. This is the clause where kind
 				// outranks scope: PascalCase would read as the class rather than the object.
-				if isClassInstance(initializer, usage) || hasClassTypeAnnotation(declaration) {
+				if isClassInstance(ctx, initializer, usage) || hasClassTypeAnnotation(declaration) {
 					if isCamelCase(declaredName) {
 						return
 					}
@@ -401,7 +401,7 @@ func isFactoryProducedFunction(initializer *ast.Node) bool {
 //
 // Parity with the gate cohere replaces is the acceptance criterion, and 95 findings on a clean
 // baseline is the shape a false-positive family takes.
-func isClassInstance(initializer *ast.Node, usage *fileUsageIndex) bool {
+func isClassInstance(ctx rule.Context, initializer *ast.Node, usage *fileUsageIndex) bool {
 	expression := initializer
 	if expression == nil {
 		return false
@@ -422,7 +422,7 @@ func isClassInstance(initializer *ast.Node, usage *fileUsageIndex) bool {
 			binary.OperatorToken.Kind != ast.KindBarBarToken {
 			return false
 		}
-		return isClassInstance(binary.Left, usage) || isClassInstance(binary.Right, usage)
+		return isClassInstance(ctx, binary.Left, usage) || isClassInstance(ctx, binary.Right, usage)
 	}
 
 	// The direct form: new NetworkService().
@@ -431,7 +431,7 @@ func isClassInstance(initializer *ast.Node, usage *fileUsageIndex) bool {
 		if callee == nil || callee.Kind != ast.KindIdentifier {
 			return false
 		}
-		return !dataStructureConstructors[callee.Text()]
+		return !dataStructureConstructors[callee.Text()] && !constructsAContainer(ctx, callee)
 	}
 
 	// The resolver form, read from the local factory's declared return type.
@@ -622,4 +622,55 @@ func mayReturnAnElement(typeChecker *checker.Checker, returnType *checker.Type) 
 		}
 	}
 	return false
+}
+
+// constructsAContainer reports whether a `new X()` callee's class extends a built-in container,
+// directly or through classes of its own: `class TypedDocumentString extends String` holds one
+// operation's text, so it is data by the same reason Map is (#w26f1b0).
+//
+// The class is found through the checker, so an imported one counts, and without a checker through
+// the class this file declares under that name. A class that cannot be found is not exempt, which is a
+// missed exemption and never an invented finding.
+func constructsAContainer(ctx rule.Context, callee *ast.Node) bool {
+	class := constantCasingClassOf(ctx, callee)
+	for depth := 0; class != nil && depth < 16; depth++ {
+		base := ast.GetClassExtendsHeritageElement(class)
+		if base == nil {
+			return false
+		}
+		baseName := unwrapAssertions(base.AsExpressionWithTypeArguments().Expression)
+		if baseName == nil || baseName.Kind != ast.KindIdentifier {
+			return false
+		}
+		if dataStructureConstructors[baseName.Text()] {
+			return true
+		}
+		class = constantCasingClassOf(ctx, baseName)
+	}
+	return false
+}
+
+// constantCasingClassOf returns the class declaration an identifier names, or nil.
+func constantCasingClassOf(ctx rule.Context, name *ast.Node) *ast.Node {
+	if ctx.TypeChecker != nil {
+		symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+		if symbol != nil {
+			symbol = checker.SkipAlias(symbol, ctx.TypeChecker)
+			for _, declaration := range symbol.Declarations {
+				if declaration.Kind == ast.KindClassDeclaration || declaration.Kind == ast.KindClassExpression {
+					return declaration
+				}
+			}
+		}
+		return nil
+	}
+	var found *ast.Node
+	ctx.SourceFile.AsNode().ForEachChild(func(statement *ast.Node) bool {
+		if statement.Kind == ast.KindClassDeclaration && statement.Name() != nil && statement.Name().Text() == name.Text() {
+			found = statement
+			return true
+		}
+		return false
+	})
+	return found
 }

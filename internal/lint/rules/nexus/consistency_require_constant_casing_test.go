@@ -968,3 +968,51 @@ func TestConsistencyRequireConstantCasingLeavesNextRouteContractsAlone(t *testin
 		})
 	}
 }
+
+// A class that extends a built-in container holds data the way the container does, so an exported
+// instance of it keeps PascalCase. Structure's GraphQL generator emits one per operation, `export const
+// XDocument = new TypedDocumentString(...)`, beside `class TypedDocumentString extends String` (#w26f1b0).
+// The heritage is read through the checker for an imported class and from this file's own classes without
+// one, transitively; a class that extends anything else is still an instance that acts.
+func TestConsistencyRequireConstantCasingExemptsAClassExtendingAContainer(t *testing.T) {
+	t.Parallel()
+
+	const document = "export class TypedDocumentString<TResult, TVariables> extends String {\n" +
+		"    constructor(private value: string) { super(value); }\n}\n"
+	for _, testCase := range []struct {
+		name       string
+		sourceText string
+		wantIds    []string
+	}{
+		{"a same-file class extending String", document + "export const AccountDocument = new TypedDocumentString<1, 2>('query { a }');\n", nil},
+		{"a same-file class extending Map", "class Registry extends Map<string, number> {}\nexport const Registries = new Registry();\n", nil},
+		{"a container reached through two classes", "class Base extends Set<string> {}\nclass Tags extends Base {}\nexport const AllTags = new Tags();\n", nil},
+		{"a class extending a class of ours", "class Service {}\nclass NetworkService extends Service {}\nexport const NetworkServiceSingleton = new NetworkService();\n", []string{"requireCamelCaseInstance"}},
+		{"a class extending nothing", "class NetworkService {}\nexport const NetworkServiceSingleton = new NetworkService();\n", []string{"requireCamelCaseInstance"}},
+	} {
+		t.Run("untyped, "+testCase.name, func(t *testing.T) {
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText), testCase.wantIds...)
+		})
+		t.Run("typed, "+testCase.name, func(t *testing.T) {
+			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText), testCase.wantIds...)
+		})
+	}
+
+	// Imported, which only the checker can follow.
+	for _, testCase := range []struct {
+		name    string
+		library string
+		wantIds []string
+	}{
+		{"an imported class extending String", document, nil},
+		{"an imported class extending a class of ours", "export class Service {}\nexport class TypedDocumentString<TResult, TVariables> extends Service {}\n", []string{"requireCamelCaseInstance"}},
+	} {
+		t.Run("imported, "+testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing, map[string]string{
+				"source/Documents.ts":  testCase.library,
+				"source/Operations.ts": "import { TypedDocumentString } from './Documents';\nexport const AccountDocument = new TypedDocumentString<1, 2>('query { a }');\nexport function use(): unknown { return AccountDocument; }\n",
+			}, "source/Operations.ts")
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		})
+	}
+}
