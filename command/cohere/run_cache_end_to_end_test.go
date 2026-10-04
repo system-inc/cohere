@@ -104,6 +104,9 @@ func TestRunCacheEndToEnd(t *testing.T) {
 		if !cached {
 			command.Args = append(command.Args, "--no-cache")
 		}
+		// What the cache notices is the subject here, not formatting: the fixture's JSON is written unformatted
+		// on purpose, and a run that formats it is a run that writes, which is never recorded.
+		command.Args = append(command.Args, "--no-format")
 		command.Env = environment
 		output, err := command.CombinedOutput()
 		if err == nil {
@@ -391,7 +394,8 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			}
 			return nil
 		})
-		if dump, _ := run(true, "--cache-dump"); !strings.Contains(dump, "runs: ") || !strings.Contains(dump, "(bare): recorded ") {
+		// Every run here leaves formatting out (see run), so the bare run is recorded as `--no-format`.
+		if dump, _ := run(true, "--cache-dump"); !strings.Contains(dump, "runs: ") || !strings.Contains(dump, "--no-format: recorded ") {
 			t.Fatalf("--cache-dump did not show the bare run it just recorded:\n%s", dump)
 		}
 		for _, table := range tables {

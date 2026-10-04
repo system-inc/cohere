@@ -154,11 +154,13 @@ func (t *teeStream) stop(target **os.File) {
 
 // runCacheEligible reports whether this invocation may use the run cache at all.
 //
-// A bare run, `--no-fix` alone, and `--no-fix --format` in either order. `--no-fix` runs every phase and
-// writes nothing, so it is a pure report, which suits a cache better than the bare run does; it is what a
-// real-tree measurement uses, so the probe asks to write nothing as well as being sandboxed. With
-// `--format` it checks formatting too, still writing nothing, and its walk declares what it read (see
-// declareFormatWalk). The key covers the arguments, so none of them replays another.
+// A bare run and `--no-fix`, each with `--format` or `--no-format` or neither, in any order. `--no-fix`
+// runs every phase and writes nothing, so it is a pure report, which suits a cache better than the bare
+// run does; it is what a real-tree measurement uses, so the probe asks to write nothing as well as being
+// sandboxed. Both format by default (#b1sjy7b), so `--format` names what they already do, and their walk
+// declares what it read (see declareFormatWalk); `--no-format` leaves formatting out. A bare run that
+// rewrites a file declines its own record (see declineRunCache). The key covers the arguments, so none of
+// them replays another.
 //
 // `--no-cache` is refused by name rather than left to the argument shape. Most flags make a run
 // ineligible, but the promise that flag makes, nothing read and nothing written, should not rest on which
@@ -167,15 +169,20 @@ func runCacheEligible() bool {
 	if cacheOff {
 		return false
 	}
-	switch arguments := os.Args[1:]; {
-	case len(arguments) == 0:
-	case len(arguments) == 1 && arguments[0] == "--no-fix":
-	case len(arguments) == 2 && (arguments[0] == "--no-fix" && arguments[1] == "--format" ||
-		arguments[0] == "--format" && arguments[1] == "--no-fix"):
-	default:
-		return false
+	seen := map[string]bool{}
+	for _, argument := range os.Args[1:] {
+		switch argument {
+		case "--no-fix", "--format", "--no-format":
+		default:
+			return false
+		}
+		if seen[argument] {
+			return false
+		}
+		seen[argument] = true
 	}
-	return true
+	// Refused by the command line before anything runs, and never a run to record.
+	return !(seen["--format"] && seen["--no-format"])
 }
 
 // beginRunCache replays a recorded run and exits if every input is unchanged, and otherwise starts
@@ -185,11 +192,11 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	if !runCacheEligible() {
 		return nil
 	}
-	// No format scope is in the key. Without a formatter the scope is the constant "formatting was not
-	// requested". With one, under `--no-fix --format`, the scope is drawn from a walk that declares every
-	// file and directory it read, so a change that would move the scope moves an input instead (see
-	// declareFormatWalk). A run that writes formatting is never eligible. The printers need no fact of
-	// their own: the key covers the running binary, so any other build of the formatter misses.
+	// No format scope is in the key. Without a formatter (`--no-format`) the scope is a constant. With one,
+	// the scope is drawn from a walk that declares every file and directory it read, so a change that would
+	// move the scope moves an input instead (see declareFormatWalk). A run that rewrites a file declines its
+	// record. The printers need no fact of their own: the key covers the running binary, so any other build
+	// of the formatter misses.
 	key, err := program.RunCacheKey(os.Args[1:], location.Root,
 		"root="+location.Root,
 		"tsconfig="+location.ConfigFileName,

@@ -121,16 +121,25 @@ func TestNoFixReportsWhatFixAndFormatWouldChange(t *testing.T) {
 		t.Fatalf("--no-fix still failed after --fix wrote what it reported, exit %d:\n%s", code, output)
 	}
 
-	// A fixable finding with no formatter asked for names its rule.
+	// A fixable finding with formatting left out names its rule alone. A bare --no-fix formats too (#b1sjy7b),
+	// so it names the formatter beside the rule, since the text the fix leaves is reformatted.
 	writeTree(t, root, map[string]string{"Debugger.ts": "export function stop(): void {\n    debugger;\n}\n"})
 	before = treeSnapshot(t, root)
-	output, code = runCohere(t, binary, root, "--no-fix")
-	if code == 0 {
-		t.Fatalf("a fixable finding passed --no-fix:\n%s", output)
+	for _, testCase := range []struct {
+		arguments []string
+		changers  string
+	}{
+		{[]string{"--no-fix", "--no-format"}, "no-debugger"},
+		{[]string{"--no-fix"}, "no-debugger, format"},
+	} {
+		output, code = runCohere(t, binary, root, testCase.arguments...)
+		if code == 0 {
+			t.Fatalf("a fixable finding passed %v:\n%s", testCase.arguments, output)
+		}
+		want = filepath.Join(root, "Debugger.ts") + ":1:1 - --fix would rewrite this file: " + testCase.changers + " [fix/would-change]"
+		if !strings.Contains(output, want) {
+			t.Errorf("%v: want %q in:\n%s", testCase.arguments, want, output)
+		}
+		assertTreeUnchanged(t, root, before, output)
 	}
-	want = filepath.Join(root, "Debugger.ts") + ":1:1 - --fix would rewrite this file: no-debugger [fix/would-change]"
-	if !strings.Contains(output, want) {
-		t.Errorf("want %q in:\n%s", want, output)
-	}
-	assertTreeUnchanged(t, root, before, output)
 }

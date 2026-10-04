@@ -22,3 +22,10 @@ Formatting: a project that configures nothing formats with the house block `cohe
 its own `format` block in `CohereSettings.json`, applied over Prettier's defaults, so `"format": {}`
 means Prettier's defaults. A project that extends a `cohere:system-inc/*` set takes its format from that
 chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
+
+### Changed
+
+- A bare `cohere` formats too: it type-checks, lints, applies fixes and formats in one call. `--fix`
+  applies fixes and formats, running no other phase, and `--no-fix` reports what formatting would change
+  beside what fixing would, and exits nonzero on either. `--no-format` leaves formatting out of all three.
+  `--format` keeps its meaning and changes nothing on those runs, since they already format.

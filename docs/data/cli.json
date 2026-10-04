@@ -20,7 +20,7 @@
         },
         {
             "name": "fix",
-            "usage": "apply fixes only, running no other phase; add --format to format as well"
+            "usage": "apply fixes and format, running no other phase (--no-format to leave formatting out)"
         },
         {
             "name": "fix-passes",
@@ -30,7 +30,7 @@
         },
         {
             "name": "format",
-            "usage": "format the files not on record as formatted, or the paths named; with --no-fix, report them instead"
+            "usage": "format the files not on record as formatted, or the paths named; a bare run, --fix and --no-fix already do, so naming it there changes nothing"
         },
         {
             "name": "format-all",
@@ -56,7 +56,11 @@
         },
         {
             "name": "no-fix",
-            "usage": "mutate no source in the checked project: report what would change without writing a byte of it (cohere still keeps its own cache in the project's .cache/cohere, unless --no-cache)"
+            "usage": "mutate no source in the checked project: report what would change, fixes and formatting both, without writing a byte of it, and exit nonzero if anything would (cohere still keeps its own cache in the project's .cache/cohere, unless --no-cache)"
+        },
+        {
+            "name": "no-format",
+            "usage": "leave formatting out of a bare run, --fix or --no-fix: fix, type-check and lint only"
         },
         {
             "name": "print-config",

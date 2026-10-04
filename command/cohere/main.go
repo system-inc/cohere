@@ -72,17 +72,21 @@ func run() error {
 	lintConfigFileName := flag.String("lint-config", "CohereSettings.json",
 		"the settings file that says which rules apply to which files, relative to --directory or else to where you typed it; unnamed, the file of this name at the project root")
 	singleThreaded := flag.Bool("single-threaded", false, "use one checker instead of several")
-	// It formats nothing unless --format is named too: formatting is its own opt-in, and this flag only
-	// narrows the run to the phase that writes.
-	fixOnly := flag.Bool("fix", false, "apply fixes only, running no other phase; add --format to format as well")
+	// The whole mutating phase, fixes and format (Kirk's ruling, 2026-10-04, reversing b617c98b's fix-only
+	// reading), narrowed from the rest of the run; --no-format leaves formatting out.
+	fixOnly := flag.Bool("fix", false, "apply fixes and format, running no other phase (--no-format to leave formatting out)")
 	// The promise is about the project's source, and it is stated with its boundary because two writes sit
 	// outside it on purpose. cohere keeps its cache for the project in `<root>/.cache/cohere/`, which is its
 	// own and which `--no-cache` turns off. And the launcher rebuilds cohere itself when its rules
 	// changed, into the gitignored `.cache/cohere/` of the cohere checkout; withholding that would run a
 	// binary that does not match the rules on disk. See recordDevelopmentHash in internal/release/dispatch.
 	noFix := flag.Bool("no-fix", false,
-		"mutate no source in the checked project: report what would change without writing a byte of it "+
-			"(cohere still keeps its own cache in the project's .cache/cohere, unless --no-cache)")
+		"mutate no source in the checked project: report what would change, fixes and formatting both, without "+
+			"writing a byte of it, and exit nonzero if anything would (cohere still keeps its own cache in the "+
+			"project's .cache/cohere, unless --no-cache)")
+	// The opt-out from formatting by default, for a run that wants fixes, types and lint alone.
+	noFormat := flag.Bool("no-format", false,
+		"leave formatting out of a bare run, --fix or --no-fix: fix, type-check and lint only")
 	formatAll := flag.Bool("format-all", false, "format every file, not only the ones not on record as formatted (implies --format)")
 	// The fix phase narrowed to formatting, the way --types and --lint narrow the run to theirs, for a gate
 	// whose question is formatting alone: a lint finding has no say in its exit.
@@ -113,10 +117,10 @@ func run() error {
 		"print the rules the lint config resolves for one file (the path given, else index.ts at the project root), with severity, and exit")
 	printConfig := flag.Bool("print-config", false,
 		"print, as JSON in ESLint's --print-config shape, every registered rule's resolved severity and options for one file (the path given, else index.ts at the project root), and exit")
-	// Off by default until the engine is shown to agree with the existing gate across the real
-	// corpus. Reformatting the tree away from what the gate produces is worse than not formatting,
-	// so enabling is a separate decision from wiring.
-	format := flag.Bool("format", false, "format the files not on record as formatted, or the paths named; with --no-fix, report them instead")
+	// A bare run, --fix and --no-fix format by default, so naming --format there changes nothing. It is
+	// accepted rather than refused, so the commands written before the default still mean what they did.
+	format := flag.Bool("format", false, "format the files not on record as formatted, or the paths named; a bare run, "+
+		"--fix and --no-fix already do, so naming it there changes nothing")
 	maxFixPasses := flag.Int("fix-passes", edit.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
 	showTiming := flag.Bool("timing", false, "report what building the graph and each rule cost, most expensive rule first")
 	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run, writing nothing")
@@ -342,6 +346,18 @@ func run() error {
 		*noFix = true
 	}
 
+	// `--no-format` leaves formatting out, so a flag that asks for formatting beside it is a contradiction.
+	if *noFormat {
+		for _, other := range []struct {
+			named bool
+			flag  string
+		}{{*format, "--format"}, {*formatAll, "--format-all"}, {*formatOnly, "--format-only"}} {
+			if other.named {
+				return fmt.Errorf("--no-format and %s contradict each other: --no-format leaves formatting out, and %s asks for it", other.flag, other.flag)
+			}
+		}
+	}
+
 	// `--format-only` is formatting and nothing else, so naming it beside a flag that asks for other work
 	// is a contradiction, refused by name like `--fix --no-fix` rather than resolved one way silently.
 	if *formatOnly {
@@ -392,7 +408,7 @@ func run() error {
 			Location:         location,
 			WorkingDirectory: workingDirectory,
 			FilePath:         *stdinFilePath,
-			Format:           *format,
+			NoFormat:         *noFormat,
 			MaxPasses:        *maxFixPasses,
 			SingleThreaded:   *singleThreaded,
 		}, os.Stdin, os.Stdout)
@@ -600,9 +616,17 @@ func run() error {
 		// `--format-all` asks for formatting by naming its scope, so it turns the formatter on. Alone it
 		// used to configure none: `cohere --format-all` formatted nothing, and `cohere --no-fix
 		// --format-all` checked nothing, each printing a clean run.
-		formatter, err := configuredFormatter(*format || *formatAll || *formatOnly)
+		//
+		// A run formats by default (Kirk's ruling, 2026-10-04: "running cohere should type check lint fix
+		// format all in one call"), unless --no-format leaves it out or the run is --explain, which explains
+		// the rules on one file and writes nothing.
+		formatter, err := configuredFormatter(!*noFormat && (*explainFile == "" || *format || *formatAll))
 		if err != nil {
 			return err
+		}
+		var formatLeftOut string
+		if formatter == nil && *noFormat {
+			formatLeftOut = "formatting left out (--no-format)"
 		}
 
 		// The format record: which bytes cohere has already seen formatted. Every formatting run adds to
@@ -633,7 +657,11 @@ func run() error {
 			// Nothing will be formatted, so there is nothing to find. This used to ask git what changed on
 			// every bare run, which was about half of a cached replay, and every file it found then reported
 			// as not formatted because nobody asked: a cost and a count that were both about nothing.
-			scope = formatScope{index: map[string]struct{}{}, Description: "nothing, since formatting was not requested"}
+			description := "nothing, since formatting was not requested"
+			if formatLeftOut != "" {
+				description = "nothing: " + formatLeftOut
+			}
+			scope = formatScope{index: map[string]struct{}{}, Description: description}
 
 		case formatter == nil:
 			// No formatter, and paths were named. The scope keeps its type-graph narrowing so the fix
@@ -795,8 +823,11 @@ func run() error {
 			}
 			report.recordChecked(phaseFix, fixDuration, len(fixSummary.ChangedFiles))
 		}
-		if *formatOnly {
+		switch {
+		case *formatOnly:
 			report.narrow(phaseFix, "formatting only, no fixes proposed")
+		case formatLeftOut != "":
+			report.narrow(phaseFix, formatLeftOut)
 		}
 
 		// Files were rewritten, so the graph built from the old bytes no longer describes the tree.

@@ -32,13 +32,15 @@ engine, and `cohere` refuses a Swift package by name and exits 1 rather than che
 Run it from the project root, where `tsconfig.json` and `CohereSettings.json` live.
 
 ```sh
-cohere                  # type-check and lint, and apply every available fix
-cohere --fix --format   # apply fixes and format, running no other phase
+cohere                  # type-check, lint, apply every available fix, and format, in one call
+cohere --fix            # apply fixes and format, running no other phase
+cohere --no-fix         # write nothing: report what fixing and formatting would change, and exit on it
 cohere --lint           # report lint findings only: no fixes, no TypeScript diagnostics
 ```
 
-A bare `cohere` writes fixes to your files but does not format them; formatting runs only when you
-pass `--format`. To see what would change without writing anything, add `--no-fix`.
+A bare `cohere` formats the files not on record as formatted at their current bytes, so a warm run
+formats what you edited and nothing else. Add `--no-format` to any of the first three to leave
+formatting out.
 
 ## CohereSettings.json
 
@@ -106,10 +108,11 @@ root unless you name another).
 
 | Flag | What it does |
 | --- | --- |
-| `--fix` | apply fixes only, running no other phase; add `--format` to format as well |
+| `--fix` | apply fixes and format, running no other phase (`--no-format` to leave formatting out) |
 | `--fix-passes N` | how many times a file may be re-linted while fixes keep landing (default 10) |
-| `--no-fix` | write nothing to your source; report what would change |
-| `--format` | format the files not on record as formatted, or the paths you name; with `--no-fix`, report them |
+| `--no-fix` | write nothing to your source; report what fixing and formatting would change, and exit nonzero if anything would |
+| `--no-format` | leave formatting out of a bare run, `--fix` or `--no-fix`: fix, type-check and lint only |
+| `--format` | format the files not on record as formatted, or the paths you name; a bare run, `--fix` and `--no-fix` already do, so naming it there changes nothing |
 | `--format-all` | format every file, not only the ones not already on record as formatted (implies `--format`) |
 | `--format-only` | format only, proposing no fixes and running no other phase (implies `--format`); with `--no-fix`, the commit gate's format check (see [Before you commit](#before-you-commit)) |
 | `--lint` | run the lint rules only, reporting what they find without fixing it, and without TypeScript's diagnostics |
@@ -180,9 +183,9 @@ you suspect the cache, or to time a run from scratch.
 cohere --no-fix
 ```
 
-`--no-fix` makes the run read-only, so CI reports what a developer's run would have fixed instead of
-fixing it on a machine nobody looks at. A nonzero exit fails the job. Add `--format` to fail on
-unformatted files too. `--no-fix` does not stop cohere writing its own cache in `.cache/cohere`,
+`--no-fix` makes the run read-only, so CI reports what a developer's run would have fixed and
+formatted instead of doing it on a machine nobody looks at. A nonzero exit fails the job, unformatted
+files included. `--no-fix` does not stop cohere writing its own cache in `.cache/cohere`,
 which is safe to persist between CI runs to speed them up, or to discard.
 
 ## Contributing

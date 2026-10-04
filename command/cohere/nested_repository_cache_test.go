@@ -62,9 +62,11 @@ func TestANestedRepositoryEditReachesItsImportersWarm(t *testing.T) {
 
 	finding := regexp.MustCompile(`(?m)^\S+:\d+:\d+ - .*$`)
 	findings := func(output string) string { return strings.Join(finding.FindAllString(output, -1), "\n") }
+	// Lint findings across a nested repository are the subject, so formatting is left out of every run: the
+	// fixture's settings are written unformatted, and their would-change findings are not what it counts.
 	run := func(arguments ...string) string {
 		t.Helper()
-		output, _ := runCohere(t, binary, root, arguments...)
+		output, _ := runCohere(t, binary, root, append(arguments, "--no-format")...)
 		return output
 	}
 

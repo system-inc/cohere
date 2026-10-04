@@ -136,12 +136,12 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 		return output
 	}
 
-	// A bare check formats nothing, so it finds nothing to scope, and still reports the fixable finding.
-	output := step("--no-fix")
-	if !strings.Contains(output, "format scope: nothing, since formatting was not requested") {
+	// A check with formatting left out finds nothing to scope, and still reports the fixable finding.
+	output := step("--no-fix", "--no-format")
+	if !strings.Contains(output, "format scope: nothing: formatting left out (--no-format)") {
 		t.Fatalf("a run that does not format still scoped something:\n%s", output)
 	}
-	expectWouldChange("a bare check", output, "Producer.ts")
+	expectWouldChange("a check without formatting", output, "Producer.ts")
 
 	// With no record, every file the formatter handles is checked, the configs among them, never the
 	// ignored file or the clone nobody declared. The declared submodule is read and not written: its
