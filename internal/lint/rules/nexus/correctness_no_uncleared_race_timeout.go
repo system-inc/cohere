@@ -4,17 +4,17 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const correctnessNoUnclearedRaceTimeoutId = "unclearedRaceTimeout"
 
-var correctnessNoUnclearedRaceTimeoutMessage = rule.Message{
-	Id: correctnessNoUnclearedRaceTimeoutId,
-	Description: "This `setTimeout` arms the losing side of a `Promise.race`, and its handle is thrown away, " +
-		"so nothing can ever clear it. When the work wins the race, the timer stays armed for its whole " +
-		"duration: in Node it holds the process open (a batch that finished its last item sits until the " +
-		"timeout elapses), and its callback still runs, rejecting a promise nobody is waiting on. Keep the " +
-		"handle (`timer = setTimeout(...)`) and `clearTimeout(timer)` in a `finally` around the race.",
+// correctnessNoUnclearedRaceTimeoutText is the rule's message, whose wording lives in
+// `policy/messages/correctness-no-uncleared-race-timeout.json`.
+var correctnessNoUnclearedRaceTimeoutText = policy.MessageOf("nexus/correctness-no-uncleared-race-timeout", correctnessNoUnclearedRaceTimeoutId)
+
+func correctnessNoUnclearedRaceTimeoutMessage() rule.Message {
+	return rule.Message{Id: correctnessNoUnclearedRaceTimeoutId, Description: correctnessNoUnclearedRaceTimeoutText.Render(nil)}
 }
 
 // CorrectnessNoUnclearedRaceTimeout reports a timeout armed inside a `Promise.race` whose timer
@@ -119,7 +119,7 @@ func correctnessNoUnclearedRaceTimeoutCheckRace(ctx rule.Context, node *ast.Node
 			continue
 		}
 		for _, timer := range correctnessNoUnclearedRaceTimeoutLostTimers(ctx, promise) {
-			ctx.ReportNode(timer, correctnessNoUnclearedRaceTimeoutMessage)
+			ctx.ReportNode(timer, correctnessNoUnclearedRaceTimeoutMessage())
 		}
 	}
 }

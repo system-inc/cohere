@@ -7,16 +7,17 @@ import (
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const correctnessNoIdenticalBranchesId = "identicalBranches"
 
-var correctnessNoIdenticalBranchesMessage = rule.Message{
-	Id: correctnessNoIdenticalBranchesId,
-	Description: "Every branch of this conditional does the same thing, so its condition chooses nothing: " +
-		"the code runs the same way whether it is true or false. Usually one branch was meant to differ " +
-		"and a copy was never edited (`highQuality ? 'pro' : 'pro'`). Write the branch that was meant, or, " +
-		"if both really are the same, drop the conditional and keep one copy.",
+// correctnessNoIdenticalBranchesText is the rule's message, whose wording lives in
+// `policy/messages/correctness-no-identical-branches.json`.
+var correctnessNoIdenticalBranchesText = policy.MessageOf("nexus/correctness-no-identical-branches", correctnessNoIdenticalBranchesId)
+
+func correctnessNoIdenticalBranchesMessage() rule.Message {
+	return rule.Message{Id: correctnessNoIdenticalBranchesId, Description: correctnessNoIdenticalBranchesText.Render(nil)}
 }
 
 // CorrectnessNoIdenticalBranches reports a conditional whose every branch is the same code, so the
@@ -140,7 +141,7 @@ var CorrectnessNoIdenticalBranches = rule.Rule{
 					}
 					anchor = parent
 				}
-				ctx.ReportNode(anchor, correctnessNoIdenticalBranchesMessage)
+				ctx.ReportNode(anchor, correctnessNoIdenticalBranchesMessage())
 			},
 			ast.KindIfStatement: func(node *ast.Node) {
 				ifStatement := node.AsIfStatement()
@@ -170,7 +171,7 @@ var CorrectnessNoIdenticalBranches = rule.Rule{
 					}
 					anchor = parent
 				}
-				ctx.ReportNode(anchor, correctnessNoIdenticalBranchesMessage)
+				ctx.ReportNode(anchor, correctnessNoIdenticalBranchesMessage())
 			},
 		}
 	},

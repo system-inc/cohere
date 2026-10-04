@@ -3,6 +3,7 @@ package nexus
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // defaultGenericNames are the words that count as saying nothing when they stutter.
@@ -20,13 +21,14 @@ type ConsistencyNoStutteringNameOptions struct {
 
 // messageStutteringName names the word that stuttered, because the repair is to pick a different
 // one and a message that will not say which word is the problem is asking the reader to guess.
+// consistencyNoStutteringNameText is the rule's message, whose wording lives in
+// `policy/messages/consistency-no-stuttering-name.json`.
+var consistencyNoStutteringNameText = policy.MessageOf("nexus/consistency-no-stuttering-name", "stutteringName")
+
 func messageStutteringName(name string) rule.Message {
 	return rule.Message{
-		Id: "stutteringName",
-		Description: `"` + name + "." + name + `" stutters, which means the name is carrying nothing: it ` +
-			"repeats the field instead of saying which " + name + " this is. Rename the value for what it " +
-			"holds, the type it came back as or whatever distinguishes it from another " + name + " in this " +
-			"scope, so a reader forty lines down does not have to find the declaration.",
+		Id:          consistencyNoStutteringNameText.Id,
+		Description: consistencyNoStutteringNameText.Render(map[string]string{"name": name}),
 	}
 }
 

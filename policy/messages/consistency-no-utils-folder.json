@@ -1,0 +1,20 @@
+{
+  "rules": {
+    "TypeScript": "nexus/consistency-no-utils-folder",
+    "Swift": "cohere-swift/consistency-no-utils-folder"
+  },
+  "messages": {
+    "noUnderscoreUtils": {
+      "text": "Folder name \"_utils\" is not allowed. Use \"_utilities\" instead.",
+      "languages": [
+        "TypeScript"
+      ]
+    },
+    "noUtils": {
+      "text": "Folder name \"utils\" is not allowed. Use \"utilities\" instead.",
+      "languages": [
+        "TypeScript"
+      ]
+    }
+  }
+}

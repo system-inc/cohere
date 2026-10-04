@@ -5,16 +5,17 @@ import (
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/control_flow_graph"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const correctnessNoWriteOnlyCollectionId = "writeOnlyCollection"
 
-var correctnessNoWriteOnlyCollectionMessage = rule.Message{
-	Id: correctnessNoWriteOnlyCollectionId,
-	Description: "This collection is only ever added to: every use of it puts something in or takes something " +
-		"out, and nothing reads what it holds. The work that fills it is thrown away. Either the code " +
-		"that was meant to read it is missing (a rank kept for the result and never copied in), or the " +
-		"collection is dead and should be deleted along with the writes.",
+// correctnessNoWriteOnlyCollectionText is the rule's message, whose wording lives in
+// `policy/messages/correctness-no-write-only-collection.json`.
+var correctnessNoWriteOnlyCollectionText = policy.MessageOf("nexus/correctness-no-write-only-collection", correctnessNoWriteOnlyCollectionId)
+
+func correctnessNoWriteOnlyCollectionMessage() rule.Message {
+	return rule.Message{Id: correctnessNoWriteOnlyCollectionId, Description: correctnessNoWriteOnlyCollectionText.Render(nil)}
 }
 
 // CorrectnessNoWriteOnlyCollection reports a local array, Map or Set that is filled and never read.
@@ -139,7 +140,7 @@ func correctnessNoWriteOnlyCollectionCheck(ctx rule.Context, declaration *ast.No
 	if read || writes == 0 {
 		return
 	}
-	ctx.ReportNode(name, correctnessNoWriteOnlyCollectionMessage)
+	ctx.ReportNode(name, correctnessNoWriteOnlyCollectionMessage())
 }
 
 // correctnessNoWriteOnlyCollectionKind names the collection an initializer makes, "Array", "Map" or

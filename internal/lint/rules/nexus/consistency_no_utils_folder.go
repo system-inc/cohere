@@ -5,18 +5,23 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
+// consistencyNoUtilsFolderUnderscoreText and consistencyNoUtilsFolderText are the rule's messages,
+// whose wording lives in `policy/messages/consistency-no-utils-folder.json`.
 var (
-	messageNoUnderscoreUtils = rule.Message{
-		Id:          "noUnderscoreUtils",
-		Description: `Folder name "_utils" is not allowed. Use "_utilities" instead.`,
-	}
-	messageNoUtils = rule.Message{
-		Id:          "noUtils",
-		Description: `Folder name "utils" is not allowed. Use "utilities" instead.`,
-	}
+	consistencyNoUtilsFolderUnderscoreText = policy.MessageOf("nexus/consistency-no-utils-folder", "noUnderscoreUtils")
+	consistencyNoUtilsFolderText           = policy.MessageOf("nexus/consistency-no-utils-folder", "noUtils")
 )
+
+func messageNoUnderscoreUtils() rule.Message {
+	return rule.Message{Id: consistencyNoUtilsFolderUnderscoreText.Id, Description: consistencyNoUtilsFolderUnderscoreText.Render(nil)}
+}
+
+func messageNoUtils() rule.Message {
+	return rule.Message{Id: consistencyNoUtilsFolderText.Id, Description: consistencyNoUtilsFolderText.Render(nil)}
+}
 
 // ConsistencyNoUtilsFolder bans "utils" and "_utils" as directory names.
 //
@@ -46,10 +51,10 @@ var ConsistencyNoUtilsFolder = rule.Rule{
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				if hasUnderscoreUtils {
-					ctx.ReportRange(node.Loc.WithEnd(node.Loc.Pos()), messageNoUnderscoreUtils)
+					ctx.ReportRange(node.Loc.WithEnd(node.Loc.Pos()), messageNoUnderscoreUtils())
 				}
 				if hasUtils {
-					ctx.ReportRange(node.Loc.WithEnd(node.Loc.Pos()), messageNoUtils)
+					ctx.ReportRange(node.Loc.WithEnd(node.Loc.Pos()), messageNoUtils())
 				}
 			},
 		}

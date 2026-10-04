@@ -67,6 +67,14 @@ enum RuleMessages {
     enum ConsistencyNoIsoStringDateCut {
     }
 
+    /* cohere-swift/consistency-no-stuttering-name */
+    enum ConsistencyNoStutteringName {
+    }
+
+    /* cohere-swift/consistency-no-utils-folder */
+    enum ConsistencyNoUtilsFolder {
+    }
+
     /* cohere-swift/correctness-no-default-for-owned-enum */
     enum CorrectnessNoDefaultForOwnedEnum {
         static func noDefaultForOwnedEnum(enumName: String) -> Message {
@@ -95,6 +103,18 @@ enum RuleMessages {
                     #"This try? is the whole body of a closure whose result goes nowhere (it returns nothing, or it is the value of a task nobody keeps), so the error is thrown away unseen. Use do/catch inside the closure, and say in the catch why the failure can be ignored if it can."#,
             )
         }
+    }
+
+    /* cohere-swift/correctness-no-identical-branches */
+    enum CorrectnessNoIdenticalBranches {
+    }
+
+    /* cohere-swift/correctness-no-uncleared-race-timeout */
+    enum CorrectnessNoUnclearedRaceTimeout {
+    }
+
+    /* cohere-swift/correctness-no-write-only-collection */
+    enum CorrectnessNoWriteOnlyCollection {
     }
 
     /* cohere-swift/force-cast */

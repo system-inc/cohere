@@ -102,7 +102,7 @@ func correctnessNoIdenticalBranchesExpectSpans(t *testing.T, result rule_testing
 		}
 	}
 	for _, diagnostic := range result.Diagnostics {
-		if diagnostic.Message.Description != correctnessNoIdenticalBranchesMessage.Description {
+		if diagnostic.Message.Description != correctnessNoIdenticalBranchesMessage().Description {
 			t.Fatalf("message is %q", diagnostic.Message.Description)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
