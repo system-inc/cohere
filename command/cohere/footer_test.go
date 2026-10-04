@@ -16,6 +16,7 @@ var (
 func cleanSummary() runSummary {
 	return runSummary{
 		Total: 2400 * time.Millisecond,
+		Graph: 900 * time.Millisecond,
 		Phases: []phaseRecord{
 			{Name: phaseFix, Outcome: outcomeRan, Elapsed: 400 * time.Millisecond},
 			{Name: phaseTypes, Outcome: outcomeRan, Elapsed: 600 * time.Millisecond},
@@ -23,6 +24,7 @@ func cleanSummary() runSummary {
 			{Name: phaseUnused, Outcome: outcomeSkipped, Detail: "not requested"},
 		},
 		Formatting:   300 * time.Millisecond,
+		Rules:        480,
 		FilesCohered: 3926,
 		Nodes:        2_412_345,
 	}
@@ -31,6 +33,7 @@ func cleanSummary() runSummary {
 // warmSummary is a green warm run: three files cohered, the rest from the cache.
 func warmSummary(summary *runSummary) {
 	summary.Total = 700 * time.Millisecond
+	summary.Graph = 200 * time.Millisecond
 	summary.Phases = []phaseRecord{
 		{Name: phaseFix, Outcome: outcomeRan, Elapsed: 100 * time.Millisecond},
 		{Name: phaseTypes, Outcome: outcomeRan, Elapsed: 400 * time.Millisecond},
@@ -40,29 +43,30 @@ func warmSummary(summary *runSummary) {
 	summary.FilesCohered, summary.FilesCached = 3, 3923
 }
 
-// The golden lines are Kirk's, from the visual spec of 2026-10-04.
+// The golden lines are Kirk's, from his footer revision of 2026-10-04 12:45.
 func TestFooterGolden(t *testing.T) {
 	cases := []struct {
 		name    string
 		summary func(summary *runSummary)
+		options footerOptions
 		want    string
 	}{
 		{
 			name:    "cold",
 			summary: func(summary *runSummary) {},
-			want:    "✓ 💎 2.4s • 3.9K cohered (🪄 0.4s • 💅 0.3s • 🔷 0.6s • 👑 1.1s) • 2.4M nodes",
+			want:    "✓ 💎 2.4s (480 rules • 3.9K files • 2.4M nodes)",
 		},
 		{
 			name:    "warm",
 			summary: warmSummary,
-			want:    "✓ 💎 0.7s • 3 cohered (🪄 0.1s • 💅 0.02s • 🔷 0.4s • 👑 0.2s) 3.9K cached • 2.4M nodes",
+			want:    "✓ 💎 0.7s (480 rules • 3.9K files • 2.4M nodes)",
 		},
 		{
 			name: "replay",
 			summary: func(summary *runSummary) {
-				*summary = runSummary{Total: 50 * time.Millisecond, Cache: cacheUse{Replayed: true}, FilesCached: 3926}
+				*summary = runSummary{Total: 50 * time.Millisecond, Cache: cacheUse{Replayed: true}, Rules: 480, FilesCached: 3926}
 			},
-			want: "✓ 💎 0.05s • replayed • 3.9K cached",
+			want: "✓ 💎 0.05s (480 rules • 3.9K files)",
 		},
 		{
 			name: "fail",
@@ -71,72 +75,142 @@ func TestFooterGolden(t *testing.T) {
 				summary.Total = 800 * time.Millisecond
 				summary.TypeErrors, summary.Findings = 1, 2
 			},
-			want: "✗ ☠️ 0.8s • 3 cohered (🪄 0.1s • 💅 0.02s • 🔷 0.4s • 👑 0.2s) 3.9K cached → 1 type error • 2 findings",
+			want: "✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3.9K files • 2.4M nodes)",
+		},
+		{
+			name:    "warm, with --verbose: cohered against cached",
+			summary: warmSummary,
+			options: footerOptions{Verbose: true},
+			want:    "✓ 💎 0.7s • 3 files cohered • 3.9K cached (480 rules • 3.9K files • 2.4M nodes)",
+		},
+		{
+			name:    "cold, with --verbose: every file cohered, none cached",
+			summary: func(summary *runSummary) {},
+			options: footerOptions{Verbose: true},
+			want:    "✓ 💎 2.4s • 3.9K files cohered (480 rules • 3.9K files • 2.4M nodes)",
+		},
+		{
+			name:    "with --verbose, one file cohered is singular",
+			summary: func(summary *runSummary) { warmSummary(summary); summary.FilesCohered = 1 },
+			options: footerOptions{Verbose: true},
+			want:    "✓ 💎 0.7s • 1 file cohered • 3.9K cached (480 rules • 3.9K files • 2.4M nodes)",
+		},
+		{
+			name: "replay, with --verbose",
+			summary: func(summary *runSummary) {
+				*summary = runSummary{Total: 50 * time.Millisecond, Cache: cacheUse{Replayed: true}, Rules: 480, FilesCached: 3926}
+			},
+			options: footerOptions{Verbose: true},
+			want:    "✓ 💎 0.05s • replayed (480 rules • 3.9K files)",
+		},
+		{
+			name: "fail, with --verbose and --phases",
+			summary: func(summary *runSummary) {
+				warmSummary(summary)
+				summary.TypeErrors = 1
+			},
+			options: footerOptions{Verbose: true, Phases: true},
+			want:    "✗ ☠️ 0.7s • 1 type error • 3 files cohered • 3.9K cached (🕸 0.2s • 🪄 0.1s • 💅 0.02s • 🔷 0.4s • 👑 0.2s • 480 rules • 3.9K files • 2.4M nodes)",
 		},
 		{
 			name:    "a gap, appended to a green run",
 			summary: func(summary *runSummary) { summary.Gaps.CrashedFiles = 1 },
-			want:    "✓ 💎 2.4s • 3.9K cohered (🪄 0.4s • 💅 0.3s • 🔷 0.6s • 👑 1.1s) • 2.4M nodes • ⚠ 1 file crashed",
+			want:    "✓ 💎 2.4s (480 rules • 3.9K files • 2.4M nodes) • ⚠ 1 file crashed",
 		},
 		{
-			name: "a phase that did not run is left out of the parentheses",
+			name:    "cold, with --phases",
+			summary: func(summary *runSummary) {},
+			options: footerOptions{Phases: true},
+			want:    "✓ 💎 2.4s (🕸 0.9s • 🪄 0.4s • 💅 0.3s • 🔷 0.6s • 👑 1.1s • 480 rules • 3.9K files • 2.4M nodes)",
+		},
+		{
+			name:    "warm, with --phases",
+			summary: warmSummary,
+			options: footerOptions{Phases: true},
+			want:    "✓ 💎 0.7s (🕸 0.2s • 🪄 0.1s • 💅 0.02s • 🔷 0.4s • 👑 0.2s • 480 rules • 3.9K files • 2.4M nodes)",
+		},
+		{
+			name: "fail, with --phases",
+			summary: func(summary *runSummary) {
+				warmSummary(summary)
+				summary.Total = 800 * time.Millisecond
+				summary.TypeErrors, summary.Findings = 1, 2
+			},
+			options: footerOptions{Phases: true},
+			want:    "✗ ☠️ 0.8s • 1 type error • 2 findings (🕸 0.2s • 🪄 0.1s • 💅 0.02s • 🔷 0.4s • 👑 0.2s • 480 rules • 3.9K files • 2.4M nodes)",
+		},
+		{
+			// A replay ran no phase, so there is no breakdown to show.
+			name: "replay, with --phases",
+			summary: func(summary *runSummary) {
+				*summary = runSummary{Total: 50 * time.Millisecond, Cache: cacheUse{Replayed: true}, Rules: 480, FilesCached: 3926}
+			},
+			options: footerOptions{Phases: true},
+			want:    "✓ 💎 0.05s (480 rules • 3.9K files)",
+		},
+		{
+			name: "with --phases, a phase that did not run is left out and unused shows only when it ran",
 			summary: func(summary *runSummary) {
 				summary.Formatting = 0
-				summary.Phases = summary.Phases[:2]
+				summary.Phases[1] = phaseRecord{Name: phaseTypes, Outcome: outcomeSkipped, Detail: "not requested"}
+				summary.Phases[3] = phaseRecord{Name: phaseUnused, Outcome: outcomeRan, Elapsed: 300 * time.Millisecond}
 			},
-			want: "✓ 💎 2.4s • 3.9K cohered (🪄 0.4s • 🔷 0.6s) • 2.4M nodes",
+			options: footerOptions{Phases: true},
+			want:    "✓ 💎 2.4s (🕸 0.9s • 🪄 0.4s • 👑 1.1s • 🧹 0.3s • 480 rules • 3.9K files • 2.4M nodes) • ⚠ 🔷 types not checked",
 		},
 		{
-			name: "lint reused the fix walk",
+			name: "with --phases, lint reused the fix walk",
 			summary: func(summary *runSummary) {
 				summary.Formatting = 0
 				summary.Phases[2] = phaseRecord{Name: phaseLint, Outcome: outcomeReused, Detail: "the fix phase's walk"}
 			},
-			want: "✓ 💎 2.4s • 3.9K cohered (🪄 0.4s • 🔷 0.6s • 👑 in 🪄) • 2.4M nodes",
+			options: footerOptions{Phases: true},
+			want:    "✓ 💎 2.4s (🕸 0.9s • 🪄 0.4s • 🔷 0.6s • 👑 in 🪄 • 480 rules • 3.9K files • 2.4M nodes)",
 		},
 		{
 			name: "types bailed, so lint did not run",
 			summary: func(summary *runSummary) {
 				summary.TypeErrors = 2
-				summary.Formatting = 0
 				summary.Phases[2] = phaseRecord{Name: phaseLint, Outcome: outcomeNotReached, Detail: "types bailed: 2 type errors"}
 			},
-			want: "✗ ☠️ 2.4s • 3.9K cohered (🪄 0.4s • 🔷 0.6s) → 2 type errors • ⚠ 👑 lint did not run",
+			want: "✗ ☠️ 2.4s • 2 type errors (480 rules • 3.9K files • 2.4M nodes) • ⚠ 👑 lint did not run",
 		},
 		{
 			name:    "labelled, in a repository with several projects",
 			summary: func(summary *runSummary) { summary.Label = "projects/www" },
-			want:    "projects/www  ✓ 💎 2.4s • 3.9K cohered (🪄 0.4s • 💅 0.3s • 🔷 0.6s • 👑 1.1s) • 2.4M nodes",
+			want:    "projects/www  ✓ 💎 2.4s (480 rules • 3.9K files • 2.4M nodes)",
 		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			summary := cleanSummary()
 			testCase.summary(&summary)
-			if got := footer(summary, plain); got != testCase.want {
+			if got := footer(summary, plain, testCase.options); got != testCase.want {
 				t.Errorf("footer:\n got  %s\n want %s", got, testCase.want)
 			}
 		})
 	}
 }
 
-// TestFooterColor pins the color on a terminal: the verdict and total bold, the phases and the counts
-// after them dim, what was found red. Without color there is not one escape code.
+// TestFooterColor pins the color on a terminal: the verdict and total bold, what was found red, the
+// parentheses dim. Without color there is not one escape code.
 func TestFooterColor(t *testing.T) {
 	summary := cleanSummary()
 	warmSummary(&summary)
-	want := "\x1b[1m✓ 💎 0.7s\x1b[22m • 3 cohered \x1b[2m(🪄 0.1s • 💅 0.02s • 🔷 0.4s • 👑 0.2s)\x1b[22m \x1b[2m3.9K cached\x1b[22m • \x1b[2m2.4M nodes\x1b[22m"
-	if got := footer(summary, colored); got != want {
+	want := "\x1b[1m✓ 💎 0.7s\x1b[22m \x1b[2m(480 rules • 3.9K files • 2.4M nodes)\x1b[22m"
+	if got := footer(summary, colored, footerOptions{}); got != want {
 		t.Errorf("colored footer:\n got  %q\n want %q", got, want)
 	}
 
-	summary.TypeErrors = 1
-	want = "\x1b[1m✗ ☠️ 0.7s\x1b[22m • 3 cohered \x1b[2m(🪄 0.1s • 💅 0.02s • 🔷 0.4s • 👑 0.2s)\x1b[22m \x1b[2m3.9K cached\x1b[22m → \x1b[31m1 type error\x1b[39m"
-	if got := footer(summary, colored); got != want {
+	summary.TypeErrors, summary.Findings = 1, 2
+	want = "\x1b[1m✗ ☠️ 0.7s\x1b[22m • \x1b[31m1 type error\x1b[39m • \x1b[31m2 findings\x1b[39m \x1b[2m(480 rules • 3.9K files • 2.4M nodes)\x1b[22m"
+	if got := footer(summary, colored, footerOptions{}); got != want {
 		t.Errorf("colored failing footer:\n got  %q\n want %q", got, want)
 	}
-	if got := footer(summary, plain); strings.Contains(got, "\x1b") {
-		t.Errorf("a footer without color carries an escape code: %q", got)
+	for _, options := range []footerOptions{{}, {Phases: true}, {Verbose: true}} {
+		if got := footer(summary, plain, options); strings.Contains(got, "\x1b") {
+			t.Errorf("a footer without color carries an escape code: %q", got)
+		}
 	}
 }
 
@@ -200,7 +274,7 @@ var uncheckedConditions = []struct {
 // and then requires the check itself to catch a footer that drops the marker. Without the second half a
 // check that matched anything would pass, and a footer that went quiet about a gap would go unnoticed.
 func TestFooterSaysWhatWasNotChecked(t *testing.T) {
-	clean := footer(cleanSummary(), plain)
+	clean := footer(cleanSummary(), plain, footerOptions{})
 	if strings.Contains(clean, "⚠") || strings.Contains(clean, "not checked") {
 		t.Fatalf("a clean run's footer carries a marker it has no cause for: %s", clean)
 	}
@@ -211,7 +285,7 @@ func TestFooterSaysWhatWasNotChecked(t *testing.T) {
 			if summary.failed() {
 				t.Fatalf("the planted condition made the run fail, so it no longer tests a green footer")
 			}
-			got := footer(summary, plain)
+			got := footer(summary, plain, footerOptions{})
 			if !strings.HasPrefix(got, "✓ 💎") {
 				t.Errorf("planting %s turned the verdict: %s", condition.name, got)
 			}

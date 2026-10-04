@@ -10,14 +10,24 @@ import (
 // The footer is the one line a default run ends with, after its findings: the verdict, where the time
 // went, and how much was checked. Everything else a run can say is under `--verbose`.
 //
-//	✓ 💎 2.4s • 3.9K cohered (🪄 0.4s • 💅 0.3s • 🔷 0.6s • 👑 1.1s) • 2.4M nodes
-//	✓ 💎 0.7s • 3 cohered (🪄 0.1s • 💅 0.02s • 🔷 0.4s • 👑 0.2s) 3.9K cached • 2.4M nodes
-//	✓ 💎 0.05s • replayed • 3.9K cached
-//	✗ ☠️ 0.8s • 3 cohered (🪄 0.1s • 🔷 0.4s • 👑 0.2s) 3.9K cached → 1 type error • 2 findings
+//	✓ 💎 0.7s (480 rules • 3.9K files • 2.4M nodes)
+//	✓ 💎 0.05s (480 rules • 3.9K files)
+//	✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3.9K files • 2.4M nodes)
 //
-// "Cohered" is the brand's verb: the files this run checked fresh, as against the ones the cache
-// answered for. It renders a runSummary and decides nothing: what ran, what was found and what went
-// unchecked are the summary's, so this file only says them.
+// In the parentheses, the rules that ran, the files in scope, and the nodes walked this run, which a
+// replay walked none of. With `--phases`, or `"output": { "phases": true }` in the settings, where the
+// time went comes first inside them:
+//
+//	✓ 💎 0.7s (🕸 0.2s • 🪄 0.1s • 💅 0.02s • 🔷 0.4s • 👑 0.2s • 480 rules • 3.9K files • 2.4M nodes)
+//
+// Under `--verbose` the footer also says how the files were checked: how many this run cohered (the
+// brand's verb, checked fresh) against how many the cache answered for, or that the run was replayed.
+//
+//	✓ 💎 0.7s • 3 files cohered • 3.9K cached (480 rules • 3.9K files • 2.4M nodes)
+//	✓ 💎 0.05s • replayed (480 rules • 3.9K files)
+//
+// It renders a runSummary and decides nothing: what ran, what was found and what went unchecked are the
+// summary's, so this file only says them.
 //
 // The glyphs are the house's, from `s c`: 💎 a clean run, ☠️ a failed one, 🪄 fixing, 💅 formatting,
 // 🔷 the type check and 👑 lint.
@@ -37,44 +47,61 @@ var phaseGlyphs = map[phaseName]string{
 	phaseUnused: "🧹",
 }
 
-// footer renders a run's summary as its one line. The verdict and total lead in bold; the phases, in
-// parentheses, and the counts after them are dim; what was found is red.
-func footer(summary runSummary, style textStyle) string {
+// footerOptions are the two ways a reader asks the footer for more.
+type footerOptions struct {
+	// Phases puts where the time went first inside the parentheses.
+	Phases bool
+	// Verbose says how the files were checked: cohered against cached, or replayed.
+	Verbose bool
+}
+
+// footer renders a run's summary as its one line. The verdict and total lead in bold, what was found
+// follows in red, and the parentheses are dim.
+func footer(summary runSummary, style textStyle, options footerOptions) string {
 	verdict := "✓ 💎 "
 	if summary.failed() {
 		verdict = "✗ ☠️ "
 	}
 	line := style.bold(verdict + footerSeconds(summary.Total))
 
-	if summary.Cache.Replayed {
-		line += " • replayed"
-		if summary.FilesCached > 0 {
-			line += " • " + style.dim(abbreviated(summary.FilesCached)+" cached")
-		}
-	} else {
-		line += " • " + abbreviated(summary.FilesCohered) + " cohered"
-		if phases := phaseTimes(summary.Phases, summary.Formatting); len(phases) > 0 {
-			line += " " + style.dim("("+strings.Join(phases, " • ")+")")
-		}
-		if summary.FilesCached > 0 {
-			line += " " + style.dim(abbreviated(summary.FilesCached)+" cached")
+	// What was found comes right after the time, the first thing a failing run's reader needs.
+	if summary.TypeErrors > 0 {
+		line += " • " + style.red(counted(summary.TypeErrors, "type error", "type errors"))
+	}
+	if summary.Findings > 0 {
+		line += " • " + style.red(counted(summary.Findings, "finding", "findings"))
+	}
+	if summary.WouldChange > 0 {
+		line += " • " + style.red(counted(summary.WouldChange, "file would change", "files would change"))
+	}
+
+	if options.Verbose {
+		if summary.Cache.Replayed {
+			line += " • replayed"
+		} else {
+			line += " • " + counted(summary.FilesCohered, "file cohered", "files cohered")
+			if summary.FilesCached > 0 {
+				line += " • " + abbreviated(summary.FilesCached) + " cached"
+			}
 		}
 	}
 
-	if summary.failed() {
-		var found []string
-		if summary.TypeErrors > 0 {
-			found = append(found, counted(summary.TypeErrors, "type error", "type errors"))
-		}
-		if summary.Findings > 0 {
-			found = append(found, counted(summary.Findings, "finding", "findings"))
-		}
-		if summary.WouldChange > 0 {
-			found = append(found, counted(summary.WouldChange, "file would change", "files would change"))
-		}
-		line += " → " + style.red(strings.Join(found, " • "))
-	} else if summary.Nodes > 0 && !summary.Cache.Replayed {
-		line += " • " + style.dim(abbreviated(summary.Nodes)+" nodes")
+	var inside []string
+	// A replay ran no phase, so it has no breakdown to give.
+	if options.Phases && !summary.Cache.Replayed {
+		inside = append(inside, phaseTimes(summary.Graph, summary.Phases, summary.Formatting)...)
+	}
+	if summary.Rules > 0 {
+		inside = append(inside, counted(summary.Rules, "rule", "rules"))
+	}
+	if files := summary.files(); files > 0 {
+		inside = append(inside, counted(files, "file", "files"))
+	}
+	if summary.Nodes > 0 {
+		inside = append(inside, counted(summary.Nodes, "node", "nodes"))
+	}
+	if len(inside) > 0 {
+		line += " " + style.dim("("+strings.Join(inside, " • ")+")")
 	}
 
 	if markers := uncheckedMarkers(summary); len(markers) > 0 {
@@ -86,10 +113,14 @@ func footer(summary runSummary, style textStyle) string {
 	return line
 }
 
-// phaseTimes is each phase that spent time, in pipeline order, formatting after fixing. A phase that did
-// not run is left out; one that reused another's walk says so instead of claiming a time of its own.
-func phaseTimes(records []phaseRecord, formatting time.Duration) []string {
+// phaseTimes is where the time went: the graph, then each phase that spent time, in pipeline order,
+// formatting after fixing. A phase that did not run is left out, so 🧹 appears only when `--unused` ran
+// it; one that reused another's walk says so instead of claiming a time of its own.
+func phaseTimes(graph time.Duration, records []phaseRecord, formatting time.Duration) []string {
 	var times []string
+	if graph > 0 {
+		times = append(times, "🕸 "+footerSeconds(graph))
+	}
 	for _, name := range phaseOrder {
 		for _, record := range records {
 			if record.Name != name {

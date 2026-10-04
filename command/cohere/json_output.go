@@ -68,6 +68,8 @@ type summaryJSON struct {
 	Label         string      `json:"label,omitempty"`
 	Verdict       string      `json:"verdict"`
 	Seconds       float64     `json:"seconds"`
+	GraphSeconds  float64     `json:"graphSeconds"`
+	Rules         int         `json:"rules"`
 	Phases        []phaseJSON `json:"phases"`
 	// FormattingSeconds is how long formatting took, absent when it did not run.
 	FormattingSeconds float64  `json:"formattingSeconds,omitempty"`
@@ -114,6 +116,8 @@ func summaryAsJSON(summary runSummary) summaryJSON {
 		Label:             summary.Label,
 		Verdict:           verdict,
 		Seconds:           summary.Total.Seconds(),
+		GraphSeconds:      summary.Graph.Seconds(),
+		Rules:             summary.Rules,
 		Phases:            phases,
 		FormattingSeconds: summary.Formatting.Seconds(),
 		Cache:             summary.Cache,

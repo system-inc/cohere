@@ -28,8 +28,12 @@ type runSummary struct {
 
 	// Total is the run's wall clock, the number a developer waited for.
 	Total time.Duration
+	// Graph is how long reading, parsing and binding the program took, zero when no graph was built.
+	Graph time.Duration
 	// Phases is each phase's outcome and time, as the pipeline recorded them.
 	Phases []phaseRecord
+	// Rules is the rules that ran.
+	Rules int
 	// Formatting is how long formatting took when it ran, zero when it did not.
 	Formatting time.Duration
 
@@ -44,11 +48,12 @@ type runSummary struct {
 	WouldChange int
 
 	// FilesCohered is the files this run checked fresh, and FilesCached the files whose results came from
-	// the cache. Cohered is the brand's verb, and the split is the point: a warm run that cohered three
-	// files and took the rest from the cache must not read like one that checked them all again.
+	// the cache; together they are the files in scope. Cohered is the brand's verb, and the split is the
+	// point: a warm run that cohered three files and took the rest from the cache must not read like one
+	// that checked them all again.
 	FilesCohered int
 	FilesCached  int
-	// Nodes is the syntax nodes visited in the cohered files only.
+	// Nodes is the syntax nodes walked this run, so only in the cohered files.
 	Nodes int
 
 	Gaps runGaps

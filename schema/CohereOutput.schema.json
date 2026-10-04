@@ -39,13 +39,15 @@
             "description": "The run, the last line. `verdict` is what the exit code says; `gaps` is every way the run fell short of checking everything, which a reader deciding whether a passing run can be trusted reads too.",
             "type": "object",
             "additionalProperties": false,
-            "required": ["kind", "schemaVersion", "verdict", "seconds", "phases", "cache", "typeErrors", "findings", "filesFixed", "filesFormatted", "wouldChange", "filesCohered", "filesCached", "nodes", "gaps"],
+            "required": ["kind", "schemaVersion", "verdict", "seconds", "graphSeconds", "rules", "phases", "cache", "typeErrors", "findings", "filesFixed", "filesFormatted", "wouldChange", "filesCohered", "filesCached", "nodes", "gaps"],
             "properties": {
                 "kind": { "const": "summary" },
                 "schemaVersion": { "const": 1, "description": "Raised by any change a reader could notice; a new optional field does not raise it." },
                 "label": { "type": "string", "description": "The project's path, in a repository with several projects." },
                 "verdict": { "enum": ["pass", "fail"] },
                 "seconds": { "type": "number", "description": "The run's wall clock." },
+                "graphSeconds": { "type": "number", "description": "Reading, parsing and binding the program; zero when no graph was built." },
+                "rules": { "type": "integer", "description": "The rules that ran." },
                 "phases": {
                     "type": "array",
                     "items": {
