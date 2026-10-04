@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -25,6 +26,20 @@ type PathAlias struct {
 type ImportRequirePathAliasOptions struct {
 	// Aliases are matched longest directory first, so a nested root is not shadowed by its parent.
 	Aliases []PathAlias `json:"aliases"`
+
+	// AliasesFromTsconfigPaths adds an alias for every directory the tsconfig's `paths` maps a
+	// wildcard onto, beside any written in Aliases.
+	//
+	// A hand-written list is a second copy of what the tsconfig already says, and the copy is the
+	// one that drifts: a project that renames a directory or adds an alias updates the tsconfig
+	// because the compiler makes it, and nothing makes it update this list. It is also why the rule
+	// stayed in ahra alone. Every Structure project spells the same three aliases in the same
+	// tsconfig it extends, so a library can turn the rule on for all of them only by reading that.
+	//
+	// Off unless asked for, so a config that names no aliases means what it meant before, which is
+	// nothing to suggest. An entry written in Aliases is kept beside the derived ones and wins a tie
+	// on the same directory.
+	AliasesFromTsconfigPaths bool `json:"aliasesFromTsconfigPaths"`
 
 	// StrictRoots are directories where every relative import is reported, not only the deep ones.
 	StrictRoots []string `json:"strictRoots"`
@@ -175,26 +190,41 @@ func messageUseAliasInStrictRoot(importPath string, root string, suggestion stri
 // relative path to prove the importer is a neighbour. Reporting here would ask for the thing that
 // rule rejects, and two rules that demand opposite edits are worse than either alone.
 //
-// No fix. The alias is derivable, but rewriting an import is only safe when the alias actually
-// resolves in that project's config, which this rule cannot see.
+// The fix rewrites the specifier to the suggestion. An alias derived from the tsconfig's `paths`
+// resolves by construction; one written in Aliases is exactly as right as the list it came from.
 var ImportRequirePathAlias = rule.Rule{
 	Name: "nexus/import-require-path-alias",
+	// The tsconfig's `paths` and the directory they resolve against, read only when
+	// aliasesFromTsconfigPaths asks for them.
+	ProgramReads: rule.ReadsCompilerOptions,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil
 		}
 
 		settings, hasSettings := rule.OptionsAs[ImportRequirePathAliasOptions](options)
-		if !hasSettings || len(settings.Aliases) == 0 || settings.RepositoryRoot == "" {
-			// Without aliases there is nothing to suggest, and without a root nothing can be made
-			// repository-relative. Declining is the honest answer, and it keeps a misconfigured
-			// rule from guessing.
+		if !hasSettings || settings.RepositoryRoot == "" {
+			// Without a root nothing can be made repository-relative. Declining is the honest
+			// answer, and it keeps a misconfigured rule from guessing.
+			return nil
+		}
+		repositoryRoot := strings.TrimSuffix(normalizedPathText(settings.RepositoryRoot), "/")
+
+		// Written first, so a written alias wins a tie with a derived one on the same directory: the
+		// sort below is stable.
+		configured := append([]PathAlias{}, settings.Aliases...)
+		if settings.AliasesFromTsconfigPaths && ctx.Program != nil {
+			configured = append(configured,
+				aliasesFromCompilerPaths(ctx.Program.Options(), ctx.Program.GetCurrentDirectory(), repositoryRoot)...)
+		}
+		if len(configured) == 0 {
+			// Nothing to suggest, so nothing to report.
 			return nil
 		}
 
 		// Longest directory first, so a nested root is not shadowed by its parent.
-		aliases := make([]PathAlias, 0, len(settings.Aliases))
-		for _, alias := range settings.Aliases {
+		aliases := make([]PathAlias, 0, len(configured))
+		for _, alias := range configured {
 			aliases = append(aliases, PathAlias{
 				Directory: normalizeConfiguredDirectory(alias.Directory),
 				Alias:     alias.Alias,
@@ -209,7 +239,6 @@ var ImportRequirePathAlias = rule.Rule{
 			strictRoots = append(strictRoots, normalizeConfiguredDirectory(root))
 		}
 
-		repositoryRoot := strings.TrimSuffix(normalizedPathText(settings.RepositoryRoot), "/")
 		importingFile := imports.NormalizedFileName(ctx.SourceFile)
 		importingRelative, isInsideRepository := repositoryRelative(repositoryRoot, importingFile)
 		if !isInsideRepository {
@@ -281,6 +310,57 @@ var ImportRequirePathAlias = rule.Rule{
 			},
 		}
 	},
+}
+
+// aliasesFromCompilerPaths reads the aliases a tsconfig's `paths` declares, as repository-relative
+// directories.
+//
+// Only the shape that names a directory becomes an alias: a wildcard key mapped to exactly one
+// wildcard target, `"@structure/*": ["../../libraries/structure/*"]`. The rest are left out, each
+// for a reason:
+//
+//   - An exact key such as `"@project/ProjectSettings": ["../../ProjectSettings.tsx"]` names one
+//     file, so there is no directory for other imports to be suggested under.
+//   - A key or target with its wildcard anywhere but the end, such as `"*-legacy": ["old/*"]`, does
+//     not map a directory onto a prefix, so no suggestion could be built by appending the rest.
+//   - More than one target is a fallback list: the compiler takes the first that has the file. A file
+//     under the second target is reached through the alias only while the first lacks a file of the
+//     same name, so suggesting the alias there would be right until someone adds that file, and then
+//     silently resolve somewhere else.
+//   - A target outside the repository is not one of this repository's directories.
+//
+// Targets resolve against the directory of the tsconfig that wrote `paths`, which is how the compiler
+// reads them. Structure writes its aliases in a config two directories down that every project
+// extends, so resolving against the project's own tsconfig instead would put every alias two levels
+// above the repository.
+func aliasesFromCompilerPaths(options *core.CompilerOptions, currentDirectory string, repositoryRoot string) []PathAlias {
+	if options == nil || options.Paths.Size() == 0 {
+		return nil
+	}
+	basePath := options.GetPathsBasePath(currentDirectory)
+
+	var aliases []PathAlias
+	for pattern, targets := range options.Paths.Entries() {
+		prefix, isWildcard := strings.CutSuffix(pattern, "/*")
+		if !isWildcard || prefix == "" || strings.Contains(prefix, "*") || len(targets) != 1 {
+			continue
+		}
+		targetDirectory, targetIsWildcard := strings.CutSuffix(targets[0], "/*")
+		if !targetIsWildcard || strings.Contains(targetDirectory, "*") {
+			continue
+		}
+
+		directory := tspath.NormalizePath(tspath.ResolvePath(normalizedPathText(basePath), targetDirectory))
+		relative, isInside := repositoryRelative(repositoryRoot, strings.TrimSuffix(directory, "/"))
+		if !isInside {
+			continue
+		}
+		if relative == "" {
+			relative = "."
+		}
+		aliases = append(aliases, PathAlias{Directory: relative, Alias: prefix})
+	}
+	return aliases
 }
 
 // aliasForPath returns the aliased spelling of a repository-relative path.

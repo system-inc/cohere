@@ -99,7 +99,7 @@ func RunTypedFilesWithSetup(
 	setup func(directory string),
 ) Result {
 	t.Helper()
-	return runTypedFiles(t, subject, files, subjectFileName, nil, setup)
+	return runTypedFiles(t, subject, files, subjectFileName, fixedOptions(nil), setup)
 }
 
 // RunTypedFilesWithSetupAndOptions is RunTypedFilesWithSetup for a rule that also reads
@@ -118,7 +118,35 @@ func RunTypedFilesWithSetupAndOptions(
 	setup func(directory string),
 ) Result {
 	t.Helper()
-	return runTypedFiles(t, subject, files, subjectFileName, options, setup)
+	return runTypedFiles(t, subject, files, subjectFileName, fixedOptions(options), setup)
+}
+
+// RunTypedFilesWithOptionsFor is RunTypedFilesWithSetup for a rule whose options name the fixture's
+// own directory, which no caller knows until the files are written.
+//
+// A repository root is the case: `import-require-path-alias` makes every path relative to one, and a
+// fixture that reads the aliases out of its own tsconfig needs that root to be the directory the
+// tsconfig sits in. Passing a fixed root instead would put every fixture file outside it, and the
+// rule would decline each one, so the clean cases would pass for the wrong reason.
+//
+// The fixture is built the setup way, uncached, because a fixture of this kind brings its own
+// tsconfig and the cached build writes the default one over it.
+func RunTypedFilesWithOptionsFor(
+	t *testing.T,
+	subject rule.Rule,
+	files map[string]string,
+	subjectFileName string,
+	optionsFor func(directory string) any,
+) Result {
+	t.Helper()
+	return runTypedFiles(t, subject, files, subjectFileName, optionsFor, func(string) {})
+}
+
+// fixedOptions is an options value that does not depend on where the fixture was written.
+func fixedOptions(options any) func(directory string) any {
+	return func(string) any {
+		return options
+	}
 }
 
 // RunTypedFilesWithOptions is the full form the others delegate to.
@@ -130,7 +158,7 @@ func RunTypedFilesWithOptions(
 	options any,
 ) Result {
 	t.Helper()
-	return runTypedFiles(t, subject, files, subjectFileName, options, nil)
+	return runTypedFiles(t, subject, files, subjectFileName, fixedOptions(options), nil)
 }
 
 // runTypedFiles is the body both public forms share.
@@ -139,7 +167,7 @@ func runTypedFiles(
 	subject rule.Rule,
 	files map[string]string,
 	subjectFileName string,
-	options any,
+	optionsFor func(directory string) any,
 	setup func(directory string),
 ) Result {
 	t.Helper()
@@ -241,6 +269,7 @@ func runTypedFiles(
 		},
 	}
 
+	options := optionsFor(directory)
 	listeners := subject.Run(ruleContext, options)
 	if listeners != nil {
 		walk(sourceFile.AsNode(), listeners)
