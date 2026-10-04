@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 273,
+        "rulesOn": 275,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -701,6 +701,14 @@
             },
             {
                 "name": "nexus/correctness-no-global-listener-target-assertion",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-identical-branches",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-leaked-number-render",
                 "severity": "error"
             },
             {
@@ -1424,7 +1432,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 337,
+        "rulesOn": 339,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2030,6 +2038,14 @@
             },
             {
                 "name": "nexus/correctness-no-global-listener-target-assertion",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-identical-branches",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-leaked-number-render",
                 "severity": "error"
             },
             {
@@ -3105,7 +3121,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 269,
+        "rulesOn": 271,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -3961,6 +3977,14 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-no-identical-branches",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-leaked-number-render",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/correctness-no-mock-on-module-namespace",
                 "severity": "error"
             },
@@ -4783,7 +4807,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 279,
+        "rulesOn": 281,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5510,6 +5534,14 @@
             },
             {
                 "name": "nexus/correctness-no-global-listener-target-assertion",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-identical-branches",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-leaked-number-render",
                 "severity": "error"
             },
             {
@@ -6362,7 +6394,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 263,
+        "rulesOn": 265,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -7016,6 +7048,14 @@
             },
             {
                 "name": "nexus/correctness-no-global-listener-target-assertion",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-identical-branches",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-leaked-number-render",
                 "severity": "error"
             },
             {
@@ -7732,7 +7772,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 251,
+        "rulesOn": 253,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8338,6 +8378,14 @@
             },
             {
                 "name": "nexus/correctness-no-global-listener-target-assertion",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-identical-branches",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-leaked-number-render",
                 "severity": "error"
             },
             {
