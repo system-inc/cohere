@@ -282,6 +282,12 @@
     "reason": null
   },
   {
+    "typeScriptRule": "nexus/correctness-no-implicit-return",
+    "verdict": "Compiler",
+    "swiftRule": null,
+    "reason": "A Swift function that declares a return type must return on every path, or it does not compile (\"missing return in a function expected to return\"), so no path can fall off the end."
+  },
+  {
     "typeScriptRule": "nexus/correctness-no-import-cycle-load-time-read",
     "verdict": "Compiler",
     "swiftRule": null,

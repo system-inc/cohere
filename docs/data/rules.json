@@ -7258,7 +7258,10 @@
                     "set": "cohere:typescript",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "Compiler"
+            }
         },
         {
             "name": "nexus/correctness-no-import-cycle-load-time-read",
