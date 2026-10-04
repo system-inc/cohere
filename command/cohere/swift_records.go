@@ -333,7 +333,9 @@ func (r *swiftRun) acceptProject(record *swiftProjectRecord) error {
 	if record.FilesInScope != record.FilesOurs || record.ScopeDescription != "" {
 		line += fmt.Sprintf(", %d in scope (%s)", record.FilesInScope, record.ScopeDescription)
 	}
-	fmt.Fprintln(r.out, line)
+	fmt.Fprintln(accountOutput(r.out), line)
+	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesInScope, record.FilesInScope
+	activeSummary.Gaps.NothingToCheck = record.FilesInScope == 0
 
 	r.report.graph = elapsed
 	r.report.filesInScope = record.FilesInScope
@@ -370,7 +372,25 @@ func (r *swiftRun) acceptFinding(record *swiftFindingRecord) error {
 	}
 	r.findings++
 	r.findingsInPhase++
-	fmt.Fprintln(r.out, swiftFindingLine(record))
+	// A compiler finding is a type error, as the TypeScript run counts its own; the rest are findings.
+	severity := record.Severity
+	if severity != "warn" {
+		severity = "error"
+	}
+	rule, messageID := record.Rule, record.MessageId
+	if record.Source == "compiler" {
+		activeSummary.TypeErrors++
+		if rule != "" {
+			rule = "#" + rule
+		} else {
+			rule = "swiftc"
+		}
+	} else {
+		activeSummary.Findings++
+	}
+	printFinding(r.out,
+		runFinding{Path: record.File, Line: record.Line, Column: record.Column, Severity: severity, Rule: rule, MessageID: messageID, Message: singleLineDescription(record.Message)},
+		swiftFindingLine(record)+"\n")
 	return nil
 }
 
@@ -521,8 +541,8 @@ func (r *swiftRun) acceptFix(record *swiftFixRecord) error {
 		FilesTransformSkipped: record.FilesNotFormatted,
 		TransformSkipReasons:  record.NotFormattedReasons,
 	}
-	fmt.Fprintln(r.out, summary.String())
-	fmt.Fprintf(r.out, "format scope: %s\n", record.FormatScope)
+	fmt.Fprintln(accountOutput(r.out), summary.String())
+	fmt.Fprintf(accountOutput(r.out), "format scope: %s\n", record.FormatScope)
 	return nil
 }
 
@@ -534,15 +554,15 @@ func (r *swiftRun) acceptTypes(record *swiftTypesRecord) error {
 		return fmt.Errorf("the types record counts %d diagnostics and %d finding records came with it", record.Diagnostics, r.findingsInPhase)
 	}
 	elapsed := time.Duration(record.ElapsedMilliseconds) * time.Millisecond
-	fmt.Fprintf(r.out, "types: %d diagnostics over %d files in %s\n", record.Diagnostics, record.Files, round(elapsed))
+	fmt.Fprintf(accountOutput(r.out), "types: %d diagnostics over %d files in %s\n", record.Diagnostics, record.Files, round(elapsed))
 
 	// The compiler checks the whole module whatever the scope, so a scoped run's types line covers more
 	// than the scope does. Said, so the larger number does not read as a scope that leaked.
 	if r.project != nil && record.Files != r.project.FilesInScope {
-		fmt.Fprintf(r.out, "  types: covered the whole package, not only the %d files in scope\n", r.project.FilesInScope)
+		fmt.Fprintf(accountOutput(r.out), "  types: covered the whole package, not only the %d files in scope\n", r.project.FilesInScope)
 	}
 	for _, file := range record.FilesWithoutRecord {
-		fmt.Fprintf(r.out, "  types: no compiler record for %s, so its diagnostics are unknown\n", file)
+		fmt.Fprintf(accountOutput(r.out), "  types: no compiler record for %s, so its diagnostics are unknown\n", file)
 	}
 	r.filesWithoutRecord += len(record.FilesWithoutRecord)
 	return nil
@@ -560,8 +580,12 @@ func (r *swiftRun) acceptLint(record *swiftLintRecord) error {
 	if record.ReusedFrom != "" {
 		walkCost = fmt.Sprintf("walked by the %s phase (nothing was rewritten, so its findings still hold)", record.ReusedFrom)
 	}
-	fmt.Fprintf(r.out, "lint: %d findings — %d rules over %d files, %d nodes visited, %s\n",
+	fmt.Fprintf(accountOutput(r.out), "lint: %d findings — %d rules over %d files, %d nodes visited, %s\n",
 		record.Findings, record.RulesRun, record.FilesWalked, record.NodesVisited, walkCost)
+	activeSummary.Rules = record.RulesRun
+	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesWalked, record.FilesWalked
+	activeSummary.Nodes = record.NodesVisited
+	activeSummary.Gaps.CrashedFiles += len(record.Crashes)
 
 	// The same coverage block a TypeScript run prints, from the same writer, so one fact reads the same
 	// whichever engine states it: one counted line whose terms add up, crashes in full, and each rule
@@ -570,11 +594,11 @@ func (r *swiftRun) acceptLint(record *swiftLintRecord) error {
 	if err != nil {
 		return err
 	}
-	writeCoverage(r.out, summary, r.details)
+	writeCoverage(accountOutput(r.out), summary, r.details)
 	r.crashes += len(record.Crashes)
 
 	if record.ConfigNote != "" {
-		fmt.Fprintf(r.out, "  %s\n", record.ConfigNote)
+		fmt.Fprintf(accountOutput(r.out), "  %s\n", record.ConfigNote)
 	}
 	r.writeExcluded()
 	return nil
@@ -685,11 +709,11 @@ func (r *swiftRun) writeExcluded() {
 	for _, reason := range reasons {
 		files := filesByReason[reason]
 		if len(files) > excludedNamedLimit {
-			fmt.Fprintf(r.out, "  not checked: %d files (%s)\n", len(files), reason)
+			fmt.Fprintf(accountOutput(r.out), "  not checked: %d files (%s)\n", len(files), reason)
 			continue
 		}
 		for _, file := range files {
-			fmt.Fprintf(r.out, "  not checked: %s (%s)\n", file, reason)
+			fmt.Fprintf(accountOutput(r.out), "  not checked: %s (%s)\n", file, reason)
 		}
 	}
 }
@@ -799,7 +823,7 @@ func (r *swiftRun) acceptSummary(record *swiftSummaryRecord) error {
 	if r.project == nil {
 		r.report.graphNotBuilt = true
 	}
-	r.report.Write(r.out)
+	writeRunEnd(r.report, r.out)
 	return nil
 }
 
@@ -869,7 +893,7 @@ func (r *swiftRun) writeUnfinished(reason string) {
 	if r.project == nil {
 		r.report.graphNotBuilt = true
 	}
-	r.report.Write(r.out)
+	writeRunEnd(r.report, r.out)
 }
 
 // truncateForError keeps a refused line short enough to read in an error.
