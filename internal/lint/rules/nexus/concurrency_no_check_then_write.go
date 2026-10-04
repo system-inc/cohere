@@ -9,20 +9,21 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/scope"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const concurrencyNoCheckThenWriteId = "checkThenWrite"
+
+// concurrencyNoCheckThenWriteText is the rule's message, whose wording lives in
+// `policy/messages/concurrency-no-check-then-write.json`.
+var concurrencyNoCheckThenWriteText = policy.MessageOf("nexus/concurrency-no-check-then-write", concurrencyNoCheckThenWriteId)
 
 // concurrencyNoCheckThenWriteMessage names the write that claims the name, so a reader of the finding
 // on the check can find the second half of the race without reading the whole function.
 func concurrencyNoCheckThenWriteMessage(write string) rule.Message {
 	return rule.Message{
-		Id: concurrencyNoCheckThenWriteId,
-		Description: "This loop looks for a file name that is free, and the `" + write + "` after it creates " +
-			"that file in a separate step, so two saves running at once (in this process or in two) can both " +
-			"find the same name free and the second silently overwrites the first. Claim the name in the step " +
-			"that creates the file: `writeFile(path, bytes, { flag: 'wx' })` fails with `EEXIST` when the name " +
-			"is taken, so retry with the next name on that error instead of checking first.",
+		Id:          concurrencyNoCheckThenWriteId,
+		Description: concurrencyNoCheckThenWriteText.Render(map[string]string{"write": write}),
 	}
 }
 

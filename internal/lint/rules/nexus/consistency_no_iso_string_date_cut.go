@@ -6,18 +6,17 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const consistencyNoIsoStringDateCutId = "isoStringCutToDate"
 
-var consistencyNoIsoStringDateCutMessage = rule.Message{
-	Id: consistencyNoIsoStringDateCutId,
-	Description: "This cuts a `toISOString()` string down to its date part. `toISOString()` is always UTC, so " +
-		"the cut is the UTC calendar day whether or not that was the day meant, and in Utah the UTC day turns " +
-		"over at 5 pm in winter and 6 pm in summer: an evening run gets tomorrow. Say the zone instead: " +
-		"`dateIso8601(date, 'UTC')` from `@nexus/source/time/FormatTime` when the UTC day is meant, or " +
-		"`dateIso8601(date, userTimeZone())` with `userTimeZone` from `@nexus/source/time/TimeZones` when " +
-		"the local day is meant.",
+// consistencyNoIsoStringDateCutText is the rule's message, whose wording lives in
+// `policy/messages/consistency-no-iso-string-date-cut.json`.
+var consistencyNoIsoStringDateCutText = policy.MessageOf("nexus/consistency-no-iso-string-date-cut", consistencyNoIsoStringDateCutId)
+
+func consistencyNoIsoStringDateCutMessage() rule.Message {
+	return rule.Message{Id: consistencyNoIsoStringDateCutId, Description: consistencyNoIsoStringDateCutText.Render(nil)}
 }
 
 // ConsistencyNoIsoStringDateCut reports a `toISOString()` string cut down to its date part, in favour of
@@ -146,7 +145,7 @@ func consistencyNoIsoStringDateCutCheckRange(ctx rule.Context, call *ast.Node) {
 		return
 	}
 	if consistencyNoIsoStringDateCutIsIsoString(ctx, receiver) {
-		ctx.ReportNode(call, consistencyNoIsoStringDateCutMessage)
+		ctx.ReportNode(call, consistencyNoIsoStringDateCutMessage())
 	}
 }
 
@@ -157,7 +156,7 @@ func consistencyNoIsoStringDateCutCheckSplitIndex(ctx rule.Context, node *ast.No
 		return
 	}
 	if consistencyNoIsoStringDateCutIsSplitOnT(ctx, ast.SkipParentheses(access.Expression)) {
-		ctx.ReportNode(node, consistencyNoIsoStringDateCutMessage)
+		ctx.ReportNode(node, consistencyNoIsoStringDateCutMessage())
 	}
 }
 
@@ -177,7 +176,7 @@ func consistencyNoIsoStringDateCutCheckDestructuredSplit(ctx rule.Context, node 
 	}
 	split := ast.SkipParentheses(initializer)
 	if consistencyNoIsoStringDateCutIsSplitOnT(ctx, split) {
-		ctx.ReportNode(split, consistencyNoIsoStringDateCutMessage)
+		ctx.ReportNode(split, consistencyNoIsoStringDateCutMessage())
 	}
 }
 

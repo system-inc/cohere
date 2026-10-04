@@ -1,0 +1,14 @@
+{
+  "rules": {
+    "TypeScript": "nexus/consistency-no-boolean-outcome",
+    "Swift": "cohere-swift/consistency-no-boolean-outcome"
+  },
+  "messages": {
+    "booleanOutcome": {
+      "text": "`{{flagName}}: boolean` on {{declaration}} collapses every outcome into one bit, at the moment the distinction is cheapest to keep. Return a named outcome instead: a union of `outcome` members naming each way the operation can turn out, with the payload on the arm that carries it. Suggested name: {{suggested}}OutcomeType.",
+      "languages": [
+        "TypeScript"
+      ]
+    }
+  }
+}

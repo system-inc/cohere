@@ -25,6 +25,14 @@ enum RuleMessages {
         "ToolchainRequireUpcomingFeatures.upcomingFeatureMissing",
     ]
 
+    /* cohere-swift/concurrency-no-check-then-write */
+    enum ConcurrencyNoCheckThenWrite {
+    }
+
+    /* cohere-swift/concurrency-no-lost-update */
+    enum ConcurrencyNoLostUpdate {
+    }
+
     /* cohere-swift/concurrency-require-escape-hatch-reason */
     enum ConcurrencyRequireEscapeHatchReason {
         static func escapeHatchWithoutReason(spelling: String) -> Message {
@@ -45,6 +53,18 @@ enum RuleMessages {
                     #"This throws an NSError made up here, with the domain \#(domain), which names no declared failure. Declare the failure as a case of an error type of our own (an enum conforming to Error, and LocalizedError for its text) and throw that case, so a caller catches it by case. Until then a caller can match it only by repeating the domain string and the code, and nothing keeps the two in step."#,
             )
         }
+    }
+
+    /* cohere-swift/consistency-no-boolean-outcome */
+    enum ConsistencyNoBooleanOutcome {
+    }
+
+    /* cohere-swift/consistency-no-hand-rolled-delay */
+    enum ConsistencyNoHandRolledDelay {
+    }
+
+    /* cohere-swift/consistency-no-iso-string-date-cut */
+    enum ConsistencyNoIsoStringDateCut {
     }
 
     /* cohere-swift/correctness-no-default-for-owned-enum */
@@ -75,6 +95,10 @@ enum RuleMessages {
                     #"This try? is the whole body of a closure whose result goes nowhere (it returns nothing, or it is the value of a task nobody keeps), so the error is thrown away unseen. Use do/catch inside the closure, and say in the catch why the failure can be ignored if it can."#,
             )
         }
+    }
+
+    /* cohere-swift/force-cast */
+    enum ForceCast {
     }
 
     /* cohere-swift/security-no-interpolated-sql-string */

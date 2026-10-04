@@ -3,18 +3,17 @@ package nexus
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const consistencyNoHandRolledDelayId = "handRolledDelay"
 
-var consistencyNoHandRolledDelayMessage = rule.Message{
-	Id: consistencyNoHandRolledDelayId,
-	Description: "This `new Promise` around a `setTimeout` is a hand-rolled `delay`. Write " +
-		"`await delay(milliseconds);` with `import { delay } from '@nexus/source/coordination/Delay';`. " +
-		"The promise does nothing but resolve after a timer, which is exactly what `delay` does, and " +
-		"spelling it out at every call site makes the reader check each one for the variant it might " +
-		"be (a value passed to `resolve`, a timer kept for cancelling, a reject path) before they can " +
-		"read past it. One named wait says it is a plain wait.",
+// consistencyNoHandRolledDelayText is the rule's message, whose wording lives in
+// `policy/messages/consistency-no-hand-rolled-delay.json`.
+var consistencyNoHandRolledDelayText = policy.MessageOf("nexus/consistency-no-hand-rolled-delay", consistencyNoHandRolledDelayId)
+
+func consistencyNoHandRolledDelayMessage() rule.Message {
+	return rule.Message{Id: consistencyNoHandRolledDelayId, Description: consistencyNoHandRolledDelayText.Render(nil)}
 }
 
 // ConsistencyNoHandRolledDelay reports a promise built only to resolve after a timer, where Nexus
@@ -90,7 +89,7 @@ var ConsistencyNoHandRolledDelay = rule.Rule{
 				if consistencyNoHandRolledDelayIsDefinition(node, duration) {
 					return
 				}
-				ctx.ReportNode(node, consistencyNoHandRolledDelayMessage)
+				ctx.ReportNode(node, consistencyNoHandRolledDelayMessage())
 			},
 		}
 	},

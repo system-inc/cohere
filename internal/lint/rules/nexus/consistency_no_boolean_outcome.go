@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // outcomeFlagNames claim to say how an operation turned out.
@@ -51,13 +52,16 @@ type ConsistencyNoBooleanOutcomeOptions struct {
 	AllowedTypeNames []string `json:"allowedTypeNames"`
 }
 
+// consistencyNoBooleanOutcomeText is the rule's message, whose wording lives in
+// `policy/messages/consistency-no-boolean-outcome.json`.
+var consistencyNoBooleanOutcomeText = policy.MessageOf("nexus/consistency-no-boolean-outcome", "booleanOutcome")
+
 func messageBooleanOutcome(flagName string, declaration string, suggested string) rule.Message {
 	return rule.Message{
-		Id: "booleanOutcome",
-		Description: "`" + flagName + ": boolean` on " + declaration + " collapses every outcome into one " +
-			"bit, at the moment the distinction is cheapest to keep. Return a named outcome instead: a " +
-			"union of `outcome` members naming each way the operation can turn out, with the payload on " +
-			"the arm that carries it. Suggested name: " + suggested + "OutcomeType.",
+		Id: consistencyNoBooleanOutcomeText.Id,
+		Description: consistencyNoBooleanOutcomeText.Render(map[string]string{
+			"flagName": flagName, "declaration": declaration, "suggested": suggested,
+		}),
 	}
 }
 

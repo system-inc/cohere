@@ -10,31 +10,34 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const concurrencyNoLostUpdateId = "lostUpdate"
+
+// concurrencyNoLostUpdateText is the rule's message, whose wording lives in
+// `policy/messages/concurrency-no-lost-update.json`. Both findings share the id, and the phrase says
+// which stale read the write builds on: a variable, or an entry a read call returned.
+var (
+	concurrencyNoLostUpdateText           = policy.MessageOf("nexus/concurrency-no-lost-update", concurrencyNoLostUpdateId)
+	concurrencyNoLostUpdateVariableRead   = concurrencyNoLostUpdateText.Option("suspendedRead", "variable")
+	concurrencyNoLostUpdateStoreEntryRead = concurrencyNoLostUpdateText.Option("suspendedRead", "storeEntry")
+)
 
 // concurrencyNoLostUpdateMessage names the written target, so a reader of the finding does not have
 // to work out which of several writes on a line is the one that loses an update.
 func concurrencyNoLostUpdateMessage(target string) rule.Message {
 	return rule.Message{
-		Id: concurrencyNoLostUpdateId,
-		Description: "This write loses updates. Its new value is computed from `" + target + "` as it was " +
-			"before an await or a yield, and the function is suspended in between, so anything else " +
-			"that changes `" + target + "` during the suspension is overwritten by this line. Read `" +
-			target + "` after the suspension, or keep the whole read, compute and write on one side of it.",
+		Id:          concurrencyNoLostUpdateId,
+		Description: concurrencyNoLostUpdateText.Render(map[string]string{"target": target}, concurrencyNoLostUpdateVariableRead),
 	}
 }
 
 // concurrencyNoLostUpdateStoreMessage names the read call whose stale answer the write builds on.
 func concurrencyNoLostUpdateStoreMessage(read string) rule.Message {
 	return rule.Message{
-		Id: concurrencyNoLostUpdateId,
-		Description: "This write loses updates. Its new value is computed from what `" + read + "` returned " +
-			"before an await or a yield, and the function is suspended in between, so anything else that " +
-			"writes that entry during the suspension is overwritten by this call. Read it again after the " +
-			"suspension and change only what this function owns, or keep the whole read, compute and write " +
-			"on one side of it.",
+		Id:          concurrencyNoLostUpdateId,
+		Description: concurrencyNoLostUpdateText.Render(map[string]string{"read": read}, concurrencyNoLostUpdateStoreEntryRead),
 	}
 }
 
