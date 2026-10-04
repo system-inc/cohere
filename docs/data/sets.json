@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 287,
+        "rulesOn": 288,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -245,7 +245,7 @@
             },
             {
                 "name": "@typescript-eslint/no-meaningless-void-operator",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-misused-new",
@@ -1466,7 +1466,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 353,
+        "rulesOn": 354,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -1616,7 +1616,7 @@
             },
             {
                 "name": "@typescript-eslint/no-meaningless-void-operator",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-misused-new",
@@ -3193,7 +3193,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 283,
+        "rulesOn": 284,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -3436,7 +3436,7 @@
             },
             {
                 "name": "@typescript-eslint/no-meaningless-void-operator",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-misused-new",
@@ -4909,7 +4909,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 292,
+        "rulesOn": 293,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5059,7 +5059,7 @@
             },
             {
                 "name": "@typescript-eslint/no-meaningless-void-operator",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-misused-new",
@@ -6526,7 +6526,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 277,
+        "rulesOn": 278,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6676,7 +6676,7 @@
             },
             {
                 "name": "@typescript-eslint/no-meaningless-void-operator",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-misused-new",
@@ -7938,7 +7938,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 265,
+        "rulesOn": 266,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8088,7 +8088,7 @@
             },
             {
                 "name": "@typescript-eslint/no-meaningless-void-operator",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-misused-new",
