@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 278,
+        "rulesOn": 279,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -422,6 +422,16 @@
             {
                 "name": "@typescript-eslint/prefer-namespace-keyword",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/prefer-nullish-coalescing",
+                "severity": "error",
+                "options": [
+                    {
+                        "ignoreTernaryTests": true,
+                        "ignoreIfStatements": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/prefer-promise-reject-errors",
@@ -1448,7 +1458,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 343,
+        "rulesOn": 344,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -1775,6 +1785,16 @@
             {
                 "name": "@typescript-eslint/prefer-namespace-keyword",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/prefer-nullish-coalescing",
+                "severity": "error",
+                "options": [
+                    {
+                        "ignoreTernaryTests": true,
+                        "ignoreIfStatements": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/prefer-promise-reject-errors",
@@ -3157,7 +3177,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 274,
+        "rulesOn": 275,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -3577,6 +3597,16 @@
             {
                 "name": "@typescript-eslint/prefer-namespace-keyword",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/prefer-nullish-coalescing",
+                "severity": "error",
+                "options": [
+                    {
+                        "ignoreTernaryTests": true,
+                        "ignoreIfStatements": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/prefer-promise-reject-errors",
@@ -4855,7 +4885,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 283,
+        "rulesOn": 284,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5182,6 +5212,16 @@
             {
                 "name": "@typescript-eslint/prefer-namespace-keyword",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/prefer-nullish-coalescing",
+                "severity": "error",
+                "options": [
+                    {
+                        "ignoreTernaryTests": true,
+                        "ignoreIfStatements": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/prefer-promise-reject-errors",
@@ -6454,7 +6494,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 268,
+        "rulesOn": 269,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6781,6 +6821,16 @@
             {
                 "name": "@typescript-eslint/prefer-namespace-keyword",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/prefer-nullish-coalescing",
+                "severity": "error",
+                "options": [
+                    {
+                        "ignoreTernaryTests": true,
+                        "ignoreIfStatements": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/prefer-promise-reject-errors",
@@ -7848,7 +7898,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 256,
+        "rulesOn": 257,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8175,6 +8225,16 @@
             {
                 "name": "@typescript-eslint/prefer-namespace-keyword",
                 "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/prefer-nullish-coalescing",
+                "severity": "error",
+                "options": [
+                    {
+                        "ignoreTernaryTests": true,
+                        "ignoreIfStatements": true
+                    }
+                ]
             },
             {
                 "name": "@typescript-eslint/prefer-promise-reject-errors",
