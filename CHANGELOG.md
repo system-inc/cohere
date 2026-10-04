@@ -22,3 +22,10 @@ Formatting: a project that configures nothing formats with the house block `cohe
 its own `format` block in `CohereSettings.json`, applied over Prettier's defaults, so `"format": {}`
 means Prettier's defaults. A project that extends a `cohere:system-inc/*` set takes its format from that
 chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
+
+Output, changed: a run prints the files it rewrote, its findings as `path:line:col severity rule
+message`, and one footer line, `✓ 💎 0.7s (480 rules • 3.9K files • 2.4M nodes)`, which names
+anything the run did not check even when it passes. `--verbose` prints everything a run printed
+before, `--phases` (or `"output": { "phases": true }` in `CohereSettings.json`) adds the phase
+timings to the footer, and `--json` prints newline-delimited JSON described by
+`schema/CohereOutput.schema.json`. Exit codes are unchanged.

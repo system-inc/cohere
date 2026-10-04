@@ -40,6 +40,17 @@ cohere --lint           # report lint findings only: no fixes, no TypeScript dia
 A bare `cohere` writes fixes to your files but does not format them; formatting runs only when you
 pass `--format`. To see what would change without writing anything, add `--no-fix`.
 
+A run prints the files it rewrote, then its findings, then one line:
+
+```
+🪄💅 app/os/SessionRow.tsx      prefer-const ×2, prefer-nullish-coalescing
+  💅 modules/pensieve/Recall.ts
+app/os/Session.ts:12:5 error nexus/consistency-no-abbreviated-identifier `ctx` is an abbreviation.
+✗ ☠️ 0.8s • 1 finding (480 rules • 3.9K files • 2.4M nodes)
+```
+
+See [Output](#output) for what that line says, and for `--verbose` and `--json`.
+
 ## CohereSettings.json
 
 cohere reads `CohereSettings.json` at the project root. The house rules ship inside cohere as rule
@@ -126,12 +137,59 @@ root unless you name another).
 | `--print-config` | print each rule's resolved severity and options for one file (`index.ts` unless you name one), as JSON, and exit |
 | `--rules` | print the rules cohere implements for your project's language, and exit |
 | `--rules-enabled` | print the rules your settings turn on for one file (`index.ts` unless you name one), with severity, and exit |
+| `--verbose` | print everything a run can say: each phase, the coverage summary, overrides, skips, notes, memory and the total |
+| `--phases` | put where the time went (graph, fix, format, types, lint) first in the footer's parentheses |
+| `--json` | print newline-delimited JSON for a program to read instead of the human view (see [Output](#output)) |
 | `--coverage` | name every rule under the coverage fact that describes it, not only count them |
 | `--timing` | report what building the graph and each rule cost, most expensive rule first |
 | `--single-threaded` | use one type checker instead of several |
 | `--profile FILE` | write a Go CPU profile of the run to FILE |
 | `--cache-dump` | print what this project's cache holds, and exit |
 | `--version` | print the version, what this binary was built from, and the Swift contract it speaks, and exit |
+
+## Output
+
+A run prints three things, in order:
+- **The files it rewrote.** Each line has a 🪄 if fixes were applied and a 💅 if it was formatted, then
+  the path, then the rules whose fixes it took, with a count past one. Past 20 files it says how many
+  more, and `--verbose` lists them all.
+- **Its findings,** one per line, as `path:line:col severity rule message`.
+- **One footer line:** the verdict (✓ 💎 or ✗ ☠️), how long the run took, what it found, and in the
+  parentheses the rules that ran, the files in scope and the syntax nodes it walked.
+
+```
+✓ 💎 0.7s (480 rules • 3.9K files • 2.4M nodes)
+✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3.9K files • 2.4M nodes)
+```
+
+Anything the run did not check is in the footer even when it passes, so a green line never hides a
+gap: `✓ 💎 2.4s (…) • ⚠ 1 file crashed`. The same goes for a phase that could not run, a rule that
+skipped every file, formatting not checked, and a run narrowed to some of the files.
+
+On a terminal the verdict and time are bold, what was found is red, and the parentheses are dim. A
+pipe, a file or `NO_COLOR` gets no color codes at all.
+
+`--phases` puts where the time went first inside the parentheses: 🕸 building the graph (read, parse,
+bind), 🪄 fixing, 💅 formatting, 🔷 the type check, 👑 lint, and 🧹 unused when `--unused` ran. A phase
+that did not run is left out. To make that a project's default, set it in `CohereSettings.json`:
+
+```json
+{ "output": { "phases": true } }
+```
+
+`--timing` is separate and still prints what each rule cost, which adds overhead; the phase times are
+free.
+
+`--verbose` prints everything a run can say: each phase and why any did not run, the coverage summary,
+overrides, skips, notes, memory and the total. Its footer also says how many files this run checked
+fresh against how many the cache answered for, or that the run was replayed whole.
+
+`--json` is for a program to read. It prints newline-delimited JSON, one object per line, each with a
+`kind`: a `finding` per finding, a `fixed` and a `formatted` per rewritten file, and a `summary` last.
+The summary carries a `schemaVersion`, the verdict, the timings and counts, and `gaps`, everything the
+run did not check, which a program deciding whether to trust a passing run should read too.
+[schema/CohereOutput.schema.json](schema/CohereOutput.schema.json) describes every field. Read
+`--json` rather than the human view, whose layout can change.
 
 ## Exit codes
 
