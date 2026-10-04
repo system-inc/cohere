@@ -155,6 +155,7 @@
         "nexus/correctness-no-leaked-number-render": "error",
         "nexus/correctness-require-response-status-check": "error",
         "nexus/correctness-no-import-cycle-load-time-read": "error",
+        "nexus/correctness-no-nullish-stripping-assertion": "error",
         "unicode-bom": "error",
         "no-useless-rename": "off",
         "strict": "off",
