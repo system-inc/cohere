@@ -159,7 +159,7 @@
         "nexus/correctness-no-process-exit-after-output": "off",
         "unicode-bom": "error",
         "no-useless-rename": "error",
-        "strict": "off",
+        "strict": "error",
         "no-restricted-properties": [
             "error",
             {
@@ -236,7 +236,7 @@
         "symbol-description": "error",
         "@typescript-eslint/no-non-null-asserted-nullish-coalescing": "error",
         "no-label-var": "error",
-        "@typescript-eslint/prefer-nullish-coalescing": ["error", { "ignoreTernaryTests": true, "ignoreIfStatements": true }],
+        "@typescript-eslint/prefer-nullish-coalescing": "error",
         "@typescript-eslint/prefer-reduce-type-parameter": "error",
         "max-classes-per-file": [
             "error",
@@ -426,9 +426,8 @@
     },
     "reasons": {
         "nexus/correctness-no-process-exit-after-output": "Off on purpose, by @system_cohere's ruling of 2026-10-03 (#h1jwmmz). Its findings are true, but every process entry blocks stdout and stderr, which correctness-require-blocking-standard-streams requires, so an exit after a write has nothing queued to lose. Turn it on only for a project whose entries don't block.",
-        "strict": "Held until cohere and ESLint agree on whether a file is a module: cohere reads Base's ProjectSecrets.test.ts as a script, ESLint as a module, so the two engines disagree on where a directive belongs (#hks3djf).",
         "@typescript-eslint/unbound-method": "Measured, not a gap: 79 findings across the repos, none a defect. 52 are expect(mock.method) in tests, where the method is passed to the assertion, never called unbound (#smnjh4c).",
-        "@typescript-eslint/no-meaningless-void-operator": "Held for a fix wave. typescript-eslint 8.71 adds a check (meaninglessVoidOnNonCall) that reports void on a plain binding, which Structure uses 9 times to discard destructured props (MenuItem, Time, NotificationsClearAllButton and others). The repos run 8.65 to 8.71, so the rule's result depends on the installed version until those sites change and the versions align (#smnjh4c).",
+        "@typescript-eslint/no-meaningless-void-operator": "Held for a fix wave. typescript-eslint 8.71, now pinned in every repo, adds a check (meaninglessVoidOnNonCall) that reports void on a plain binding, which cohere reports as well since c0862ea1 (#89d8yk5). Both engines read 0 in ahra's modules; Structure's 5 left discard rest siblings and go once no-unused-vars honors ignoreRestSiblings (#6qxs15e), and api's 12 are listed (#t87dmk5).",
         "no-unused-private-class-members": "The core rule sees only #private names. @typescript-eslint/no-unused-private-class-members, on here, is the typed rule that supersedes it.",
         "guard-for-in": "nexus/consistency-no-for-in bans for...in outright, guarded or not, so there is no loop left for this rule to guard.",
         "no-invalid-this": "@typescript-eslint/no-invalid-this, on here, is the same rule taught TypeScript's this parameters.",
