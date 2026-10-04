@@ -198,12 +198,13 @@ func ruleNames(rules []rule.Rule) []string {
 	return names
 }
 
-// replayEntry turns a cached entry back into the walk's diagnostics and coverage for one file.
+// replayEntry turns a cached entry back into the walk's diagnostics and coverage for one file, and returns the
+// replayed rules' notes.
 //
 // hits says which keyed classes are replayed as well as the pure one. A class that is not runs again on this
-// file and counts its own coverage, so replaying its coverage here would count it twice.
+// file and counts its own coverage and notes, so replaying them here would count them twice.
 func replayEntry(entry LintCacheEntry, hits classHits, sourceFile *ast.SourceFile, diagnostics *[]rule.Diagnostic,
-	reporting map[string]int, offered map[string]int, listening map[string]int) {
+	reporting map[string]int, offered map[string]int, listening map[string]int) RuleNotes {
 	replays := make(map[string]bool, len(entry.Rules)+len(entry.TypedRules)+len(entry.ShapedRules)+len(entry.DesignRules))
 	for _, names := range [][]string{entry.Rules, classIf(hits.typed, entry.TypedRules), classIf(hits.shaped, entry.ShapedRules),
 		classIf(hits.design, entry.DesignRules)} {
@@ -229,6 +230,7 @@ func replayEntry(entry LintCacheEntry, hits classHits, sourceFile *ast.SourceFil
 		})
 		reporting[finding.RuleName]++
 	}
+	return notesOf(entry.Notes, replays)
 }
 
 // classIf is names when the class is included, and nothing otherwise.
@@ -239,6 +241,39 @@ func classIf(included bool, names []string) []string {
 	return nil
 }
 
+// notesOf is the notes of the named rules, nil when none of them noted anything. The per-key counts are
+// shared, not copied: nothing writes to a file's notes once its walk has returned them.
+func notesOf(notes RuleNotes, names map[string]bool) RuleNotes {
+	var kept RuleNotes
+	for ruleName, counts := range notes {
+		if !names[ruleName] {
+			continue
+		}
+		if kept == nil {
+			kept = RuleNotes{}
+		}
+		kept[ruleName] = counts
+	}
+	return kept
+}
+
+// mergeNotes is the notes of two disjoint sets of rules together, nil when neither has any.
+func mergeNotes(first RuleNotes, second RuleNotes) RuleNotes {
+	if len(first) == 0 {
+		return second
+	}
+	if len(second) == 0 {
+		return first
+	}
+	merged := make(RuleNotes, len(first)+len(second))
+	for _, notes := range []RuleNotes{first, second} {
+		for ruleName, counts := range notes {
+			merged[ruleName] = counts
+		}
+	}
+	return merged
+}
+
 // recordableEntry builds the entry a fully walked file would leave, or reports that it must not leave
 // one.
 //
@@ -247,7 +282,7 @@ func classIf(included bool, names []string) []string {
 // finding carries a fix or a suggestion, since a cached finding stores neither and the fix phase needs
 // the edit itself.
 func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics []rule.Diagnostic,
-	fileListening map[string]int, visited int, silenced suppressionTally) (LintCacheEntry, bool) {
+	fileListening map[string]int, fileNotes RuleNotes, visited int, silenced suppressionTally) (LintCacheEntry, bool) {
 	if silenced.applied != 0 || silenced.unusedDirectives != 0 {
 		return LintCacheEntry{}, false
 	}
@@ -266,6 +301,7 @@ func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics
 		ShapeFingerprint: keys.shapeFingerprint,
 		DesignRules:      keys.design,
 		VisitedNodes:     visited,
+		Notes:            notesOf(fileNotes, isCacheable),
 	}
 	for _, name := range cacheable {
 		if fileListening[name] > 0 {
@@ -291,13 +327,13 @@ func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics
 }
 
 // refreshClasses is an entry whose pure part was replayed and one or more of whose keyed classes just ran
-// again: the old findings and listening of every class that replayed, and the fresh ones of every class that
-// ran, under this run's fingerprints. Refused, like any recording, when a fresh finding carries a fix or a
+// again: the old findings, listening and notes of every class that replayed, and the fresh ones of every class
+// that ran, under this run's fingerprints. Refused, like any recording, when a fresh finding carries a fix or a
 // suggestion.
 //
 // A design-system class that ran takes a zero fingerprint, settled to this run's design system in Recorded.
 func refreshClasses(old LintCacheEntry, keys cacheKeys, hits classHits,
-	fileDiagnostics []rule.Diagnostic, fileListening map[string]int) (LintCacheEntry, bool) {
+	fileDiagnostics []rule.Diagnostic, fileListening map[string]int, fileNotes RuleNotes) (LintCacheEntry, bool) {
 	ran := map[string]bool{}
 	for _, name := range append(append(append([]string{}, classIf(!hits.typed, keys.typed)...), classIf(!hits.shaped, keys.shaped)...),
 		classIf(!hits.design, keys.design)...) {
@@ -318,6 +354,7 @@ func refreshClasses(old LintCacheEntry, keys cacheKeys, hits classHits,
 		ShapeFingerprint: keys.shapeFingerprint,
 		DesignRules:      keys.design,
 		VisitedNodes:     old.VisitedNodes,
+		Notes:            mergeNotes(notesOf(old.Notes, kept), notesOf(fileNotes, ran)),
 	}
 	if hits.design {
 		refreshed.DesignFingerprint = old.DesignFingerprint

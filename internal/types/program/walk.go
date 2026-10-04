@@ -328,6 +328,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				// entry was produced under that design system. See DesignSystemKey.
 				walkRules := applicable
 				var replayed *LintCacheEntry
+				var replayedNotes RuleNotes
 				var hits classHits
 				var keys cacheKeys
 				if reuse != nil {
@@ -370,9 +371,12 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 						if !hits.design && len(keys.design) > 0 {
 							localDesignSystemRerun++
 						}
-						replayEntry(entry, hits, sourceFile, &localDiagnostics, localReporting, localOffered, localListening)
+						replayedNotes = replayEntry(entry, hits, sourceFile, &localDiagnostics, localReporting, localOffered, localListening)
 						if len(walkRules) == 0 {
 							localNodes += entry.VisitedNodes
+							if len(replayedNotes) > 0 {
+								localNotes[sourceFile.FileName()] = replayedNotes
+							}
 							return
 						}
 					}
@@ -483,19 +487,20 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					localNodes += visited
 				}
 				localSuppressed.add(silenced)
-				if len(fileNotes) > 0 {
-					localNotes[sourceFile.FileName()] = fileNotes
+				// The walked rules' notes beside the replayed rules' notes: the two are disjoint by rule.
+				if allNotes := mergeNotes(replayedNotes, fileNotes); len(allNotes) > 0 {
+					localNotes[sourceFile.FileName()] = allNotes
 				}
 
 				if recording && replayed == nil {
 					if entry, eligible := recordableEntry(sourceFile, keys,
-						localDiagnostics[diagnosticsBefore:], fileListening, visited, silenced); eligible {
+						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes, visited, silenced); eligible {
 						reuse.keep(entry)
 					}
 				}
 				if recording && replayed != nil {
 					if entry, eligible := refreshClasses(*replayed, keys, hits,
-						localDiagnostics[diagnosticsBefore:], fileListening); eligible {
+						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes); eligible {
 						reuse.keep(entry)
 					}
 				}

@@ -104,6 +104,8 @@ type CacheTableIdentity struct {
 // half is enforced by TestCacheTableShapeIsPinnedToItsVersion; the meaning half is the reason each
 // section also keeps its own version.
 //
+// 7: findings entries carry their rules' notes.
+//
 // 6: the types section carries its compiler-options key.
 //
 // 5: the table holds the types phase's section.
@@ -114,7 +116,7 @@ type CacheTableIdentity struct {
 // design system's key.
 //
 // 2: findings entries carry shape-keyed rules and their fingerprint, and the table holds Signatures.
-const cacheTableVersion = 6
+const cacheTableVersion = 7
 
 // cacheTableMagic opens every table, so a file that is not one is refused on its first field.
 const cacheTableMagic = "cohere cache table"
@@ -170,6 +172,48 @@ type lintCacheWireEntry struct {
 
 	DesignRules       int
 	DesignFingerprint [sha256.Size]byte
+
+	Notes []lintCacheWireNote
+}
+
+// lintCacheWireNote is one rule's count of one note key in one file. Notes are a sorted slice on the wire
+// rather than the entry's map, so a table's bytes do not depend on map order.
+type lintCacheWireNote struct {
+	Rule  string
+	Key   string
+	Count int
+}
+
+// wireNotes flattens an entry's notes, sorted by rule and then key.
+func wireNotes(notes RuleNotes) []lintCacheWireNote {
+	var flat []lintCacheWireNote
+	for ruleName, counts := range notes {
+		for key, count := range counts {
+			flat = append(flat, lintCacheWireNote{Rule: ruleName, Key: key, Count: count})
+		}
+	}
+	sort.Slice(flat, func(first, second int) bool {
+		if flat[first].Rule != flat[second].Rule {
+			return flat[first].Rule < flat[second].Rule
+		}
+		return flat[first].Key < flat[second].Key
+	})
+	return flat
+}
+
+// ruleNotes is wireNotes undone, nil when there are none.
+func ruleNotes(flat []lintCacheWireNote) RuleNotes {
+	if len(flat) == 0 {
+		return nil
+	}
+	notes := RuleNotes{}
+	for _, note := range flat {
+		if notes[note.Rule] == nil {
+			notes[note.Rule] = map[string]int{}
+		}
+		notes[note.Rule][note.Key] = note.Count
+	}
+	return notes
 }
 
 // NewCacheTable is an empty table, what a first run and every discard start from.
@@ -310,6 +354,8 @@ func (c *LintCache) wire() *lintCacheWire {
 
 			DesignRules:       intern(entry.DesignRules),
 			DesignFingerprint: entry.DesignFingerprint,
+
+			Notes: wireNotes(entry.Notes),
 		})
 	}
 	return wire
@@ -342,6 +388,8 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 			ShapeFingerprint: stored.ShapeFingerprint,
 
 			DesignFingerprint: stored.DesignFingerprint,
+
+			Notes: ruleNotes(stored.Notes),
 		}
 		var err error
 		if entry.Rules, err = list(stored.Rules); err != nil {

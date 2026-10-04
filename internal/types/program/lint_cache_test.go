@@ -37,6 +37,12 @@ func sampleLintCache() *program.LintCache {
 				DesignFingerprint: program.HashContent("the design system debugger; was checked under"),
 				Listening:         []string{"no-debugger", "no-empty", "await-thenable", "no-floating-promises"},
 				VisitedNodes:      5,
+				// Two rules sharing a key and one rule with two, so an encoder that summed across either could
+				// not match.
+				Notes: program.RuleNotes{
+					"no-empty":       {"Hub in /project/source/hub.ts": 2, "Other in /project/source/other.ts": 1},
+					"await-thenable": {"Hub in /project/source/hub.ts": 3},
+				},
 				Findings: []program.LintCacheFinding{
 					{
 						RuleName: "no-debugger", Start: 0, End: 9,
@@ -150,6 +156,9 @@ func TestLintCacheRoundTripsEveryField(t *testing.T) {
 		}
 		if got.VisitedNodes != want.VisitedNodes {
 			t.Errorf("entry %d VisitedNodes: %d against %d", index, got.VisitedNodes, want.VisitedNodes)
+		}
+		if !reflect.DeepEqual(got.Notes, want.Notes) {
+			t.Errorf("entry %d Notes: %v against %v", index, got.Notes, want.Notes)
 		}
 		if len(got.Findings) != len(want.Findings) {
 			t.Fatalf("entry %d findings: %d back from %d", index, len(got.Findings), len(want.Findings))
@@ -328,6 +337,7 @@ func TestLintCacheEntryHasNoUncheckedFields(t *testing.T) {
 	compared := map[string]struct{}{
 		"Path": {}, "ContentHash": {}, "Rules": {}, "TypedRules": {}, "TypeFingerprint": {}, "Listening": {},
 		"VisitedNodes": {}, "Findings": {}, "ShapedRules": {}, "ShapeFingerprint": {}, "DesignRules": {}, "DesignFingerprint": {},
+		"Notes": {},
 	}
 	entryType := reflect.TypeOf(program.LintCacheEntry{})
 	for index := range entryType.NumField() {

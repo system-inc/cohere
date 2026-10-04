@@ -451,3 +451,91 @@ func TestCacheClassesSplitsFourWays(t *testing.T) {
 		t.Errorf("pure [%s] typed [%s] design [%s] never [%s]", names(pure), names(typeAware), names(design), names(never))
 	}
 }
+
+// A walk that replays from the findings cache counts each rule's notes exactly as a walk without one does
+// (#dz42gce), so --coverage reports the same number warm and cold.
+//
+// Three noting rules, one per way a replay can treat a rule: a pure one replayed while the file's bytes hold,
+// a type-aware one replayed while its type fingerprint holds, and one that reads other files and is walked
+// every time. The cache goes through the table's encoding between runs, as it does on disk. Then lib.ts
+// changes its type, so consumer.ts replays its pure rule and walks its type-aware one again: its notes are
+// the old pure notes and no typed ones, and the run after that replays the refreshed entry.
+func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(t *testing.T) {
+	noting := func(name string, needsTypeChecker bool, reads rule.ProgramRead, key func(ctx rule.Context, declaration *ast.Node) string) rule.Rule {
+		return rule.Rule{
+			Name:             name,
+			NeedsTypeChecker: needsTypeChecker,
+			ProgramReads:     reads,
+			Run: func(ctx rule.Context, options any) rule.Listeners {
+				return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
+					if noted := key(ctx, node); noted != "" {
+						ctx.Note(noted)
+					}
+				}}
+			},
+		}
+	}
+	// The type-aware rule notes only strings, so after lib.ts turns its value into a number it notes nothing
+	// in consumer.ts, and a refresh that kept its old notes would show.
+	rules := []rule.Rule{
+		noting("test-notes-pure", false, 0, func(ctx rule.Context, declaration *ast.Node) string { return "declared" }),
+		noting("test-notes-typed", true, 0, func(ctx rule.Context, declaration *ast.Node) string {
+			if rendered := ctx.TypeChecker.TypeToString(ctx.TypeChecker.GetTypeAtLocation(declaration.Name())); rendered == "string" {
+				return "a string"
+			}
+			return ""
+		}),
+		noting("test-notes-uncacheable", false, rule.ReadsOtherFiles, func(ctx rule.Context, declaration *ast.Node) string { return "walked" }),
+	}
+	if pure, typeAware, _, uncacheable := program.CacheClasses(rules); len(pure) != 1 || len(typeAware) != 1 || len(uncacheable) != 1 {
+		t.Fatalf("the noting rules are not one per class (%d pure, %d type-aware, %d uncacheable), so this proves nothing",
+			len(pure), len(typeAware), len(uncacheable))
+	}
+	root := writeProject(t, map[string]string{
+		"tsconfig.json": minimalConfig,
+		"lib.ts":        "export const value: string = \"1\";\n",
+		"consumer.ts":   "import { value } from \"./lib\";\nexport const copy = value;\nexport const other = copy;\n",
+	})
+	throughTheTable := func(cache *program.LintCache) *program.LintCache {
+		t.Helper()
+		table := program.NewCacheTable()
+		table.Findings = cache
+		encoded, err := program.EncodeCacheTable(table, testIdentity)
+		if err != nil {
+			t.Fatalf("encoding: %v", err)
+		}
+		decoded, err := program.DecodeCacheTable(encoded, testIdentity)
+		if err != nil {
+			t.Fatalf("decoding: %v", err)
+		}
+		return decoded.Findings
+	}
+	sameNotes := func(when string, cached program.Result) {
+		t.Helper()
+		truth := plainWalk(t, root, rules)
+		if len(truth.Notes) == 0 {
+			t.Fatalf("%s: an uncached walk noted nothing, so this proves nothing", when)
+		}
+		if cached.FilesReplayed == 0 {
+			t.Fatalf("%s: nothing replayed, so the equality below holds for nothing", when)
+		}
+		if !reflect.DeepEqual(cached.Notes, truth.Notes) {
+			t.Errorf("%s: a replaying walk counted other notes than an uncached one:\n cached %v\n truth  %v", when, cached.Notes, truth.Notes)
+		}
+	}
+
+	_, recorded := walkAndRecord(t, root, rules, nil)
+	warm, recorded := walkAndRecord(t, root, rules, throughTheTable(recorded))
+	sameNotes("unchanged", warm)
+
+	if err := os.WriteFile(filepath.Join(root, "lib.ts"), []byte("export const value: number = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	refreshing, recorded := walkAndRecord(t, root, rules, throughTheTable(recorded))
+	if refreshing.TypeAwareRerun == 0 {
+		t.Fatal("consumer.ts did not walk its type-aware rule again, so the refresh is untested here")
+	}
+	sameNotes("after the edit", refreshing)
+	again, _ := walkAndRecord(t, root, rules, throughTheTable(recorded))
+	sameNotes("the run after the refresh", again)
+}

@@ -123,6 +123,10 @@ type LintCacheEntry struct {
 	// contribute zero and change the coverage line.
 	VisitedNodes int
 
+	// Notes is what the cacheable rules noted through rule.Context.Note, per rule and per key, nil when none
+	// did. A replay restores the notes of the rules it replays, so a warm run counts them as a walked one does.
+	Notes RuleNotes
+
 	// Findings is what the cacheable rules reported. Empty is a real answer: it means the rules ran
 	// and found nothing, which is exactly the case worth caching since most files are clean.
 	Findings []LintCacheFinding
@@ -212,6 +216,9 @@ func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 
 // lintCacheVersion is bumped whenever the format's meaning changes.
 //
+// 8: entries carry their cacheable rules' notes. A version 7 entry has none, and replaying it would count
+// none where a walk counts some.
+//
 // 7: entries carry design-system rules and the design system they were produced under, and the cache carries
 // that design system's read set.
 //
@@ -228,7 +235,7 @@ func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 // The encoding itself is no longer this version's business. The cache is the findings section of the
 // cache table (cache_table.go), encoded with gob behind the table's header, so a change to the encoded
 // shape moves cacheTableVersion. This one moves when what an entry means changes.
-const lintCacheVersion = 7
+const lintCacheVersion = 8
 
 // Lookup returns a file's cached entry, and whether the cache had a usable answer.
 //
