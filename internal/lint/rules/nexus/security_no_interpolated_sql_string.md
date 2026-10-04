@@ -85,6 +85,31 @@ interpolation in them.
   backslash-and-quote `replace` chain is accepted. The doc comment gives the reasoning.
 - **A fixer.** The fix is a bound parameter, which spans the query and the driver call.
 
+## The bare-value branch (`interpolatedSqlValue`, #3ng4vkk)
+
+A second shape, reported under its own id: in a confirmed statement, an unquoted interpolation right
+after a comparison (`=`, `<>`, `!=`, `<`, `>`, `<=`, `>=`) whose type can hold any text. The value is
+written straight into the SQL, so quoting or escaping can't make it safe; the fix is a bound parameter,
+or, for a language with none such as GAQL, a type that holds only fixed text. A union of literals stays
+silent, which is how GAQL writes an enum. Only comparisons count: after `(`, `,`, `AND`, `FROM` or
+`ORDER BY`, an interpolation builds SQL from code, such as an `IN` list of placeholders, a condition, or
+a table or column name.
+
+Measured on 2026-10-03 before the fixes: **ahra 25, www 0, api 0**, all 25 true.
+- 23 were GAQL ids typed `string` from the command line, across 7 files in `modules/google/ads`. They
+  were fixed by typing the ids as numbers at the entry points (`#kx29bm3`, ahra 0269aa0).
+- 2 were `sqlLiteral(...)` in `modules/data/DataMirrorReconcile.ts`, a helper that doubled only the
+  quote, in a query that runs on MySQL. That is the `AhraOsTriggers` bug class, which the quoted branch
+  can't see because the quotes are added inside the helper. It was fixed in ahra 7d88414.
+
+After both fixes, ahra reads 0 with a planted string id firing.
+
+Verification: 5 firing and 8 silent fixture groups, plus 8 mutants, each confirmed to compile, all
+killed. The mutants: any value token counted rather than only comparisons, the branch removed,
+literals counted as text, template holes ignored, branded strings ignored, an open type parameter
+treated as fixed, `any` and `unknown` treated as fixed, and the bare value reported under the quoted
+id.
+
 ## Verification
 
 - Fixtures both ways from the real sites: `ContactsApi.ts` before (4 findings: the three search

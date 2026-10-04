@@ -159,6 +159,11 @@ func securityNoInterpolatedSqlStringAhraOsTriggers(escapeLine string) string {
 	)
 }
 
+// securityNoInterpolatedSqlStringWording is the quoted-value message, written out here rather than read
+// from the rule, so this compares the finding against the text it had before the wording moved to
+// policy/messages.
+const securityNoInterpolatedSqlStringWording = "This value is written between the single quotes of a SQL string, so a quote in it ends the string early: the query breaks on ordinary input like `O'Brien`, and a crafted value runs as SQL. Pass it as a bound parameter (`WHERE name LIKE ?` with the value beside the query). Where the query language has no parameters, give the value a type that cannot hold a quote (a number, a union of literals, a template literal type such as `${number}-${number}-${number}`), or escape it in place with `.replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\")`, which doubles backslashes as well as quotes."
+
 // securityNoInterpolatedSqlStringReported is the source text each finding points at, in order.
 func securityNoInterpolatedSqlStringReported(result rule_testing.Result, sourceText string) []string {
 	reported := make([]string, 0, len(result.Diagnostics))
@@ -182,7 +187,7 @@ func securityNoInterpolatedSqlStringExpectSpans(t *testing.T, result rule_testin
 		}
 	}
 	for _, diagnostic := range result.Diagnostics {
-		if diagnostic.Message.Description != securityNoInterpolatedSqlStringMessage.Description {
+		if diagnostic.Message.Description != securityNoInterpolatedSqlStringWording {
 			t.Fatalf("message is %q", diagnostic.Message.Description)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
@@ -635,5 +640,155 @@ func TestSecurityNoInterpolatedSqlStringDeclinesWithoutAChecker(t *testing.T) {
 	}
 	if listeners := SecurityNoInterpolatedSqlString.Run(rule.Context{}, nil); listeners != nil {
 		t.Errorf("with no checker the rule must register no listeners, got %d", len(listeners))
+	}
+}
+
+// securityNoInterpolatedSqlValueWording is the bare-value message, written out here.
+const securityNoInterpolatedSqlValueWording = "This value is written into a SQL statement without quotes, right after a comparison, so it becomes " +
+	"part of the SQL rather than a value: a space, a keyword or a quote in it changes what the query does, " +
+	"and a crafted value runs as SQL. Quoting it does not help, since the value can close the quote. Pass it " +
+	"as a bound parameter (`WHERE id = ?` with the value beside the query). Where the query language has no " +
+	"parameters, as with GAQL, give the value a type that holds only fixed text: a number, a union of " +
+	"literals, or a template literal type such as `${number}`."
+
+// securityNoInterpolatedSqlValueFinding is one expected finding: its id and the source it points at.
+type securityNoInterpolatedSqlValueFinding struct {
+	id   string
+	span string
+}
+
+func securityNoInterpolatedSqlValueExpect(t *testing.T, result rule_testing.Result, sourceText string, want []securityNoInterpolatedSqlValueFinding) {
+	t.Helper()
+	wantIds := make([]string, 0, len(want))
+	for _, finding := range want {
+		wantIds = append(wantIds, finding.id)
+	}
+	rule_testing.ExpectFindings(t, result, wantIds...)
+	reported := securityNoInterpolatedSqlStringReported(result, sourceText)
+	for index, finding := range want {
+		if reported[index] != finding.span {
+			t.Fatalf("finding %d points at %q, want %q", index, reported[index], finding.span)
+		}
+		wording := securityNoInterpolatedSqlStringWording
+		if finding.id == securityNoInterpolatedSqlValueId {
+			wording = securityNoInterpolatedSqlValueWording
+		}
+		if got := result.Diagnostics[index].Message.Description; got != wording {
+			t.Fatalf("finding %d reads %q", index, got)
+		}
+	}
+}
+
+// The bare-value branch: an unquoted interpolation right after a comparison, in a confirmed statement,
+// whose type can hold any text. The first case is the GAQL lookup in ahra's
+// `modules/google/ads/GoogleAdsCampaignApi.ts` before #kx29bm3 typed its ids as numbers.
+func TestSecurityNoInterpolatedSqlValueFires(t *testing.T) {
+	t.Parallel()
+
+	value := func(span string) securityNoInterpolatedSqlValueFinding {
+		return securityNoInterpolatedSqlValueFinding{securityNoInterpolatedSqlValueId, span}
+	}
+	cases := []struct {
+		name  string
+		lines []string
+		want  []securityNoInterpolatedSqlValueFinding
+	}{
+		{"a GAQL id typed string, from the command line", []string{
+			"export function campaignDetails(campaignId: string) {",
+			"    return `SELECT campaign.id, campaign.name FROM campaign WHERE campaign.id = ${campaignId}`;",
+			"}",
+		}, []securityNoInterpolatedSqlValueFinding{value("campaignId")}},
+		{"every comparison", []string{
+			"export function filter(a: string, b: string, c: string, d: string, e: string, f: string, g: string) {",
+			"    return `SELECT id FROM t WHERE a = ${a} AND b <> ${b} AND c != ${c} AND d < ${d} AND e > ${e} AND f <= ${f} AND g >= ${g}`;",
+			"}",
+		}, []securityNoInterpolatedSqlValueFinding{value("a"), value("b"), value("c"), value("d"), value("e"), value("f"), value("g")}},
+		{"a literal built by a helper that doubles only the quote", []string{
+			"declare function sqlLiteral(value: string): string;",
+			"export function count(table: string, watermark: string) {",
+			"    return `SELECT COUNT(*) AS c FROM ${table} WHERE updated_at <= ${sqlLiteral(watermark)}`;",
+			"}",
+		}, []securityNoInterpolatedSqlValueFinding{value("sqlLiteral(watermark)")}},
+		{"any, unknown, a branded string, a template with a text hole, an open type parameter", []string{
+			"type EmailType = string & { brand: 'Email' };",
+			"export function lookup<T>(a: any, b: unknown, c: EmailType, d: `user-${string}`, e: T) {",
+			"    return `SELECT id FROM t WHERE a = ${a} AND b = ${b} AND c = ${c} AND d = ${d} AND e = ${e}`;",
+			"}",
+		}, []securityNoInterpolatedSqlValueFinding{value("a"), value("b"), value("c"), value("d"), value("e")}},
+		{"a quoted value and a bare one, each under its own id", []string{
+			"export function find(name: string, identifier: string) {",
+			"    return `SELECT id FROM Contact WHERE name = '${name}' AND id = ${identifier}`;",
+			"}",
+		}, []securityNoInterpolatedSqlValueFinding{{securityNoInterpolatedSqlStringId, "name"}, value("identifier")}},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			sourceText := securityNoInterpolatedSqlStringSource(testCase.lines...)
+			result := rule_testing.RunTyped(t, SecurityNoInterpolatedSqlString, securityNoInterpolatedSqlStringFile, sourceText)
+			securityNoInterpolatedSqlValueExpect(t, result, sourceText, testCase.want)
+		})
+	}
+}
+
+// What the bare-value branch leaves alone: values that hold only fixed text, unquoted interpolations
+// that build SQL from code rather than compare a value, and templates that are not a statement.
+func TestSecurityNoInterpolatedSqlValueStaysSilent(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		lines []string
+	}{
+		{"a GAQL id typed as a number, after #kx29bm3", []string{
+			"export function campaignDetails(campaignId: number) {",
+			"    return `SELECT campaign.id FROM campaign WHERE campaign.id = ${campaignId}`;",
+			"}",
+		}},
+		{"a GAQL enum from a union of literals, which GAQL writes unquoted", []string{
+			"export function byStatus(status: 'ENABLED' | 'PAUSED') {",
+			"    return `SELECT campaign.id FROM campaign WHERE campaign.status = ${status}`;",
+			"}",
+		}},
+		{"a numeric template type, a bigint and a boolean", []string{
+			"export function byDate(date: `${number}-${number}-${number}`, big: bigint, flag: boolean) {",
+			"    return `SELECT id FROM t WHERE day = ${date} AND total > ${big} AND active = ${flag}`;",
+			"}",
+		}},
+		{"placeholders built for an IN list", []string{
+			"export function byIds(placeholders: string) {",
+			"    return `SELECT id FROM t WHERE id IN (${placeholders})`;",
+			"}",
+		}},
+		{"a condition, a table, a column and a limit built from code", []string{
+			"export function query(condition: string, table: string, column: string, limit: string) {",
+			"    return `SELECT id FROM ${table} WHERE id > 0 AND ${condition} ORDER BY ${column} LIMIT ${limit}`;",
+			"}",
+		}},
+		{"a log line that is not a statement", []string{
+			"export function note(identifier: string) {",
+			"    return `Updated campaign id = ${identifier}`;",
+			"}",
+		}},
+		{"lowercase SQL", []string{
+			"export function find(identifier: string) {",
+			"    return `select id from t where id = ${identifier}`;",
+			"}",
+		}},
+		{"a tagged template, whose tag decides what the value becomes", []string{
+			"declare function sql(strings: TemplateStringsArray, ...values: unknown[]): string;",
+			"export function find(identifier: string) {",
+			"    return sql`SELECT id FROM t WHERE id = ${identifier}`;",
+			"}",
+		}},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			sourceText := securityNoInterpolatedSqlStringSource(testCase.lines...)
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, SecurityNoInterpolatedSqlString, securityNoInterpolatedSqlStringFile, sourceText))
+		})
 	}
 }

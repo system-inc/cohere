@@ -226,3 +226,38 @@ func TestPhrasesRenderTheSharedTextAndThePickedOption(t *testing.T) {
 		}()
 	}
 }
+
+// A twin file can hold a message only one engine renders, named by its languages.
+func TestAMessageCanBeRenderedInOneLanguageOfATwinFile(t *testing.T) {
+	withOneLanguage := strings.Replace(minimalMessages, `"messages": {`, `"messages": {
+    "onlyHere": { "text": "Only TypeScript says {{this}}.", "languages": ["TypeScript"] },`, 1)
+	catalog, err := loadMinimalMessages(withOneLanguage)
+	if err != nil {
+		t.Fatalf("a twin file with a TypeScript-only message is refused: %v", err)
+	}
+	if _, rendered := catalog.templates["cohere-swift/consistency-no-thing"]["onlyHere"]; rendered {
+		t.Error("the Swift rule holds a message only TypeScript renders")
+	}
+	if _, rendered := catalog.templates["base/consistency-no-thing"]["onlyHere"]; !rendered {
+		t.Error("the TypeScript rule does not hold its own message")
+	}
+	for _, refused := range []struct {
+		name string
+		old  string
+		new  string
+	}{
+		{"a language the file names no rule for", `["TypeScript"]`, `["Kotlin"]`},
+		{"a language twice", `["TypeScript"]`, `["TypeScript", "TypeScript"]`},
+		{"no language", `["TypeScript"]`, `[]`},
+		{"a term on a one-language message", `"languages": ["TypeScript"]`, `"languages": ["TypeScript"], "terms": {"x": {"TypeScript": "y"}}`},
+	} {
+		if _, err := loadMinimalMessages(strings.Replace(withOneLanguage, refused.old, refused.new, 1)); err == nil {
+			t.Errorf("%s loaded", refused.name)
+		}
+	}
+	twinTerm := strings.Replace(minimalMessages, `"terms": { "subject": { "TypeScript": "a {{kind}}", "Swift": "an enum" } }`,
+		`"terms": { "subject": { "TypeScript": "a {{kind}}", "Swift": "an enum" } }, "languages": ["TypeScript"]`, 1)
+	if _, err := loadMinimalMessages(twinTerm); err == nil {
+		t.Error("a term giving words for a language the message is not rendered in loaded")
+	}
+}

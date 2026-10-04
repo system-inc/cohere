@@ -7,20 +7,19 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const securityNoInterpolatedSqlStringId = "interpolatedSqlString"
 
-var securityNoInterpolatedSqlStringMessage = rule.Message{
-	Id: securityNoInterpolatedSqlStringId,
-	Description: "This value is written between the single quotes of a SQL string, so a quote in it ends " +
-		"the string early: the query breaks on ordinary input like `O'Brien`, and a crafted value runs as " +
-		"SQL. Pass it as a bound parameter (`WHERE name LIKE ?` with the value beside the query). Where the " +
-		"query language has no parameters, give the value a type that cannot hold a quote (a number, a union " +
-		"of literals, a template literal type such as `${number}-${number}-${number}`), or escape it in " +
-		"place with `.replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\")`, which doubles backslashes as well " +
-		"as quotes.",
-}
+const securityNoInterpolatedSqlValueId = "interpolatedSqlValue"
+
+// The rule's two messages, whose wording lives in `policy/messages/security-no-interpolated-sql-string.json`,
+// the quoted one shared with the Swift twin.
+var (
+	securityNoInterpolatedSqlStringText = policy.MessageOf("nexus/security-no-interpolated-sql-string", securityNoInterpolatedSqlStringId)
+	securityNoInterpolatedSqlValueText  = policy.MessageOf("nexus/security-no-interpolated-sql-string", securityNoInterpolatedSqlValueId)
+)
 
 // SecurityNoInterpolatedSqlString reports a value interpolated inside the single quotes of a SQL string
 // written as a template literal, when the value's type can hold a quote.
@@ -89,6 +88,26 @@ var securityNoInterpolatedSqlStringMessage = rule.Message{
 // that ends inside a string, a name or a block comment, which is a fragment whose other half this
 // rule cannot see. A tagged template (a `sql` tag before the backquote) is never read: its tag
 // decides what an interpolation becomes, and the usual SQL tags turn it into a bound parameter.
+//
+// # A value with no quotes around it
+//
+// In a confirmed statement, an interpolation outside any string, right after a comparison (`=`, `<>`,
+// `!=`, `<`, `>`, `<=`, `>=`), is a value written straight into the SQL, and it is reported under its
+// own id, `interpolatedSqlValue`, when its type can hold any text: `string`, `any`, `unknown`, a branded
+// string, a `string` mapping, a template literal type with a text hole, or a type parameter whose
+// constraint allows one. A number, a bigint, a boolean, a string literal and a union of them are fixed
+// text and stay silent, which is how GAQL writes an enum (`campaign.status = ${status}`). Quoting and
+// escaping are no answer here, so the escape chain above does not apply.
+//
+// Only comparisons, on purpose. After `(`, `,`, `AND`, `FROM` or `ORDER BY`, an unquoted interpolation
+// builds SQL from code (an `IN (${placeholders})` list, an `AND ${condition}` fragment, a table or a
+// column), and reading those would be false findings.
+//
+// Where it came from: `#3ng4vkk`. On ahra in 2026-10 it found 25 sites. 23 were GAQL ids typed `string`
+// from the command line across `modules/google/ads` (fixed in `#kx29bm3` by typing them as numbers),
+// and 2 were `sqlLiteral(...)` in `modules/data/DataMirrorReconcile.ts`, a helper that doubled only the
+// quote while one query ran on MySQL, where a backslash still escapes (fixed in ahra 7d88414). www and
+// api had none.
 //
 // # Which values can hold a quote
 //
@@ -161,8 +180,9 @@ var SecurityNoInterpolatedSqlString = rule.Rule{
 					texts = append(texts, span.AsTemplateSpan().Literal.Text())
 				}
 				var quotedSpans []int
+				var bareSpans []int
 				if securityNoInterpolatedSqlStringOpensWithStatement(texts[0]) {
-					quotedSpans = securityNoInterpolatedSqlStringReadStatement(texts)
+					quotedSpans, bareSpans = securityNoInterpolatedSqlStringReadStatement(texts)
 				} else {
 					quotedSpans = securityNoInterpolatedSqlStringReadLikePatterns(texts)
 				}
@@ -174,7 +194,14 @@ var SecurityNoInterpolatedSqlString = rule.Rule{
 					if securityNoInterpolatedSqlStringIsEscaped(ctx, expression) {
 						continue
 					}
-					ctx.ReportNode(expression, securityNoInterpolatedSqlStringMessage)
+					ctx.ReportNode(expression, rule.Message{Id: securityNoInterpolatedSqlStringId, Description: securityNoInterpolatedSqlStringText.Render(nil)})
+				}
+				for _, spanIndex := range bareSpans {
+					expression := template.TemplateSpans.Nodes[spanIndex].AsTemplateSpan().Expression
+					if !securityNoInterpolatedSqlStringCanHoldText(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(expression), 0) {
+						continue
+					}
+					ctx.ReportNode(expression, rule.Message{Id: securityNoInterpolatedSqlValueId, Description: securityNoInterpolatedSqlValueText.Render(nil)})
 				}
 			},
 		}
@@ -269,12 +296,13 @@ const (
 // interpolation an opaque value between two texts, and returns the indexes of the interpolations that
 // sit inside a single-quoted string in a value position. It returns nothing when the text is not
 // confirmed as SQL or when its reading is uncertain anywhere (see the doc comment).
-func securityNoInterpolatedSqlStringReadStatement(texts []string) []int {
+func securityNoInterpolatedSqlStringReadStatement(texts []string) ([]int, []int) {
 	state := securityNoInterpolatedSqlStringInCode
 	previousToken := ""
 	keywordCount := 0
 	openedAtValue := false
 	var quotedSpans []int
+	var bareSpans []int
 	for textIndex, text := range texts {
 		for index := 0; index < len(text); {
 			character := text[index]
@@ -295,7 +323,7 @@ func securityNoInterpolatedSqlStringReadStatement(texts []string) []int {
 					index++
 				case character == '-' && index+1 < len(text) && text[index+1] == '-':
 					if index+2 >= len(text) || !securityNoInterpolatedSqlStringIsWhitespace(text[index+2]) {
-						return nil
+						return nil, nil
 					}
 					state = securityNoInterpolatedSqlStringInLineComment
 					index += 3
@@ -303,12 +331,12 @@ func securityNoInterpolatedSqlStringReadStatement(texts []string) []int {
 					state = securityNoInterpolatedSqlStringInBlockComment
 					index += 2
 				case character == '#':
-					return nil
+					return nil, nil
 				case character == '$':
 					// `$1` and `$name` are placeholders; `$$` and `$tag$` open a dollar-quoted string.
 					length := securityNoInterpolatedSqlStringWordLength(text, index+1)
 					if index+1+length < len(text) && text[index+1+length] == '$' {
-						return nil
+						return nil, nil
 					}
 					previousToken = "$"
 					index += 1 + length
@@ -334,7 +362,7 @@ func securityNoInterpolatedSqlStringReadStatement(texts []string) []int {
 			case securityNoInterpolatedSqlStringInString:
 				switch character {
 				case '\\':
-					return nil
+					return nil, nil
 				case '\'':
 					if index+1 < len(text) && text[index+1] == '\'' {
 						index += 2
@@ -351,7 +379,7 @@ func securityNoInterpolatedSqlStringReadStatement(texts []string) []int {
 				}
 				switch character {
 				case '\\':
-					return nil
+					return nil, nil
 				case closing:
 					if index+1 < len(text) && text[index+1] == closing {
 						index += 2
@@ -385,16 +413,61 @@ func securityNoInterpolatedSqlStringReadStatement(texts []string) []int {
 				quotedSpans = append(quotedSpans, textIndex)
 			}
 		case securityNoInterpolatedSqlStringInCode:
+			if securityNoInterpolatedSqlStringComparisons[previousToken] {
+				bareSpans = append(bareSpans, textIndex)
+			}
 			previousToken = "${}"
 		}
 	}
 	if state != securityNoInterpolatedSqlStringInCode && state != securityNoInterpolatedSqlStringInLineComment {
-		return nil
+		return nil, nil
 	}
 	if keywordCount < 2 && !securityNoInterpolatedSqlStringSelfConfirmingKeywords[securityNoInterpolatedSqlStringLeadingWord(texts[0])] {
-		return nil
+		return nil, nil
 	}
-	return quotedSpans
+	return quotedSpans, bareSpans
+}
+
+// securityNoInterpolatedSqlStringComparisons are the operators after which an unquoted interpolation is
+// a value compared, not a name or a fragment of SQL.
+var securityNoInterpolatedSqlStringComparisons = map[string]bool{
+	"=": true, "==": true, "<": true, ">": true, "<=": true, ">=": true, "<>": true, "!=": true,
+}
+
+// securityNoInterpolatedSqlStringCanHoldText says whether a value of this type can print arbitrary text,
+// rather than a number, a boolean or a fixed literal.
+func securityNoInterpolatedSqlStringCanHoldText(typeChecker *checker.Checker, valueType *checker.Type, depth int) bool {
+	if valueType == nil || depth > 8 {
+		return false
+	}
+	for _, part := range type_checking.UnionTypeParts(valueType) {
+		flags := part.Flags()
+		switch {
+		case type_checking.IsIntrinsicErrorType(part):
+		case flags&checker.TypeFlagsAnyOrUnknown != 0:
+			return true
+		case flags&(checker.TypeFlagsString|checker.TypeFlagsStringMapping) != 0:
+			return true
+		case flags&checker.TypeFlagsTemplateLiteral != 0:
+			for _, hole := range part.AsTemplateLiteralType().Types() {
+				if securityNoInterpolatedSqlStringCanHoldText(typeChecker, hole, depth+1) {
+					return true
+				}
+			}
+		case flags&checker.TypeFlagsIntersection != 0:
+			for _, member := range type_checking.IntersectionTypeParts(part) {
+				if member.Flags()&(checker.TypeFlagsString|checker.TypeFlagsStringMapping) != 0 {
+					return true
+				}
+			}
+		case flags&checker.TypeFlagsInstantiable != 0:
+			constraint := checker.Checker_getBaseConstraintOfType(typeChecker, part)
+			if constraint == nil || constraint == part || securityNoInterpolatedSqlStringCanHoldText(typeChecker, constraint, depth+1) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // securityNoInterpolatedSqlStringReadLikePatterns finds, in a template that is not a statement, every

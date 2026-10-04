@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -58,6 +59,10 @@ type messageFile struct {
 type messageFileMessage struct {
 	Text  string                       `json:"text"`
 	Terms map[string]map[string]string `json:"terms"`
+	// Languages names the engines that render this message, when only some of the file's rules do: a
+	// twin file can hold a message only one engine detects. Left out, it is every language the file
+	// names.
+	Languages []string `json:"languages"`
 }
 
 // MessageCatalog is every message file, read and checked, with each rule's text resolved for its
@@ -202,11 +207,16 @@ func (catalog *MessageCatalog) add(idea string, data []byte) error {
 		if strings.TrimSpace(message.Text) == "" {
 			return fmt.Errorf("message %q has no text", id)
 		}
-		if len(message.Terms) > 0 && len(file.Rules) == 1 {
-			return fmt.Errorf("message %q: a lone rule has nothing to vary, so it carries no terms", id)
+		languages, err := messageLanguagesOf(message, file.Rules)
+		if err != nil {
+			return fmt.Errorf("message %q: %w", id, err)
+		}
+		if len(message.Terms) > 0 && len(languages) == 1 {
+			return fmt.Errorf("message %q: one language has nothing to vary, so it carries no terms", id)
 		}
 		usedTerms := map[string]bool{}
-		for language, ruleName := range file.Rules {
+		for _, language := range languages {
+			ruleName := file.Rules[language]
 			text, err := resolveTerms(message.Text, message.Terms, language, usedTerms)
 			if err != nil {
 				return fmt.Errorf("message %q, %s: %w", id, language, err)
@@ -235,8 +245,8 @@ func (catalog *MessageCatalog) add(idea string, data []byte) error {
 				return fmt.Errorf("message %q: the term %q is in no text", id, term)
 			}
 			for language := range byLanguage {
-				if _, spoken := file.Rules[language]; !spoken {
-					return fmt.Errorf("message %q: the term %q gives %s, which the file names no rule for", id, term, language)
+				if !slices.Contains(languages, language) {
+					return fmt.Errorf("message %q: the term %q gives %s, which the message is not rendered in", id, term, language)
 				}
 			}
 		}
@@ -255,6 +265,33 @@ func (catalog *MessageCatalog) add(idea string, data []byte) error {
 		catalog.languages[ruleName] = language
 	}
 	return nil
+}
+
+// messageLanguagesOf is the languages a message is rendered in: its own list, every one a language the
+// file names a rule for and none twice, or every language the file names.
+func messageLanguagesOf(message messageFileMessage, rules map[string]string) ([]string, error) {
+	if message.Languages == nil {
+		languages := make([]string, 0, len(rules))
+		for language := range rules {
+			languages = append(languages, language)
+		}
+		sort.Strings(languages)
+		return languages, nil
+	}
+	if len(message.Languages) == 0 {
+		return nil, fmt.Errorf("languages is empty, so no engine renders it")
+	}
+	seen := map[string]bool{}
+	for _, language := range message.Languages {
+		if _, named := rules[language]; !named {
+			return nil, fmt.Errorf("languages: %q is not a language the file names a rule for", language)
+		}
+		if seen[language] {
+			return nil, fmt.Errorf("languages: %q appears twice", language)
+		}
+		seen[language] = true
+	}
+	return message.Languages, nil
 }
 
 // readPhrases splits a file's phrases into the string kind and the object kind, refusing a name that
