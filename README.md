@@ -158,6 +158,11 @@ fixes, no type check and no lint, so a lint finding has no say in it.
   the formatter could not read, such as one that does not parse, and a format walk that failed. A run that
   could not check a file never exits `0`.
 
+Only declared submodules are read. A git repository inside yours that `.gitmodules` does not name (a
+clone in an ignored directory, say) is skipped and nothing in it is checked: the scope line lists it
+under `skipped nested repositories`, and `nested repositories:` does not count it. Declare it as a
+submodule, or run the gate inside it.
+
 Drop `--format-all` to check only the files not on record as formatted at their current bytes, or name
 paths to check only those. Without `--no-fix`, `cohere --format-only` formats and writes nothing else.
 
