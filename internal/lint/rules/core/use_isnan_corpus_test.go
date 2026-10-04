@@ -10,42 +10,16 @@ import (
 
 /*
  * ESLint 10.8.1's whole use-isnan corpus, replayed through the installed rule under the TypeScript
- * parser (#6esg2nx).
+ * parser (#6esg2nx), now agreeing on every row and every span (#9g0v4j6).
  *
  * Extracted from upstream's tests/lib/rules/use-isnan.js at v10.8.1 by stubbing RuleTester, each row
  * run through ESLint's Linter with @typescript-eslint/parser, and the answers written here. Upstream's
- * `caseNaN` and `switchNaN` are this rule's `caseWithNaN` and `switchOnNaN`. A switch finding is
- * compared by id alone: this rule points at the discriminant or the label where upstream spans the
- * whole statement or clause, which is a known difference in where, not whether.
+ * `caseNaN` and `switchNaN` are this rule's `caseWithNaN` and `switchOnNaN`. The rows run through the
+ * typed harness, because 18 of them shadow NaN or Number with a local and only the checker can tell.
  *
  * Every row that sets `enforceForIndexOf: true` is also run with it false, and must then report no
  * indexOfNaN: the option was decoded and never read until this task, so off and on looked the same.
  */
-
-// useIsNaNKnownGaps are the rows where this rule and ESLint disagree, keyed by options and code, each
-// with its cause. A row here must still disagree; when one starts agreeing, the entry has to go.
-var useIsNaNKnownGaps = map[string]string{
-	"{} let NaN; if (x === NaN) {}":                                                              "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{} let Number; if (x === Number.NaN) {}":                                                    "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{} function f(NaN) { return x === NaN; }":                                                   "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{} function f(Number) { return x === Number.NaN; }":                                         "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{\"enforceForSwitchCase\":true} let NaN; switch (foo) { case NaN: break; }":                 "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{\"enforceForSwitchCase\":true} let Number; switch (foo) { case Number.NaN: break; }":       "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{\"enforceForSwitchCase\":true} let NaN; switch (NaN) { case a: break; }":                   "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{\"enforceForSwitchCase\":true} let Number; switch (Number.NaN) { case a: break; }":         "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{\"enforceForIndexOf\":true} function foo(NaN) { return arr.indexOf(NaN); }":                "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{\"enforceForIndexOf\":true} function foo(NaN) { return arr.lastIndexOf(NaN); }":            "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{\"enforceForIndexOf\":true} function foo(Number) { return arr.indexOf(Number.NaN); }":      "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{\"enforceForIndexOf\":true} function foo(Number) { return arr.lastIndexOf(Number.NaN); }":  "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{} let Number; if (x === Number?.NaN) {}":                                                   "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{} function f(Number) { return x === Number?.NaN; }":                                        "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{\"enforceForSwitchCase\":true} let Number; switch (foo) { case Number?.NaN: break; }":      "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{\"enforceForSwitchCase\":true} let Number; switch (Number?.NaN) { case a: break; }":        "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{\"enforceForIndexOf\":true} function foo(Number) { return arr.indexOf(Number?.NaN); }":     "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{\"enforceForIndexOf\":true} function foo(Number) { return arr.lastIndexOf(Number?.NaN); }": "a local named NaN or Number shadows the global, and this rule matches by spelling (see isNaNReference)",
-	"{\"enforceForSwitchCase\":true} switch(NaN) { case NaN: break; }":                           "upstream reports the switch and the case; this rule reports the switch and stops",
-	"{\"enforceForSwitchCase\":true} switch(Number.NaN) { case Number.NaN: break; }":             "upstream reports the switch and the case; this rule reports the switch and stops",
-}
 
 func TestUseIsNaNAgreesWithESLintsCorpus(t *testing.T) {
 	t.Parallel()
@@ -294,29 +268,23 @@ func TestUseIsNaNAgreesWithESLintsCorpus(t *testing.T) {
 		t.Fatalf("%d rows, and 234 were replayed", len(cases))
 	}
 
-	gapsSeen := 0
 	for _, testCase := range cases {
+		// The harness writes the file trimmed, so positions are in the trimmed text.
+		source := strings.TrimSpace(testCase.code) + "\n"
 		run := func(options string) []string {
 			var settings UseIsNaNOptions
 			if err := rule.UnmarshalOptions([]byte(options), &settings); err != nil {
 				t.Fatalf("decoding %s: %v", options, err)
 			}
-			result := rule_testing.RunWithOptions(t, UseIsNaN, isNaNFile, testCase.code, settings)
+			result := rule_testing.RunTypedWithOptions(t, UseIsNaN, isNaNFile, source, settings)
 			var got []string
 			for _, diagnostic := range result.Diagnostics {
-				got = append(got, diagnostic.Message.Id+" "+testCase.code[diagnostic.Range.Pos():diagnostic.Range.End()])
+				got = append(got, diagnostic.Message.Id+" "+source[diagnostic.Range.Pos():diagnostic.Range.End()])
 			}
-			return comparableUseIsNaNFindings(got)
+			return got
 		}
 		got := strings.Join(run(testCase.options), " | ")
-		want := strings.Join(comparableUseIsNaNFindings(testCase.want), " | ")
-		if reason, isGap := useIsNaNKnownGaps[testCase.options+" "+testCase.code]; isGap {
-			gapsSeen++
-			if got == want {
-				t.Errorf("%q now agrees with ESLint (%s), so its entry in useIsNaNKnownGaps (%s) has to go", testCase.code, got, reason)
-			}
-			continue
-		}
+		want := strings.Join(testCase.want, " | ")
 		if got != want {
 			t.Errorf("%s %q: reported [%s], ESLint reports [%s]", testCase.options, testCase.code, got, want)
 		}
@@ -327,21 +295,4 @@ func TestUseIsNaNAgreesWithESLintsCorpus(t *testing.T) {
 			}
 		}
 	}
-	if gapsSeen != len(useIsNaNKnownGaps) {
-		t.Errorf("met %d of the %d known gaps, so an entry names a row that is no longer in the corpus", gapsSeen, len(useIsNaNKnownGaps))
-	}
-}
-
-// comparableUseIsNaNFindings drops the span from a switch finding, which this rule anchors on the
-// discriminant or the label rather than on the statement or the clause.
-func comparableUseIsNaNFindings(findings []string) []string {
-	comparable := make([]string, 0, len(findings))
-	for _, finding := range findings {
-		id, _, _ := strings.Cut(finding, " ")
-		if id == "caseWithNaN" || id == "switchOnNaN" {
-			finding = id
-		}
-		comparable = append(comparable, finding)
-	}
-	return comparable
 }

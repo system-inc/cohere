@@ -76,8 +76,7 @@ var messageSwitchOnNaN = rule.Message{
 // UseIsNaN flags a comparison against NaN.
 //
 //	valid:   Number.isNaN(value)
-//	valid:   value === Number.NaN ? 0 : 1   (still reported; see below)
-//	invalid: const NaN = 1; value === NaN   (a local shadowing the global IS reported; see below)
+//	valid:   const NaN = 1; value === NaN   (a local is not the global; see isNaNReference)
 //	invalid: value === NaN
 //	invalid: NaN !== value
 //	invalid: value < NaN
@@ -94,6 +93,10 @@ var messageSwitchOnNaN = rule.Message{
 // behavior change wearing a lint fix.
 var UseIsNaN = rule.Rule{
 	Name: "use-isnan",
+	// Asked only whether a name spelled NaN or Number is declared in this file, so its findings key
+	// on the closure's shapes. A NaN anywhere is rare, so the checker is consulted rarely.
+	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Defaults to on, matching ESLint 9 and this tree's configuration. An option that only relaxes the
 		// rule gets the strict reading when the config says nothing, so a misconfiguration cannot
@@ -112,11 +115,11 @@ var UseIsNaN = rule.Rule{
 
 				statement := node.AsSwitchStatement()
 
-				// Switching on NaN kills every case at once, so it is reported on the discriminant
-				// rather than once per clause.
-				if isNaNReference(statement.Expression) {
-					ctx.ReportNode(statement.Expression, messageSwitchOnNaN)
-					return
+				// Upstream's checkSwitchStatement, spans included: switchNaN on the whole statement and
+				// caseNaN on the whole clause, and a NaN case under a NaN switch is reported as well,
+				// since each is its own dead code. Measured on ESLint 10.8.1's corpus (#9g0v4j6).
+				if isNaNReference(ctx, statement.Expression) {
+					ctx.ReportNode(node, messageSwitchOnNaN)
 				}
 
 				if statement.CaseBlock == nil {
@@ -126,8 +129,8 @@ var UseIsNaN = rule.Rule{
 					if clause.Kind != ast.KindCaseClause {
 						continue
 					}
-					if label := clause.AsCaseOrDefaultClause().Expression; isNaNReference(label) {
-						ctx.ReportNode(label, messageCaseWithNaN)
+					if isNaNReference(ctx, clause.AsCaseOrDefaultClause().Expression) {
+						ctx.ReportNode(clause, messageCaseWithNaN)
 					}
 				}
 			},
@@ -147,7 +150,7 @@ var UseIsNaN = rule.Rule{
 					return
 				}
 				arguments := call.Arguments.Nodes
-				if len(arguments) == 0 || len(arguments) > 2 || !isNaNReference(arguments[0]) {
+				if len(arguments) == 0 || len(arguments) > 2 || !isNaNReference(ctx, arguments[0]) {
 					return
 				}
 				ctx.ReportNode(node, buildIndexOfNaNMessage(methodName))
@@ -158,7 +161,7 @@ var UseIsNaN = rule.Rule{
 				if binary.OperatorToken == nil || !comparisonOperators[binary.OperatorToken.Kind] {
 					return
 				}
-				if isNaNReference(binary.Left) || isNaNReference(binary.Right) {
+				if isNaNReference(ctx, binary.Left) || isNaNReference(ctx, binary.Right) {
 					ctx.ReportNode(node, messageComparisonWithNaN)
 				}
 			},
@@ -183,27 +186,22 @@ func staticMethodName(callee *ast.Node) string {
 	return ""
 }
 
-// isNaNReference reports whether an expression names NaN, bare or through Number.
+// isNaNReference reports whether an expression names the global NaN, bare or through Number.
 //
-// Matched on spelling rather than through the checker, so a local binding named NaN shadows the
-// global and is reported anyway. That is a known false positive, accepted because declaring a
-// binding called NaN is rare enough and strange enough that the trade favors catching the real
-// defect.
-//
-// This comment previously claimed the opposite in two places: that a shadowed NaN was not reported,
-// and that the fixtures covered the case. Neither was true. No such fixture existed, and a probe
-// against this rule reported `comparisonWithNaN` on `const NaN = 1; value === NaN`. Found by a
-// research pass on `no-regex-spaces`, a sibling asking the same shadowing question and reading this
-// rule for precedent. The fixture below now pins the real behavior, so the next reader takes away
-// what the code does rather than what this comment wished it did.
-func isNaNReference(node *ast.Node) bool {
+// A local named NaN or Number is not the global, and upstream's sourceCode.isGlobalReference stays
+// silent on it: `function f(NaN) { return x === NaN; }` and `let Number; x === Number.NaN` are clean
+// in ESLint 10.8.1's corpus. This rule matched by spelling and reported both, an accepted false
+// positive until #9g0v4j6 asked the checker instead, through identifierIsShadowed: a name declared
+// in source is a shadow, and one declared only in a declaration file, as the lib's NaN and Number
+// are, is the global. Without a checker the answer is the global, which reports.
+func isNaNReference(ctx rule.Context, node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
 
 	switch node.Kind {
 	case ast.KindIdentifier:
-		return node.Text() == "NaN"
+		return node.Text() == "NaN" && !identifierIsShadowed(ctx, node)
 
 	case ast.KindPropertyAccessExpression:
 		// `Number.NaN` is the same value spelled through the constructor.
@@ -211,7 +209,7 @@ func isNaNReference(node *ast.Node) bool {
 		if access.Expression == nil || access.Expression.Kind != ast.KindIdentifier {
 			return false
 		}
-		if access.Expression.Text() != "Number" {
+		if access.Expression.Text() != "Number" || identifierIsShadowed(ctx, access.Expression) {
 			return false
 		}
 		name := access.Name()
@@ -221,7 +219,8 @@ func isNaNReference(node *ast.Node) bool {
 		// `Number['NaN']` is the same read in brackets, which upstream's isSpecificMemberAccess
 		// accepts through its static property name.
 		access := node.AsElementAccessExpression()
-		if access.Expression == nil || access.Expression.Kind != ast.KindIdentifier || access.Expression.Text() != "Number" {
+		if access.Expression == nil || access.Expression.Kind != ast.KindIdentifier || access.Expression.Text() != "Number" ||
+			identifierIsShadowed(ctx, access.Expression) {
 			return false
 		}
 		argument := ast.SkipParentheses(access.ArgumentExpression)
@@ -229,7 +228,7 @@ func isNaNReference(node *ast.Node) bool {
 			argument.Text() == "NaN"
 
 	case ast.KindParenthesizedExpression:
-		return isNaNReference(node.AsParenthesizedExpression().Expression)
+		return isNaNReference(ctx, node.AsParenthesizedExpression().Expression)
 
 	case ast.KindBinaryExpression:
 		// A sequence's value is its last expression, so `(sideEffect(), NaN)` is NaN. Upstream's
@@ -237,7 +236,7 @@ func isNaNReference(node *ast.Node) bool {
 		// and the switch as well as indexOf.
 		binary := node.AsBinaryExpression()
 		return binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindCommaToken &&
-			isNaNReference(binary.Right)
+			isNaNReference(ctx, binary.Right)
 	}
 	return false
 }

@@ -14809,7 +14809,7 @@
             "language": "TypeScript",
             "origin": "core",
             "upstreamName": "use-isnan",
-            "typeAware": false,
+            "typeAware": true,
             "options": {
                 "elements": "one"
             },

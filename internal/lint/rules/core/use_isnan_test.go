@@ -26,20 +26,10 @@ func TestUseIsNaNFires(t *testing.T) {
 		// The same value reached through the constructor.
 		{"Number.NaN", "declare const value: number;\nexport const Bad = value === Number.NaN;\n"},
 		{"parenthesized", "declare const value: number;\nexport const Bad = value === (NaN);\n"},
-		// A local binding named NaN shadows the global, and this reports anyway. That is a known
-		// false positive rather than an oversight: the rule matches on spelling instead of asking
-		// the checker, and declaring a binding called NaN is rare enough that the trade favors
-		// catching the real defect.
-		//
-		// It is a firing case rather than a clean one, and the rule's own doc claimed the opposite
-		// in two places while asserting this fixture already existed. It did not. Pinned here so the
-		// next reader gets the behavior from a test rather than from prose.
-		{"a local shadowing the global is reported anyway",
-			"declare const value: number;\nconst NaN = 1;\nexport const Bad = value === NaN;\n"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, UseIsNaN, isNaNFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, UseIsNaN, isNaNFile, testCase.sourceText),
 				"comparisonWithNaN")
 		})
 	}
@@ -69,9 +59,8 @@ func TestUseIsNaNFiresOnSwitches(t *testing.T) {
 			"declare const value: number;\nexport function run() {\n    switch(value) {\n        case Number.NaN: return 1;\n    }\n    return 0;\n}\n",
 			"caseWithNaN",
 		},
-		// Switching on NaN kills every case at once, so it reports on the discriminant rather than
-		// once per clause. A rule reporting per-clause would produce a pile of findings for one
-		// defect and miss the switch that has no cases at all.
+		// Switching on NaN kills every case at once, so it reports once on the switch rather than
+		// once per clause, and a switch with no cases at all still reports.
 		{
 			"switching on NaN",
 			"declare const other: number;\nexport function run() {\n    switch(NaN) {\n        case other: return 1;\n    }\n    return 0;\n}\n",
@@ -80,7 +69,7 @@ func TestUseIsNaNFiresOnSwitches(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, UseIsNaN, isNaNFile, testCase.sourceText), testCase.wantId)
+			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, UseIsNaN, isNaNFile, testCase.sourceText), testCase.wantId)
 		})
 	}
 }
@@ -92,14 +81,14 @@ func TestUseIsNaNSwitchOption(t *testing.T) {
 	source := "declare const value: number;\nexport function run() {\n    switch(value) {\n        case NaN: return 1;\n    }\n    return 0;\n}\n"
 
 	// Default is on, so a config that says nothing gets the rule rather than half of it.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, UseIsNaN, isNaNFile, source), "caseWithNaN")
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, UseIsNaN, isNaNFile, source), "caseWithNaN")
 
 	disabled := false
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, UseIsNaN, isNaNFile, source,
+	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, UseIsNaN, isNaNFile, source,
 		UseIsNaNOptions{EnforceForSwitchCase: &disabled}))
 
 	enabled := true
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, UseIsNaN, isNaNFile, source,
+	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, UseIsNaN, isNaNFile, source,
 		UseIsNaNOptions{EnforceForSwitchCase: &enabled}), "caseWithNaN")
 }
 
@@ -124,10 +113,17 @@ func TestUseIsNaNStaysSilent(t *testing.T) {
 		// discriminant name NaN", not "is this a switch".
 		{"a switch without NaN", "declare const value: number;\nexport function run() {\n    switch(value) {\n        case 0: return 1;\n    }\n    return 0;\n}\n"},
 		{"a default clause", "declare const value: number;\nexport function run() {\n    switch(value) {\n        default: return 1;\n    }\n}\n"},
+		// A local named NaN or Number is not the global, and upstream is silent on each (#9g0v4j6).
+		// This rule matched by spelling and reported them until it asked the checker, which is why
+		// these run through the typed harness: without a checker the answer is the global.
+		{"a local NaN", "declare const value: number;\nconst NaN = 1;\nexport const Ok = value === NaN;\n"},
+		{"a parameter named NaN", "declare const value: number;\nexport function run(NaN: number) {\n    return value === NaN;\n}\n"},
+		{"a parameter named Number", "declare const value: number;\nexport function run(Number: { NaN: number }) {\n    return value === Number.NaN;\n}\n"},
+		{"a parameter named Number, read in brackets", "declare const value: number;\nexport function run(Number: Record<string, number>) {\n    return value === Number['NaN'];\n}\n"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			rule_testing.ExpectClean(t, rule_testing.Run(t, UseIsNaN, isNaNFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, UseIsNaN, isNaNFile, testCase.sourceText))
 		})
 	}
 }
