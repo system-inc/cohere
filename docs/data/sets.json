@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 269,
+        "rulesOn": 270,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -740,6 +740,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/security-no-interpolated-sql-string",
+                "severity": "error"
+            },
+            {
                 "name": "no-alert",
                 "severity": "error"
             },
@@ -1405,7 +1409,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 333,
+        "rulesOn": 334,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2047,6 +2051,10 @@
             },
             {
                 "name": "nexus/security-no-interpolated-shell-command",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/security-no-interpolated-sql-string",
                 "severity": "error"
             },
             {
@@ -3067,7 +3075,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 265,
+        "rulesOn": 266,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -3959,6 +3967,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/security-no-interpolated-sql-string",
+                "severity": "error"
+            },
+            {
                 "name": "no-alert",
                 "severity": "error"
             },
@@ -4726,7 +4738,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 275,
+        "rulesOn": 276,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5489,6 +5501,10 @@
             },
             {
                 "name": "nexus/security-no-interpolated-shell-command",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/security-no-interpolated-sql-string",
                 "severity": "error"
             },
             {
@@ -6286,7 +6302,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 259,
+        "rulesOn": 260,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6979,6 +6995,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/security-no-interpolated-sql-string",
+                "severity": "error"
+            },
+            {
                 "name": "no-alert",
                 "severity": "error"
             },
@@ -7637,7 +7657,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 247,
+        "rulesOn": 248,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8279,6 +8299,10 @@
             },
             {
                 "name": "nexus/security-no-interpolated-shell-command",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/security-no-interpolated-sql-string",
                 "severity": "error"
             },
             {

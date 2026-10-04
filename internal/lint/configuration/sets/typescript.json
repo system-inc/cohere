@@ -148,6 +148,7 @@
         "nexus/correctness-no-uncleared-race-timeout": "error",
         "nexus/correctness-require-child-process-error-listener": "error",
         "nexus/security-no-interpolated-shell-command": "error",
+        "nexus/security-no-interpolated-sql-string": "error",
         "unicode-bom": "error",
         "no-useless-rename": "off",
         "strict": "off",
