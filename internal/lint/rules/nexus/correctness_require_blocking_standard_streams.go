@@ -1,8 +1,8 @@
 package nexus
 
 import (
-	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -10,9 +10,20 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/control_flow_graph"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const correctnessRequireBlockingStandardStreamsId = "exitBeforeBlockingStandardStreams"
+
+// The rule's message and the options it picks from, whose wording lives in
+// `policy/messages/correctness-require-blocking-standard-streams.json`.
+var (
+	correctnessRequireBlockingStandardStreamsText         = policy.MessageOf("nexus/correctness-require-blocking-standard-streams", correctnessRequireBlockingStandardStreamsId)
+	correctnessRequireBlockingStandardStreamsShebang      = correctnessRequireBlockingStandardStreamsText.Option("processReason", "shebang")
+	correctnessRequireBlockingStandardStreamsUnimported   = correctnessRequireBlockingStandardStreamsText.Option("processReason", "unimported")
+	correctnessRequireBlockingStandardStreamsOneExit      = correctnessRequireBlockingStandardStreamsText.Option("exitCount", "one")
+	correctnessRequireBlockingStandardStreamsSeveralExits = correctnessRequireBlockingStandardStreamsText.Option("exitCount", "several")
+)
 
 // CorrectnessRequireBlockingStandardStreams reports a file that runs as a process and can reach
 // `process.exit()` after a write to stdout or stderr without having called Nexus's
@@ -345,12 +356,12 @@ func correctnessRequireBlockingStandardStreamsScanFile(ctx rule.Context) {
 		return
 	}
 	index := correctnessRequireBlockingStandardStreamsIndexFor(ctx)
-	reason := "it starts with `#!`"
+	reason := correctnessRequireBlockingStandardStreamsShebang
 	if !strings.HasPrefix(sourceFile.Text(), "#!") {
 		if index.imported[sourceFile.Path()] {
 			return
 		}
-		reason = "nothing in the program imports it"
+		reason = correctnessRequireBlockingStandardStreamsUnimported
 	}
 	analysis := &correctnessRequireBlockingStandardStreamsAnalysis{
 		ctx:              ctx,
@@ -367,18 +378,15 @@ func correctnessRequireBlockingStandardStreamsScanFile(ctx rule.Context) {
 		return
 	}
 	sort.Slice(exits, func(left int, right int) bool { return exits[left].Pos() < exits[right].Pos() })
-	count := ""
+	count := correctnessRequireBlockingStandardStreamsOneExit
+	values := map[string]string(nil)
 	if len(exits) > 1 {
-		count = fmt.Sprintf(", the first of %d such exits in this file", len(exits))
+		count = correctnessRequireBlockingStandardStreamsSeveralExits
+		values = map[string]string{"count": strconv.Itoa(len(exits))}
 	}
 	ctx.ReportNode(exits[0], rule.Message{
-		Id: correctnessRequireBlockingStandardStreamsId,
-		Description: fmt.Sprintf("This file runs as a process (%s), and this `process.exit()` runs after a write to "+
-			"stdout or stderr before the process has called `blockStandardStreams()`%s. Node writes to a pipe "+
-			"asynchronously, and `process.exit()` does not wait: a reader piping this process gets the output cut "+
-			"off (measured: 65,536 of 1 MiB), with exit status 0 and no error. Call Nexus's `blockStandardStreams()` "+
-			"(`source/system/StandardStreams`) before anything that can exit: first in the module, or first in the "+
-			"main it runs.", reason, count),
+		Id:          correctnessRequireBlockingStandardStreamsId,
+		Description: correctnessRequireBlockingStandardStreamsText.Render(values, reason, count),
 	})
 }
 

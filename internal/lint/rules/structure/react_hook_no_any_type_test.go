@@ -711,3 +711,19 @@ export function Widget() {
 		})
 	}
 }
+
+// The branch no test binary reaches through the catalog: a build that linked none of the rules says so
+// instead of naming an empty list. Both of the message's options are exercised, this one here.
+func TestReactHookAnyTypeSaysWhenNoBlindedRuleIsLinked(t *testing.T) {
+	t.Parallel()
+
+	got := reactHookNoAnyTypeDescriptionFor("useThing", nil)
+	want := "`useThing` here resolves to `any`, so the type checker cannot see what this hook returns. " +
+		"Every rule that identifies a React value by its type is disabled for this file, and this build linked " +
+		"none of them so none can be named. React's types are probably not resolving here: check that " +
+		"`@types/react` is installed and current, that no ambient declaration is shadowing it, and that the " +
+		"path mapping for `react` resolves."
+	if got != want {
+		t.Errorf("reads %q, want %q", got, want)
+	}
+}

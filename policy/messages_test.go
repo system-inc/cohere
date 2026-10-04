@@ -139,3 +139,90 @@ func TestTheEmbeddedCatalogHoldsBothTwins(t *testing.T) {
 		}
 	}
 }
+
+// minimalPhrases is a lone rule's file with both kinds of phrase, every refusal below starting from it.
+const minimalPhrases = `{
+  "rules": { "TypeScript": "base/consistency-no-thing" },
+  "phrases": {
+    "shared": "Both say this.",
+    "reason": { "constructor": "it is a constructor", "setter": "it is a setter for {{name}}" }
+  },
+  "messages": {
+    "first": { "text": "First, because <<reason>>. <<shared>>" },
+    "second": { "text": "Second. <<shared>>" }
+  }
+}`
+
+// TestThePhraseLoaderRefusesWhatWouldReadAsSomethingElse: the file with phrases loads, and each one-place
+// change that would misread does not.
+func TestThePhraseLoaderRefusesWhatWouldReadAsSomethingElse(t *testing.T) {
+	if _, err := loadMinimalMessages(minimalPhrases); err != nil {
+		t.Fatalf("the minimal file is refused (%v), so no refusal below would mean anything", err)
+	}
+	for _, refused := range []struct {
+		name string
+		old  string
+		new  string
+	}{
+		{"a phrase no message defines", `<<reason>>`, `<<cause>>`},
+		{"a string phrase only one message uses", `"Second. <<shared>>"`, `"Second."`},
+		{"an object phrase no message uses", `"First, because <<reason>>. <<shared>>"`, `"First. <<shared>>"`},
+		{"a phrase inside a phrase", `"Both say this."`, `"Both say <<reason>>."`},
+		{"a term inside a phrase", `"Both say this."`, `"Both say [[this]]."`},
+		{"an object with no option", `{ "constructor": "it is a constructor", "setter": "it is a setter for {{name}}" }`, `{}`},
+		{"an option that is not camelCase", `"setter":`, `"Setter":`},
+		{"a phrase that is not camelCase", `"shared": "Both`, `"Shared": "Both`},
+		{"a phrase of another shape", `"shared": "Both say this."`, `"shared": ["Both say this."]`},
+		{"a malformed value in an option", `{{name}}`, `{{name`},
+	} {
+		if !strings.Contains(minimalPhrases, refused.old) {
+			t.Fatalf("%s: the anchor %q is not in the minimal file, so the change would not apply", refused.name, refused.old)
+		}
+		if _, err := loadMinimalMessages(strings.Replace(minimalPhrases, refused.old, refused.new, 1)); err == nil {
+			t.Errorf("%s loaded", refused.name)
+		}
+	}
+}
+
+// A string phrase is put in at load, and an object phrase is the option the rule picks, with that
+// option's values, and nothing else.
+func TestPhrasesRenderTheSharedTextAndThePickedOption(t *testing.T) {
+	catalog, err := loadMinimalMessages(minimalPhrases)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restore := UseMessages(catalog)
+	defer restore()
+
+	first := MessageHandle{Rule: "base/consistency-no-thing", Id: "first"}
+	second := MessageHandle{Rule: "base/consistency-no-thing", Id: "second"}
+	setter := first.Option("reason", "setter")
+	constructor := first.Option("reason", "constructor")
+	if got, want := first.Render(map[string]string{"name": "value"}, setter), "First, because it is a setter for value. Both say this."; got != want {
+		t.Errorf("the setter option renders %q, want %q", got, want)
+	}
+	if got, want := first.Render(nil, constructor), "First, because it is a constructor. Both say this."; got != want {
+		t.Errorf("the constructor option renders %q, want %q", got, want)
+	}
+	if got, want := second.Render(nil), "Second. Both say this."; got != want {
+		t.Errorf("the shared phrase renders %q, want %q", got, want)
+	}
+
+	for name, render := range map[string]func(){
+		"no option":                           func() { first.Render(nil) },
+		"two options for one phrase":          func() { first.Render(nil, constructor, constructor) },
+		"another message's option":            func() { second.Render(nil, constructor) },
+		"the option's value missing":          func() { first.Render(nil, setter) },
+		"a value the picked option lacks":     func() { first.Render(map[string]string{"name": "value"}, constructor) },
+		"an option the catalog does not hold": func() { first.Option("reason", "getter") },
+	} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("%s rendered", name)
+				}
+			}()
+			render()
+		}()
+	}
+}

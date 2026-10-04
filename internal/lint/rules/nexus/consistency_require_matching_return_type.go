@@ -1,18 +1,54 @@
 package nexus
 
 import (
-	"fmt"
 	"regexp"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const consistencyRequireMatchingReturnTypeBareId = "bareReturnInValueFunction"
 
 const consistencyRequireMatchingReturnTypeUndefinedId = "undefinedReturnInVoidFunction"
+
+// consistencyRequireMatchingReturnTypeOrigin is where a function's return type came from, which both
+// messages say.
+type consistencyRequireMatchingReturnTypeOrigin string
+
+const (
+	consistencyRequireMatchingReturnTypeFromAnnotation consistencyRequireMatchingReturnTypeOrigin = "Annotation"
+	consistencyRequireMatchingReturnTypeFromSignature  consistencyRequireMatchingReturnTypeOrigin = "Signature"
+	consistencyRequireMatchingReturnTypeInferred       consistencyRequireMatchingReturnTypeOrigin = "Inferred"
+)
+
+// The rule's two messages and the options they pick from, whose wording lives in
+// `policy/messages/consistency-require-matching-return-type.json`.
+var (
+	consistencyRequireMatchingReturnTypeBareText          = policy.MessageOf("nexus/consistency-require-matching-return-type", consistencyRequireMatchingReturnTypeBareId)
+	consistencyRequireMatchingReturnTypeUndefinedText     = policy.MessageOf("nexus/consistency-require-matching-return-type", consistencyRequireMatchingReturnTypeUndefinedId)
+	consistencyRequireMatchingReturnTypeConstructorReason = consistencyRequireMatchingReturnTypeUndefinedText.Option("voidReason", "constructor")
+	consistencyRequireMatchingReturnTypeSetterReason      = consistencyRequireMatchingReturnTypeUndefinedText.Option("voidReason", "setter")
+)
+
+// consistencyRequireMatchingReturnTypeSources says where a value verdict's type came from, in the
+// bare-return message.
+var consistencyRequireMatchingReturnTypeSources = map[consistencyRequireMatchingReturnTypeOrigin]policy.MessageOption{
+	consistencyRequireMatchingReturnTypeFromAnnotation: consistencyRequireMatchingReturnTypeBareText.Option("source", "annotation"),
+	consistencyRequireMatchingReturnTypeFromSignature:  consistencyRequireMatchingReturnTypeBareText.Option("source", "signature"),
+	consistencyRequireMatchingReturnTypeInferred:       consistencyRequireMatchingReturnTypeBareText.Option("source", "inferred"),
+}
+
+// consistencyRequireMatchingReturnTypeVoidReasons says why a `void` type makes a verdict void, by where
+// the type came from, in the undefined-return message. One option per source rather than a source
+// inside the reason, since phrases do not nest.
+var consistencyRequireMatchingReturnTypeVoidReasons = map[consistencyRequireMatchingReturnTypeOrigin]policy.MessageOption{
+	consistencyRequireMatchingReturnTypeFromAnnotation: consistencyRequireMatchingReturnTypeUndefinedText.Option("voidReason", "annotatedVoid"),
+	consistencyRequireMatchingReturnTypeFromSignature:  consistencyRequireMatchingReturnTypeUndefinedText.Option("voidReason", "signatureVoid"),
+	consistencyRequireMatchingReturnTypeInferred:       consistencyRequireMatchingReturnTypeUndefinedText.Option("voidReason", "inferredVoid"),
+}
 
 // ConsistencyRequireMatchingReturnType makes every `return` spell what the function's return type
 // says it returns.
@@ -145,11 +181,10 @@ var ConsistencyRequireMatchingReturnType = rule.Rule{
 					}
 					message := rule.Message{
 						Id: consistencyRequireMatchingReturnTypeBareId,
-						Description: fmt.Sprintf("This %s returns a value: its return type is `%s` (%s), so a bare `return;` "+
-							"hides that this path hands back `undefined`. Write `return undefined;`. A bare return is "+
-							"reserved for functions whose type says `void`, so a reader can tell at the return which kind "+
-							"of function this is.",
-							verdict.functionKind, verdict.rendered, verdict.source),
+						Description: consistencyRequireMatchingReturnTypeBareText.Render(
+							map[string]string{"functionKind": verdict.functionKind, "rendered": verdict.rendered},
+							verdict.source,
+						),
 					}
 					if verdict.admitsUndefined && consistencyRequireMatchingReturnTypeText(ctx, node) == "return;" {
 						ctx.ReportNodeWithFixes(node, message, rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), "return undefined;"))
@@ -162,12 +197,8 @@ var ConsistencyRequireMatchingReturnType = rule.Rule{
 						return
 					}
 					message := rule.Message{
-						Id: consistencyRequireMatchingReturnTypeUndefinedId,
-						Description: fmt.Sprintf("This %s returns nothing: %s, so `return undefined;` dresses an early exit "+
-							"up as a value. Write `return;`. `return undefined;` is reserved for functions whose type "+
-							"includes `undefined` as a value, so a reader can tell at the return which kind of function "+
-							"this is.",
-							verdict.functionKind, verdict.voidReason),
+						Id:          consistencyRequireMatchingReturnTypeUndefinedId,
+						Description: consistencyRequireMatchingReturnTypeUndefinedText.Render(verdict.voidValues(), verdict.voidReason),
 					}
 					if consistencyRequireMatchingReturnTypeCanonicalUndefined.MatchString(consistencyRequireMatchingReturnTypeText(ctx, node)) {
 						ctx.ReportNodeWithFixes(node, message, rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), "return;"))
@@ -202,14 +233,26 @@ type consistencyRequireMatchingReturnTypeVerdict struct {
 
 	// rendered and source describe a value verdict's type and where it came from.
 	rendered string
-	source   string
+	source   policy.MessageOption
 
-	// voidReason says why a void verdict is void, as a clause.
-	voidReason string
+	// voidReason says why a void verdict is void, as a clause, and written is the type it names when
+	// the reason is a `void` type rather than a constructor or a setter.
+	voidReason policy.MessageOption
+	written    string
 
 	// admitsUndefined is whether `undefined` is a member of a value verdict's type, which is what
 	// makes the bare-return fix type-safe as well as behaviour-safe.
 	admitsUndefined bool
+}
+
+// voidValues are the values the undefined-return message takes: the function's kind, and the type its
+// reason names when the reason is a `void` type.
+func (verdict consistencyRequireMatchingReturnTypeVerdict) voidValues() map[string]string {
+	values := map[string]string{"functionKind": verdict.functionKind}
+	if verdict.written != "" {
+		values["written"] = verdict.written
+	}
+	return values
 }
 
 // consistencyRequireMatchingReturnTypeContainer is the function a `return` belongs to, or nil.
@@ -242,25 +285,25 @@ func consistencyRequireMatchingReturnTypeJudge(ctx rule.Context, function *ast.N
 		return consistencyRequireMatchingReturnTypeVerdict{
 			kind:         consistencyRequireMatchingReturnTypeKindVoid,
 			functionKind: functionKind,
-			voidReason:   "a constructor's result is the instance, and `return` in it is only an early exit",
+			voidReason:   consistencyRequireMatchingReturnTypeConstructorReason,
 		}
 	case ast.KindSetAccessor:
 		return consistencyRequireMatchingReturnTypeVerdict{
 			kind:         consistencyRequireMatchingReturnTypeKindVoid,
 			functionKind: functionKind,
-			voidReason:   "a setter's result is discarded, and `return` in it is only an early exit",
+			voidReason:   consistencyRequireMatchingReturnTypeSetterReason,
 		}
 	}
 
 	// 1. The declared annotation is the author's statement, and is final even when it is `any`.
 	if annotation := function.Type(); annotation != nil {
 		declared := checker.Checker_getTypeFromTypeNode(ctx.TypeChecker, annotation)
-		return consistencyRequireMatchingReturnTypeClassify(ctx, declared, true, isAsync, isGenerator, functionKind, "from its annotation")
+		return consistencyRequireMatchingReturnTypeClassify(ctx, declared, true, isAsync, isGenerator, functionKind, consistencyRequireMatchingReturnTypeFromAnnotation)
 	}
 
 	// 2. The contextual signature, passed over when it says nothing.
 	if contextual := consistencyRequireMatchingReturnTypeContextualReturnType(ctx, function); contextual != nil {
-		verdict := consistencyRequireMatchingReturnTypeClassify(ctx, contextual, false, isAsync, isGenerator, functionKind, "from the signature it is passed to")
+		verdict := consistencyRequireMatchingReturnTypeClassify(ctx, contextual, false, isAsync, isGenerator, functionKind, consistencyRequireMatchingReturnTypeFromSignature)
 		if verdict.kind != consistencyRequireMatchingReturnTypeKindUnknown {
 			return verdict
 		}
@@ -273,7 +316,7 @@ func consistencyRequireMatchingReturnTypeJudge(ctx rule.Context, function *ast.N
 	}
 	if function.Kind == ast.KindGetAccessor {
 		// A get accessor's type is the property's type, which is its return type.
-		return consistencyRequireMatchingReturnTypeClassify(ctx, functionType, false, isAsync, isGenerator, functionKind, "inferred from its returns")
+		return consistencyRequireMatchingReturnTypeClassify(ctx, functionType, false, isAsync, isGenerator, functionKind, consistencyRequireMatchingReturnTypeInferred)
 	}
 	signatures := type_checking.GetCallSignatures(ctx.TypeChecker, functionType)
 	if len(signatures) == 0 {
@@ -282,7 +325,7 @@ func consistencyRequireMatchingReturnTypeJudge(ctx rule.Context, function *ast.N
 	var agreed consistencyRequireMatchingReturnTypeVerdict
 	for index, signature := range signatures {
 		returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
-		verdict := consistencyRequireMatchingReturnTypeClassify(ctx, returnType, false, isAsync, isGenerator, functionKind, "inferred from its returns")
+		verdict := consistencyRequireMatchingReturnTypeClassify(ctx, returnType, false, isAsync, isGenerator, functionKind, consistencyRequireMatchingReturnTypeInferred)
 		if index == 0 {
 			agreed = verdict
 			continue
@@ -358,7 +401,7 @@ func consistencyRequireMatchingReturnTypeClassify(
 	isAsync bool,
 	isGenerator bool,
 	functionKind string,
-	source string,
+	source consistencyRequireMatchingReturnTypeOrigin,
 ) consistencyRequireMatchingReturnTypeVerdict {
 	unknown := consistencyRequireMatchingReturnTypeVerdict{functionKind: functionKind}
 	if returnType == nil {
@@ -395,7 +438,8 @@ func consistencyRequireMatchingReturnTypeClassify(
 		return consistencyRequireMatchingReturnTypeVerdict{
 			kind:         consistencyRequireMatchingReturnTypeKindVoid,
 			functionKind: functionKind,
-			voidReason:   fmt.Sprintf("its return type is `%s` (%s), which says `void`", ctx.TypeChecker.TypeToString(written), source),
+			voidReason:   consistencyRequireMatchingReturnTypeVoidReasons[source],
+			written:      ctx.TypeChecker.TypeToString(written),
 		}
 	}
 	// Nothing but `undefined`, and not because the author wrote it, is unknowable. An inferred type is
@@ -425,7 +469,7 @@ func consistencyRequireMatchingReturnTypeClassify(
 		kind:            consistencyRequireMatchingReturnTypeKindValue,
 		functionKind:    functionKind,
 		rendered:        ctx.TypeChecker.TypeToString(written),
-		source:          source,
+		source:          consistencyRequireMatchingReturnTypeSources[source],
 		admitsUndefined: combined&checker.TypeFlagsUndefined != 0,
 	}
 }

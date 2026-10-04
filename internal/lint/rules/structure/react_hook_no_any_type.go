@@ -5,6 +5,7 @@ import (
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // reactHookNoAnyTypeMessage is built per finding, because it names the hook and the rules that lost
@@ -296,32 +297,35 @@ func reactHookNoAnyTypeBlindedRules() []string {
 	return blinded
 }
 
+// The rule's message and the two ways it can go, whose wording lives in
+// `policy/messages/react-hook-no-any-type.json`.
+var (
+	reactHookNoAnyTypeText     = policy.MessageOf("structure/react-hook-no-any-type", reactHookNoAnyTypeMessageId)
+	reactHookNoAnyTypeNamed    = reactHookNoAnyTypeText.Option("blindedRules", "named")
+	reactHookNoAnyTypeUnlinked = reactHookNoAnyTypeText.Option("blindedRules", "unlinked")
+)
+
 // reactHookNoAnyTypeDescription builds the finding's sentence for one hook.
 //
 // The condition comes first and the cost second, because the cost is what makes the finding worth
 // acting on. A reader who stops after the first clause has still been told what is wrong.
 func reactHookNoAnyTypeDescription(hookName string) string {
-	opening := "`" + hookName + "` here resolves to `any`, so the type checker cannot see what this " +
-		"hook returns. "
+	return reactHookNoAnyTypeDescriptionFor(hookName, reactHookNoAnyTypeBlindedRules())
+}
 
-	blinded := reactHookNoAnyTypeBlindedRules()
+// reactHookNoAnyTypeDescriptionFor is the sentence for a given set of blinded rules, apart from the
+// catalog so a test can reach the branch no test binary links its way into.
+func reactHookNoAnyTypeDescriptionFor(hookName string, blinded []string) string {
 	if len(blinded) == 0 {
 		// Not a hedge and not a default. This branch is reached only in a binary that did not link
 		// the rules in question, and saying so is more useful than naming a set this binary cannot
 		// see. See the derivation comment above.
-		return opening +
-			"Every rule that identifies a React value by its type is disabled for this file, and " +
-			"this build linked none of them so none can be named. React's types are probably not " +
-			"resolving here: check that `@types/react` is installed and current, that no ambient " +
-			"declaration is shadowing it, and that the path mapping for `react` resolves."
+		return reactHookNoAnyTypeText.Render(map[string]string{"hookName": hookName}, reactHookNoAnyTypeUnlinked)
 	}
-
-	return opening + "These rules identify a React value by asking the checker for its type, so " +
-		"they cannot analyse this file and will report nothing in it: " +
-		reactHookNoAnyTypeJoin(blinded) + ". Suppressing this finding turns those off for the file " +
-		"rather than tidying a type. React's types are probably not resolving here: check that " +
-		"`@types/react` is installed and current, that no ambient declaration is shadowing it, and " +
-		"that the path mapping for `react` resolves."
+	return reactHookNoAnyTypeText.Render(
+		map[string]string{"hookName": hookName, "rules": reactHookNoAnyTypeJoin(blinded)},
+		reactHookNoAnyTypeNamed,
+	)
 }
 
 // reactHookNoAnyTypeJoin renders a name list as prose, so the message reads as a sentence.

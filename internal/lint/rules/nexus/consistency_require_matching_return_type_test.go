@@ -191,6 +191,14 @@ var consistencyRequireMatchingReturnTypeUndefinedCases = []consistencyRequireMat
 		"    }",
 		"}",
 	}, []string{"return undefined;"}, "        if (!ready) return;"},
+	{"a setter's early exit", []string{
+		"export class Engine {",
+		"    set speed(value: number) {",
+		"        if (!ready) return undefined;",
+		"        work();",
+		"    }",
+		"}",
+	}, []string{"return undefined;"}, "        if (!ready) return;"},
 	{"a void-and-value union is still void", []string{
 		"export function maybe(): string | void {",
 		"    if (!ready) return undefined;",
