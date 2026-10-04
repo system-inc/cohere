@@ -661,6 +661,10 @@ func TestNoUnusedVarsTreatsADecoratedClassOrParameterAsUsed(t *testing.T) {
 		{"a decorated parameter shields the undecorated ones before it", decorators + "export class Resolver {\n    tickets(input: string, first: number, @Argument('context') context: object): string { return 'ok'; }\n}\n", nil},
 		{"under args all, the undecorated ones before it still report", decorators + "export class Resolver {\n    tickets(input: string, @Argument('context') context: object): string { return 'ok'; }\n}\n", []string{"input"}},
 		{"a decorated parameter is used even under args all", decorators + "export class Resolver {\n    tickets(@Argument('pagination') pagination: number, used: string): string { return used; }\n}\n", nil},
+		// The decorator records the parameter's position, which a name inside its pattern does not hold, so
+		// that name is still judged, as ESLint judges it; the pattern still holds the position (#s48y8eg).
+		{"a name destructured out of a decorated parameter is still judged", decorators + "export class Resolver {\n    tickets(@Argument('page') { size }: { size: number }): string { return 'ok'; }\n}\n", []string{"size"}},
+		{"a decorated destructured parameter shields the ones before it", decorators + "export class Resolver {\n    tickets(input: string, @Argument('page') { size }: { size: number }): string { return 'ok'; }\n}\n", []string{"size"}},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

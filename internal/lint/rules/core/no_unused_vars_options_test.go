@@ -225,3 +225,87 @@ func TestDecodeNoUnusedVarsOptionsModesAndShorthand(t *testing.T) {
 		}
 	}
 }
+
+// A name destructured out of a parameter is a parameter, as upstream's definition type says (#s48y8eg).
+//
+// cohere filed it as a variable, so `args: "none"` and `argsIgnorePattern` did not reach it and
+// `varsIgnorePattern` did. Every row was replayed through the installed
+// `@typescript-eslint/no-unused-vars` 8.71.0 in a module, with the prelude's findings left out. The
+// `after-used` rows pin the two halves of upstream's isAfterLastUsedArg: a destructured name is never
+// skipped by it, and a later destructured name that is read, or given a default anywhere in its
+// pattern, keeps the parameters before it.
+func TestNoUnusedVarsJudgesADestructuredParameterAsAParameter(t *testing.T) {
+	t.Parallel()
+
+	const prelude = "declare function use(...values: unknown[]): void;\n"
+	cases := []struct {
+		options string
+		body    string
+		want    []string
+	}{
+		{"{\"args\":\"none\"}", "function f({ a }: { a: number }) {}\nuse(f);", nil},
+		{"{\"args\":\"none\"}", "function f([a]: number[]) {}\nuse(f);", nil},
+		{"{\"args\":\"none\"}", "function f({ x: { a } }: { x: { a: number } }) {}\nuse(f);", nil},
+		{"{\"args\":\"none\"}", "function f({ a }: { a?: number } = {}) {}\nuse(f);", nil},
+		{"{\"args\":\"none\"}", "const g = ({ a }: { a: number }) => 1;\nuse(g);", nil},
+		{"{\"args\":\"none\"}", "function f(p: number) {\n  const { a } = { a: p };\n}\nuse(f);", []string{"unusedVar a"}},
+		{"{\"argsIgnorePattern\":\"^_\"}", "function f({ _a }: { _a: number }) {}\nuse(f);", nil},
+		{"{\"argsIgnorePattern\":\"^_\"}", "function f([_a]: number[]) {}\nuse(f);", nil},
+		{"{\"argsIgnorePattern\":\"^_\"}", "function f({ x: _a }: { x: number }) {}\nuse(f);", nil},
+		{"{\"argsIgnorePattern\":\"^_\"}", "function f({ a, ..._rest }: Record<string, number>) {\n  return a;\n}\nuse(f);", nil},
+		{"{\"argsIgnorePattern\":\"^_\"}", "function f(p: number) {\n  const { _a } = { _a: p };\n}\nuse(f);", []string{"unusedVar _a"}},
+		{"{\"varsIgnorePattern\":\"^_\"}", "function f({ _a }: { _a: number }) {}\nuse(f);", []string{"unusedVar _a"}},
+		{"{\"varsIgnorePattern\":\"^_\"}", "function f([_a]: number[]) {}\nuse(f);", []string{"unusedVar _a"}},
+		{"{\"varsIgnorePattern\":\"^_\"}", "function f(p: number) {\n  const { _a } = { _a: p };\n}\nuse(f);", nil},
+		{"{}", "function f(a: number, { b }: { b: number }) {\n  return b;\n}\nuse(f);", nil},
+		{"{}", "function f({ a }: { a: number }, b: number) {\n  return b;\n}\nuse(f);", []string{"unusedVar a"}},
+		{"{}", "function f({ a, b }: { a: number; b: number }) {\n  return b;\n}\nuse(f);", []string{"unusedVar a"}},
+		{"{}", "function f(a: number, { b = 1 }: { b?: number }) {}\nuse(f);", []string{"unusedVar b"}},
+		{"{}", "function f(a: number, [b]: number[]) {\n  return b;\n}\nuse(f);", nil},
+		{"{}", "function f(a: number, { x: { b } }: { x: { b: number } }) {\n  return b;\n}\nuse(f);", nil},
+		{"{}", "function f(a: number, { b }: { b: number }, c: number) {\n  return c;\n}\nuse(f);", []string{"unusedVar b"}},
+		{"{\"args\":\"all\"}", "function f(a: number, { b }: { b: number }) {\n  return b;\n}\nuse(f);", []string{"unusedVar a"}},
+		{"{\"args\":\"after-used\",\"argsIgnorePattern\":\"^_\"}", "function f(a: number, { _b }: { _b: number }) {}\nuse(f);", []string{"unusedVar a"}},
+		{"{\"argsIgnorePattern\":\"^_\"}", "function f([_a, b]: number[]) {\n  return b;\n}\nuse(f);", nil},
+		{"{\"destructuredArrayIgnorePattern\":\"^_\"}", "function f([_a]: number[]) {}\nuse(f);", nil},
+		{"{\"destructuredArrayIgnorePattern\":\"^_\",\"args\":\"all\"}", "function f({ _a }: { _a: number }) {}\nuse(f);", []string{"unusedVar _a"}},
+		{"{}", "class C {\n  m({ a }: { a: number }) {}\n}\nuse(C);", []string{"unusedVar a"}},
+		{"{}", "class C {\n  set v({ a }: { a: number }) {}\n}\nuse(C);", nil},
+		{"{\"args\":\"none\"}", "const { a } = { a: 1 };", []string{"unusedVar a"}},
+		{"{}", "function f(a: number, { b }: { b?: number } = {}) {}\nuse(f);", []string{"unusedVar b"}},
+		{"{}", "function f(a: number, { x: { b } = { b: 1 } }: { x?: { b: number } }) {}\nuse(f);", []string{"unusedVar b"}},
+		{"{}", "function f(a: number, [b = 1]: number[]) {}\nuse(f);", []string{"unusedVar b"}},
+		{"{}", "class C {\n  set v(a: number) {}\n}\nuse(C);", nil},
+		{"{\"argsIgnorePattern\":\"^_\"}", "function f(a: number, { b }: { b: number }) {}\nuse(f);", []string{"unusedVar a", "unusedVar b"}},
+	}
+	if len(cases) != 34 {
+		t.Fatalf("%d rows, and 34 were replayed", len(cases))
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.options+" "+testCase.body, func(t *testing.T) {
+			t.Parallel()
+
+			options, err := DecodeNoUnusedVarsOptions(json.RawMessage(testCase.options))
+			if err != nil {
+				t.Fatalf("decoding %s: %v", testCase.options, err)
+			}
+			source := prelude + testCase.body + "\nexport {};\n"
+			result := rule_testing.RunTypedWithOptions(t, NoUnusedVars, "a.ts", source, options)
+			var got []string
+			for _, diagnostic := range result.Diagnostics {
+				if diagnostic.Range.Pos() < len(prelude) {
+					continue
+				}
+				id := diagnostic.Message.Id
+				if id == "noUnusedVars" {
+					id = "unusedVar"
+				}
+				got = append(got, id+" "+source[diagnostic.Range.Pos():diagnostic.Range.End()])
+			}
+			if strings.Join(got, ",") != strings.Join(testCase.want, ",") {
+				t.Fatalf("reported %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}

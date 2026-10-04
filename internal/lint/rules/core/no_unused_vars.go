@@ -817,7 +817,9 @@ func collectCandidateBindings(sourceFile *ast.Node) []candidateBinding {
 		case ast.KindBindingElement:
 			if name := current.Name(); name != nil && name.Kind == ast.KindIdentifier {
 				kind := bindingVariable
-				if isDestructuredFromACatchBinding(current) {
+				if owner := patternOwner(current); owner.Kind == ast.KindParameter {
+					kind = bindingParameter
+				} else if owner.Kind == ast.KindVariableDeclaration && owner.Parent != nil && owner.Parent.Kind == ast.KindCatchClause {
 					kind = bindingCaughtError
 				}
 				candidates = append(candidates, candidateBinding{name, current, kind})
@@ -880,24 +882,55 @@ func collectCandidateBindings(sourceFile *ast.Node) []candidateBinding {
 	return candidates
 }
 
-// isDestructuredFromACatchBinding reports whether a binding element sits in the pattern a catch clause
-// binds, `catch ({ message })`.
+// patternOwner is the node a binding element's pattern belongs to: the parameter, the variable
+// declaration or the catch binding it destructures, found by climbing patterns only. A pattern in a
+// default's arrow function therefore belongs to that function's parameter, not to the outer one.
 //
-// Upstream's definition type for every name in that pattern is CatchClause, not Variable, so each one
-// is a caught error: `caughtErrors: "none"` skips it and `caughtErrorsIgnorePattern` decides it, while
-// `varsIgnorePattern` does not apply. Measured on the installed 8.71.0: `catch ({ _message }) {}` is
-// silent under `caughtErrorsIgnorePattern: "^_"` and reports under `varsIgnorePattern: "^_"`, and
-// cohere had those two the other way round until #6esg2nx. The walk climbs patterns only, so a
-// pattern in a default's arrow function belongs to that function's parameter, not to the catch.
-func isDestructuredFromACatchBinding(element *ast.Node) bool {
-	for current := element.Parent; current != nil; current = current.Parent {
+// The owner decides the element's kind, because upstream's definition type for every name in a
+// pattern is its owner's. A name destructured out of a catch is a caught error: `caughtErrors:
+// "none"` skips it and `caughtErrorsIgnorePattern` decides it, which cohere had the other way round
+// until #6esg2nx. A name destructured out of a parameter is a parameter: `args: "none"` skips it and
+// `argsIgnorePattern` decides it, while `varsIgnorePattern` applies to neither, which cohere had as
+// a variable until #s48y8eg. Measured on the installed 8.71.0: `function f({ _a }) {}` is silent
+// under `argsIgnorePattern: "^_"` and reports under `varsIgnorePattern: "^_"`.
+func patternOwner(element *ast.Node) *ast.Node {
+	current := element.Parent
+	for current != nil && (current.Kind == ast.KindObjectBindingPattern ||
+		current.Kind == ast.KindArrayBindingPattern || current.Kind == ast.KindBindingElement) {
+		current = current.Parent
+	}
+	return current
+}
+
+// declaringParameter is the parameter a parameter candidate is declared by: the candidate's own
+// declaration, or, for a name destructured out of one, the parameter that pattern belongs to.
+func declaringParameter(candidate candidateBinding) *ast.Node {
+	if candidate.declaration.Kind == ast.KindParameter {
+		return candidate.declaration
+	}
+	return patternOwner(candidate.declaration)
+}
+
+// hasDefaultOnTheWayToItsParameter reports whether a parameter binding is given a default anywhere
+// between its name and its parameter: `b = 1`, `{ b = 1 }`, `{ x: { b } = {} }` or `{ b } = {}`.
+//
+// Each of those is a write reference to the binding in ESLint's scope model, so upstream's
+// isAfterLastUsedArg counts it as a later parameter that is used, and the ones before it are kept.
+// Measured on the installed 8.71.0: `(a, { b = 1 })`, `(a, [b = 1])` and `(a, { b } = {})` with
+// nothing read each report `b` and not `a`.
+func hasDefaultOnTheWayToItsParameter(declaration *ast.Node) bool {
+	for current := declaration; current != nil; current = current.Parent {
 		switch current.Kind {
-		case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern, ast.KindBindingElement:
-			continue
-		case ast.KindVariableDeclaration:
-			return current.Parent != nil && current.Parent.Kind == ast.KindCatchClause
+		case ast.KindBindingElement:
+			if current.Initializer() != nil {
+				return true
+			}
+		case ast.KindParameter:
+			return current.AsParameterDeclaration().Initializer != nil
+		case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
+		default:
+			return false
 		}
-		return false
 	}
 	return false
 }
@@ -1040,13 +1073,19 @@ func isExemptFromUnusedReport(
 	// manager marks only the decorator function as referenced, so ESLint reports both shapes. The
 	// divergence is in cohere's favor and is exact: no decorated declaration is dead. It is the
 	// decorator, not a naming convention, that exempts, so `argsIgnorePattern` stays unset.
-	if (candidate.declaration.Kind == ast.KindClassDeclaration || candidate.kind == bindingParameter) &&
+	//
+	// It is the declaration the decorator sits on that is used, so a name destructured out of a
+	// decorated parameter is still judged: deleting it from the pattern leaves the parameter, and its
+	// position, where the decorator recorded them. ESLint reports it too (#s48y8eg).
+	if (candidate.declaration.Kind == ast.KindClassDeclaration || candidate.declaration.Kind == ast.KindParameter) &&
 		carriesDecorator(candidate.declaration) {
 		return true
 	}
 
 	// A parameter under `args: "none"` is never reported. Under the default `after-used`, only
-	// parameters following the last used one are.
+	// parameters following the last used one are. A name destructured out of a parameter is a
+	// parameter for all of this except the last: upstream's isAfterLastUsedArg applies only when the
+	// name's parent is the function itself, so `({ a, b }) => b` reports `a` under `after-used`.
 	if candidate.kind == bindingParameter {
 		if settings.Args == "none" {
 			return true
@@ -1054,11 +1093,13 @@ func isExemptFromUnusedReport(
 		// A setter's parameter cannot be removed: `set foo() {}` is a syntax error. Upstream
 		// exempts it for exactly that reason at `allowed.rs`'s
 		// `is_allowed_param_because_of_method`, and so does a constructor parameter carrying an
-		// accessibility modifier, which declares a class member rather than a mere argument.
-		if isStructurallyRequiredParameter(candidate.declaration) {
+		// accessibility modifier, which declares a class member rather than a mere argument. A name
+		// destructured out of a setter's parameter is silent upstream too, measured on 8.71.0.
+		if isStructurallyRequiredParameter(declaringParameter(candidate)) {
 			return true
 		}
-		if settings.Args != "all" && isParameterBeforeAUsedOne(ctx, candidate, all, reads) {
+		if settings.Args != "all" && candidate.declaration.Kind == ast.KindParameter &&
+			isParameterBeforeAUsedOne(ctx, candidate, all, reads) {
 			return true
 		}
 	}
@@ -1913,7 +1954,7 @@ func isParameterBeforeAUsedOne(
 	all []candidateBinding,
 	reads map[*ast.Symbol]bool,
 ) bool {
-	owner := candidate.declaration.Parent
+	owner := declaringParameter(candidate).Parent
 	if owner == nil {
 		return false
 	}
@@ -1924,29 +1965,33 @@ func isParameterBeforeAUsedOne(
 			seenSelf = true
 			continue
 		}
-		if !seenSelf || other.kind != bindingParameter || other.declaration.Parent != owner {
+		// A later parameter is any name its function's parameters declare, destructured ones included,
+		// as upstream's getDeclaredVariables lists them: `(a, { b }) => b` keeps `a`.
+		if !seenSelf || other.kind != bindingParameter || declaringParameter(other).Parent != owner {
 			continue
 		}
+		parameter := declaringParameter(other)
 		// A later parameter carrying a modifier counts as used even when nothing reads it, because
 		// it declares a class property and so cannot be removed. Upstream says this at the line:
 		// "has_modifier() to handle: constructor(unused: number, public property: string) {}".
 		// Without it, `constructor(baz: string, private logger: Logger)` reports `baz`, which is a
 		// parameter that genuinely cannot be deleted without breaking the property behind it.
-		if isStructurallyRequiredParameter(other.declaration) {
+		if isStructurallyRequiredParameter(parameter) {
 			return true
 		}
 		// A later parameter carrying a decorator is used (see isExemptFromUnusedReport), so it shields
 		// the ones before it like any used parameter: `(_input, @Inject() context)` keeps `_input`,
 		// which holds the decorated parameter's position. Missing at 92059a9, found by api's Base pass.
-		if carriesDecorator(other.declaration) {
+		if carriesDecorator(parameter) {
 			return true
 		}
 		// A later parameter with a default value shields the ones before it, as upstream's
 		// `isAfterLastUsedArg` does: it asks whether a later parameter has any reference, and a default
 		// is a write reference. So `(a, b, c = {})` with only `a` read reports `c`, as assigned and
 		// never used, and not `b`. Measured with lintText on the installed typescript-eslint, and
-		// the shape of api-phi-health's FakeStripePaymentProcessor.ts:122 (#c6jhg93).
-		if other.declaration.Kind == ast.KindParameter && other.declaration.AsParameterDeclaration().Initializer != nil {
+		// the shape of api-phi-health's FakeStripePaymentProcessor.ts:122 (#c6jhg93). A default
+		// anywhere in a destructured parameter's pattern counts the same way (#s48y8eg).
+		if hasDefaultOnTheWayToItsParameter(other.declaration) {
 			return true
 		}
 		if symbol := ctx.TypeChecker.GetSymbolAtLocation(other.name); symbol != nil && reads[symbol] {
