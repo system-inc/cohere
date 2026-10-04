@@ -6789,6 +6789,9 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
+            "messageIds": [
+                "callerDataMutation"
+            ],
             "swift": {
                 "verdict": "Compiler"
             }
@@ -7618,7 +7621,8 @@
             "category": "security",
             "typeAware": true,
             "messageIds": [
-                "interpolatedSqlString"
+                "interpolatedSqlString",
+                "interpolatedSqlValue"
             ],
             "sets": [
                 {

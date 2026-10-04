@@ -449,3 +449,23 @@ func TestCorrectnessNoNullishStrippingAssertionNeverReportsTheStyleRulesCast(t *
 		})
 	}
 }
+
+// The message gives the repairs in the order `no-non-null-assertion` does, since the two rules report
+// the same claim through two doors: guard it, fix the type, then `required` with its reason.
+func TestCorrectnessNoNullishStrippingAssertionMessageGivesTheRepairsInOrder(t *testing.T) {
+	t.Parallel()
+
+	result := correctnessNoNullishStrippingAssertionRun(t, correctnessNoNullishStrippingAssertionAnalytics(false))
+	if len(result.Diagnostics) == 0 {
+		t.Fatal("want a finding to read the message from")
+	}
+	text := result.Diagnostics[0].Message.Description
+	rest := text
+	for _, part := range []string{"guard it", "fix the type", "`stringFlag` or `numberFlag`", "`required(value, 'why it is present')` from `@nexus/source/errors/Assert`"} {
+		index := strings.Index(rest, part)
+		if index < 0 {
+			t.Fatalf("message lacks %q after the parts before it:\n%s", part, text)
+		}
+		rest = rest[index+len(part):]
+	}
+}

@@ -5,17 +5,21 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const correctnessNoNullishStrippingAssertionId = "nullishStrippedByAssertion"
 
-var correctnessNoNullishStrippingAssertionMessage = rule.Message{
-	Id: correctnessNoNullishStrippingAssertionId,
-	Description: "This assertion removes `undefined` or `null` from the value's type without a check, the same " +
-		"claim a `!` makes. From here on the type says the value is present, so the compiler stops asking, and " +
-		"a fallback after it (`?? fallback`) reads as dead code. Keep `| undefined` in the asserted type and " +
-		"handle it, check the value first, use `required(value, 'why it is present')` from " +
-		"`@nexus/source/errors/Assert`, or read a command-line flag through `stringFlag` or `numberFlag`.",
+// correctnessNoNullishStrippingAssertionText is the rule's message, whose wording lives in
+// `policy/messages/correctness-no-nullish-stripping-assertion.json`. It gives the repairs in the
+// order `no-non-null-assertion` does, since the two rules report the same claim through two doors.
+var correctnessNoNullishStrippingAssertionText = policy.MessageOf("nexus/correctness-no-nullish-stripping-assertion", correctnessNoNullishStrippingAssertionId)
+
+func correctnessNoNullishStrippingAssertionMessage() rule.Message {
+	return rule.Message{
+		Id:          correctnessNoNullishStrippingAssertionId,
+		Description: correctnessNoNullishStrippingAssertionText.Render(nil),
+	}
 }
 
 // CorrectnessNoNullishStrippingAssertion reports a type assertion that removes `undefined` or `null`
@@ -124,7 +128,7 @@ var CorrectnessNoNullishStrippingAssertion = rule.Rule{
 		}
 		check := func(node *ast.Node, expression *ast.Node, typeNode *ast.Node) {
 			if correctnessNoNullishStrippingAssertionStrips(ctx.TypeChecker, node, expression, typeNode) {
-				ctx.ReportNode(node, correctnessNoNullishStrippingAssertionMessage)
+				ctx.ReportNode(node, correctnessNoNullishStrippingAssertionMessage())
 			}
 		}
 		return rule.Listeners{

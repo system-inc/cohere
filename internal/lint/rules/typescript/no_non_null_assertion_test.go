@@ -220,3 +220,33 @@ func applyFixes(sourceText string, fixes []rule.Fix) string {
 func containsLine(haystack string, needle string) bool {
 	return strings.Contains(haystack, needle)
 }
+
+// TestNoNonNullAssertionMessageGivesTheRepairsInOrder pins the wording's shape rather than its every
+// word: the finding names the four repairs in the order the house's migration waves ranked them, and
+// the suggestion offers `?.` only with its condition attached. Upstream's text recommended `?.` as a
+// repair outright, and a reworded message that drifted back to that would pass an id-only test.
+func TestNoNonNullAssertionMessageGivesTheRepairsInOrder(t *testing.T) {
+	t.Parallel()
+
+	result := rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, "declare const foo: any;\nexport const r = foo!.bar;\n")
+	if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 1 {
+		t.Fatalf("want 1 finding with 1 suggestion, got %d findings", len(result.Diagnostics))
+	}
+	noNonNullAssertionExpectInOrder(t, result.Diagnostics[0].Message.Description,
+		"guard it", "fix the type", "restructure so the index goes away", "`required(value, 'why it holds')` from `@nexus/source/errors/Assert`")
+	noNonNullAssertionExpectInOrder(t, result.Diagnostics[0].Suggestions[0].Message.Description,
+		"`?.`", "only where a missing value is really possible")
+}
+
+// noNonNullAssertionExpectInOrder fails unless each part appears in text after the one before it.
+func noNonNullAssertionExpectInOrder(t *testing.T, text string, parts ...string) {
+	t.Helper()
+	rest := text
+	for _, part := range parts {
+		index := strings.Index(rest, part)
+		if index < 0 {
+			t.Fatalf("message lacks %q after the parts before it:\n%s", part, text)
+		}
+		rest = rest[index+len(part):]
+	}
+}

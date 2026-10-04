@@ -19,6 +19,7 @@
         "source": "export function open(name: string) {\n    return `WHERE name = '${name}` + `'`;\n}\n"
     },
     "assertedMessageIds": [
-        "interpolatedSqlString"
+        "interpolatedSqlString",
+        "interpolatedSqlValue"
     ]
 }

@@ -5,22 +5,25 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageNoNonNull = rule.Message{
-	Id: "noNonNull",
-	Description: "A non-null assertion tells the compiler to stop checking, and it is erased " +
-		"before the code runs, so it changes what the type system will let you write without " +
-		"changing what actually arrives at runtime. When the value is nullish anyway the failure " +
-		"lands somewhere else, as a property access on `undefined` in code the types promised was " +
-		"safe. Narrow the value with a check, use `?.` to keep the runtime guard, or fix the type " +
-		"if it is wrong about being nullable.",
+// noNonNullText and suggestOptionalChainText are the rule's messages, whose wording lives in
+// `policy/messages/no-non-null-assertion.json`. The ids are upstream's. The wording is not: it gives
+// the repairs in the order the house's three migration waves settled on (guard, fix the type,
+// restructure, then `assert` or `required`), and upstream's recommends `?.`, which those waves found
+// hides a missing value as often as it handles one.
+var (
+	noNonNullText            = policy.MessageOf("@typescript-eslint/no-non-null-assertion", "noNonNull")
+	suggestOptionalChainText = policy.MessageOf("@typescript-eslint/no-non-null-assertion", "suggestOptionalChain")
+)
+
+func messageNoNonNull() rule.Message {
+	return rule.Message{Id: noNonNullText.Id, Description: noNonNullText.Render(nil)}
 }
 
-var messageSuggestOptionalChain = rule.Message{
-	Id: "suggestOptionalChain",
-	Description: "Use the optional chain operator `?.` instead. It performs the check at runtime " +
-		"rather than only silencing the compiler.",
+func messageSuggestOptionalChain() rule.Message {
+	return rule.Message{Id: suggestOptionalChainText.Id, Description: suggestOptionalChainText.Render(nil)}
 }
 
 // NoNonNullAssertion flags every non-null assertion.
@@ -66,10 +69,10 @@ var NoNonNullAssertion = rule.Rule{
 			ast.KindNonNullExpression: func(node *ast.Node) {
 				suggestions := optionalChainSuggestions(ctx, node)
 				if len(suggestions) == 0 {
-					ctx.ReportNode(node, messageNoNonNull)
+					ctx.ReportNode(node, messageNoNonNull())
 					return
 				}
-				ctx.ReportNodeWithSuggestions(node, messageNoNonNull, suggestions...)
+				ctx.ReportNodeWithSuggestions(node, messageNoNonNull(), suggestions...)
 			},
 		}
 	},
@@ -92,7 +95,7 @@ func optionalChainSuggestions(ctx rule.Context, node *ast.Node) []rule.Suggestio
 	}
 
 	suggest := func(fixes ...rule.Fix) []rule.Suggestion {
-		return []rule.Suggestion{{Message: messageSuggestOptionalChain, Fixes: fixes}}
+		return []rule.Suggestion{{Message: messageSuggestOptionalChain(), Fixes: fixes}}
 	}
 	operator := nonNullAssertionOperatorRange(node)
 
