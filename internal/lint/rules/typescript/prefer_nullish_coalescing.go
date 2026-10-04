@@ -233,17 +233,25 @@ func preferNullishCoalescingSuggestion(replacement string) string {
 //	valid:   declare const a: string | null; if (a || 'b') {}    ignoreConditionalTests defaults TRUE
 //	invalid: declare const a: string | null; const x = a || 'b';
 //
-// # This port covers the `||` arm only, and says so rather than appearing complete
+//	invalid: declare const a: string | null; const x = a !== null ? a : 'b';
+//	invalid: declare let a: string | null; if (!a) a = 'b';
 //
-// Upstream is 919 lines across three reporting paths: `||` (its `preferNullishOverOr`), a ternary
-// matcher, and an `if` that could become `??=`. The ternary matcher alone is 533 of those lines and
-// covers 205 of the corpus's 345 reporting cases. This file implements the `||` arm, which is 133
-// cases, and the other two arms are absent rather than approximated. See the test file for the exact
-// corpus split and for what a reader should expect from `--rules` today.
+// # Three reporting paths, all ported
 //
-// A partial rule is registered rather than withheld because the `||` arm is the one that fires on
-// real source, and a rule that reports a true subset is useful where one that guesses at the other
-// two arms would not be.
+// Upstream reports from three listeners: `||` and `||=` (its `preferNullishOverOr`, this file), a
+// ternary that tests for null or undefined and returns what it tested (`preferNullishOverTernary`),
+// and an `if` with no `else` that assigns only when its target is nullish (`preferNullishOverAssignment`).
+// The second and third live in prefer_nullish_coalescing_ternary.go, because they share one reading of
+// a test that the `||` arm never needs.
+//
+// For a month the rule shipped with only the first path while its option decoder parsed
+// `ignoreTernaryTests` and `ignoreIfStatements` and the set enabled it with both on, so a config could
+// not tell. With the rule on in both engines, ESLint found 64 sites in ahra that cohere never reported
+// (55 ternaries, 9 if-assignments) (#10kqgs6). The options now gate real checks, and the corpus test
+// counts every path so a missing one fails by name.
+//
+// The `noStrictNullCheck` whole-file complaint is still absent: it needs a program compiled without
+// strictNullChecks, which no tree we lint has.
 //
 // # The type gate is upstream's `isNullableType`, and the shelf's IsTypeFlagSet is the WRONG helper
 //
@@ -315,10 +323,18 @@ var PreferNullishCoalescing = rule.Rule{
 
 				var visit func(*ast.Node) bool
 				visit = func(current *ast.Node) bool {
-					if current.Kind == ast.KindBinaryExpression {
-						if finding, reports := preferNullishCoalescingJudge(ctx, current, settings); reports {
-							pending = append(pending, finding)
-						}
+					var finding preferNullishCoalescingFinding
+					reports := false
+					switch current.Kind {
+					case ast.KindBinaryExpression:
+						finding, reports = preferNullishCoalescingJudge(ctx, current, settings)
+					case ast.KindConditionalExpression:
+						finding, reports = preferNullishCoalescingJudgeTernary(ctx, current, settings)
+					case ast.KindIfStatement:
+						finding, reports = preferNullishCoalescingJudgeIf(ctx, current, settings)
+					}
+					if reports {
+						pending = append(pending, finding)
 					}
 					current.ForEachChild(visit)
 					return false
@@ -326,10 +342,10 @@ var PreferNullishCoalescing = rule.Rule{
 				file.ForEachChild(visit)
 
 				sort.SliceStable(pending, func(left, right int) bool {
-					return pending[left].operatorRange.Pos() < pending[right].operatorRange.Pos()
+					return pending[left].reportRange.Pos() < pending[right].reportRange.Pos()
 				})
 				for _, finding := range pending {
-					ctx.ReportRangeWithSuggestions(finding.operatorRange, finding.message,
+					ctx.ReportRangeWithSuggestions(finding.reportRange, finding.message,
 						rule.Suggestion{Message: finding.suggestion, Fixes: finding.fixes})
 				}
 			},
@@ -338,11 +354,14 @@ var PreferNullishCoalescing = rule.Rule{
 }
 
 // preferNullishCoalescingFinding is one pending report, held until the file is walked.
+//
+// `reportRange` is the `||` token for the first path and the whole ternary or `if` for the other two,
+// which is where upstream anchors each.
 type preferNullishCoalescingFinding struct {
-	operatorRange core.TextRange
-	message       rule.Message
-	suggestion    rule.Message
-	fixes         []rule.Fix
+	reportRange core.TextRange
+	message     rule.Message
+	suggestion  rule.Message
+	fixes       []rule.Fix
 }
 
 // preferNullishCoalescingJudge decides one binary expression.
@@ -376,7 +395,7 @@ func preferNullishCoalescingJudge(ctx rule.Context, node *ast.Node,
 
 	operatorRange := rule.TokenRange(ctx.SourceFile, expression.OperatorToken)
 	return preferNullishCoalescingFinding{
-		operatorRange: operatorRange,
+		reportRange: operatorRange,
 		message: rule.Message{
 			Id:          messagePreferNullishOverOr.Id,
 			Description: preferNullishCoalescingDescribe(operator, replacement, kind),
@@ -467,7 +486,13 @@ func preferNullishCoalescingEligible(ctx rule.Context, node *ast.Node, testNode 
 	if settings.IgnoreConditionalTests && preferNullishCoalescingIsConditionalTest(node) {
 		return false
 	}
-	if settings.IgnoreBooleanCoercion && preferNullishCoalescingInBooleanCall(ctx, node) {
+	// A ternary passed straight to `Boolean(...)` is still reported: upstream exempts the coercion
+	// context everywhere except there, since `Boolean(a ? a : b)` and `Boolean(a ?? b)` can differ
+	// when `a` is a falsy non-nullish value. Measured, and pinned by upstream's own corpus.
+	if settings.IgnoreBooleanCoercion && preferNullishCoalescingInBooleanCall(ctx, node) &&
+		!(node.Kind == ast.KindConditionalExpression &&
+			preferNullishCoalescingParentSkippingParentheses(node) != nil &&
+			preferNullishCoalescingParentSkippingParentheses(node).Kind == ast.KindCallExpression) {
 		return false
 	}
 	if ctx.TypeChecker == nil || testNode == nil {
@@ -724,6 +749,16 @@ func preferNullishCoalescingIsConditionalTest(node *ast.Node) bool {
 		}
 	}
 	return false
+}
+
+// preferNullishCoalescingParentSkippingParentheses is the node's ESTree parent: the first ancestor
+// that is not a pair of parentheses.
+func preferNullishCoalescingParentSkippingParentheses(node *ast.Node) *ast.Node {
+	parent := node.Parent
+	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		parent = parent.Parent
+	}
+	return parent
 }
 
 // preferNullishCoalescingUnwrap strips parentheses, which upstream's parser folds away.

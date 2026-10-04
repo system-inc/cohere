@@ -2,65 +2,81 @@
 
 | | |
 |---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **774** |
+| **Recommendation** | **Yes** |
+| Violations in ahra | **64** with every check on; none under the house sets' interim options |
 | Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
+| Auto-fixable | no (a suggestion on every finding) |
 | Needs type information | yes |
 
 ## What it checks
 
-Enforce using the nullish coalescing operator instead of logical assignments or chaining
+Enforce using the nullish coalescing operator instead of logical assignments or chaining. Three
+shapes, each reported where upstream anchors it:
+
+- **`||` and `||=` on a nullable left side** (`preferNullishOverOr`), at the operator. `a || b`
+  falls through on every falsy value, so an empty string, a zero and a false take the right side
+  along with null and undefined. `ignoreConditionalTests` defaults to true, so a `||` inside an
+  `if`, loop or ternary test is not reported.
+- **A ternary that tests its subject for null or undefined and returns it** (`preferNullishOverTernary`),
+  at the whole ternary: `a !== null && a !== undefined ? a : b`, `a == null ? b : a`, `a ? a : b`. A
+  test that rules out only one of null and undefined strictly is reported when the type cannot hold
+  the other. Off with `ignoreTernaryTests`.
+- **An `if` with no `else` whose body is one assignment to the subject it tested**
+  (`preferNullishOverAssignment`), at the whole `if`: `if (a == null) a = b;` suggests `a ??= b;`,
+  carrying any comments in the body out with it. Off with `ignoreIfStatements`.
+
+The whole-file `noStrictNullCheck` complaint is not implemented. It needs a program compiled without
+`strictNullChecks`, which no tree we lint has.
 
 ## Why this recommendation
 
-Stylistic with a cleanup cost that is not obviously worth the convention it buys.
+`??` says what the code means where the left side can be missing, and leaves the valid falsy values
+alone. The ternary and `if` forms say the same thing at greater length, and name the subject twice,
+so the two mentions can drift apart.
+
+## The interim options
+
+The ternary and `if` checks shipped late. Until 2026-10-04 the decoder parsed `ignoreTernaryTests` and
+`ignoreIfStatements` while neither check existed, so the options did nothing and this page described
+checks that never ran. ESLint, which does run them, found 64 sites in ahra that cohere never
+reported (#10kqgs6). The house sets turned the rule on with both options set to true in both engines,
+so neither engine reports those shapes while the sites are fixed. The options come off once ahra, www
+and api read 0 in both engines.
+
+Measured with both options off, against ESLint with typescript-eslint 8.67.0 on the same trees, file
+by file, line and column:
+
+| Tree | Ternary | `if` | Agreement with ESLint |
+|---|---|---|---|
+| ahra | 55 | 9 | 64 of 64 |
+| www | 33 | 5 | 38 of 38 |
+| api | 21 | 1 | 22 of 22 |
 
 ## Violations
 
-774 in the tree. Showing the first few.
+64 in ahra with every check on. Two of them:
 
-**`app/(os-layout)/_components/TasksCenter.tsx:332`**
-
-```
-const activeProjectTitle = projectId !== null ? activeProject?.title || projectId : undefined;
-```
-
-> Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator
-
-**`app/(os-layout)/_components/kingdom/OsKingdomLayout.ts:118`**
+**`libraries/structure/source/modules/account/Account.ts:59`**
 
 ```
-if(firstChildX === undefined) {
+accountQueryData.emailAddress !== undefined ? accountQueryData.emailAddress : this.emailAddress,
+```
+
+> Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read
+
+**`libraries/structure/source/services/cookie/CookieService.ts:46`**
+
+```
+if(cookies[name] === undefined) {
+    cookies[name] = value;
+}
 ```
 
 > Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read
 
-**`app/(os-layout)/_components/row/TaskRowTitleEditor.tsx:204`**
-
-```
-const fallback = !visibleText ? properties.fallbackText || '(no title)' : null;
-```
-
-> Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator
-
-**`app/(os-layout)/art/_components/ArtCard.tsx:42`**
-
-```
-const [comment, setComment] = React.useState(properties.item.ratingComment || '');
-```
-
-> Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator
-
-**`app/(os-layout)/art/_components/ArtGallery.tsx:115`**
-
-```
-return { ...item, rating, ratingComment: comment || undefined };
-```
-
-> Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator
-
 ### What fixing looks like
 
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-
+Not auto-fixable. Every finding carries a suggestion, `accountQueryData.emailAddress ?? this.emailAddress`
+and `cookies[name] ??= value;` above. It is a suggestion because a truthiness ternary (`a ? a : b`)
+changes meaning for a falsy non-nullish `a`, and the `if` form accepts any assignment operator in its
+body, as upstream's does, so `if (!a) a += b` suggests `a ??= b`. Each site needs a reader.

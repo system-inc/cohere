@@ -215,9 +215,8 @@ func runPreferNullishCoalescing(t *testing.T, testCase preferNullishCoalescingCa
 
 // TestPreferNullishCoalescingStaysSilent runs upstream's whole `valid` list.
 //
-// All 275, including the ones whose reporting counterpart belongs to an arm this port does not
-// implement: a valid case is a false positive this rule must not produce, whichever arm would have
-// produced it.
+// All 275, across every reporting path: a valid case is a false positive this rule must not
+// produce, whichever path would have produced it.
 func TestPreferNullishCoalescingStaysSilent(t *testing.T) {
 	for _, testCase := range preferNullishCoalescingCleanCases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -1561,9 +1560,9 @@ const b = a || 'bar';
 
 // preferNullishCoalescingOrCases are the invalid cases whose findings are ALL preferNullishOverOr.
 //
-// The other 222 reporting cases belong to the ternary and if-statement arms, which this port
-// does not implement. They are listed by id in the arm-coverage test rather than silently
-// omitted, so the gap is visible from the test file rather than only from the rule.
+// The ternary and if-statement paths' 221 cases live in prefer_nullish_coalescing_ternary_test.go,
+// with their spans and suggestions as the installed build replayed them. The one left over is
+// `noStrictNullCheck`, which needs a non-strict program.
 var preferNullishCoalescingOrCases = []preferNullishCoalescingCase{
 	{name: "upstream invalid[0]", source: `
 declare let x: string | null | undefined;
@@ -2376,42 +2375,49 @@ func asTheTypedPreferNullishHarnessWroteIt(text string) string {
 	return strings.TrimSpace(text) + "\n"
 }
 
-// TestPreferNullishCoalescingArmCoverage states what this port does NOT implement.
+// TestPreferNullishCoalescingArmCoverage counts upstream's corpus by the path that reports it.
 //
-// Upstream reports four message ids across three paths. This port implements the `||` and `||=` arm,
-// which is `preferNullishOverOr`. The ternary matcher (`preferNullishOverTernary`) and the
-// if-statement matcher (`preferNullishOverAssignment`) are absent, and the `noStrictNullCheck`
-// whole-file complaint is absent with them.
+// Upstream reports four message ids from three paths. A count that silently drifts is how a partial
+// port comes to look complete, and this rule did look complete for a month: its decoder parsed the
+// ternary and if-statement options while neither check existed (#10kqgs6). So every path's cases are
+// counted here, and dropping one fails by name.
 //
-// This exists so the gap is visible from the test file rather than only from a doc comment, and so
-// that adding an arm later fails here until the numbers are updated deliberately. A count that
-// silently drifts upward is how a partial port comes to look complete.
-//
-//	preferNullishOverOr           123 invalid cases    IMPLEMENTED
-//	preferNullishOverTernary      205 invalid cases    not implemented
-//	preferNullishOverAssignment    16 invalid cases    not implemented
+//	preferNullishOverOr           123 invalid cases    prefer_nullish_coalescing_test.go
+//	preferNullishOverTernary      205 invalid cases    prefer_nullish_coalescing_ternary_test.go
+//	preferNullishOverAssignment    14 invalid cases    prefer_nullish_coalescing_ternary_test.go
+//	  and also ...OverOr            2 invalid cases    prefer_nullish_coalescing_ternary_test.go
 //	noStrictNullCheck               1 invalid case     not implemented, needs a non-strict program
 //
-// All 275 of upstream's valid cases are exercised regardless of which arm would have reported them:
-// a valid case is a false positive this rule must not produce, whichever path would have produced it.
+// All 275 of upstream's valid cases run against every path.
 func TestPreferNullishCoalescingArmCoverage(t *testing.T) {
 	if len(preferNullishCoalescingOrCases) != 123 {
-		t.Errorf("expected upstream's 123 preferNullishOverOr cases, have %d. If an arm was added, "+
-			"update this count deliberately rather than letting it drift",
+		t.Errorf("expected upstream's 123 preferNullishOverOr cases, have %d",
 			len(preferNullishCoalescingOrCases))
 	}
 	if len(preferNullishCoalescingCleanCases) != 275 {
 		t.Errorf("expected all 275 of upstream's valid cases, have %d", len(preferNullishCoalescingCleanCases))
 	}
 
-	// The ternary arm is genuinely absent, and this is the control that says so rather than leaving
-	// it to the doc comment. If somebody implements it, this fails and names itself.
-	ternary := runPreferNullishCoalescing(t, preferNullishCoalescingCase{
-		source: "declare const a: string | null;\ndeclare const b: string;\n" +
-			"const x = a !== null && a !== undefined ? a : b;\n",
-	})
-	if len(ternary.Diagnostics) != 0 {
-		t.Errorf("the ternary arm is not implemented, so this must be silent; if you implemented "+
-			"it, update this test and the arm table above. Got %v", ternary.MessageIds())
+	byPath := map[string]int{}
+	for _, testCase := range preferNullishCoalescingTernaryAndIfCases {
+		ids := map[string]bool{}
+		for _, finding := range testCase.findings {
+			ids[finding.id] = true
+		}
+		switch {
+		case ids[messagePreferNullishOverTernary.Id] && len(ids) == 1:
+			byPath["ternary"]++
+		case ids[messagePreferNullishOverAssignment.Id] && len(ids) == 1:
+			byPath["assignment"]++
+		case ids[messagePreferNullishOverAssignment.Id] && ids[messagePreferNullishOverOr.Id] && len(ids) == 2:
+			byPath["assignment and or"]++
+		default:
+			t.Errorf("%s reports an unexpected mix of ids: %v", testCase.name, ids)
+		}
+	}
+	for path, want := range map[string]int{"ternary": 205, "assignment": 14, "assignment and or": 2} {
+		if byPath[path] != want {
+			t.Errorf("expected %d %s cases from upstream's corpus, have %d", want, path, byPath[path])
+		}
 	}
 }
