@@ -285,6 +285,11 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 			candidateWrites = writes[symbol]
 			usedOnlyAsType = typeOnlyReads[symbol]
 		}
+		// Before either report, as upstream's gate is: a rest sibling read only through `typeof` is
+		// silent too.
+		if settings.IgnoreRestSiblings && hasRestSiblingDeclarationOrWrite(candidate, candidateWrites) {
+			continue
+		}
 		if usedOnlyAsType {
 			// A value import read only through `typeof` is consistent-type-imports' finding, so
 			// upstream withholds this one rather than report the import twice.
@@ -1029,6 +1034,76 @@ func isExemptFromUnusedReport(
 	}
 
 	return false
+}
+
+// hasRestSiblingDeclarationOrWrite is upstream's `hasRestSpreadSibling`, which `ignoreRestSiblings`
+// turns on: the binding is declared, or written, as a property of an object pattern whose last
+// element is a rest element.
+//
+// `const { removed, ...rest } = o` is the idiom for copying an object without one property, and
+// `removed` exists only to be left out of `rest`. Without the option it reports, and the only other
+// way to say "everything but this key" is a helper that cannot be typed without a cast.
+//
+// Upstream asks `hasRestSibling` of the identifier's ESTree parent, so the binding has to sit
+// DIRECTLY in a property of that pattern. Measured on the installed 8.71.0, each of these follows:
+//
+//	const { a, ...rest } = o           silent        so is `{ a: b, ...rest }`, `{ [k]: a, ...rest }`
+//	const { a = 1, ...rest } = o       reports `a`   a default makes the parent an AssignmentPattern
+//	const { b: { c }, ...rest } = n    reports `c`   the inner pattern has no rest of its own
+//	const [a, ...rest] = list          reports `a`   an array pattern is not covered
+//	({ a, ...rest } = o)               silent        through the write, for a binding declared apart
+//	({ x: (a), ...rest } = o)          silent        ESTree drops the parentheses
+//
+// The rest element itself is not its own sibling, so an unused `rest` still reports. Only writes are
+// asked on the reference side: an identifier can sit in an object pattern only as a target, and
+// every read has already made the binding used.
+func hasRestSiblingDeclarationOrWrite(candidate candidateBinding, writes []*ast.Node) bool {
+	declaration := candidate.declaration
+	if declaration.Kind == ast.KindBindingElement && declaration.Name() == candidate.name &&
+		declaration.Initializer() == nil && declaration.AsBindingElement().DotDotDotToken == nil &&
+		declaration.Parent != nil && declaration.Parent.Kind == ast.KindObjectBindingPattern {
+		elements := declaration.Parent.AsBindingPattern().Elements.Nodes
+		if last := elements[len(elements)-1]; last.AsBindingElement().DotDotDotToken != nil {
+			return true
+		}
+	}
+	for _, write := range writes {
+		if isWrittenBesideARestProperty(write) {
+			return true
+		}
+	}
+	return false
+}
+
+// isWrittenBesideARestProperty is the reference half: the identifier is a property's value in a
+// destructuring object literal whose last property is a spread.
+func isWrittenBesideARestProperty(identifier *ast.Node) bool {
+	parent := identifier.Parent
+	if parent == nil {
+		return false
+	}
+	var object *ast.Node
+	if parent.Kind == ast.KindShorthandPropertyAssignment {
+		// `{ a = 1 }` is an AssignmentPattern in ESTree, so a shorthand with a default is not a
+		// property's direct value.
+		if parent.AsShorthandPropertyAssignment().ObjectAssignmentInitializer != nil {
+			return false
+		}
+		object = parent.Parent
+	} else {
+		// `{ x: (a) }` is a direct value too, since ESTree drops the parentheses.
+		property := ast.WalkUpParenthesizedExpressions(parent)
+		if property == nil || property.Kind != ast.KindPropertyAssignment ||
+			ast.SkipParentheses(property.AsPropertyAssignment().Initializer) != identifier {
+			return false
+		}
+		object = property.Parent
+	}
+	if object == nil || object.Kind != ast.KindObjectLiteralExpression {
+		return false
+	}
+	properties := object.AsObjectLiteralExpression().Properties.Nodes
+	return len(properties) > 0 && properties[len(properties)-1].Kind == ast.KindSpreadAssignment
 }
 
 // isReadInsideAClosureAssignedToItself reports whether a read sits inside a function expression
@@ -1902,7 +1977,8 @@ type NoUnusedVarsOptions struct {
 	// CaughtErrorsIgnorePattern is a regular expression naming catch bindings to skip.
 	CaughtErrorsIgnorePattern string `json:"caughtErrorsIgnorePattern"`
 	// IgnoreRestSiblings keeps a binding alive when it sits beside a rest element, which is the
-	// idiom for omitting a property: `const { removed, ...rest } = o`.
+	// idiom for omitting a property: `const { removed, ...rest } = o`. Default false, as upstream's.
+	// See hasRestSiblingDeclarationOrWrite.
 	IgnoreRestSiblings bool `json:"ignoreRestSiblings"`
 	// DestructuredArrayIgnorePattern names array-destructured elements to skip.
 	DestructuredArrayIgnorePattern string `json:"destructuredArrayIgnorePattern"`

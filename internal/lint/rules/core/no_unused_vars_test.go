@@ -679,3 +679,82 @@ func TestNoUnusedVarsTreatsADecoratedClassOrParameterAsUsed(t *testing.T) {
 		})
 	}
 }
+
+// ignoreRestSiblings keeps a binding alive beside a rest element, and only there (#6qxs15e).
+//
+// cohere declared the option and never read it, so a config turning it on changed nothing and every
+// `const { removed, ...rest } = o` reported. Every row was replayed through the installed
+// `@typescript-eslint/no-unused-vars` 8.71.0 with the option true and false, and both columns are
+// asserted, so neither direction can drift: the option has to silence exactly the rows it silences
+// upstream, and silence nothing when off. Upstream's id `unusedVar` is this rule's `noUnusedVars`.
+//
+// Findings in the prelude are left out of the comparison. It is `declare` statements, which this
+// rule exempts as ambient and ESLint's Linter reports, a difference that is not this option's.
+func TestNoUnusedVarsIgnoreRestSiblings(t *testing.T) {
+	t.Parallel()
+
+	const prelude = "declare const o: Record<string, number>;\ndeclare const n: Record<string, Record<string, number>>;\ndeclare const list: number[];\ndeclare const list2: Record<string, number>[];\ndeclare const key: string;\ndeclare function use(...values: unknown[]): void;\n"
+	cases := []struct {
+		body            string
+		wantWhenIgnored []string
+		wantOtherwise   []string
+	}{
+		{"const { a, ...rest } = o;\nuse(rest);", nil, []string{"unusedVar a"}},
+		{"const { a: b, ...rest } = o;\nuse(rest);", nil, []string{"unusedVar b"}},
+		{"const { a = 1, ...rest } = o;\nuse(rest);", []string{"unusedVar a"}, []string{"unusedVar a"}},
+		{"const { a: b = 1, ...rest } = o;\nuse(rest);", []string{"unusedVar b"}, []string{"unusedVar b"}},
+		{"const { a, ...rest } = o;", []string{"unusedVar rest"}, []string{"unusedVar a", "unusedVar rest"}},
+		{"const { a, b: { c }, ...rest } = n;\nuse(rest);", []string{"unusedVar c"}, []string{"unusedVar a", "unusedVar c"}},
+		{"const { x: { a, ...inner }, ...outer } = n;\nuse(inner, outer);", nil, []string{"unusedVar a"}},
+		{"const { a, b } = o;\nuse(a);", []string{"unusedVar b"}, []string{"unusedVar b"}},
+		{"const [a, ...rest] = list;\nuse(rest);", []string{"unusedVar a"}, []string{"unusedVar a"}},
+		{"let a;\nlet rest;\n({ a, ...rest } = o);\nuse(rest);", nil, []string{"unusedVar a"}},
+		{"let a;\nlet rest;\n({ x: a, ...rest } = o);\nuse(rest);", nil, []string{"unusedVar a"}},
+		{"let a;\nlet rest;\n({ a = 1, ...rest } = o);\nuse(rest);", []string{"unusedVar a"}, []string{"unusedVar a"}},
+		{"let a;\nlet rest;\n({ x: (a), ...rest } = o);\nuse(rest);", nil, []string{"unusedVar a"}},
+		{"let a;\nlet rest;\n({ a, rest } = o);\nuse(rest);", []string{"unusedVar a"}, []string{"unusedVar a"}},
+		{"function f({ a, ...rest }: Record<string, number>) {\n  return rest;\n}\nuse(f);", nil, []string{"unusedVar a"}},
+		{"for (const { a, ...rest } of list2) {\n  use(rest);\n}", nil, []string{"unusedVar a"}},
+		{"const { a, ...rest } = o;\ntype A = typeof a;\nuse(rest);\nexport type { A };", nil, []string{"usedOnlyAsType a"}},
+		{"const { [key]: a, ...rest } = o;\nuse(rest);", nil, []string{"unusedVar a"}},
+		{"const { 'quoted': a, ...rest } = o;\nuse(rest);", nil, []string{"unusedVar a"}},
+	}
+
+	for _, testCase := range cases {
+		for _, ignored := range []bool{true, false} {
+			want := testCase.wantOtherwise
+			if ignored {
+				want = testCase.wantWhenIgnored
+			}
+			name := testCase.body
+			if ignored {
+				name = "ignored: " + name
+			}
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+
+				options, err := DecodeNoUnusedVarsOptions(json.RawMessage(
+					`{"ignoreRestSiblings":` + map[bool]string{true: "true", false: "false"}[ignored] + `}`))
+				if err != nil {
+					t.Fatalf("decoding: %v", err)
+				}
+				source := prelude + testCase.body
+				result := rule_testing.RunTypedWithOptions(t, NoUnusedVars, "a.ts", source, options)
+				var got []string
+				for _, diagnostic := range result.Diagnostics {
+					if diagnostic.Range.Pos() < len(prelude) {
+						continue
+					}
+					id := diagnostic.Message.Id
+					if id == "noUnusedVars" {
+						id = "unusedVar"
+					}
+					got = append(got, id+" "+source[diagnostic.Range.Pos():diagnostic.Range.End()])
+				}
+				if strings.Join(got, ",") != strings.Join(want, ",") {
+					t.Fatalf("reported %v, want %v", got, want)
+				}
+			})
+		}
+	}
+}
