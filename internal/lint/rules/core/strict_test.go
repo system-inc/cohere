@@ -2,13 +2,23 @@ package core
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// strictFile is where the fixtures pretend to live.
-const strictFile = "/repository/source/Strict.ts"
+// strictFile is where the corpus pretends to live.
+//
+// A `.js` file, because upstream's corpus is JavaScript run as a script, and a TypeScript file is
+// strict whatever its shape (`alwaysStrict`), so on a `.ts` path every script row collapses into the
+// `implied` judgment. The rows ran there until #hks3djf, which proved the script arms against a file
+// kind that can never reach them in a real run.
+const strictFile = "/repository/source/Strict.js"
+
+// strictTypeScriptFile is where the rows that need TypeScript syntax live.
+const strictTypeScriptFile = "/repository/source/Strict.ts"
 
 // strictCase is one imported corpus row.
 type strictCase struct {
@@ -19,11 +29,17 @@ type strictCase struct {
 	wantFixedSource string
 }
 
-// runStrict drives one case through the rule's own exported decoder.
+// runStrict drives one corpus case through the rule's own exported decoder.
 func runStrict(t *testing.T, testCase strictCase) rule_testing.Result {
 	t.Helper()
+	return runStrictIn(t, strictFile, testCase)
+}
+
+// runStrictIn is runStrict at a chosen path, for the rows whose answer turns on the file kind.
+func runStrictIn(t *testing.T, fileName string, testCase strictCase) rule_testing.Result {
+	t.Helper()
 	if testCase.options == nil {
-		return rule_testing.Run(t, Strict, strictFile, testCase.sourceText)
+		return rule_testing.Run(t, Strict, fileName, testCase.sourceText)
 	}
 	encoded, err := json.Marshal(testCase.options)
 	if err != nil {
@@ -33,7 +49,7 @@ func runStrict(t *testing.T, testCase strictCase) rule_testing.Result {
 	if err != nil {
 		t.Fatalf("could not decode options: %v", err)
 	}
-	return rule_testing.RunWithOptions(t, Strict, strictFile, testCase.sourceText, decoded)
+	return rule_testing.RunWithOptions(t, Strict, fileName, testCase.sourceText, decoded)
 }
 
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
@@ -244,22 +260,29 @@ func TestStrictDeclinesToRepair(t *testing.T) {
 // syntax on the parameter, and a port that asked "is this parameter node a bare identifier" without
 // looking past the annotation would get it backwards.
 //
-// Every verdict below was measured against the installed rule through the TypeScript parser. The
-// first two rows are the ones upstream cannot contain; the last four are the controls that keep
-// them honest by showing the predicate still says no to the three real cases.
+// Every verdict below was measured against the installed rule through the TypeScript parser, with
+// `impliedStrict` on, because a TypeScript file is strict whatever its shape and so reads `implied`
+// (see TestStrictReadsATypeScriptFileAsImpliedStrict). The configured `never` is overridden there,
+// as it is upstream, which is what keeps it from mattering. The first four rows are the ones
+// upstream's corpus cannot contain; the last three are the controls that keep them honest by showing
+// the predicate still says no to the three real cases.
 func TestStrictReadsTypeScriptParameterLists(t *testing.T) {
 	t.Parallel()
 
 	never := StrictOptions{Mode: StrictNever}
 	cases := []strictCase{
 		// An annotation and a return type leave the parameter simple, so the directive is merely
-		// forbidden by the configuration rather than a syntax error.
-		{"function f(a: string): void { 'use strict'; }", never, []string{"never"}, ""},
-		{"function f<T>(a: T): T { 'use strict'; return a; }", never, []string{"never"}, ""},
+		// redundant rather than a syntax error, and the repair deletes it.
+		{"function f(a: string): void { 'use strict'; }", never, []string{"implied"},
+			"function f(a: string): void {  }"},
+		{"function f<T>(a: T): T { 'use strict'; return a; }", never, []string{"implied"},
+			"function f<T>(a: T): T {  return a; }"},
 		// An optional marker likewise.
-		{"function f(a?: string) { 'use strict'; }", never, []string{"never"}, ""},
+		{"function f(a?: string) { 'use strict'; }", never, []string{"implied"},
+			"function f(a?: string) {  }"},
 		// A method with an annotated parameter, reached through the class arm.
-		{"class A { foo(a: string): void { 'use strict'; } }", never, []string{"never"}, ""},
+		{"class A { foo(a: string): void { 'use strict'; } }", never, []string{"implied"},
+			"class A { foo(a: string): void {  } }"},
 		// The three shapes that genuinely make the directive a syntax error, each carrying a type
 		// annotation as well so the annotation is not what decides it.
 		{"function f(a: string = 'x') { 'use strict'; }", never,
@@ -271,9 +294,102 @@ func TestStrictReadsTypeScriptParameterLists(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			rule_testing.ExpectFindings(t, runStrict(t, testCase), testCase.wantIds...)
+			result := runStrictIn(t, strictTypeScriptFile, testCase)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			if testCase.wantFixedSource != "" {
+				rule_testing.ExpectFixedSource(t, result, testCase.wantFixedSource)
+			}
 		})
 	}
+}
+
+// A TypeScript file is strict whatever its shape, so it reads as upstream's `implied` mode.
+//
+// The case that found it is api's Base ProjectSecrets.test.ts, a Jest file with no import or export.
+// TypeScript's module detection makes it a script, and the rule asked for a directive in each of its
+// top-level functions, while ESLint, whose flat config parses every `.ts` file as a module, was silent
+// (#hks3djf). The compiler's `alwaysStrict` makes the file strict, and that is upstream's
+// `impliedStrict`. Every row was replayed through the installed rule with the TypeScript parser and
+// `impliedStrict` on, the fixed source included.
+func TestStrictReadsATypeScriptFileAsImpliedStrict(t *testing.T) {
+	t.Parallel()
+
+	script := "function foo(): number { return 1; }\nfoo();"
+	// The #hks3djf shape, under every mode: nothing to ask for, because nothing is missing.
+	for _, mode := range []StrictMode{"", StrictSafe, StrictGlobal, StrictFunction, StrictNever} {
+		t.Run("a script under "+string(mode), func(t *testing.T) {
+			testCase := strictCase{sourceText: script}
+			if mode != "" {
+				testCase.options = StrictOptions{Mode: mode}
+			}
+			rule_testing.ExpectClean(t, runStrictIn(t, strictTypeScriptFile, testCase))
+		})
+	}
+
+	// A written directive is redundant, and the repair deletes it. Upstream reports every directive
+	// here rather than the first as `implied` and the rest as `multiple`, because `implied` goes
+	// through the same reportAll as `never` and `module`.
+	cases := []strictCase{
+		{"'use strict';\nconst a: number = 1;", nil, []string{"implied"}, "\nconst a: number = 1;"},
+		{"'use strict';\nconst a: number = 1;", StrictOptions{Mode: StrictGlobal},
+			[]string{"implied"}, "\nconst a: number = 1;"},
+		{"'use strict'; 'use strict';\nconst a: number = 1;", StrictOptions{Mode: StrictGlobal},
+			[]string{"implied", "implied"}, " \nconst a: number = 1;"},
+		{"function foo(): void { 'use strict'; 'use strict'; }", StrictOptions{Mode: StrictFunction},
+			[]string{"implied", "implied"}, "function foo(): void {   }"},
+		// A module still wins, as upstream's Program listener has it: `module` is assigned after
+		// `implied`, so a TypeScript module says the more specific thing.
+		{"'use strict';\nexport const a: number = 1;", nil, []string{"module"},
+			"\nexport const a: number = 1;"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.sourceText, func(t *testing.T) {
+			result := runStrictIn(t, strictTypeScriptFile, testCase)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFixedSource(t, result, testCase.wantFixedSource)
+		})
+	}
+
+	// The control: the same script in a JavaScript file is run as written, so it still needs the
+	// directive. Without this a rule that read every file as implied would pass every row above.
+	t.Run("a JavaScript script is not implied", func(t *testing.T) {
+		rule_testing.ExpectFindings(t, runStrict(t, strictCase{
+			sourceText: "function foo() { return 1; }\nfoo();"}), "function")
+	})
+}
+
+// The verdict follows the tsconfig, read through the program a real run has.
+//
+// The syntax-only harness has no program and reads the default options, so these rows build one.
+// `strict: false` turns `alwaysStrict` off with it, and the script arms come back. An explicit
+// `alwaysStrict` beside it turns them off again, which separates reading the option from reading
+// `strict`.
+func TestStrictFollowsTheCompilersAlwaysStrict(t *testing.T) {
+	t.Parallel()
+
+	files := map[string]string{"Strict.ts": "function foo(): number { return 1; }\nfoo();"}
+	withConfig := func(compilerOptions string) func(directory string) {
+		return func(directory string) {
+			config := `{"compilerOptions": {` + compilerOptions + `, "target": "ES2022", ` +
+				`"lib": ["ES2022"], "types": []}, "include": ["**/*.ts"]}`
+			if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config),
+				0o644); err != nil {
+				t.Fatalf("writing the tsconfig: %v", err)
+			}
+		}
+	}
+
+	t.Run("strict on implies it", func(t *testing.T) {
+		rule_testing.ExpectClean(t, rule_testing.RunTypedFiles(t, Strict, files, "Strict.ts"))
+	})
+	t.Run("strict off leaves a script sloppy", func(t *testing.T) {
+		rule_testing.ExpectFindings(t, rule_testing.RunTypedFilesWithSetup(t, Strict, files,
+			"Strict.ts", withConfig(`"strict": false`)), "function")
+	})
+	t.Run("alwaysStrict on its own implies it", func(t *testing.T) {
+		rule_testing.ExpectClean(t, rule_testing.RunTypedFilesWithSetup(t, Strict, files,
+			"Strict.ts", withConfig(`"strict": false, "alwaysStrict": true`)))
+	})
 }
 
 // The repair deletes one whole statement and can therefore never eat type syntax.
@@ -296,7 +412,7 @@ func TestStrictRepairPreservesTypeSyntax(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := runStrict(t, testCase)
+			result := runStrictIn(t, strictTypeScriptFile, testCase)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			rule_testing.ExpectFixedSource(t, result, testCase.wantFixedSource)
 		})
@@ -356,13 +472,18 @@ func TestStrictCollapsesEveryModeInAModule(t *testing.T) {
 // These are facts about the harness rather than about the rule, and hiding them inside a relaxed
 // rule would turn them into facts about the rule. This test asserts the one thing that IS
 // expressible about them: the two parser features have no configuration surface at all, so no
-// spelling of the options can reach the `implied` message.
+// spelling of the options can select the `implied` mode.
+//
+// The mode itself is reachable since #hks3djf, through the file rather than the options: a
+// TypeScript file under `alwaysStrict` is upstream's `impliedStrict`, proven in
+// TestStrictReadsATypeScriptFileAsImpliedStrict. The seventeen rows stay unimported because they are
+// JavaScript, which the compiler does not make strict.
 func TestStrictHasNoImpliedMode(t *testing.T) {
 	t.Parallel()
 
-	// `implied` is one of upstream's ten message ids and this port can never emit it, because the
-	// parser feature that selects it does not exist here. If a future harness gains one, this
-	// fails and the cases above become importable.
+	// Upstream has no `implied` option either: `impliedStrict` is a parser feature, and here the
+	// file kind and the tsconfig stand in for it. An option spelling would be a second way to say
+	// the same thing that could disagree with the first.
 	for _, mode := range []string{"Safe", "Global", "Function", "Never", "Implied"} {
 		decoded, err := DecodeStrictOptions([]byte(`{"mode":"` + mode + `"}`))
 		if mode == "Implied" {
@@ -462,8 +583,10 @@ func TestStrictStopsAtANonStrictDirective(t *testing.T) {
 // `const x = require('y')`, and both together -- `CommonJSModuleIndicator` is nil for every one of
 // them in a `.ts` file.
 //
-// So the branch is not dead code and it is not covered either. It would fire for a `.js` file, which
-// this tree does not currently lint but the config could include. The alternative to recording it
+// The corpus now runs on a `.js` path, and the indicator is still nil there, because this harness
+// parses without binding. So the branch is not dead code and it is not covered either. It would fire
+// for a `.js` file in a real run, which this tree does not currently lint but the config could
+// include. The alternative to recording it
 // was deleting the branch as unreachable, which would be wrong for the same reason: the verdict is a
 // fact about the harness and the file extension, not about the rule.
 //

@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -70,6 +71,13 @@ var (
 		Id: "module",
 		Description: "This file is a module, and every module is already strict. The directive " +
 			"does nothing here, so a reader has to check the file's imports to learn that it is " +
+			"redundant rather than load-bearing. Delete it.",
+	}
+	messageStrictImplied = rule.Message{
+		Id: "implied",
+		Description: "The compiler already makes this file strict: `alwaysStrict`, which `strict` " +
+			"turns on, has TypeScript check it as strict code and emit the directive itself. This " +
+			"one does nothing, so a reader has to check the tsconfig to learn that it is " +
 			"redundant rather than load-bearing. Delete it.",
 	}
 	messageStrictNever = rule.Message{
@@ -148,9 +156,29 @@ func messageStrictWrapFor(description string) rule.Message {
 // still compiled as modules. So the mode option is nearly inert in practice and the rule is, in
 // effect, a guard against somebody pasting a directive into a module.
 //
-// The script arms are ported in full anyway. They are not dead code -- a `.js` or `.cjs` file, or a
-// file that loses its last export, reaches them -- and reproducing only the arm this tree exercises
-// would be a port of the configuration rather than of the rule.
+// The script arms are ported in full anyway. They are not dead code -- a `.js` or `.cjs` file reaches
+// them, and so does a TypeScript file under a tsconfig that turns `alwaysStrict` off -- and
+// reproducing only the arm this tree exercises would be a port of the configuration rather than of
+// the rule.
+//
+// # A TypeScript file is strict whatever its shape
+//
+// Upstream's other override is `ecmaFeatures.impliedStrict`, a parser flag saying the code will run
+// strict however it is written, which selects the `implied` mode: every directive is redundant and
+// nothing is asked for. The TypeScript compiler's `alwaysStrict` is that flag. Under it the checker
+// binds every TypeScript file as strict code, and the emit writes the directive into any output that
+// is not already ESM. `strict` turns it on, and TypeScript 6 turns `strict` on by default, so an
+// unset tsconfig gets it. The transpilers that read a tsconfig (esbuild, ts-jest) honor it too.
+//
+// Without this, a test file with no import or export, which is a script by TypeScript's module
+// detection, was asked for a directive in every top-level function. That is api's Base
+// ProjectSecrets.test.ts, where ESLint was silent because its flat config parses every `.ts` file as
+// a module (#hks3djf). ESLint's silence was right for a different reason. The file is strict because
+// the compiler says so, not because it is a module, so here it reads `implied` rather than `module`.
+//
+// A JavaScript file is left on the script arms. `alwaysStrict` governs what the compiler emits, and a
+// `.js` or `.cjs` file in these repositories is run as written rather than emitted, so a sloppy one
+// really does run sloppy.
 //
 // # Three findings the author cannot fix by moving the directive
 //
@@ -172,6 +200,9 @@ func messageStrictWrapFor(description string) rule.Message {
 // symptom of something else is reported and left alone.
 var Strict = rule.Rule{
 	Name: "strict",
+	// `alwaysStrict` decides whether a TypeScript script is strict, so the cached verdict has to
+	// follow the tsconfig.
+	ProgramReads: rule.ReadsCompilerOptions,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings := StrictOptions{}
 		if decoded, configured := rule.OptionsAs[StrictOptions](options); configured {
@@ -203,7 +234,9 @@ func checkStrict(ctx rule.Context, file *ast.Node, settings StrictOptions) {
 	if mode == "" {
 		mode = StrictSafe
 	}
-	if mode == StrictSafe {
+	if strictImpliedByCompiler(ctx, source) {
+		mode = strictModeImplied
+	} else if mode == StrictSafe {
 		// Upstream picks Global when the file is CommonJS or the parser allows a top-level
 		// return, and Function otherwise.
 		//
@@ -256,11 +289,33 @@ func checkStrict(ctx rule.Context, file *ast.Node, settings StrictOptions) {
 // why it is a package constant rather than a StrictMode the decoder accepts.
 const strictModeModule StrictMode = "Module"
 
+// strictModeImplied is the mode a TypeScript file collapses to when the compiler makes it strict. Like
+// strictModeModule it is selected by the file rather than configured, which is upstream's shape too:
+// `impliedStrict` is a parser feature, and `implied` is not one of the option's four values.
+const strictModeImplied StrictMode = "Implied"
+
+// strictImpliedByCompiler answers whether the compiler makes this file strict however it is written.
+//
+// A run with no program, which is the syntax-only test harness, reads the default options, where an
+// unset `strict` is on. So the harness and a repository with an empty tsconfig agree.
+func strictImpliedByCompiler(ctx rule.Context, source *ast.SourceFile) bool {
+	if ast.IsSourceFileJS(source) {
+		return false
+	}
+	options := &core.CompilerOptions{}
+	if ctx.Program != nil {
+		options = ctx.Program.Options()
+	}
+	return type_checking.IsStrictCompilerOptionEnabled(options, options.AlwaysStrict)
+}
+
 // fileLevelMessage is what a directive at the top of the file means under the current mode.
 func (w strictWalker) fileLevelMessage() rule.Message {
 	switch w.mode {
 	case strictModeModule:
 		return messageStrictModule
+	case strictModeImplied:
+		return messageStrictImplied
 	case StrictNever:
 		return messageStrictNever
 	case StrictFunction:
@@ -277,7 +332,7 @@ func (w strictWalker) fileLevelMessage() rule.Message {
 // problem -- the wrong form for the configuration -- is reported and left alone, because the repair
 // is a judgment about what the author meant rather than a deletion.
 func strictShouldFix(mode StrictMode) bool {
-	return mode == strictModeModule
+	return mode == strictModeModule || mode == strictModeImplied
 }
 
 // walkStatements descends the tree, tracking strictness and class nesting.
