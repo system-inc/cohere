@@ -17,6 +17,12 @@ var allowedRuleImports = map[string]bool{
 	// prefix without a trailing slash would also admit `internal/tailwindanything`, and one with a
 	// trailing slash matches no package at all when the package is the directory itself.
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse": true,
+	// The house policy both engines read as data: rule names, message text. It imports only the
+	// standard library and moves when a shared decision changes, which is the event a rebuild should
+	// follow. Measured on 2026-10-03 when Base's bare-throw rule began rendering its message from it,
+	// three warm rounds each under the same load: editing a rule that imports it rebuilds in 1.13 to
+	// 1.25s, editing one that does not in 1.21 to 1.23s, and editing policy itself in about 0.2s.
+	"github.com/system-inc/cohere/policy": true,
 }
 
 // allowedRuleImportPrefixes are subtrees a rule package may depend on wholesale.

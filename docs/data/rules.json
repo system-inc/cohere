@@ -4003,7 +4003,7 @@
             "category": "consistency",
             "typeAware": false,
             "messageIds": [
-                "consistencyNoBareThrow"
+                "bareThrow"
             ],
             "sets": [
                 {

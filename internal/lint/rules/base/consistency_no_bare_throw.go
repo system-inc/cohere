@@ -6,22 +6,22 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
+
+// consistencyNoBareThrowMessage is the rule's one message, shared with its Swift twin in
+// `policy/messages/consistency-no-bare-throw.json`, where the wording lives.
+var consistencyNoBareThrowMessage = policy.MessageOf("base/consistency-no-bare-throw", "bareThrow")
 
 // messageNoBareThrow names the constructor, because the message is the fix and the fix differs.
 //
-// `rule.Message` has no interpolation layer, so the original's `{{constructorName}}` becomes
-// concatenation here. The name is worth carrying rather than dropping: a file throwing an `Error`
-// and a `TypeError` produces two findings under one id, and the constructor is the only thing in the
-// text that separates them.
+// The name is worth carrying rather than dropping: a file throwing an `Error` and a `TypeError`
+// produces two findings under one id, and the constructor is the only thing in the text that
+// separates them.
 func messageNoBareThrow(constructorName string) rule.Message {
 	return rule.Message{
-		Id: "consistencyNoBareThrow",
-		Description: "This throws a bare `" + constructorName + "`, which names no declared " +
-			"failure. Raise it through the tier that declares it, `AccountModule.error(identifier, " +
-			"data, cause)`, `ApiWorker.error(...)` or `Base.error(...)`. A bare throw carries no " +
-			"identifier, so the board groups it by its message and one interpolated value mints one " +
-			"identity per value, and it normalizes to 500, so a refusal reads as our fault.",
+		Id:          consistencyNoBareThrowMessage.Id,
+		Description: consistencyNoBareThrowMessage.Render(map[string]string{"constructor": constructorName}),
 	}
 }
 

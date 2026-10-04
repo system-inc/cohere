@@ -362,7 +362,7 @@ func sourceSnapshot(t *testing.T) string {
 	for _, name := range []string{"go.mod", "go.sum", "go.work", "go.work.sum"} {
 		copySnapshotFile(t, filepath.Join(moduleRoot, name), filepath.Join(snapshot, name))
 	}
-	for _, directory := range []string{"command", "internal", "TypeScript-shim"} {
+	for _, directory := range []string{"command", "internal", "policy", "TypeScript-shim"} {
 		source := filepath.Join(moduleRoot, directory)
 		err := filepath.WalkDir(source, func(path string, entry fs.DirEntry, walkError error) error {
 			if walkError != nil {

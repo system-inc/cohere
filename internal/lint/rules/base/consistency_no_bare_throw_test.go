@@ -1,10 +1,14 @@
 package base
 
 import (
+	"io/fs"
 	"strconv"
+	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/policy"
 )
 
 // consistencyNoBareThrowCaseName numbers a row so a failure names which one, since many rows differ only in a
@@ -144,7 +148,7 @@ func TestNoBareThrowFires(t *testing.T) {
 
 			wantIds := make([]string, len(testCase.wantSpans))
 			for index := range wantIds {
-				wantIds[index] = "consistencyNoBareThrow"
+				wantIds[index] = "bareThrow"
 			}
 			rule_testing.ExpectFindings(t, result, wantIds...)
 
@@ -154,16 +158,52 @@ func TestNoBareThrowFires(t *testing.T) {
 					t.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
 				}
 
-				// Against a literal built here rather than against the rule's own constant: a test
+				// Against a literal built here rather than against the rule's own message: a test
 				// comparing a diagnostic to the value it was built from moves both sides under
-				// mutation and asserts nothing.
-				want := messageNoBareThrow(testCase.wantNames[index]).Description
+				// mutation and asserts nothing. The literal is the text from before the wording moved
+				// to policy/messages, so this row also proves the move changed no word.
+				want := consistencyNoBareThrowWording(testCase.wantNames[index])
 				if result.Diagnostics[index].Message.Description != want {
 					t.Errorf("finding %d reads %q, want %q", index,
 						result.Diagnostics[index].Message.Description, want)
 				}
 			}
 		})
+	}
+}
+
+// consistencyNoBareThrowWording is the rule's message for one constructor, written out here.
+func consistencyNoBareThrowWording(constructorName string) string {
+	return "This throws a bare `" + constructorName + "`, which names no declared " +
+		"failure. Raise it through the tier that declares it, `AccountModule.error(identifier, " +
+		"data, cause)`, `ApiWorker.error(...)` or `Base.error(...)`. A bare throw carries no " +
+		"identifier, so the board groups it by its message and one interpolated value mints one " +
+		"identity per value, and it normalizes to 500, so a refusal reads as our fault."
+}
+
+// TestNoBareThrowRendersAnEditedEntry: the finding's words come from policy/messages, so an edit to the
+// entry shows up in the finding. Not parallel, since it swaps the catalog every render reads.
+func TestNoBareThrowRendersAnEditedEntry(t *testing.T) {
+	original, err := fs.ReadFile(policy.MessageFiles(), "consistency-no-bare-throw.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	edited := strings.Replace(string(original), "which names no declared failure", "which names no failure anyone declared", 1)
+	if edited == string(original) {
+		t.Fatal("the anchor is not in the entry, so the edit would not apply")
+	}
+	catalog, err := policy.LoadMessages(fstest.MapFS{"consistency-no-bare-throw.json": {Data: []byte(edited)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	restore := policy.UseMessages(catalog)
+	defer restore()
+
+	result := rule_testing.Run(t, ConsistencyNoBareThrow, "/repository/source/modules/thing/Service.ts",
+		"export function f(): void { throw new TypeError('x'); }")
+	rule_testing.ExpectFindings(t, result, "bareThrow")
+	if got := result.Diagnostics[0].Message.Description; !strings.Contains(got, "This throws a bare `TypeError`, which names no failure anyone declared.") {
+		t.Errorf("the finding reads %q, without the edit", got)
 	}
 }
 
