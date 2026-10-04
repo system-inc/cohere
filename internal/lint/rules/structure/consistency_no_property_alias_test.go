@@ -36,6 +36,14 @@ func TestConsistencyNoPropertyAliasFires(t *testing.T) {
 		// findings quietly, and a hatch that is too NARROW manufactures accusations against
 		// correct files. 117 of the 231 alias-shaped declarations on the ahra tree are exempted by
 		// this hatch alone, so both directions get a case.
+		// The two exemptions of #nd52037, each from the side that must still report. A write to the
+		// source before the snapshot, or after its last read, leaves the reach reading what the local
+		// holds, and a write to some other property does not touch the reach at all.
+		{"the source is written before the declaration", "export class Runner {\n    server: ServerInterface | undefined;\n    stop() {\n        this.server = undefined;\n        const server = this.server;\n        return server;\n    }\n}\n"},
+		{"the source is written after the last read", "export class Runner {\n    server: ServerInterface | undefined;\n    stop() {\n        const server = this.server;\n        close(server);\n        this.server = undefined;\n    }\n}\n"},
+		{"a different property is written", "export class Runner {\n    server: ServerInterface | undefined;\n    other: number = 0;\n    stop() {\n        const server = this.server;\n        this.other = 1;\n        close(server);\n    }\n}\n"},
+		{"a longer reach through the local is written", "export function run(state: StateInterface) {\n    const inner = state.inner;\n    state.inner.value = 1;\n    return inner;\n}\n"},
+		{"a let only read", "export function run(options: OptionsInterface) {\n    let label = options.label;\n    use(label);\n    return label;\n}\n"},
 		{"an array argument to something that is not a hook", "export function run(options: OptionsInterface) {\n    const secret = options.secret;\n    notAHook(function() {\n        return 1;\n    }, [secret]);\n    return secret;\n}\n"},
 	}
 	for _, testCase := range cases {
@@ -89,6 +97,19 @@ func TestConsistencyNoPropertyAliasStaysSilent(t *testing.T) {
 		{"no initializer", "export function run() {\n    let value;\n    return value;\n}\n"},
 		{"a destructure rather than a reach", "export function run(options: OptionsInterface) {\n    const { timeout } = options;\n    return timeout;\n}\n"},
 		{"an initializer that is not a reach", "export function run() {\n    const value = 1;\n    return value;\n}\n"},
+		// A snapshot taken before its source is written (#nd52037). The first is api's
+		// BaseWorkerNodeRunner.ts:109, where a reach at the read would see undefined.
+		{"a snapshot before its property is cleared", "export class Runner {\n    httpServer: ServerInterface | undefined;\n    stop() {\n        const httpServer = this.httpServer;\n        this.httpServer = undefined;\n        close(httpServer);\n    }\n}\n"},
+		{"a snapshot before an object above it is replaced", "export function run(state: StateInterface, other: InnerInterface) {\n    const value = state.inner.value;\n    state.inner = other;\n    return value;\n}\n"},
+		{"a snapshot before its root is reassigned", "export function run(options: OptionsInterface, fallback: OptionsInterface) {\n    const timeout = options.timeout;\n    options = fallback;\n    return timeout;\n}\n"},
+		{"a snapshot before its property is deleted", "export function run(record: RecordInterface) {\n    const value = record.value;\n    delete record.value;\n    return value;\n}\n"},
+		{"a snapshot before its property is incremented", "export function run(counter: CounterInterface) {\n    const count = counter.count;\n    counter.count++;\n    return count;\n}\n"},
+		{"a snapshot before a compound write through a cast", "export function run(counter: CounterInterface) {\n    const count = counter.count;\n    (counter as WritableInterface).count += 1;\n    return count;\n}\n"},
+		// A binding written again after its declaration (#nd52037): a default a branch overrides.
+		{"a let reassigned in a branch", "export function run(options: OptionsInterface, compact: boolean) {\n    let label = options.label;\n    if (compact) {\n        label = 'short';\n    }\n    return label;\n}\n"},
+		{"a let updated by a compound assignment", "export function run(options: OptionsInterface) {\n    let total = options.total;\n    total += 1;\n    return total;\n}\n"},
+		{"a let written by destructuring", "export function run(options: OptionsInterface) {\n    let cursor = options.cursor;\n    [cursor] = next();\n    return cursor;\n}\n"},
+		{"a var reassigned", "export function run(options: OptionsInterface) {\n    var limit = options.limit;\n    limit = 10;\n    return limit;\n}\n"},
 		{"read in a useEffect dependency array", "export function run(options: OptionsInterface) {\n    const timeout = options.timeout;\n    React.useEffect(function() {\n        report(timeout);\n    }, [timeout]);\n}\n"},
 		{"read in a bare hook dependency array", "export function run(options: OptionsInterface) {\n    const timeout = options.timeout;\n    useMemo(function() {\n        return timeout;\n    }, [timeout]);\n}\n"},
 		{"read inside a longer reach in a dependency array", "export function run(options: OptionsInterface) {\n    const settings = options.settings;\n    useMemo(function() {\n        return 1;\n    }, [settings.value]);\n}\n"},

@@ -2,6 +2,7 @@ package structure
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/scope"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
@@ -20,7 +21,7 @@ var consistencyNoPropertyAliasText = policy.MessageOf("structure/consistency-no-
 //	valid:   const Foo = Bar.Foo              // module scope, a re-export shape rather than an alias
 //	invalid: function run() { const promise = tracked.promise; return promise; }
 //
-// Four exemptions, each of which is a real judgment rather than a narrowing for safety.
+// Six exemptions, each of which is a real judgment rather than a narrowing for safety.
 //
 // **A chain containing a call is caching, not aliasing.** `Intl.DateTimeFormat().resolvedOptions()`
 // costs something to evaluate, so a local holding its result is doing work a reach would repeat.
@@ -39,6 +40,20 @@ var consistencyNoPropertyAliasText = policy.MessageOf("structure/consistency-no-
 // the canonical workaround rather than a lapse. The check looks for the local anywhere in the
 // enclosing function, not only beside the declaration, because the array is usually several lines
 // below.
+//
+// **A binding written again after its declaration is not an alias.** `let label = options.label`
+// followed by `if (compact) label = short` is a default a branch overrides, and the reach could
+// not stand in for it. Nine sites in api had the shape (#nd52037, PostResolver.ts:135 among them).
+//
+// **A snapshot taken before its source is written is not an alias either.** api's
+// BaseWorkerNodeRunner.ts:109 takes `const httpServer = this.httpServer`, sets
+// `this.httpServer = undefined`, then reads the local. A reach there would read undefined, so the
+// local holds a value the property no longer does. Exempt when a link of the source chain (the
+// property, an object above it, or the root binding) is assigned, updated or deleted after the
+// declaration and before the local's last read (#nd52037).
+//
+// Both read names, not symbols, within the enclosing function, as the hook exemption does, so a
+// nested binding of the same name counts too. Structure's ESLint twin decides the same two.
 var ConsistencyNoPropertyAlias = rule.Rule{
 	Name: "structure/consistency-no-property-alias",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
@@ -98,6 +113,14 @@ var ConsistencyNoPropertyAlias = rule.Rule{
 				}
 
 				if isReadInsideHookDependencyArray(enclosing, localName, name) {
+					return
+				}
+
+				if isWrittenAfterItsDeclaration(enclosing, localName, name) {
+					return
+				}
+
+				if isSnapshotTakenBeforeItsSourceIsWritten(enclosing, node, localName, name, initializer) {
 					return
 				}
 
@@ -237,4 +260,141 @@ func arrayMentions(array *ast.Node, localName string, declarationName *ast.Node)
 	walk(array)
 
 	return mentioned
+}
+
+// isWrittenAfterItsDeclaration reports whether anything in the enclosing function writes the local's
+// name again: an assignment, a compound assignment, an update, or a destructuring target.
+func isWrittenAfterItsDeclaration(enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
+	written := false
+	var walk func(node *ast.Node) bool
+	walk = func(node *ast.Node) bool {
+		if node == nil || written {
+			return false
+		}
+		if node.Kind == ast.KindIdentifier && node != declarationName && node.Text() == localName &&
+			reference.WritesToBinding(node) {
+			written = true
+			return true
+		}
+		node.ForEachChild(walk)
+		return written
+	}
+	walk(enclosing)
+	return written
+}
+
+// isSnapshotTakenBeforeItsSourceIsWritten reports whether a link of the reach the local was taken
+// from is written after the declaration and before the local's last read.
+//
+// The links are the reach itself and every object above it down to the root: for
+// `const value = state.inner.value`, a write to `state.inner.value`, to `state.inner` or to `state`
+// each changes what a reach at the read would see. A write is an assignment of any operator, an
+// update, or a `delete`.
+func isSnapshotTakenBeforeItsSourceIsWritten(enclosing *ast.Node, declaration *ast.Node, localName string, declarationName *ast.Node, initializer *ast.Node) bool {
+	lastRead := -1
+	var findLastRead func(node *ast.Node) bool
+	findLastRead = func(node *ast.Node) bool {
+		if node == nil {
+			return false
+		}
+		if node.Kind == ast.KindIdentifier && node != declarationName && node.Text() == localName &&
+			!reference.WritesToBinding(node) && node.End() > lastRead {
+			lastRead = node.End()
+		}
+		node.ForEachChild(findLastRead)
+		return false
+	}
+	findLastRead(enclosing)
+	if lastRead < 0 {
+		return false
+	}
+
+	var links []*ast.Node
+	for current := unwrapReach(initializer); current != nil; {
+		links = append(links, current)
+		if current.Kind != ast.KindPropertyAccessExpression {
+			break
+		}
+		current = unwrapReach(current.AsPropertyAccessExpression().Expression)
+	}
+
+	found := false
+	var walk func(node *ast.Node) bool
+	walk = func(node *ast.Node) bool {
+		if node == nil || found {
+			return false
+		}
+		if target := writeTarget(node); target != nil && node.Pos() >= declaration.End() && node.End() <= lastRead {
+			for _, link := range links {
+				if sameReach(target, link) {
+					found = true
+					return true
+				}
+			}
+		}
+		node.ForEachChild(walk)
+		return found
+	}
+	walk(enclosing)
+	return found
+}
+
+// writeTarget is what a node writes, for an assignment of any operator, an update, or a `delete`,
+// and nil for anything else.
+func writeTarget(node *ast.Node) *ast.Node {
+	switch node.Kind {
+	case ast.KindBinaryExpression:
+		binary := node.AsBinaryExpression()
+		if binary.OperatorToken != nil && ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
+			return binary.Left
+		}
+	case ast.KindPrefixUnaryExpression:
+		unary := node.AsPrefixUnaryExpression()
+		if reference.IsUpdateOperator(unary.Operator) {
+			return unary.Operand
+		}
+	case ast.KindPostfixUnaryExpression:
+		unary := node.AsPostfixUnaryExpression()
+		if reference.IsUpdateOperator(unary.Operator) {
+			return unary.Operand
+		}
+	case ast.KindDeleteExpression:
+		return node.AsDeleteExpression().Expression
+	}
+	return nil
+}
+
+// unwrapReach sees through what does not change which value an expression reaches: parentheses, a
+// non-null assertion, and a type assertion.
+func unwrapReach(node *ast.Node) *ast.Node {
+	for node != nil {
+		switch node.Kind {
+		case ast.KindParenthesizedExpression, ast.KindNonNullExpression, ast.KindAsExpression,
+			ast.KindSatisfiesExpression, ast.KindTypeAssertionExpression:
+			node = node.Expression()
+		default:
+			return node
+		}
+	}
+	return nil
+}
+
+// sameReach reports whether two expressions name the same place by spelling: the same identifier,
+// `this`, or the same property of the same reach.
+func sameReach(first *ast.Node, second *ast.Node) bool {
+	first, second = unwrapReach(first), unwrapReach(second)
+	if first == nil || second == nil || first.Kind != second.Kind {
+		return false
+	}
+	switch first.Kind {
+	case ast.KindIdentifier:
+		return first.Text() == second.Text()
+	case ast.KindThisKeyword:
+		return true
+	case ast.KindPropertyAccessExpression:
+		firstName, secondName := first.AsPropertyAccessExpression().Name(), second.AsPropertyAccessExpression().Name()
+		return firstName != nil && secondName != nil && firstName.Text() == secondName.Text() &&
+			sameReach(first.AsPropertyAccessExpression().Expression, second.AsPropertyAccessExpression().Expression)
+	}
+	return false
 }
