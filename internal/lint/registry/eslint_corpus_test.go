@@ -96,6 +96,24 @@ func decodeCorpusOptions(registration rule.Registration, options []json.RawMessa
 	}
 }
 
+// utf16ToByteOffsets maps each UTF-16 offset in code to its byte offset, one entry past the end included.
+//
+// ESLint's offsets are JavaScript string indices, which count UTF-16 code units, and Go slices bytes. On
+// ASCII the two agree, so the difference hid until a row had a non-ASCII character before its finding:
+// then the expected slice was the wrong text, and 122 rows of the unicode rules read as span gaps that
+// were not there. A character outside the Basic Multilingual Plane is two units and four bytes; a lone
+// surrogate, which several rows hold on purpose, decodes to U+FFFD, one unit either way.
+func utf16ToByteOffsets(code string) []int {
+	offsets := make([]int, 0, len(code)+1)
+	for index, character := range code {
+		offsets = append(offsets, index)
+		if character > 0xFFFF {
+			offsets = append(offsets, index)
+		}
+	}
+	return append(offsets, len(code))
+}
+
 // corpusVerdict replays one row through the rule and says how cohere's answer compares with ESLint's
 func corpusVerdict(t *testing.T, registration rule.Registration, row eslintCorpusRow) string {
 	decoded, problem := decodeCorpusOptions(registration, row.Options)
@@ -113,9 +131,10 @@ func corpusVerdict(t *testing.T, registration rule.Registration, row eslintCorpu
 		return "harness"
 	}
 
+	byteOffset := utf16ToByteOffsets(row.Code)
 	expected := make([]string, 0, len(row.ESLint))
 	for _, finding := range row.ESLint {
-		start, end := int(finding[1].(float64)), int(finding[2].(float64))
+		start, end := byteOffset[int(finding[1].(float64))], byteOffset[int(finding[2].(float64))]
 		expected = append(expected, row.Code[start:end])
 	}
 	// The harness writes the file trimmed, so cohere's offsets are in the trimmed text, and slices compare
@@ -244,5 +263,21 @@ func TestCohereAgreesWithESLintsCoreCorpus(t *testing.T) {
 		if err := os.WriteFile(eslintCorpusGapsFile, append(encoded, '\n'), 0o644); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// ESLint counts UTF-16 units: é is one unit and two bytes, 😀 is two units and four bytes.
+func TestUTF16OffsetsBecomeByteOffsets(t *testing.T) {
+	t.Parallel()
+
+	code := "é😀x"
+	offsets := utf16ToByteOffsets(code)
+	// Units: é at 0, 😀 at 1 and 2, x at 3, the end at 4
+	want := []int{0, 2, 2, 6, 7}
+	if fmt.Sprint(offsets) != fmt.Sprint(want) {
+		t.Fatalf("offsets %v, want %v", offsets, want)
+	}
+	if got := code[offsets[3]:offsets[4]]; got != "x" {
+		t.Fatalf("unit 3 slices to %q, want x", got)
 	}
 }
