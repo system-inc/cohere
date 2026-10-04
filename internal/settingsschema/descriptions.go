@@ -47,6 +47,10 @@ var topLevelDescriptions = map[string]string{
 	"jsPlugins": "Accepted and ignored: paths to the JavaScript rule implementations oxlint loads. cohere's " +
 		"rules are compiled in, so there is nothing to load.",
 
+	"output": "How a run prints, for this repository. phases: true puts where the time went (graph, fix, format, " +
+		"types, lint) first in the footer's parentheses, as --phases does. Read only from the file cohere reads " +
+		"first, and a key outside this block's is refused.",
+
 	"settings": "Per-plugin settings carried for the JavaScript tools that still read this file. Allowed only " +
 		"in the file cohere reads first, never in a file another extends, and nothing in cohere reads it.",
 

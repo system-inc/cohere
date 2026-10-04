@@ -148,7 +148,19 @@ var ignoredKeyShapes = map[string]func() map[string]any{
 		return map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
 	},
 	"settings": func() map[string]any { return map[string]any{"type": "object"} },
-	FormatKey:  formatShape,
+	"output": func() map[string]any {
+		return map[string]any{
+			"type":                 "object",
+			"additionalProperties": false,
+			"properties": map[string]any{
+				"phases": map[string]any{
+					"type":        "boolean",
+					"description": "Put where the time went first in the footer's parentheses, as --phases does.",
+				},
+			},
+		}
+	},
+	FormatKey: formatShape,
 }
 
 func formatShape() map[string]any {

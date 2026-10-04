@@ -409,6 +409,12 @@ func loadLayers(layers []configLayer, root string, registeredNames []string) (*C
 				"silently. Keep \"settings\" in the project's own file",
 				layer.path, layers[len(layers)-1].path)
 		}
+		if isBase && layer.present["output"] {
+			return nil, fmt.Errorf("lint config %s declares \"output\", and it is extended by %s: "+
+				"the run reads \"output\" from the project's own file only, so the value would be ignored "+
+				"silently. Keep \"output\" in the project's own file",
+				layer.path, layers[len(layers)-1].path)
+		}
 
 		// What the layers below wrote, frozen before this one writes anything. Comparing against the
 		// live map would let two spellings in this same file read as one inheriting from the other, in
@@ -974,6 +980,9 @@ var ignoredTopLevelKeys = map[string]string{
 		"internal/format/formatoptions. They moved here from package.json's prettier block when cohere's " +
 		"native printers replaced Prettier, so the linter leaves them alone on purpose: they are the " +
 		"formatter's, not a rule's.",
+
+	"output": "how a run prints, read by the command (command/cohere/output_settings.go) from the file cohere " +
+		"reads first. It decides nothing a rule does, so the linter leaves it alone on purpose.",
 
 	"settings": "per-plugin configuration for the JavaScript plugins above, and it is the entry " +
 		"most worth re-reading. `settings.better-tailwindcss.entryPoint` names this repository's " +

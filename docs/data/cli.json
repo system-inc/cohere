@@ -41,6 +41,10 @@
             "usage": "format only, proposing no fixes and running no other phase (implies --format); with --no-fix, the commit gate's format check: every file formatting would change here or in a nested repository is a finding, and so is one the formatter could not read, and the exit is 0 only when there are none"
         },
         {
+            "name": "json",
+            "usage": "print newline-delimited JSON for a program to read, described by schema/CohereOutput.schema.json"
+        },
+        {
             "name": "lint",
             "usage": "run the lint rules only, reporting their findings without fixing them and without TypeScript's diagnostics"
         },
@@ -61,6 +65,10 @@
         {
             "name": "no-format",
             "usage": "leave formatting out of a bare run, --fix or --no-fix: fix, type-check and lint only"
+        },
+        {
+            "name": "phases",
+            "usage": "put where the time went first in the footer's parentheses"
         },
         {
             "name": "print-config",
@@ -113,6 +121,10 @@
         {
             "name": "unused-deep",
             "usage": "also compute the transitive closure of unused code and group it into islands (implies --unused)"
+        },
+        {
+            "name": "verbose",
+            "usage": "print everything a run can say: each phase, the coverage summary, overrides, skips, notes, memory and the total"
         },
         {
             "name": "version",

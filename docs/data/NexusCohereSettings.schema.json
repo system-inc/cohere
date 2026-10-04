@@ -1640,6 +1640,17 @@
             },
             "type": "array"
         },
+        "output": {
+            "additionalProperties": false,
+            "description": "How a run prints, for this repository. phases: true puts where the time went (graph, fix, format, types, lint) first in the footer's parentheses, as --phases does. Read only from the file cohere reads first, and a key outside this block's is refused.",
+            "properties": {
+                "phases": {
+                    "description": "Put where the time went first in the footer's parentheses, as --phases does.",
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
         "overrides": {
             "description": "Blocks that change rules for the paths their globs match, applied in order after the base rules, a later block winning.",
             "items": {

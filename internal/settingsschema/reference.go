@@ -23,6 +23,7 @@ var examples = map[string]string{
 	"plugins":        `["react"]`,
 	"jsPlugins":      `["./code-quality/lint/rules/index.js"]`,
 	"settings":       `{ "react": { "version": "19.0" } }`,
+	"output":         `{ "phases": true }`,
 	FormatKey:        `{ "printWidth": 120, "tabWidth": 4, "singleQuote": true, "ignore": ["pnpm-lock.yaml", "*.sqlite"] }`,
 }
 
@@ -58,7 +59,7 @@ func reference(ruleNames []string) string {
 		switch key.Name {
 		case FormatKey:
 			where = "any settings file outside our tiers; in a chain extending a cohere:system-inc set, the Nexus tier only"
-		case "settings":
+		case "settings", "output":
 			where = "the file cohere reads first"
 		}
 		write("| [`%s`](#%s) | %s | %s |\n", key.Name, anchor(key.Name), typeName(key), where)

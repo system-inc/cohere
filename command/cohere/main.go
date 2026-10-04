@@ -445,6 +445,15 @@ func run() error {
 		}, os.Stdin, os.Stdout)
 	}
 
+	// The repository's own way of printing, from its settings, under whatever the command line named.
+	block, err := readOutputBlock(location.LintConfigFileName)
+	if err != nil {
+		return err
+	}
+	if block.Phases != nil && !given["phases"] {
+		activeOutput.Phases = *block.Phases
+	}
+
 	// The run cache: a bare run whose every input is unchanged replays its recorded report here and
 	// exits, before the graph is built. Otherwise this starts recording. See run_cache.go.
 	runCacheInputs := beginRunCache(location)

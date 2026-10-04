@@ -42,6 +42,7 @@ never something it silently ignores.
 | [`format`](#format) | object | any settings file outside our tiers; in a chain extending a cohere:system-inc set, the Nexus tier only |
 | [`ignorePatterns`](#ignorepatterns) | array of strings | any settings file |
 | [`jsPlugins`](#jsplugins) | array | any settings file |
+| [`output`](#output) | object | the file cohere reads first |
 | [`overrides`](#overrides) | array of blocks | any settings file |
 | [`plugins`](#plugins) | array of strings | any settings file |
 | [`reasons`](#reasons) | object of reasons | any settings file |
@@ -130,6 +131,14 @@ Accepted and ignored: paths to the JavaScript rule implementations oxlint loads.
 
 ```json
 { "jsPlugins": ["./code-quality/lint/rules/index.js"] }
+```
+
+### `output`
+
+How a run prints, for this repository. phases: true puts where the time went (graph, fix, format, types, lint) first in the footer's parentheses, as --phases does. Read only from the file cohere reads first, and a key outside this block's is refused.
+
+```json
+{ "output": { "phases": true } }
 ```
 
 ### `overrides`
