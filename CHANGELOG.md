@@ -16,3 +16,9 @@ The first release. It carries these rule sets:
 - `cohere:system-inc/structure`, 36 rules on
 - `cohere:tailwind`, 12 rules on
 - `cohere:typescript`, 232 rules on
+
+Formatting: a project that configures nothing formats with the house block `cohere:typescript` carries
+(tab width 4, single quotes, print width 120). A project outside the `cohere:system-inc/*` sets may set
+its own `format` block in `CohereSettings.json`, applied over Prettier's defaults, so `"format": {}`
+means Prettier's defaults. A project that extends a `cohere:system-inc/*` set takes its format from that
+chain's Nexus tier alone, and a `format` block anywhere else in it is refused.

@@ -16,18 +16,19 @@ import (
 /*
  * Which options a directory is formatted with.
  *
- * They live in one `format` block, in the Nexus tier (NexusCohereSettings.json) that every
- * repository's CohereSettings.json extends, and nowhere else: formatting is unified (Kirk's ruling,
- * 2026-10-03). They used to be read from package.json's `prettier` key, then from each repository's
- * own block, merged over its tiers.
+ * Zero config is the house stack, our format included (Kirk, 2026-10-04, #bfxz13m): a tree with no
+ * CohereSettings.json, or settings that never say how to format, formats with the house block that
+ * cohere:typescript carries. A project going its own way sets a `format` block in its own settings,
+ * applied over Prettier's defaults, so `{}` means Prettier's defaults.
  *
- * So this resolves from the nearest CohereSettings.json walking up from the directory, follows its
- * `extends` chain as the lint loader does, and takes the block from the Nexus tier alone. It refuses
- * every case that would otherwise format with options nobody chose or chose in two places: a `format`
- * key in any other file of the chain, a chain without a Nexus tier, a Nexus tier without the block,
- * and Prettier config left behind in its old place, whatever it says. The only way to get Prettier's
- * defaults is to configure nothing anywhere, which is the honest meaning of a default. A refusal says
- * which file and why.
+ * Our own tiers stay unified (Kirk's ruling, 2026-10-03): a chain that extends a cohere:system-inc set
+ * (configuration.InOurTiers, the predicate the lint loader shares) takes its block from the Nexus tier alone, and a `format` key anywhere else in
+ * it is refused, naming the file, as is a Nexus tier without the block.
+ *
+ * So this resolves from the nearest CohereSettings.json walking up from the directory and follows its
+ * `extends` chain as the lint loader does. Prettier config left behind in its old place is refused
+ * wherever the walk meets it, whatever it says: cohere reads format options from CohereSettings.json
+ * alone. A refusal says which file and why.
  */
 
 // SettingsFileName is the file a repository's cohere configuration lives in.
@@ -82,11 +83,11 @@ type Resolution struct {
 	IgnorePatterns []string
 }
 
-// PrettierDefaults are Prettier 3's own defaults, what a directory with no options anywhere formats
-// with.
+// PrettierDefaults are Prettier 3's own defaults, what a project's own `format` block is applied over:
+// `{}` formats with exactly these.
 //
-// Not Default: those are ahra's choices, and a repository that configures nothing gets tab width 2,
-// print width 80 and double quotes, not ahra's 4, 120 and single.
+// Not Default, and not the house block: a project that writes `"format": {}` chose tab width 2, print
+// width 80 and double quotes, not the house's 4, 120 and single.
 func PrettierDefaults() Options {
 	return Options{
 		TabWidth:        2,
@@ -167,8 +168,8 @@ func (resolver *Resolver) resolveHere(directory string) resolved {
 		return resolved{err: err}
 	}
 	if found {
-		return resolved{err: fmt.Errorf("%s: %w; delete it, since cohere formats with the format block in the Nexus tier (%s)",
-			leftover, ErrPrettierConfigRemains, NexusTierFileName)}
+		return resolved{err: fmt.Errorf("%s: %w; delete it, since cohere reads format options only from a \"format\" block in %s",
+			leftover, ErrPrettierConfigRemains, SettingsFileName)}
 	}
 
 	path := filepath.Join(directory, SettingsFileName)
@@ -179,7 +180,9 @@ func (resolver *Resolver) resolveHere(directory string) resolved {
 
 	parent := filepath.Dir(directory)
 	if parent == directory {
-		return resolved{resolution: Resolution{Options: PrettierDefaults()}}
+		// No settings anywhere above: zero config, which is the house stack and its format.
+		resolution, err := houseResolution()
+		return resolved{resolution: resolution, err: err}
 	}
 	return resolver.resolve(parent)
 }
@@ -245,23 +248,30 @@ func (entry chainEntry) stillReads() bool {
 	return true
 }
 
-// NexusTierFileName is the one file in a chain that may hold the format block: the Nexus tier, which
-// every repository's chain ends at (ahra and www-phi-health through Structure, api-phi-health
-// through Base).
+// NexusTierFileName is the Nexus tier as a file, the copy the Nexus repository keeps for its ESLint twin.
+// No chain names it: ours reach the tier as NexusTierSetName.
 const NexusTierFileName = "NexusCohereSettings.json"
 
-// NexusTierSetName is the Nexus tier as the rule set cohere carries, which a chain names in `extends`.
+// NexusTierSetName is the Nexus tier as the rule set cohere carries. Every set extends it, and its
+// format block is the house format, what zero config formats with.
 const NexusTierSetName = configuration.SetPrefix + "typescript"
 
-// resolveChain reads the format block from the Nexus tier of path's `extends` chain, and only from
-// there.
+// isNexusTier reports whether a chain source is the Nexus tier, the set every chain of ours reaches.
+func isNexusTier(source string) bool {
+	return source == NexusTierSetName
+}
+
+// resolveChain reads the format block path's `extends` chain says to format with.
 //
-// Formatting is unified (Kirk's ruling, 2026-10-03): every repository formats the same way, so the
-// block is written once, in the Nexus tier, and a `format` key anywhere else in the chain is refused,
-// naming the file, rather than merged over it. A project or a Structure or Base tier that restated
-// the block would be a second place the house format could drift. A chain with no Nexus tier, or a
-// Nexus tier without the block, does not say how to format, and is refused rather than formatted with
-// Prettier's defaults.
+// In our tiers (configuration.InOurTiers, shared with the lint loader so a project cannot be strict for
+// one reader and free for the other) it is the Nexus tier's and only the Nexus tier's: formatting is unified (Kirk's ruling,
+// 2026-10-03), so a `format` key anywhere else in the chain is refused, naming the file, rather than
+// merged over it, and a Nexus tier without the block is refused rather than formatted with anything.
+//
+// Outside them (Kirk, 2026-10-04, #bfxz13m), the project goes its own way: the most derived file of
+// the chain with a `format` block decides, applied over Prettier's defaults, and its `ignore` is the
+// house list when it has one. A chain with no block formats the house way, the block cohere:typescript
+// carries, whether or not the chain names that set.
 //
 // The chain is read by the lint loader's own SourcesOf rather than by a second walk of `extends` here,
 // so the two readers cannot disagree about which files a configuration is made of.
@@ -271,9 +281,8 @@ func resolveChain(path string) (Resolution, error) {
 		return Resolution{}, err
 	}
 
-	var nexusTier string
-	var block json.RawMessage
-	for _, source := range sources {
+	blocks := make([]json.RawMessage, len(sources))
+	for index, source := range sources {
 		contents, err := configuration.SourceContents(source)
 		if err != nil {
 			return Resolution{}, err
@@ -282,45 +291,108 @@ func resolveChain(path string) (Resolution, error) {
 		if err := json.Unmarshal(contents, &settings); err != nil {
 			return Resolution{}, fmt.Errorf("%s is not valid JSON: %w", source, err)
 		}
-		sourceBlock, present := settings["format"]
-		if source != NexusTierSetName && filepath.Base(source) != NexusTierFileName {
-			if present {
-				return Resolution{}, fmt.Errorf("%s has a \"format\" block; formatting is unified, and only the Nexus tier (%s) holds the format block, so remove it here", source, NexusTierFileName)
+		blocks[index] = settings["format"]
+	}
+
+	var resolution Resolution
+	if configuration.InOurTiers(sources) {
+		var nexusTier string
+		var block json.RawMessage
+		for index, source := range sources {
+			if !isNexusTier(source) {
+				if blocks[index] != nil {
+					return Resolution{}, fmt.Errorf("%s has a \"format\" block; formatting is unified in our tiers, and only the Nexus tier (%s) holds the format block, so remove it here", source, NexusTierSetName)
+				}
+				continue
 			}
-			continue
+			nexusTier = source
+			if blocks[index] != nil {
+				block = blocks[index]
+			}
 		}
-		nexusTier = source
-		if present {
-			block = sourceBlock
+		if nexusTier == "" {
+			return Resolution{}, fmt.Errorf("%s does not extend the Nexus tier (%s), which holds the format block, so it does not say how to format", path, NexusTierSetName)
+		}
+		if block == nil {
+			return Resolution{}, fmt.Errorf("%s, the Nexus tier %s extends, has no \"format\" block, so the chain does not say how to format", nexusTier, path)
+		}
+		resolution, err = blockResolution(nexusTier, block)
+		if err != nil {
+			return Resolution{}, err
+		}
+	} else {
+		resolution, err = houseResolution()
+		if err != nil {
+			return Resolution{}, err
+		}
+		// SourcesOf lists the project's own file first and each base after the file that extends it, so the
+		// first block found is the most derived.
+		for index := range sources {
+			if blocks[index] == nil || isNexusTier(sources[index]) {
+				continue
+			}
+			own, err := blockResolution(sources[index], blocks[index])
+			if err != nil {
+				return Resolution{}, err
+			}
+			resolution.Options = own.Options
+			if own.HouseIgnoreDeclared {
+				resolution.HouseIgnore = own.HouseIgnore
+			}
+			break
 		}
 	}
 
-	if nexusTier == "" {
-		return Resolution{}, fmt.Errorf("%s does not extend the Nexus tier (%s), which holds the format block, so it does not say how to format", path, NexusTierFileName)
-	}
-	if block == nil {
-		return Resolution{}, fmt.Errorf("%s, the Nexus tier %s extends, has no \"format\" block, so the chain does not say how to format", nexusTier, path)
-	}
-	options, err := applyFormatBlock(nexusTier, block, PrettierDefaults())
-	if err != nil {
-		return Resolution{}, err
-	}
-	resolution := Resolution{Options: options, Source: path}
-
-	var keys map[string]json.RawMessage
-	if err := json.Unmarshal(block, &keys); err != nil {
-		return Resolution{}, fmt.Errorf("%s: the \"format\" block is not a JSON object: %w", nexusTier, err)
-	}
-	if raw, present := keys["ignore"]; present {
-		if err := json.Unmarshal(raw, &resolution.HouseIgnore); err != nil {
-			return Resolution{}, fmt.Errorf("%s: the format block's \"ignore\" is not a list of patterns: %w", nexusTier, err)
-		}
-		resolution.HouseIgnoreDeclared = true
-	}
-
+	resolution.Source = path
 	resolution.IgnorePatterns, err = configuration.IgnorePatternsOf(path)
 	if err != nil {
 		return Resolution{}, err
+	}
+	return resolution, nil
+}
+
+// houseResolution is the house format and ignore list, from the block cohere:typescript carries: what
+// zero config formats with. It names no Source, since no settings file chose it.
+func houseResolution() (Resolution, error) {
+	contents, err := configuration.SourceContents(NexusTierSetName)
+	if err != nil {
+		return Resolution{}, err
+	}
+	var settings map[string]json.RawMessage
+	if err := json.Unmarshal(contents, &settings); err != nil {
+		return Resolution{}, fmt.Errorf("%s is not valid JSON: %w", NexusTierSetName, err)
+	}
+	block, present := settings["format"]
+	if !present {
+		return Resolution{}, fmt.Errorf("%s carries no \"format\" block, so cohere has no house format", NexusTierSetName)
+	}
+	resolution, err := blockResolution(NexusTierSetName, block)
+	if err != nil {
+		return Resolution{}, err
+	}
+	// The house always declares its list, an empty one included, so the walk never treats zero config as
+	// a chain that forgot to say.
+	resolution.HouseIgnoreDeclared = true
+	return resolution, nil
+}
+
+// blockResolution is one format block applied over Prettier's defaults, with its `ignore` list.
+func blockResolution(source string, block json.RawMessage) (Resolution, error) {
+	options, err := applyFormatBlock(source, block, PrettierDefaults())
+	if err != nil {
+		return Resolution{}, err
+	}
+	resolution := Resolution{Options: options}
+
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(block, &keys); err != nil {
+		return Resolution{}, fmt.Errorf("%s: the \"format\" block is not a JSON object: %w", source, err)
+	}
+	if raw, present := keys["ignore"]; present {
+		if err := json.Unmarshal(raw, &resolution.HouseIgnore); err != nil {
+			return Resolution{}, fmt.Errorf("%s: the format block's \"ignore\" is not a list of patterns: %w", source, err)
+		}
+		resolution.HouseIgnoreDeclared = true
 	}
 	return resolution, nil
 }

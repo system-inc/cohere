@@ -253,29 +253,28 @@ func TestALeftoverPrettierignoreIsRefused(t *testing.T) {
 	}
 }
 
-// TestAChainWithoutTheHouseListIsRefused: a chain whose Nexus tier declares no `ignore` says nothing
-// about what no repository formats, and a walk without that list would offer pnpm-lock.yaml and every
-// database file. So it is refused, naming the settings and the Nexus tier, rather than walked. A root
-// with no settings at all has no chain to ask and walks with `.gitignore` alone.
-func TestAChainWithoutTheHouseListIsRefused(t *testing.T) {
-	root := settingsTree(t, "", `[]`, map[string]string{"a.ts": "export const a = 1;\n", "pnpm-lock.yaml": "lockfileVersion: 1\n"})
-	_, err := Enumerate(root, handlesEveryLanguage)
-	if !errors.Is(err, ErrHouseIgnoreUndeclared) {
-		t.Fatalf("a chain without the house list was walked: %v", err)
-	}
-	for _, want := range []string{filepath.Join(root, "CohereSettings.json"), formatoptions.NexusTierFileName} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("refusal %q does not name %s", err, want)
-		}
-	}
-
-	bare := writeTree(t, map[string]string{".gitignore": "built.ts\n", "a.ts": "export const a = 1;\n", "built.ts": "export const built = 1;\n"})
-	enumeration, err := Enumerate(bare, handlesEveryLanguage)
-	if err != nil {
-		t.Fatalf("a root with no settings was refused: %v", err)
-	}
-	if len(enumeration.Files) != 1 || len(enumeration.IgnoredByLayer) != 1 || enumeration.IgnoredByLayer[".gitignore"] != 1 {
-		t.Errorf("a root with no settings walked %v with layers %v, want a.ts by .gitignore alone", enumeration.Files, enumeration.IgnoredByLayer)
+// TestEveryWalkHasAHouseList: zero config is the house stack (#bfxz13m), so a walk never offers the
+// files no repository formats. An outsider's block without an `ignore`, and a root with no settings at
+// all, both skip pnpm-lock.yaml by the house list, beside .gitignore.
+func TestEveryWalkHasAHouseList(t *testing.T) {
+	for name, root := range map[string]string{
+		"an outsider's block without ignore": settingsTree(t, "", `[]`, map[string]string{".gitignore": "built.ts\n", "a.ts": "export const a = 1;\n", "built.ts": "export const built = 1;\n", "pnpm-lock.yaml": "lockfileVersion: 1\n"}),
+		"no settings at all":                 writeTree(t, map[string]string{".gitignore": "built.ts\n", "a.ts": "export const a = 1;\n", "built.ts": "export const built = 1;\n", "pnpm-lock.yaml": "lockfileVersion: 1\n"}),
+	} {
+		t.Run(name, func(t *testing.T) {
+			enumeration, err := Enumerate(root, handlesEveryLanguage)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if enumeration.IgnoredByLayer[".gitignore"] != 1 || enumeration.IgnoredByLayer[HouseIgnoreLayer] != 1 {
+				t.Fatalf("layers %v, want built.ts by .gitignore and pnpm-lock.yaml by %s", enumeration.IgnoredByLayer, HouseIgnoreLayer)
+			}
+			for _, file := range enumeration.Files {
+				if base := filepath.Base(file); base == "pnpm-lock.yaml" || base == "built.ts" {
+					t.Errorf("offered %s", file)
+				}
+			}
+		})
 	}
 }
 

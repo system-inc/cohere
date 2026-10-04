@@ -4,7 +4,6 @@
 package formatfiles
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -57,10 +56,6 @@ type Enumeration struct {
 	// Files is what survived, absolute paths.
 	Files []string
 }
-
-// ErrHouseIgnoreUndeclared is a refusal to walk a tree whose settings chain names no house list: the
-// format block in the Nexus tier has no `ignore`, so nothing says what no repository formats.
-var ErrHouseIgnoreUndeclared = errors.New("the settings chain does not declare the house ignore list")
 
 // ignoreLayer is one ignore list and how its patterns are read.
 type ignoreLayer struct {
@@ -234,9 +229,9 @@ const (
 // difference between a corpus that measures the tree and one that measures a smaller subject while
 // looking complete.
 //
-// A chain that does not declare the house list is refused rather than walked without one, and so is a
-// `.prettierignore` in root, which cohere no longer reads: either way the walk would skip less than the
-// project believes. A root with no settings at all has no chain and walks with `.gitignore` alone.
+// Every resolution carries a house list: our tiers' from the Nexus tier, an outsider's from its own
+// block or else the house's, and zero config's from cohere:typescript (#bfxz13m). A `.prettierignore` in
+// root is refused, since cohere no longer reads it and the walk would skip less than the project believes.
 func Enumerate(root string, handles func(fileName string) bool) (Enumeration, error) {
 	enumeration := Enumeration{
 		Root:               root,
@@ -247,10 +242,6 @@ func Enumerate(root string, handles func(fileName string) bool) (Enumeration, er
 	resolution, err := formatoptions.Resolve(root)
 	if err != nil {
 		return enumeration, err
-	}
-	if resolution.Source != "" && !resolution.HouseIgnoreDeclared {
-		return enumeration, fmt.Errorf("%s: %w; give the format block in the Nexus tier (%s) an \"ignore\" list, or extend %s, which carries one",
-			resolution.Source, ErrHouseIgnoreUndeclared, formatoptions.NexusTierFileName, formatoptions.NexusTierSetName)
 	}
 	leftover := filepath.Join(root, ".prettierignore")
 	if _, statError := os.Lstat(leftover); statError == nil {
