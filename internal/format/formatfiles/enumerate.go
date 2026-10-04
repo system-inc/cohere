@@ -48,6 +48,12 @@ type Enumeration struct {
 	// than summed, because "we skipped 57 files" is not actionable and ".json 57" is.
 	DeclinedExtensions map[string]int
 
+	// Directories is every directory the walk entered, the root included, absolute paths: each was
+	// read rather than pruned or skipped as a nested repository. A file added, removed or renamed in
+	// one, or a `.git` or a config file appearing there, changes that directory's modification time,
+	// which is how a cache replaying the walk knows the tree it walked is no longer the tree on disk.
+	Directories []string
+
 	// Files is what survived, absolute paths.
 	Files []string
 }
@@ -303,6 +309,7 @@ func Enumerate(root string, handles func(fileName string) bool) (Enumeration, er
 			// repository, filtering after the fact walked 317,258 files in 8.7s, of which .gitignore
 			// removed 148,279 that had already been stat'd. Pruning never enters them.
 			if relative == "." {
+				enumeration.Directories = append(enumeration.Directories, path)
 				return nil
 			}
 			for _, layer := range layers {
@@ -311,6 +318,7 @@ func Enumerate(root string, handles func(fileName string) bool) (Enumeration, er
 					return filepath.SkipDir
 				}
 			}
+			enumeration.Directories = append(enumeration.Directories, path)
 			return nil
 		}
 

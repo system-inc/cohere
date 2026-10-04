@@ -134,6 +134,40 @@ func TestEnumerateRefusesNestedRepositories(t *testing.T) {
 	}
 }
 
+// TestEnumerateNamesTheDirectoriesItEntered: a cache replaying the walk stats exactly the directories
+// it read, so the list holds the root and every directory entered, and none it pruned by an ignore
+// layer or skipped as a nested repository. A directory missing from it is a change nothing would see;
+// one too many is only a wasted stat.
+func TestEnumerateNamesTheDirectoriesItEntered(t *testing.T) {
+	root := settingsTree(t, `["pnpm-lock.yaml"]`, `["archived/**"]`, map[string]string{
+		".gitignore":       "dist/\n",
+		"a.ts":             "export const a = 1;\n",
+		"source/b.ts":      "export const b = 1;\n",
+		"source/deep/c.ts": "export const c = 1;\n",
+		"dist/built.ts":    "export const built = 1;\n",
+		"archived/old.md":  "# old\n",
+		"vendor/.git/HEAD": "ref: refs/heads/main\n",
+		"vendor/theirs.ts": "export const theirs = 1;\n",
+	})
+
+	enumeration, err := Enumerate(root, handlesEveryLanguage)
+	if err != nil {
+		t.Fatalf("enumerate: %v", err)
+	}
+	var entered []string
+	for _, directory := range enumeration.Directories {
+		relative, err := filepath.Rel(root, directory)
+		if err != nil || !filepath.IsAbs(directory) {
+			t.Fatalf("directory %q is not an absolute path under the root", directory)
+		}
+		entered = append(entered, filepath.ToSlash(relative))
+	}
+	sort.Strings(entered)
+	if want := ".,nexus,source,source/deep"; strings.Join(entered, ",") != want {
+		t.Fatalf("entered %v, want %s: the root and every directory read, none pruned or nested", entered, want)
+	}
+}
+
 // settingsTree writes a repository whose CohereSettings.json extends a Nexus tier, with the format
 // block's `ignore` (omitted when house is empty) and the project's own ignorePatterns.
 func settingsTree(t *testing.T, house string, ignorePatterns string, files map[string]string) string {
