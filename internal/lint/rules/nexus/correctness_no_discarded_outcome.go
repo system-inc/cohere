@@ -6,17 +6,19 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const correctnessNoDiscardedOutcomeId = "outcomeDiscarded"
 
+// correctnessNoDiscardedOutcomeText is the rule's message, whose wording lives in
+// `policy/messages/correctness-no-discarded-outcome.json`.
+var correctnessNoDiscardedOutcomeText = policy.MessageOf("nexus/correctness-no-discarded-outcome", correctnessNoDiscardedOutcomeId)
+
 func correctnessNoDiscardedOutcomeMessage(typeName string) rule.Message {
 	return rule.Message{
-		Id: correctnessNoDiscardedOutcomeId,
-		Description: "This call returns a `" + typeName + "` and the statement throws it away, so the arm " +
-			"that says it failed (a write that never landed, a file that would not parse) is never read " +
-			"and the code runs on as if it succeeded. Keep the outcome and handle its failure arm, or " +
-			"return it to a caller that will. If ignoring it is the intent, say so with `void`.",
+		Id:          correctnessNoDiscardedOutcomeId,
+		Description: correctnessNoDiscardedOutcomeText.Render(map[string]string{"typeName": typeName}),
 	}
 }
 
