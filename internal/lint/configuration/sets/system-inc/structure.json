@@ -68,7 +68,6 @@
         "structure/next-require-page-default-export": "error",
         "structure/react-component-no-const-assignment": "error",
         "structure/react-component-no-destructuring": "error",
-        "structure/react-component-no-display-name": "error",
         "structure/react-component-no-forward-ref": "error",
         "structure/react-component-require-properties-type-suffix": "error",
         "structure/react-hook-require-result-naming": "error",

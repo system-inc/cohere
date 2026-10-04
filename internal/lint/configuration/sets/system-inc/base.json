@@ -105,8 +105,7 @@
         "structure/storage-no-direct-local-storage": "off",
         "structure/tailwind-no-physical-direction": "off",
         "structure/react-element-no-anchor": "off",
-        "structure/react-element-no-horizontal-rule": "off",
-        "structure/react-component-no-display-name": "off"
+        "structure/react-element-no-horizontal-rule": "off"
     },
     "reasons": {
         "@next/next/google-font-display": "api has no Next.js (#e4cn6wq Block 4).",
@@ -159,8 +158,7 @@
         "structure/storage-no-direct-local-storage": "Workers have no localStorage (#e4cn6wq Block 4).",
         "structure/tailwind-no-physical-direction": "api has no Tailwind (#e4cn6wq Block 4).",
         "structure/react-element-no-anchor": "Structure's Link does not exist in Base, and emails need anchors (#e4cn6wq Block 4).",
-        "structure/react-element-no-horizontal-rule": "Structure's Divider does not exist in Base (#e4cn6wq Block 4).",
-        "structure/react-component-no-display-name": "It fires on any .displayName assignment, and all 17 of its findings in api are domain fields in plain services, not components; off until it checks the target is a component (#qpms5xz)."
+        "structure/react-element-no-horizontal-rule": "Structure's Divider does not exist in Base (#e4cn6wq Block 4)."
     },
     "overrides": [
         {

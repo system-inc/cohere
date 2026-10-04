@@ -1440,7 +1440,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 341,
+        "rulesOn": 342,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -3061,6 +3061,10 @@
             },
             {
                 "name": "structure/consistency-require-matching-file-name",
+                "severity": "error"
+            },
+            {
+                "name": "structure/react-component-no-display-name",
                 "severity": "error"
             },
             {
@@ -4732,10 +4736,6 @@
                 "severity": "off"
             },
             {
-                "name": "structure/react-component-no-display-name",
-                "severity": "off"
-            },
-            {
                 "name": "structure/react-element-no-anchor",
                 "severity": "off"
             },
@@ -4831,7 +4831,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 283,
+        "rulesOn": 282,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6317,10 +6317,6 @@
             },
             {
                 "name": "structure/react-component-no-destructuring",
-                "severity": "error"
-            },
-            {
-                "name": "structure/react-component-no-display-name",
                 "severity": "error"
             },
             {

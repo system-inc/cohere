@@ -14188,7 +14188,7 @@
             ],
             "sets": [
                 {
-                    "set": "cohere:system-inc/structure",
+                    "set": "cohere:react",
                     "severity": "error"
                 }
             ],
