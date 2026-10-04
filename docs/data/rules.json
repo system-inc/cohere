@@ -975,6 +975,11 @@
             "options": {
                 "elements": "one"
             },
+            "messageIds": [
+                "useBrackets",
+                "useDot"
+            ],
+            "fixKind": "fix",
             "sets": [
                 {
                     "set": "cohere:next",
@@ -5698,7 +5703,8 @@
                 "elements": "one"
             },
             "messageIds": [
-                "expected"
+                "expected",
+                "expectedAlways"
             ],
             "sets": [
                 {
@@ -7233,6 +7239,9 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
+            "messageIds": [
+                "implicitReturn"
+            ],
             "sets": [
                 {
                     "set": "cohere:next",
