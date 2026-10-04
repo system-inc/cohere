@@ -13,6 +13,13 @@ import (
 // byteOrderMark is U+FEFF, which opens a file legitimately and is a stray character anywhere else.
 const byteOrderMark = 0xFEFF
 
+// lineSeparator and paragraphSeparator, U+2028 and U+2029, end a line, so each is a finding of its own
+// rather than part of a run of spaces.
+const (
+	lineSeparator      = 0x2028
+	paragraphSeparator = 0x2029
+)
+
 var messageIrregularWhitespace = rule.Message{
 	Id: "noIrregularWhitespace",
 	Description: "This is an irregular whitespace character, not a space or a tab. It is " +
@@ -212,20 +219,33 @@ var NoIrregularWhitespace = rule.Rule{
 				collectSkippedLiterals(ctx.SourceFile, node, &skipped,
 					skipStrings, skipTemplates, skipRegExps, skipJSXText)
 
-				for offset, character := range text {
-					if !irregularWhitespaceCodepoints[character] {
-						continue
+				// A run of irregular spaces is one finding and each irregular line terminator is
+				// its own, as ESLint reports them: its IRREGULAR_WHITESPACE pattern is a `+` run per
+				// line, and its line-terminator pattern matches one character. Reporting each
+				// character of `\v\v` apart was 3 of ESLint's corpus rows reading as extra
+				// (#jjfa7qb). A run is skipped when it starts inside a skipped region, which is the
+				// start ESLint tests, and no run can cross into one, since every skipped literal
+				// and comment is delimited by a character that is not whitespace.
+				runStart := -1
+				reportRun := func(end int) {
+					if runStart >= 0 && !isInsideAny(runStart, skipped) {
+						ctx.ReportRange(core.NewTextRange(runStart, end), messageIrregularWhitespace)
 					}
-					if offset == 0 && character == byteOrderMark {
-						continue
-					}
-					if isInsideAny(offset, skipped) {
-						continue
-					}
-					ctx.ReportRange(
-						core.NewTextRange(offset, offset+len(string(character))),
-						messageIrregularWhitespace)
+					runStart = -1
 				}
+				for offset, character := range text {
+					switch {
+					case !irregularWhitespaceCodepoints[character], offset == 0 && character == byteOrderMark:
+						reportRun(offset)
+					case character == lineSeparator || character == paragraphSeparator:
+						reportRun(offset)
+						runStart = offset
+						reportRun(offset + len(string(character)))
+					case runStart < 0:
+						runStart = offset
+					}
+				}
+				reportRun(len(text))
 			},
 		}
 	},

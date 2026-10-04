@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 	"testing"
 
@@ -165,7 +164,7 @@ func buildProgramInto(key string, files map[string]string, subjectFileName strin
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return nil, "", fmt.Errorf("creating the fixture directory for %s: %w", name, err)
 		}
-		if err := os.WriteFile(path, []byte(strings.TrimSpace(contents)+"\n"), 0o644); err != nil {
+		if err := os.WriteFile(path, []byte(FixtureText(contents)), 0o644); err != nil {
 			return nil, "", fmt.Errorf("writing the fixture %s: %w", name, err)
 		}
 	}
