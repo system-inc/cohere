@@ -229,7 +229,10 @@ public struct AbbreviationVocabulary: Sendable {
             return Finding(
                 form: "whole",
                 abbreviation: entry.abbreviation,
-                message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedIdentifier(name: name, advice: advice),
+                message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedIdentifier(
+                    name: name,
+                    advice: advice,
+                ),
             )
         }
         let bytes = Array(name.utf8)
@@ -250,7 +253,10 @@ public struct AbbreviationVocabulary: Sendable {
                     return Finding(
                         form: "suffix",
                         abbreviation: entry.abbreviation,
-                        message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.millisecondSuffix(name: name, suggestion: suggestion),
+                        message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.millisecondSuffix(
+                            name: name,
+                            suggestion: suggestion,
+                        ),
                     )
                 }
                 continue
@@ -265,7 +271,11 @@ public struct AbbreviationVocabulary: Sendable {
             return Finding(
                 form: "suffix",
                 abbreviation: entry.abbreviation,
-                message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedSuffix(name: name, suffix: word, advice: advice),
+                message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedSuffix(
+                    name: name,
+                    suffix: word,
+                    advice: advice,
+                ),
             )
         }
         for entry in latePrefixes {
@@ -292,7 +302,11 @@ public struct AbbreviationVocabulary: Sendable {
             return Finding(
                 form: "segment",
                 abbreviation: entry.abbreviation,
-                message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedWordSegment(name: name, word: shown, suggestion: suggestion),
+                message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedWordSegment(
+                    name: name,
+                    word: shown,
+                    suggestion: suggestion,
+                ),
             )
         }
         return nil
@@ -309,14 +323,20 @@ public struct AbbreviationVocabulary: Sendable {
             return Finding(
                 form: "prefix",
                 abbreviation: entry.abbreviation,
-                message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedIdentifier(name: entry.abbreviation, advice: entry.advice),
+                message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedIdentifier(
+                    name: entry.abbreviation,
+                    advice: entry.advice,
+                ),
             )
         }
         let suggestion = entry.expansion + name.dropFirst(entry.abbreviation.count)
         return Finding(
             form: "prefix",
             abbreviation: entry.abbreviation,
-            message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedIdentifier(name: name, advice: "Use \"\(suggestion)\"."),
+            message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedIdentifier(
+                name: name,
+                advice: "Use \"\(suggestion)\".",
+            ),
         )
     }
 
