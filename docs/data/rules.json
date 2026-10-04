@@ -7307,6 +7307,32 @@
                 "bodyReadWithoutStatusCheck",
                 "responseDiscarded"
             ],
+            "sets": [
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ],
             "swift": {
                 "verdict": "Ported",
                 "swiftRule": "cohere-swift/correctness-require-response-status-check"

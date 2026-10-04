@@ -153,6 +153,7 @@
         "nexus/consistency-no-iso-string-date-cut": "error",
         "nexus/correctness-no-identical-branches": "error",
         "nexus/correctness-no-leaked-number-render": "error",
+        "nexus/correctness-require-response-status-check": "error",
         "unicode-bom": "error",
         "no-useless-rename": "off",
         "strict": "off",

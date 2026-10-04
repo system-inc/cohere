@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 275,
+        "rulesOn": 276,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -732,6 +732,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-require-response-status-check",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
@@ -1432,7 +1436,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 339,
+        "rulesOn": 340,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2066,6 +2070,10 @@
             },
             {
                 "name": "nexus/correctness-require-child-process-error-listener",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-response-status-check",
                 "severity": "error"
             },
             {
@@ -3121,7 +3129,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 271,
+        "rulesOn": 272,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -4005,6 +4013,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-require-response-status-check",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/import-no-forbidden-source",
                 "severity": "error"
             },
@@ -4807,7 +4819,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 281,
+        "rulesOn": 282,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5562,6 +5574,10 @@
             },
             {
                 "name": "nexus/correctness-require-child-process-error-listener",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-response-status-check",
                 "severity": "error"
             },
             {
@@ -6394,7 +6410,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 265,
+        "rulesOn": 266,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -7076,6 +7092,10 @@
             },
             {
                 "name": "nexus/correctness-require-child-process-error-listener",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-response-status-check",
                 "severity": "error"
             },
             {
@@ -7772,7 +7792,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 253,
+        "rulesOn": 254,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8406,6 +8426,10 @@
             },
             {
                 "name": "nexus/correctness-require-child-process-error-listener",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-require-response-status-check",
                 "severity": "error"
             },
             {
