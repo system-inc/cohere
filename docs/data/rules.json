@@ -7747,12 +7747,6 @@
                 "useAliasInStrictRoot"
             ],
             "fixKind": "fix",
-            "sets": [
-                {
-                    "set": "cohere:system-inc/structure",
-                    "severity": "error"
-                }
-            ],
             "swift": {
                 "verdict": "NotApplicable"
             }
