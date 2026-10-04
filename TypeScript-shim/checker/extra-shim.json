@@ -30,7 +30,14 @@
 			"getBaseTypeOfLiteralType",
 			"getWidenedType",
 			"isTypeAssignableTo",
-			"isTypeStrictSubtypeOf"
+			"isTypeStrictSubtypeOf",
+			"functionHasImplicitReturn",
+			"isUnwrappedReturnTypeUndefinedVoidOrAny",
+			"getReturnTypeFromAnnotation",
+			"unwrapReturnType",
+			"maybeTypeOfKind",
+			"getSignatureFromDeclaration",
+			"getTypeOfAccessors"
 		]
 	},
 	"ExtraFields": {
@@ -51,7 +58,8 @@
 			"numberType",
 			"stringType",
 			"booleanType",
-			"globalRegExpType"
+			"globalRegExpType",
+			"undefinedType"
 		],
 		"InterfaceType": [
 			"thisType"

@@ -143,6 +143,7 @@
         "nexus/correctness-no-discarded-outcome": "error",
         "nexus/correctness-no-discarded-pure-result": "error",
         "nexus/correctness-no-global-listener-target-assertion": "error",
+        "nexus/correctness-no-implicit-return": "error",
         "nexus/correctness-no-mock-on-module-namespace": "error",
         "nexus/correctness-no-test-on-global-regex": "error",
         "nexus/correctness-no-uncleared-race-timeout": "error",

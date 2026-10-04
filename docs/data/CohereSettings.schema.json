@@ -668,6 +668,9 @@
                 "nexus/correctness-no-identical-branches": {
                     "$ref": "#/$defs/ruleSetting"
                 },
+                "nexus/correctness-no-implicit-return": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
                 "nexus/correctness-no-import-cycle-load-time-read": {
                     "$ref": "#/$defs/ruleSetting"
                 },

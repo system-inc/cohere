@@ -100,6 +100,9 @@ type Checker = checker.Checker
 //go:linkname Checker_getImmediateAliasedSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getImmediateAliasedSymbol
 func Checker_getImmediateAliasedSymbol(recv *checker.Checker, symbol *ast.Symbol) *ast.Symbol
 
+//go:linkname Checker_isUnwrappedReturnTypeUndefinedVoidOrAny github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isUnwrappedReturnTypeUndefinedVoidOrAny
+func Checker_isUnwrappedReturnTypeUndefinedVoidOrAny(recv *checker.Checker, fn *ast.Node, returnType *checker.Type) bool
+
 //go:linkname Checker_getResolvedSignature github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getResolvedSignature
 func Checker_getResolvedSignature(recv *checker.Checker, node *ast.Node, candidatesOutArray *[]*checker.Signature, checkMode checker.CheckMode) *checker.Signature
 
@@ -111,6 +114,9 @@ func Checker_getTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker
 
 //go:linkname Checker_getWidenedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWidenedType
 func Checker_getWidenedType(recv *checker.Checker, t *checker.Type) *checker.Type
+
+//go:linkname Checker_getTypeOfAccessors github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeOfAccessors
+func Checker_getTypeOfAccessors(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
 
 //go:linkname Checker_getPropertiesOfType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getPropertiesOfType
 func Checker_getPropertiesOfType(recv *checker.Checker, t *checker.Type) []*ast.Symbol
@@ -127,8 +133,20 @@ func Checker_getIndexTypeOfType(recv *checker.Checker, t *checker.Type, keyType 
 //go:linkname Checker_getBaseTypes github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getBaseTypes
 func Checker_getBaseTypes(recv *checker.Checker, t *checker.Type) []*checker.Type
 
+//go:linkname Checker_getSignatureFromDeclaration github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getSignatureFromDeclaration
+func Checker_getSignatureFromDeclaration(recv *checker.Checker, declaration *ast.Node) *checker.Signature
+
 //go:linkname Checker_getReturnTypeOfSignature github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getReturnTypeOfSignature
 func Checker_getReturnTypeOfSignature(recv *checker.Checker, sig *checker.Signature) *checker.Type
+
+//go:linkname Checker_getReturnTypeFromAnnotation github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getReturnTypeFromAnnotation
+func Checker_getReturnTypeFromAnnotation(recv *checker.Checker, declaration *ast.Node) *checker.Type
+
+//go:linkname Checker_functionHasImplicitReturn github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).functionHasImplicitReturn
+func Checker_functionHasImplicitReturn(recv *checker.Checker, fn *ast.Node) bool
+
+//go:linkname Checker_unwrapReturnType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).unwrapReturnType
+func Checker_unwrapReturnType(recv *checker.Checker, returnType *checker.Type, functionFlags ast.FunctionFlags) *checker.Type
 
 //go:linkname Checker_getApparentType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getApparentType
 func Checker_getApparentType(recv *checker.Checker, t *checker.Type) *checker.Type
@@ -153,6 +171,9 @@ func Checker_getBaseTypeOfLiteralType(recv *checker.Checker, t *checker.Type) *c
 
 //go:linkname Checker_getBaseConstraintOfType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getBaseConstraintOfType
 func Checker_getBaseConstraintOfType(recv *checker.Checker, t *checker.Type) *checker.Type
+
+//go:linkname Checker_maybeTypeOfKind github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).maybeTypeOfKind
+func Checker_maybeTypeOfKind(recv *checker.Checker, t *checker.Type, kind checker.TypeFlags) bool
 
 //go:linkname Checker_getContextualType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getContextualType
 func Checker_getContextualType(recv *checker.Checker, node *ast.Node, contextFlags checker.ContextFlags) *checker.Type
@@ -512,6 +533,9 @@ func Checker_booleanType(v *checker.Checker) *checker.Type {
 }
 func Checker_globalRegExpType(v *checker.Checker) *checker.Type {
 	return ((*extra_Checker)(unsafe.Pointer(v))).globalRegExpType
+}
+func Checker_undefinedType(v *checker.Checker) *checker.Type {
+	return ((*extra_Checker)(unsafe.Pointer(v))).undefinedType
 }
 
 //go:linkname CompareTypes github.com/microsoft/TypeScript/tsc/internal/checker.CompareTypes
