@@ -17,10 +17,15 @@ const correctnessNoCallerDataMutationId = "callerDataMutation"
 var (
 	correctnessNoCallerDataMutationText             = policy.MessageOf("nexus/correctness-no-caller-data-mutation", correctnessNoCallerDataMutationId)
 	correctnessNoCallerDataMutationBareProcessState = policy.MessageOf("nexus/correctness-no-caller-data-mutation", "processStateWithoutReason")
+	correctnessNoCallerDataMutationBareMutates      = policy.MessageOf("nexus/correctness-no-caller-data-mutation", "mutatesWithoutReason")
+	correctnessNoCallerDataMutationUnknownMutates   = policy.MessageOf("nexus/correctness-no-caller-data-mutation", "mutatesUnknownParameter")
 )
 
 // correctnessNoCallerDataMutationProcessStateTag declares a type as state the process shares.
 const correctnessNoCallerDataMutationProcessStateTag = "processState"
+
+// correctnessNoCallerDataMutationMutatesTag declares a method's parameter an out-parameter by contract.
+const correctnessNoCallerDataMutationMutatesTag = "mutates"
 
 func correctnessNoCallerDataMutationMessage() rule.Message {
 	return rule.Message{
@@ -95,6 +100,8 @@ func correctnessNoCallerDataMutationMessage() rule.Message {
 //     parameter by plain access.
 //   - A write whose target type is `any`: no declaration, and no receiver type to read.
 //   - A write through a parameter whose declared type is process state (below).
+//   - A write through a method's parameter that the method, or a method it overrides or implements,
+//     declares an out-parameter (below).
 //
 // # Process state: `@processState <why>`
 //
@@ -114,6 +121,28 @@ func correctnessNoCallerDataMutationMessage() rule.Message {
 //
 // The reason is required. A bare `@processState` is reported where it is written, and it exempts
 // nothing, so a tag can never hide a write without saying why.
+//
+// # An out-parameter by contract: `@mutates <parameter> <why>`
+//
+// Some methods are handed a record to fill in, and that is their contract rather than a side effect.
+// Base's `OrmPersistedScheduledExecutable.run(entity, context)` is the case: the scheduler persists
+// `entity` after `run` returns, so every override writes its outcome onto it. Stating that at each of
+// api's 26 overrides says one sentence 26 times. So the method that defines the contract says it once:
+//
+//	/** @mutates entity the scheduler persists the record after run returns */
+//	protected abstract run(entity: JobRecordInterface, context: ContextInterface): Promise<void>;
+//
+// A write through that parameter is then exempt in the tagged method and in every method that
+// overrides or implements it, at any depth. The override is found through the checker: the class's
+// and interface's base types are asked for a member of the method's name, and that member's own
+// declarations are read, so a method that only shares the name, or the parameter's name, with a tagged
+// one overrides nothing and still reports. An override may rename the parameter, so it is matched by
+// position in the tagged declaration's list, never by name. Every other parameter of the method still
+// reports, and so does a plain function, which has nothing to override.
+//
+// The tag sits on a method declaration or an interface's method signature. A tag without a reason is
+// reported where it is written and exempts nothing, as a bare `@processState` is, and so is one whose
+// first word names none of its method's parameters.
 //
 // # No fix
 //
@@ -144,10 +173,25 @@ var CorrectnessNoCallerDataMutation = rule.Rule{
 				}
 			}
 		}
+		reportMutatesTags := func(node *ast.Node) {
+			for _, tag := range correctnessNoCallerDataMutationTagsOf(ctx.SourceFile, node, correctnessNoCallerDataMutationMutatesTag) {
+				parameter, reason := correctnessNoCallerDataMutationMutatesTagParts(ctx.SourceFile, tag)
+				message := correctnessNoCallerDataMutationBareMutates
+				switch {
+				case correctnessNoCallerDataMutationParameterIndex(node, parameter) < 0:
+					message = correctnessNoCallerDataMutationUnknownMutates
+				case reason != "":
+					continue
+				}
+				ctx.ReportNode(tag, rule.Message{Id: message.Id, Description: message.Render(nil)})
+			}
+		}
 		return rule.Listeners{
 			ast.KindInterfaceDeclaration: reportBareTags,
 			ast.KindTypeAliasDeclaration: reportBareTags,
 			ast.KindClassDeclaration:     reportBareTags,
+			ast.KindMethodDeclaration:    reportMutatesTags,
+			ast.KindMethodSignature:      reportMutatesTags,
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
 				if !ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
@@ -223,6 +267,10 @@ func correctnessNoCallerDataMutationCheckTarget(ctx rule.Context, target *ast.No
 		ctx.Note(tagged)
 		return
 	}
+	if contract, isOutParameter := correctnessNoCallerDataMutationOutParameterOf(ctx, parameter); isOutParameter {
+		ctx.Note(contract)
+		return
+	}
 	ctx.ReportNode(target, correctnessNoCallerDataMutationMessage())
 }
 
@@ -251,6 +299,10 @@ func correctnessNoCallerDataMutationCheckCall(ctx rule.Context, call *ast.Node) 
 	}
 	if tagged, isProcessState := correctnessNoCallerDataMutationProcessStateOf(ctx, parameter); isProcessState {
 		ctx.Note(tagged)
+		return
+	}
+	if contract, isOutParameter := correctnessNoCallerDataMutationOutParameterOf(ctx, parameter); isOutParameter {
+		ctx.Note(contract)
 		return
 	}
 	ctx.ReportNode(callee, correctnessNoCallerDataMutationMessage())
@@ -483,6 +535,11 @@ func correctnessNoCallerDataMutationProcessStateOf(ctx rule.Context, parameter *
 // correctnessNoCallerDataMutationProcessStateTags returns the `@processState` tags in a declaration's
 // doc comments.
 func correctnessNoCallerDataMutationProcessStateTags(file *ast.SourceFile, declaration *ast.Node) []*ast.Node {
+	return correctnessNoCallerDataMutationTagsOf(file, declaration, correctnessNoCallerDataMutationProcessStateTag)
+}
+
+// correctnessNoCallerDataMutationTagsOf returns the tags of one name in a declaration's doc comments.
+func correctnessNoCallerDataMutationTagsOf(file *ast.SourceFile, declaration *ast.Node, tagName string) []*ast.Node {
 	if file == nil {
 		return nil
 	}
@@ -496,7 +553,7 @@ func correctnessNoCallerDataMutationProcessStateTags(file *ast.SourceFile, decla
 			if tag.Kind != ast.KindJSDocUnknownTag {
 				continue
 			}
-			if name := tag.TagName(); name != nil && name.Text() == correctnessNoCallerDataMutationProcessStateTag {
+			if name := tag.TagName(); name != nil && name.Text() == tagName {
 				tags = append(tags, tag)
 			}
 		}
@@ -508,7 +565,7 @@ func correctnessNoCallerDataMutationProcessStateTags(file *ast.SourceFile, decla
 // line-leading asterisks and the surrounding space removed. Empty for a bare tag.
 func correctnessNoCallerDataMutationTagReason(file *ast.SourceFile, tag *ast.Node) string {
 	text := file.Text()[tag.Pos():tag.End()]
-	_, reason, _ := strings.Cut(text, "@"+correctnessNoCallerDataMutationProcessStateTag)
+	_, reason, _ := strings.Cut(text, "@"+tag.TagName().Text())
 	reason = strings.TrimSuffix(strings.TrimSpace(reason), "*/")
 	var words []string
 	for _, line := range strings.Split(reason, "\n") {
@@ -518,4 +575,106 @@ func correctnessNoCallerDataMutationTagReason(file *ast.SourceFile, tag *ast.Nod
 		}
 	}
 	return strings.Join(words, " ")
+}
+
+// correctnessNoCallerDataMutationMutatesTagParts splits a `@mutates` tag into the parameter it names,
+// its first word, and the reason after it.
+func correctnessNoCallerDataMutationMutatesTagParts(file *ast.SourceFile, tag *ast.Node) (string, string) {
+	parameter, reason, _ := strings.Cut(correctnessNoCallerDataMutationTagReason(file, tag), " ")
+	return parameter, strings.TrimSpace(reason)
+}
+
+// correctnessNoCallerDataMutationParameterIndex is the position of the parameter a function names
+// plainly, or -1.
+func correctnessNoCallerDataMutationParameterIndex(function *ast.Node, name string) int {
+	for index, parameter := range function.Parameters() {
+		if declared := parameter.Name(); declared != nil && declared.Kind == ast.KindIdentifier && declared.Text() == name {
+			return index
+		}
+	}
+	return -1
+}
+
+// correctnessNoCallerDataMutationOutParameterOf says whether a parameter is an out-parameter by
+// contract: its method, or a method its method overrides or implements, carries `@mutates` naming the
+// parameter at its position, with a reason.
+//
+// It answers with the note key the exemption is counted under, the tagged method and parameter and the
+// file declaring them, so --coverage can say which contract excused how many writes.
+func correctnessNoCallerDataMutationOutParameterOf(ctx rule.Context, parameter *ast.Symbol) (string, bool) {
+	declaration := correctnessNoCallerDataMutationParameterOf(ctx, parameter)
+	if declaration == nil || declaration.Parent == nil || declaration.Parent.Kind != ast.KindMethodDeclaration {
+		return "", false
+	}
+	method := declaration.Parent
+	position := -1
+	for index, candidate := range method.Parameters() {
+		if candidate == declaration {
+			position = index
+		}
+	}
+	for _, contract := range append([]*ast.Node{method}, correctnessNoCallerDataMutationOverriddenMethods(ctx, method)...) {
+		file := ast.GetSourceFileOfNode(contract)
+		for _, tag := range correctnessNoCallerDataMutationTagsOf(file, contract, correctnessNoCallerDataMutationMutatesTag) {
+			named, reason := correctnessNoCallerDataMutationMutatesTagParts(file, tag)
+			if reason == "" || correctnessNoCallerDataMutationParameterIndex(contract, named) != position {
+				continue
+			}
+			owner := ""
+			if contract.Parent != nil && contract.Parent.Name() != nil {
+				owner = contract.Parent.Name().Text() + "."
+			}
+			return owner + contract.Name().Text() + "(" + named + ") in " + file.FileName(), true
+		}
+	}
+	return "", false
+}
+
+// correctnessNoCallerDataMutationOverriddenMethods returns the method declarations and signatures a
+// class method overrides or implements, at any depth.
+//
+// Each class or interface is asked for its base types (the class it extends, the interfaces it
+// extends) and its implemented interfaces, and each base for a member of the method's name. That
+// member's declarations are what the method overrides, and their own containers are asked in turn, so
+// an override of an override still reaches the tagged declaration.
+func correctnessNoCallerDataMutationOverriddenMethods(ctx rule.Context, method *ast.Node) []*ast.Node {
+	name := method.Name()
+	if name == nil || (name.Kind != ast.KindIdentifier && name.Kind != ast.KindStringLiteral) {
+		return nil
+	}
+	var overridden []*ast.Node
+	seen := map[*ast.Node]bool{}
+	queue := []*ast.Node{method.Parent}
+	for len(queue) > 0 {
+		container := queue[0]
+		queue = queue[1:]
+		if container == nil || seen[container] || container.Symbol() == nil {
+			continue
+		}
+		seen[container] = true
+		var bases []*checker.Type
+		if declared := checker.Checker_getDeclaredTypeOfSymbol(ctx.TypeChecker, container.Symbol()); declared != nil &&
+			checker.Type_objectFlags(declared)&(checker.ObjectFlagsInterface|checker.ObjectFlagsClass) != 0 {
+			bases = checker.Checker_getBaseTypes(ctx.TypeChecker, declared)
+		}
+		for _, implemented := range ast.GetImplementsHeritageClauseElements(container) {
+			if implementedType := ctx.TypeChecker.GetTypeAtLocation(implemented.AsNode()); implementedType != nil {
+				bases = append(bases, implementedType)
+			}
+		}
+		for _, base := range bases {
+			member := checker.Checker_getPropertyOfType(ctx.TypeChecker, base, name.Text())
+			if member == nil {
+				continue
+			}
+			for _, declaration := range member.Declarations {
+				if declaration.Kind != ast.KindMethodDeclaration && declaration.Kind != ast.KindMethodSignature {
+					continue
+				}
+				overridden = append(overridden, declaration)
+				queue = append(queue, declaration.Parent)
+			}
+		}
+	}
+	return overridden
 }

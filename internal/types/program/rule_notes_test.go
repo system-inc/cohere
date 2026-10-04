@@ -103,3 +103,46 @@ func TestTheCallerDataRuleNotesEachProcessStateExemption(t *testing.T) {
 		t.Errorf("%d findings, want the one write through the untagged type: %v", len(result.Diagnostics), result.Diagnostics)
 	}
 }
+
+// The caller-data rule notes each write a `@mutates` contract excuses, under the tagged method and
+// parameter and the file declaring them. The contract sits in another file, as Base's scheduler does
+// for api's jobs, and is reached through the override; the neighbouring parameter is a finding and no
+// note (#tnn31qs).
+func TestTheCallerDataRuleNotesEachOutParameterContract(t *testing.T) {
+	directory := writeProject(t, map[string]string{
+		"tsconfig.json":       minimalConfig,
+		"CohereSettings.json": `{"rules": {"nexus/correctness-no-caller-data-mutation": "error"}}`,
+		"base.ts": "export interface RecordInterface { status: string; log: string[] }\n" +
+			"export abstract class ScheduledExecutable {\n" +
+			"    /** @mutates entity the scheduler persists the record after run returns */\n" +
+			"    protected abstract run(entity: RecordInterface, context: RecordInterface): void;\n" +
+			"}\n",
+		"job.ts": "import { RecordInterface, ScheduledExecutable } from './base';\n" +
+			"export class Job extends ScheduledExecutable {\n" +
+			"    protected run(job: RecordInterface, context: RecordInterface): void { job.status = 'done'; job.log.push('done'); context.status = 'x'; }\n" +
+			"}\n",
+	})
+	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if err != nil {
+		t.Fatalf("building: %v", err)
+	}
+	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	if err != nil {
+		t.Fatalf("loading the config: %v", err)
+	}
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{nexus.CorrectnessNoCallerDataMutation})
+	if err != nil {
+		t.Fatalf("walking: %v", err)
+	}
+
+	job := filepath.Join(directory, "job.ts")
+	want := map[string]program.RuleNotes{
+		job: {"nexus/correctness-no-caller-data-mutation": {"ScheduledExecutable.run(entity) in " + filepath.Join(directory, "base.ts"): 2}},
+	}
+	if !reflect.DeepEqual(result.Notes, want) {
+		t.Errorf("notes are %v, want %v", result.Notes, want)
+	}
+	if len(result.Diagnostics) != 1 {
+		t.Errorf("%d findings, want the one write through the untagged parameter: %v", len(result.Diagnostics), result.Diagnostics)
+	}
+}

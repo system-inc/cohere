@@ -46,6 +46,32 @@ interface, a class or a type alias.
 - **The reason is required.** A bare `@processState` is reported where it is written
   (`processStateWithoutReason`), and it exempts nothing.
 
+## An out-parameter by contract: `@mutates <parameter> <why>`
+
+Some methods are handed a record to fill in, and that is their contract. Base's
+`OrmPersistedScheduledExecutable.run(entity, context)` is the case: the scheduler persists `entity` after
+`run` returns, so every job's override writes its outcome onto it. Rather than the same sentence at each
+of api's 26 overrides, the method that defines the contract says it once:
+
+```ts
+/** @mutates entity the scheduler persists the record after run returns */
+protected abstract run(entity: JobRecordInterface, context: ContextInterface): Promise<void>;
+```
+
+A write through that parameter is then exempt in the tagged method and in every method that overrides or
+implements it, at any depth. The tag goes on a method declaration or an interface's method signature.
+
+- **Overrides are found through the checker**, from the class's and interface's base types and its
+  implemented interfaces, never by name. A method that shares the tagged method's name, or its
+  parameter's name, without overriding it still reports.
+- **The parameter is matched by position** in the tagged declaration, since an override may rename it.
+  Every other parameter of the method still reports, and so does a plain function.
+- **The tag has to be usable.** One without a reason (`mutatesWithoutReason`), or whose first word names
+  none of its method's parameters (`mutatesUnknownParameter`), is reported where it is written and
+  exempts nothing.
+- Each write a contract excuses is counted in `--coverage`, under the tagged method, its parameter and
+  the file declaring them.
+
 ## Where it came from
 
 Kirk's ruling on `#e3yxyx7`, 2026-10-01: not upstream's `no-param-reassign` with `props: true`. On ahra
@@ -94,6 +120,16 @@ an assignment, an update and a collection call. A plain interface of the same sh
 `Readonly`, an array, an extending interface and an optional parameter each still report in the same file,
 and a bare tag reports and exempts nothing. Mutants killed: the exemption never applied, a bare tag never
 reported, a bare tag exempting.
+
+Out-parameter contracts (`#tnn31qs`): an override that renames the parameter, an override of that
+override, and an implementation of a tagged interface method are exempt, through an assignment, an update
+and a collection call, and the neighbouring parameter still reports. A method sharing the name and
+parameter names without overriding, one sharing an interface method's name without implementing it, a
+swapped parameter order and a plain function each still report. A bare tag, a misspelled parameter and a
+tag naming nothing each report and exempt nothing. The notes count two excused writes under a contract
+declared in another file. Mutants killed: no override walk, matching by name rather than position, a bare
+tag honored, implements not followed, no walk past the first override, no unknown-parameter finding, a
+bare tag not reported, the collection-call path ignoring contracts.
 
 - Fixtures from the real site: `addUsage` as it stands (three writes fire) and fixed to return the sum
   (silent). 15 firing shapes and 20 silent ones, including a host type in a declaration file, the

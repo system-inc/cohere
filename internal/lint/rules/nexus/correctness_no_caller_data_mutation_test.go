@@ -454,3 +454,121 @@ func TestCorrectnessNoCallerDataMutationReportsABareProcessStateTag(t *testing.T
 	))
 	rule_testing.ExpectFindings(t, result, "processStateWithoutReason", correctnessNoCallerDataMutationId)
 }
+
+// correctnessNoCallerDataMutationContracts declares out-parameters by contract the ways the tag is
+// written: on an abstract method a scheduler's jobs override (Base's OrmPersistedScheduledExecutable
+// shape), and on an interface method a processor implements.
+var correctnessNoCallerDataMutationContracts = strings.Join([]string{
+	"interface JobRecordInterface { status: string; attempts: number; log: string[] }",
+	"interface JobContextInterface { now: number; seen: string[] }",
+	"abstract class ScheduledExecutable {",
+	"    /**",
+	"     * Runs one job.",
+	"     * @mutates entity the scheduler persists the record after run returns",
+	"     */",
+	"    protected abstract run(entity: JobRecordInterface, context: JobContextInterface): void;",
+	"}",
+	"interface ProcessorInterface {",
+	"    /** @mutates record the processor saves it afterwards */",
+	"    process(record: JobRecordInterface): void;",
+	"}",
+	"",
+}, "\n")
+
+// A write through the tagged parameter is exempt in an override, which may rename it, in an override
+// of that override, and in an implementation of a tagged interface method, through an assignment, an
+// update and a collection call. Another parameter of the same method still reports (#tnn31qs).
+func TestCorrectnessNoCallerDataMutationExemptsAnOutParameterByContract(t *testing.T) {
+	t.Parallel()
+
+	result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+		correctnessNoCallerDataMutationContracts,
+		"export class SendEmails extends ScheduledExecutable {",
+		"    protected run(job: JobRecordInterface, context: JobContextInterface): void {",
+		"        job.status = 'sent';",
+		"        job.log.push('sent');",
+		"        context.seen.push('sent');",
+		"    }",
+		"}",
+		"export class RetryEmails extends SendEmails {",
+		"    protected override run(record: JobRecordInterface, context: JobContextInterface): void {",
+		"        record.attempts++;",
+		"        use(context);",
+		"    }",
+		"}",
+		"export class Processor implements ProcessorInterface {",
+		"    process(record: JobRecordInterface): void { record.status = 'done'; }",
+		"}",
+	))
+	correctnessNoCallerDataMutationExpect(t, result, "context.seen.push")
+}
+
+// What the tag does not reach: a method that shares the tagged method's name and parameter names but
+// overrides nothing, one that shares an interface method's name without implementing it, the tagged
+// parameter's neighbour, a plain function, and a parameter at another position under the tagged name.
+func TestCorrectnessNoCallerDataMutationOutParameterIsExact(t *testing.T) {
+	t.Parallel()
+
+	result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+		correctnessNoCallerDataMutationContracts,
+		"export class LooksAlike {",
+		"    run(entity: JobRecordInterface, context: JobContextInterface): void { entity.status = 'x'; use(context); }",
+		"}",
+		"export class Unrelated {",
+		"    process(record: JobRecordInterface): void { record.status = 'x'; }",
+		"}",
+		"export class Swapped extends ScheduledExecutable {",
+		"    protected run(context: JobRecordInterface, entity: JobContextInterface): void { use(context); entity.seen.push('x'); }",
+		"}",
+		"export function free(entity: JobRecordInterface): void { entity.status = 'x'; }",
+	))
+	correctnessNoCallerDataMutationExpect(t, result, "entity.status", "record.status", "entity.seen.push", "entity.status")
+}
+
+// The tagged method itself honors its own tag, for the named parameter only.
+func TestCorrectnessNoCallerDataMutationHonorsAMethodsOwnContract(t *testing.T) {
+	t.Parallel()
+
+	result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+		"export class Totals {",
+		"    /** @mutates into the caller hands its running total to be added to */",
+		"    add(into: UsageInterface, from: UsageInterface): void {",
+		"        into.inputTokens += from.inputTokens;",
+		"        from.inputTokens = 0;",
+		"    }",
+		"}",
+	))
+	correctnessNoCallerDataMutationExpect(t, result, "from.inputTokens")
+}
+
+// A tag without a reason, and one naming no parameter of its method, are each reported where they are
+// written and exempt nothing, so the override's write still reports.
+func TestCorrectnessNoCallerDataMutationReportsAnUnusableMutatesTag(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name string
+		tag  string
+		want string
+	}{
+		{"no reason", "/** @mutates entity */", "mutatesWithoutReason"},
+		{"a misspelled parameter", "/** @mutates entitty the scheduler persists it */", "mutatesUnknownParameter"},
+		{"no parameter at all", "/** @mutates */", "mutatesUnknownParameter"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+				"interface JobRecordInterface { status: string }",
+				"abstract class Base {",
+				"    "+testCase.tag,
+				"    abstract run(entity: JobRecordInterface): void;",
+				"}",
+				"export class Child extends Base {",
+				"    run(entity: JobRecordInterface): void { entity.status = 'x'; }",
+				"}",
+			))
+			rule_testing.ExpectFindings(t, result, testCase.want, correctnessNoCallerDataMutationId)
+		})
+	}
+}
