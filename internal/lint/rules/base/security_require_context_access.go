@@ -8,7 +8,12 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/decorators"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
+
+// securityRequireContextAccessText is the rule's message, whose wording lives in
+// `policy/messages/security-require-context-access.json`.
+var securityRequireContextAccessText = policy.MessageOf("base/security-require-context-access", "missingProtector")
 
 // SecurityRequireContextAccessRequirement pairs a protected context key with the decorators that unlock it.
 type SecurityRequireContextAccessRequirement struct {
@@ -224,13 +229,11 @@ func checkContextRequiresAccess(
 			wanted = append(wanted, "`@"+decoratorName+"()`")
 		}
 		ctx.ReportNode(securityRequireContextAccessReportTarget(node), rule.Message{
-			Id: "missingProtector",
-			Description: fmt.Sprintf(
-				"This injects `%s` from the request context but carries no decorator "+
-					"establishing access to it, so the value arrives whether or not anyone "+
-					"verified the request and any authorization decision made from it is made on "+
-					"unverified input. Add %s, to this member or to its class.",
-				key, strings.Join(wanted, " or ")),
+			Id: securityRequireContextAccessText.Id,
+			Description: securityRequireContextAccessText.Render(map[string]string{
+				"contextKey": key,
+				"protectors": strings.Join(wanted, " or "),
+			}),
 		})
 	}
 }

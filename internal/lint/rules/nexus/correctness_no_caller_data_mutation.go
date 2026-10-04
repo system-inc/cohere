@@ -6,16 +6,20 @@ import (
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const correctnessNoCallerDataMutationId = "callerDataMutation"
 
-var correctnessNoCallerDataMutationMessage = rule.Message{
-	Id: correctnessNoCallerDataMutationId,
-	Description: "This writes into data the caller passed in. The change reaches the caller, and nothing at " +
-		"the call site says it will: the call reads like it hands data over, and the caller's data comes " +
-		"back different. Return what changed and let the caller write it, or build a new value from the " +
-		"parameter.",
+// correctnessNoCallerDataMutationText is the rule's message, whose wording lives in
+// `policy/messages/correctness-no-caller-data-mutation.json`.
+var correctnessNoCallerDataMutationText = policy.MessageOf("nexus/correctness-no-caller-data-mutation", correctnessNoCallerDataMutationId)
+
+func correctnessNoCallerDataMutationMessage() rule.Message {
+	return rule.Message{
+		Id:          correctnessNoCallerDataMutationId,
+		Description: correctnessNoCallerDataMutationText.Render(nil),
+	}
 }
 
 // CorrectnessNoCallerDataMutation reports a write through a parameter into data declared in project
@@ -174,7 +178,7 @@ func correctnessNoCallerDataMutationCheckTarget(ctx rule.Context, target *ast.No
 	if !correctnessNoCallerDataMutationWritesData(ctx, target) {
 		return
 	}
-	ctx.ReportNode(target, correctnessNoCallerDataMutationMessage)
+	ctx.ReportNode(target, correctnessNoCallerDataMutationMessage())
 }
 
 // correctnessNoCallerDataMutationCheckCall judges a call of a mutating collection method.
@@ -199,7 +203,7 @@ func correctnessNoCallerDataMutationCheckCall(ctx rule.Context, call *ast.Node) 
 	if receiver.Kind != ast.KindIdentifier && !correctnessNoCallerDataMutationWritesData(ctx, receiver) {
 		return
 	}
-	ctx.ReportNode(callee, correctnessNoCallerDataMutationMessage)
+	ctx.ReportNode(callee, correctnessNoCallerDataMutationMessage())
 }
 
 // correctnessNoCallerDataMutationReachesParameter walks an access chain to its root and says whether

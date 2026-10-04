@@ -3,6 +3,7 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // graphQlQueryMethods are the methods whose first argument must be a gql-tagged template.
@@ -19,12 +20,16 @@ var graphQlQueryMethods = map[string]bool{
 	"graphQlRequest":          true,
 }
 
-var messageNoStringLiteralGraphQlQuery = rule.Message{
-	Id: "noStringLiteralGraphQlQuery",
-	Description: "This GraphQL document is a string rather than a gql tagged template. The gql tag " +
-		"is what lets the code generator see the document and produce the operation's types, so a " +
-		"plain string compiles and runs while every variable and every field of the result goes " +
-		"untyped. Import gql from NetworkService and write gql(`query { ... }`).",
+// networkNoStringLiteralQueryText is the rule's message, whose wording lives in
+// `policy/messages/network-no-string-literal-query.json`.
+var networkNoStringLiteralQueryText = policy.MessageOf("structure/network-no-string-literal-query", "noStringLiteralGraphQlQuery")
+
+// messageNoStringLiteralGraphQlQuery is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageNoStringLiteralGraphQlQuery() rule.Message {
+	return rule.Message{
+		Id:          networkNoStringLiteralQueryText.Id,
+		Description: networkNoStringLiteralQueryText.Render(nil),
+	}
 }
 
 // NetworkNoStringLiteralQuery flags a GraphQL document passed as a string rather than a gql tag.
@@ -58,7 +63,7 @@ var NetworkNoStringLiteralQuery = rule.Rule{
 
 				firstArgument := call.Arguments.Nodes[0]
 				if resolvesToStringLiteral(firstArgument, map[*ast.Node]bool{}) {
-					ctx.ReportNode(firstArgument, messageNoStringLiteralGraphQlQuery)
+					ctx.ReportNode(firstArgument, messageNoStringLiteralGraphQlQuery())
 				}
 			},
 		}

@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // Four or fewer double-slash lines read fine as a stack; the block delimiters would be noise.
@@ -21,12 +22,11 @@ var directivePrefixes = []string{
 	"#__PURE__", "global ", "globals ", "exported ",
 }
 
-var messageLongLineComment = rule.Message{
-	Id: "longLineComment",
-	Description: "A run of five or more double-slash lines should be a block comment. Past four lines a " +
-		"stack of slashes stops reading as one thought and starts reading as a wall, with no cue where the " +
-		"passage ends.",
-}
+const consistencyNoLongLineCommentId = "longLineComment"
+
+// consistencyNoLongLineCommentText is the rule's message, whose wording lives in
+// `policy/messages/consistency-no-long-line-comment.json`.
+var consistencyNoLongLineCommentText = policy.MessageOf("nexus/consistency-no-long-line-comment", consistencyNoLongLineCommentId)
 
 // ConsistencyNoLongLineComment requires a block comment for a long run of line comments.
 //
@@ -132,9 +132,8 @@ func reportLineCommentRun(ctx rule.Context, run []comments.Comment, maximumLineC
 	runRange := core.NewTextRange(first.Range.Pos(), last.Range.End())
 
 	message := rule.Message{
-		Id: messageLongLineComment.Id,
-		Description: messageLongLineComment.Description + " This run is " +
-			strconv.Itoa(len(run)) + " lines.",
+		Id:          consistencyNoLongLineCommentId,
+		Description: consistencyNoLongLineCommentText.Render(map[string]string{"lineCount": strconv.Itoa(len(run))}),
 	}
 
 	// A star-slash anywhere in the text would close the block early, so report without a fix and

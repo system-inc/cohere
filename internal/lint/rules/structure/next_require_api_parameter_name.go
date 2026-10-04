@@ -3,21 +3,30 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageUseParamsNotParameters = rule.Message{
-	Id: "useParamsNotParameters",
-	Description: "Next reads this argument by name, so calling the field `parameters` means the " +
-		"framework passes `params` and the function receives undefined. Nothing fails: the type " +
-		"says the field exists, the code compiles, and the value is simply absent at runtime. " +
-		"This is the one place the house naming convention has to yield, because the name is an " +
-		"external contract rather than a style choice.",
+// The rule's messages, one handle per id, whose wording lives in
+// `policy/messages/next-require-api-parameter-name.json`.
+var (
+	nextRequireApiParameterNameUseParamsNotParametersText             = policy.MessageOf("structure/next-require-api-parameter-name", "useParamsNotParameters")
+	nextRequireApiParameterNameUseSearchParamsNotSearchParametersText = policy.MessageOf("structure/next-require-api-parameter-name", "useSearchParamsNotSearchParameters")
+)
+
+// messageUseParamsNotParameters is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageUseParamsNotParameters() rule.Message {
+	return rule.Message{
+		Id:          nextRequireApiParameterNameUseParamsNotParametersText.Id,
+		Description: nextRequireApiParameterNameUseParamsNotParametersText.Render(nil),
+	}
 }
 
-var messageUseSearchParamsNotSearchParameters = rule.Message{
-	Id: "useSearchParamsNotSearchParameters",
-	Description: "Next passes this field as `searchParams`, so spelling it `searchParameters` " +
-		"gets undefined at runtime while type-checking cleanly. The framework's spelling wins here.",
+// messageUseSearchParamsNotSearchParameters is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageUseSearchParamsNotSearchParameters() rule.Message {
+	return rule.Message{
+		Id:          nextRequireApiParameterNameUseSearchParamsNotSearchParametersText.Id,
+		Description: nextRequireApiParameterNameUseSearchParamsNotSearchParametersText.Render(nil),
+	}
 }
 
 // nextApiFunctionNames are the framework-called functions whose argument shape Next dictates.
@@ -93,10 +102,10 @@ var NextRequireApiParameterName = rule.Rule{
 
 					switch key.Text() {
 					case "parameters":
-						ctx.ReportNodeWithFixes(key, messageUseParamsNotParameters,
+						ctx.ReportNodeWithFixes(key, messageUseParamsNotParameters(),
 							ctx.ReplaceNode(key, "params"))
 					case "searchParameters":
-						ctx.ReportNodeWithFixes(key, messageUseSearchParamsNotSearchParameters,
+						ctx.ReportNodeWithFixes(key, messageUseSearchParamsNotSearchParameters(),
 							ctx.ReplaceNode(key, "searchParams"))
 					}
 				}

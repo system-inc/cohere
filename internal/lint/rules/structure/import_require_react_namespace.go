@@ -7,33 +7,48 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageNoNamedImport = rule.Message{
-	Id: "noNamedImport",
-	Description: "This imports a name out of react directly. Reach it through the React namespace " +
-		"instead. A bare `useState` or `Ref` at a call site says nothing about where it came from, " +
-		"so a reader has to go to the import block to find out, and a local binding with the same " +
-		"name shadows it silently. React.useState carries its provenance with it.",
+// The rule's messages, one handle per id, whose wording lives in
+// `policy/messages/import-require-react-namespace.json`.
+var (
+	importRequireReactNamespaceNoNamedImportText                = policy.MessageOf("structure/import-require-react-namespace", "noNamedImport")
+	importRequireReactNamespaceNoDestructuringFromReactText     = policy.MessageOf("structure/import-require-react-namespace", "noDestructuringFromReact")
+	importRequireReactNamespaceNoCallWithoutPrefixText          = policy.MessageOf("structure/import-require-react-namespace", "noCallWithoutPrefix")
+	importRequireReactNamespaceNoTypeReferenceWithoutPrefixText = policy.MessageOf("structure/import-require-react-namespace", "noTypeReferenceWithoutPrefix")
+)
+
+// messageNoNamedImport is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageNoNamedImport() rule.Message {
+	return rule.Message{
+		Id:          importRequireReactNamespaceNoNamedImportText.Id,
+		Description: importRequireReactNamespaceNoNamedImportText.Render(nil),
+	}
 }
 
-var messageNoDestructuringFromReact = rule.Message{
-	Id: "noDestructuringFromReact",
-	Description: "This import takes names out of react without importing React itself, so there " +
-		"is no namespace to reach through and every use in the file has to be a bare name. Import " +
-		"React as the default and use React.* instead.",
+// messageNoDestructuringFromReact is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageNoDestructuringFromReact() rule.Message {
+	return rule.Message{
+		Id:          importRequireReactNamespaceNoDestructuringFromReactText.Id,
+		Description: importRequireReactNamespaceNoDestructuringFromReactText.Render(nil),
+	}
 }
 
-var messageNoCallWithoutPrefix = rule.Message{
-	Id: "noCallWithoutPrefix",
-	Description: "This calls a hook that was destructured out of react. Call it as React.<hook> so " +
-		"the call site says where the hook comes from.",
+// messageNoCallWithoutPrefix is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageNoCallWithoutPrefix() rule.Message {
+	return rule.Message{
+		Id:          importRequireReactNamespaceNoCallWithoutPrefixText.Id,
+		Description: importRequireReactNamespaceNoCallWithoutPrefixText.Render(nil),
+	}
 }
 
-var messageNoTypeReferenceWithoutPrefix = rule.Message{
-	Id: "noTypeReferenceWithoutPrefix",
-	Description: "This uses a type that was destructured out of react. Write it as React.<Type> so " +
-		"the annotation says where the type comes from.",
+// messageNoTypeReferenceWithoutPrefix is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageNoTypeReferenceWithoutPrefix() rule.Message {
+	return rule.Message{
+		Id:          importRequireReactNamespaceNoTypeReferenceWithoutPrefixText.Id,
+		Description: importRequireReactNamespaceNoTypeReferenceWithoutPrefixText.Render(nil),
+	}
 }
 
 // ImportRequireReactNamespace flags names taken out of react rather than reached through React.
@@ -108,13 +123,13 @@ var ImportRequireReactNamespace = rule.Rule{
 					}
 
 					namedCount++
-					ctx.ReportNode(element, messageNoNamedImport)
+					ctx.ReportNode(element, messageNoNamedImport())
 				}
 
 				// A namespace import (`import * as React from 'react'`) provides the namespace and
 				// destructures nothing, so it is left alone.
 				if namedCount > 0 && !hasReactDefault {
-					ctx.ReportNode(node, messageNoDestructuringFromReact)
+					ctx.ReportNode(node, messageNoDestructuringFromReact())
 				}
 			},
 
@@ -129,7 +144,7 @@ var ImportRequireReactNamespace = rule.Rule{
 				// calls, so testing every imported name here would report on nothing real while
 				// risking a finding on an unrelated call.
 				if importedFromReact[name] && react.IsHookName(name) {
-					ctx.ReportNode(node, messageNoCallWithoutPrefix)
+					ctx.ReportNode(node, messageNoCallWithoutPrefix())
 				}
 			},
 
@@ -144,7 +159,7 @@ var ImportRequireReactNamespace = rule.Rule{
 				// The "use" prefix rather than react.IsHookName, matching the original. See the rule
 				// comment: the two arms deliberately spell the hook test differently.
 				if importedFromReact[name] && !strings.HasPrefix(name, "use") {
-					ctx.ReportNode(node, messageNoTypeReferenceWithoutPrefix)
+					ctx.ReportNode(node, messageNoTypeReferenceWithoutPrefix())
 				}
 			},
 		}

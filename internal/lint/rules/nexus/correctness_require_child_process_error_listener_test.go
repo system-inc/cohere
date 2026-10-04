@@ -105,7 +105,7 @@ func correctnessRequireChildProcessErrorListenerExpect(t *testing.T, result rule
 		if reported != wantSpans[index] {
 			t.Fatalf("finding %d points at\n%s\nwant\n%s", index, reported, wantSpans[index])
 		}
-		if diagnostic.Message.Description != correctnessRequireChildProcessErrorListenerMessage.Description {
+		if diagnostic.Message.Description != correctnessRequireChildProcessErrorListenerMessage().Description {
 			t.Fatalf("message is %q", diagnostic.Message.Description)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {

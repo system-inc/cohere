@@ -7,15 +7,17 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageMissingEffectComment = rule.Message{
-	Id: "missingEffectComment",
-	Description: "This React.useEffect has no comment above it starting with \"Effect to\". An " +
-		"effect is the one place in a component where the reason for the code is not visible in " +
-		"the code: what a render does is on the screen, and what an effect does happens somewhere " +
-		"else at some other time. The comment is what lets the next reader decide whether a " +
-		"dependency change is safe. Write // Effect to ... immediately above it.",
+// reactHookRequireEffectCommentText is the rule's message, whose wording lives in
+// `policy/messages/react-hook-require-effect-comment.json`.
+var reactHookRequireEffectCommentText = policy.MessageOf("structure/react-hook-require-effect-comment", "missingEffectComment")
+
+// messageMissingEffectComment is the finding, rendered when it is reported so the text comes from
+// the current catalog.
+func messageMissingEffectComment() rule.Message {
+	return rule.Message{Id: reactHookRequireEffectCommentText.Id, Description: reactHookRequireEffectCommentText.Render(nil)}
 }
 
 // effectCommentPrefix is what the first line of the comment must start with.
@@ -61,7 +63,7 @@ var ReactHookRequireEffectComment = rule.Rule{
 				}
 
 				if !hasEffectCommentAbove(ctx, node) {
-					ctx.ReportNode(callee, messageMissingEffectComment)
+					ctx.ReportNode(callee, messageMissingEffectComment())
 				}
 			},
 		}

@@ -5,18 +5,20 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const correctnessNoDiscardedPureResultId = "discardedPureResult"
 
-var correctnessNoDiscardedPureResultMessage = rule.Message{
-	Id: correctnessNoDiscardedPureResultId,
-	Description: "This call computes a new value and changes nothing, and its result is thrown away, so the " +
-		"statement does nothing. Strings are immutable (`name.trim()` returns a trimmed copy and leaves " +
-		"`name` as it was), and these array methods return a new array or a value without touching the " +
-		"original (`list.concat(more)` does not add to `list`). Assign the result " +
-		"(`name = name.trim()`, `list = list.concat(more)`), use the mutating form (`list.push(...more)`), " +
-		"or delete the statement.",
+// correctnessNoDiscardedPureResultText is the rule's message, whose wording lives in
+// `policy/messages/correctness-no-discarded-pure-result.json`.
+var correctnessNoDiscardedPureResultText = policy.MessageOf("nexus/correctness-no-discarded-pure-result", correctnessNoDiscardedPureResultId)
+
+func correctnessNoDiscardedPureResultMessage() rule.Message {
+	return rule.Message{
+		Id:          correctnessNoDiscardedPureResultId,
+		Description: correctnessNoDiscardedPureResultText.Render(nil),
+	}
 }
 
 // CorrectnessNoDiscardedPureResult reports a statement that calls a side-effect-free method of the
@@ -142,7 +144,7 @@ func correctnessNoDiscardedPureResultCheck(ctx rule.Context, statement *ast.Node
 			}
 		}
 	}
-	ctx.ReportNode(call, correctnessNoDiscardedPureResultMessage)
+	ctx.ReportNode(call, correctnessNoDiscardedPureResultMessage())
 }
 
 // correctnessNoDiscardedPureResultIsPure says whether a method name resolves, through every

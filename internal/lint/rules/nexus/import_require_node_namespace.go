@@ -11,6 +11,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // Node built-in modules, bare (no "node:" prefix).
@@ -87,29 +88,48 @@ func expectedAlias(source string) string {
 // namespace message, which told `import NodePath from 'node:path'` to import a different module
 // under a different name. The reasons are cohere's own and stay; the specifics are the original's.
 
+// importRequireNodeNamespaceRequireNamespaceImportText is the rule's `requireNamespaceImport` message,
+// whose wording lives in `policy/messages/import-require-node-namespace.json`.
+var importRequireNodeNamespaceRequireNamespaceImportText = policy.MessageOf("nexus/import-require-node-namespace", "requireNamespaceImport")
+
 func messageRequireNamespaceImport(source string, expected string, bare string) rule.Message {
 	return rule.Message{
 		Id: "requireNamespaceImport",
-		Description: "Node built-in '" + source + "' must use a namespace import, so every call site says " +
-			"which module it came from. Use: import * as " + expected + " from 'node:" + bare + "'",
+		Description: importRequireNodeNamespaceRequireNamespaceImportText.Render(map[string]string{
+			"source":   source,
+			"expected": expected,
+			"bare":     bare,
+		}),
 	}
 }
+
+// importRequireNodeNamespaceRequireNodePrefixText is the rule's `requireNodePrefix` message,
+// whose wording lives in `policy/messages/import-require-node-namespace.json`.
+var importRequireNodeNamespaceRequireNodePrefixText = policy.MessageOf("nexus/import-require-node-namespace", "requireNodePrefix")
 
 func messageRequireNodePrefix(source string, expected string, bare string) rule.Message {
 	return rule.Message{
 		Id: "requireNodePrefix",
-		Description: "Node built-in '" + source + "' must use the 'node:' prefix, which says the module is " +
-			"Node's rather than a package that happens to share its name. Use: import * as " + expected +
-			" from 'node:" + bare + "'",
+		Description: importRequireNodeNamespaceRequireNodePrefixText.Render(map[string]string{
+			"source":   source,
+			"expected": expected,
+			"bare":     bare,
+		}),
 	}
 }
+
+// importRequireNodeNamespaceRequireCorrectAliasText is the rule's `requireCorrectAlias` message,
+// whose wording lives in `policy/messages/import-require-node-namespace.json`.
+var importRequireNodeNamespaceRequireCorrectAliasText = policy.MessageOf("nexus/import-require-node-namespace", "requireCorrectAlias")
 
 func messageRequireCorrectAlias(expected string, actual string, bare string) rule.Message {
 	return rule.Message{
 		Id: "requireCorrectAlias",
-		Description: "Node namespace alias must be '" + expected + "', got '" + actual + "'. The alias is the " +
-			"Node-prefixed expansion of the module, so a reader forty lines down knows what they are " +
-			"looking at without finding the import. Use: import * as " + expected + " from 'node:" + bare + "'",
+		Description: importRequireNodeNamespaceRequireCorrectAliasText.Render(map[string]string{
+			"expected": expected,
+			"actual":   actual,
+			"bare":     bare,
+		}),
 	}
 }
 

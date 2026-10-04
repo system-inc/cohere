@@ -6,6 +6,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/decorators"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // graphQlNullableParityDecorators are the decorators whose `nullable` flag this rule holds to the
@@ -289,27 +290,30 @@ func typeIncludesNull(subjectType *checker.Type) bool {
 	return false
 }
 
+// The rule's messages, whose wording lives in `policy/messages/correctness-require-graphql-nullable-parity.json`.
+var (
+	graphQlNullableParityDecoratorNullableButInputExcludesNullText = policy.MessageOf("base/correctness-require-graphql-nullable-parity", "decoratorNullableButInputExcludesNull")
+	graphQlNullableParityDecoratorNullableButTypeNotText           = policy.MessageOf("base/correctness-require-graphql-nullable-parity", "decoratorNullableButTypeNot")
+	graphQlNullableParityTypeNullableButDecoratorNotText           = policy.MessageOf("base/correctness-require-graphql-nullable-parity", "typeNullableButDecoratorNot")
+)
+
 func buildDecoratorNullableButInputExcludesNullMessage(typeText string) rule.Message {
 	return rule.Message{
-		Id: "decoratorNullableButInputExcludesNull",
-		Description: "Decorator declares 'nullable: true' on an input, so a client can send null, " +
-			"but the type '" + typeText + "' does not admit null. Add '| null' so the code's " +
-			"checks follow what can arrive",
+		Id:          graphQlNullableParityDecoratorNullableButInputExcludesNullText.Id,
+		Description: graphQlNullableParityDecoratorNullableButInputExcludesNullText.Render(map[string]string{"typeText": typeText}),
 	}
 }
 
 func buildDecoratorNullableButTypeNotMessage(typeText string) rule.Message {
 	return rule.Message{
-		Id: "decoratorNullableButTypeNot",
-		Description: "Decorator declares 'nullable: true' but the type '" + typeText +
-			"' is not nullable",
+		Id:          graphQlNullableParityDecoratorNullableButTypeNotText.Id,
+		Description: graphQlNullableParityDecoratorNullableButTypeNotText.Render(map[string]string{"typeText": typeText}),
 	}
 }
 
 func buildTypeNullableButDecoratorNotMessage(typeText string) rule.Message {
 	return rule.Message{
-		Id: "typeNullableButDecoratorNot",
-		Description: "Type '" + typeText + "' is nullable but the decorator does not have " +
-			"'nullable: true'",
+		Id:          graphQlNullableParityTypeNullableButDecoratorNotText.Id,
+		Description: graphQlNullableParityTypeNullableButDecoratorNotText.Render(map[string]string{"typeText": typeText}),
 	}
 }

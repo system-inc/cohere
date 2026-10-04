@@ -3,11 +3,16 @@ package base
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageNoGlobalContainer = rule.Message{
-	Id:          "boundaryNoGlobalContainer",
-	Description: "Usage of 'getGlobalContainer' is not allowed.",
+// boundaryNoGlobalContainerText is the rule's message, whose wording lives in
+// `policy/messages/boundary-no-global-container.json`.
+var boundaryNoGlobalContainerText = policy.MessageOf("base/boundary-no-global-container", "boundaryNoGlobalContainer")
+
+// messageNoGlobalContainer is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageNoGlobalContainer() rule.Message {
+	return rule.Message{Id: boundaryNoGlobalContainerText.Id, Description: boundaryNoGlobalContainerText.Render(nil)}
 }
 
 // BoundaryNoGlobalContainer bans every reference to the name `getGlobalContainer`.
@@ -62,7 +67,7 @@ var BoundaryNoGlobalContainer = rule.Rule{
 				if node.AsIdentifier().Text != "getGlobalContainer" {
 					return
 				}
-				ctx.ReportNode(node, messageNoGlobalContainer)
+				ctx.ReportNode(node, messageNoGlobalContainer())
 			},
 		}
 	},

@@ -6,13 +6,18 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageForbiddenProjectImport = rule.Message{
-	Id: "forbiddenProjectImport",
-	Description: "A framework library must not import from '@project', except the specifiers named in this " +
-		"rule's allowed option. A library reaching into arbitrary project code inverts the dependency: the " +
-		"framework starts depending on the thing that depends on it.",
+// boundaryNoProjectImportText is the rule's message, whose wording lives in
+// `policy/messages/boundary-no-project-import.json`.
+var boundaryNoProjectImportText = policy.MessageOf("nexus/boundary-no-project-import", "forbiddenProjectImport")
+
+func messageForbiddenProjectImport() rule.Message {
+	return rule.Message{
+		Id:          "forbiddenProjectImport",
+		Description: boundaryNoProjectImportText.Render(nil),
+	}
 }
 
 // BoundaryNoProjectImportOptions configures which library is guarded and what it may still read.
@@ -70,7 +75,7 @@ var BoundaryNoProjectImport = rule.Rule{
 
 		return imports.SourceVisitors(func(source string, node *ast.Node) {
 			if isProjectAlias(source) && !allowed[source] {
-				ctx.ReportNode(imports.SpecifierNode(node), messageForbiddenProjectImport)
+				ctx.ReportNode(imports.SpecifierNode(node), messageForbiddenProjectImport())
 			}
 		})
 	},

@@ -6,28 +6,36 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
+)
+
+// The rule's messages, one handle per id, whose wording lives in
+// `policy/messages/consistency-no-multiline-arrow-function.json`.
+var (
+	consistencyNoMultilineArrowFunctionReactHookArrowText        = policy.MessageOf("nexus/consistency-no-multiline-arrow-function", "reactHookArrow")
+	consistencyNoMultilineArrowFunctionAddEventListenerArrowText = policy.MessageOf("nexus/consistency-no-multiline-arrow-function", "addEventListenerArrow")
+	consistencyNoMultilineArrowFunctionMultilineArrowText        = policy.MessageOf("nexus/consistency-no-multiline-arrow-function", "multilineArrow")
 )
 
 func messageReactHookArrow(hookName string) rule.Message {
 	return rule.Message{
-		Id: "reactHookArrow",
-		Description: "Use a regular function instead of an arrow function with React." + hookName +
-			". A named function shows up in a stack trace and in the React devtools as itself.",
+		Id:          "reactHookArrow",
+		Description: consistencyNoMultilineArrowFunctionReactHookArrowText.Render(map[string]string{"hookName": hookName}),
 	}
 }
 
-var messageAddEventListenerArrow = rule.Message{
-	Id: "addEventListenerArrow",
-	Description: "Use a regular function instead of an arrow function with addEventListener. A listener " +
-		"you cannot name is a listener you cannot remove, since removeEventListener needs the same " +
-		"reference back.",
+func messageAddEventListenerArrow() rule.Message {
+	return rule.Message{
+		Id:          "addEventListenerArrow",
+		Description: consistencyNoMultilineArrowFunctionAddEventListenerArrowText.Render(nil),
+	}
 }
 
-var messageMultilineArrow = rule.Message{
-	Id: "multilineArrow",
-	Description: "Use a regular function instead of a multi-line arrow function. An arrow earns its " +
-		"terseness on a single-line implicit return, and past that a named function declaration reads " +
-		"better and hoists. Arrows that use `this` are exempt, since a function would rebind it.",
+func messageMultilineArrow() rule.Message {
+	return rule.Message{
+		Id:          "multilineArrow",
+		Description: consistencyNoMultilineArrowFunctionMultilineArrowText.Render(nil),
+	}
 }
 
 // ConsistencyNoMultilineArrowFunction steers multi-line arrows to function declarations.
@@ -95,7 +103,7 @@ var ConsistencyNoMultilineArrowFunction = rule.Rule{
 				}
 				if propertyName == "addEventListener" && len(arguments) > 1 &&
 					arguments[1].Kind == ast.KindArrowFunction {
-					reportArrow(ctx, arguments[1], messageAddEventListenerArrow)
+					reportArrow(ctx, arguments[1], messageAddEventListenerArrow())
 				}
 			},
 
@@ -122,7 +130,7 @@ var ConsistencyNoMultilineArrowFunction = rule.Rule{
 					return
 				}
 
-				reportArrow(ctx, node, messageMultilineArrow)
+				reportArrow(ctx, node, messageMultilineArrow())
 			},
 		}
 	},

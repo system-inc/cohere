@@ -7,45 +7,57 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/scope"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-const destructuringReasoning = "Reading properties.name at each use keeps the origin of a value " +
-	"visible: a bare `label` could come from anywhere, while `properties.label` says where it came " +
-	"from and survives a rename of the parameter. Destructuring is allowed only where it earns its " +
-	"keep, gathering the remaining properties to spread onto an element."
+// messageNoDestructuringText is the rule's `noDestructuring` message, whose wording lives in
+// `policy/messages/react-component-no-destructuring.json`.
+var messageNoDestructuringText = policy.MessageOf("structure/react-component-no-destructuring", "noDestructuring")
 
-var messageNoDestructuring = rule.Message{
-	Id: "noDestructuring",
-	Description: "This destructures a component's properties without gathering a rest. " +
-		destructuringReasoning,
+// messageNoDestructuring is the finding, rendered when it is reported so the text comes from the
+// current catalog.
+func messageNoDestructuring() rule.Message {
+	return rule.Message{Id: messageNoDestructuringText.Id, Description: messageNoDestructuringText.Render(nil)}
 }
 
-var messageNoDestructuringFromPropsSource = rule.Message{
-	Id: "noDestructuringFromPropsSource",
-	Description: "This destructures out of the properties object inside the component body, which " +
-		"is the same thing as destructuring the parameter and reads worse, since the properties " +
-		"were already named. " + destructuringReasoning,
+// messageNoDestructuringFromPropsSourceText is the rule's `noDestructuringFromPropsSource` message,
+// whose wording lives in `policy/messages/react-component-no-destructuring.json`.
+var messageNoDestructuringFromPropsSourceText = policy.MessageOf("structure/react-component-no-destructuring", "noDestructuringFromPropsSource")
+
+// messageNoDestructuringFromPropsSource is the finding, rendered when it is reported so the text
+// comes from the current catalog.
+func messageNoDestructuringFromPropsSource() rule.Message {
+	return rule.Message{Id: messageNoDestructuringFromPropsSourceText.Id, Description: messageNoDestructuringFromPropsSourceText.Render(nil)}
 }
 
-var messageRequirePropertiesSuffix = rule.Message{
-	Id: "requirePropertiesSuffix",
-	Description: "The rest variable must end in Properties. It is going to be spread onto an " +
-		"element, and the name is the only thing at the spread site that says what it holds: " +
-		"`{...rest}` says nothing, `{...buttonProperties}` says which element it belongs to.",
+// messageRequirePropertiesSuffixText is the rule's `requirePropertiesSuffix` message, whose wording
+// lives in `policy/messages/react-component-no-destructuring.json`.
+var messageRequirePropertiesSuffixText = policy.MessageOf("structure/react-component-no-destructuring", "requirePropertiesSuffix")
+
+// messageRequirePropertiesSuffix is the finding, rendered when it is reported so the text comes
+// from the current catalog.
+func messageRequirePropertiesSuffix() rule.Message {
+	return rule.Message{Id: messageRequirePropertiesSuffixText.Id, Description: messageRequirePropertiesSuffixText.Render(nil)}
 }
 
-var messageSemanticSpreadName = rule.Message{
-	Id: "semanticSpreadName",
-	Description: "The rest variable is named for being a rest rather than for what it holds. Name " +
-		"it for the element it will be spread onto, such as buttonProperties or inputProperties, " +
-		"so the spread site says which element the properties are for.",
+// messageSemanticSpreadNameText is the rule's `semanticSpreadName` message, whose wording lives in
+// `policy/messages/react-component-no-destructuring.json`.
+var messageSemanticSpreadNameText = policy.MessageOf("structure/react-component-no-destructuring", "semanticSpreadName")
+
+// messageSemanticSpreadName is the finding, rendered when it is reported so the text comes from the
+// current catalog.
+func messageSemanticSpreadName() rule.Message {
+	return rule.Message{Id: messageSemanticSpreadNameText.Id, Description: messageSemanticSpreadNameText.Render(nil)}
 }
 
-var messageSpreadMustBeUsed = rule.Message{
-	Id: "spreadMustBeUsed",
-	Description: "This gathers a rest variable and never uses it, so the destructuring buys " +
-		"nothing and the gathered properties are silently dropped rather than reaching an element. " +
-		"Remove the destructuring and read properties directly.",
+// messageSpreadMustBeUsedText is the rule's `spreadMustBeUsed` message, whose wording lives in
+// `policy/messages/react-component-no-destructuring.json`.
+var messageSpreadMustBeUsedText = policy.MessageOf("structure/react-component-no-destructuring", "spreadMustBeUsed")
+
+// messageSpreadMustBeUsed is the finding, rendered when it is reported so the text comes from the
+// current catalog.
+func messageSpreadMustBeUsed() rule.Message {
+	return rule.Message{Id: messageSpreadMustBeUsedText.Id, Description: messageSpreadMustBeUsedText.Render(nil)}
 }
 
 // genericSpreadNames are rest names that describe being a rest rather than what they hold.
@@ -152,7 +164,7 @@ var ReactComponentNoDestructuring = rule.Rule{
 				// No rest at all is its own message here, because the repair is different: the
 				// whole statement goes, rather than a rest being added to it.
 				if restBindingName(pattern) == nil {
-					ctx.ReportNode(pattern, messageNoDestructuringFromPropsSource)
+					ctx.ReportNode(pattern, messageNoDestructuringFromPropsSource())
 					return
 				}
 				if message, ok := destructuringProblem(pattern, containing); ok {
@@ -173,18 +185,18 @@ func destructuringProblem(pattern *ast.Node, functionNode *ast.Node) (rule.Messa
 
 	restName := restBindingName(pattern)
 	if restName == nil {
-		return messageNoDestructuring, true
+		return messageNoDestructuring(), true
 	}
 	name := restName.Text()
 
 	if !strings.HasSuffix(name, "Properties") {
-		return messageRequirePropertiesSuffix, true
+		return messageRequirePropertiesSuffix(), true
 	}
 	if genericSpreadNames[name] {
-		return messageSemanticSpreadName, true
+		return messageSemanticSpreadName(), true
 	}
 	if !bodyReferencesName(scope.BodyOf(functionNode), name) {
-		return messageSpreadMustBeUsed, true
+		return messageSpreadMustBeUsed(), true
 	}
 
 	return rule.Message{}, false

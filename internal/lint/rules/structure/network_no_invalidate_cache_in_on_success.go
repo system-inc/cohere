@@ -6,16 +6,19 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageNoInvalidateCacheInOnSuccess = rule.Message{
-	Id: "noInvalidateCacheInOnSuccess",
-	Description: "This invalidates the cache from inside an `onSuccess` handler. Use the " +
-		"`invalidateOnSuccess` option instead, which puts the invalidation list next to the " +
-		"request that makes it necessary and runs it automatically. Hand-written invalidation in a " +
-		"handler drifts from the request over time: somebody adds a field the request now affects " +
-		"and the handler does not know about it, so the stale read appears somewhere unrelated and " +
-		"nobody connects it back to this line.",
+// networkNoInvalidateCacheInOnSuccessText is the rule's message, whose wording lives in
+// `policy/messages/network-no-invalidate-cache-in-on-success.json`.
+var networkNoInvalidateCacheInOnSuccessText = policy.MessageOf("structure/network-no-invalidate-cache-in-on-success", "noInvalidateCacheInOnSuccess")
+
+// messageNoInvalidateCacheInOnSuccess is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageNoInvalidateCacheInOnSuccess() rule.Message {
+	return rule.Message{
+		Id:          networkNoInvalidateCacheInOnSuccessText.Id,
+		Description: networkNoInvalidateCacheInOnSuccessText.Render(nil),
+	}
 }
 
 // NetworkNoInvalidateCacheInOnSuccess flags a cache invalidation inside an onSuccess handler.
@@ -51,7 +54,7 @@ var NetworkNoInvalidateCacheInOnSuccess = rule.Rule{
 					return
 				}
 				if current.Kind == ast.KindCallExpression && isServiceCacheInvalidate(current) {
-					ctx.ReportNode(current, messageNoInvalidateCacheInOnSuccess)
+					ctx.ReportNode(current, messageNoInvalidateCacheInOnSuccess())
 				}
 				current.ForEachChild(func(child *ast.Node) bool {
 					visit(child)

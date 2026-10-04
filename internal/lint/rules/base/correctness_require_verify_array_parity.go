@@ -1,13 +1,12 @@
 package base
 
 import (
-	"fmt"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/decorators"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // verifyArrayLevelDecorators operate on the array container itself, so their presence satisfies
@@ -80,12 +79,9 @@ var verifyKnownNonValueDecorators = func() map[string]struct{} {
 	return known
 }()
 
-var messageVerifyMissingArrayRule = rule.Message{
-	Id: "missingArrayRule",
-	Description: "The validation engine applies a value-level rule per element only when the " +
-		"property also declares an array-level rule. Without that pairing the rule evaluates the " +
-		"whole array instead of each item, so every legitimate array fails validation.",
-}
+// correctnessRequireVerifyArrayParityText is the rule's message, whose wording lives in
+// `policy/messages/correctness-require-verify-array-parity.json`.
+var correctnessRequireVerifyArrayParityText = policy.MessageOf("base/correctness-require-verify-array-parity", "missingArrayRule")
 
 // CorrectnessRequireVerifyArrayParity requires an array-typed property with value-level rules to declare an
 // array-level rule too.
@@ -184,10 +180,8 @@ func checkVerifyArrayParity(ctx rule.Context, node *ast.Node, key *ast.Node) {
 	}
 
 	ctx.ReportNode(key, rule.Message{
-		Id: messageVerifyMissingArrayRule.Id,
-		Description: fmt.Sprintf(
-			"Array-typed property '%s' has value-level @Verify rules but no array-level rule. %s",
-			key.Text(), messageVerifyMissingArrayRule.Description),
+		Id:          correctnessRequireVerifyArrayParityText.Id,
+		Description: correctnessRequireVerifyArrayParityText.Render(map[string]string{"propertyName": key.Text()}),
 	})
 }
 

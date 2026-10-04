@@ -5,18 +5,20 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const correctnessNoGlobalListenerTargetAssertionId = "globalListenerTargetAssertion"
 
-var correctnessNoGlobalListenerTargetAssertionMessage = rule.Message{
-	Id: correctnessNoGlobalListenerTargetAssertionId,
-	Description: "This asserts `event.target` to a specific element type inside a listener on `document` or " +
-		"`window`. A listener that high up hears the event from every element on the page, so the target " +
-		"is whatever was clicked or focused, and a member read through the assertion (`selectionStart`, " +
-		"`value`, `checked`) is `undefined` on any other element. Check it with `instanceof` first, which " +
-		"narrows the type and makes the assertion unnecessary, or listen on the element itself and read " +
-		"`event.currentTarget`.",
+// correctnessNoGlobalListenerTargetAssertionText is the rule's message, whose wording lives in
+// `policy/messages/correctness-no-global-listener-target-assertion.json`.
+var correctnessNoGlobalListenerTargetAssertionText = policy.MessageOf("nexus/correctness-no-global-listener-target-assertion", correctnessNoGlobalListenerTargetAssertionId)
+
+func correctnessNoGlobalListenerTargetAssertionMessage() rule.Message {
+	return rule.Message{
+		Id:          correctnessNoGlobalListenerTargetAssertionId,
+		Description: correctnessNoGlobalListenerTargetAssertionText.Render(nil),
+	}
 }
 
 // CorrectnessNoGlobalListenerTargetAssertion reports an assertion of `event.target` to a specific
@@ -120,7 +122,7 @@ var CorrectnessNoGlobalListenerTargetAssertion = rule.Rule{
 				visit = func(current *ast.Node) bool {
 					if current.Kind == ast.KindPropertyAccessExpression {
 						if assertion := correctnessNoGlobalListenerTargetAssertionAt(ctx, current, event); assertion != nil {
-							ctx.ReportNode(assertion, correctnessNoGlobalListenerTargetAssertionMessage)
+							ctx.ReportNode(assertion, correctnessNoGlobalListenerTargetAssertionMessage())
 						}
 					}
 					current.ForEachChild(visit)

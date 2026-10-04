@@ -6,16 +6,21 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // The aliases that point out of nexus and into the things built on top of it.
 var outsideNexusAliases = []string{"@project", "@structure", "@base"}
 
-var messageForbiddenOutsideImport = rule.Message{
-	Id: "forbiddenOutsideImport",
-	Description: "Nexus must not import from '@project', '@structure', or '@base'. Nexus is the layer they " +
-		"are all built on, so a reach upward makes the foundation depend on what rests on it, and the " +
-		"cycle only shows up as a build failure in whichever project imports nexus first.",
+// boundaryNoNexusOutsideImportText is the rule's message, whose wording lives in
+// `policy/messages/boundary-no-nexus-outside-import.json`.
+var boundaryNoNexusOutsideImportText = policy.MessageOf("nexus/boundary-no-nexus-outside-import", "forbiddenOutsideImport")
+
+func messageForbiddenOutsideImport() rule.Message {
+	return rule.Message{
+		Id:          "forbiddenOutsideImport",
+		Description: boundaryNoNexusOutsideImportText.Render(nil),
+	}
 }
 
 // BoundaryNoNexusOutsideImport keeps nexus self-contained.
@@ -36,7 +41,7 @@ var BoundaryNoNexusOutsideImport = rule.Rule{
 
 		return imports.SourceVisitors(func(source string, node *ast.Node) {
 			if isOutsideNexusAlias(source) {
-				ctx.ReportNode(imports.SpecifierNode(node), messageForbiddenOutsideImport)
+				ctx.ReportNode(imports.SpecifierNode(node), messageForbiddenOutsideImport())
 			}
 		})
 	},

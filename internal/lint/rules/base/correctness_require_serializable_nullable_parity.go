@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/decorators"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // CorrectnessRequireSerializableNullableParity flags a `@SerializableField` whose `optional` disagrees with its type.
@@ -116,18 +117,22 @@ var CorrectnessRequireSerializableNullableParity = rule.Rule{
 	},
 }
 
+// The rule's messages, whose wording lives in `policy/messages/correctness-require-serializable-nullable-parity.json`.
+var (
+	correctnessRequireSerializableNullableParityDecoratorOptionalButTypeNotText = policy.MessageOf("base/correctness-require-serializable-nullable-parity", "decoratorOptionalButTypeNot")
+	correctnessRequireSerializableNullableParityTypeOptionalButDecoratorNotText = policy.MessageOf("base/correctness-require-serializable-nullable-parity", "typeOptionalButDecoratorNot")
+)
+
 func buildDecoratorOptionalButTypeNotMessage(typeText string) rule.Message {
 	return rule.Message{
-		Id: "decoratorOptionalButTypeNot",
-		Description: "@SerializableField declares 'optional: true' but type '" + typeText +
-			"' does not include null/undefined",
+		Id:          correctnessRequireSerializableNullableParityDecoratorOptionalButTypeNotText.Id,
+		Description: correctnessRequireSerializableNullableParityDecoratorOptionalButTypeNotText.Render(map[string]string{"typeText": typeText}),
 	}
 }
 
 func buildTypeOptionalButDecoratorNotMessage(typeText string) rule.Message {
 	return rule.Message{
-		Id: "typeOptionalButDecoratorNot",
-		Description: "Type '" + typeText +
-			"' is nullable but @SerializableField does not declare 'optional: true'",
+		Id:          correctnessRequireSerializableNullableParityTypeOptionalButDecoratorNotText.Id,
+		Description: correctnessRequireSerializableNullableParityTypeOptionalButDecoratorNotText.Render(map[string]string{"typeText": typeText}),
 	}
 }

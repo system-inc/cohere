@@ -3,7 +3,12 @@ package base
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
+
+// correctnessRequireOrmColumnDeclareText is the rule's message, whose wording lives in
+// `policy/messages/correctness-require-orm-column-declare.json`.
+var correctnessRequireOrmColumnDeclareText = policy.MessageOf("base/correctness-require-orm-column-declare", "missingDeclare")
 
 // declareRequiringColumnDecorators is the source rule's set of the same name.
 //
@@ -114,10 +119,11 @@ var CorrectnessRequireOrmColumnDeclare = rule.Rule{
 				}
 
 				ctx.ReportNode(key, rule.Message{
-					Id: "missingDeclare",
-					Description: "Property '" + propertyName + "' decorated with @" +
-						triggeringDecorator + "() must use 'declare' (e.g. `declare " +
-						propertyName + ": ...`)",
+					Id: correctnessRequireOrmColumnDeclareText.Id,
+					Description: correctnessRequireOrmColumnDeclareText.Render(map[string]string{
+						"propertyName":  propertyName,
+						"decoratorName": triggeringDecorator,
+					}),
 				})
 			},
 		}

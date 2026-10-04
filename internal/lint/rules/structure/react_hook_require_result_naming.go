@@ -6,29 +6,37 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-const hookResultNamingReasoning = "A hook's result carries its origin in its name or it carries " +
-	"nothing: twenty lines down, `data` says only that something was fetched, while " +
-	"`accountQuery` says which call produced it and where to look when it is wrong."
+// messageHookResultNamingGenericText is the rule's `hookResultNamingGeneric` message, whose wording
+// lives in `policy/messages/react-hook-require-result-naming.json`.
+var messageHookResultNamingGenericText = policy.MessageOf("structure/react-hook-require-result-naming", "hookResultNamingGeneric")
 
-var messageHookResultNamingGeneric = rule.Message{
-	Id: "hookResultNamingGeneric",
-	Description: "This hook result is named something generic. " + hookResultNamingReasoning +
-		" Name it after the hook, or after what it holds.",
+// messageHookResultNamingGeneric is the finding, rendered when it is reported so the text comes
+// from the current catalog.
+func messageHookResultNamingGeneric() rule.Message {
+	return rule.Message{Id: messageHookResultNamingGenericText.Id, Description: messageHookResultNamingGenericText.Render(nil)}
 }
 
-var messageHookResultNamingBadSuffix = rule.Message{
-	Id: "hookResultNamingBadSuffix",
-	Description: "This hook result ends in a suffix that adds nothing. Result, Data, Value, State, " +
-		"and Hook describe the fact that it is a variable rather than what is in it. " +
-		hookResultNamingReasoning,
+// messageHookResultNamingBadSuffixText is the rule's `hookResultNamingBadSuffix` message, whose
+// wording lives in `policy/messages/react-hook-require-result-naming.json`.
+var messageHookResultNamingBadSuffixText = policy.MessageOf("structure/react-hook-require-result-naming", "hookResultNamingBadSuffix")
+
+// messageHookResultNamingBadSuffix is the finding, rendered when it is reported so the text comes
+// from the current catalog.
+func messageHookResultNamingBadSuffix() rule.Message {
+	return rule.Message{Id: messageHookResultNamingBadSuffixText.Id, Description: messageHookResultNamingBadSuffixText.Render(nil)}
 }
 
-var messageHookResultNamingMismatch = rule.Message{
-	Id: "hookResultNamingMismatch",
-	Description: "This hook result's name has no relation to the hook that produced it. " +
-		hookResultNamingReasoning,
+// messageHookResultNamingMismatchText is the rule's `hookResultNamingMismatch` message, whose
+// wording lives in `policy/messages/react-hook-require-result-naming.json`.
+var messageHookResultNamingMismatchText = policy.MessageOf("structure/react-hook-require-result-naming", "hookResultNamingMismatch")
+
+// messageHookResultNamingMismatch is the finding, rendered when it is reported so the text comes
+// from the current catalog.
+func messageHookResultNamingMismatch() rule.Message {
+	return rule.Message{Id: messageHookResultNamingMismatchText.Id, Description: messageHookResultNamingMismatchText.Render(nil)}
 }
 
 // emptySuffixes are the endings that describe a variable rather than its contents.
@@ -199,14 +207,14 @@ func isRelatedHookResultName(variableName string, hookName string) bool {
 func hookResultNamingMessage(variableName string) rule.Message {
 	for _, suffix := range emptySuffixes {
 		if strings.HasSuffix(variableName, suffix) {
-			return messageHookResultNamingBadSuffix
+			return messageHookResultNamingBadSuffix()
 		}
 	}
 
 	lower := strings.ToLower(variableName)
 	if lower == "data" || lower == "result" || len(variableName) <= 2 {
-		return messageHookResultNamingGeneric
+		return messageHookResultNamingGeneric()
 	}
 
-	return messageHookResultNamingMismatch
+	return messageHookResultNamingMismatch()
 }

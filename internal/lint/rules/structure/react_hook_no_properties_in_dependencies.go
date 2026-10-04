@@ -5,15 +5,17 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/scope"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageExtractPropertiesFirst = rule.Message{
-	Id: "extractPropertiesFirst",
-	Description: "This lists the whole `properties` object as a dependency, so the hook re-runs " +
-		"whenever the parent re-renders, because a parent building its props inline hands down a " +
-		"new object every time even when nothing in it changed. Every field the component does not " +
-		"read is now a trigger. Pull out what the hook actually depends on first, as " +
-		"`const propertiesOnRefresh = properties.onRefresh;`, and depend on those instead.",
+// reactHookNoPropertiesInDependenciesText is the rule's message, whose wording lives in
+// `policy/messages/react-hook-no-properties-in-dependencies.json`.
+var reactHookNoPropertiesInDependenciesText = policy.MessageOf("structure/react-hook-no-properties-in-dependencies", "extractPropertiesFirst")
+
+// messageExtractPropertiesFirst is the finding, rendered when it is reported so the text comes from
+// the current catalog.
+func messageExtractPropertiesFirst() rule.Message {
+	return rule.Message{Id: reactHookNoPropertiesInDependenciesText.Id, Description: reactHookNoPropertiesInDependenciesText.Render(nil)}
 }
 
 // hooksWithDependencies are the React hooks that take a dependency array.
@@ -98,7 +100,7 @@ var ReactHookNoPropertiesInDependencies = rule.Rule{
 					if element.Text() != "properties" {
 						continue
 					}
-					ctx.ReportNode(element, messageExtractPropertiesFirst)
+					ctx.ReportNode(element, messageExtractPropertiesFirst())
 				}
 			},
 		}

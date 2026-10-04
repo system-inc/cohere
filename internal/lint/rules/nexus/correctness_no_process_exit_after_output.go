@@ -9,17 +9,20 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/control_flow_graph"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const correctnessNoProcessExitAfterOutputId = "exitAfterOutput"
 
-var correctnessNoProcessExitAfterOutputMessage = rule.Message{
-	Id: correctnessNoProcessExitAfterOutputId,
-	Description: "This calls `process.exit()` on a path that has already written to stdout or stderr in this " +
-		"function. `process.exit()` ends the process without waiting for writes still in flight, and a " +
-		"write to a pipe can be one: a reader piping this command (`| grep`, `execSync`, a spawned child) " +
-		"gets the output cut at 64 KB, with exit status 0 and no error. Set `process.exitCode = n` and " +
-		"return instead, so the process ends on its own once the output has drained.",
+// correctnessNoProcessExitAfterOutputText is the rule's message, whose wording lives in
+// `policy/messages/correctness-no-process-exit-after-output.json`.
+var correctnessNoProcessExitAfterOutputText = policy.MessageOf("nexus/correctness-no-process-exit-after-output", correctnessNoProcessExitAfterOutputId)
+
+func correctnessNoProcessExitAfterOutputMessage() rule.Message {
+	return rule.Message{
+		Id:          correctnessNoProcessExitAfterOutputId,
+		Description: correctnessNoProcessExitAfterOutputText.Render(nil),
+	}
 }
 
 // CorrectnessNoProcessExitAfterOutput reports a `process.exit()` that runs after the same function
@@ -444,7 +447,7 @@ func correctnessNoProcessExitAfterOutputAnalyzeRoot(ctx rule.Context, root *corr
 
 	for _, exit := range root.exits {
 		if reported[exit] {
-			ctx.ReportNode(exit, correctnessNoProcessExitAfterOutputMessage)
+			ctx.ReportNode(exit, correctnessNoProcessExitAfterOutputMessage())
 		}
 	}
 }

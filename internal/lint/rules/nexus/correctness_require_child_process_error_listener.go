@@ -7,17 +7,20 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/module"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const correctnessRequireChildProcessErrorListenerId = "childProcessWithoutErrorListener"
 
-var correctnessRequireChildProcessErrorListenerMessage = rule.Message{
-	Id: correctnessRequireChildProcessErrorListenerId,
-	Description: "This child process never gets an `'error'` listener. When the program is missing (ENOENT), " +
-		"cannot run (EACCES), or the process table is full (EAGAIN), node emits `'error'` on the " +
-		"ChildProcess instead of throwing at the call, and an `'error'` event with no listener throws " +
-		"\"Unhandled 'error' event\" and kills this whole process. Attach `child.on('error', ...)` in the " +
-		"same tick as the spawn, and decide there what a failed spawn means: reject, log, or fall back.",
+// correctnessRequireChildProcessErrorListenerText is the rule's message, whose wording lives in
+// `policy/messages/correctness-require-child-process-error-listener.json`.
+var correctnessRequireChildProcessErrorListenerText = policy.MessageOf("nexus/correctness-require-child-process-error-listener", correctnessRequireChildProcessErrorListenerId)
+
+func correctnessRequireChildProcessErrorListenerMessage() rule.Message {
+	return rule.Message{
+		Id:          correctnessRequireChildProcessErrorListenerId,
+		Description: correctnessRequireChildProcessErrorListenerText.Render(nil),
+	}
 }
 
 // CorrectnessRequireChildProcessErrorListener reports a ChildProcess from `node:child_process`'s
@@ -142,7 +145,7 @@ var CorrectnessRequireChildProcessErrorListener = rule.Rule{
 						return
 					}
 				}
-				ctx.ReportNode(node, correctnessRequireChildProcessErrorListenerMessage)
+				ctx.ReportNode(node, correctnessRequireChildProcessErrorListenerMessage())
 			},
 		}
 	},

@@ -3,21 +3,27 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageUsePropertiesNotProps = rule.Message{
-	Id: "usePropertiesNotProps",
-	Description: "Name a component's parameter `properties` rather than `props`. The abbreviation " +
-		"is the odd one out in a codebase that spells everything else in full, and the cost is not " +
-		"aesthetic: half the components reading `props.label` and half reading `properties.label` " +
-		"means every search for one spelling misses the other, which is the same drift the naming " +
-		"rules exist to prevent everywhere else.",
+// messageUsePropertiesNotPropsText is the rule's `usePropertiesNotProps` message, whose wording
+// lives in `policy/messages/react-component-require-properties-parameter.json`.
+var messageUsePropertiesNotPropsText = policy.MessageOf("structure/react-component-require-properties-parameter", "usePropertiesNotProps")
+
+// messageUsePropertiesNotProps is the finding, rendered when it is reported so the text comes from
+// the current catalog.
+func messageUsePropertiesNotProps() rule.Message {
+	return rule.Message{Id: messageUsePropertiesNotPropsText.Id, Description: messageUsePropertiesNotPropsText.Render(nil)}
 }
 
-var messageRenameToProperties = rule.Message{
-	Id: "renameToProperties",
-	Description: "Rename the parameter to `properties`. The uses in the body have to be updated " +
-		"too, and only you can tell which `props` in there are this parameter.",
+// messageRenameToPropertiesText is the rule's `renameToProperties` message, whose wording lives in
+// `policy/messages/react-component-require-properties-parameter.json`.
+var messageRenameToPropertiesText = policy.MessageOf("structure/react-component-require-properties-parameter", "renameToProperties")
+
+// messageRenameToProperties is the suggestion, rendered when it is reported so the text comes from
+// the current catalog.
+func messageRenameToProperties() rule.Message {
+	return rule.Message{Id: messageRenameToPropertiesText.Id, Description: messageRenameToPropertiesText.Render(nil)}
 }
 
 // ReactComponentRequirePropertiesParameter flags a component whose first parameter is named `props`.
@@ -65,8 +71,8 @@ var ReactComponentRequirePropertiesParameter = rule.Rule{
 			if name == nil || name.Kind != ast.KindIdentifier || name.Text() != "props" {
 				return
 			}
-			ctx.ReportNodeWithSuggestions(name, messageUsePropertiesNotProps, rule.Suggestion{
-				Message: messageRenameToProperties,
+			ctx.ReportNodeWithSuggestions(name, messageUsePropertiesNotProps(), rule.Suggestion{
+				Message: messageRenameToProperties(),
 				Fixes:   []rule.Fix{ctx.ReplaceNode(name, "properties")},
 			})
 		}

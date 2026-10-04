@@ -5,32 +5,39 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageMissingOptionsParameter = rule.Message{
-	Id: "missingOptionsParameter",
-	Description: "This hook wraps a NetworkService query or mutation but takes no options " +
-		"parameter, so a caller cannot reach anything the underlying call supports: no enabling " +
-		"and disabling, no cache policy, no success or error handler. The wrapper becomes a " +
-		"narrower thing than what it wraps, and the only repair available to a caller is to stop " +
-		"using it. Accept an options parameter last and forward it.",
+// The rule's messages, one handle per id, whose wording lives in
+// `policy/messages/network-require-hook-options-parameter.json`.
+var (
+	networkRequireHookOptionsParameterMissingOptionsParameterText          = policy.MessageOf("structure/network-require-hook-options-parameter", "missingOptionsParameter")
+	networkRequireHookOptionsParameterOptionsParameterNotPassedThroughText = policy.MessageOf("structure/network-require-hook-options-parameter", "optionsParameterNotPassedThrough")
+	networkRequireHookOptionsParameterIncorrectOptionsParameterTypeText    = policy.MessageOf("structure/network-require-hook-options-parameter", "incorrectOptionsParameterType")
+)
+
+// messageMissingOptionsParameter is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageMissingOptionsParameter() rule.Message {
+	return rule.Message{
+		Id:          networkRequireHookOptionsParameterMissingOptionsParameterText.Id,
+		Description: networkRequireHookOptionsParameterMissingOptionsParameterText.Render(nil),
+	}
 }
 
-var messageOptionsParameterNotPassedThrough = rule.Message{
-	Id: "optionsParameterNotPassedThrough",
-	Description: "This hook accepts an options parameter and does not pass it to the NetworkService " +
-		"call, so every option a caller supplies is silently discarded. That is worse than not " +
-		"accepting one at all: the signature promises the caller control it does not get, and " +
-		"nothing fails to make the promise visible.",
+// messageOptionsParameterNotPassedThrough is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageOptionsParameterNotPassedThrough() rule.Message {
+	return rule.Message{
+		Id:          networkRequireHookOptionsParameterOptionsParameterNotPassedThroughText.Id,
+		Description: networkRequireHookOptionsParameterOptionsParameterNotPassedThroughText.Render(nil),
+	}
 }
 
-var messageIncorrectOptionsParameterType = rule.Message{
-	Id: "incorrectOptionsParameterType",
-	Description: "This options parameter is not typed with InferUseGraphQlQueryOptions or " +
-		"InferUseGraphQlMutationOptions. Those types derive the option shape from the document " +
-		"itself, which is what makes a handler's arguments typed against this operation's result " +
-		"rather than against anything. A hand-written or generic type compiles and gives the " +
-		"caller no help.",
+// messageIncorrectOptionsParameterType is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageIncorrectOptionsParameterType() rule.Message {
+	return rule.Message{
+		Id:          networkRequireHookOptionsParameterIncorrectOptionsParameterTypeText.Id,
+		Description: networkRequireHookOptionsParameterIncorrectOptionsParameterTypeText.Render(nil),
+	}
 }
 
 // inferOptionsTypeNames are the two generated option types a hook's options parameter may carry.
@@ -107,20 +114,20 @@ func checkHookOptionsPattern(ctx rule.Context, hook NetworkHookDeclaration, call
 	hasOptionsParameter := strings.Contains(strings.ToLower(lastParameterName), "option")
 
 	if hasOptionsParameter && !hasInferOptionsType(lastParameter) {
-		ctx.ReportNode(lastParameter, messageIncorrectOptionsParameterType)
+		ctx.ReportNode(lastParameter, messageIncorrectOptionsParameterType())
 	}
 
 	if !hasOptionsParameter {
 		// Reported against the function rather than the name, unlike the naming rule: what is wrong
 		// is the signature, so the range should cover the thing that needs changing.
-		ctx.ReportNode(hook.FunctionNode, messageMissingOptionsParameter)
+		ctx.ReportNode(hook.FunctionNode, messageMissingOptionsParameter())
 		return
 	}
 
 	if !callForwardsOptions(call, optionsArgumentIndex, lastParameterName) {
 		// Reported against the call rather than the parameter. The parameter is correct; the call
 		// is what fails to use it.
-		ctx.ReportNode(call.Node, messageOptionsParameterNotPassedThrough)
+		ctx.ReportNode(call.Node, messageOptionsParameterNotPassedThrough())
 	}
 }
 

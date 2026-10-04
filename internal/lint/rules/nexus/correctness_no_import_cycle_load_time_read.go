@@ -1,7 +1,6 @@
 package nexus
 
 import (
-	"fmt"
 	"path"
 	"sort"
 	"strings"
@@ -12,9 +11,14 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const correctnessNoImportCycleLoadTimeReadId = "loadTimeReadInImportCycle"
+
+// correctnessNoImportCycleLoadTimeReadText is the rule's message, whose wording lives in
+// `policy/messages/correctness-no-import-cycle-load-time-read.json`.
+var correctnessNoImportCycleLoadTimeReadText = policy.MessageOf("nexus/correctness-no-import-cycle-load-time-read", correctnessNoImportCycleLoadTimeReadId)
 
 // CorrectnessNoImportCycleLoadTimeRead reports a binding read while its module loads, when the binding
 // is declared in a module in the same runtime import cycle as the reader.
@@ -533,11 +537,11 @@ func correctnessNoImportCycleLoadTimeReadScanFile(ctx rule.Context, graph *corre
 			}
 			ctx.ReportNode(read, rule.Message{
 				Id: correctnessNoImportCycleLoadTimeReadId,
-				Description: fmt.Sprintf("`%s` is read while this module loads, and it is declared in `%s`, which is in an import cycle "+
-					"with this file (%s). If `%s` is loaded first, this line runs before `%s` is initialized and throws "+
-					"`Cannot access '%s' before initialization`. Break the cycle, or move the read into a function that runs after load.",
-					target.Name, path.Base(declaringFile.FileName()), graph.cycleThrough(readerPath, declaringFile.Path()),
-					path.Base(declaringFile.FileName()), target.Name, target.Name),
+				Description: correctnessNoImportCycleLoadTimeReadText.Render(map[string]string{
+					"name":  target.Name,
+					"file":  path.Base(declaringFile.FileName()),
+					"cycle": graph.cycleThrough(readerPath, declaringFile.Path()),
+				}),
 			})
 			return
 		}

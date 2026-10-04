@@ -4,7 +4,12 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/decorators"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
+
+// correctnessRequireOrmColumnNullableParityText is the rule's message, whose wording lives in
+// `policy/messages/correctness-require-orm-column-nullable-parity.json`.
+var correctnessRequireOrmColumnNullableParityText = policy.MessageOf("base/correctness-require-orm-column-nullable-parity", "columnNullableButTypeNot")
 
 // ormNullableColumnDecorators is the source rule's own `nullableColumnDecorators`.
 //
@@ -135,14 +140,13 @@ var CorrectnessRequireOrmColumnNullableParity = rule.Rule{
 
 // buildColumnNullableButTypeNotMessage renders the source rule's message verbatim.
 //
-// The em dash is the source's own and is reproduced rather than normalised. This file is otherwise
-// pure ASCII, and the house copy rule avoids em dashes, but a user-visible message that differs from
-// the rule being ported is a real divergence: the two linters print different text for the same
-// finding. Confirmed against the message the real rule emits.
+// The em dash in the message file is the source's own and is reproduced rather than normalised. The
+// house copy rule avoids em dashes, but a user-visible message that differs from the rule being
+// ported is a real divergence: the two linters print different text for the same finding. Confirmed
+// against the message the real rule emits.
 func buildColumnNullableButTypeNotMessage(typeText string) rule.Message {
 	return rule.Message{
-		Id: "columnNullableButTypeNot",
-		Description: "Column declares 'nullable: true' but the type '" + typeText +
-			"' does not include null/undefined — a NULL row value will not match this type",
+		Id:          correctnessRequireOrmColumnNullableParityText.Id,
+		Description: correctnessRequireOrmColumnNullableParityText.Render(map[string]string{"typeText": typeText}),
 	}
 }

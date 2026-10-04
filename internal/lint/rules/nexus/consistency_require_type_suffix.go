@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // The suffixes each declaration form may end in.
@@ -18,31 +19,32 @@ var (
 	interfaceSuffixes = []string{"Interface", "Properties", "Options"}
 )
 
+// The rule's messages, one handle per id, whose wording lives in
+// `policy/messages/consistency-require-type-suffix.json`.
+var (
+	consistencyRequireTypeSuffixNoTypeAliasSuffixText = policy.MessageOf("nexus/consistency-require-type-suffix", "noTypeAliasSuffix")
+	consistencyRequireTypeSuffixNoInterfaceSuffixText = policy.MessageOf("nexus/consistency-require-type-suffix", "noInterfaceSuffix")
+	consistencyRequireTypeSuffixNoConstEnumSuffixText = policy.MessageOf("nexus/consistency-require-type-suffix", "noConstEnumSuffix")
+)
+
 func messageNoTypeAliasSuffix(name string) rule.Message {
 	return rule.Message{
-		Id: "noTypeAliasSuffix",
-		Description: `Type alias "` + name + `" should end in "Type", "Properties", "Interface", or ` +
-			`"Options". Rename to "` + name + `Type", "` + name + `Properties" if it shapes React ` +
-			`component props, "` + name + `Options" if it is an options or config bag, or convert it to ` +
-			`an interface and use "` + name + `Interface".`,
+		Id:          "noTypeAliasSuffix",
+		Description: consistencyRequireTypeSuffixNoTypeAliasSuffixText.Render(map[string]string{"name": name}),
 	}
 }
 
 func messageNoInterfaceSuffix(name string) rule.Message {
 	return rule.Message{
-		Id: "noInterfaceSuffix",
-		Description: `Interface "` + name + `" should end in "Interface", "Properties", or "Options". ` +
-			`Rename to "` + name + `Interface", "` + name + `Properties" if it shapes React component ` +
-			`props, or "` + name + `Options" if it is an options or config bag.`,
+		Id:          "noInterfaceSuffix",
+		Description: consistencyRequireTypeSuffixNoInterfaceSuffixText.Render(map[string]string{"name": name}),
 	}
 }
 
 func messageNoConstEnumSuffix(name string) rule.Message {
 	return rule.Message{
-		Id: "noConstEnumSuffix",
-		Description: `Const enum-shaped object "` + name + `" should end in "Kind". Rename to "` + name +
-			`Kind" with a paired "` + name + `KindType" alias, so the runtime value and the type that ` +
-			`indexes it are visibly one thing.`,
+		Id:          "noConstEnumSuffix",
+		Description: consistencyRequireTypeSuffixNoConstEnumSuffixText.Render(map[string]string{"name": name}),
 	}
 }
 

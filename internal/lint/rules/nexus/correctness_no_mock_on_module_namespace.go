@@ -6,17 +6,20 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const correctnessNoMockOnModuleNamespaceId = "mockOnModuleNamespace"
 
-var correctnessNoMockOnModuleNamespaceMessage = rule.Message{
-	Id: correctnessNoMockOnModuleNamespaceId,
-	Description: "This mocks a member of an `import * as` namespace with node:test. An ES module namespace is " +
-		"sealed: its properties cannot be redefined, so the mock throws `Cannot redefine property` every " +
-		"time and the test never runs its body. Mock the object the module really exports instead: for a " +
-		"node builtin, the CommonJS exports reached through `createRequire(import.meta.url)`, followed by " +
-		"`syncBuiltinESMExports()` so the namespace's live binding sees the mock.",
+// correctnessNoMockOnModuleNamespaceText is the rule's message, whose wording lives in
+// `policy/messages/correctness-no-mock-on-module-namespace.json`.
+var correctnessNoMockOnModuleNamespaceText = policy.MessageOf("nexus/correctness-no-mock-on-module-namespace", correctnessNoMockOnModuleNamespaceId)
+
+func correctnessNoMockOnModuleNamespaceMessage() rule.Message {
+	return rule.Message{
+		Id:          correctnessNoMockOnModuleNamespaceId,
+		Description: correctnessNoMockOnModuleNamespaceText.Render(nil),
+	}
 }
 
 // CorrectnessNoMockOnModuleNamespace reports node:test's `mock.method`, `mock.getter`, `mock.setter`
@@ -128,7 +131,7 @@ var CorrectnessNoMockOnModuleNamespace = rule.Rule{
 				if !correctnessNoMockOnModuleNamespaceIsMockTracker(ctx, node) {
 					return
 				}
-				ctx.ReportNode(node, correctnessNoMockOnModuleNamespaceMessage)
+				ctx.ReportNode(node, correctnessNoMockOnModuleNamespaceMessage())
 			},
 		}
 	},

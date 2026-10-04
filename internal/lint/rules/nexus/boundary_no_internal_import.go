@@ -7,22 +7,29 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
+// boundaryNoInternalImportAliasedInternalText and boundaryNoInternalImportOutsideInternalText are the
+// rule's messages, whose wording lives in `policy/messages/boundary-no-internal-import.json`.
 var (
-	messageAliasedInternal = rule.Message{
-		Id: "aliasedInternal",
-		Description: "An aliased or absolute import must not reach through 'internal'. The folder is named " +
-			"internal to say it belongs to exactly one owner, and an alias erases the distance that made " +
-			"that ownership legible.",
-	}
-	messageOutsideInternal = rule.Message{
-		Id: "outsideInternal",
-		Description: "Only files inside the folder that owns this 'internal' directory may import from it. " +
-			"An internal folder is the one place a module may keep something it is free to change without " +
-			"warning, and that freedom lasts exactly as long as nobody outside reaches in.",
-	}
+	boundaryNoInternalImportAliasedInternalText = policy.MessageOf("nexus/boundary-no-internal-import", "aliasedInternal")
+	boundaryNoInternalImportOutsideInternalText = policy.MessageOf("nexus/boundary-no-internal-import", "outsideInternal")
 )
+
+func messageAliasedInternal() rule.Message {
+	return rule.Message{
+		Id:          "aliasedInternal",
+		Description: boundaryNoInternalImportAliasedInternalText.Render(nil),
+	}
+}
+
+func messageOutsideInternal() rule.Message {
+	return rule.Message{
+		Id:          "outsideInternal",
+		Description: boundaryNoInternalImportOutsideInternalText.Render(nil),
+	}
+}
 
 // BoundaryNoInternalImport confines an internal folder to the folder that owns it.
 //
@@ -66,7 +73,7 @@ func checkInternalImport(ctx rule.Context, node *ast.Node, importingFile string,
 	// that can prove it belongs.
 	if !strings.HasPrefix(source, ".") {
 		if imports.HasPathSegment(source, "internal") {
-			ctx.ReportNode(imports.SpecifierNode(node), messageAliasedInternal)
+			ctx.ReportNode(imports.SpecifierNode(node), messageAliasedInternal())
 		}
 		return
 	}
@@ -88,6 +95,6 @@ func checkInternalImport(ctx rule.Context, node *ast.Node, importingFile string,
 
 	owningFolder := strings.Join(segments[:internalIndex], "/")
 	if !strings.HasPrefix(importingFile, owningFolder+"/") {
-		ctx.ReportNode(imports.SpecifierNode(node), messageOutsideInternal)
+		ctx.ReportNode(imports.SpecifierNode(node), messageOutsideInternal())
 	}
 }

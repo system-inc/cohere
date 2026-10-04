@@ -6,7 +6,12 @@ import (
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/decorators"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
+
+// correctnessRequireOptionalRelationText is the rule's message, whose wording lives in
+// `policy/messages/correctness-require-optional-relation.json`.
+var correctnessRequireOptionalRelationText = policy.MessageOf("base/correctness-require-optional-relation", "mustBeOptional")
 
 // relationDecorators is the source rule's `RelationDecorators` set.
 //
@@ -95,11 +100,11 @@ var CorrectnessRequireOptionalRelation = rule.Rule{
 				}
 
 				ctx.ReportNode(name, rule.Message{
-					Id: "mustBeOptional",
-					Description: "Relation property must be optional ('" +
-						name.AsIdentifier().Text + "?: " +
-						ctx.TypeChecker.TypeToString(propertyType) +
-						"') because TypeORM relations are undefined when not loaded",
+					Id: correctnessRequireOptionalRelationText.Id,
+					Description: correctnessRequireOptionalRelationText.Render(map[string]string{
+						"propertyName": name.AsIdentifier().Text,
+						"propertyType": ctx.TypeChecker.TypeToString(propertyType),
+					}),
 				})
 			},
 		}

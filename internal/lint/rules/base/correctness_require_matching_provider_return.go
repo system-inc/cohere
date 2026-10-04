@@ -1,12 +1,15 @@
 package base
 
 import (
-	"fmt"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
+
+// correctnessRequireMatchingProviderReturnText is the rule's message, whose wording lives in
+// `policy/messages/correctness-require-matching-provider-return.json`.
+var correctnessRequireMatchingProviderReturnText = policy.MessageOf("base/correctness-require-matching-provider-return", "mismatch")
 
 // expectedReturnTypeBrand is the phantom property a typed method decorator carries.
 //
@@ -142,13 +145,12 @@ func checkProviderReturn(ctx rule.Context, node *ast.Node) {
 	}
 
 	ctx.ReportNode(method, rule.Message{
-		Id: "mismatch",
-		Description: fmt.Sprintf(
-			"@%s expects a return type assignable to `%s`, and this method returns `%s`. The "+
-				"decorator's token is the contract every caller resolves through, so a method that "+
-				"does not satisfy it is registered under a promise it cannot keep.",
-			decoratorNameOf(decorator), ctx.TypeChecker.TypeToString(expectedType),
-			ctx.TypeChecker.TypeToString(returnType)),
+		Id: correctnessRequireMatchingProviderReturnText.Id,
+		Description: correctnessRequireMatchingProviderReturnText.Render(map[string]string{
+			"decoratorName": decoratorNameOf(decorator),
+			"expectedType":  ctx.TypeChecker.TypeToString(expectedType),
+			"returnType":    ctx.TypeChecker.TypeToString(returnType),
+		}),
 	})
 }
 

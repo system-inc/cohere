@@ -5,24 +5,27 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-const forwardRefReasoning = "React 19 passes ref as an ordinary property to a function component, " +
-	"so forwardRef wraps a component in a layer that no longer does anything. The cost is not the " +
-	"wrapper itself: a wrapped component's properties type is written against the wrapper rather " +
-	"than the component, so the shape a reader sees at the call site is one indirection away from " +
-	"the shape the component actually declares. Accept ref as a regular property instead."
+// messageNoForwardRefCallText is the rule's `noForwardRefCall` message, whose wording lives in
+// `policy/messages/react-component-no-forward-ref.json`.
+var messageNoForwardRefCallText = policy.MessageOf("structure/react-component-no-forward-ref", "noForwardRefCall")
 
-var messageNoForwardRefCall = rule.Message{
-	Id:          "noForwardRefCall",
-	Description: "This uses forwardRef. " + forwardRefReasoning,
+// messageNoForwardRefCall is the finding, rendered when it is reported so the text comes from the
+// current catalog.
+func messageNoForwardRefCall() rule.Message {
+	return rule.Message{Id: messageNoForwardRefCallText.Id, Description: messageNoForwardRefCallText.Render(nil)}
 }
 
-var messageNoForwardRefImport = rule.Message{
-	Id: "noForwardRefImport",
-	Description: "This imports forwardRef from react. " + forwardRefReasoning +
-		" The import is reported separately from a call because a leftover import outlives the " +
-		"last call site and is what makes the next one easy to write.",
+// messageNoForwardRefImportText is the rule's `noForwardRefImport` message, whose wording lives in
+// `policy/messages/react-component-no-forward-ref.json`.
+var messageNoForwardRefImportText = policy.MessageOf("structure/react-component-no-forward-ref", "noForwardRefImport")
+
+// messageNoForwardRefImport is the finding, rendered when it is reported so the text comes from the
+// current catalog.
+func messageNoForwardRefImport() rule.Message {
+	return rule.Message{Id: messageNoForwardRefImportText.Id, Description: messageNoForwardRefImportText.Render(nil)}
 }
 
 // forwardRefTypeNames are the React types that only exist to describe a forwardRef wrapper.
@@ -67,11 +70,11 @@ var ReactComponentNoForwardRef = rule.Rule{
 				switch callee.Kind {
 				case ast.KindIdentifier:
 					if callee.Text() == "forwardRef" {
-						ctx.ReportNode(callee, messageNoForwardRefCall)
+						ctx.ReportNode(callee, messageNoForwardRefCall())
 					}
 				case ast.KindPropertyAccessExpression:
 					if react.IsNamespacedMember(callee, func(name string) bool { return name == "forwardRef" }) {
-						ctx.ReportNode(callee, messageNoForwardRefCall)
+						ctx.ReportNode(callee, messageNoForwardRefCall())
 					}
 				}
 			},
@@ -85,7 +88,7 @@ var ReactComponentNoForwardRef = rule.Rule{
 				}
 				if left.Kind == ast.KindIdentifier && left.Text() == "React" &&
 					right.Kind == ast.KindIdentifier && forwardRefTypeNames[right.Text()] {
-					ctx.ReportNode(node, messageNoForwardRefCall)
+					ctx.ReportNode(node, messageNoForwardRefCall())
 				}
 			},
 		}
@@ -117,7 +120,7 @@ func reportForwardRefImport(ctx rule.Context, node *ast.Node) {
 		if imports.ImportedNameOf(element) == "forwardRef" {
 			// The specifier node rather than the local name, so an aliased import blames the whole
 			// `forwardRef as forward` rather than just the alias.
-			ctx.ReportNode(element, messageNoForwardRefImport)
+			ctx.ReportNode(element, messageNoForwardRefImport())
 		}
 	}
 }

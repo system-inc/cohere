@@ -6,6 +6,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/decorators"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // graphQlOperationDecorators scopes this rule to methods that really are GraphQL operations.
@@ -275,18 +276,25 @@ func unwrapToElementType(ctx rule.Context, subject *checker.Type) *checker.Type 
 // wrote by hand.
 const unwrapDepthLimit = 64
 
+// The rule's messages, whose wording lives in `policy/messages/correctness-require-matching-operation-context.json`.
+var (
+	graphQlOperationContextMatchesReturnMismatchText      = policy.MessageOf("base/correctness-require-matching-operation-context", "mismatch")
+	graphQlOperationContextMatchesReturnWrongBaseTypeText = policy.MessageOf("base/correctness-require-matching-operation-context", "wrongBaseType")
+)
+
 func buildMismatchMessage(parameterGeneric string, returnType string) rule.Message {
 	return rule.Message{
-		Id: "mismatch",
-		Description: "@InjectGraphQlOperationContext parameter is GraphQlOperationContext<" +
-			parameterGeneric + "> but the method returns '" + returnType + "'",
+		Id: graphQlOperationContextMatchesReturnMismatchText.Id,
+		Description: graphQlOperationContextMatchesReturnMismatchText.Render(map[string]string{
+			"parameterGeneric": parameterGeneric,
+			"returnType":       returnType,
+		}),
 	}
 }
 
 func buildWrongBaseTypeMessage(parameterType string) rule.Message {
 	return rule.Message{
-		Id: "wrongBaseType",
-		Description: "Parameter decorated with @InjectGraphQlOperationContext must be typed as " +
-			"GraphQlOperationContext<...>, got '" + parameterType + "'",
+		Id:          graphQlOperationContextMatchesReturnWrongBaseTypeText.Id,
+		Description: graphQlOperationContextMatchesReturnWrongBaseTypeText.Render(map[string]string{"parameterType": parameterType}),
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // minimumLengthToFlagAsUntranslated is how long a string must be before matching English is taken
@@ -20,14 +21,23 @@ const minimumLengthToFlagAsUntranslated = 4
 // untranslatedValuePreviewLength is how much of a value a finding quotes before eliding.
 const untranslatedValuePreviewLength = 40
 
+// localizationNoUntranslatedValueMissingTranslationText is the rule's `missingTranslation` message,
+// whose wording lives in `policy/messages/localization-no-untranslated-value.json`.
+var localizationNoUntranslatedValueMissingTranslationText = policy.MessageOf("nexus/localization-no-untranslated-value", "missingTranslation")
+
 func messageMissingTranslation(key string, locale string) rule.Message {
 	return rule.Message{
 		Id: "missingTranslation",
-		Description: "Translation for '" + key + "' is empty while English has content. An empty " +
-			"string is not a missing translation at runtime, it is a blank rendered where a word " +
-			"belongs, so provide a '" + locale + "' translation or remove the key.",
+		Description: localizationNoUntranslatedValueMissingTranslationText.Render(map[string]string{
+			"key":    key,
+			"locale": locale,
+		}),
 	}
 }
+
+// localizationNoUntranslatedValueIdenticalToSourceText is the rule's `identicalToSource` message,
+// whose wording lives in `policy/messages/localization-no-untranslated-value.json`.
+var localizationNoUntranslatedValueIdenticalToSourceText = policy.MessageOf("nexus/localization-no-untranslated-value", "identicalToSource")
 
 func messageIdenticalToSource(key string, locale string, value string) rule.Message {
 	preview := value
@@ -36,10 +46,11 @@ func messageIdenticalToSource(key string, locale string, value string) rule.Mess
 	}
 	return rule.Message{
 		Id: "identicalToSource",
-		Description: "Translation for '" + key + "' is identical to English (\"" + preview +
-			"\"). A copied English string reads as a finished translation to everything downstream, " +
-			"so it never appears in a coverage count and nobody is told the '" + locale +
-			"' reader is still seeing English.",
+		Description: localizationNoUntranslatedValueIdenticalToSourceText.Render(map[string]string{
+			"key":     key,
+			"preview": preview,
+			"locale":  locale,
+		}),
 	}
 }
 

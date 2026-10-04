@@ -7,16 +7,20 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/control_flow_graph"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const correctnessNoCallbackInParseTryId = "callbackInParseTry"
 
-var correctnessNoCallbackInParseTryMessage = rule.Message{
-	Id: correctnessNoCallbackInParseTryId,
-	Description: "This calls a caller-supplied function inside a `try` that guards a JSON parse, and the `catch` " +
-		"throws the caught error away. An error the callback throws is caught there and handled as if the " +
-		"text had not parsed: the real error is lost and the line is blamed. Parse inside the `try` and call " +
-		"the callback after it, or use `parseJson` and branch on its outcome.",
+// correctnessNoCallbackInParseTryText is the rule's message, whose wording lives in
+// `policy/messages/correctness-no-callback-in-parse-try.json`.
+var correctnessNoCallbackInParseTryText = policy.MessageOf("nexus/correctness-no-callback-in-parse-try", correctnessNoCallbackInParseTryId)
+
+func correctnessNoCallbackInParseTryMessage() rule.Message {
+	return rule.Message{
+		Id:          correctnessNoCallbackInParseTryId,
+		Description: correctnessNoCallbackInParseTryText.Render(nil),
+	}
 }
 
 // CorrectnessNoCallbackInParseTry reports a call to a caller-supplied function inside a `try` whose
@@ -124,7 +128,7 @@ func correctnessNoCallbackInParseTryCheck(ctx rule.Context, node *ast.Node) {
 		return
 	}
 	for _, call := range callbacks {
-		ctx.ReportNode(call, correctnessNoCallbackInParseTryMessage)
+		ctx.ReportNode(call, correctnessNoCallbackInParseTryMessage())
 	}
 }
 

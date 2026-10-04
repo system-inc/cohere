@@ -6,13 +6,18 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageUseSimpleComment = rule.Message{
-	Id: "useSimpleComment",
-	Description: "A JSDoc comment carrying one line of description should be a line comment. JSDoc's " +
-		"delimiters exist to hold structure, so spending three lines of them on a sentence tells a reader " +
-		"to look for tags that are not there.",
+// consistencyNoSingleLineJsDocText is the rule's message, whose wording lives in
+// `policy/messages/consistency-no-single-line-jsdoc.json`.
+var consistencyNoSingleLineJsDocText = policy.MessageOf("nexus/consistency-no-single-line-jsdoc", "useSimpleComment")
+
+func messageUseSimpleComment() rule.Message {
+	return rule.Message{
+		Id:          "useSimpleComment",
+		Description: consistencyNoSingleLineJsDocText.Render(nil),
+	}
 }
 
 // ConsistencyNoSingleLineJsDoc turns a JSDoc comment holding nothing but one line of prose into a
@@ -53,13 +58,13 @@ var ConsistencyNoSingleLineJsDoc = rule.Rule{
 					description := lines[0]
 					isSingleSourceLine := comment.StartLine == comment.EndLine
 					if strings.Contains(description, "//") || !isSingleSourceLine {
-						ctx.ReportRange(comment.Range, messageUseSimpleComment)
+						ctx.ReportRange(comment.Range, messageUseSimpleComment())
 						continue
 					}
 
 					ctx.Report(rule.Diagnostic{
 						Range:      comment.Range,
-						Message:    messageUseSimpleComment,
+						Message:    messageUseSimpleComment(),
 						SourceFile: ctx.SourceFile,
 						Fixes: []rule.Fix{
 							rule.ReplaceRange(comment.Range, "// "+description),

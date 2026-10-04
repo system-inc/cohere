@@ -6,23 +6,30 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageInlineVariablesType = rule.Message{
-	Id: "inlineVariablesType",
-	Description: "This hook types its variables parameter inline rather than with the generated " +
-		"QueryVariablesType or MutationVariablesType from GraphQlOperations. An inline type is a " +
-		"second, hand-maintained statement of what the document already declares, so when the " +
-		"document gains a required argument the hand-written type still compiles and the caller " +
-		"still omits it. The generated type changes with the document; a copy of it does not.",
+// The rule's messages, one handle per id, whose wording lives in
+// `policy/messages/network-require-hook-variables-type.json`.
+var (
+	networkRequireHookVariablesTypeInlineVariablesTypeText               = policy.MessageOf("structure/network-require-hook-variables-type", "inlineVariablesType")
+	networkRequireHookVariablesTypeUnnecessaryVariablesDestructuringText = policy.MessageOf("structure/network-require-hook-variables-type", "unnecessaryVariablesDestructuring")
+)
+
+// messageInlineVariablesType is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageInlineVariablesType() rule.Message {
+	return rule.Message{
+		Id:          networkRequireHookVariablesTypeInlineVariablesTypeText.Id,
+		Description: networkRequireHookVariablesTypeInlineVariablesTypeText.Render(nil),
+	}
 }
 
-var messageUnnecessaryVariablesDestructuring = rule.Message{
-	Id: "unnecessaryVariablesDestructuring",
-	Description: "This call rebuilds the variables object property by property out of the " +
-		"parameter it was handed, producing the same object it already had. Beyond the noise, the " +
-		"rebuild is a place a property can be dropped: adding one to the type and forgetting it " +
-		"here compiles and silently sends a query without it. Pass the parameter through instead.",
+// messageUnnecessaryVariablesDestructuring is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageUnnecessaryVariablesDestructuring() rule.Message {
+	return rule.Message{
+		Id:          networkRequireHookVariablesTypeUnnecessaryVariablesDestructuringText.Id,
+		Description: networkRequireHookVariablesTypeUnnecessaryVariablesDestructuringText.Render(nil),
+	}
 }
 
 // NetworkRequireHookVariablesType flags a hook whose variables parameter is typed inline, or whose
@@ -99,7 +106,7 @@ func checkHookVariablesPattern(ctx rule.Context, hook NetworkHookDeclaration, ca
 
 		if strings.Contains(name, "variable") || name == "input" {
 			if !hasGeneratedVariablesType(parameter) {
-				ctx.ReportNode(parameter, messageInlineVariablesType)
+				ctx.ReportNode(parameter, messageInlineVariablesType())
 			}
 			continue
 		}
@@ -108,7 +115,7 @@ func checkHookVariablesPattern(ctx rule.Context, hook NetworkHookDeclaration, ca
 		// shape of an inline type, since a named type here is very often a legitimate domain type
 		// that has nothing to do with this document.
 		if inlineTypeLooksLikeVariables(parameterTypeNode(parameter)) {
-			ctx.ReportNode(parameter, messageInlineVariablesType)
+			ctx.ReportNode(parameter, messageInlineVariablesType())
 		}
 	}
 
@@ -195,7 +202,7 @@ func checkVariablesRebuild(ctx rule.Context, hook NetworkHookDeclaration, call N
 		}
 	}
 
-	ctx.ReportNode(argument, messageUnnecessaryVariablesDestructuring)
+	ctx.ReportNode(argument, messageUnnecessaryVariablesDestructuring())
 }
 
 // isSameNamedReadOff reports `name: variables.name`, where the key and the property agree.

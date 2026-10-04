@@ -1,12 +1,12 @@
 package base
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/decorators"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // verifyIsOptionalDecorator is the sentinel that tells the validation engine to skip every other
@@ -18,19 +18,11 @@ const verifyIsOptionalDecorator = "VerifyIsOptional"
 // verifyDecoratorPrefix is what marks a decorator as belonging to the validation engine.
 const verifyDecoratorPrefix = "Verify"
 
-var messageVerifyOptionalButTypeNot = rule.Message{
-	Id: "optionalButTypeNot",
-	Description: "The validator is configured to tolerate a missing value here and the type is " +
-		"not, so TypeScript forbids the very values the validation would have let through. One of " +
-		"the two is wrong and a reader cannot tell which.",
-}
-
-var messageVerifyTypeOptionalButNoVerify = rule.Message{
-	Id: "typeOptionalButNoVerify",
-	Description: "The type says this value may be missing and the validator does not, so passing " +
-		"undefined fails validation at runtime while the compiler was happy with it. That gap " +
-		"only shows up in production data.",
-}
+// The rule's messages, whose wording lives in `policy/messages/correctness-require-verify-optional-parity.json`.
+var (
+	correctnessRequireVerifyOptionalParityOptionalButTypeNotText      = policy.MessageOf("base/correctness-require-verify-optional-parity", "optionalButTypeNot")
+	correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText = policy.MessageOf("base/correctness-require-verify-optional-parity", "typeOptionalButNoVerify")
+)
 
 // CorrectnessRequireVerifyOptionalParity requires the optional sentinel and the declared type to agree.
 //
@@ -131,10 +123,8 @@ func checkVerifyOptionalParity(ctx rule.Context, node *ast.Node, key *ast.Node) 
 
 	if hasOptionalSentinel && !typeIsNullable {
 		ctx.ReportNode(key, rule.Message{
-			Id: messageVerifyOptionalButTypeNot.Id,
-			Description: fmt.Sprintf(
-				"@VerifyIsOptional() is present but type '%s' does not include null/undefined. %s",
-				typeText, messageVerifyOptionalButTypeNot.Description),
+			Id:          correctnessRequireVerifyOptionalParityOptionalButTypeNotText.Id,
+			Description: correctnessRequireVerifyOptionalParityOptionalButTypeNotText.Render(map[string]string{"typeText": typeText}),
 		})
 		return
 	}
@@ -155,10 +145,8 @@ func checkVerifyOptionalParity(ctx rule.Context, node *ast.Node, key *ast.Node) 
 	// is what caught it.
 	if typeIsNullable && !hasOptionalSentinel && hasOtherVerifyRule {
 		ctx.ReportNode(key, rule.Message{
-			Id: messageVerifyTypeOptionalButNoVerify.Id,
-			Description: fmt.Sprintf(
-				"Type '%s' is nullable but @VerifyIsOptional() is missing. %s",
-				typeText, messageVerifyTypeOptionalButNoVerify.Description),
+			Id:          correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText.Id,
+			Description: correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText.Render(map[string]string{"typeText": typeText}),
 		})
 	}
 }

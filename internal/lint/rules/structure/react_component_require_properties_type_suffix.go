@@ -7,29 +7,37 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/module"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-const propertiesTypeSuffixReasoning = "A component's property type is the one type a reader looks " +
-	"up by guessing its name from the component's, so the suffix is what makes that guess work. " +
-	"Mixed suffixes mean every search for one spelling misses the other."
+// messageUseComponentPropertyTypeSuffixText is the rule's `useComponentPropertyTypeSuffix` message,
+// whose wording lives in `policy/messages/react-component-require-properties-type-suffix.json`.
+var messageUseComponentPropertyTypeSuffixText = policy.MessageOf("structure/react-component-require-properties-type-suffix", "useComponentPropertyTypeSuffix")
 
-var messageUseComponentPropertyTypeSuffix = rule.Message{
-	Id: "useComponentPropertyTypeSuffix",
-	Description: "This component's property type does not end in Properties. " +
-		propertiesTypeSuffixReasoning,
+// messageUseComponentPropertyTypeSuffix is the finding, rendered when it is reported so the text
+// comes from the current catalog.
+func messageUseComponentPropertyTypeSuffix() rule.Message {
+	return rule.Message{Id: messageUseComponentPropertyTypeSuffixText.Id, Description: messageUseComponentPropertyTypeSuffixText.Render(nil)}
 }
 
-var messageUseInterfaceSuffix = rule.Message{
-	Id: "useInterfaceSuffix",
-	Description: "This interface is used as a component's property type and does not end in " +
-		"Properties. " + propertiesTypeSuffixReasoning + " Reported separately from the use site " +
-		"because renaming the declaration is the edit, and the use site follows.",
+// messageUseInterfaceSuffixText is the rule's `useInterfaceSuffix` message, whose wording lives in
+// `policy/messages/react-component-require-properties-type-suffix.json`.
+var messageUseInterfaceSuffixText = policy.MessageOf("structure/react-component-require-properties-type-suffix", "useInterfaceSuffix")
+
+// messageUseInterfaceSuffix is the finding, rendered when it is reported so the text comes from the
+// current catalog.
+func messageUseInterfaceSuffix() rule.Message {
+	return rule.Message{Id: messageUseInterfaceSuffixText.Id, Description: messageUseInterfaceSuffixText.Render(nil)}
 }
 
-var messageUseTypeAliasSuffix = rule.Message{
-	Id: "useTypeAliasSuffix",
-	Description: "This type alias is used as a component's property type and does not end in " +
-		"Properties. " + propertiesTypeSuffixReasoning,
+// messageUseTypeAliasSuffixText is the rule's `useTypeAliasSuffix` message, whose wording lives in
+// `policy/messages/react-component-require-properties-type-suffix.json`.
+var messageUseTypeAliasSuffixText = policy.MessageOf("structure/react-component-require-properties-type-suffix", "useTypeAliasSuffix")
+
+// messageUseTypeAliasSuffix is the finding, rendered when it is reported so the text comes from the
+// current catalog.
+func messageUseTypeAliasSuffix() rule.Message {
+	return rule.Message{Id: messageUseTypeAliasSuffixText.Id, Description: messageUseTypeAliasSuffixText.Render(nil)}
 }
 
 // ReactComponentRequirePropertiesTypeSuffix flags a component property type not named `*Properties`.
@@ -101,11 +109,11 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 				// without a fix rather than silenced: the name still violates the convention and
 				// the author is the one who can decide which of the two survives.
 				ctx.ReportNode(typeNode.AsTypeReferenceNode().TypeName,
-					messageUseComponentPropertyTypeSuffix)
+					messageUseComponentPropertyTypeSuffix())
 				return
 			}
 			ctx.ReportNodeWithFixes(typeNode.AsTypeReferenceNode().TypeName,
-				messageUseComponentPropertyTypeSuffix,
+				messageUseComponentPropertyTypeSuffix(),
 				ctx.ReplaceNode(typeNode.AsTypeReferenceNode().TypeName, propertiesTypeNameFor(typeName)))
 		}
 
@@ -182,11 +190,11 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 			},
 
 			ast.KindInterfaceDeclaration: func(node *ast.Node) {
-				reportDeclaration(node.AsInterfaceDeclaration().Name(), messageUseInterfaceSuffix)
+				reportDeclaration(node.AsInterfaceDeclaration().Name(), messageUseInterfaceSuffix())
 			},
 
 			ast.KindTypeAliasDeclaration: func(node *ast.Node) {
-				reportDeclaration(node.AsTypeAliasDeclaration().Name(), messageUseTypeAliasSuffix)
+				reportDeclaration(node.AsTypeAliasDeclaration().Name(), messageUseTypeAliasSuffix())
 			},
 		}
 	},

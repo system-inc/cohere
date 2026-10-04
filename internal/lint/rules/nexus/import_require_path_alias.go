@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // PathAlias maps a repository-relative directory to the alias that names it.
@@ -123,22 +124,33 @@ func pathsNest(first string, second string) bool {
 	return nests(resolvedFirst, resolvedSecond) || nests(resolvedSecond, resolvedFirst)
 }
 
+// importRequirePathAliasUseAliasText is the rule's `useAlias` message,
+// whose wording lives in `policy/messages/import-require-path-alias.json`.
+var importRequirePathAliasUseAliasText = policy.MessageOf("nexus/import-require-path-alias", "useAlias")
+
 func messageUseAlias(importPath string, levels int, suggestion string) rule.Message {
 	return rule.Message{
 		Id: "useAlias",
-		Description: "'" + importPath + "' climbs " + strconv.Itoa(levels) + " levels, which says how far " +
-			"up to walk rather than where it lands. A reader has to count directories to learn what it " +
-			"means. Import it as '" + suggestion + "', which reads the same from any file and survives " +
-			"this one moving.",
+		Description: importRequirePathAliasUseAliasText.Render(map[string]string{
+			"importPath": importPath,
+			"levels":     strconv.Itoa(levels),
+			"suggestion": suggestion,
+		}),
 	}
 }
+
+// importRequirePathAliasUseAliasInStrictRootText is the rule's `useAliasInStrictRoot` message,
+// whose wording lives in `policy/messages/import-require-path-alias.json`.
+var importRequirePathAliasUseAliasInStrictRootText = policy.MessageOf("nexus/import-require-path-alias", "useAliasInStrictRoot")
 
 func messageUseAliasInStrictRoot(importPath string, root string, suggestion string) rule.Message {
 	return rule.Message{
 		Id: "useAliasInStrictRoot",
-		Description: "'" + importPath + "' is relative, and everything under '" + root + "' is imported " +
-			"by alias so one path means one thing in every project that reads it. Import it as '" +
-			suggestion + "'.",
+		Description: importRequirePathAliasUseAliasInStrictRootText.Render(map[string]string{
+			"importPath": importPath,
+			"root":       root,
+			"suggestion": suggestion,
+		}),
 	}
 }
 

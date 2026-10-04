@@ -6,31 +6,39 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageNoDirectTanStackQuery = rule.Message{
-	Id: "noDirectTanStackQuery",
-	Description: "This imports @tanstack/react-query directly. NetworkService wraps it, and the " +
-		"wrapper is where the query client, the cache keys, the retry policy and the error " +
-		"shaping live. A component holding its own useQuery gets a different client and a " +
-		"different cache, so its data goes stale independently of everything else on the page. " +
-		"NetworkService's own module, source/services/network/, is exempt, since that is where " +
-		"TanStack is configured.",
+// The rule's messages, one handle per id, whose wording lives in
+// `policy/messages/network-no-forbidden-import.json`.
+var (
+	networkNoForbiddenImportNoDirectTanStackQueryText = policy.MessageOf("structure/network-no-forbidden-import", "noDirectTanStackQuery")
+	networkNoForbiddenImportNoDirectApolloText        = policy.MessageOf("structure/network-no-forbidden-import", "noDirectApollo")
+	networkNoForbiddenImportNoDirectGraphqlImportText = policy.MessageOf("structure/network-no-forbidden-import", "noDirectGraphqlImport")
+)
+
+// messageNoDirectTanStackQuery is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageNoDirectTanStackQuery() rule.Message {
+	return rule.Message{
+		Id:          networkNoForbiddenImportNoDirectTanStackQueryText.Id,
+		Description: networkNoForbiddenImportNoDirectTanStackQueryText.Render(nil),
+	}
 }
 
-var messageNoDirectApollo = rule.Message{
-	Id: "noDirectApollo",
-	Description: "This imports Apollo directly. NetworkService replaced it rather than wrapping " +
-		"it, so an Apollo import pulls a second GraphQL client into the bundle and gives this one " +
-		"call site a cache nothing else reads or invalidates.",
+// messageNoDirectApollo is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageNoDirectApollo() rule.Message {
+	return rule.Message{
+		Id:          networkNoForbiddenImportNoDirectApolloText.Id,
+		Description: networkNoForbiddenImportNoDirectApolloText.Render(nil),
+	}
 }
 
-var messageNoDirectGraphqlImport = rule.Message{
-	Id: "noDirectGraphqlImport",
-	Description: "This imports `graphql` from a generated path. Import `gql` from NetworkService " +
-		"instead, which is the spelling that carries type information downstream. The generated " +
-		"function produces a document the tooling cannot follow back to its query, so the types " +
-		"at the call site degrade to unknown without anything failing.",
+// messageNoDirectGraphqlImport is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageNoDirectGraphqlImport() rule.Message {
+	return rule.Message{
+		Id:          networkNoForbiddenImportNoDirectGraphqlImportText.Id,
+		Description: networkNoForbiddenImportNoDirectGraphqlImportText.Render(nil),
+	}
 }
 
 // NetworkNoForbiddenImport flags a direct import of a library NetworkService wraps or replaces.
@@ -74,19 +82,19 @@ var NetworkNoForbiddenImport = rule.Rule{
 				source := declaration.ModuleSpecifier.Text()
 
 				if source == "@tanstack/react-query" && !isTanStackExempt {
-					ctx.ReportNode(node, messageNoDirectTanStackQuery)
+					ctx.ReportNode(node, messageNoDirectTanStackQuery())
 				}
 
 				// A prefix match rather than an exact one, so every package in the scope is
 				// caught rather than only the client entry point.
 				if strings.HasPrefix(source, "@apollo/") {
-					ctx.ReportNode(node, messageNoDirectApollo)
+					ctx.ReportNode(node, messageNoDirectApollo())
 				}
 
 				// Only when the graphql specifier is actually named. A generated path is an
 				// ordinary place to import types from, so the path alone is not the defect.
 				if strings.Contains(source, "/generated") && importsGraphqlSpecifier(declaration) {
-					ctx.ReportNode(node, messageNoDirectGraphqlImport)
+					ctx.ReportNode(node, messageNoDirectGraphqlImport())
 				}
 			},
 		}

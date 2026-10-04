@@ -4,22 +4,30 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageHookShouldEndWithRequest = rule.Message{
-	Id: "hookShouldEndWithRequest",
-	Description: "This hook calls NetworkService but its name does not end in Request. The suffix is " +
-		"what makes a network call visible at the import site: a caller reading `useUser()` cannot " +
-		"tell it reaches the server, and so cannot know it needs loading and error handling until " +
-		"the hook is already wired in. Rename it to end in Request.",
+// The rule's messages, one handle per id, whose wording lives in
+// `policy/messages/network-require-hook-request-suffix.json`.
+var (
+	networkRequireHookRequestSuffixHookShouldEndWithRequestText = policy.MessageOf("structure/network-require-hook-request-suffix", "hookShouldEndWithRequest")
+	networkRequireHookRequestSuffixFileShouldEndWithRequestText = policy.MessageOf("structure/network-require-hook-request-suffix", "fileShouldEndWithRequest")
+)
+
+// messageHookShouldEndWithRequest is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageHookShouldEndWithRequest() rule.Message {
+	return rule.Message{
+		Id:          networkRequireHookRequestSuffixHookShouldEndWithRequestText.Id,
+		Description: networkRequireHookRequestSuffixHookShouldEndWithRequestText.Render(nil),
+	}
 }
 
-var messageFileShouldEndWithRequest = rule.Message{
-	Id: "fileShouldEndWithRequest",
-	Description: "This file declares a hook that calls NetworkService, but the file name does not " +
-		"end in Request. The name is the only signal a grep or a file tree gives, so a network " +
-		"module that does not carry the suffix is invisible to anyone auditing what talks to the " +
-		"server. Rename the file to end in Request.",
+// messageFileShouldEndWithRequest is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageFileShouldEndWithRequest() rule.Message {
+	return rule.Message{
+		Id:          networkRequireHookRequestSuffixFileShouldEndWithRequestText.Id,
+		Description: networkRequireHookRequestSuffixFileShouldEndWithRequestText.Render(nil),
+	}
 }
 
 // NetworkRequireHookRequestSuffix flags a NetworkService hook, or its file, not named `*Request`.
@@ -53,7 +61,7 @@ var NetworkRequireHookRequestSuffix = rule.Rule{
 
 		for _, hook := range analysis.HookDeclarations {
 			if !strings.HasSuffix(hook.Name, "Request") {
-				ctx.ReportNode(hook.NameNode, messageHookShouldEndWithRequest)
+				ctx.ReportNode(hook.NameNode, messageHookShouldEndWithRequest())
 			}
 		}
 
@@ -61,7 +69,7 @@ var NetworkRequireHookRequestSuffix = rule.Rule{
 		// declared. The defect is the file's name, and reporting it once per hook would say the same
 		// thing three times about one rename.
 		if fileNeedsRequestSuffix(ctx.SourceFile.FileName()) {
-			ctx.ReportNode(analysis.HookDeclarations[0].NameNode, messageFileShouldEndWithRequest)
+			ctx.ReportNode(analysis.HookDeclarations[0].NameNode, messageFileShouldEndWithRequest())
 		}
 
 		return nil

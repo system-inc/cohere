@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // forbiddenSource is one package we do not import, and what to import instead.
@@ -16,7 +17,9 @@ import (
 type forbiddenSource struct {
 	Specifier   string
 	Replacement string
-	Message     rule.Message
+	// Message is the entry's message, whose wording lives in
+	// `policy/messages/import-no-forbidden-source.json`.
+	Message policy.MessageHandle
 
 	// Owners are where the sanctioned wrapper lives, matched as path substrings. The wrapper imports
 	// the forbidden source by design, so a file there is exempt, and reporting it would also have the
@@ -29,45 +32,26 @@ var forbiddenSources = []forbiddenSource{
 		Specifier:   "next/navigation",
 		Replacement: "@structure/source/router/Navigation",
 		// Navigation spans its router directory: its useRouter hook imports Next's own.
-		Owners: []string{"/source/router/"},
-		Message: rule.Message{
-			Id: "forbiddenNavigationImport",
-			Description: "Importing from 'next/navigation' is not allowed. Use " +
-				"'@structure/source/router/Navigation', which is the same navigation without binding " +
-				"the file to one framework's router.",
-		},
+		Owners:  []string{"/source/router/"},
+		Message: policy.MessageOf("nexus/import-no-forbidden-source", "forbiddenNavigationImport"),
 	},
 	{
 		Specifier:   "next/link",
 		Replacement: "@structure/source/components/navigation/Link",
 		// A single file, since the components beside it must still use the wrapper.
-		Owners: []string{"/source/components/navigation/Link.tsx"},
-		Message: rule.Message{
-			Id: "forbiddenLinkImport",
-			Description: "Importing from 'next/link' is not allowed. Use " +
-				"'@structure/source/components/navigation/Link' instead, so a link renders the same way " +
-				"whichever framework is underneath it.",
-		},
+		Owners:  []string{"/source/components/navigation/Link.tsx"},
+		Message: policy.MessageOf("nexus/import-no-forbidden-source", "forbiddenLinkImport"),
 	},
 	{
 		Specifier:   "next/image",
 		Replacement: "@structure/source/components/images/Image",
 		Owners:      []string{"/source/components/images/Image.tsx"},
-		Message: rule.Message{
-			Id: "forbiddenImageImport",
-			Description: "Importing from 'next/image' is not allowed. Use " +
-				"'@structure/source/components/images/Image' instead, so an image renders the same way " +
-				"whichever framework is underneath it.",
-		},
+		Message:     policy.MessageOf("nexus/import-no-forbidden-source", "forbiddenImageImport"),
 	},
 	{
 		Specifier:   "framer-motion",
 		Replacement: "motion/react",
-		Message: rule.Message{
-			Id: "forbiddenMotionImport",
-			Description: "Importing from 'framer-motion' is not allowed. Use 'motion/react', which is the " +
-				"same library under the name it ships as now.",
-		},
+		Message:     policy.MessageOf("nexus/import-no-forbidden-source", "forbiddenMotionImport"),
 	},
 }
 
@@ -115,7 +99,7 @@ var ImportNoForbiddenSource = rule.Rule{
 				}
 				ctx.ReportNodeWithFixes(
 					specifierNode,
-					forbidden.Message,
+					rule.Message{Id: forbidden.Message.Id, Description: forbidden.Message.Render(nil)},
 					ctx.ReplaceNode(specifierNode, "'"+forbidden.Replacement+"'"),
 				)
 				return

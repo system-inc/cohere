@@ -7,29 +7,37 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/module"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messagePageRequireDefaultExport = rule.Message{
-	Id: "pageRequireDefaultExport",
-	Description: "A Next.js page file has no default export, so the route it defines does not " +
-		"exist. Next resolves a route by this export and by nothing else, so the failure is a " +
-		"missing page at runtime rather than anything the compiler reports: every other export in " +
-		"the file type-checks fine. Add a default-exported function ending in PageRoute.",
+// messagePageRequireDefaultExportText is the rule's `pageRequireDefaultExport` message, whose
+// wording lives in `policy/messages/next-require-page-default-export.json`.
+var messagePageRequireDefaultExportText = policy.MessageOf("structure/next-require-page-default-export", "pageRequireDefaultExport")
+
+// messagePageRequireDefaultExport is the finding, rendered when it is reported so the text comes
+// from the current catalog.
+func messagePageRequireDefaultExport() rule.Message {
+	return rule.Message{Id: messagePageRequireDefaultExportText.Id, Description: messagePageRequireDefaultExportText.Render(nil)}
 }
 
-var messagePageDefaultExportInline = rule.Message{
-	Id: "pageDefaultExportInline",
-	Description: "This page's default export is a separate statement rather than being on the " +
-		"function itself. Writing `export default function NameOfPageRoute()` puts the route's " +
-		"identity on the declaration, where a reader opening the file sees it first, instead of " +
-		"in a line at the bottom that a refactor can leave pointing at the wrong function.",
+// messagePageDefaultExportInlineText is the rule's `pageDefaultExportInline` message, whose wording
+// lives in `policy/messages/next-require-page-default-export.json`.
+var messagePageDefaultExportInlineText = policy.MessageOf("structure/next-require-page-default-export", "pageDefaultExportInline")
+
+// messagePageDefaultExportInline is the finding, rendered when it is reported so the text comes
+// from the current catalog.
+func messagePageDefaultExportInline() rule.Message {
+	return rule.Message{Id: messagePageDefaultExportInlineText.Id, Description: messagePageDefaultExportInlineText.Render(nil)}
 }
 
-var messagePageDefaultExportNameSuffix = rule.Message{
-	Id: "pageDefaultExportNameSuffix",
-	Description: "A page's default export must be a named function ending in PageRoute. Every " +
-		"page in the app is a file called page.tsx, so the function name is the only thing that " +
-		"distinguishes one in a stack trace, a profiler flame graph, or the React tree.",
+// messagePageDefaultExportNameSuffixText is the rule's `pageDefaultExportNameSuffix` message, whose
+// wording lives in `policy/messages/next-require-page-default-export.json`.
+var messagePageDefaultExportNameSuffixText = policy.MessageOf("structure/next-require-page-default-export", "pageDefaultExportNameSuffix")
+
+// messagePageDefaultExportNameSuffix is the finding, rendered when it is reported so the text comes
+// from the current catalog.
+func messagePageDefaultExportNameSuffix() rule.Message {
+	return rule.Message{Id: messagePageDefaultExportNameSuffixText.Id, Description: messagePageDefaultExportNameSuffixText.Render(nil)}
 }
 
 // NextRequirePageDefaultExport flags a Next.js page whose default export is missing or misshapen.
@@ -74,16 +82,16 @@ var NextRequirePageDefaultExport = rule.Rule{
 			hasDefaultExport = true
 
 			if defaultExport.separate {
-				ctx.ReportNode(statement, messagePageDefaultExportInline)
+				ctx.ReportNode(statement, messagePageDefaultExportInline())
 			}
 			if defaultExport.name != "" && !strings.HasSuffix(defaultExport.name, "PageRoute") {
-				ctx.ReportNode(statement, messagePageDefaultExportNameSuffix)
+				ctx.ReportNode(statement, messagePageDefaultExportNameSuffix())
 			}
 			return false
 		})
 
 		if !hasDefaultExport {
-			ctx.ReportNode(sourceFile, messagePageRequireDefaultExport)
+			ctx.ReportNode(sourceFile, messagePageRequireDefaultExport())
 		}
 
 		return nil

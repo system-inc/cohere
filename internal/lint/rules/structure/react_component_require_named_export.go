@@ -5,15 +5,17 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/module"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageComponentRequiresNamedExport = rule.Message{
-	Id: "componentRequiresNamedExport",
-	Description: "This file declares a component and exports nothing by name, so a consumer can " +
-		"only reach it through a default import, which lets every importer choose its own name for " +
-		"the same component. That makes the codebase impossible to grep: the thing is called one " +
-		"name where it is written and another wherever it is used, and a rename never propagates. " +
-		"Put `export` on the declaration.",
+// reactComponentRequireNamedExportText is the rule's message, whose wording lives in
+// `policy/messages/react-component-require-named-export.json`.
+var reactComponentRequireNamedExportText = policy.MessageOf("structure/react-component-require-named-export", "componentRequiresNamedExport")
+
+// messageComponentRequiresNamedExport is the finding, rendered when it is reported so the text
+// comes from the current catalog.
+func messageComponentRequiresNamedExport() rule.Message {
+	return rule.Message{Id: reactComponentRequireNamedExportText.Id, Description: reactComponentRequireNamedExportText.Render(nil)}
 }
 
 // ReactComponentRequireNamedExport flags a component file with no named export.
@@ -81,7 +83,7 @@ var ReactComponentRequireNamedExport = rule.Rule{
 		// The first component declared, matching the original. A file with several components and no
 		// named export reports once, naming the first, because the fix is to export the one the file
 		// is about and the rest are its helpers.
-		ctx.ReportNode(components[0].nameNode, messageComponentRequiresNamedExport)
+		ctx.ReportNode(components[0].nameNode, messageComponentRequiresNamedExport())
 		return nil
 	},
 }

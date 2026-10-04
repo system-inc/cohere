@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "TypeScript": "nexus/correctness-no-caller-data-mutation"
+  },
+  "messages": {
+    "callerDataMutation": {
+      "text": "This writes into data the caller passed in. The change reaches the caller, and nothing at the call site says it will: the call reads like it hands data over, and the caller's data comes back different. Return what changed and let the caller write it, or build a new value from the parameter."
+    }
+  }
+}

@@ -1,7 +1,6 @@
 package structure
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 	"unicode"
@@ -12,29 +11,27 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-// nearMissRouteExportReasoning is the part of every message that says why a near miss matters.
-const nearMissRouteExportReasoning = "Next.js reads a route file's exports by exact name and ignores " +
-	"every other export without a warning, so this one is dead code and the route silently goes " +
-	"without what it was written to configure. Five phi web routes exported " +
-	"`generateStaticParameters` for fifteen months and never prerendered."
+// nextNoNearMissRouteExportNearMissText and nextNoNearMissRouteExportPagesRouterText are the rule's
+// messages, whose wording lives in `policy/messages/next-no-near-miss-route-export.json`.
+var (
+	nextNoNearMissRouteExportNearMissText    = policy.MessageOf("structure/next-no-near-miss-route-export", "nearMissRouteExport")
+	nextNoNearMissRouteExportPagesRouterText = policy.MessageOf("structure/next-no-near-miss-route-export", "pagesRouterExport")
+)
 
 func messageNearMissRouteExport(name string, contractName string) rule.Message {
 	return rule.Message{
-		Id: "nearMissRouteExport",
-		Description: fmt.Sprintf("`%s` is not a name Next.js reads from this file, and it is one "+
-			"step from `%s`, which it does. %s Rename it to `%s`.",
-			name, contractName, nearMissRouteExportReasoning, contractName),
+		Id:          nextNoNearMissRouteExportNearMissText.Id,
+		Description: nextNoNearMissRouteExportNearMissText.Render(map[string]string{"name": name, "contractName": contractName}),
 	}
 }
 
 func messagePagesRouterExport(name string) rule.Message {
 	return rule.Message{
-		Id: "pagesRouterExport",
-		Description: fmt.Sprintf("`%s` is a Pages Router data function, and the App Router never "+
-			"calls it. %s Fetch in the component itself, and export `generateStaticParams` for the "+
-			"paths to prerender.", name, nearMissRouteExportReasoning),
+		Id:          nextNoNearMissRouteExportPagesRouterText.Id,
+		Description: nextNoNearMissRouteExportPagesRouterText.Render(map[string]string{"name": name}),
 	}
 }
 

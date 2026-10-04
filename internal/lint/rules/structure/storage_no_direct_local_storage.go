@@ -3,22 +3,27 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-const localStorageReasoning = "LocalStorageService is what makes storage survive the places raw " +
-	"localStorage does not: it is absent during server rendering, it throws in private browsing " +
-	"on some browsers, and it holds strings, so every caller reinvents parsing and every one of " +
-	"them gets the quota error differently. Use localStorageService from " +
-	"@structure/source/services/local-storage/LocalStorageService instead."
+// messageDirectLocalStorageText is the rule's `directLocalStorage` message, whose wording lives in
+// `policy/messages/storage-no-direct-local-storage.json`.
+var messageDirectLocalStorageText = policy.MessageOf("structure/storage-no-direct-local-storage", "directLocalStorage")
 
-var messageDirectLocalStorage = rule.Message{
-	Id:          "directLocalStorage",
-	Description: "This reaches localStorage directly. " + localStorageReasoning,
+// messageDirectLocalStorage is the finding, rendered when it is reported so the text comes from the
+// current catalog.
+func messageDirectLocalStorage() rule.Message {
+	return rule.Message{Id: messageDirectLocalStorageText.Id, Description: messageDirectLocalStorageText.Render(nil)}
 }
 
-var messageWindowLocalStorage = rule.Message{
-	Id:          "windowLocalStorage",
-	Description: "This reaches window.localStorage directly. " + localStorageReasoning,
+// messageWindowLocalStorageText is the rule's `windowLocalStorage` message, whose wording lives in
+// `policy/messages/storage-no-direct-local-storage.json`.
+var messageWindowLocalStorageText = policy.MessageOf("structure/storage-no-direct-local-storage", "windowLocalStorage")
+
+// messageWindowLocalStorage is the finding, rendered when it is reported so the text comes from the
+// current catalog.
+func messageWindowLocalStorage() rule.Message {
+	return rule.Message{Id: messageWindowLocalStorageText.Id, Description: messageWindowLocalStorageText.Render(nil)}
 }
 
 // StorageNoDirectLocalStorage flags any direct use of localStorage outside the service.
@@ -83,14 +88,14 @@ var StorageNoDirectLocalStorage = rule.Rule{
 					if access.Name() == node {
 						receiver := ast.SkipParentheses(access.Expression)
 						if receiver != nil && receiver.Kind == ast.KindIdentifier && receiver.Text() == "window" {
-							ctx.ReportNode(parent, messageWindowLocalStorage)
+							ctx.ReportNode(parent, messageWindowLocalStorage())
 						}
 						// A `localStorage` property on anything else is somebody's own field.
 						return
 					}
 
 					// `localStorage.getItem(...)`, where the identifier is the receiver.
-					ctx.ReportNode(node, messageDirectLocalStorage)
+					ctx.ReportNode(node, messageDirectLocalStorage())
 
 				case ast.KindPropertyAssignment:
 					// A key named localStorage is a name, not a use. `{ localStorage: x }` stores
@@ -99,7 +104,7 @@ var StorageNoDirectLocalStorage = rule.Rule{
 					if parent.AsPropertyAssignment().Name() == node {
 						return
 					}
-					ctx.ReportNode(node, messageDirectLocalStorage)
+					ctx.ReportNode(node, messageDirectLocalStorage())
 
 				case ast.KindPropertyDeclaration, ast.KindMethodDeclaration,
 					ast.KindPropertySignature, ast.KindMethodSignature,
@@ -114,12 +119,12 @@ var StorageNoDirectLocalStorage = rule.Rule{
 					if declaredName(parent) == node {
 						return
 					}
-					ctx.ReportNode(node, messageDirectLocalStorage)
+					ctx.ReportNode(node, messageDirectLocalStorage())
 
 				default:
 					// Every other position is the value being used: an argument, an initializer, a
 					// return, an element of an array.
-					ctx.ReportNode(node, messageDirectLocalStorage)
+					ctx.ReportNode(node, messageDirectLocalStorage())
 				}
 			},
 		}

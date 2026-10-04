@@ -8,7 +8,12 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/module"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
+
+// boundaryNoProjectThemeValueText is the rule's message, whose wording lives in
+// `policy/messages/boundary-no-project-theme-value.json`.
+var boundaryNoProjectThemeValueText = policy.MessageOf("structure/boundary-no-project-theme-value", "forbiddenThemeValue")
 
 // messageForbiddenThemeValue names the value, the component, and what is allowed instead.
 //
@@ -16,13 +21,13 @@ import (
 // the theme file; naming the values it can be is the edit.
 func messageForbiddenThemeValue(component string, propertyName string, value string, allowed []string) rule.Message {
 	return rule.Message{
-		Id: "forbiddenThemeValue",
-		Description: "<" + component + " " + propertyName + "=\"" + value + "\"> uses a value the " +
-			"library does not define. A shared component that renders a project's value has a " +
-			"dependency pointing the wrong way: the library would need the project to build, and " +
-			"the next project to use this component finds a value that means nothing to it. Use " +
-			"one the library defines: " + strings.Join(allowed, ", ") + ". If the value belongs in " +
-			"the library, add it to the theme first.",
+		Id: boundaryNoProjectThemeValueText.Id,
+		Description: boundaryNoProjectThemeValueText.Render(map[string]string{
+			"component":    component,
+			"propertyName": propertyName,
+			"value":        value,
+			"allowed":      strings.Join(allowed, ", "),
+		}),
 	}
 }
 

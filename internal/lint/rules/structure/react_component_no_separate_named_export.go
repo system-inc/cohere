@@ -7,16 +7,17 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageNoSeparateNamedExport = rule.Message{
-	Id: "noSeparateNamedExport",
-	Description: "This exports a component declared in the same file from a separate statement. " +
-		"Put the export on the declaration instead. A reader opening the file to find what it " +
-		"offers should see that on the function, not have to hold the whole file in mind and check " +
-		"a list at the bottom, and the list is a second place a rename has to reach: renaming the " +
-		"function and forgetting the export is a build error, renaming it in both and forgetting a " +
-		"consumer is not.",
+// reactComponentNoSeparateNamedExportText is the rule's message, whose wording lives in
+// `policy/messages/react-component-no-separate-named-export.json`.
+var reactComponentNoSeparateNamedExportText = policy.MessageOf("structure/react-component-no-separate-named-export", "noSeparateNamedExport")
+
+// messageNoSeparateNamedExport is the finding, rendered when it is reported so the text comes from
+// the current catalog.
+func messageNoSeparateNamedExport() rule.Message {
+	return rule.Message{Id: reactComponentNoSeparateNamedExportText.Id, Description: reactComponentNoSeparateNamedExportText.Render(nil)}
 }
 
 // ReactComponentNoSeparateNamedExport flags a bare export list naming a component the file declares.
@@ -100,10 +101,10 @@ var ReactComponentNoSeparateNamedExport = rule.Rule{
 						fix, repairable := separateNamedExportRepair(ctx, node, declaredComponents,
 							declarationStatements)
 						if !repairable {
-							ctx.ReportNode(node, messageNoSeparateNamedExport)
+							ctx.ReportNode(node, messageNoSeparateNamedExport())
 							return
 						}
-						ctx.ReportNodeWithFixes(node, messageNoSeparateNamedExport, fix)
+						ctx.ReportNodeWithFixes(node, messageNoSeparateNamedExport(), fix)
 						return
 					}
 				}

@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const (
@@ -16,33 +17,48 @@ const (
 	correctnessNoCollectionMisuseObjectMethodId   = "objectMethodOnCollection"
 )
 
-var correctnessNoCollectionMisuseInOnArrayMessage = rule.Message{
-	Id: correctnessNoCollectionMisuseInOnArrayId,
-	Description: "This uses `in` to look for a value in an array. `in` asks whether the array has a property " +
-		"or index of that name, never whether it holds that element, and this name is neither, so the test " +
-		"is always false. Use `.includes()` for membership.",
+// correctnessNoCollectionMisuseInOnArrayText is one of the rule's messages, whose wording lives in
+// `policy/messages/correctness-no-collection-misuse.json`.
+var correctnessNoCollectionMisuseInOnArrayText = policy.MessageOf("nexus/correctness-no-collection-misuse", correctnessNoCollectionMisuseInOnArrayId)
+
+func correctnessNoCollectionMisuseInOnArrayMessage() rule.Message {
+	return rule.Message{
+		Id:          correctnessNoCollectionMisuseInOnArrayId,
+		Description: correctnessNoCollectionMisuseInOnArrayText.Render(nil),
+	}
 }
 
-var correctnessNoCollectionMisuseSizeComparisonMessage = rule.Message{
-	Id: correctnessNoCollectionMisuseSizeComparisonId,
-	Description: "This compares a `.length` or `.size` against a value it can never be on the other side of. " +
-		"A length or size is never negative, so the comparison has the same answer every time: always " +
-		"false (`< 0`, `=== -1`) or always true (`>= 0`, `!== -1`). Compare against `0` for empty, or " +
-		"`> 0` for not empty.",
+// correctnessNoCollectionMisuseSizeComparisonText is one of the rule's messages, whose wording lives in
+// `policy/messages/correctness-no-collection-misuse.json`.
+var correctnessNoCollectionMisuseSizeComparisonText = policy.MessageOf("nexus/correctness-no-collection-misuse", correctnessNoCollectionMisuseSizeComparisonId)
+
+func correctnessNoCollectionMisuseSizeComparisonMessage() rule.Message {
+	return rule.Message{
+		Id:          correctnessNoCollectionMisuseSizeComparisonId,
+		Description: correctnessNoCollectionMisuseSizeComparisonText.Render(nil),
+	}
 }
 
-var correctnessNoCollectionMisuseBracketAccessMessage = rule.Message{
-	Id: correctnessNoCollectionMisuseBracketAccessId,
-	Description: "This reads or writes a Map or Set with brackets. Brackets reach the object's own " +
-		"properties, not its entries, so a read finds nothing that `.set()` or `.add()` stored and a write " +
-		"stores nothing `.get()` or `.has()` will see. Use `.get()`, `.set()`, `.has()` or `.add()`.",
+// correctnessNoCollectionMisuseBracketAccessText is one of the rule's messages, whose wording lives in
+// `policy/messages/correctness-no-collection-misuse.json`.
+var correctnessNoCollectionMisuseBracketAccessText = policy.MessageOf("nexus/correctness-no-collection-misuse", correctnessNoCollectionMisuseBracketAccessId)
+
+func correctnessNoCollectionMisuseBracketAccessMessage() rule.Message {
+	return rule.Message{
+		Id:          correctnessNoCollectionMisuseBracketAccessId,
+		Description: correctnessNoCollectionMisuseBracketAccessText.Render(nil),
+	}
 }
 
-var correctnessNoCollectionMisuseObjectMethodMessage = rule.Message{
-	Id: correctnessNoCollectionMisuseObjectMethodId,
-	Description: "This hands a Map or Set to an `Object` method that lists own properties. Entries are not " +
-		"properties, so the result is always empty. Use the collection's own `.keys()`, `.values()` or " +
-		"`.entries()`, or `Array.from(...)` around one of them.",
+// correctnessNoCollectionMisuseObjectMethodText is one of the rule's messages, whose wording lives in
+// `policy/messages/correctness-no-collection-misuse.json`.
+var correctnessNoCollectionMisuseObjectMethodText = policy.MessageOf("nexus/correctness-no-collection-misuse", correctnessNoCollectionMisuseObjectMethodId)
+
+func correctnessNoCollectionMisuseObjectMethodMessage() rule.Message {
+	return rule.Message{
+		Id:          correctnessNoCollectionMisuseObjectMethodId,
+		Description: correctnessNoCollectionMisuseObjectMethodText.Render(nil),
+	}
 }
 
 // CorrectnessNoCollectionMisuse reports four ways of treating a built-in collection that cannot do
@@ -134,12 +150,12 @@ var CorrectnessNoCollectionMisuse = rule.Rule{
 				binary := node.AsBinaryExpression()
 				if binary.OperatorToken.Kind == ast.KindInKeyword {
 					if correctnessNoCollectionMisuseIsInOnArray(ctx, binary) {
-						ctx.ReportNode(node, correctnessNoCollectionMisuseInOnArrayMessage)
+						ctx.ReportNode(node, correctnessNoCollectionMisuseInOnArrayMessage())
 					}
 					return
 				}
 				if correctnessNoCollectionMisuseIsImpossibleSizeComparison(ctx, binary) {
-					ctx.ReportNode(node, correctnessNoCollectionMisuseSizeComparisonMessage)
+					ctx.ReportNode(node, correctnessNoCollectionMisuseSizeComparisonMessage())
 				}
 			},
 			ast.KindElementAccessExpression: func(node *ast.Node) {
@@ -149,12 +165,12 @@ var CorrectnessNoCollectionMisuse = rule.Rule{
 					return
 				}
 				if correctnessNoCollectionMisuseKeyMissesEveryMember(ctx, access.Expression, access.ArgumentExpression) {
-					ctx.ReportNode(node, correctnessNoCollectionMisuseBracketAccessMessage)
+					ctx.ReportNode(node, correctnessNoCollectionMisuseBracketAccessMessage())
 				}
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
 				if correctnessNoCollectionMisuseIsObjectMethodOnCollection(ctx, node) {
-					ctx.ReportNode(node, correctnessNoCollectionMisuseObjectMethodMessage)
+					ctx.ReportNode(node, correctnessNoCollectionMisuseObjectMethodMessage())
 				}
 			},
 		}

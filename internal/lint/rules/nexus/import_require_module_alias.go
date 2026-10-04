@@ -3,6 +3,7 @@ package nexus
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // ImportStyle is how a package expects to be bound.
@@ -48,30 +49,46 @@ var defaultModuleAliases = map[string]ModuleAlias{
 	"typescript": {Name: "TypeScript", Style: ImportStyleNamespace},
 }
 
+// importRequireModuleAliasRequireAliasNameText is the rule's `requireAliasName` message,
+// whose wording lives in `policy/messages/import-require-module-alias.json`.
+var importRequireModuleAliasRequireAliasNameText = policy.MessageOf("nexus/import-require-module-alias", "requireAliasName")
+
 func messageRequireAliasName(source string, expected string, actual string) rule.Message {
 	return rule.Message{
 		Id: "requireAliasName",
-		Description: "Import \"" + source + "\" as \"" + expected + "\", not \"" + actual +
-			"\". A package bound to a different name in each file is the same dependency wearing " +
-			"several faces, and it stops being greppable by one spelling.",
+		Description: importRequireModuleAliasRequireAliasNameText.Render(map[string]string{
+			"source":   source,
+			"expected": expected,
+			"actual":   actual,
+		}),
 	}
 }
+
+// importRequireModuleAliasRequireDefaultStyleText is the rule's `requireDefaultStyle` message,
+// whose wording lives in `policy/messages/import-require-module-alias.json`.
+var importRequireModuleAliasRequireDefaultStyleText = policy.MessageOf("nexus/import-require-module-alias", "requireDefaultStyle")
 
 func messageRequireDefaultStyle(source string, expected string) rule.Message {
 	return rule.Message{
 		Id: "requireDefaultStyle",
-		Description: "Import \"" + source + "\" as a default import: `import " + expected + " from '" +
-			source + "'`. A namespace object is frozen and, under esModuleInterop, is not the value " +
-			"the default import yields, so the two forms are not interchangeable.",
+		Description: importRequireModuleAliasRequireDefaultStyleText.Render(map[string]string{
+			"source":   source,
+			"expected": expected,
+		}),
 	}
 }
+
+// importRequireModuleAliasRequireNamespaceStyleText is the rule's `requireNamespaceStyle` message,
+// whose wording lives in `policy/messages/import-require-module-alias.json`.
+var importRequireModuleAliasRequireNamespaceStyleText = policy.MessageOf("nexus/import-require-module-alias", "requireNamespaceStyle")
 
 func messageRequireNamespaceStyle(source string, expected string) rule.Message {
 	return rule.Message{
 		Id: "requireNamespaceStyle",
-		Description: "Import \"" + source + "\" as a namespace import: `import * as " + expected +
-			" from '" + source + "'`. This package exports a namespace rather than a default, so the " +
-			"namespace form is the accurate one.",
+		Description: importRequireModuleAliasRequireNamespaceStyleText.Render(map[string]string{
+			"source":   source,
+			"expected": expected,
+		}),
 	}
 }
 

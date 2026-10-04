@@ -6,7 +6,12 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
+
+// correctnessRequireMatchingInjectTypeText is the rule's message, whose wording lives in
+// `policy/messages/correctness-require-matching-inject-type.json`.
+var correctnessRequireMatchingInjectTypeText = policy.MessageOf("base/correctness-require-matching-inject-type", "mismatch")
 
 // CorrectnessRequireMatchingInjectType checks that a typed injection decorator resolves to a type the
 // decorated parameter accepts.
@@ -116,10 +121,12 @@ var CorrectnessRequireMatchingInjectType = rule.Rule{
 					rule.TokenRange(ctx.SourceFile, parameterNode.Name()).Pos(),
 					parameterNode.End(),
 				), rule.Message{
-					Id: "mismatch",
-					Description: "@" + injectDecoratorName(node) + " resolves to '" +
-						ctx.TypeChecker.TypeToString(resolvedType) + "' but parameter is typed as '" +
-						ctx.TypeChecker.TypeToString(parameterType) + "'",
+					Id: correctnessRequireMatchingInjectTypeText.Id,
+					Description: correctnessRequireMatchingInjectTypeText.Render(map[string]string{
+						"decoratorName": injectDecoratorName(node),
+						"resolvedType":  ctx.TypeChecker.TypeToString(resolvedType),
+						"parameterType": ctx.TypeChecker.TypeToString(parameterType),
+					}),
 				})
 			},
 		}

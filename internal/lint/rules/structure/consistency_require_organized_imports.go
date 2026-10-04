@@ -5,15 +5,19 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messageImportsNotOrganized = rule.Message{
-	Id: "importsNotOrganized",
-	Description: "The imports in this file are not grouped and ordered the way the rest of the tree " +
-		"is. Every file opens with the same twenty-three named blocks in the same sequence, each " +
-		"under its own comment header and alphabetized inside itself, so a reader looking for where " +
-		"a symbol comes from goes to the block rather than reading the whole list, and a reviewer " +
-		"sees a new dependency land in the block that says what kind of dependency it is.",
+// consistencyRequireOrganizedImportsText is the rule's message, whose wording lives in
+// `policy/messages/consistency-require-organized-imports.json`.
+var consistencyRequireOrganizedImportsText = policy.MessageOf("structure/consistency-require-organized-imports", "importsNotOrganized")
+
+// messageImportsNotOrganized is the finding, rendered when it is reported so the text comes from the current catalog.
+func messageImportsNotOrganized() rule.Message {
+	return rule.Message{
+		Id:          consistencyRequireOrganizedImportsText.Id,
+		Description: consistencyRequireOrganizedImportsText.Render(nil),
+	}
 }
 
 // ConsistencyRequireOrganizedImports flags a file whose import section is not in canonical form.
@@ -150,10 +154,10 @@ func checkImportOrganization(ctx rule.Context, sourceFile *ast.Node) {
 	 * being reordered. Those files are reported without a fix.
 	 */
 	if !canRenderSafely(interleaved) || suppressionPrecedesSection(sourceText, fileComments, sectionStart) {
-		ctx.ReportNode(importDeclarations[0], messageImportsNotOrganized)
+		ctx.ReportNode(importDeclarations[0], messageImportsNotOrganized())
 		return
 	}
 
-	ctx.ReportNodeWithFixes(importDeclarations[0], messageImportsNotOrganized,
+	ctx.ReportNodeWithFixes(importDeclarations[0], messageImportsNotOrganized(),
 		rule.ReplaceRange(core.NewTextRange(sectionStart, sectionEnd), expected))
 }
