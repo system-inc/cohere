@@ -1215,3 +1215,61 @@ func TestNoUnnecessaryTypeParametersPhantomBrands(t *testing.T) {
 		})
 	}
 }
+
+// TestNoUnnecessaryTypeParametersCountsAnObjectTypesPropertiesOnce is upstream's list guard (#vn5vpfs).
+//
+// `Extract<ComponentType, { type: Kind }>` distributes over the union, and each constituent's
+// conditional carries the same `{ type: Kind }` object. Upstream walks that object's properties once,
+// so `Kind` counts once and the function reports: Structure's `surveyFieldRendererFor` at ea00a681,
+// which ESLint reported and cohere did not. The site is fixed in Structure 3146950 by narrowing the
+// map to `Pick<RenderersType, Kind>`, so this fixture is the only place the shape still lives.
+// Both replayed through the installed typescript-eslint 8.67.0: the first reports `sole` at 7:29,
+// the second is silent.
+func TestNoUnnecessaryTypeParametersCountsAnObjectTypesPropertiesOnce(t *testing.T) {
+	t.Parallel()
+
+	fires := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, `interface ShortAnswerInterface { type: 'ShortAnswer'; placeholder: string }
+interface RatingInterface { type: 'Rating'; maximum: number }
+type ComponentType = ShortAnswerInterface | RatingInterface;
+type RendererType<Kind extends ComponentType['type']> = (component: Extract<ComponentType, { type: Kind }>) => string;
+type RenderersType = { [Kind in ComponentType['type']]?: RendererType<Kind> };
+
+export function rendererFor<Kind extends ComponentType['type']>(
+    renderers: RenderersType,
+    component: Extract<ComponentType, { type: Kind }>,
+): (() => string) | undefined {
+    const renderer = renderers[component.type];
+    if(!renderer) {
+        return undefined;
+    }
+    return function() {
+        return renderer(component);
+    };
+}
+`)
+	rule_testing.ExpectFindings(t, fires, "sole")
+	if !strings.HasPrefix(fires.Diagnostics[0].Message.Description, "Type parameter Kind is used only once in the function signature.") {
+		t.Errorf("expected upstream's sentence first, got %q", fires.Diagnostics[0].Message.Description)
+	}
+
+	silent := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, `interface ShortAnswerInterface { type: 'ShortAnswer'; placeholder: string }
+interface RatingInterface { type: 'Rating'; maximum: number }
+type ComponentType = ShortAnswerInterface | RatingInterface;
+type RendererType<Kind extends ComponentType['type']> = (component: Extract<ComponentType, { type: Kind }>) => string;
+type RenderersType = { [Kind in ComponentType['type']]?: RendererType<Kind> };
+
+export function rendererFor<Kind extends ComponentType['type']>(
+    renderers: Pick<RenderersType, Kind>,
+    component: Extract<ComponentType, { type: Kind }>,
+): (() => string) | undefined {
+    const renderer = renderers[component.type];
+    if(!renderer) {
+        return undefined;
+    }
+    return function() {
+        return renderer(component);
+    };
+}
+`)
+	rule_testing.ExpectClean(t, silent)
+}

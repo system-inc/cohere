@@ -684,6 +684,10 @@ type typeUsageWalk struct {
 	visitedConstraints map[*checker.Type]bool
 	visitedDefault     bool
 
+	// visitedPropertyLists is upstream's `visitedSymbolLists`, keyed on the object type whose
+	// properties were walked. See visitObjectType for why the key is the type.
+	visitedPropertyLists map[*checker.Type]bool
+
 	// fromClass records that this walk is over a class or one of its members, where upstream
 	// accepts every type argument as a multiple use.
 	fromClass bool
@@ -722,11 +726,12 @@ func collectTypeParameterUsageCounts(
 	fromClass bool,
 ) {
 	walk := &typeUsageWalk{
-		ctx:                ctx,
-		counts:             counts,
-		typeUsages:         map[*checker.Type]int{},
-		visitedConstraints: map[*checker.Type]bool{},
-		fromClass:          fromClass,
+		ctx:                  ctx,
+		counts:               counts,
+		typeUsages:           map[*checker.Type]int{},
+		visitedConstraints:   map[*checker.Type]bool{},
+		visitedPropertyLists: map[*checker.Type]bool{},
+		fromClass:            fromClass,
 	}
 
 	// A call signature and a constructor are resolved as SIGNATURES rather than as types, because
@@ -922,9 +927,26 @@ func (walk *typeUsageWalk) visitTypeReference(subject *checker.Type, assumeMulti
 // The mapped-type half of upstream's arm is absent here, and deliberately so: the four fields it
 // reads are unexported on checker.MappedType with no accessor, measured with a compiling probe.
 // See the note on the rule variable for what that costs and why the direction is safe.
+//
+// # An object type's properties are walked once per walk, which is upstream's list guard
+//
+// Upstream's `visitSymbolsListOnce` skips a property list it has already walked, keyed on the
+// array's identity. `type.getProperties()` returns the array cached on the type's resolved members,
+// so the same type always hands back the same array and the guard is "each object type's
+// properties once". Go slices carry no identity, so the key here is the type itself, which is the
+// same set.
+//
+// It changes counts, not only recursion. `Extract<Union, { type: Kind }>` distributes over the
+// union, and every constituent's conditional carries the SAME `{ type: Kind }` object as its extends
+// type. Upstream walks its properties once and counts `Kind` once, so a `Kind` used nowhere else in
+// the signature reports. Without the guard each constituent walked them again, `Kind` counted once
+// per union member, and the rule was silent where ESLint reports: Structure's `surveyFieldRendererFor`
+// (#vn5vpfs) at ea00a681, fixed in 3146950.
 func (walk *typeUsageWalk) visitObjectType(subject *checker.Type) {
-	properties := walk.ctx.TypeChecker.GetPropertiesOfType(subject)
-	walk.visitSymbolsList(properties, false)
+	if !walk.visitedPropertyLists[subject] {
+		walk.visitedPropertyLists[subject] = true
+		walk.visitSymbolsList(walk.ctx.TypeChecker.GetPropertiesOfType(subject), false)
+	}
 
 	walk.visitType(walk.ctx.TypeChecker.GetNumberIndexType(subject), true, false)
 	walk.visitType(walk.ctx.TypeChecker.GetStringIndexType(subject), true, false)
@@ -978,12 +1000,8 @@ func (walk *typeUsageWalk) visitSignature(signature *checker.Signature) {
 	walk.visitType(returnType, false, true)
 }
 
-// visitSymbolsList is upstream's `visitSymbolsListOnce` without the list-identity guard.
-//
-// Upstream keys that guard on the SYMBOL ARRAY's identity, which JavaScript gives it for free
-// because `type.getProperties()` returns the same cached array each time. Go slices have no such
-// identity, so the guard cannot be reproduced as written. The nine-visit type guard in visitType
-// already bounds the recursion, which is what the list guard was protecting against.
+// visitSymbolsList walks each symbol's type. Upstream's once-per-list guard is kept by its one
+// caller, visitObjectType, keyed on the type that owns the list.
 func (walk *typeUsageWalk) visitSymbolsList(symbols []*ast.Symbol, assumeMultipleUses bool) {
 	for _, symbol := range symbols {
 		walk.visitType(walk.ctx.TypeChecker.GetTypeOfSymbol(symbol), assumeMultipleUses, false)
