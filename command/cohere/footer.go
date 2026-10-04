@@ -237,10 +237,13 @@ func overallFooter(facts overallFacts, style textStyle) string {
 	return line
 }
 
-// footerSeconds is a duration as the footer says it: 0.05s, 0.4s, 2.4s, 12s.
+// footerSeconds is a duration as the footer says it: 0.004s, 0.05s, 0.4s, 2.4s, 12s. Below a hundredth it
+// keeps a third decimal, so a fast replay never reads as taking no time at all.
 func footerSeconds(duration time.Duration) string {
 	seconds := duration.Seconds()
 	switch {
+	case seconds < 0.01:
+		return fmt.Sprintf("%.3fs", seconds)
 	case seconds < 0.1:
 		return fmt.Sprintf("%.2fs", seconds)
 	case seconds < 10:

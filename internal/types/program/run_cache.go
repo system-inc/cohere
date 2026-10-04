@@ -78,6 +78,11 @@ type RunCache struct {
 	// ExitCode is the process exit code to return on a hit. A cache that replayed the output and
 	// exited zero on a failing tree would pass CI while printing a failure.
 	ExitCode int
+
+	// Summary is the run's summary as the command encodes it, opaque here. The footer a run ends with
+	// carries that run's time, so it is never in Output; a replay renders its own from this, with the
+	// replay's time, rather than reprinting a recorded one that would claim the recorded run's.
+	Summary []byte
 }
 
 // RunCacheInput is one input's signature.
@@ -121,7 +126,11 @@ type RunCacheInput struct {
 //
 // 4: Inputs carry their change time and inode. A version-3 input has neither, and checked against a
 // stat that does, every one would read as changed.
-const runCacheVersion = 4
+//
+// 5: A run ends with a footer that is not in Output, and Summary carries what a replay renders it from.
+// A version-4 manifest has the old phase account in Output and no Summary, and would replay with no
+// footer at all.
+const runCacheVersion = 5
 
 // ErrRunCacheMiss is the one answer a check gives when it cannot prove a hit. Callers treat every
 // error from Check as a miss and run normally; this exists so a test can tell a clean miss

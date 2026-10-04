@@ -582,6 +582,10 @@ type ChangedFile struct {
 	// Changers names the fixing rules whose repairs landed, distinct and in the order they first
 	// landed, followed by "format" when the whole-text transform changed the result.
 	Changers []string
+
+	// FixesByRule counts the repairs that landed, by rule, so a reader of `prefer-const ×2` learns how
+	// much each rule changed and not only that it did. The transform is not in it; it is in Changers.
+	FixesByRule map[string]int
 }
 
 // Summarize folds per-file results into a run summary.
@@ -602,7 +606,11 @@ func Summarize(results []FileResult) Summary {
 			if result.Transformed {
 				changers = append(changers, transformRuleName)
 			}
-			summary.ChangedFiles = append(summary.ChangedFiles, ChangedFile{FileName: result.FileName, Changers: changers})
+			fixesByRule := map[string]int{}
+			for _, proposal := range result.Applied {
+				fixesByRule[proposal.RuleName]++
+			}
+			summary.ChangedFiles = append(summary.ChangedFiles, ChangedFile{FileName: result.FileName, Changers: changers, FixesByRule: fixesByRule})
 		}
 		if result.Transformed {
 			summary.FilesTransformed++

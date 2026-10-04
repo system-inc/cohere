@@ -307,7 +307,9 @@ func nestedSummary(check nestedDriftCheck) string {
 // naming the repository whose own run fixes it.
 func printNestedDrift(out io.Writer, check nestedDriftCheck) {
 	for _, drift := range check.Drift {
-		fmt.Fprintf(out, "%s:1:1 - the formatter would rewrite this file in nested repository %s, which a run here never writes: run cohere there [format/nested-drift]\n",
-			drift.FileName, drift.Repository)
+		message := fmt.Sprintf("the formatter would rewrite this file in nested repository %s, which a run here never writes: run cohere there", drift.Repository)
+		printFinding(out,
+			runFinding{Path: drift.FileName, Line: 1, Column: 1, Severity: "error", Rule: "format", MessageID: "nested-drift", Message: message},
+			fmt.Sprintf("%s:1:1 - %s [format/nested-drift]\n", drift.FileName, message))
 	}
 }

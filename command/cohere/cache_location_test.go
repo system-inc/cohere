@@ -39,7 +39,7 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(t *testing.T) {
 	}
 	run := func(root string, arguments ...string) (string, string) {
 		t.Helper()
-		command := exec.Command(binary, arguments...)
+		command := exec.Command(binary, verboseArguments(arguments)...)
 		command.Dir = root
 		command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME=")
 		var stdout, stderr bytes.Buffer

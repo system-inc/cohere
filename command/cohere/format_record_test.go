@@ -331,7 +331,7 @@ func TestTheRecordFollowsTheFormatterNotTheBinary(t *testing.T) {
 	})
 	run := func(binary string, arguments ...string) string {
 		t.Helper()
-		command := exec.Command(binary, arguments...)
+		command := exec.Command(binary, verboseArguments(arguments)...)
 		command.Dir = root
 		command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME=")
 		output, _ := command.CombinedOutput()

@@ -320,8 +320,10 @@ func formatInParallel(fileNames []string, byFileName map[string][]edit.Proposal,
 // the formatter would change it. Before it, an unformatted file passed a clean `--no-fix` run unseen.
 func printWouldChange(out io.Writer, changed []edit.ChangedFile) {
 	for _, file := range changed {
-		fmt.Fprintf(out, "%s:1:1 - --fix would rewrite this file: %s [fix/would-change]\n",
-			file.FileName, strings.Join(file.Changers, ", "))
+		message := "--fix would rewrite this file: " + strings.Join(file.Changers, ", ")
+		printFinding(out,
+			runFinding{Path: file.FileName, Line: 1, Column: 1, Severity: "error", Rule: "fix", MessageID: "would-change", Message: message},
+			fmt.Sprintf("%s:1:1 - %s [fix/would-change]\n", file.FileName, message))
 	}
 }
 

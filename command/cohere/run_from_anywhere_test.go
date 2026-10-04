@@ -59,7 +59,7 @@ func buildCohere(t *testing.T) string {
 // runCohere runs the binary from a directory and returns its combined output and exit code.
 func runCohere(t *testing.T, binary string, directory string, arguments ...string) (string, int) {
 	t.Helper()
-	command := exec.Command(binary, arguments...)
+	command := exec.Command(binary, verboseArguments(arguments)...)
 	command.Dir = directory
 	output, err := command.CombinedOutput()
 	if err == nil {
@@ -259,4 +259,21 @@ func TestTheTypePhaseReadsButDoesNotWriteWhenAskedNotTo(t *testing.T) {
 	if !bytes.Equal(before, after) {
 		t.Error("persist=false rewrote an existing build info")
 	}
+}
+
+// verboseArguments asks for the verbose view, which is the account these tests read: everything a run
+// printed before the footer existed, with the footer after it. The default view has its own golden tests
+// (footer_test.go, human_output_test.go) and its own end-to-end test (default_output_test.go). The flag goes
+// first, before any path, since flags stop at the first argument that is not one; a verb, which must come
+// first itself, is left as it is.
+func verboseArguments(arguments []string) []string {
+	if isRenameVerb(arguments) {
+		return arguments
+	}
+	for _, argument := range arguments {
+		if argument == "--json" || argument == "--verbose" {
+			return arguments
+		}
+	}
+	return append([]string{"--verbose"}, arguments...)
 }

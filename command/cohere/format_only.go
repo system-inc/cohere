@@ -64,9 +64,13 @@ func nestedUnchecked(check nestedDriftCheck) []uncheckedFile {
 func printUnchecked(out io.Writer, unchecked []uncheckedFile) {
 	for _, file := range unchecked {
 		if file.FileName == "" {
-			fmt.Fprintf(out, "cohere: the formatter could not check this run: %s [format/unchecked]\n", file.Reason)
+			printFinding(out,
+				runFinding{Severity: "error", Rule: "format", MessageID: "unchecked", Message: "the formatter could not check this run: " + file.Reason},
+				fmt.Sprintf("cohere: the formatter could not check this run: %s [format/unchecked]\n", file.Reason))
 			continue
 		}
-		fmt.Fprintf(out, "%s:1:1 - the formatter could not check this file: %s [format/unchecked]\n", file.FileName, file.Reason)
+		printFinding(out,
+			runFinding{Path: file.FileName, Line: 1, Column: 1, Severity: "error", Rule: "format", MessageID: "unchecked", Message: "the formatter could not check this file: " + file.Reason},
+			fmt.Sprintf("%s:1:1 - the formatter could not check this file: %s [format/unchecked]\n", file.FileName, file.Reason))
 	}
 }

@@ -365,7 +365,7 @@ func TestFooterAbbreviates(t *testing.T) {
 		}
 	}
 	for duration, want := range map[time.Duration]string{
-		50 * time.Millisecond: "0.05s", 400 * time.Millisecond: "0.4s", 2400 * time.Millisecond: "2.4s",
+		4 * time.Millisecond: "0.004s", 50 * time.Millisecond: "0.05s", 400 * time.Millisecond: "0.4s", 2400 * time.Millisecond: "2.4s",
 		12 * time.Second: "12s",
 	} {
 		if got := footerSeconds(duration); got != want {

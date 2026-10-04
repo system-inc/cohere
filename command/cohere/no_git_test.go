@@ -88,7 +88,7 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 	totalLine := regexp.MustCompile(`(?m)^ *total .*\n`)
 	run := func(arguments ...string) (string, int) {
 		t.Helper()
-		command := exec.Command(binary, arguments...)
+		command := exec.Command(binary, verboseArguments(arguments)...)
 		command.Dir = root
 		command.Env = append(os.Environ(), path, "HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, ".cache"))
 		// The streams are read apart and joined after, not combined as they arrive. A run the run cache

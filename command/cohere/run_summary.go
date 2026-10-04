@@ -61,7 +61,49 @@ type runSummary struct {
 	// Nodes is the syntax nodes walked this run, so only in the checked files.
 	Nodes int
 
+	// Skips is each rule that declined every file it was offered. Whether one is a gap depends on its cover
+	// having run, which uncoveredSkips decides once the phases are known, into Gaps.
+	Skips []ruleSkip
+
 	Gaps runGaps
+}
+
+// ruleSkip is a rule that declined every file it was offered: why, and the check that reports the same
+// thing in its place, empty when none does.
+type ruleSkip struct {
+	Rule      string
+	Reason    string
+	CoveredBy string
+}
+
+// uncoveredSkips counts the skips that left something unchecked: every skip with no cover, and every
+// covered skip whose cover did not run this run. The one cover today is the types phase, which ran only
+// when it ran to its end and lint was not cut off behind it, since a bail is a types phase that stopped
+// the run rather than one that stood in for a rule.
+func (summary runSummary) uncoveredSkips() int {
+	count := 0
+	for _, skip := range summary.Skips {
+		if skip.CoveredBy == "" || !summary.coverRan(skip.CoveredBy) {
+			count++
+		}
+	}
+	return count
+}
+
+func (summary runSummary) coverRan(cover string) bool {
+	if cover != "types" {
+		return false
+	}
+	typesRan, lintCutOff := false, false
+	for _, record := range summary.Phases {
+		switch {
+		case record.Name == phaseTypes && record.Outcome == outcomeRan:
+			typesRan = true
+		case record.Name == phaseLint && record.Outcome == outcomeNotReached:
+			lintCutOff = true
+		}
+	}
+	return typesRan && !lintCutOff
 }
 
 // cohered is the files the run rewrote, which is what the 🪄 and 💅 lines above the footer list.

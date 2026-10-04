@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -92,7 +93,20 @@ type runCacheSession struct {
 	// graph never reached a walk.
 	types *program.TypeDiagnosticsReuse
 
+	// summary is the run's summary, encoded, which a replay renders its footer from. See recordRunSummary.
+	summary []byte
+
 	stdout, stderr teeStream
+}
+
+// recordRunSummary keeps the run's summary for the record, when this run is being recorded.
+func recordRunSummary(summary runSummary) {
+	if activeRunCache == nil {
+		return
+	}
+	if encoded, err := json.Marshal(summary); err == nil {
+		activeRunCache.summary = encoded
+	}
 }
 
 // teeStream copies a standard stream to its real destination and to a buffer.
@@ -162,6 +176,10 @@ func (t *teeStream) stop(target **os.File) {
 // rewrites a file declines its own record (see declineRunCache). The key covers the arguments, so none of
 // them replays another.
 //
+// `--verbose`, `--json` and `--phases` choose how the run is printed and change nothing it computes, so
+// each of them may join any of those runs. Each is still its own record, because each prints a different
+// body: the key covers the arguments, and whether the output is colored.
+//
 // `--no-cache` is refused by name rather than left to the argument shape. Most flags make a run
 // ineligible, but the promise that flag makes, nothing read and nothing written, should not rest on which
 // arguments happen to be admitted next.
@@ -172,7 +190,7 @@ func runCacheEligible() bool {
 	seen := map[string]bool{}
 	for _, argument := range os.Args[1:] {
 		switch argument {
-		case "--no-fix", "--format", "--no-format":
+		case "--no-fix", "--format", "--no-format", "--verbose", "--json", "--phases":
 		default:
 			return false
 		}
@@ -182,7 +200,7 @@ func runCacheEligible() bool {
 		seen[argument] = true
 	}
 	// Refused by the command line before anything runs, and never a run to record.
-	return !(seen["--format"] && seen["--no-format"])
+	return !(seen["--format"] && seen["--no-format"]) && !(seen["--verbose"] && seen["--json"])
 }
 
 // beginRunCache replays a recorded run and exits if every input is unchanged, and otherwise starts
@@ -196,11 +214,13 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	// the scope is drawn from a walk that declares every file and directory it read, so a change that would
 	// move the scope moves an input instead (see declareFormatWalk). A run that rewrites a file declines its
 	// record. The printers need no fact of their own: the key covers the running binary, so any other build
-	// of the formatter misses.
+	// of the formatter misses. Whether the output is colored is one, since a body recorded for a terminal
+	// carries escape codes that a replay into a pipe must not print.
 	key, err := program.RunCacheKey(os.Args[1:], location.Root,
 		"root="+location.Root,
 		"tsconfig="+location.ConfigFileName,
 		"lint-config="+location.LintConfigFileName,
+		fmt.Sprintf("color=%t", activeOutput.Style.color),
 	)
 	if err != nil {
 		return nil
@@ -358,15 +378,54 @@ func cacheTableIdentity() program.CacheTableIdentity {
 // exits with its exit code.
 func replayRunCache(stored *program.RunCache) {
 	recorded := time.Unix(0, stored.RecordedUnixNanoseconds).Format("15:04:05")
-	fmt.Fprintf(os.Stdout,
+	account := accountOutput(os.Stdout)
+	fmt.Fprintf(account,
 		"cached: no input has changed since the run at %s, so graph, types and lint did not run; its verdict follows\n",
 		recorded)
 	os.Stdout.Write(replayLines(stored.Output, recorded))
 	os.Stderr.Write(stored.Errors)
-	fmt.Fprintf(os.Stdout, "phases: replayed the run at %s · fix, types and lint did not run\n", recorded)
-	fmt.Fprintf(os.Stdout, "  this run: %s, after checking %d inputs\n", round(time.Since(processStart)), len(stored.Inputs))
-	fmt.Fprintf(os.Stdout, "  %s\n", activeMemoryPolicy.line())
+	fmt.Fprintf(account, "phases: replayed the run at %s · fix, types and lint did not run\n", recorded)
+	fmt.Fprintf(account, "  this run: %s, after checking %d inputs\n", round(time.Since(processStart)), len(stored.Inputs))
+	fmt.Fprintf(account, "  %s\n", activeMemoryPolicy.line())
+
+	// The footer is this replay's, rendered from the recorded run's summary: its findings and its counts,
+	// with this run's time, nothing checked fresh, every file answered by the cache and nothing rewritten.
+	// The recorded run's own footer is not in the recording, since it would claim that run's time.
+	var summary runSummary
+	if len(stored.Summary) > 0 && json.Unmarshal(stored.Summary, &summary) == nil {
+		summary = replayedSummary(summary, time.Since(processStart))
+		switch activeOutput.Mode {
+		case outputVerbose:
+			fmt.Fprintln(os.Stdout, footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}))
+		case outputJSON:
+			writeJSONLine(os.Stdout, summaryAsJSON(summary))
+		default:
+			fmt.Fprintln(os.Stdout, footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}))
+		}
+	}
 	exitProcess(stored.ExitCode)
+}
+
+// replayedSummary is a recorded run's summary as its replay says it: the same findings and gaps, this
+// replay's time, no phase run, nothing checked fresh, every file in scope answered by the cache, and
+// nothing rewritten or walked. The recorded run's phases that ran are dropped, since none ran now; the
+// ones that did not are kept, since a phase the recorded run never reached is a gap in the verdict this
+// replay repeats.
+func replayedSummary(recorded runSummary, elapsed time.Duration) runSummary {
+	replayed := recorded
+	replayed.Total = elapsed
+	replayed.Graph, replayed.Formatting = 0, 0
+	replayed.Phases = nil
+	for _, record := range recorded.Phases {
+		if record.Outcome == outcomeSkipped || record.Outcome == outcomeNotReached {
+			replayed.Phases = append(replayed.Phases, record)
+		}
+	}
+	replayed.Cache = cacheUse{Replayed: true}
+	replayed.FilesChecked, replayed.FilesCached = 0, recorded.FilesInScope
+	replayed.Changed = nil
+	replayed.Nodes = 0
+	return replayed
 }
 
 // declareRunCacheInputs marks the build as having succeeded, and adds inputs the command reads itself.
@@ -490,6 +549,7 @@ func (session *runCacheSession) record(exitCode int) *program.RunCache {
 	}
 	cache.Errors = session.stderr.buffer.Bytes()
 	cache.RecordedUnixNanoseconds = time.Now().UnixNano()
+	cache.Summary = session.summary
 	return cache
 }
 
@@ -568,7 +628,7 @@ func printPreviousNotes(directory string) {
 	os.Remove(path)
 	for line := range strings.SplitSeq(strings.TrimSpace(string(contents)), "\n") {
 		if line != "" {
-			fmt.Fprintf(os.Stderr, "note: after the last run returned, %s\n", line)
+			fmt.Fprintf(accountOutput(os.Stderr), "note: after the last run returned, %s\n", line)
 		}
 	}
 }

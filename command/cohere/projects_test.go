@@ -28,7 +28,7 @@ func mixedRepository(t *testing.T, swiftDirectory string) string {
 // runWithEngine runs cohere from a directory with the Swift engine the override names.
 func runWithEngine(t *testing.T, binary string, engine string, directory string, arguments ...string) (string, int) {
 	t.Helper()
-	command := exec.Command(binary, arguments...)
+	command := exec.Command(binary, verboseArguments(arguments)...)
 	command.Dir = directory
 	command.Env = append(os.Environ(), "COHERE_SWIFT_ENGINE="+engine, "COHERE_VERDICT_FD=")
 	output, err := command.CombinedOutput()

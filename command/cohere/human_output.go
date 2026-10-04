@@ -117,7 +117,11 @@ func findingLine(finding runFinding, style textStyle) string {
 		severity = style.red(finding.Severity)
 	}
 	// The rule alone, without which of its messages this is: a person reads the message, and `--json`
-	// carries the message id for a program.
+	// carries the message id for a program. A finding about no one file, such as a formatter that could not
+	// run at all, has no location to lead with.
+	if finding.Path == "" {
+		return fmt.Sprintf("%s %s %s", severity, style.dim(finding.Rule), singleLineDescription(finding.Message))
+	}
 	return fmt.Sprintf("%s:%d:%d %s %s %s",
 		finding.Path, finding.Line, finding.Column, severity, style.dim(finding.Rule), singleLineDescription(finding.Message))
 }

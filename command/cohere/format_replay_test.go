@@ -39,7 +39,7 @@ func TestANoFixFormatRunReplaysUntilWhatItsWalkReadMoves(t *testing.T) {
 	})
 	run := func() (string, int) {
 		t.Helper()
-		command := exec.Command(binary, "--no-fix", "--format")
+		command := exec.Command(binary, "--verbose", "--no-fix", "--format")
 		command.Dir = root
 		command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME=")
 		output, err := command.CombinedOutput()

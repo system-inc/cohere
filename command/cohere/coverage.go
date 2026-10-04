@@ -464,6 +464,9 @@ func splitRuleSkips(notes map[string]map[string]int) (skips, others map[string]m
 			target, label := others, key
 			if reason, isSkip := strings.CutPrefix(key, rule.SkippedNotePrefix); isSkip {
 				target, label = skips, reason
+			} else if rest, isCovered := strings.CutPrefix(key, rule.CoveredSkipNotePrefix); isCovered {
+				cover, reason, _ := strings.Cut(rest, ": ")
+				target, label = skips, reason+" (covered by "+cover+")"
 			}
 			if target[ruleName] == nil {
 				target[ruleName] = map[string]int{}
@@ -472,6 +475,28 @@ func splitRuleSkips(notes map[string]map[string]int) (skips, others map[string]m
 		}
 	}
 	return skips, others
+}
+
+// rulesSkippingEveryFile is each rule that declined every file it was offered, with its reason and, for a
+// covered skip, the check that covers it. A rule that declined only some files still checked the rest, so
+// it is not here. Offered is the same measure excuseRulesThatSkippedEveryFile uses.
+func rulesSkippingEveryFile(notes map[string]map[string]int, offered map[string]int) []ruleSkip {
+	var skipping []ruleSkip
+	for ruleName, counts := range notes {
+		for key, count := range counts {
+			if offered[ruleName] == 0 || count < offered[ruleName] {
+				continue
+			}
+			if reason, isSkip := strings.CutPrefix(key, rule.SkippedNotePrefix); isSkip {
+				skipping = append(skipping, ruleSkip{Rule: ruleName, Reason: reason})
+			} else if rest, isCovered := strings.CutPrefix(key, rule.CoveredSkipNotePrefix); isCovered {
+				cover, reason, _ := strings.Cut(rest, ": ")
+				skipping = append(skipping, ruleSkip{Rule: ruleName, Reason: reason, CoveredBy: cover})
+			}
+		}
+	}
+	sort.Slice(skipping, func(left, right int) bool { return skipping[left].Rule < skipping[right].Rule })
+	return skipping
 }
 
 // skipLines renders each rule's skips as `rule: skipped on N files, reason`, sorted by rule and reason. A
@@ -691,10 +716,12 @@ type lintReport struct {
 // decides whether the counts print.
 func writeLintReport(out io.Writer, report lintReport) {
 	for _, diagnostic := range report.Result.Diagnostics {
-		printRuleDiagnostic(out, diagnostic)
+		printRuleDiagnostic(out, diagnostic, report.LintConfig)
 	}
 	coverage := report.Result.Coverage
-	fmt.Fprintf(invocationOutput(out),
+	// The account below is `--verbose`'s; the footer carries what a reader needs of it in every view.
+	account := accountOutput(out)
+	fmt.Fprintf(accountOutput(invocationOutput(out)),
 		"lint: %d findings — %d rules over %d files, %d nodes visited, %s%s\n",
 		len(report.Result.Diagnostics), coverage.RulesRun, coverage.FilesWalked, coverage.NodesVisited, report.WalkCost,
 		replayedFromCache(report.Result),
@@ -703,13 +730,24 @@ func writeLintReport(out io.Writer, report lintReport) {
 	summary := classifyTypeScriptCoverage(report.Rules, coverage, report.LintConfig)
 	summary.Notes = sumRuleNotes(report.Result.Notes)
 	summary.excuseRulesThatSkippedEveryFile(coverage)
-	fmt.Fprintln(out, summary.coverageCountedLine())
-	fmt.Fprintln(out, summary.coverageFilesLine(report.Details))
-	writeParityCoverage(out, report.Rules, report.LintConfig)
-	writeOrphanedConfigKeys(out, report.Rules, report.LintConfig)
-	writeDepartures(out, report.LintConfig)
-	writeOverrideReasons(out, report.LintConfig)
-	writeCoverageNotes(out, summary, report.Details)
+	fmt.Fprintln(account, summary.coverageCountedLine())
+	fmt.Fprintln(account, summary.coverageFilesLine(report.Details))
+	writeParityCoverage(account, report.Rules, report.LintConfig)
+	writeOrphanedConfigKeys(account, report.Rules, report.LintConfig)
+	writeDepartures(account, report.LintConfig)
+	writeOverrideReasons(account, report.LintConfig)
+	writeCoverageNotes(account, summary, report.Details)
+
+	// What the footer says of lint: the rules that ran, the files it checked fresh against those the cache
+	// answered for, the nodes it walked, and the two gaps a green run must still name.
+	activeSummary.Rules = coverage.RulesRun
+	activeSummary.FilesCached = report.Result.FilesReplayed
+	activeSummary.FilesChecked = coverage.FilesWalked - report.Result.FilesReplayed
+	activeSummary.FilesInScope = coverage.FilesWalked
+	activeSummary.Nodes = coverage.NodesVisited
+	activeSummary.Findings += len(report.Result.Diagnostics)
+	activeSummary.Gaps.CrashedFiles = len(summary.Crashes)
+	activeSummary.Skips = rulesSkippingEveryFile(summary.Notes, coverage.RulesOffered)
 }
 
 // writeDepartures names every rule a config sets differently from a file it extends, with the reason it

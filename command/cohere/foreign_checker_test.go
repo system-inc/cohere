@@ -59,7 +59,7 @@ func TestEveryFileWalkedOnAForeignCheckerFindsTheSame(t *testing.T) {
 	moved := regexp.MustCompile(`foreign checkers: (\d+) of (\d+) files walked`)
 	run := func(t *testing.T, root string, foreign bool) []string {
 		t.Helper()
-		command := exec.Command(binary, "--no-fix", "--no-cache")
+		command := exec.Command(binary, "--verbose", "--no-fix", "--no-cache")
 		command.Dir = root
 		command.Env = append(os.Environ(), "COHERE_TEST_FOREIGN_CHECKERS=")
 		if foreign {

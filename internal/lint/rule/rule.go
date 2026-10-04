@@ -389,6 +389,24 @@ func (c Context) Skip(reason string) {
 	c.Note(SkippedNotePrefix + reason)
 }
 
+// Cover is another check that reports what a rule declined to, named so a run can tell whether it ran.
+type Cover string
+
+// CoverTypeCheck is the types phase: the compiler reporting the same thing itself, under an option the
+// rule found on.
+const CoverTypeCheck Cover = "types"
+
+// CoveredSkipNotePrefix opens the key of every note SkipCovered records: the cover, then the reason.
+const CoveredSkipNotePrefix = "skipped, covered by "
+
+// SkipCovered records that the rule declined this file because another check reports the same thing, and
+// names that check. A skip whose cover ran this run left nothing unchecked, so the footer does not mark it;
+// one whose cover did not run (`--lint`, or a types phase that bailed) is a gap like any other skip. A rule
+// declining for any other reason calls Skip: choosing between the two is how a skip says which it is.
+func (c Context) SkipCovered(cover Cover, reason string) {
+	c.Note(CoveredSkipNotePrefix + string(cover) + ": " + reason)
+}
+
 func (c Context) ReportNode(node *ast.Node, message Message) {
 	c.Report(Diagnostic{
 		Range:      TokenRange(c.SourceFile, node),

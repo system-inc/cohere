@@ -145,8 +145,23 @@ func run() error {
 	// or `--no-fix` is.
 	// The backquoted word is the argument's name in the help, which is how the flag package spells one.
 	profilePath := flag.String("profile", "", "write a Go CPU profile of the run to `file`, for go tool pprof")
+	// The view. A run prints the files it rewrote, its findings and one footer line; these widen it.
+	verbose := flag.Bool("verbose", false,
+		"print everything a run can say: each phase, the coverage summary, overrides, skips, notes, memory and the total")
+	showPhases := flag.Bool("phases", false, "put where the time went first in the footer's parentheses")
+	jsonOutput := flag.Bool("json", false, "print newline-delimited JSON for a program to read, described by schema/CohereOutput.schema.json")
 	flag.Parse()
 	cacheOff = *noCache
+	if *verbose && *jsonOutput {
+		return fmt.Errorf("--verbose and --json contradict each other: --verbose prints the human account in full, --json prints JSON for a program")
+	}
+	activeOutput = outputSettings{Mode: outputHuman, Phases: *showPhases, Style: styleFor(os.Stdout)}
+	switch {
+	case *verbose:
+		activeOutput.Mode = outputVerbose
+	case *jsonOutput:
+		activeOutput = outputSettings{Mode: outputJSON}
+	}
 	if *profilePath != "" {
 		if err := startProfile(*profilePath); err != nil {
 			return err
@@ -533,9 +548,9 @@ func run() error {
 
 	switch {
 	case graph == nil:
-		fmt.Fprintln(invocationOutput(os.Stdout), "graph not built: --format-only reads the disk, not the program")
+		fmt.Fprintln(accountOutput(invocationOutput(os.Stdout)), "graph not built: --format-only reads the disk, not the program")
 	case lintScope.Everything:
-		fmt.Fprintf(invocationOutput(os.Stdout),
+		fmt.Fprintf(accountOutput(invocationOutput(os.Stdout)),
 			"graph built in %s — %d files in the program, %d of them ours\n",
 			round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
 		)
@@ -551,13 +566,13 @@ func run() error {
 		// for one file and sees eleven checked should be told why without having to know that this
 		// binary walks imports at all.
 		if lintScope.DependentCount > 0 {
-			fmt.Fprintf(invocationOutput(os.Stdout),
+			fmt.Fprintf(accountOutput(invocationOutput(os.Stdout)),
 				"graph built in %s — %d files in the program, %d of them ours, %d in scope (%s plus %d that import it)\n",
 				round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
 				len(projectFiles), lintScope.RequestDescription, lintScope.DependentCount,
 			)
 		} else {
-			fmt.Fprintf(invocationOutput(os.Stdout),
+			fmt.Fprintf(accountOutput(invocationOutput(os.Stdout)),
 				"graph built in %s — %d files in the program, %d of them ours, %d in scope (%s)\n",
 				round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
 				len(projectFiles), lintScope.RequestDescription,
@@ -570,6 +585,11 @@ func run() error {
 	}
 
 	findings := 0
+	// What the footer says, filled in as the phases finish. Lint replaces the counts with its own; a run
+	// lint does not reach still accounts for every file in scope.
+	activeSummary.FilesInScope, activeSummary.FilesChecked = len(projectFiles), len(projectFiles)
+	activeSummary.Gaps.NothingToCheck = graph != nil && len(projectFiles) == 0
+	activeSummary.Gaps.FormattingNotChecked = !runFix
 	report := &pipelineReport{
 		graph:          buildDuration,
 		processStart:   processStart,
@@ -601,7 +621,7 @@ func run() error {
 			return err
 		}
 		lintConfig = loaded
-		writeSetsLine(os.Stdout, lintConfig)
+		writeSetsLine(accountOutput(os.Stdout), lintConfig)
 		// The run cache's second layer, attached once the config is known and before anything walks.
 		attachFindingsCache(graph, location)
 	}
@@ -641,6 +661,7 @@ func run() error {
 		if err != nil {
 			return err
 		}
+		activeSummary.Gaps.FormattingNotChecked = formatter == nil
 		var formatLeftOut string
 		if formatter == nil && *noFormat {
 			formatLeftOut = "formatting left out (--no-format)"
@@ -773,11 +794,16 @@ func run() error {
 			// is meaningless, so the pipeline stops and says which phases never ran.
 			report.record(phaseFix, outcomeRan, fixDuration, "")
 			report.markRemainingNotReachedFor(phaseFix, err.Error(), unusedRequest)
-			report.Write(os.Stdout)
+			writeRunEnd(report, os.Stdout)
 			return fmt.Errorf("fix: %w", err)
 		}
 		// True of the tree and actionable, so a replay keeps it, but it says which run produced it.
-		fmt.Fprintln(provenanceOutput(os.Stdout), fixSummary)
+		fmt.Fprintln(accountOutput(provenanceOutput(os.Stdout)), fixSummary)
+		// The files the fix phase rewrote, above the findings, in the views that list them.
+		if mutate {
+			activeSummary.Changed = changedFilesFrom(fixSummary.ChangedFiles, location.Root)
+			printChangedFiles(os.Stdout, activeSummary.Changed)
+		}
 
 		// Not writing the record costs the next run a format of files already formatted, never a skip,
 		// so it is a note rather than a failure.
@@ -796,7 +822,7 @@ func run() error {
 		// tree, and what is not on record as formatted are three different answers to "what was
 		// formatted", and a reader cannot tell which one they got from a number alone. It describes the run
 		// that drew the scope, record included, so a replay says which run that was.
-		fmt.Fprintf(provenanceOutput(os.Stdout), "format scope: %s\n", scope.Description)
+		fmt.Fprintf(accountOutput(provenanceOutput(os.Stdout)), "format scope: %s\n", scope.Description)
 
 		// A run whose verdict is formatting alone counts every file it could not read: an empty scope from
 		// a failed walk, or a file the formatter declined because it does not parse, or broke on, would
@@ -805,6 +831,7 @@ func run() error {
 			unchecked := formatOnlyUnchecked(fixSummary, scope)
 			printUnchecked(os.Stdout, unchecked)
 			findings += len(unchecked)
+			activeSummary.Findings += len(unchecked)
 		}
 		if mutate {
 			report.record(phaseFix, outcomeRan, fixDuration, "")
@@ -813,6 +840,7 @@ func run() error {
 			// `--no-fix` run over a tree `--fix` would rewrite is not clean.
 			printWouldChange(os.Stdout, fixSummary.ChangedFiles)
 			findings += len(fixSummary.ChangedFiles)
+			activeSummary.WouldChange += len(fixSummary.ChangedFiles)
 
 			// The nested check started beside the fix phase. What it adds to the phase is only the wait
 			// past the fix phase's own end.
@@ -828,15 +856,17 @@ func run() error {
 					declareFormatWalk(walk)
 				}
 				for _, note := range nested.Notes {
-					fmt.Fprintln(os.Stderr, note)
+					fmt.Fprintln(accountOutput(os.Stderr), note)
 				}
 				printNestedDrift(os.Stdout, nested)
 				findings += len(nested.Drift)
+				activeSummary.WouldChange += len(nested.Drift)
 				if *formatOnly {
 					printUnchecked(os.Stdout, nestedUnchecked(nested))
 					findings += len(nested.Unchecked)
+					activeSummary.Findings += len(nested.Unchecked)
 				}
-				fmt.Fprintln(provenanceOutput(os.Stdout), nestedSummary(nested))
+				fmt.Fprintln(accountOutput(provenanceOutput(os.Stdout)), nestedSummary(nested))
 			}
 			report.recordChecked(phaseFix, fixDuration, len(fixSummary.ChangedFiles))
 		}
@@ -855,7 +885,7 @@ func run() error {
 			rebuiltGraph, rebuildDuration, err := rebuildGraph(location.ConfigFileName, location.Root, *singleThreaded, lintConfig)
 			if err != nil {
 				report.markRemainingNotReachedFor(phaseFix, fmt.Sprintf("the graph could not be rebuilt after fixing: %v", err), unusedRequest)
-				report.Write(os.Stdout)
+				writeRunEnd(report, os.Stdout)
 				return fmt.Errorf("rebuilding the type graph after fixing: %w", err)
 			}
 			// The early check was of the bytes the fixer just replaced. It is retired and left to finish
@@ -875,7 +905,7 @@ func run() error {
 				fmt.Fprintf(os.Stderr, "note: %s was in scope and is not in the rebuilt program, so it is not checked\n", fileName)
 			}
 			projectFiles = rescoped
-			fmt.Printf(
+			fmt.Fprintf(accountOutput(os.Stdout),
 				"graph rebuilt in %s — %d files changed, so every later phase reads the new text\n",
 				round(rebuildDuration), fixSummary.FilesChanged,
 			)
@@ -928,6 +958,7 @@ func run() error {
 			printCompilerDiagnostic(diagnostic)
 		}
 		findings += len(typeDiagnostics)
+		activeSummary.TypeErrors += len(typeDiagnostics)
 
 		// Counted among the files reported on: the check covers the whole program whatever the scope.
 		replayedClause := ""
@@ -936,7 +967,7 @@ func run() error {
 				replayedClause = fmt.Sprintf("; %d of %d files' semantic diagnostics replayed from cache", inScope, len(projectFiles))
 			}
 		}
-		fmt.Fprintf(invocationOutput(os.Stdout),
+		fmt.Fprintf(accountOutput(invocationOutput(os.Stdout)),
 			"types: %d diagnostics over %d files in %s%s\n",
 			len(typeDiagnostics), len(projectFiles), round(typesDuration), replayedClause,
 		)
@@ -954,7 +985,12 @@ func run() error {
 				fmt.Sprintf("%d type diagnostics — lint findings against wrong semantics are noise", len(typeDiagnostics)),
 				unusedRequest,
 			)
-			report.Write(os.Stdout)
+			// Lint will not report, but the fix phase walked the same rules, and its skips are the ones lint
+			// would have named. A skip the types phase covers is a gap here, since that phase stopped the run.
+			if reusableWalk != nil {
+				activeSummary.Skips = rulesSkippingEveryFile(sumRuleNotes(reusableWalk.Notes), reusableWalk.Coverage.RulesOffered)
+			}
+			writeRunEnd(report, os.Stdout)
 			finishRunCache(1)
 		}
 	}
@@ -1118,7 +1154,7 @@ func run() error {
 	// The phase line prints on every run, success included. A run that checked nothing must not be
 	// able to print like a run that checked everything and found it clean, and a phase summary that
 	// only appeared on failure would reintroduce exactly that ambiguity for the successful case.
-	report.Write(os.Stdout)
+	writeRunEnd(report, os.Stdout)
 
 	if findings > 0 {
 		finishRunCache(1)
@@ -1366,15 +1402,15 @@ func finishTypeCheck(ctx context.Context, check *typeCheck, files []*ast.SourceF
 func printCompilerDiagnostic(diagnostic *ast.Diagnostic) {
 	sourceFile := diagnostic.File()
 	if sourceFile == nil {
-		fmt.Printf("error TS%d: %s\n", diagnostic.Code(), diagnosticMessage(diagnostic))
+		printFinding(os.Stdout, compilerFinding(diagnostic), fmt.Sprintf("error TS%d: %s\n", diagnostic.Code(), diagnosticMessage(diagnostic)))
 		return
 	}
 
 	line, character := scanner.GetECMALineAndByteOffsetOfPosition(sourceFile, diagnostic.Loc().Pos())
-	fmt.Printf(
+	printFinding(os.Stdout, compilerFinding(diagnostic), fmt.Sprintf(
 		"%s:%d:%d - error TS%d: %s\n",
 		sourceFile.FileName(), line+1, character+1, diagnostic.Code(), diagnosticMessage(diagnostic),
-	)
+	))
 }
 
 // diagnosticMessage renders a compiler diagnostic's text.
@@ -1404,11 +1440,11 @@ func singleLineDescription(description string) string {
 }
 
 // printRuleDiagnostic prints one rule finding in the same shape, with the rule name where the error
-// code goes — a reader should not have to learn two formats.
-func printRuleDiagnostic(out io.Writer, diagnostic rule.Diagnostic) {
+// code goes — a reader should not have to learn two formats. The settings give it its severity.
+func printRuleDiagnostic(out io.Writer, diagnostic rule.Diagnostic, lintConfig *configuration.Config) {
 	sourceFile := diagnostic.SourceFile
 	if sourceFile == nil {
-		fmt.Fprintf(out, "error %s: %s\n", diagnostic.RuleName, diagnostic.Message.Description)
+		printFinding(out, ruleFinding(diagnostic, lintConfig), fmt.Sprintf("error %s: %s\n", diagnostic.RuleName, diagnostic.Message.Description))
 		return
 	}
 
@@ -1426,11 +1462,11 @@ func printRuleDiagnostic(out io.Writer, diagnostic rule.Diagnostic) {
 	// paragraph: the message is the rule's to write and the line discipline is the printer's to keep.
 	description := singleLineDescription(diagnostic.Message.Description)
 
-	fmt.Fprintf(out,
+	printFinding(out, ruleFinding(diagnostic, lintConfig), fmt.Sprintf(
 		"%s:%d:%d - %s [%s/%s]\n",
 		sourceFile.FileName(), line+1, character+1,
 		description, diagnostic.RuleName, diagnostic.Message.Id,
-	)
+	))
 }
 
 // changedConfiguration names the configuration file in a changed-file scope, or empty when none is.

@@ -17,6 +17,8 @@ import (
 // the table is keyed by the project root, so no two tests share a table; a test that needs a cold run
 // says `--no-cache`, and TestRunCacheEndToEnd sets a home of its own for its runs.
 func TestMain(m *testing.M) {
+	// In-process, the tests read the verbose account, as the binary tests do through verboseArguments.
+	activeOutput = outputSettings{Mode: outputVerbose}
 	home, err := os.MkdirTemp("", "cohere-test-home-")
 	if err != nil {
 		panic(err)
@@ -93,7 +95,7 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// run cache serves. cached false is the cold truth every cached result is held against.
 	run := func(cached bool, arguments ...string) (string, int) {
 		t.Helper()
-		command := exec.Command(binary, arguments...)
+		command := exec.Command(binary, verboseArguments(arguments)...)
 		command.Dir = root
 		environment := []string{"HOME=" + home}
 		for _, variable := range os.Environ() {
@@ -131,8 +133,11 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// The total line's shape depends on timing as well as its numbers: the types phase's check runs alongside
 	// the fix walk, so whether the phases overlap is a property of this invocation, never of the tree.
 	totalLine := regexp.MustCompile(`(?m)^  total .*\n`)
+	// The footer is this invocation's: its time, and how many files it checked fresh against how many the
+	// cache answered for, which a warm run and a cold one differ in by design.
+	footerLine := regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) .*\n?`)
 	normalized := func(output string) string {
-		return typesClause.ReplaceAllString(totalLine.ReplaceAllString(cacheOffLine.ReplaceAllString(layerTwoClause.ReplaceAllString(durations.ReplaceAllString(output, "T"), ""), ""), ""), "")
+		return typesClause.ReplaceAllString(footerLine.ReplaceAllString(totalLine.ReplaceAllString(cacheOffLine.ReplaceAllString(layerTwoClause.ReplaceAllString(durations.ReplaceAllString(output, "T"), ""), ""), ""), ""), "")
 	}
 	isReplay := func(output string) bool { return strings.HasPrefix(output, "cached: ") }
 	keepLines := func(output string, drop ...string) string {
@@ -149,15 +154,16 @@ func TestRunCacheEndToEnd(t *testing.T) {
 		return strings.Join(kept, "\n")
 	}
 	// A replay must equal the cold run's verdict: its lines minus the ones that describe that
-	// invocation, which a replay deliberately does not print. Its own framing comes off first.
+	// invocation, which a replay deliberately does not print. Its own framing comes off first. The footer is
+	// the invocation's too, with its own time, and a replay renders its own (required below).
 	verdict := func(cold string) string {
-		return keepLines(cold, "graph built in ", "types: ", "lint: ", "phases: ", "  total ", "  memory: ", "  cache: off, by --no-cache")
+		return keepLines(cold, "graph built in ", "types: ", "lint: ", "phases: ", "  total ", "  memory: ", "  cache: off, by --no-cache", "✓ 💎 ", "✗ ☠️ ")
 	}
 	// A replay says which run a phase's line came from; that label comes off before the comparison,
 	// and is required separately below so a replay that lost it fails.
 	provenance := regexp.MustCompile(`^(fix|format scope|nested repositories) \(from the cached run at \d\d:\d\d:\d\d\): `)
 	replayBody := func(replay string) string {
-		lines := strings.Split(keepLines(replay, "cached: ", "phases: replayed ", "  this run: ", "  memory: "), "\n")
+		lines := strings.Split(keepLines(replay, "cached: ", "phases: replayed ", "  this run: ", "  memory: ", "✓ 💎 ", "✗ ☠️ "), "\n")
 		for index, line := range lines {
 			lines[index] = provenance.ReplaceAllString(line, "$1: ")
 		}
@@ -299,6 +305,10 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			if replayBody(next) != verdict(cold) || nextExit != coldExit {
 				t.Fatalf("the replay is not the cold run's verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
 					nextExit, coldExit, replayBody(next), verdict(cold))
+			}
+			// And it ends on a footer of its own, which says it was replayed rather than claiming the cold run's.
+			if !regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) [0-9.]+s(?: •[^\n]*)? • replayed`).MatchString(next) {
+				t.Fatalf("the replay did not end on a footer saying it was replayed:\n%s", next)
 			}
 		})
 	}

@@ -55,7 +55,7 @@ var CorrectnessNoImplicitReturn = rule.Rule{
 		}
 		compilerOptions := ctx.Program.Options()
 		if compilerOptions.NoImplicitReturns.IsTrue() {
-			ctx.Skip("noImplicitReturns is on, so the type check reports these itself")
+			ctx.SkipCovered(rule.CoverTypeCheck, "noImplicitReturns is on, so the type check reports these itself")
 			return nil
 		}
 		strictNullChecks := compilerOptions.GetStrictOptionValue(compilerOptions.StrictNullChecks)
