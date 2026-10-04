@@ -234,7 +234,7 @@ func checkStrict(ctx rule.Context, file *ast.Node, settings StrictOptions) {
 	if mode == "" {
 		mode = StrictSafe
 	}
-	if strictImpliedByCompiler(ctx, source) {
+	if type_checking.CompilerImpliesStrict(ctx, source) {
 		mode = strictModeImplied
 	} else if mode == StrictSafe {
 		// Upstream picks Global when the file is CommonJS or the parser allows a top-level
@@ -293,21 +293,6 @@ const strictModeModule StrictMode = "Module"
 // strictModeModule it is selected by the file rather than configured, which is upstream's shape too:
 // `impliedStrict` is a parser feature, and `implied` is not one of the option's four values.
 const strictModeImplied StrictMode = "Implied"
-
-// strictImpliedByCompiler answers whether the compiler makes this file strict however it is written.
-//
-// A run with no program, which is the syntax-only test harness, reads the default options, where an
-// unset `strict` is on. So the harness and a repository with an empty tsconfig agree.
-func strictImpliedByCompiler(ctx rule.Context, source *ast.SourceFile) bool {
-	if ast.IsSourceFileJS(source) {
-		return false
-	}
-	options := &core.CompilerOptions{}
-	if ctx.Program != nil {
-		options = ctx.Program.Options()
-	}
-	return type_checking.IsStrictCompilerOptionEnabled(options, options.AlwaysStrict)
-}
 
 // fileLevelMessage is what a directive at the top of the file means under the current mode.
 func (w strictWalker) fileLevelMessage() rule.Message {

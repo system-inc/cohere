@@ -77,3 +77,8 @@ chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
   global object with a constant computed key (`globalThis["JSON"]`). A local named `globalThis` is not
   taken for the global, and a file that writes to a global is not checked for it. The ids are ESLint's:
   `unexpectedCall`, and `unexpectedRefCall` when the callee is another name.
+- `no-implicit-globals` reports an assignment to an undeclared name only in sloppy code. In strict code
+  that assignment throws instead of creating a global, and a module is strict, as is every TypeScript
+  file under `alwaysStrict`, so in a TypeScript program the leak is reported only in a JavaScript
+  script. A script's top-level `var` or function declaration still reports, strict or not, since it is
+  a global either way.

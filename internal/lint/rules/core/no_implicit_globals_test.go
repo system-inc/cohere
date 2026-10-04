@@ -2,6 +2,8 @@ package core
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -9,6 +11,36 @@ import (
 
 // implicitGlobalsFile is where the fixtures pretend to live.
 const implicitGlobalsFile = "/repository/source/ImplicitGlobals.ts"
+
+// implicitGlobalsScript is the sloppy JavaScript script the leak half can still fire in.
+const implicitGlobalsScript = "/repository/source/ImplicitGlobals.js"
+
+// implicitGlobalsScriptTsConfig is the typed harness's project with TypeScript's own module detection
+// rather than `force`, so a file with no import or export is a script, and with JavaScript allowed.
+const implicitGlobalsScriptTsConfig = `{
+	"compilerOptions": {
+		"strict": true,
+		"target": "ES2022",
+		"lib": ["ES2022"],
+		"moduleDetection": "auto",
+		"allowJs": true,
+		"types": []
+	},
+	"include": ["**/*.ts", "**/*.js"]
+}`
+
+// runImplicitGlobalsAsAScript builds a typed program in which the fixture is a script: sloppy for a
+// .js file, and strict under alwaysStrict for a .ts one.
+func runImplicitGlobalsAsAScript(t *testing.T, fileName string, sourceText string, options any) rule_testing.Result {
+	t.Helper()
+	return rule_testing.RunTypedFilesWithSetupAndOptions(t, NoImplicitGlobals,
+		map[string]string{fileName: sourceText}, fileName, options, func(directory string) {
+			path := filepath.Join(directory, "tsconfig.json")
+			if err := os.WriteFile(path, []byte(implicitGlobalsScriptTsConfig), 0o644); err != nil {
+				t.Fatalf("writing the script tsconfig: %v", err)
+			}
+		})
+}
 
 // implicitGlobalsOptions routes the option through the rule's own exported decoder.
 func implicitGlobalsOptions(t *testing.T, lexicalBindings bool) any {
@@ -24,19 +56,18 @@ func implicitGlobalsOptions(t *testing.T, lexicalBindings bool) any {
 	return decoded
 }
 
-// This rule's two halves are proven through DIFFERENT harnesses, and that is a fact about the
-// harnesses rather than about the rule.
+// Each half is decided by what the file is, so the fixtures build each kind of file on purpose.
 //
-// The declaration halves fire only in a SCRIPT, since a module has no global scope. The typed
-// harness pins moduleDetection force in its tsconfig (internal/rule_testing/program.go), so every
-// file it builds is a module and those halves can never fire there. The untyped harness parses
-// with no tsconfig and does produce a script, so they are proven there.
+// The declaration halves fire only in a SCRIPT, since a module has no global scope. The leak half
+// fires only in SLOPPY code, since in strict code an assignment to an undeclared name throws, and it
+// needs the checker to ask whether a name was ever declared. Three harnesses give three kinds of file:
 //
-// The leak half asks resolution whether a name was ever declared, so it needs the checker and can
-// only be proven in the typed harness.
+//	the untyped harness               a script, with no checker, so only the declaration halves
+//	the typed harness                 a module (it forces module detection), strict throughout
+//	runImplicitGlobalsAsAScript       a typed script: a .js one sloppy, so both halves fire, and a
+//	                                  .ts one strict under alwaysStrict, so only declarations do
 //
-// Measured rather than assumed, with both controls, in
-// TestNoImplicitGlobalsHalvesNeedDifferentHarnesses below.
+// Measured with controls in TestNoImplicitGlobalsReadsWhatTheFileIs below.
 
 // The corpus is ESLint's own, imported from eslint/tests/lib/rules/no-implicit-globals.js.
 //
@@ -93,10 +124,11 @@ func TestNoImplicitGlobalsFiresOnGlobalDeclarations(t *testing.T) {
 	}
 }
 
-// The leak half, which asks resolution whether a name was ever declared.
+// The leak half, which asks resolution whether a name was ever declared, in the sloppy script it
+// can still fire in.
 //
-// This half is deliberately NOT gated on the file being a script, because a leak creates a global
-// from anywhere. Upstream's window.foo = function() { bar = 1; } is the case that says so: the
+// It is not gated on the assignment being at the top level, because a leak creates a global from a
+// function too. Upstream's window.foo = function() { bar = 1; } is the case that says so: the
 // assignment is inside a function and it still reports.
 func TestNoImplicitGlobalsFiresOnLeaks(t *testing.T) {
 	t.Parallel()
@@ -120,46 +152,30 @@ func TestNoImplicitGlobalsFiresOnLeaks(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			// The typed harness, because this half needs the checker.
-			result := rule_testing.RunTypedWithOptions(t, NoImplicitGlobals, implicitGlobalsFile,
-				testCase.sourceText, implicitGlobalsOptions(t, false))
+			result := runImplicitGlobalsAsAScript(t, implicitGlobalsScript, testCase.sourceText,
+				implicitGlobalsOptions(t, false))
 			rule_testing.ExpectFindings(t, result, testCase.messages...)
 		})
 	}
 }
 
-// Two upstream cases report from BOTH halves at once, and no single harness can show that.
-//
-// They need a script, which only the untyped harness produces, and a checker, which only the
-// typed one has. So each is asserted twice, once per harness, and the union of the two
-// assertions is exactly what upstream reports for it. Recording it this way rather than
-// weakening either assertion keeps it a fact about the harness instead of turning it into a
-// fact about the rule.
+// Two upstream cases report from both halves at once, which a sloppy script shows in one run. The
+// declarations are reported first, since the declaration half runs first.
 func TestNoImplicitGlobalsFiresFromBothHalves(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		sourceText       string
-		upstreamMessages []string
-		inTheScript      []string
-		inTheModule      []string
+		sourceText string
+		messages   []string
 	}{
-		{"foo = 1; var bar;", []string{"globalVariableLeak", "globalNonLexicalBinding"}, []string{"globalNonLexicalBinding"}, []string{"globalVariableLeak"}},
-		{"var foo = bar = 1;", []string{"globalNonLexicalBinding", "globalVariableLeak"}, []string{"globalNonLexicalBinding"}, []string{"globalVariableLeak"}},
+		{"foo = 1; var bar;", []string{"globalNonLexicalBinding", "globalVariableLeak"}},
+		{"var foo = bar = 1;", []string{"globalNonLexicalBinding", "globalVariableLeak"}},
 	}
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoImplicitGlobals,
-				implicitGlobalsFile, testCase.sourceText, implicitGlobalsOptions(t, true)),
-				testCase.inTheScript...)
-			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoImplicitGlobals,
-				implicitGlobalsFile, testCase.sourceText, implicitGlobalsOptions(t, true)),
-				testCase.inTheModule...)
-			if len(testCase.inTheScript)+len(testCase.inTheModule) != len(testCase.upstreamMessages) {
-				t.Errorf("the two harnesses together should account for every upstream finding, got %d against %d",
-					len(testCase.inTheScript)+len(testCase.inTheModule), len(testCase.upstreamMessages))
-			}
+			rule_testing.ExpectFindings(t, runImplicitGlobalsAsAScript(t, implicitGlobalsScript,
+				testCase.sourceText, implicitGlobalsOptions(t, true)), testCase.messages...)
 		})
 	}
 }
@@ -171,8 +187,8 @@ func TestNoImplicitGlobalsFiresFromBothHalves(t *testing.T) {
 // reports nearly all of them. The lexicalBindings rows are the other half: a global let or const
 // is clean by default and reports only when the option asks.
 //
-// Run through BOTH harnesses, because a clean case must stay clean either way and the two reach
-// different halves of the rule. A case clean only in the harness that cannot fire is not evidence.
+// Run through the untyped harness and a sloppy typed script, because a clean case must stay clean in
+// the one place both halves can fire. A case clean only where the rule cannot fire is not evidence.
 func TestNoImplicitGlobalsStaysSilent(t *testing.T) {
 	t.Parallel()
 
@@ -237,8 +253,8 @@ func TestNoImplicitGlobalsStaysSilent(t *testing.T) {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoImplicitGlobals,
 				implicitGlobalsFile, testCase.sourceText, implicitGlobalsOptions(t, testCase.lexicalBindings)))
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoImplicitGlobals,
-				implicitGlobalsFile, testCase.sourceText, implicitGlobalsOptions(t, testCase.lexicalBindings)))
+			rule_testing.ExpectClean(t, runImplicitGlobalsAsAScript(t, implicitGlobalsScript,
+				testCase.sourceText, implicitGlobalsOptions(t, testCase.lexicalBindings)))
 		})
 	}
 }
@@ -292,8 +308,8 @@ func TestNoImplicitGlobalsDeclinesReadonlyGlobals(t *testing.T) {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			var result rule_testing.Result
 			if testCase.typed {
-				result = rule_testing.RunTypedWithOptions(t, NoImplicitGlobals,
-					implicitGlobalsFile, testCase.sourceText, implicitGlobalsOptions(t, true))
+				result = runImplicitGlobalsAsAScript(t, implicitGlobalsScript, testCase.sourceText,
+					implicitGlobalsOptions(t, true))
 			} else {
 				result = rule_testing.RunWithOptions(t, NoImplicitGlobals,
 					implicitGlobalsFile, testCase.sourceText, implicitGlobalsOptions(t, true))
@@ -309,41 +325,52 @@ func TestNoImplicitGlobalsDeclinesReadonlyGlobals(t *testing.T) {
 	}
 }
 
-// The two halves are reachable through different harnesses, measured with controls.
+// What the file is decides each half, measured with controls in each kind of file.
 //
-// The file comment above asserts this as the reason the fixtures are split, and an unmeasured claim
-// like that is exactly what this brief warns inoculates the next reader. So it is pinned here: a
-// declaration case fires only in the untyped harness, a leak case only in the typed one, and the
-// mixed case produces one finding in each.
-//
-// If the typed harness ever stops forcing module detection, the first row starts reporting in both
-// and this test fails, which is the right direction: the split would no longer be necessary and
-// somebody should notice rather than inherit it as folklore.
-func TestNoImplicitGlobalsHalvesNeedDifferentHarnesses(t *testing.T) {
+// A module has no global scope and is strict, so neither half fires. A TypeScript script is strict
+// under alwaysStrict, which every TypeScript file is, so its top-level var is still a global and
+// reports while its assignment to an undeclared name throws and leaks nothing (#hks3djf, #jjfa7qb).
+// A sloppy JavaScript script reports both. The untyped harness has no checker, so it shows only the
+// declaration half.
+func TestNoImplicitGlobalsReadsWhatTheFileIs(t *testing.T) {
 	t.Parallel()
 
+	run := map[string]func(t *testing.T, sourceText string) rule_testing.Result{
+		"the untyped harness": func(t *testing.T, sourceText string) rule_testing.Result {
+			return rule_testing.RunWithOptions(t, NoImplicitGlobals, implicitGlobalsFile, sourceText, implicitGlobalsOptions(t, true))
+		},
+		"a module": func(t *testing.T, sourceText string) rule_testing.Result {
+			return rule_testing.RunTypedWithOptions(t, NoImplicitGlobals, implicitGlobalsFile, sourceText, implicitGlobalsOptions(t, true))
+		},
+		"a TypeScript script under alwaysStrict": func(t *testing.T, sourceText string) rule_testing.Result {
+			return runImplicitGlobalsAsAScript(t, implicitGlobalsFile, sourceText, implicitGlobalsOptions(t, true))
+		},
+		"a sloppy JavaScript script": func(t *testing.T, sourceText string) rule_testing.Result {
+			return runImplicitGlobalsAsAScript(t, implicitGlobalsScript, sourceText, implicitGlobalsOptions(t, true))
+		},
+	}
 	cases := []struct {
-		name         string
-		sourceText   string
-		untypedFinds []string
-		typedFinds   []string
+		file       string
+		sourceText string
+		messages   []string
 	}{
-		{"a global declaration reaches only the untyped harness",
-			"var foo = 1;", []string{"globalNonLexicalBinding"}, nil},
-		{"a leak reaches only the typed harness",
-			"foo = 1", nil, []string{"globalVariableLeak"}},
-		{"a mixed case gives one finding to each",
-			"foo = 1; var bar;", []string{"globalNonLexicalBinding"}, []string{"globalVariableLeak"}},
+		{"the untyped harness", "var foo = 1;", []string{"globalNonLexicalBinding"}},
+		{"the untyped harness", "foo = 1", nil},
+		{"a module", "var foo = 1;", nil},
+		{"a module", "foo = 1", nil},
+		{"a TypeScript script under alwaysStrict", "var foo = 1;", []string{"globalNonLexicalBinding"}},
+		{"a TypeScript script under alwaysStrict", "foo = 1", nil},
+		{"a TypeScript script under alwaysStrict", "foo = 1; var bar;", []string{"globalNonLexicalBinding"}},
+		{"a sloppy JavaScript script", "var foo = 1;", []string{"globalNonLexicalBinding"}},
+		{"a sloppy JavaScript script", "foo = 1", []string{"globalVariableLeak"}},
+		{"a sloppy JavaScript script", "foo = 1; var bar;", []string{"globalNonLexicalBinding", "globalVariableLeak"}},
+		// A JavaScript module is strict by being a module, with no compiler option involved.
+		{"a sloppy JavaScript script", "export {}; foo = 1", nil},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoImplicitGlobals,
-				implicitGlobalsFile, testCase.sourceText, implicitGlobalsOptions(t, true)),
-				testCase.untypedFinds...)
-			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoImplicitGlobals,
-				implicitGlobalsFile, testCase.sourceText, implicitGlobalsOptions(t, true)),
-				testCase.typedFinds...)
+		t.Run(testCase.file+": "+testCase.sourceText, func(t *testing.T) {
+			rule_testing.ExpectFindings(t, run[testCase.file](t, testCase.sourceText), testCase.messages...)
 		})
 	}
 }
@@ -376,9 +403,8 @@ func TestNoImplicitGlobalsIsSilentInStrictMode(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoImplicitGlobals,
-				implicitGlobalsFile, testCase.sourceText, implicitGlobalsOptions(t, false)),
-				testCase.messages...)
+			rule_testing.ExpectFindings(t, runImplicitGlobalsAsAScript(t, implicitGlobalsScript,
+				testCase.sourceText, implicitGlobalsOptions(t, false)), testCase.messages...)
 		})
 	}
 }
@@ -450,8 +476,7 @@ func TestNoImplicitGlobalsPointsAtTheDeclaration(t *testing.T) {
 		t.Errorf("expected the finding on the whole declarator, pointed at %q", reported)
 	}
 
-	leak := rule_testing.RunTypedWithOptions(t, NoImplicitGlobals, implicitGlobalsFile,
-		"foo = 1", implicitGlobalsOptions(t, false))
+	leak := runImplicitGlobalsAsAScript(t, implicitGlobalsScript, "foo = 1", implicitGlobalsOptions(t, false))
 	rule_testing.ExpectFindings(t, leak, "globalVariableLeak")
 	leakSource := leak.SourceFile.Text()
 	leakReported := leakSource[leak.Diagnostics[0].Range.Pos():leak.Diagnostics[0].Range.End()]

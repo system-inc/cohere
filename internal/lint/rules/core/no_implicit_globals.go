@@ -2,6 +2,7 @@ package core
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -72,7 +73,7 @@ func DecodeNoImplicitGlobalsOptions(raw []byte) (any, error) {
 //	valid:   var foo = 1;                    in a module, which has no global scope
 //	invalid: var foo = 1;                    in a script
 //	invalid: function foo() {}               in a script
-//	invalid: foo = 1;                        anywhere, since nothing declared foo
+//	invalid: foo = 1;                        in sloppy code, since nothing declared foo
 //
 // # It only fires in a SCRIPT, and that is the whole reason it measures zero here
 //
@@ -109,9 +110,12 @@ func DecodeNoImplicitGlobalsOptions(raw []byte) (any, error) {
 // symbol was never declared. Probed with a control before being built on -- `foo = 1` answers no
 // symbol, `var foo; foo = 1` answers a symbol with one declaration.
 //
-// This half is NOT gated on the file being a script, and that is upstream's behaviour rather than an
-// oversight: a leak creates a global from anywhere, including inside a function and inside a module,
-// which is why `window.foo = function() { bar = 1; }` is one of upstream's failing cases.
+// This half is not gated on the file being a script, since a leak escapes from inside a function as
+// well: `window.foo = function() { bar = 1; }` is one of upstream's failing cases. It is gated on the
+// code being sloppy, because in strict code an assignment to an undeclared name throws instead of
+// creating a global (see liesInStrictModeCode). A module is strict throughout, and so is every
+// TypeScript file under `alwaysStrict`, so in a TypeScript program the leak half fires only in a
+// sloppy JavaScript script.
 var NoImplicitGlobals = rule.Rule{
 	Name: "no-implicit-globals",
 
@@ -121,6 +125,9 @@ var NoImplicitGlobals = rule.Rule{
 	// Asks only whether a name resolves to any symbol, never reading a declaration, and no function
 	// body can declare a name another file sees, so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
+	// `alwaysStrict` decides whether a TypeScript script can leak, so the cached verdict has to
+	// follow the tsconfig.
+	ProgramReads: rule.ReadsCompilerOptions,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoImplicitGlobalsSettings](options)
@@ -134,20 +141,15 @@ var NoImplicitGlobals = rule.Rule{
 				if file == nil {
 					return
 				}
-				// A module has no global scope, so the declaration halves do not apply to it. The
-				// leak half runs either way, because a leak escapes from anywhere.
+				// A module has no global scope, so the declaration halves do not apply to it. A
+				// script's top-level var or function is a global whether or not the script is
+				// strict, which is why this half reads module detection and nothing else (#rbvd7sv).
 				if file.ExternalModuleIndicator == nil {
 					reportGlobalDeclarations(ctx, node, settings.LexicalBindings)
 				}
 				// The leak half is the only one that asks the checker, so it is guarded separately
-				// rather than at the top. Guarding the whole listener would make the declaration
-				// halves untestable: the typed harness pins `moduleDetection: "force"`, so every
-				// file it builds is a module and the script gate above never opens there, while the
-				// untyped harness parses without a tsconfig and does produce a script.
-				//
-				// So the two halves are proven through different harnesses on purpose, and each
-				// test says which and why. A single guard at the top would have left 22 of
-				// upstream's failing cases unreachable by any fixture.
+				// rather than at the top, and the declaration halves still run in the untyped
+				// harness, which parses a script with no checker.
 				if ctx.TypeChecker != nil {
 					reportGlobalVariableLeaks(ctx, node)
 				}
@@ -244,9 +246,9 @@ func reportEachBoundName(ctx rule.Context, name *ast.Node, message rule.Message)
 // reportGlobalVariableLeaks reports an assignment to a name nothing ever declared.
 //
 // This is upstream's `scope.implicit.variables`, asked of resolution instead: a target resolving to
-// no symbol was never declared anywhere, so assigning to it creates a global at run time. It is not
-// gated on the file being a script, because a leak escapes from anywhere, and upstream's
-// `window.foo = function() { bar = 1; }` is the case that says so.
+// no symbol was never declared anywhere, so assigning to it in sloppy code creates a global at run
+// time. It is not gated on the file being a script, because a leak escapes from a function too, and
+// upstream's `window.foo = function() { bar = 1; }` is the case that says so.
 //
 // The three assignment forms are upstream's own set: an assignment expression, and the left side of
 // a `for...in` or `for...of`.
@@ -258,7 +260,7 @@ func reportGlobalVariableLeaks(ctx rule.Context, node *ast.Node) {
 			binary := current.AsBinaryExpression()
 			if binary != nil && binary.OperatorToken != nil &&
 				binary.OperatorToken.Kind == ast.KindEqualsToken &&
-				!liesInStrictModeCode(current) {
+				!liesInStrictModeCode(ctx, current) {
 				reportIfTargetIsUndeclared(ctx, binary.Left)
 			}
 
@@ -274,7 +276,7 @@ func reportGlobalVariableLeaks(ctx rule.Context, node *ast.Node) {
 			// pattern and an initialized declaration: byte identical findings under both spellings.
 			initializer := current.AsForInOrOfStatement().Initializer
 			if initializer != nil && initializer.Kind != ast.KindVariableDeclarationList &&
-				!liesInStrictModeCode(current) {
+				!liesInStrictModeCode(ctx, current) {
 				reportIfTargetIsUndeclared(ctx, initializer)
 			}
 		}
@@ -333,15 +335,17 @@ func reportIfTargetIsUndeclared(ctx rule.Context, target *ast.Node) {
 //	(function() {'use strict'; foo = 1; })();    clean
 //	{ class Foo { constructor() { bar = 1; } } } clean, a class body is always strict
 //
-// Two sources of strictness are checked. A `use strict` directive at the top of the file or of any
-// enclosing function body, and a class, whose body is strict by specification with no directive
-// written anywhere. The class half is the one a port is most likely to miss, and it costs a false
-// positive on ordinary code rather than a missed finding.
+// Four sources of strictness are checked. A `use strict` directive at the top of the file or of any
+// enclosing function body. A class, whose body is strict by specification with no directive written
+// anywhere: the source a port is most likely to miss, and it costs a false positive on ordinary code
+// rather than a missed finding. A module, which is strict throughout. And the compiler: under
+// `alwaysStrict` every TypeScript file is bound and emitted as strict, which is ESLint's
+// `ecmaFeatures.impliedStrict`, where eslint-scope likewise records no implicit global (#hks3djf).
 //
-// A module is strict throughout, but the leak half deliberately still runs there, matching upstream:
-// its own corpus reports `window.foo = function() { bar = 1; }` and the module cases it excludes are
-// excluded for the declaration halves rather than for this one.
-func liesInStrictModeCode(node *ast.Node) bool {
+// The last two settled #jjfa7qb's 34 leak rows. The port this replaced followed oxc, which reports a
+// leak in a module, and ran ESLint's corpus as modules where ESLint reports nothing. Under the authority
+// rule, and on first principles, an assignment that throws leaks nothing.
+func liesInStrictModeCode(ctx rule.Context, node *ast.Node) bool {
 	for ancestor := node; ancestor != nil; ancestor = ancestor.Parent {
 		// A class body is strict by specification, with no directive to find.
 		if ast.IsClassLike(ancestor) {
@@ -351,7 +355,11 @@ func liesInStrictModeCode(node *ast.Node) bool {
 		var statements []*ast.Node
 		switch {
 		case ast.IsSourceFile(ancestor):
-			statements = ancestor.AsSourceFile().Statements.Nodes
+			file := ancestor.AsSourceFile()
+			if file.ExternalModuleIndicator != nil || type_checking.CompilerImpliesStrict(ctx, file) {
+				return true
+			}
+			statements = file.Statements.Nodes
 		case ast.IsBlock(ancestor) && ancestor.Parent != nil &&
 			ast.IsFunctionLikeDeclaration(ancestor.Parent):
 			statements = ancestor.AsBlock().Statements.Nodes
