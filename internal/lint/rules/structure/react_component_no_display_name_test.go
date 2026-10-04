@@ -18,38 +18,39 @@ func TestReactComponentNoDisplayNameFires(t *testing.T) {
 	}{
 		{
 			"a function component assigning its own name",
-			"export function Field() { return null; }\nField.displayName = 'Field';\n",
+			"export function Field() { return <div />; }\nField.displayName = 'Field';\n",
 			1,
 		},
 		{
 			"an arrow component assigning its name",
-			"export const Field = () => null;\nField.displayName = 'Field';\n",
+			"export const Field = () => <div />;\nField.displayName = 'Field';\n",
 			1,
 		},
-		// The exemption is for wrappers that produce something anonymous. An ordinary call does
-		// not, so a binding initialized from one is not exempt.
+		// The detector's parameter arm: a capitalized function taking `properties` is a component
+		// whatever its body returns.
 		{
-			"a binding initialized from an unrelated call",
-			"declare function build(): unknown;\nexport const Field = build();\nField.displayName = 'Field';\n",
+			"a component known by its properties parameter",
+			"export function Field(properties: { label: string }) { return null; }\nField.displayName = 'Field';\n",
 			1,
 		},
-		// A wrapper name reached off something other than React is not the React wrapper.
 		{
-			"memo reached off a receiver that is not React",
-			"declare const Other: { memo(component: unknown): unknown };\n" +
-				"export const Field = Other.memo(function () { return null; });\nField.displayName = 'Field';\n",
+			"a class component",
+			"import React from 'react';\nexport class Field extends React.Component { render() { return <div />; } }\n" +
+				"Field.displayName = 'Field';\n",
+			1,
+		},
+		// A function declaration hoists, so an assignment above it names the component all the same.
+		// The set is gathered from the whole file for this case, not built up during the walk.
+		{
+			"an assignment above the function it names",
+			"Field.displayName = 'Field';\nexport function Field() { return <div />; }\n",
 			1,
 		},
 		{
 			"two assignments report twice",
-			"export function A() { return null; }\nexport function B() { return null; }\n" +
+			"export function A() { return <div />; }\nexport function B() { return <div />; }\n" +
 				"A.displayName = 'A';\nB.displayName = 'B';\n",
 			2,
-		},
-		{
-			"an assignment to a member of an object",
-			"declare const components: { Field: { displayName?: string } };\ncomponents.Field.displayName = 'Field';\n",
-			1,
 		},
 	}
 	for _, testCase := range cases {
@@ -112,6 +113,42 @@ func TestReactComponentNoDisplayNameStaysSilent(t *testing.T) {
 		{
 			"reading displayName",
 			"declare const Field: { displayName: string };\nexport const name = Field.displayName;\n",
+		},
+		// A domain field. These are api-phi-health's 17 former findings, all in plain services, and the
+		// reason the rule asks whether the target is a component at all (#qpms5xz).
+		{
+			"a domain object's displayName field",
+			"declare const event: { displayName: string };\ndeclare const organization: { displayName: string };\n" +
+				"event.displayName = organization.displayName;\n",
+		},
+		// A capital letter alone does not make a component: the binding has to be one.
+		{
+			"a capitalized object that is not a component",
+			"export const Organization = { displayName: 'Phi' };\nOrganization.displayName = 'Phi, Inc.';\n",
+		},
+		{
+			"a lowercase function that returns JSX",
+			"export function field() { return <div />; }\nfield.displayName = 'field';\n",
+		},
+		// A component this file does not declare is not seen, so these miss rather than guess.
+		{
+			"a binding initialized from an unrelated call",
+			"declare function build(): unknown;\nexport const Field = build();\nField.displayName = 'Field';\n",
+		},
+		{
+			"an assignment to a member of an object",
+			"declare const components: { Field: { displayName?: string } };\ncomponents.Field.displayName = 'Field';\n",
+		},
+		// `Other.memo` is not React's wrapper, so its result is neither exempt nor known to be a
+		// component, and the binding is as opaque as any other factory's.
+		{
+			"memo reached off a receiver that is not React",
+			"declare const Other: { memo(component: unknown): unknown };\n" +
+				"export const Field = Other.memo(function () { return <div />; });\nField.displayName = 'Field';\n",
+		},
+		{
+			"an imported component",
+			"import { Field } from './Field';\nField.displayName = 'Field';\n",
 		},
 		{
 			"a file with no assignments",
