@@ -34,12 +34,18 @@ struct LegacyConstructorsTests {
 
     /* Every fix applied the way the fix phase applies them, overlaps refused. */
     static func fixed(_ source: String) -> String {
-        FixApplier.apply(findings(source).flatMap(\.fixes), to: source).text
+        FixApplier.apply(FixApplier.proposals(from: findings(source)), to: source).text
     }
 
     /* Every finding's first suggestion applied, for the rewrites that are offered and never applied. */
     static func suggested(_ source: String) -> String {
-        FixApplier.apply(findings(source).flatMap { $0.suggestions.first?.fixes ?? [] }, to: source).text
+        FixApplier.apply(
+            findings(source).flatMap { finding in
+                (finding.suggestions.first?.fixes ?? []).map { FixApplier.Proposal(rule: finding.rule, edit: $0) }
+            },
+            to: source,
+        )
+        .text
     }
 
     /* SwiftLint's `legacy_constructor` triggering examples, one per line. */
