@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 281,
+        "rulesOn": 285,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -197,7 +197,7 @@
             },
             {
                 "name": "@typescript-eslint/no-duplicate-type-constituents",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-dynamic-delete",
@@ -373,7 +373,7 @@
             },
             {
                 "name": "@typescript-eslint/no-useless-default-assignment",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-useless-empty-export",
@@ -455,7 +455,7 @@
             },
             {
                 "name": "@typescript-eslint/require-array-sort-compare",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/restrict-plus-operands",
@@ -1300,7 +1300,7 @@
             },
             {
                 "name": "no-useless-rename",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "no-useless-return",
@@ -1463,7 +1463,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 347,
+        "rulesOn": 351,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -1565,7 +1565,7 @@
             },
             {
                 "name": "@typescript-eslint/no-duplicate-type-constituents",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-dynamic-delete",
@@ -1741,7 +1741,7 @@
             },
             {
                 "name": "@typescript-eslint/no-useless-default-assignment",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-useless-empty-export",
@@ -1823,7 +1823,7 @@
             },
             {
                 "name": "@typescript-eslint/require-array-sort-compare",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/restrict-plus-operands",
@@ -2668,7 +2668,7 @@
             },
             {
                 "name": "no-useless-rename",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "no-useless-return",
@@ -3187,7 +3187,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 277,
+        "rulesOn": 281,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -3377,7 +3377,7 @@
             },
             {
                 "name": "@typescript-eslint/no-duplicate-type-constituents",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-dynamic-delete",
@@ -3558,7 +3558,7 @@
             },
             {
                 "name": "@typescript-eslint/no-useless-default-assignment",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-useless-empty-export",
@@ -3640,7 +3640,7 @@
             },
             {
                 "name": "@typescript-eslint/require-array-sort-compare",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/restrict-plus-operands",
@@ -4639,7 +4639,7 @@
             },
             {
                 "name": "no-useless-rename",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "no-useless-return",
@@ -4900,7 +4900,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 286,
+        "rulesOn": 290,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5002,7 +5002,7 @@
             },
             {
                 "name": "@typescript-eslint/no-duplicate-type-constituents",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-dynamic-delete",
@@ -5178,7 +5178,7 @@
             },
             {
                 "name": "@typescript-eslint/no-useless-default-assignment",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-useless-empty-export",
@@ -5260,7 +5260,7 @@
             },
             {
                 "name": "@typescript-eslint/require-array-sort-compare",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/restrict-plus-operands",
@@ -6226,7 +6226,7 @@
             },
             {
                 "name": "no-useless-rename",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "no-useless-return",
@@ -6514,7 +6514,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 271,
+        "rulesOn": 275,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6616,7 +6616,7 @@
             },
             {
                 "name": "@typescript-eslint/no-duplicate-type-constituents",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-dynamic-delete",
@@ -6792,7 +6792,7 @@
             },
             {
                 "name": "@typescript-eslint/no-useless-default-assignment",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-useless-empty-export",
@@ -6874,7 +6874,7 @@
             },
             {
                 "name": "@typescript-eslint/require-array-sort-compare",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/restrict-plus-operands",
@@ -7767,7 +7767,7 @@
             },
             {
                 "name": "no-useless-rename",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "no-useless-return",
@@ -7923,7 +7923,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 259,
+        "rulesOn": 263,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8025,7 +8025,7 @@
             },
             {
                 "name": "@typescript-eslint/no-duplicate-type-constituents",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-dynamic-delete",
@@ -8201,7 +8201,7 @@
             },
             {
                 "name": "@typescript-eslint/no-useless-default-assignment",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/no-useless-empty-export",
@@ -8283,7 +8283,7 @@
             },
             {
                 "name": "@typescript-eslint/require-array-sort-compare",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "@typescript-eslint/restrict-plus-operands",
@@ -9128,7 +9128,7 @@
             },
             {
                 "name": "no-useless-rename",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "no-useless-return",
