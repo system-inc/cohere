@@ -116,8 +116,11 @@ func writeRunEnd(report *pipelineReport, out io.Writer) {
 	// skips again against phases it did not run.
 	summary.Gaps.RulesSkippingEverything = summary.uncoveredSkips()
 	summary.Gaps.ModifiedBuild = release.Current().SourceTreeModified || report.engineSourceTreeModified
-	if report.incompleteBeyondPhases != "" && summary.Gaps.CrashedFiles == 0 {
-		summary.Gaps.Unread = report.incompleteBeyondPhases
+	// The phase line's sentence points at notes only --verbose prints, so the footer says the gap itself:
+	// each path that finds one sets Gaps with its count. A gap nothing counted still shows, saying where
+	// to look, so no run falls short in silence.
+	if report.incompleteBeyondPhases != "" && summary.Gaps.Unread == "" && summary.Gaps.CrashedFiles == 0 {
+		summary.Gaps.Unread = "the run fell short of checking everything; --verbose says where"
 	}
 	if report.filesInScope > 0 && report.filesInScope < report.filesInProgram {
 		summary.Gaps.ProgramFiles = report.filesInProgram

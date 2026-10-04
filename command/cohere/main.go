@@ -1083,6 +1083,7 @@ func run() error {
 			report.incompleteBeyondPhases = namedGapsSentence
 		case len(result.Coverage.RulesCrashed) > 0:
 			report.incompleteBeyondPhases = namedRuleGapsSentence
+			activeSummary.Gaps.Unread = counted(len(result.Coverage.RulesCrashed), "rule crash left a file's verdict missing", "rule crashes left files' verdicts missing")
 		}
 
 		if *showTiming {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/system-inc/cohere/internal/edit"
@@ -373,9 +374,10 @@ func (r *swiftRun) acceptFinding(record *swiftFindingRecord) error {
 	r.findings++
 	r.findingsInPhase++
 	// A compiler finding is a type error, as the TypeScript run counts its own; the rest are findings.
-	severity := record.Severity
-	if severity != "warn" {
-		severity = "error"
+	// The contract spells the severities error and warning; the view spells a warning warn, as the settings do.
+	severity := "error"
+	if record.Severity == "warning" {
+		severity = "warn"
 	}
 	rule, messageID := record.Rule, record.MessageId
 	if record.Source == "compiler" {
@@ -804,8 +806,10 @@ func (r *swiftRun) acceptSummary(record *swiftSummaryRecord) error {
 	if !*record.Complete && r.report.checkedEveryRequestedPhase() {
 		if namedGaps {
 			r.report.incompleteBeyondPhases = "the notes above name the files nothing checked"
+			activeSummary.Gaps.Unread = swiftUncheckedFiles(r.filesWithoutRecord, len(r.unreadable))
 		} else {
 			r.report.incompleteBeyondPhases = "the Swift engine reported that it fell short without a record saying where"
+			activeSummary.Gaps.Unread = "the Swift engine fell short without saying where"
 		}
 	}
 
@@ -903,4 +907,22 @@ func truncateForError(line []byte) string {
 		return string(line)
 	}
 	return string(line[:limit]) + "…"
+}
+
+// swiftUncheckedFiles says, for the footer, how many files nothing checked and why, since the notes naming
+// them are --verbose's. A crashed file is counted apart, as the footer's own marker. Empty when the only
+// gaps were crashes.
+func swiftUncheckedFiles(withoutRecord, unreadable int) string {
+	total := withoutRecord + unreadable
+	if total == 0 {
+		return ""
+	}
+	var kinds []string
+	if withoutRecord > 0 {
+		kinds = append(kinds, fmt.Sprintf("%d with no compiler record", withoutRecord))
+	}
+	if unreadable > 0 {
+		kinds = append(kinds, fmt.Sprintf("%d unreadable", unreadable))
+	}
+	return fmt.Sprintf("%s nothing checked: %s", counted(total, "file", "files"), strings.Join(kinds, ", "))
 }
