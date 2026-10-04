@@ -195,41 +195,22 @@ func GetWellKnownSymbolPropertyOfType(t *checker.Type, name string, typeChecker 
 	return checker.Checker_getPropertyOfType(typeChecker, t, checker.Checker_getPropertyNameForKnownSymbolName(typeChecker, name))
 }
 
-/**
- * Checks if a given compiler option is enabled, accounting for whether all flags
- * (except `strictPropertyInitialization`) have been enabled by `strict: true`.
- * @category Compiler Options
- * @example
- * ```ts
- * const optionsLenient = {
- * 	noImplicitAny: true,
- * };
- *
- * isStrictCompilerOptionEnabled(optionsLenient, "noImplicitAny"); // true
- * isStrictCompilerOptionEnabled(optionsLenient, "noImplicitThis"); // false
- * ```
- * @example
- * ```ts
- * const optionsStrict = {
- * 	noImplicitThis: false,
- * 	strict: true,
- * };
- *
- * isStrictCompilerOptionEnabled(optionsStrict, "noImplicitAny"); // true
- * isStrictCompilerOptionEnabled(optionsStrict, "noImplicitThis"); // false
- * ```
- */
+// IsStrictCompilerOptionEnabled reports whether a strict-family option is on, as the compiler resolves
+// it: an explicit value wins, and an unset one follows `strict`, which is itself on unless set false.
+//
+// That last clause is TypeScript 6's default, and it is what ts-api-utils 2.5 reads too
+// (`options[option] ?? options.strict ?? isTsVersionAtLeast(6)`), so upstream's rules see it. This
+// helper used to read an unset `strict` as off, TypeScript 5's default. Structure's tsconfig never
+// writes `strict`, so in ahra and www every caller believed `strictNullChecks` and `noImplicitThis`
+// were off. no-useless-default-assignment then declined every file there while it fired in api,
+// whose Base tsconfig writes `strict: true` (#6ar414z). The compiler's own GetStrictOptionValue is
+// the resolution the checker uses, so asking it keeps a rule's premise and the types it reads in step.
+//
+// Upstream also ties `strictPropertyInitialization` to `strictNullChecks`. No caller asks about that
+// option, so the clause is not reproduced.
 func IsStrictCompilerOptionEnabled(
 	options *core.CompilerOptions,
 	option core.Tristate,
 ) bool {
-	if options.Strict.IsTrue() {
-		return option.IsTrueOrUnknown()
-	}
-	return option.IsTrue()
-	// return (
-	// 	(options.strict ? options[option] !== false : options[option] === true) &&
-	// 	(option !== "strictPropertyInitialization" ||
-	// 		isStrictCompilerOptionEnabled(options, "strictNullChecks"))
-	// );
+	return options.GetStrictOptionValue(option)
 }
