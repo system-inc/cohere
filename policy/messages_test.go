@@ -261,3 +261,79 @@ func TestAMessageCanBeRenderedInOneLanguageOfATwinFile(t *testing.T) {
 		t.Error("a term giving words for a language the message is not rendered in loaded")
 	}
 }
+
+// optionsByLanguage is a twin file whose object phrase gives one option's text by language: `variable`
+// for both engines, each in its own words, and `storeEntry` for TypeScript only.
+const optionsByLanguage = `{
+  "rules": { "TypeScript": "base/consistency-no-thing", "Swift": "cohere-swift/consistency-no-thing" },
+  "phrases": {
+    "source": {
+      "everywhere": "from anywhere",
+      "variable": { "TypeScript": "from {{target}}", "Swift": "from the property {{target}}" },
+      "storeEntry": { "TypeScript": "from what {{read}} returned" }
+    }
+  },
+  "messages": {
+    "lostUpdate": { "text": "This write is computed <<source>>." }
+  }
+}`
+
+// An option's text may be given by language, as a term's is. Each language renders its own, and an
+// option with no text for a language does not reach it, so that language's rule cannot pick it.
+func TestAnOptionCanGiveItsTextByLanguage(t *testing.T) {
+	catalog, err := loadMinimalMessages(optionsByLanguage)
+	if err != nil {
+		t.Fatalf("an option with text by language is refused: %v", err)
+	}
+	restore := UseMessages(catalog)
+	defer restore()
+
+	typeScript := MessageHandle{Rule: "base/consistency-no-thing", Id: "lostUpdate"}
+	swift := MessageHandle{Rule: "cohere-swift/consistency-no-thing", Id: "lostUpdate"}
+	for _, rendered := range []struct {
+		handle MessageHandle
+		option string
+		values map[string]string
+		want   string
+	}{
+		{typeScript, "everywhere", nil, "This write is computed from anywhere."},
+		{swift, "everywhere", nil, "This write is computed from anywhere."},
+		{typeScript, "variable", map[string]string{"target": "total"}, "This write is computed from total."},
+		{swift, "variable", map[string]string{"target": "total"}, "This write is computed from the property total."},
+		{typeScript, "storeEntry", map[string]string{"read": "cache.get(key)"}, "This write is computed from what cache.get(key) returned."},
+	} {
+		if got := rendered.handle.Render(rendered.values, rendered.handle.Option("source", rendered.option)); got != rendered.want {
+			t.Errorf("%s %s renders %q, want %q", rendered.handle.Rule, rendered.option, got, rendered.want)
+		}
+	}
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Error("the Swift rule took a TypeScript-only option")
+			}
+		}()
+		swift.Option("source", "storeEntry")
+	}()
+
+	for _, refused := range []struct {
+		name string
+		old  string
+		new  string
+	}{
+		{"an option in a language the file names no rule for", `"Swift": "from the property {{target}}"`, `"Kotlin": "from the property {{target}}"`},
+		{"an option with text for no language", `{ "TypeScript": "from what {{read}} returned" }`, `{}`},
+		{"an option of another shape", `{ "TypeScript": "from what {{read}} returned" }`, `["from what {{read}} returned"]`},
+		{"a phrase with no option in a language a message renders it in", `"everywhere": "from anywhere",
+      "variable": { "TypeScript": "from {{target}}", "Swift": "from the property {{target}}" },`, ``},
+		{"a term inside an option's language text", `"from the property {{target}}"`, `"from the [[kind]] {{target}}"`},
+		{"a phrase inside an option's language text", `"from the property {{target}}"`, `"from <<source>>"`},
+		{"a malformed value in an option's language text", `"from the property {{target}}"`, `"from the property {{target"`},
+	} {
+		if !strings.Contains(optionsByLanguage, refused.old) {
+			t.Fatalf("%s: the anchor %q is not in the file, so the change would not apply", refused.name, refused.old)
+		}
+		if _, err := loadMinimalMessages(strings.Replace(optionsByLanguage, refused.old, refused.new, 1)); err == nil {
+			t.Errorf("%s loaded", refused.name)
+		}
+	}
+}

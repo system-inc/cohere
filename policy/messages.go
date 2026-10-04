@@ -31,7 +31,9 @@ import (
 //	           or more of the file's messages share, put in when the file is read, so a sentence the
 //	           messages have in common lives once. An object phrase is a closed set of named options,
 //	           and the rule picks one when it reports: wording that varies by case, kept in the data
-//	           rather than passed in as a value. An option may carry values.
+//	           rather than passed in as a value. An option may carry values. An option's text is one
+//	           string for every language, or an object giving it by language, as a term does; an option
+//	           with no text for a language does not reach that language, so its rule cannot pick it.
 //
 // Nothing nests: a term holds no term or phrase, and a phrase holds no phrase or term. Swift's
 // generator resolves string phrases when it generates, and an object phrase becomes an enum parameter
@@ -192,7 +194,7 @@ func (catalog *MessageCatalog) add(idea string, data []byte) error {
 		return fmt.Errorf("is named %q, and its idea is %q", idea, leaf)
 	}
 
-	stringPhrases, objectPhrases, err := readPhrases(file.Phrases)
+	stringPhrases, objectPhrases, err := readPhrases(file.Phrases, file.Rules)
 	if err != nil {
 		return err
 	}
@@ -221,7 +223,7 @@ func (catalog *MessageCatalog) add(idea string, data []byte) error {
 			if err != nil {
 				return fmt.Errorf("message %q, %s: %w", id, language, err)
 			}
-			template, err := resolvePhrases(text, stringPhrases, objectPhrases)
+			template, err := resolvePhrases(text, stringPhrases, objectPhrases, language)
 			if err != nil {
 				return fmt.Errorf("message %q, %s: %w", id, language, err)
 			}
@@ -294,12 +296,17 @@ func messageLanguagesOf(message messageFileMessage, rules map[string]string) ([]
 	return message.Languages, nil
 }
 
+// objectPhrase is an object phrase's options, each option's text by language. A text for every
+// language is held under the empty language.
+type objectPhrase map[string]map[string]string
+
 // readPhrases splits a file's phrases into the string kind and the object kind, refusing a name that
-// is not camelCase, an object with no option or an option name that is not, and a phrase holding a
-// phrase or a term.
-func readPhrases(raw map[string]json.RawMessage) (map[string]string, map[string]map[string]string, error) {
+// is not camelCase, an object with no option or an option name that is not, an option giving its text
+// by language for no language or for one the file names no rule for, and a phrase holding a phrase or
+// a term.
+func readPhrases(raw map[string]json.RawMessage, rules map[string]string) (map[string]string, map[string]objectPhrase, error) {
 	stringPhrases := map[string]string{}
-	objectPhrases := map[string]map[string]string{}
+	objectPhrases := map[string]objectPhrase{}
 	for name, value := range raw {
 		if !isCamelCaseName(name) {
 			return nil, nil, fmt.Errorf("phrase %q: a phrase is named in camelCase", name)
@@ -310,20 +317,28 @@ func readPhrases(raw map[string]json.RawMessage) (map[string]string, map[string]
 			stringPhrases[name] = text
 			texts = append(texts, text)
 		} else {
-			var options map[string]string
+			var options map[string]json.RawMessage
 			if err := strictUnmarshal(value, &options); err != nil {
 				return nil, nil, fmt.Errorf("phrase %q is neither text nor named options of text", name)
 			}
 			if len(options) == 0 {
 				return nil, nil, fmt.Errorf("phrase %q has no option", name)
 			}
-			for option, optionText := range options {
+			phrase := objectPhrase{}
+			for option, optionValue := range options {
 				if !isCamelCaseName(option) {
 					return nil, nil, fmt.Errorf("phrase %q: the option %q is not camelCase", name, option)
 				}
-				texts = append(texts, optionText)
+				byLanguage, err := readOptionText(optionValue, rules)
+				if err != nil {
+					return nil, nil, fmt.Errorf("phrase %q, option %q: %w", name, option, err)
+				}
+				for _, optionText := range byLanguage {
+					texts = append(texts, optionText)
+				}
+				phrase[option] = byLanguage
 			}
-			objectPhrases[name] = options
+			objectPhrases[name] = phrase
 		}
 		for _, text := range texts {
 			if strings.Contains(text, "<<") || strings.Contains(text, ">>") || strings.Contains(text, "[[") || strings.Contains(text, "]]") {
@@ -337,6 +352,28 @@ func readPhrases(raw map[string]json.RawMessage) (map[string]string, map[string]
 	return stringPhrases, objectPhrases, nil
 }
 
+// readOptionText reads one option's text: a string, which every language renders, or an object of
+// text by language, which only the languages it names render.
+func readOptionText(value json.RawMessage, rules map[string]string) (map[string]string, error) {
+	var text string
+	if err := strictUnmarshal(value, &text); err == nil {
+		return map[string]string{"": text}, nil
+	}
+	var byLanguage map[string]string
+	if err := strictUnmarshal(value, &byLanguage); err != nil {
+		return nil, fmt.Errorf("is neither text nor text by language")
+	}
+	if len(byLanguage) == 0 {
+		return nil, fmt.Errorf("gives its text for no language, so nothing renders it")
+	}
+	for language := range byLanguage {
+		if _, named := rules[language]; !named {
+			return nil, fmt.Errorf("gives text for %q, which the file names no rule for", language)
+		}
+	}
+	return byLanguage, nil
+}
+
 // strictUnmarshal decodes JSON into target, refusing a value of another shape.
 func strictUnmarshal(data []byte, target any) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
@@ -344,9 +381,10 @@ func strictUnmarshal(data []byte, target any) error {
 	return decoder.Decode(target)
 }
 
-// resolvePhrases puts each string phrase into text, and keeps each object phrase as a slot with its
-// options, refusing a `<<name>>` the file does not define.
-func resolvePhrases(text string, stringPhrases map[string]string, objectPhrases map[string]map[string]string) (messageTemplate, error) {
+// resolvePhrases puts each string phrase into text, and keeps each object phrase as a slot with the
+// options that have text for language, refusing a `<<name>>` the file does not define and an object
+// phrase with no option for the language the text is rendered in.
+func resolvePhrases(text string, stringPhrases map[string]string, objectPhrases map[string]objectPhrase, language string) (messageTemplate, error) {
 	names, err := placeholderNames(text, "<<", ">>")
 	if err != nil {
 		return messageTemplate{}, err
@@ -357,9 +395,20 @@ func resolvePhrases(text string, stringPhrases map[string]string, objectPhrases 
 			template.text = strings.ReplaceAll(template.text, "<<"+name+">>", phrase)
 			continue
 		}
-		options, isObject := objectPhrases[name]
+		phrase, isObject := objectPhrases[name]
 		if !isObject {
 			return messageTemplate{}, fmt.Errorf("the phrase %q is not in the file's phrases", name)
+		}
+		options := map[string]string{}
+		for option, byLanguage := range phrase {
+			if optionText, forEvery := byLanguage[""]; forEvery {
+				options[option] = optionText
+			} else if optionText, forThis := byLanguage[language]; forThis {
+				options[option] = optionText
+			}
+		}
+		if len(options) == 0 {
+			return messageTemplate{}, fmt.Errorf("the phrase %q has no option in %s", name, language)
 		}
 		if template.options == nil {
 			template.options = map[string]map[string]string{}
