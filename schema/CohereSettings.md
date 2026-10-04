@@ -185,7 +185,7 @@ A rule's value is a severity, or `[severity, ...options]` for a rule that takes 
 
 ## Rules
 
-cohere implements 483 rules. `cohere --rules` lists them for your project's language, and
+cohere implements 484 rules. `cohere --rules` lists them for your project's language, and
 `cohere --rules-enabled` lists the ones your settings turn on. A name cohere does not implement is accepted:
 it records a decision about a rule, and is reported as unported rather than refused.
 
@@ -222,7 +222,7 @@ it records a decision about a rule, and is reported as unported rather than refu
 
 </details>
 
-<details><summary><code>@typescript-eslint</code>, 98 rules</summary>
+<details><summary><code>@typescript-eslint</code>, 99 rules</summary>
 
 - `@typescript-eslint/adjacent-overload-signatures`
 - `@typescript-eslint/array-type`
@@ -238,6 +238,7 @@ it records a decision about a rule, and is reported as unported rather than refu
 - `@typescript-eslint/consistent-type-exports`
 - `@typescript-eslint/consistent-type-imports`
 - `@typescript-eslint/default-param-last`
+- `@typescript-eslint/dot-notation`
 - `@typescript-eslint/init-declarations`
 - `@typescript-eslint/method-signature-style`
 - `@typescript-eslint/no-array-constructor`

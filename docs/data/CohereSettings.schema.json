@@ -155,6 +155,9 @@
                 "@typescript-eslint/default-param-last": {
                     "$ref": "#/$defs/ruleSetting"
                 },
+                "@typescript-eslint/dot-notation": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
                 "@typescript-eslint/init-declarations": {
                     "$ref": "#/$defs/ruleSetting"
                 },

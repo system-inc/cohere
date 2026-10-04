@@ -2,65 +2,44 @@
 
 | | |
 |---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **121** |
+| **Recommendation** | **Yes, with `allowProtectedClassPropertyAccess`, in place of the core `dot-notation`.** Bracket access is TypeScript's sanctioned way past `protected`, so a test reaching a protected hook keeps its brackets, and the dot form the core rule would propose is a type error (TS2445) |
+| Measured precision | exact against typescript-eslint 8.71.0: all 63 of upstream's rows and 40 edge rows replayed through the installed rule, findings, spans and fix output identical |
 | Plugin | `@typescript-eslint` |
-| Auto-fixable | yes |
+| Auto-fixable | yes, the core rule's repair |
 | Needs type information | yes |
 
 ## What it checks
 
-Enforce dot notation whenever possible
+What the core `dot-notation` checks: a bracket access with a literal key that is a valid identifier
+reads better as a dot access, `a['b']` as `a.b`, and under `allowKeywords: false` a keyword after a
+dot must be bracketed. The judgment and the repairs are the core rule's, shared through
+`ecmascript/dotnotation`.
 
-## Why this recommendation
+What it adds is one question, asked before a computed access is reported, and only when one of the
+three typed options is on:
 
-Stylistic with a cleanup cost that is not obviously worth the convention it buys.
+- `allowPrivateClassPropertyAccess` and `allowProtectedClassPropertyAccess`: the accessed property's
+  first declaration carries `private` or `protected` as its first modifier. Decorators are not
+  modifiers, so `@tracked private value` counts; `static private value` does not, because its first
+  modifier is `static`.
+- `allowIndexSignaturePropertyAccess`: no property is found, and the object's type has an index
+  signature whose key is string-like (`string`, a template literal, `Lowercase<string>`). A number or
+  symbol key does not count, and `any` has no index signature. A tsconfig that sets
+  `noPropertyAccessFromIndexSignature` turns this on whatever the option says, because there the dot
+  form is a type error.
 
-## Violations
+The property is found as upstream finds it: the checker's symbol for the key, or failing that the
+object's non-nullable type's property of the same name for a string key. So `x[('p')]` and
+`` x[`p`] `` are judged like `x['p']`, while `x[null]` and `x[true]` never find a property.
 
-121 in the tree. Showing the first few.
+## Options
 
-**`libraries/structure/command-line/Structure.ts:1012`**
+| Option | Default |
+|---|---|
+| `allowKeywords` | `true` |
+| `allowPattern` | `""` |
+| `allowIndexSignaturePropertyAccess` | `false` |
+| `allowPrivateClassPropertyAccess` | `false` |
+| `allowProtectedClassPropertyAccess` | `false` |
 
-```
-env['NEXT_PUBLIC_API_HOST'] = baseApi.base.port
-```
-
-> ["NEXT_PUBLIC_API_HOST"] is better written in dot notation
-
-**`libraries/structure/command-line/Structure.ts:1024`**
-
-```
-env['STRUCTURE_DEV_ORIGINS'] = allDevHosts.join(',');
-```
-
-> ["STRUCTURE_DEV_ORIGINS"] is better written in dot notation
-
-**`libraries/structure/command-line/Structure.ts:1304`**
-
-```
-const pathDirs = (process.env['PATH'] ?? '').split(NodePath.delimiter);
-```
-
-> ["PATH"] is better written in dot notation
-
-**`libraries/structure/command-line/Structure.ts:1328`**
-
-```
-console.log(`  ${diff['key']}: ${diff['current']} → ${diff['desired']}`);
-```
-
-> ["key"] is better written in dot notation
-
-**`libraries/structure/command-line/Structure.ts:1328`**
-
-```
-console.log(`  ${diff['key']}: ${diff['current']} → ${diff['desired']}`);
-```
-
-> ["current"] is better written in dot notation
-
-### What fixing looks like
-
-Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-
+An unknown key is refused, as upstream's schema does.

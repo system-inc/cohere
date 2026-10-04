@@ -14,7 +14,7 @@
         "typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
         "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json)"
     },
-    "count": 537,
+    "count": 538,
     "rules": [
         {
             "name": "@eslint-community/eslint-comments/require-description",
@@ -964,6 +964,17 @@
                     "severity": "error"
                 }
             ]
+        },
+        {
+            "name": "@typescript-eslint/dot-notation",
+            "language": "TypeScript",
+            "namespace": "@typescript-eslint",
+            "origin": "typescript-eslint",
+            "upstreamName": "@typescript-eslint/dot-notation",
+            "typeAware": true,
+            "options": {
+                "elements": "one"
+            }
         },
         {
             "name": "@typescript-eslint/init-declarations",
