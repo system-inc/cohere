@@ -255,7 +255,7 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		if errors.Is(readError, program.ErrCacheTableUnreadable) || errors.Is(readError, program.ErrCacheTablePartlyKept) {
 			// Said once, before the recording starts, so it reaches the terminal and never a replay. A table
 			// thrown away on every run would otherwise look like a cache that is merely cold.
-			fmt.Fprintf(os.Stderr, "note: %v; this run starts cold and writes what it drops anew\n", readError)
+			fmt.Fprintf(accountOutput(os.Stderr), "note: %v; this run starts cold and writes what it drops anew\n", readError)
 		}
 	}
 
@@ -307,7 +307,7 @@ var prepareCacheDirectoryOnce sync.Once
 func prepareCacheDirectory(root string) {
 	prepareCacheDirectoryOnce.Do(func() {
 		if err := os.MkdirAll(cacheDirectory(root), 0o755); err != nil {
-			fmt.Fprintf(os.Stderr, "note: the cache directory %s could not be created: %v\n", cacheDirectory(root), firstLine(err.Error()))
+			fmt.Fprintf(accountOutput(os.Stderr), "note: the cache directory %s could not be created: %v\n", cacheDirectory(root), firstLine(err.Error()))
 			return
 		}
 		ignoreFile := filepath.Join(root, gitignore.IgnoreFileName)
@@ -316,7 +316,7 @@ func prepareCacheDirectory(root string) {
 			return
 		}
 		if ignored, _, err := matcher.IgnoredPath(".cache/cohere/findings.gob", false); err == nil && !ignored {
-			fmt.Fprintf(os.Stderr, "note: %s does not ignore .cache/, so cohere's cache in %s would be tracked: add the line `.cache/` to it\n",
+			fmt.Fprintf(accountOutput(os.Stderr), "note: %s does not ignore .cache/, so cohere's cache in %s would be tracked: add the line `.cache/` to it\n",
 				ignoreFile, cacheDirectory(root))
 		}
 	})
@@ -627,7 +627,7 @@ func (session *runCacheSession) note(text string) {
 // the next run once it has its verdict.
 func cacheNote(directory string, text string) {
 	if !verdictSent {
-		fmt.Fprintf(os.Stderr, "note: %s\n", text)
+		fmt.Fprintf(accountOutput(os.Stderr), "note: %s\n", text)
 		return
 	}
 	file, err := os.OpenFile(previousNotesPath(directory), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)

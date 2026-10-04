@@ -124,7 +124,7 @@ func applyProposedFixes(
 		}
 	}
 	reportWithheld(withheld, writable)
-	reportInNestedRepositories(os.Stderr, inNestedRepository)
+	reportInNestedRepositories(accountOutput(os.Stderr), inNestedRepository)
 
 	// The file set is the union of "something proposed a fix here" and "this file can be formatted",
 	// and the union rather than the intersection is the whole point. Fixing is driven by findings, so
@@ -241,7 +241,7 @@ func applyProposedFixes(
 		results = append(results, fileResult)
 	}
 
-	lineEndings.report(os.Stderr, write)
+	lineEndings.report(accountOutput(os.Stderr), write)
 
 	summary := edit.Summarize(results)
 	summary.Checked = !write
@@ -361,7 +361,7 @@ func reportWithheld(withheld map[string]struct{}, writable formatScope) {
 	if len(names) == 1 {
 		verb = "was"
 	}
-	fmt.Fprintf(os.Stderr,
+	fmt.Fprintf(accountOutput(os.Stderr),
 		"note: %d file%s outside %s had fixable findings and %s not rewritten, because only what was stated is written: %s%s\n",
 		len(names), plural(len(names)), stated, verb, strings.Join(listed, ", "), more)
 }

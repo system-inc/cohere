@@ -31,7 +31,7 @@ func openContentPack(root string) *program.ContentPack {
 	pack, err := program.OpenContentPack(cacheDirectory(root))
 	if err != nil {
 		// A fact about this invocation, never about the tree, so a replay never says it again.
-		fmt.Fprintf(invocationOutput(os.Stderr), "note: %v\n", err)
+		fmt.Fprintf(accountOutput(invocationOutput(os.Stderr)), "note: %v\n", err)
 	}
 	activeContentPack, activeContentPackRoot = pack, root
 	return pack

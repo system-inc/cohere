@@ -817,7 +817,7 @@ func run() error {
 		// Not writing the record costs the next run a format of files already formatted, never a skip,
 		// so it is a note rather than a failure.
 		if err := record.save(recordUniverse); err != nil {
-			fmt.Fprintf(os.Stderr, "note: the format record could not be written: %v\n", firstLine(err.Error()))
+			fmt.Fprintf(accountOutput(os.Stderr), "note: the format record could not be written: %v\n", firstLine(err.Error()))
 		}
 
 		// A run that rewrote files must not be replayed. The run cache stats inputs when it records, which
@@ -911,7 +911,11 @@ func run() error {
 			// in the program, with nothing saying the scope had been dropped.
 			rescoped, lost := rescopeAfterRebuild(graph.ProjectFiles(), projectFiles, lintScope.Everything)
 			for _, fileName := range lost {
-				fmt.Fprintf(os.Stderr, "note: %s was in scope and is not in the rebuilt program, so it is not checked\n", fileName)
+				fmt.Fprintf(accountOutput(os.Stderr), "note: %s was in scope and is not in the rebuilt program, so it is not checked\n", fileName)
+			}
+			// The notes are --verbose's, so the footer says the gap they name.
+			if len(lost) > 0 && activeSummary.Gaps.Unread == "" {
+				activeSummary.Gaps.Unread = fmt.Sprintf("%d file%s in scope not in the rebuilt program", len(lost), plural(len(lost)))
 			}
 			projectFiles = rescoped
 			fmt.Fprintf(accountOutput(os.Stdout),
@@ -1757,7 +1761,7 @@ func narrowToClosure(
 	seeds := filterToScope(projectFiles, scope)
 	closure, within := graph.DependentClosure(seeds)
 	if !within {
-		fmt.Fprintf(os.Stderr,
+		fmt.Fprintf(accountOutput(os.Stderr),
 			"note: %s reaches more than %d files through imports, so the whole tree is checked\n",
 			scope.RequestDescription, program.DependentClosureLimit)
 		return formatScope{Everything: true}, projectFiles

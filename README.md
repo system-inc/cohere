@@ -210,7 +210,9 @@ free.
 
 `--verbose` prints everything a run can say: each phase and why any did not run, the coverage summary,
 overrides, skips, notes, memory and the total. Its footer adds the syntax nodes the run walked, and
-says when the whole run was replayed from the cache.
+says when the whole run was replayed from the cache. A note, about the cache, line endings or a scope
+widened to the whole tree, prints only there; one that names something left unchecked is a gap the
+default footer says too.
 
 `--json` is for a program to read. It prints newline-delimited JSON, one object per line, each with a
 `kind`: a `finding` per finding, a `fixed` and a `formatted` per rewritten file, and a `summary` last.

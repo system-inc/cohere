@@ -63,7 +63,7 @@ func checkDiscoveredProjects(location projectLocation, locateError error, workin
 	}
 	if found.isTheLocatedProject(location, locateError) {
 		for _, note := range found.notes() {
-			fmt.Fprintf(os.Stderr, "cohere: %s\n", note)
+			fmt.Fprintf(accountOutput(os.Stderr), "cohere: %s\n", note)
 		}
 		return 0, false, nil
 	}
