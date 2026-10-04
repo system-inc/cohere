@@ -70,6 +70,10 @@ type formatRecord struct {
 
 	mutex   sync.Mutex
 	entries map[string]program.FormatEntry
+
+	// changed says an entry was added, replaced or given a signature since the record was read, so a
+	// caller that writes only what moved (see saveChanged) knows whether there is anything to write.
+	changed bool
 }
 
 // loadFormatRecord reads the record from the root's cache table. It never fails: a record that cannot
@@ -187,9 +191,24 @@ func (record *formatRecord) formatted(fileName string, optionsFor func(fileName 
 		entry.ModifiedNanoseconds = information.ModTime().UnixNano()
 		record.mutex.Lock()
 		record.entries[fileName] = entry
+		record.changed = true
 		record.mutex.Unlock()
 	}
 	return true
+}
+
+// vouches reports whether text is the bytes the record holds as formatted for a file, under the options
+// it formats with now. Unlike formatted, it is asked about text in hand, such as a fixer's output, rather
+// than the file on disk.
+func (record *formatRecord) vouches(fileName string, text string, optionsFor func(fileName string) (string, error)) bool {
+	record.mutex.Lock()
+	entry, present := record.entries[fileName]
+	record.mutex.Unlock()
+	if !present {
+		return false
+	}
+	options, err := optionsFor(fileName)
+	return err == nil && options == entry.Options && formatRecordSum([]byte(text)) == entry.Sum
 }
 
 // observe wraps a format transform so every text it returns is recorded as formatted. A nil record or
@@ -204,8 +223,12 @@ func (record *formatRecord) observe(inner edit.Transform, optionsFor func(fileNa
 			return formatted, err
 		}
 		if options, optionsError := optionsFor(fileName); optionsError == nil {
+			entry := program.FormatEntry{Sum: formatRecordSum([]byte(formatted)), Options: options}
 			record.mutex.Lock()
-			record.entries[fileName] = program.FormatEntry{Sum: formatRecordSum([]byte(formatted)), Options: options}
+			if previous, present := record.entries[fileName]; !present || previous.Sum != entry.Sum || previous.Options != entry.Options {
+				record.entries[fileName] = entry
+				record.changed = true
+			}
 			record.mutex.Unlock()
 		}
 		return formatted, nil
@@ -238,6 +261,34 @@ func (record *formatRecord) save(universe []string) error {
 	section := &program.FormatSection{Key: record.key, Entries: entries}
 	record.mutex.Unlock()
 	return writeFormatSection(record.root, section)
+}
+
+// saveChanged is save for a reader that should leave the table alone when it learned nothing: it writes
+// only when an entry moved or the universe drops one. The nested drift check reads repositories it never
+// writes, so on an unchanged library it should not rewrite the library's table every run either.
+func (record *formatRecord) saveChanged(universe []string) error {
+	if record == nil || record.key == "" {
+		return nil
+	}
+	record.mutex.Lock()
+	moved := record.changed
+	if !moved && universe != nil {
+		inUniverse := make(map[string]struct{}, len(universe))
+		for _, fileName := range universe {
+			inUniverse[fileName] = struct{}{}
+		}
+		for fileName := range record.entries {
+			if _, present := inUniverse[fileName]; !present {
+				moved = true
+				break
+			}
+		}
+	}
+	record.mutex.Unlock()
+	if !moved {
+		return nil
+	}
+	return record.save(universe)
 }
 
 func formatRecordSum(contents []byte) string {
@@ -339,6 +390,9 @@ func unformattedScope(engine formatEngine, record *formatRecord, root string) (f
 		FileNames:   unformatted,
 		index:       index,
 		Description: description + " · " + universe.describe(),
+		recorded: func(fileName string, text string) bool {
+			return record.vouches(fileName, text, engine.OptionsFingerprint)
+		},
 	}, universe.files
 }
 

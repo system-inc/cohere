@@ -154,7 +154,7 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 		"CohereSettings.json", "NexusCohereSettings.json", "Producer.ts", "Ugly.ts", "tsconfig.json")
 
 	if !strings.Contains(output, "library/Inner.ts:1:1 - the formatter would rewrite this file in nested repository library, which a run here never writes: run cohere there [format/nested-drift]") ||
-		!strings.Contains(output, "nested repositories: 1 read, 1 files, 1 would change under their own run") {
+		!strings.Contains(output, "nested repositories: 1 read, 1 files (1 not on record as formatted), 1 would change under their own run") {
 		t.Fatalf("the submodule's drift was not reported as its own:\n%s", output)
 	}
 

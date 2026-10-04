@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/edit"
@@ -25,6 +26,9 @@ type fakeEngine struct {
 	options        func(fileName string) (string, error)
 	askedFor       []string
 	enumeratedRoot string
+
+	// askedForMutex guards askedFor, since the nested drift check formats several files at once.
+	askedForMutex sync.Mutex
 }
 
 func (e *fakeEngine) Handles(fileName string) bool {
@@ -58,7 +62,9 @@ func (e *fakeEngine) OptionsFingerprint(fileName string) (string, error) {
 }
 
 func (e *fakeEngine) Format(fileName string, text string) (string, error) {
+	e.askedForMutex.Lock()
 	e.askedFor = append(e.askedFor, fileName)
+	e.askedForMutex.Unlock()
 	if e.format != nil {
 		return e.format(fileName, text)
 	}

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/format/formatfiles"
 )
 
 // treeSnapshot reads every file under a root, so a run can be held to having written nothing at all:
@@ -15,9 +17,12 @@ func treeSnapshot(t *testing.T, root string) map[string]string {
 	snapshot := map[string]string{}
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkError error) error {
 		// cohere's own cache for the project is outside `--no-fix`'s promise, which is about source: it is
-		// cohere's to keep, and `--no-cache` is the flag that writes none of it.
-		if walkError == nil && entry.IsDir() && path == cacheDirectory(root) {
-			return filepath.SkipDir
+		// cohere's to keep, and `--no-cache` is the flag that writes none of it. So is a nested
+		// repository's, where the drift check keeps that repository's format record.
+		if walkError == nil && entry.IsDir() && filepath.Base(filepath.Dir(path)) == ".cache" {
+			if owner := filepath.Dir(filepath.Dir(path)); path == cacheDirectory(owner) && (owner == root || formatfiles.HasOwnRepository(owner)) {
+				return filepath.SkipDir
+			}
 		}
 		if walkError != nil || entry.IsDir() {
 			return walkError

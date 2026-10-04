@@ -48,6 +48,12 @@ type formatScope struct {
 	// directory enumerates every file under it, most of which the program never contained, so the
 	// enumerated count is not a number anybody wants beside the count actually checked.
 	RequestDescription string
+
+	// recorded, when set, says a file outside the scope is out only because the format record vouches
+	// for its bytes, and answers whether a given text is still those bytes. A fix that rewrites such a
+	// file hands the transform text the record never saw, so it is formatted after all: the record
+	// proves the bytes it hashed, not whatever a fixer makes of them.
+	recorded func(fileName string, text string) bool
 }
 
 // narrowTo reports how many of the scope's files are in a given population, and re-describes the
@@ -140,7 +146,7 @@ func scopedTransform(inner edit.Transform, scope formatScope) edit.Transform {
 	}
 
 	return func(fileName string, text string) (string, error) {
-		if !scope.includes(fileName) {
+		if !scope.includes(fileName) && (scope.recorded == nil || scope.recorded(fileName, text)) {
 			return "", fmt.Errorf("%w: outside the format scope, %s", edit.ErrSkipped, scope.Description)
 		}
 		return inner(fileName, text)

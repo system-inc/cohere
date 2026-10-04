@@ -633,6 +633,15 @@ func run() error {
 			scope, recordUniverse = unformattedScope(formatter, record, repositoryRoot)
 		}
 
+		// The submodules this repository declares are read, never written: each file a run inside one
+		// would rewrite is a finding here, so a library's drift fails the project's check until that
+		// library's own run formats it. Only on a whole-tree check with a formatter, since a run that named
+		// paths has said which files it is about. It starts here, beside the fix phase, and is joined below.
+		var nestedCheck <-chan nestedCheckResult
+		if !mutate && formatter != nil && writeScope.Everything {
+			nestedCheck = startNestedCheck(formatter, repositoryRoot)
+		}
+
 		fixStart := time.Now()
 		fixSummary, fixWalk, err := applyProposedFixes(
 			ctx, graph, projectFiles, registry.All(),
@@ -682,21 +691,26 @@ func run() error {
 			printWouldChange(os.Stdout, fixSummary.ChangedFiles)
 			findings += len(fixSummary.ChangedFiles)
 
-			// The submodules this repository declares are read, never written: each file a run inside
-			// one would rewrite is a finding here, so a library's drift fails the project's check until
-			// that library's own run formats it. Only on a whole-tree check with a formatter, since a
-			// run that named paths has said which files it is about.
-			if formatter != nil && writeScope.Everything {
-				nestedStart := time.Now()
-				nested, err := checkNestedRepositories(formatter, repositoryRoot)
-				if err != nil {
-					return fmt.Errorf("reading the nested repositories: %w", err)
+			// The nested check started beside the fix phase. What it adds to the phase is only the wait
+			// past the fix phase's own end.
+			if nestedCheck != nil {
+				waitStart := time.Now()
+				answer := <-nestedCheck
+				fixDuration += time.Since(waitStart)
+				if answer.err != nil {
+					return fmt.Errorf("reading the nested repositories: %w", answer.err)
 				}
-				fixDuration += time.Since(nestedStart)
+				nested := answer.check
+				for _, walk := range nested.Walks {
+					declareFormatWalk(walk)
+				}
+				for _, note := range nested.Notes {
+					fmt.Fprintln(os.Stderr, note)
+				}
 				printNestedDrift(os.Stdout, nested)
 				findings += len(nested.Drift)
-				fmt.Fprintf(provenanceOutput(os.Stdout), "nested repositories: %d read, %d files, %d would change under their own run\n",
-					nested.Repositories, nested.Files, len(nested.Drift))
+				fmt.Fprintf(provenanceOutput(os.Stdout), "nested repositories: %d read, %d files (%d not on record as formatted), %d would change under their own run\n",
+					nested.Repositories, nested.Files, nested.Formatted, len(nested.Drift))
 			}
 			report.recordChecked(phaseFix, fixDuration, len(fixSummary.ChangedFiles))
 		}
