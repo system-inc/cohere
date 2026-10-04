@@ -34,6 +34,13 @@ its own `format` block in `CohereSettings.json`, applied over Prettier's default
 means Prettier's defaults. A project that extends a `cohere:system-inc/*` set takes its format from that
 chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
 
+### Added
+
+- Mixed repositories: a run checks the project it starts in and every project below it, each TypeScript
+  program and Swift package with its own engine, in parallel, in one report whose exit code is the worst
+  of theirs. Finding them never enters what `.gitignore` ignores, `node_modules`, `.build`, `.cache`,
+  `testdata` or a nested repository. `--directory` or a path still narrows the run to one project.
+
 ### Changed
 
 - A bare `cohere` formats too: it type-checks, lints, applies fixes and formats in one call. `--fix`

@@ -31,9 +31,8 @@ const projectMarker = "tsconfig.json"
 // above it, which would check a program that excludes `projects/` and print a green about Swift code
 // nothing looked at.
 //
-// A directory holding both is TypeScript's until mixed repositories are designed. The Swift engine
-// checks one package and the TypeScript engine one program, and running both from one root is a
-// decision about whose verdict the exit code is, which this file should not make by accident.
+// For one engine's run, a directory holding both is TypeScript's. A run from the root checks both: discovery
+// finds each marker as a project of its own, and each project's run names its engine (see discovery.go).
 const swiftProjectMarker = "Package.swift"
 
 // projectEngine is which engine checks the project at a root.
@@ -89,6 +88,10 @@ type locationRequest struct {
 	// Directory is `--directory`, empty when not given.
 	Directory string
 
+	// Engine, when set, is the engine that checks Directory, overriding what its markers say: the run of a
+	// discovered project names it, since a directory holding both markers is two projects (#f9nftxz).
+	Engine projectEngine
+
 	ConfigFileName      string
 	ConfigFileNameGiven bool
 
@@ -131,6 +134,9 @@ func locateProject(request locationRequest) (projectLocation, error) {
 		location.Engine = engineTypeScript
 		if engine, found := engineAt(base); found {
 			location.Engine = engine
+		}
+		if request.Engine != "" {
+			location.Engine = request.Engine
 		}
 
 	case request.ConfigFileNameGiven:

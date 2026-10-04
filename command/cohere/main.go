@@ -175,7 +175,20 @@ func run() error {
 		ConfigFileNameGiven:     given["tsconfig"],
 		LintConfigFileName:      *lintConfigFileName,
 		LintConfigFileNameGiven: given["lint-config"],
+		Engine:                  projectEngine(os.Getenv(projectEngineVariable)),
 	})
+
+	// A root holding more than one project, TypeScript and Swift side by side or nested, checks each with
+	// its own engine and reports them as one (#f9nftxz). One project is checked here, as it always was.
+	if discoveryApplies(given, flag.Args()) {
+		exitCode, checked, err := checkDiscoveredProjects(location, locateError, workingDirectory)
+		if err != nil {
+			return err
+		}
+		if checked {
+			exitProcess(exitCode)
+		}
+	}
 
 	if locateError == nil && location.Engine == engineSwift {
 		exitCode, err := runSwiftEngine(location, given, flag.Args())

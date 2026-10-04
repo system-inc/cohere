@@ -29,7 +29,16 @@ engine, and `cohere` refuses a Swift package by name and exits 1 rather than che
 
 ## Running it
 
-Run it from the project root, where `tsconfig.json` and `CohereSettings.json` live.
+Run it anywhere in a repository. It starts from the project you're in, the nearest `tsconfig.json` or
+`Package.swift` at or above you, or from the repository's root when there's none, and checks that
+project and every project below it: each TypeScript program and each Swift package, each with its own
+engine and its own settings, all at once. A repository holding more than one gets one report, a section
+per project, a line per project and one summary, and the exit code is the worst of theirs, so it's green
+only when every project is. A run that finds no project fails.
+
+Finding projects never enters what `.gitignore` ignores, at any level, nor `node_modules`, `.build`,
+`.cache` or `testdata`, nor a directory that is a repository of its own: a submodule stays part of the
+program above it, as it always was. `--directory` or a path narrows the run to one project.
 
 ```sh
 cohere                  # type-check, lint, apply every available fix, and format, in one call
