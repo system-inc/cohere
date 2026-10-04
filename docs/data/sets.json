@@ -724,6 +724,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-no-process-exit-after-output",
+                "severity": "off"
+            },
+            {
                 "name": "nexus/correctness-no-test-on-global-regex",
                 "severity": "error"
             },
@@ -2071,6 +2075,10 @@
             {
                 "name": "nexus/correctness-no-nullish-stripping-assertion",
                 "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-process-exit-after-output",
+                "severity": "off"
             },
             {
                 "name": "nexus/correctness-no-test-on-global-regex",
@@ -4025,6 +4033,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-no-process-exit-after-output",
+                "severity": "off"
+            },
+            {
                 "name": "nexus/correctness-no-test-on-global-regex",
                 "severity": "error"
             },
@@ -5593,6 +5605,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-no-process-exit-after-output",
+                "severity": "off"
+            },
+            {
                 "name": "nexus/correctness-no-test-on-global-regex",
                 "severity": "error"
             },
@@ -7115,6 +7131,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-no-process-exit-after-output",
+                "severity": "off"
+            },
+            {
                 "name": "nexus/correctness-no-test-on-global-regex",
                 "severity": "error"
             },
@@ -8455,6 +8475,10 @@
             {
                 "name": "nexus/correctness-no-nullish-stripping-assertion",
                 "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-process-exit-after-output",
+                "severity": "off"
             },
             {
                 "name": "nexus/correctness-no-test-on-global-regex",

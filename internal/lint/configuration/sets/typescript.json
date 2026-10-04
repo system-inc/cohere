@@ -156,6 +156,7 @@
         "nexus/correctness-require-response-status-check": "error",
         "nexus/correctness-no-import-cycle-load-time-read": "error",
         "nexus/correctness-no-nullish-stripping-assertion": "error",
+        "nexus/correctness-no-process-exit-after-output": "off",
         "unicode-bom": "error",
         "no-useless-rename": "off",
         "strict": "off",
@@ -423,6 +424,7 @@
         "no-restricted-imports": "off"
     },
     "reasons": {
+        "nexus/correctness-no-process-exit-after-output": "Off on purpose, by @system_cohere's ruling of 2026-10-03 (#h1jwmmz). Its findings are true, but every process entry blocks stdout and stderr, which correctness-require-blocking-standard-streams requires, so an exit after a write has nothing queued to lose. Turn it on only for a project whose entries don't block.",
         "no-useless-rename": "Off until its fix wave reads 0 (#smnjh4c).",
         "strict": "Off until its fix wave reads 0 (#smnjh4c).",
         "@typescript-eslint/no-base-to-string": "Off until its fix wave reads 0 (#smnjh4c).",
