@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -107,6 +108,26 @@ type Graph struct {
 	// WalkOnForeignCheckers walks every file on a checker other than its own: a test instrument, for holding a
 	// stolen file's findings and type diagnostics to its home checker's. See walkQueue.
 	WalkOnForeignCheckers bool
+
+	// retired is set when the graph has been replaced, by Retire. See there.
+	retired atomic.Bool
+}
+
+// Retire marks a graph replaced: the fix phase rewrote files and a new graph was built from the new bytes.
+//
+// A check still running on this graph is left to finish rather than cancelled, and what it finds is never
+// recorded into the run cache's types section, since it describes bytes that no longer exist. It is not
+// cancelled because the compiler's whole-program check cannot be: a checker that sees its context end
+// marks itself cancelled, the compiler then hands it the next file in its group, and GetGlobalDiagnostics
+// panics on a compiler goroutine nothing here can recover. The gate itself died that way, a bare `cohere`
+// in 5 of 6 runs once its fix phase rewrote a file before the early check finished (#sm79kfv).
+func (g *Graph) Retire() {
+	g.retired.Store(true)
+}
+
+// Retired reports whether Retire was called.
+func (g *Graph) Retired() bool {
+	return g.retired.Load()
 }
 
 // configHost adapts a filesystem and a working directory to what tsconfig parsing wants.

@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -112,7 +113,7 @@ func run() error {
 	format := flag.Bool("format", false, "format the files not on record as formatted, or the paths named; with --no-fix, report them instead")
 	maxFixPasses := flag.Int("fix-passes", edit.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
 	showTiming := flag.Bool("timing", false, "report what building the graph and each rule cost, most expensive rule first")
-	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run")
+	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run, writing nothing")
 	// The counts print on every run; this names every rule once under the one coverage fact that
 	// describes it. Behind a flag because 170 per-rule notes on a clean run buried the lines that need
 	// action, and in front of nobody's habit because the counts that add up stay on the default line.
@@ -323,6 +324,17 @@ func run() error {
 	// from one nobody asked for. Without it a bail prints "unused did not run (types bailed)" on
 	// every ordinary run, which manufactures a gap out of a run where nothing was withheld.
 	unusedRequest := requestedPhases{phaseUnused: runUnused}
+
+	// `--explain` explains the file as it stands, so it writes nothing: it is a `--no-fix` run with an
+	// explanation after it. It used to run the writing fix phase, so `cohere --explain SecretRow.tsx` in
+	// ahra rewrote two other files, rebuilt the graph, and explained a tree that was no longer the one
+	// asked about (#sm79kfv). Naming it with `--fix`, which only writes, is refused by name.
+	if *explainFile != "" {
+		if *fixOnly {
+			return fmt.Errorf("--explain and --fix contradict each other: --explain reads the file as it stands and writes nothing, --fix only writes")
+		}
+		*noFix = true
+	}
 
 	// `--no-fix` mutates nothing, which is what continuous integration needs and what anyone asking
 	// "what would this change" needs. The fix phase still runs under it, in memory: every file a
@@ -726,12 +738,13 @@ func run() error {
 				report.Write(os.Stdout)
 				return fmt.Errorf("rebuilding the type graph after fixing: %w", err)
 			}
+			// The early check was of the bytes the fixer just replaced. It is retired and left to finish
+			// rather than cancelled: the compiler's whole-program check panics when its context ends part
+			// way, which killed the gate itself (#sm79kfv). Its graph records nothing, and its result is
+			// dropped with the reference.
+			graph.Retire()
 			graph = rebuiltGraph
-			// The early check was of the bytes the fixer just replaced.
-			if earlyTypeCheck != nil {
-				earlyTypeCheck.cancel()
-				earlyTypeCheck = nil
-			}
+			earlyTypeCheck = nil
 			// The scope survives the rebuild. Taking every project file here turned a run scoped to
 			// one named path, or to what changed, into a whole-tree run the moment a fixer landed:
 			// the graph line said `1 in scope` and the types and lint lines then reported every file
@@ -766,6 +779,8 @@ func run() error {
 			reusableWalk = &fixWalk
 		}
 	}
+
+	releaseEarlyTypeCheck()
 
 	// Phase 3: types. This is the phase that bails alone and loudly.
 	if !runTypes {
@@ -1102,7 +1117,6 @@ type typeCheck struct {
 	session *program.IncrementalSession
 	checked []*ast.Diagnostic
 	done    chan struct{}
-	cancel  context.CancelFunc
 
 	// reuse is the types section of the run cache's table, nil when this run is not recorded. replayed is
 	// how many files' semantic diagnostics the check took from it rather than checking.
@@ -1125,14 +1139,24 @@ type typeCheck struct {
 //
 // Only the per-file checking starts early. What reads every checker at once, the global and config
 // diagnostics, waits for finishTypeCheck, when the walk has let go of them.
+//
+// Nothing ever cancels it. The compiler's whole-program check is not cancellable part way: a checker that
+// sees its context end marks itself cancelled and the compiler hands it the next file anyway, where it
+// panics on a goroutine nothing here can recover. A check whose graph is replaced is retired instead (see
+// program.Graph.Retire), left to finish, and its result dropped.
 func startTypeCheck(ctx context.Context, graph *program.Graph, incremental bool) *typeCheck {
-	checkContext, cancel := context.WithCancel(ctx)
-	check := &typeCheck{graph: graph, done: make(chan struct{}), cancel: cancel, reuse: activeTypesReuse()}
+	checkContext := ctx
+	check := &typeCheck{graph: graph, done: make(chan struct{}), reuse: activeTypesReuse()}
 	// One session across check-then-write. The build info has to be emitted from the same
 	// incremental program that did the checking: that program's snapshot is what records which
 	// files were checked, and emitting from a second one writes a build info that skips nothing
 	// while looking correct. See program.IncrementalSession.
 	go func() {
+		// A test instrument: hold the check until the fix phase and any rebuild are over, so a test can put
+		// the rebuild ahead of the check every time rather than by luck. See releaseEarlyTypeCheck.
+		if os.Getenv("COHERE_TEST_HOLD_EARLY_CHECK") != "" {
+			<-earlyTypeCheckReleased
+		}
 		start := time.Now()
 		defer close(check.done)
 		defer func() { check.elapsed, check.finished = time.Since(start), time.Now() }()
@@ -1163,11 +1187,22 @@ func startTypeCheck(ctx context.Context, graph *program.Graph, incremental bool)
 	return check
 }
 
+// earlyTypeCheckReleased is closed once the fix phase and any rebuild are over, for COHERE_TEST_HOLD_EARLY_CHECK.
+var (
+	earlyTypeCheckReleased    = make(chan struct{})
+	releaseEarlyTypeCheckOnce sync.Once
+)
+
+// releaseEarlyTypeCheck lets a held check start. Called when the fix phase is over, whether or not anything
+// was held.
+func releaseEarlyTypeCheck() {
+	releaseEarlyTypeCheckOnce.Do(func() { close(earlyTypeCheckReleased) })
+}
+
 // finishTypeCheck waits for the check, writes the build info if asked, and returns the diagnostics that
 // belong to files, plus the program's own.
 func finishTypeCheck(ctx context.Context, check *typeCheck, files []*ast.SourceFile, persist bool) []*ast.Diagnostic {
 	<-check.done
-	defer check.cancel()
 
 	// The read already happened when the session began; only the write is conditional.
 	if check.session != nil && persist {

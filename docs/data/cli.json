@@ -16,7 +16,7 @@
         {
             "name": "explain",
             "argument": "string",
-            "usage": "report what every rule did on one file, and why it did or did not run"
+            "usage": "report what every rule did on one file, and why it did or did not run, writing nothing"
         },
         {
             "name": "fix",

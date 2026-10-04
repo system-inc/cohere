@@ -121,7 +121,7 @@ root unless you name another).
 | `--lint-config PATH` | the settings file, relative to `--directory` if given, else to where you run it (default: `CohereSettings.json` at the project root) |
 | `--no-cache` | read and write no cache, so every phase computes from source |
 | `--stdin-filepath PATH` | with `--fix`, read one file from stdin and print the fixed text, writing nothing |
-| `--explain FILE` | report what every rule did on one file, and why it ran or did not |
+| `--explain FILE` | report what every rule did on one file, and why it ran or did not, writing nothing |
 | `--print-config` | print each rule's resolved severity and options for one file (`index.ts` unless you name one), as JSON, and exit |
 | `--rules` | print the rules cohere implements for your project's language, and exit |
 | `--rules-enabled` | print the rules your settings turn on for one file (`index.ts` unless you name one), with severity, and exit |

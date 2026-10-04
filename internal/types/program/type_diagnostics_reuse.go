@@ -204,10 +204,13 @@ func (g *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (
 	}
 
 	// A check cancelled part way can hand back a partial list, which recorded as a file's whole verdict would
-	// replay a file as clean. Whatever finished before the cancel is still exactly the list for its key.
+	// replay a file as clean. Whatever finished before the cancel is still exactly the list for its key. A
+	// retired graph's check describes bytes the fixer replaced, and its graph's successor records instead;
+	// asked under the mutex, so a retired check finishing late can never overwrite what the successor
+	// recorded.
 	reuse.mutex.Lock()
 	reuse.replayed = replayedFiles
-	if ctx.Err() == nil {
+	if ctx.Err() == nil && !g.Retired() {
 		reuse.recorded = &TypesSection{Version: typesSectionVersion, Key: reuse.key, Entries: entries}
 	}
 	reuse.mutex.Unlock()
@@ -231,7 +234,10 @@ func (g *Graph) RecordFull(ctx context.Context, reuse *TypeDiagnosticsReuse, par
 		}
 	}
 	reuse.mutex.Lock()
-	reuse.recorded = &TypesSection{Version: typesSectionVersion, Key: reuse.key, Entries: entries}
+	// Asked here, under the mutex, for the reason CheckReusing gives: a retired graph never records.
+	if !g.Retired() {
+		reuse.recorded = &TypesSection{Version: typesSectionVersion, Key: reuse.key, Entries: entries}
+	}
 	reuse.mutex.Unlock()
 }
 
