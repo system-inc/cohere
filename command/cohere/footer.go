@@ -10,9 +10,12 @@ import (
 // The footer is the one line a default run ends with, after its findings: the verdict, where the time
 // went, and how much was checked. Everything else a run can say is under `--verbose`.
 //
-//	✓ 💎 2.4s → 🪄 0.4s • 💅 0.3s • 🔷 0.6s • 👑 1.1s · 3.9K files · 2.4M nodes
-//	✗ ☠️ 2.4s → 1 type error · 1 finding · 3.9K files · 2.4M nodes
-//	✓ 💎 0.05s ↺ replayed · 3.9K files
+//	✓ 💎 (2.4s → 🪄 0.4s • 💅 0.3s • 🔷 0.6s • 👑 1.1s • 3.9K files • 2.4M nodes)
+//	✗ ☠️ (2.4s → 1 type error • 1 finding • 3.9K files • 2.4M nodes)
+//	✓ 💎 (0.05s ↺ replayed • 3.9K files)
+//
+// It renders a runSummary and decides nothing: what ran, what was found and what went unchecked are the
+// summary's, so this file only says them.
 //
 // The glyphs are the house's, from `s c`: 💎 a clean run, ☠️ a failed one, 🪄 fixing, 💅 formatting,
 // 🔷 the type check and 👑 lint.
@@ -24,47 +27,6 @@ import (
 // one-line summary that dropped those cases would undo it in the line people actually read. So a gap is
 // never left to `--verbose`.
 
-// footerFacts is what the footer says beyond the phase records: the totals, and every way the run fell
-// short of checking everything.
-type footerFacts struct {
-	// Label is the project's path in a repository with several, which the line leads with. Empty for a
-	// project checked on its own.
-	Label string
-
-	// Total is the run's wall clock, the number a developer waited for.
-	Total time.Duration
-	// Replayed is a run answered from the run cache, which ran no phase.
-	Replayed bool
-
-	TypeErrors int
-	Findings   int
-	// WouldChange is the files a `--no-fix` run found a fix or formatting would change, which fail it.
-	WouldChange int
-
-	Files int
-	Nodes int
-
-	// FilesInScope is set when a run was narrowed to some of the program's Files.
-	FilesInScope int
-
-	CrashedFiles int
-	// RulesSkippingEverything is the rules that declined every file they were offered.
-	RulesSkippingEverything int
-	// FormattingNotChecked is a run that did not check formatting.
-	FormattingNotChecked bool
-	// NothingToCheck is a project with no files to check.
-	NothingToCheck bool
-	// ModifiedBuild is a binary built from a modified tree, which no commit reproduces.
-	ModifiedBuild bool
-	// Unread is files the run could not check for any other reason, said as the run said it.
-	Unread string
-}
-
-// failed is whether the run found anything, which is what the exit code says too.
-func (facts footerFacts) failed() bool {
-	return facts.TypeErrors > 0 || facts.Findings > 0 || facts.WouldChange > 0
-}
-
 // phaseGlyphs are the house's glyph for each phase that has one.
 var phaseGlyphs = map[phaseName]string{
 	phaseFix:    "🪄",
@@ -73,56 +35,59 @@ var phaseGlyphs = map[phaseName]string{
 	phaseUnused: "🧹",
 }
 
-// footer renders the line. records are the run's phases, and formatting is how long formatting took
-// when it ran (zero when it did not).
-func footer(records []phaseRecord, formatting time.Duration, facts footerFacts) string {
-	var line strings.Builder
-	if facts.Label != "" {
-		line.WriteString(facts.Label + "  ")
-	}
-	if facts.failed() {
-		fmt.Fprintf(&line, "✗ ☠️ %s", footerSeconds(facts.Total))
-	} else {
-		fmt.Fprintf(&line, "✓ 💎 %s", footerSeconds(facts.Total))
+// footer renders a run's summary as its one line: the verdict, then everything else inside parentheses,
+// the total first and each further item after a bullet.
+func footer(summary runSummary) string {
+	verdict := "✓ 💎"
+	if summary.failed() {
+		verdict = "✗ ☠️"
 	}
 
-	var parts []string
+	// The total leads, joined to what comes next by the arrow when phases or counts follow it, or by the
+	// replay mark when no phase ran.
+	opening := footerSeconds(summary.Total)
+	var items []string
 	switch {
-	case facts.Replayed:
-		line.WriteString(" ↺ replayed")
-	case facts.failed():
-		line.WriteString(" →")
+	case summary.Cache.Replayed:
+		opening += " ↺ replayed"
+	case summary.failed():
+		opening += " →"
 	default:
-		line.WriteString(" →")
-		parts = append(parts, strings.Join(phaseTimes(records, formatting), " • "))
+		opening += " →"
+		items = append(items, phaseTimes(summary.Phases, summary.Formatting)...)
 	}
 
-	if facts.TypeErrors > 0 {
-		parts = append(parts, counted(facts.TypeErrors, "type error", "type errors"))
+	if summary.TypeErrors > 0 {
+		items = append(items, counted(summary.TypeErrors, "type error", "type errors"))
 	}
-	if facts.Findings > 0 {
-		parts = append(parts, counted(facts.Findings, "finding", "findings"))
+	if summary.Findings > 0 {
+		items = append(items, counted(summary.Findings, "finding", "findings"))
 	}
-	if facts.WouldChange > 0 {
-		parts = append(parts, counted(facts.WouldChange, "file would change", "files would change"))
+	if summary.WouldChange > 0 {
+		items = append(items, counted(summary.WouldChange, "file would change", "files would change"))
 	}
-	if facts.Files > 0 {
-		parts = append(parts, abbreviated(facts.Files)+" files")
+	if summary.Files > 0 {
+		items = append(items, abbreviated(summary.Files)+" files")
 	}
-	if facts.Nodes > 0 && !facts.Replayed {
-		parts = append(parts, abbreviated(facts.Nodes)+" nodes")
+	if summary.Nodes > 0 && !summary.Cache.Replayed {
+		items = append(items, abbreviated(summary.Nodes)+" nodes")
 	}
-	parts = append(parts, uncheckedMarkers(records, facts)...)
+	items = append(items, uncheckedMarkers(summary)...)
 
-	if len(parts) == 0 {
-		return line.String()
+	inside := opening
+	if len(items) > 0 {
+		// After the arrow the first item needs only a space; after the replay mark it takes a bullet.
+		joiner := " "
+		if summary.Cache.Replayed {
+			joiner = " • "
+		}
+		inside += joiner + strings.Join(items, " • ")
 	}
-	separator := " · "
-	if !facts.Replayed {
-		// The arrow already separates the verdict from what follows it.
-		return line.String() + " " + strings.Join(nonEmpty(parts), separator)
+	line := fmt.Sprintf("%s (%s)", verdict, inside)
+	if summary.Label != "" {
+		line = summary.Label + "  " + line
 	}
-	return line.String() + separator + strings.Join(nonEmpty(parts), separator)
+	return line
 }
 
 // phaseTimes is each phase that spent time, in pipeline order, formatting after fixing. A phase that did
@@ -150,16 +115,17 @@ func phaseTimes(records []phaseRecord, formatting time.Duration) []string {
 
 // uncheckedMarkers is every way the run fell short of checking everything, one marker each, in a fixed
 // order so the line reads the same way every time.
-func uncheckedMarkers(records []phaseRecord, facts footerFacts) []string {
+func uncheckedMarkers(summary runSummary) []string {
+	gaps := summary.Gaps
 	var markers []string
-	if facts.NothingToCheck {
+	if gaps.NothingToCheck {
 		markers = append(markers, "⚠ no files to check")
 	}
-	if facts.FilesInScope > 0 && facts.FilesInScope < facts.Files {
-		markers = append(markers, fmt.Sprintf("⚠ only %s of the files", abbreviated(facts.FilesInScope)))
+	if gaps.FilesInScope > 0 && gaps.FilesInScope < summary.Files {
+		markers = append(markers, fmt.Sprintf("⚠ only %s of the files", abbreviated(gaps.FilesInScope)))
 	}
 	for _, name := range phaseOrder {
-		for _, record := range records {
+		for _, record := range summary.Phases {
 			if record.Name != name {
 				continue
 			}
@@ -174,19 +140,19 @@ func uncheckedMarkers(records []phaseRecord, facts footerFacts) []string {
 			}
 		}
 	}
-	if facts.FormattingNotChecked {
+	if gaps.FormattingNotChecked {
 		markers = append(markers, "💅 formatting not checked")
 	}
-	if facts.CrashedFiles > 0 {
-		markers = append(markers, "⚠ "+counted(facts.CrashedFiles, "file crashed", "files crashed"))
+	if gaps.CrashedFiles > 0 {
+		markers = append(markers, "⚠ "+counted(gaps.CrashedFiles, "file crashed", "files crashed"))
 	}
-	if facts.RulesSkippingEverything > 0 {
-		markers = append(markers, "⚠ "+counted(facts.RulesSkippingEverything, "rule skipped every file", "rules skipped every file"))
+	if gaps.RulesSkippingEverything > 0 {
+		markers = append(markers, "⚠ "+counted(gaps.RulesSkippingEverything, "rule skipped every file", "rules skipped every file"))
 	}
-	if facts.Unread != "" {
-		markers = append(markers, "⚠ "+facts.Unread)
+	if gaps.Unread != "" {
+		markers = append(markers, "⚠ "+gaps.Unread)
 	}
-	if facts.ModifiedBuild {
+	if gaps.ModifiedBuild {
 		markers = append(markers, "⚠ built from a modified tree")
 	}
 	return markers
@@ -209,8 +175,8 @@ type overallFacts struct {
 
 // overallFooter renders the verdict line for a repository with several projects:
 //
-//	✓ 💎 8.1s · 3 projects (2 TypeScript, 1 Swift)
-//	✗ ☠️ 8.1s · 3 projects (2 TypeScript, 1 Swift) · ☠️ www (exit 1)
+//	✓ 💎 (8.1s • 3 projects: 1 Swift, 2 TypeScript)
+//	✗ ☠️ (8.1s • 3 projects: 1 Swift, 2 TypeScript • ☠️ www (exit 1))
 //
 // The run is green only when every project is, and a project that did not finish is a gap, never a pass.
 func overallFooter(facts overallFacts) string {
@@ -226,27 +192,25 @@ func overallFooter(facts overallFacts) string {
 		byEngine = append(byEngine, fmt.Sprintf("%d %s", facts.ProjectsByEngine[engine], engine))
 	}
 
-	failed := len(facts.Failed) > 0 || facts.Unfinished > 0
-	var line strings.Builder
-	if failed {
-		fmt.Fprintf(&line, "✗ ☠️ %s", footerSeconds(facts.Total))
-	} else {
-		fmt.Fprintf(&line, "✓ 💎 %s", footerSeconds(facts.Total))
+	verdict := "✓ 💎"
+	if len(facts.Failed) > 0 || facts.Unfinished > 0 {
+		verdict = "✗ ☠️"
 	}
-	fmt.Fprintf(&line, " · %s", counted(total, "project", "projects"))
+	projects := counted(total, "project", "projects")
 	if len(byEngine) > 1 {
-		fmt.Fprintf(&line, " (%s)", strings.Join(byEngine, ", "))
+		projects += ": " + strings.Join(byEngine, ", ")
 	}
+	items := []string{footerSeconds(facts.Total), projects}
 	if len(facts.Failed) > 0 {
-		fmt.Fprintf(&line, " · ☠️ %s", strings.Join(facts.Failed, ", "))
+		items = append(items, "☠️ "+strings.Join(facts.Failed, ", "))
 	}
 	if facts.Unfinished > 0 {
-		line.WriteString(" · ⚠ " + counted(facts.Unfinished, "project did not finish", "projects did not finish"))
+		items = append(items, "⚠ "+counted(facts.Unfinished, "project did not finish", "projects did not finish"))
 	}
 	if facts.NestedNotEntered > 0 {
-		line.WriteString(" · ⚠ " + counted(facts.NestedNotEntered, "nested repository not checked", "nested repositories not checked"))
+		items = append(items, "⚠ "+counted(facts.NestedNotEntered, "nested repository not checked", "nested repositories not checked"))
 	}
-	return line.String()
+	return fmt.Sprintf("%s (%s)", verdict, strings.Join(items, " • "))
 }
 
 // footerSeconds is a duration as the footer says it: 0.05s, 0.4s, 2.4s, 12s.
@@ -285,14 +249,4 @@ func counted(count int, singular, pluralNoun string) string {
 		return "1 " + singular
 	}
 	return abbreviated(count) + " " + pluralNoun
-}
-
-func nonEmpty(parts []string) []string {
-	kept := parts[:0]
-	for _, part := range parts {
-		if part != "" {
-			kept = append(kept, part)
-		}
-	}
-	return kept
 }

@@ -6,80 +6,76 @@ import (
 	"time"
 )
 
-// cleanRecords is a default run in which every phase ran and lint reused the fix phase's walk.
-func cleanRecords() []phaseRecord {
-	return []phaseRecord{
-		{Name: phaseFix, Outcome: outcomeRan, Elapsed: 400 * time.Millisecond},
-		{Name: phaseTypes, Outcome: outcomeRan, Elapsed: 600 * time.Millisecond},
-		{Name: phaseLint, Outcome: outcomeRan, Elapsed: 1100 * time.Millisecond},
-		{Name: phaseUnused, Outcome: outcomeSkipped, Detail: "not requested"},
+// cleanSummary is a green default run in which every phase ran, formatting included.
+func cleanSummary() runSummary {
+	return runSummary{
+		Total: 2400 * time.Millisecond,
+		Phases: []phaseRecord{
+			{Name: phaseFix, Outcome: outcomeRan, Elapsed: 400 * time.Millisecond},
+			{Name: phaseTypes, Outcome: outcomeRan, Elapsed: 600 * time.Millisecond},
+			{Name: phaseLint, Outcome: outcomeRan, Elapsed: 1100 * time.Millisecond},
+			{Name: phaseUnused, Outcome: outcomeSkipped, Detail: "not requested"},
+		},
+		Formatting: 300 * time.Millisecond,
+		Files:      3926,
+		Nodes:      2_412_345,
 	}
-}
-
-func cleanFacts() footerFacts {
-	return footerFacts{Total: 2400 * time.Millisecond, Files: 3926, Nodes: 2_412_345}
 }
 
 func TestFooterGolden(t *testing.T) {
 	cases := []struct {
-		name       string
-		records    []phaseRecord
-		formatting time.Duration
-		facts      footerFacts
-		want       string
+		name    string
+		summary func(summary *runSummary)
+		want    string
 	}{
 		{
-			name:       "pass",
-			records:    cleanRecords(),
-			formatting: 300 * time.Millisecond,
-			facts:      cleanFacts(),
-			want:       "✓ 💎 2.4s → 🪄 0.4s • 💅 0.3s • 🔷 0.6s • 👑 1.1s · 3.9K files · 2.4M nodes",
+			name:    "pass",
+			summary: func(summary *runSummary) {},
+			want:    "✓ 💎 (2.4s → 🪄 0.4s • 💅 0.3s • 🔷 0.6s • 👑 1.1s • 3.9K files • 2.4M nodes)",
 		},
 		{
-			name:       "fail",
-			records:    cleanRecords(),
-			formatting: 300 * time.Millisecond,
-			facts: func() footerFacts {
-				facts := cleanFacts()
-				facts.TypeErrors, facts.Findings = 1, 1
-				return facts
-			}(),
-			want: "✗ ☠️ 2.4s → 1 type error · 1 finding · 3.9K files · 2.4M nodes",
+			name:    "fail",
+			summary: func(summary *runSummary) { summary.TypeErrors, summary.Findings = 1, 1 },
+			want:    "✗ ☠️ (2.4s → 1 type error • 1 finding • 3.9K files • 2.4M nodes)",
 		},
 		{
-			name:    "replay",
-			records: nil,
-			facts:   footerFacts{Total: 50 * time.Millisecond, Replayed: true, Files: 3926},
-			want:    "✓ 💎 0.05s ↺ replayed · 3.9K files",
+			name: "replay",
+			summary: func(summary *runSummary) {
+				*summary = runSummary{Total: 50 * time.Millisecond, Cache: cacheUse{Replayed: true}, Files: 3926}
+			},
+			want: "✓ 💎 (0.05s ↺ replayed • 3.9K files)",
 		},
 		{
 			name: "lint reused the fix walk",
-			records: []phaseRecord{
-				{Name: phaseFix, Outcome: outcomeRan, Elapsed: 1500 * time.Millisecond},
-				{Name: phaseTypes, Outcome: outcomeRan, Elapsed: 600 * time.Millisecond},
-				{Name: phaseLint, Outcome: outcomeReused, Detail: "the fix phase's walk"},
+			summary: func(summary *runSummary) {
+				summary.Formatting = 0
+				summary.Phases = []phaseRecord{
+					{Name: phaseFix, Outcome: outcomeRan, Elapsed: 1500 * time.Millisecond},
+					{Name: phaseTypes, Outcome: outcomeRan, Elapsed: 600 * time.Millisecond},
+					{Name: phaseLint, Outcome: outcomeReused, Detail: "the fix phase's walk"},
+				}
 			},
-			facts: cleanFacts(),
-			want:  "✓ 💎 2.4s → 🪄 1.5s • 🔷 0.6s • 👑 in 🪄 · 3.9K files · 2.4M nodes",
+			want: "✓ 💎 (2.4s → 🪄 1.5s • 🔷 0.6s • 👑 in 🪄 • 3.9K files • 2.4M nodes)",
 		},
 		{
 			name: "types bailed, so lint did not run",
-			records: []phaseRecord{
-				{Name: phaseFix, Outcome: outcomeRan, Elapsed: 400 * time.Millisecond},
-				{Name: phaseTypes, Outcome: outcomeRan, Elapsed: 600 * time.Millisecond},
-				{Name: phaseLint, Outcome: outcomeNotReached, Detail: "types bailed: 2 type errors"},
+			summary: func(summary *runSummary) {
+				summary.TypeErrors = 2
+				summary.Phases[2] = phaseRecord{Name: phaseLint, Outcome: outcomeNotReached, Detail: "types bailed: 2 type errors"}
 			},
-			facts: func() footerFacts {
-				facts := cleanFacts()
-				facts.TypeErrors = 2
-				return facts
-			}(),
-			want: "✗ ☠️ 2.4s → 2 type errors · 3.9K files · 2.4M nodes · ⚠ 👑 lint did not run",
+			want: "✗ ☠️ (2.4s → 2 type errors • 3.9K files • 2.4M nodes • ⚠ 👑 lint did not run)",
+		},
+		{
+			name:    "labelled, in a repository with several projects",
+			summary: func(summary *runSummary) { summary.Label = "projects/www" },
+			want:    "projects/www  ✓ 💎 (2.4s → 🪄 0.4s • 💅 0.3s • 🔷 0.6s • 👑 1.1s • 3.9K files • 2.4M nodes)",
 		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if got := footer(testCase.records, testCase.formatting, testCase.facts); got != testCase.want {
+			summary := cleanSummary()
+			testCase.summary(&summary)
+			if got := footer(summary); got != testCase.want {
 				t.Errorf("footer:\n got  %s\n want %s", got, testCase.want)
 			}
 		})
@@ -90,76 +86,54 @@ func TestFooterGolden(t *testing.T) {
 // on an otherwise clean run, and the footer must say so with its marker.
 var uncheckedConditions = []struct {
 	name   string
-	plant  func(records []phaseRecord, facts *footerFacts) []phaseRecord
+	plant  func(summary *runSummary)
 	marker string
 }{
+	{name: "a file crashed", plant: func(summary *runSummary) { summary.Gaps.CrashedFiles = 1 }, marker: "⚠ 1 file crashed"},
 	{
-		name:   "a file crashed",
-		plant:  func(records []phaseRecord, facts *footerFacts) []phaseRecord { facts.CrashedFiles = 1; return records },
-		marker: "⚠ 1 file crashed",
-	},
-	{
-		name: "a rule skipped every file",
-		plant: func(records []phaseRecord, facts *footerFacts) []phaseRecord {
-			facts.RulesSkippingEverything = 2
-			return records
-		},
+		name:   "a rule skipped every file",
+		plant:  func(summary *runSummary) { summary.Gaps.RulesSkippingEverything = 2 },
 		marker: "⚠ 2 rules skipped every file",
 	},
 	{
 		name: "a phase could not run",
-		plant: func(records []phaseRecord, facts *footerFacts) []phaseRecord {
-			records[2] = phaseRecord{Name: phaseLint, Outcome: outcomeNotReached, Detail: "fix bailed"}
-			return records
+		plant: func(summary *runSummary) {
+			summary.Phases[2] = phaseRecord{Name: phaseLint, Outcome: outcomeNotReached, Detail: "fix bailed"}
 		},
 		marker: "⚠ 👑 lint did not run",
 	},
 	{
 		name: "a reporting phase was skipped",
-		plant: func(records []phaseRecord, facts *footerFacts) []phaseRecord {
-			records[1] = phaseRecord{Name: phaseTypes, Outcome: outcomeSkipped, Detail: "not requested"}
-			return records
+		plant: func(summary *runSummary) {
+			summary.Phases[1] = phaseRecord{Name: phaseTypes, Outcome: outcomeSkipped, Detail: "not requested"}
 		},
 		marker: "⚠ 🔷 types not checked",
 	},
 	{
-		name: "formatting was not checked",
-		plant: func(records []phaseRecord, facts *footerFacts) []phaseRecord {
-			facts.FormattingNotChecked = true
-			return records
-		},
+		name:   "formatting was not checked",
+		plant:  func(summary *runSummary) { summary.Gaps.FormattingNotChecked, summary.Formatting = true, 0 },
 		marker: "💅 formatting not checked",
 	},
 	{
 		name: "the project had nothing to check",
-		plant: func(records []phaseRecord, facts *footerFacts) []phaseRecord {
-			facts.NothingToCheck, facts.Files, facts.Nodes = true, 0, 0
-			return records
+		plant: func(summary *runSummary) {
+			summary.Gaps.NothingToCheck, summary.Files, summary.Nodes = true, 0, 0
 		},
 		marker: "⚠ no files to check",
 	},
 	{
-		name: "the run was narrowed to some files",
-		plant: func(records []phaseRecord, facts *footerFacts) []phaseRecord {
-			facts.FilesInScope = 12
-			return records
-		},
+		name:   "the run was narrowed to some files",
+		plant:  func(summary *runSummary) { summary.Gaps.FilesInScope = 12 },
 		marker: "⚠ only 12 of the files",
 	},
 	{
-		name: "a file could not be read",
-		plant: func(records []phaseRecord, facts *footerFacts) []phaseRecord {
-			facts.Unread = "1 file the compiler left no record for"
-			return records
-		},
+		name:   "a file could not be read",
+		plant:  func(summary *runSummary) { summary.Gaps.Unread = "1 file the compiler left no record for" },
 		marker: "⚠ 1 file the compiler left no record for",
 	},
 	{
-		name: "the binary was built from a modified tree",
-		plant: func(records []phaseRecord, facts *footerFacts) []phaseRecord {
-			facts.ModifiedBuild = true
-			return records
-		},
+		name:   "the binary was built from a modified tree",
+		plant:  func(summary *runSummary) { summary.Gaps.ModifiedBuild = true },
 		marker: "⚠ built from a modified tree",
 	},
 }
@@ -168,18 +142,18 @@ var uncheckedConditions = []struct {
 // and then requires the check itself to catch a footer that drops the marker. Without the second half a
 // check that matched anything would pass, and a footer that went quiet about a gap would go unnoticed.
 func TestFooterSaysWhatWasNotChecked(t *testing.T) {
-	clean := footer(cleanRecords(), 300*time.Millisecond, cleanFacts())
+	clean := footer(cleanSummary())
 	if strings.Contains(clean, "⚠") || strings.Contains(clean, "not checked") {
 		t.Fatalf("a clean run's footer carries a marker it has no cause for: %s", clean)
 	}
 	for _, condition := range uncheckedConditions {
 		t.Run(condition.name, func(t *testing.T) {
-			facts := cleanFacts()
-			records := condition.plant(cleanRecords(), &facts)
-			if facts.failed() {
+			summary := cleanSummary()
+			condition.plant(&summary)
+			if summary.failed() {
 				t.Fatalf("the planted condition made the run fail, so it no longer tests a green footer")
 			}
-			got := footer(records, 300*time.Millisecond, facts)
+			got := footer(summary)
 			if !strings.HasPrefix(got, "✓ 💎") {
 				t.Errorf("planting %s turned the verdict: %s", condition.name, got)
 			}
@@ -188,7 +162,7 @@ func TestFooterSaysWhatWasNotChecked(t *testing.T) {
 			}
 
 			// The mutant: the same run with the marker dropped from its footer. The check must fail on it.
-			mutant := strings.Replace(got, " · "+condition.marker, "", 1)
+			mutant := strings.Replace(got, " • "+condition.marker, "", 1)
 			if mutant == got {
 				t.Fatalf("the mutant could not drop %q from %s", condition.marker, got)
 			}
@@ -231,15 +205,6 @@ func TestFooterAbbreviates(t *testing.T) {
 	}
 }
 
-func TestFooterLeadsWithItsProjectsLabel(t *testing.T) {
-	facts := cleanFacts()
-	facts.Label = "projects/www"
-	want := "projects/www  ✓ 💎 2.4s → 🪄 0.4s • 🔷 0.6s • 👑 1.1s · 3.9K files · 2.4M nodes"
-	if got := footer(cleanRecords(), 0, facts); got != want {
-		t.Errorf("footer:\n got  %s\n want %s", got, want)
-	}
-}
-
 func TestOverallFooterGolden(t *testing.T) {
 	engines := map[string]int{"TypeScript": 2, "Swift": 1}
 	cases := []struct {
@@ -250,29 +215,29 @@ func TestOverallFooterGolden(t *testing.T) {
 		{
 			name:  "every project green",
 			facts: overallFacts{Total: 8100 * time.Millisecond, ProjectsByEngine: engines},
-			want:  "✓ 💎 8.1s · 3 projects (1 Swift, 2 TypeScript)",
+			want:  "✓ 💎 (8.1s • 3 projects: 1 Swift, 2 TypeScript)",
 		},
 		{
 			name:  "one engine",
 			facts: overallFacts{Total: 8100 * time.Millisecond, ProjectsByEngine: map[string]int{"TypeScript": 2}},
-			want:  "✓ 💎 8.1s · 2 projects",
+			want:  "✓ 💎 (8.1s • 2 projects)",
 		},
 		{
 			name:  "a project failed",
 			facts: overallFacts{Total: 8100 * time.Millisecond, ProjectsByEngine: engines, Failed: []string{"www (exit 1)"}},
-			want:  "✗ ☠️ 8.1s · 3 projects (1 Swift, 2 TypeScript) · ☠️ www (exit 1)",
+			want:  "✗ ☠️ (8.1s • 3 projects: 1 Swift, 2 TypeScript • ☠️ www (exit 1))",
 		},
 		{
 			// A project that did not finish checked nothing, so the run cannot be green.
 			name:  "a project did not finish",
 			facts: overallFacts{Total: 8100 * time.Millisecond, ProjectsByEngine: engines, Unfinished: 1},
-			want:  "✗ ☠️ 8.1s · 3 projects (1 Swift, 2 TypeScript) · ⚠ 1 project did not finish",
+			want:  "✗ ☠️ (8.1s • 3 projects: 1 Swift, 2 TypeScript • ⚠ 1 project did not finish)",
 		},
 		{
 			// Green, and still saying what it left unchecked.
 			name:  "a nested repository was not checked",
 			facts: overallFacts{Total: 8100 * time.Millisecond, ProjectsByEngine: engines, NestedNotEntered: 2},
-			want:  "✓ 💎 8.1s · 3 projects (1 Swift, 2 TypeScript) · ⚠ 2 nested repositories not checked",
+			want:  "✓ 💎 (8.1s • 3 projects: 1 Swift, 2 TypeScript • ⚠ 2 nested repositories not checked)",
 		},
 	}
 	for _, testCase := range cases {
