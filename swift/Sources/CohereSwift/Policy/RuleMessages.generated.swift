@@ -10,7 +10,7 @@ enum RuleMessages {
     }
 
     /* SHA-256 of every .json file in policy/messages/, each one's name and bytes in name order, which a test recomputes from the files on disk. */
-    static let sourceDigest = "d9f38526060ba8ede2909e6a7684a1d0cd4fee632eb14722a67af0f98d5cafa9"
+    static let sourceDigest = "445a85674d16ba891fd27721b6b686d81ad1973c85a1759227da8e872efdf907"
 
     /* Every message here, as `Rule.id`, for the test that fails on one no rule renders. */
     static let all = [
