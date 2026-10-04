@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 290,
+        "rulesOn": 289,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -631,10 +631,6 @@
             },
             {
                 "name": "nexus/boundary-no-internal-import",
-                "severity": "error"
-            },
-            {
-                "name": "nexus/boundary-no-nexus-outside-import",
                 "severity": "error"
             },
             {
@@ -1478,7 +1474,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 356,
+        "rulesOn": 355,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2014,10 +2010,6 @@
             },
             {
                 "name": "nexus/boundary-no-internal-import",
-                "severity": "error"
-            },
-            {
-                "name": "nexus/boundary-no-nexus-outside-import",
                 "severity": "error"
             },
             {
@@ -6613,7 +6605,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 280,
+        "rulesOn": 279,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -7197,10 +7189,6 @@
             },
             {
                 "name": "nexus/boundary-no-internal-import",
-                "severity": "error"
-            },
-            {
-                "name": "nexus/boundary-no-nexus-outside-import",
                 "severity": "error"
             },
             {
@@ -8037,7 +8025,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 268,
+        "rulesOn": 267,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8573,10 +8561,6 @@
             },
             {
                 "name": "nexus/boundary-no-internal-import",
-                "severity": "error"
-            },
-            {
-                "name": "nexus/boundary-no-nexus-outside-import",
                 "severity": "error"
             },
             {

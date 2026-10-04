@@ -12,8 +12,8 @@ The first release. It carries these rule sets:
 
 - `cohere:next`, 22 rules on
 - `cohere:react`, 88 rules on
-- `cohere:system-inc/base`, 23 rules on
-- `cohere:system-inc/structure`, 30 rules on
+- `cohere:system-inc/base`, 24 rules on
+- `cohere:system-inc/structure`, 31 rules on
 - `cohere:tailwind`, 12 rules on
 - `cohere:typescript`, 267 rules on
 
@@ -23,8 +23,9 @@ to each file that imports react or contains JSX, `cohere:next` to each file that
 of Next's own files, and `cohere:tailwind` to every file when the root stylesheet imports `tailwindcss`.
 package.json is never the evidence, and the run's `sets:` line names each set and why. Outside the
 `cohere:system-inc/*` sets, an `"off"` needs no reason and `--coverage` names each one. Inside them,
-every off and departure still says why. `nexus/import-no-forbidden-source` and `no-restricted-properties` (JSON.parse)
-moved from `cohere:typescript` to the `cohere:system-inc/*` sets, and those sets add Buffer to
+every off and departure still says why. `nexus/import-no-forbidden-source`,
+`nexus/boundary-no-nexus-outside-import` and `no-restricted-properties` (JSON.parse) moved from
+`cohere:typescript` to the `cohere:system-inc/*` sets, and those sets add Buffer to
 `no-restricted-globals`, since that advice names our own libraries.
 
 Formatting: a project that configures nothing formats with the house block `cohere:typescript` carries

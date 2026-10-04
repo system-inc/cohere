@@ -183,7 +183,6 @@
         "nexus/performance-no-independent-await-in-loop": "error",
         "nexus/consistency-require-matching-return-type": "error",
         "nexus/boundary-no-internal-import": "error",
-        "nexus/boundary-no-nexus-outside-import": "error",
         "nexus/consistency-no-ambiguous-identifier": "error",
         "nexus/consistency-no-enum": "error",
         "nexus/consistency-no-long-line-comment": "error",

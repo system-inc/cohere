@@ -7,6 +7,7 @@
         "no-restricted-globals": "Adds Buffer to the house list: our code runs on Cloudflare Workers, where @cloudflare/workers-types declares Buffer as any, and @nexus/source/encoding/ByteEncoding replaces it. Every other entry is cohere:typescript's."
     },
     "rules": {
+        "nexus/boundary-no-nexus-outside-import": "error",
         "nexus/import-no-forbidden-source": "error",
         "no-restricted-properties": [
             "error",

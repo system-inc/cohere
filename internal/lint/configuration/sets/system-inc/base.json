@@ -9,6 +9,7 @@
         "@typescript-eslint/unified-signatures": "ignoreDifferentlyNamedParameters, ruled by @system_cohere in 17339 and corrected in 17361, mirrored in Base ESLint defaults c4d3916 (api 3f87fa5e)"
     },
     "rules": {
+        "nexus/boundary-no-nexus-outside-import": "error",
         "no-restricted-properties": [
             "error",
             {
