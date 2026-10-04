@@ -59,13 +59,13 @@ func TestDifferentNodeCountsAreNotCompared(t *testing.T) {
 func TestSharedFillIsReported(t *testing.T) {
 	timings := program.NewTimings([]string{"a-rule"})
 	setCost(timings, "a-rule", 10*time.Millisecond, 100)
-	timings.RecordSharedFill("a-rule", "nexus.allComments", 120*time.Millisecond)
+	timings.SetSharedForTest("nexus.allComments", 120*time.Millisecond)
 
 	rendered := renderTimings(timings, 200*time.Millisecond)
-	if !strings.Contains(rendered, "nexus.allComments") {
-		t.Fatalf("the shared derivation was not named:\n%s", rendered)
+	if !strings.Contains(rendered, "shared: nexus.allComments cost 120ms of CPU") {
+		t.Fatalf("the shared derivation was not named with its cost:\n%s", rendered)
 	}
-	if !strings.Contains(rendered, "paid once per file") {
+	if !strings.Contains(rendered, "computed once per file") {
 		t.Fatalf("the note did not explain what a shared cost is:\n%s", rendered)
 	}
 }
@@ -126,138 +126,94 @@ func TestTheNamedRulesAreTheRulesWhoseCostsAreQuoted(t *testing.T) {
 	}
 }
 
-// TestCoverageStatesWhatTheTableDoesNotMeasure guards the line that keeps the table honest.
+// TestTheHeaderNamesItsUnit pins the line that keeps the table from being read as wall time (#8qyzmxw).
 //
-// The rows measure rule listeners and per-file setup. Nothing measures the walk that offers nodes
-// to them, and on the ahra tree that walk is the majority of the phase: 285ms of rule time against
-// 1,024ms wall clock single-threaded, so the table covers roughly 28 percent. A reader who sums the
-// share column gets 100 percent and concludes the phase is explained.
-//
-// Unlike the notes above, this takes only two durations and has no ordering invariant, so calling
-// it directly is the real path rather than a bypass of one.
-func TestCoverageStatesWhatTheTableDoesNotMeasure(t *testing.T) {
-	var out strings.Builder
-	printCoverage(&out, 285*time.Millisecond, 1024*time.Millisecond)
-	rendered := out.String()
+// The table this replaced printed wall time under the same columns, and the better-tailwindcss family
+// read about 1.2s on it where its real cost was about 0.05s. The unit goes in the first line, and the
+// measurement's own cost per call in the second, so a reader cannot mistake what a row is.
+func TestTheHeaderNamesItsUnit(t *testing.T) {
+	timings := program.NewTimings([]string{"a-rule"})
+	setCost(timings, "a-rule", 120*time.Millisecond, 100)
+	timings.Account.Calls = 1000
+	timings.Account.InstrumentCPU = 150 * time.Microsecond
 
-	if !strings.Contains(rendered, "28%") {
-		t.Fatalf("coverage did not state the share the rows account for: %q", rendered)
+	rendered := renderTimings(timings, time.Second)
+	header := strings.SplitN(strings.TrimLeft(rendered, "\n"), "\n", 2)[0]
+	if !strings.Contains(header, "rule CPU") || !strings.Contains(header, "not wall time") {
+		t.Fatalf("the header does not say the table is CPU and not wall time:\n  %s", header)
 	}
-	if !strings.Contains(rendered, "72%") {
-		t.Fatalf("coverage did not state the share nothing measures: %q", rendered)
-	}
-	if !strings.Contains(rendered, "traversal") {
-		t.Fatalf("coverage did not name what the unmeasured remainder is: %q", rendered)
+	if !strings.Contains(rendered, "1000 measured calls costs about 150ns to measure") {
+		t.Fatalf("the header does not state what measuring a call cost:\n%s", rendered)
 	}
 }
 
-// TestCoverageRefusesToQuoteAShareWhenTimeIsSummedAcrossWorkers is the half that matters more,
-// because parallel is the default mode.
-//
-// Attributed time is summed across workers while wall clock overlaps them, so in a parallel run
-// rule time slightly exceeds wall clock. Printing that as a coverage percentage would say the table
-// accounts for 104 percent of the phase, which reads as "rules are everything and traversal is
-// free." Traversal is not free; it parallelizes almost perfectly and so collapses out of wall clock
-// rather than being cheap. A ratio that cannot mean what it appears to mean must not be printed as
-// though it does.
-func TestCoverageRefusesToQuoteAShareWhenTimeIsSummedAcrossWorkers(t *testing.T) {
-	var out strings.Builder
-	printCoverage(&out, 314*time.Millisecond, 301*time.Millisecond)
-	rendered := out.String()
+// TestNoClockIsSaidRatherThanPrintedAsZero covers a platform with no thread CPU clock. A table of zeros
+// would read as every rule being free.
+func TestNoClockIsSaidRatherThanPrintedAsZero(t *testing.T) {
+	timings := program.NewTimings([]string{"a-rule"})
+	setCost(timings, "a-rule", 0, 100)
+	timings.Account.Unavailable = "this platform has no thread CPU clock to read"
 
-	if strings.Contains(rendered, "%") {
-		t.Fatalf("a share was quoted for a run whose time is summed across workers: %q", rendered)
+	rendered := renderTimings(timings, time.Second)
+	if !strings.Contains(rendered, "no rule CPU this run, because this platform has no thread CPU clock to read") {
+		t.Fatalf("the table did not say why it has no CPU:\n%s", rendered)
 	}
-	if !strings.Contains(rendered, "single-threaded") {
-		t.Fatalf("coverage did not point at the mode that can answer the question: %q", rendered)
+	if strings.Contains(rendered, "0.00ms") || strings.Contains(rendered, "coverage:") {
+		t.Fatalf("a table with no clock printed CPU figures anyway:\n%s", rendered)
 	}
-	if !strings.Contains(rendered, "traversal") {
-		t.Fatalf("coverage did not say traversal is unmeasured: %q", rendered)
+	if !strings.Contains(rendered, "a-rule") || !strings.Contains(rendered, " 100 ") {
+		t.Fatalf("the counts, which were still counted, were dropped:\n%s", rendered)
 	}
 }
 
-// TestCoverageSaysNothingRatherThanComputingFromZero covers the degenerate input.
+// TestCoverageStatesEveryPartOfTheWalksCPU guards the line that keeps the table honest.
 //
-// A zero phase duration has no ratio to state. Printing a coverage claim derived from it would be
-// worse than the silence it replaced, since a fabricated number is harder to notice than a missing
-// line.
+// The rows are rule listeners and per-file setup. A reader who sums the share column gets 100 percent and
+// concludes the phase is explained, when the walk that offers nodes to those listeners costs CPU too. The
+// wall-clock table could only guess at that from wall clock, which absorbed every wait, and in a parallel
+// run it vanished entirely. The threads' clocks account for it, so the line states each part.
+func TestCoverageStatesEveryPartOfTheWalksCPU(t *testing.T) {
+	timings := program.NewTimings([]string{"a-rule"})
+	setCost(timings, "a-rule", 300*time.Millisecond, 100)
+	timings.SetSharedForTest("hir.Function", 100*time.Millisecond)
+	timings.Account.InstrumentCPU = 100 * time.Millisecond
+	timings.Account.WalkCPU = 500 * time.Millisecond
+	timings.Account.OtherCPU = 250 * time.Millisecond
+
+	var out strings.Builder
+	printCoverage(&out, timings)
+	rendered := out.String()
+
+	for _, want := range []string{"1000ms", "rules 30%", "shared derivations 10%", "measuring 10%", "50% the walk itself", "250ms of process CPU"} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("coverage did not state %q: %q", want, rendered)
+		}
+	}
+}
+
+// TestCoverageSaysNothingRatherThanComputingFromZero covers the degenerate input. Nothing sampled on the
+// walk workers means no share to state, and a share computed from a zero would be harder to notice than a
+// missing line.
 func TestCoverageSaysNothingRatherThanComputingFromZero(t *testing.T) {
 	var out strings.Builder
-	printCoverage(&out, 285*time.Millisecond, 0)
+	printCoverage(&out, program.NewTimings([]string{"a-rule"}))
 	if out.String() != "" {
-		t.Fatalf("coverage printed a claim computed from a zero phase duration: %q", out.String())
-	}
-
-	out.Reset()
-	printCoverage(&out, 0, 1024*time.Millisecond)
-	if out.String() != "" {
-		t.Fatalf("coverage printed a claim with no attributed time to divide: %q", out.String())
+		t.Fatalf("coverage printed a claim computed from zero CPU: %q", out.String())
 	}
 }
 
 // TestTheTableItselfCarriesTheCoverageLine pins the wiring, not just the function.
 //
-// The three tests above call printCoverage directly, which verifies a fragment and reads as though
-// it verifies the behavior. It does not: deleting the call from printTimings leaves all three green
-// while the table goes back to implying it explains the whole phase. Guard present, fixtures
-// passing, behavior gone.
-//
-// That failure shape was reported by @system_cohere_lint_fix an hour before this was written, in
-// their own package and against their own fixtures, so it is a measured pattern in this codebase
-// rather than a hypothetical. It costs one test to exclude, driven through the same renderTimings
-// seam the other table assertions use.
+// The tests above call printCoverage directly, which verifies a fragment and reads as though it verifies
+// the behavior. It does not: deleting the call from printTimings leaves them green while the table goes
+// back to implying it explains the whole phase. Guard present, fixtures passing, behavior gone.
 func TestTheTableItselfCarriesTheCoverageLine(t *testing.T) {
 	timings := program.NewTimings([]string{"a-rule"})
 	setCost(timings, "a-rule", 285*time.Millisecond, 100)
+	timings.Account.WalkCPU = 700 * time.Millisecond
 
 	rendered := renderTimings(timings, 1024*time.Millisecond)
-	if !strings.Contains(rendered, "coverage:") {
-		t.Fatalf("the table did not carry a coverage line:\n%s", rendered)
-	}
-	if !strings.Contains(rendered, "traversal") {
-		t.Fatalf("the table's coverage line did not name the unmeasured remainder:\n%s", rendered)
-	}
-}
-
-// TestPerNodeSharedFillsCollapseToOneRow holds that a derivation keyed per node reports as one
-// line rather than one line per node.
-//
-// A cache key identifies a cache entry, which is not a unit anybody wants to read. The HIR cache
-// keys per function by kind and source offset, correctly, and `--timing` rendered 11,150 rows for
-// it against three real ones: 17,000 lines of output, two thirds of it a single derivation reported
-// one function at a time, every row reading 0.00ms and none of them actionable. Collapsed, that
-// derivation is 1,256ms and the largest shared cost in the run.
-//
-// The single-entry assertions matter as much as the collapsed one. A fix that summed everything
-// under one heading would pass a test that only counted rows, and would destroy the three
-// distinct entries this table exists to separate.
-func TestPerNodeSharedFillsCollapseToOneRow(t *testing.T) {
-	timings := program.NewTimings([]string{"a-rule"})
-	setCost(timings, "a-rule", 10*time.Millisecond, 100)
-
-	timings.RecordSharedFill("a-rule", "hir.Function:175:1001", 3*time.Millisecond)
-	timings.RecordSharedFill("a-rule", "hir.Function:175:2002", 4*time.Millisecond)
-	timings.RecordSharedFill("a-rule", "hir.Function:175:3003", 5*time.Millisecond)
-	timings.RecordSharedFill("a-rule", "comments.All", 120*time.Millisecond)
-
-	rendered := renderTimings(timings, 200*time.Millisecond)
-
-	if strings.Count(rendered, "shared: hir.Function") != 1 {
-		t.Fatalf("the per-node derivation should report as exactly one row:\n%s", rendered)
-	}
-	if !strings.Contains(rendered, "across 3 entries") {
-		t.Fatalf("the collapsed row should say how many entries it stands for:\n%s", rendered)
-	}
-	if !strings.Contains(rendered, "12.0ms") && !strings.Contains(rendered, "12ms") {
-		t.Fatalf("the collapsed row should carry the summed cost of 12ms:\n%s", rendered)
-	}
-
-	// A derivation with one entry keeps the plain wording: the count would be noise on a row that
-	// stands for exactly itself.
-	if !strings.Contains(rendered, "shared: comments.All cost") {
-		t.Fatalf("a single-entry derivation should still be named plainly:\n%s", rendered)
-	}
-	if strings.Contains(rendered, "comments.All cost 120ms across") {
-		t.Fatalf("a single-entry derivation should not carry an entry count:\n%s", rendered)
+	if !strings.Contains(rendered, "coverage:") || !strings.Contains(rendered, "the walk itself") {
+		t.Fatalf("the table did not carry a coverage line naming the walk's own CPU:\n%s", rendered)
 	}
 }

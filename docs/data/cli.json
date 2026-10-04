@@ -98,7 +98,7 @@
         },
         {
             "name": "timing",
-            "usage": "report what building the graph and each rule cost, most expensive rule first"
+            "usage": "report what building the graph cost and the CPU each rule cost, most expensive rule first"
         },
         {
             "name": "tsconfig",

@@ -5,14 +5,15 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
 // TestSortedPutsTheExpensiveRuleFirst is what makes an outlier obvious without arithmetic.
 func TestSortedPutsTheExpensiveRuleFirst(t *testing.T) {
 	timings := NewTimings([]string{"cheap", "expensive", "middling"})
-	timings.forRule("cheap").ListenerDuration = time.Millisecond
-	timings.forRule("expensive").ListenerDuration = 500 * time.Millisecond
-	timings.forRule("middling").ListenerDuration = 50 * time.Millisecond
+	timings.forRule("cheap").ListenerCPU = time.Millisecond
+	timings.forRule("expensive").ListenerCPU = 500 * time.Millisecond
+	timings.forRule("middling").ListenerCPU = 50 * time.Millisecond
 
 	sorted := timings.Sorted()
 	if len(sorted) != 3 {
@@ -35,34 +36,33 @@ func TestSortedPutsTheExpensiveRuleFirst(t *testing.T) {
 func TestSetupAndListenerTimeStaySeparate(t *testing.T) {
 	timings := NewTimings([]string{"decides-slowly"})
 	timing := timings.forRule("decides-slowly")
-	timing.SetupDuration = 300 * time.Millisecond
-	timing.ListenerDuration = 2 * time.Millisecond
+	timing.SetupCPU = 300 * time.Millisecond
+	timing.ListenerCPU = 2 * time.Millisecond
 
 	sorted := timings.Sorted()
-	if sorted[0].SetupDuration != 300*time.Millisecond {
-		t.Fatalf("setup time was lost: %v", sorted[0].SetupDuration)
+	if sorted[0].SetupCPU != 300*time.Millisecond {
+		t.Fatalf("setup time was lost: %v", sorted[0].SetupCPU)
 	}
-	if sorted[0].ListenerDuration != 2*time.Millisecond {
-		t.Fatalf("listener time was lost: %v", sorted[0].ListenerDuration)
+	if sorted[0].ListenerCPU != 2*time.Millisecond {
+		t.Fatalf("listener time was lost: %v", sorted[0].ListenerCPU)
 	}
-	if sorted[0].TotalDuration() != 302*time.Millisecond {
-		t.Fatalf("total does not sum its parts: %v", sorted[0].TotalDuration())
+	if sorted[0].TotalCPU() != 302*time.Millisecond {
+		t.Fatalf("total does not sum its parts: %v", sorted[0].TotalCPU())
 	}
 }
 
 // TestMergeAccumulatesAcrossWorkers covers the path every real run takes.
 //
-// Workers time locally and merge once under the mutex, because timing through a shared lock would
-// measure contention rather than rule cost. A merge that dropped or double-counted would make every
-// number quietly wrong in a way no single-worker test could see.
+// Workers count locally and merge once under the mutex, because counting through a shared lock would
+// put contention into the walk being measured. A merge that dropped or double-counted would make every
+// number quietly wrong in a way no single-worker test could see. CPU is not merged: it comes from the
+// one profile of the whole walk.
 func TestMergeAccumulatesAcrossWorkers(t *testing.T) {
 	shared := NewTimings([]string{"a-rule"})
 
 	for worker := 0; worker < 4; worker++ {
 		local := NewTimings(nil)
 		timing := local.forRule("a-rule")
-		timing.ListenerDuration = 10 * time.Millisecond
-		timing.SetupDuration = time.Millisecond
 		timing.NodesOffered = 100
 		timing.FilesListened = 5
 		timing.FilesDeclined = 2
@@ -71,9 +71,6 @@ func TestMergeAccumulatesAcrossWorkers(t *testing.T) {
 	}
 
 	merged := shared.Sorted()[0]
-	if merged.ListenerDuration != 40*time.Millisecond {
-		t.Fatalf("listener time did not accumulate: %v", merged.ListenerDuration)
-	}
 	if merged.NodesOffered != 400 || merged.FilesListened != 20 || merged.FilesDeclined != 8 || merged.Findings != 12 {
 		t.Fatalf("counts did not accumulate: %+v", merged)
 	}
@@ -84,7 +81,7 @@ func TestMergeAccumulatesAcrossWorkers(t *testing.T) {
 func TestMergePicksUpARuleTheRunAddedLate(t *testing.T) {
 	shared := NewTimings(nil)
 	local := NewTimings(nil)
-	local.forRule("late-rule").ListenerDuration = time.Millisecond
+	local.forRule("late-rule").NodesOffered = 1
 	shared.merge(local)
 
 	if len(shared.Sorted()) != 1 {
@@ -104,7 +101,7 @@ func TestNilCollectorIsInert(t *testing.T) {
 	if timings.Sorted() != nil {
 		t.Fatal("a nil collector produced rows")
 	}
-	if timings.TotalDuration() != 0 {
+	if timings.TotalCPU() != 0 {
 		t.Fatal("a nil collector reported time")
 	}
 	if timings.forRule("anything") != nil {
@@ -112,96 +109,196 @@ func TestNilCollectorIsInert(t *testing.T) {
 	}
 }
 
-// TestMeasuringListenerCountsAndTimes covers the wrapper the whole table rests on.
-func TestMeasuringListenerCountsAndTimes(t *testing.T) {
-	timing := &RuleTiming{Name: "measured"}
-	wrapped := measuringListener(timing, func(node *ast.Node) {
-		time.Sleep(time.Millisecond)
-	})
-
-	wrapped(nil)
-	wrapped(nil)
-
-	if timing.NodesOffered != 2 {
-		t.Fatalf("nodes were not counted: %d", timing.NodesOffered)
+// spinFor burns cpu of this thread's CPU, by the thread's own clock, so it is CPU however the scheduler
+// treats it.
+func spinFor(t *testing.T, cpu time.Duration) {
+	t.Helper()
+	start, known := threadCPU()
+	if !known {
+		t.Fatal("this platform has no thread CPU clock, so the meter cannot be tested here")
 	}
-	if timing.ListenerDuration < 2*time.Millisecond {
-		t.Fatalf("listener time was not accumulated: %v", timing.ListenerDuration)
+	for {
+		if now, _ := threadCPU(); now-start >= cpu {
+			return
+		}
 	}
 }
 
-// TestMeasuringListenerIsPassThroughWhenNotTiming proves the zero-cost path is actually zero cost:
-// the same function comes back, not a wrapper around it.
-func TestMeasuringListenerIsPassThroughWhenNotTiming(t *testing.T) {
-	called := 0
-	original := func(node *ast.Node) { called++ }
+// within reports whether got is want give or take a tenth, plus a little for the clock's step.
+func within(got time.Duration, want time.Duration) bool {
+	slack := want/10 + 200*time.Microsecond
+	return got >= want-slack && got <= want+slack
+}
 
-	measuringListener(nil, original)(nil)
+// startTestMeter starts a meter on the test's goroutine and finishes it when the test ends.
+func startTestMeter(t *testing.T) (*workerMeter, *Timings) {
+	t.Helper()
+	timings := NewTimings(nil)
+	meter := startWorkerMeter(timings)
+	if meter == nil {
+		t.Fatalf("no meter started: %s", timings.Account.Unavailable)
+	}
+	t.Cleanup(meter.finish)
+	return meter, timings
+}
 
-	if called != 1 {
-		t.Fatal("the listener was not called through")
+// TestAMeteredCallIsBilledItsCPU covers the wrapper the whole table rests on. Five calls each spinning 2ms
+// of CPU are billed 10ms, and each call is counted as a node offered.
+func TestAMeteredCallIsBilledItsCPU(t *testing.T) {
+	meter, _ := startTestMeter(t)
+	timing := &RuleTiming{Name: "spins"}
+	wrapped := meter.listener(timing, func(node *ast.Node) { spinFor(t, 2*time.Millisecond) })
+
+	for range 5 {
+		wrapped(nil)
+	}
+
+	if timing.NodesOffered != 5 {
+		t.Fatalf("calls were not counted: %d", timing.NodesOffered)
+	}
+	if !within(timing.ListenerCPU, 10*time.Millisecond) {
+		t.Fatalf("five calls spinning 2ms were billed %v", timing.ListenerCPU)
 	}
 }
 
-// TestSharedFillIsBilledToTheCacheNotAVictimRule is the fix for an instrument that lied.
+// TestAWaitingCallCostsNothing is the property the wall clock lacked (#8qyzmxw). Five calls each sleeping
+// 5ms spend 25ms of wall time and almost no CPU, and they are billed the CPU.
+func TestAWaitingCallCostsNothing(t *testing.T) {
+	meter, _ := startTestMeter(t)
+	timing := &RuleTiming{Name: "sleeps"}
+	wrapped := meter.listener(timing, func(node *ast.Node) { time.Sleep(5 * time.Millisecond) })
+
+	wallStart := time.Now()
+	for range 5 {
+		wrapped(nil)
+	}
+	wall := time.Since(wallStart)
+
+	if wall < 25*time.Millisecond {
+		t.Fatalf("the calls slept %v, under the 25ms planted, so they cannot show a wall clock's error", wall)
+	}
+	if timing.ListenerCPU > time.Millisecond {
+		t.Fatalf("five calls that only slept were billed %v of CPU, having slept %v", timing.ListenerCPU, wall)
+	}
+}
+
+// TestSetupIsBilledApartFromListeners keeps the distinction that decides which fix a slow rule needs.
+func TestSetupIsBilledApartFromListeners(t *testing.T) {
+	meter, _ := startTestMeter(t)
+	timing := &RuleTiming{Name: "decides"}
+	meter.setup(timing, func() { spinFor(t, 3*time.Millisecond) })
+
+	if !within(timing.SetupCPU, 3*time.Millisecond) || timing.ListenerCPU != 0 {
+		t.Fatalf("a 3ms setup was billed setup %v and listen %v", timing.SetupCPU, timing.ListenerCPU)
+	}
+}
+
+// TestSharedFillIsBilledToTheDerivationNotTheRuleThatAsked is the fix for an instrument that lied.
 //
 // A cached derivation is computed by whichever rule asks first, and files are walked in parallel,
 // so that rule is arbitrary. Measured on three comment rules sharing one scan before this existed:
 // 171ms, 132ms, and 1.0ms for identical work. The cheap one had simply asked last, and a reader
 // would have concluded the 171ms rule was expensive and optimized the wrong thing.
 //
-// The number that made it visible: two rules offered exactly the same 3,407 nodes differed by 83x.
-// Equal nodes with wildly unequal time is the signature of cost that belongs to neither.
-func TestSharedFillIsBilledToTheCacheNotAVictimRule(t *testing.T) {
-	timings := NewTimings([]string{"asked-first", "asked-second"})
+// So a fill is a frame of its own, billed to its derivation's family, and the frame around it is billed
+// less the fill: the rule that asked, or an outer fill when one derivation fills another. The family is
+// the key up to its first colon, because the HIR cache keys per function node and once reported 11,150
+// rows of 0.00ms.
+func TestSharedFillIsBilledToTheDerivationNotTheRuleThatAsked(t *testing.T) {
+	meter, timings := startTestMeter(t)
+	cache := rule.NewFileCache()
+	meter.watchFills(cache)
+	timing := &RuleTiming{Name: "asked-first"}
 
-	// Both rules did 10ms of their own work; the first also paid 100ms to fill a shared cache.
-	timings.forRule("asked-first").ListenerDuration = 110 * time.Millisecond
-	timings.forRule("asked-second").ListenerDuration = 10 * time.Millisecond
+	meter.listener(timing, func(node *ast.Node) {
+		spinFor(t, 2*time.Millisecond)
+		rule.Cached(cache, "comments.All", func() int {
+			spinFor(t, 3*time.Millisecond)
+			rule.Cached(cache, "hir.Function:175:1001", func() int {
+				spinFor(t, 4*time.Millisecond)
+				return 1
+			})
+			return 1
+		})
+	})(nil)
 
-	timings.RecordSharedFill("asked-first", "a.derivation", 100*time.Millisecond)
-
-	first := timings.forRule("asked-first")
-	if first.ListenerDuration != 10*time.Millisecond {
-		t.Fatalf("the shared cost stayed on the rule that paid it: %v", first.ListenerDuration)
+	if !within(timing.ListenerCPU, 2*time.Millisecond) {
+		t.Fatalf("the rule that asked was billed %v for its own 2ms", timing.ListenerCPU)
 	}
-	if timings.forRule("asked-second").ListenerDuration != 10*time.Millisecond {
-		t.Fatal("the rule that did not pay was altered")
+	if got := timings.SharedCPU()["comments.All"]; !within(got, 3*time.Millisecond) {
+		t.Fatalf("the outer derivation was billed %v for its own 3ms", got)
 	}
-	if timings.SharedFills()["a.derivation"] != 100*time.Millisecond {
-		t.Fatalf("the shared cost was not recorded against the derivation: %v", timings.SharedFills())
+	if got := timings.SharedCPU()["hir.Function"]; !within(got, 4*time.Millisecond) {
+		t.Fatalf("the per-node derivation was billed %v to its family for its 4ms", got)
 	}
-}
-
-// TestSharedFillCannotDriveARuleNegative guards the subtraction.
-//
-// A fill recorded larger than the rule's measured time would otherwise produce a negative duration,
-// which formats as a nonsense number rather than failing. Clamping is the honest floor: the rule
-// did at least zero work.
-func TestSharedFillCannotDriveARuleNegative(t *testing.T) {
-	timings := NewTimings([]string{"a-rule"})
-	timings.forRule("a-rule").ListenerDuration = time.Millisecond
-
-	timings.RecordSharedFill("a-rule", "a.derivation", time.Second)
-
-	if got := timings.forRule("a-rule").ListenerDuration; got < 0 {
-		t.Fatalf("a rule's time went negative: %v", got)
+	if cache.Fills()["comments.All"] != 1 || cache.Fills()["hir.Function:175:1001"] != 1 {
+		t.Fatalf("each derivation should have been computed once: %v", cache.Fills())
 	}
 }
 
-// TestSharedFillsMergeAcrossWorkers covers the path a real run takes, where each worker fills its
-// own files' caches and the totals have to add up.
-func TestSharedFillsMergeAcrossWorkers(t *testing.T) {
-	shared := NewTimings([]string{"a-rule"})
-
-	for worker := 0; worker < 4; worker++ {
-		local := NewTimings(nil)
-		local.forRule("a-rule").ListenerDuration = 50 * time.Millisecond
-		local.RecordSharedFill("a-rule", "a.derivation", 25*time.Millisecond)
-		shared.merge(local)
+// TestARuleThatPanicsStillBalancesItsFrames covers the crash path. A rule's panic is recovered by its
+// containment and the walk goes on, so a frame that closed only on a normal return would leave every
+// later call nested inside the crashed one, billed against it.
+func TestARuleThatPanicsStillBalancesItsFrames(t *testing.T) {
+	meter, _ := startTestMeter(t)
+	timing := &RuleTiming{Name: "crashes"}
+	recovering := func(run func()) {
+		defer func() { _ = recover() }()
+		run()
 	}
 
-	if got := shared.SharedFills()["a.derivation"]; got != 100*time.Millisecond {
-		t.Fatalf("shared fills did not accumulate across workers: %v", got)
+	recovering(func() { meter.listener(timing, func(node *ast.Node) { panic("planted") })(nil) })
+	recovering(func() { meter.setup(timing, func() { panic("planted") }) })
+
+	if meter.depth != 0 {
+		t.Fatalf("frames were left open after a recovered panic: depth %d", meter.depth)
+	}
+}
+
+// TestTheWorkersCPUIsAccountedFor holds that the rows and the account add up to what the worker's thread
+// spent, so nothing the table prints is a residual it cannot name.
+func TestTheWorkersCPUIsAccountedFor(t *testing.T) {
+	timings := NewTimings(nil)
+	meter := startWorkerMeter(timings)
+	if meter == nil {
+		t.Fatalf("no meter started: %s", timings.Account.Unavailable)
+	}
+	timing := timings.forRule("spins")
+	spinFor(t, 2*time.Millisecond)
+	meter.listener(timing, func(node *ast.Node) { spinFor(t, 3*time.Millisecond) })(nil)
+	meter.finish()
+
+	account := timings.Account
+	if account.Calls != 1 {
+		t.Fatalf("one call was counted as %d", account.Calls)
+	}
+	if !within(account.WalkCPU, 2*time.Millisecond) {
+		t.Fatalf("2ms spent outside any call was billed to the walk as %v", account.WalkCPU)
+	}
+	parts := timing.ListenerCPU + account.InstrumentCPU + account.WalkCPU
+	if difference := account.WorkersCPU - parts; difference < -time.Microsecond || difference > time.Microsecond {
+		t.Fatalf("the worker spent %v and its parts sum to %v", account.WorkersCPU, parts)
+	}
+}
+
+// TestTheMeterIsPassThroughWhenNotTiming proves the ordinary path costs nothing: no meter, the listener
+// itself rather than a wrapper, and a cache whose fills run as they always did.
+func TestTheMeterIsPassThroughWhenNotTiming(t *testing.T) {
+	meter := startWorkerMeter(nil)
+	if meter != nil {
+		t.Fatal("a walk without --timing started a meter")
+	}
+	cache := rule.NewFileCache()
+	meter.watchFills(cache)
+
+	called := 0
+	meter.listener(nil, func(node *ast.Node) { called++ })(nil)
+	meter.setup(nil, func() { called++ })
+	meter.finish()
+	if called != 2 {
+		t.Fatalf("the rule was not called through: %d of 2", called)
+	}
+	if got := rule.Cached(cache, "a.derivation", func() int { return 7 }); got != 7 {
+		t.Fatalf("an unmetered cache did not fill: %d", got)
 	}
 }

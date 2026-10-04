@@ -21,6 +21,9 @@ import (
 // Setup and listeners are separate columns because they are different defects. Time in setup means
 // a rule is doing expensive work to decide it has nothing to do. Time in listeners means it is
 // doing expensive work per node. The fixes have nothing in common.
+//
+// Every cost here is the walk threads' own CPU clock (see program.Timings), so a rule that waits costs
+// nothing and the first line says so.
 func printTimings(out io.Writer, timings *program.Timings, lintDuration time.Duration) {
 	sorted := timings.Sorted()
 	if len(sorted) == 0 {
@@ -30,35 +33,51 @@ func printTimings(out io.Writer, timings *program.Timings, lintDuration time.Dur
 		return
 	}
 
-	// Attributed time is summed across workers, so it exceeds wall clock by roughly the worker
-	// count. Reporting it against wall clock would print shares over 100 percent and read as a bug
-	// in the measurement rather than as parallelism. Shares are taken against the attributed total,
-	// which is the number they are actually a share of.
-	attributed := timings.TotalDuration()
+	account := timings.Account
+	if account.Unavailable != "" {
+		// No CPU is not zero CPU. A table of zeros would read as every rule being free, so the CPU
+		// columns are left out and the reason given, and the counts, which were still counted, stay.
+		fmt.Fprintf(out, "\ntiming: no rule CPU this run, because %s. The counts below are real; the CPU columns are left out rather than shown as zero.\n",
+			account.Unavailable)
+		fmt.Fprintf(out, "  %-42s %8s %8s %8s\n", "rule", "files", "nodes", "found")
+		for _, timing := range sorted {
+			fmt.Fprintf(out, "  %-42s %8d %8d %8d\n", timing.Name, timing.FilesListened, timing.NodesOffered, timing.Findings)
+		}
+		return
+	}
 
-	fmt.Fprintf(out, "\ntiming: %d rules, %s of rule time across all workers, %s wall clock\n",
-		len(sorted), formatMilliseconds(attributed), formatMilliseconds(lintDuration))
-	// Said out loud rather than left for someone to discover: a --timing run is slower than a real
-	// one. Each listener call is wrapped in a time.Now pair costing about 42ns against a listener
-	// body well under a nanosecond, which is why these numbers are for comparing rules to each
-	// other and never for quoting as the tool's speed.
-	fmt.Fprintf(out, "  (a --timing run is slower than a real one: every listener call is timed. "+
-		"Compare rules to each other, not these totals to a normal run.)\n")
-	printCoverage(out, attributed, lintDuration)
+	// CPU is summed across workers, so it exceeds wall clock by roughly the worker count. Shares are
+	// taken against the rules' total, which is the number they are actually a share of.
+	ruleCPU := timings.TotalCPU()
+
+	// The unit is in the first line, because the table this replaced printed wall time under the same
+	// columns and was read as cost (#8qyzmxw): a rule descheduled mid-call was billed for the wait.
+	fmt.Fprintf(out, "\ntiming: rule CPU, from each walk thread's own CPU clock, not wall time: "+
+		"%d rules, %s of rule CPU across all workers, %s wall clock\n",
+		len(sorted), formatMilliseconds(ruleCPU), formatMilliseconds(lintDuration))
+	perCall := time.Duration(0)
+	if account.Calls > 0 {
+		perCall = account.InstrumentCPU / time.Duration(account.Calls)
+	}
+	fmt.Fprintf(out, "  (a rule that waits, sleeps or is descheduled costs nothing here. Each of the %d measured calls "+
+		"costs about %dns to measure, subtracted from every row and counted once below. Compare rules to each other: "+
+		"the measurement makes a --timing run slower than a real one.)\n",
+		account.Calls, perCall.Nanoseconds())
+	printCoverage(out, timings)
 	fmt.Fprintf(out, "  %-42s %9s %9s %9s %8s %8s %8s\n",
-		"rule", "total", "setup", "listen", "files", "nodes", "found")
+		"rule", "cpu", "setup", "listen", "files", "nodes", "found")
 
 	for _, timing := range sorted {
 		share := ""
-		if attributed > 0 {
-			share = fmt.Sprintf(" %5.1f%%", 100*float64(timing.TotalDuration())/float64(attributed))
+		if ruleCPU > 0 {
+			share = fmt.Sprintf(" %5.1f%%", 100*float64(timing.TotalCPU())/float64(ruleCPU))
 		}
 
 		fmt.Fprintf(out, "  %-42s %9s %9s %9s %8d %8d %8d%s\n",
 			timing.Name,
-			formatMilliseconds(timing.TotalDuration()),
-			formatMilliseconds(timing.SetupDuration),
-			formatMilliseconds(timing.ListenerDuration),
+			formatMilliseconds(timing.TotalCPU()),
+			formatMilliseconds(timing.SetupCPU),
+			formatMilliseconds(timing.ListenerCPU),
 			timing.FilesListened,
 			timing.NodesOffered,
 			timing.Findings,
@@ -76,55 +95,28 @@ func printTimings(out io.Writer, timings *program.Timings, lintDuration time.Dur
 // files are walked in parallel that rule is arbitrary. Measured before this existed: three comment
 // rules doing identical work reported 171ms, 132ms, and 1.0ms, and the cheap one had simply asked
 // last. A reader would have concluded the 171ms rule was expensive and optimized the wrong thing.
+//
+// Reported by family, which is a cache key up to its first colon, because a key identifies a cache
+// entry and a cache entry is not a line worth reading. The HIR cache keys per function node, by kind
+// and source offset, which is correct for a cache and once produced 11,150 rows here against three
+// real ones: `--timing` was 17,000 lines, two thirds of them a single derivation reported one
+// function at a time, each costing 0.00ms and none of them actionable. The family is the label the
+// fill's CPU carries, so the collapse happens where it is measured.
 func printSharedFills(out io.Writer, timings *program.Timings) {
-	fills := timings.SharedFills()
-	if len(fills) == 0 {
+	shared := timings.SharedCPU()
+	if len(shared) == 0 {
 		return
 	}
 
-	// Keys are collapsed to their family before reporting, because a key identifies a cache entry
-	// and a cache entry is not a line worth reading. The HIR cache keys per function node, by kind
-	// and source offset, which is correct for a cache and produced 11,150 rows here against three
-	// real ones: `--timing` was 17,000 lines, two thirds of them a single derivation reported one
-	// function at a time, each costing 0.00ms and none of them actionable.
-	//
-	// The family is everything before the first colon, which is how these keys are already built
-	// (`hir.Function:175:10055`, `comments.All`). A key with no colon is its own family, so the
-	// three genuinely distinct entries are unchanged.
-	type sharedFamily struct {
-		duration time.Duration
-		entries  int
+	families := make([]string, 0, len(shared))
+	for family := range shared {
+		families = append(families, family)
 	}
-	families := make(map[string]*sharedFamily, len(fills))
-	for key, duration := range fills {
-		name := key
-		if colon := strings.IndexByte(key, ':'); colon >= 0 {
-			name = key[:colon]
-		}
-		family, seen := families[name]
-		if !seen {
-			family = &sharedFamily{}
-			families[name] = family
-		}
-		family.duration += duration
-		family.entries++
-	}
+	sort.Strings(families)
 
-	names := make([]string, 0, len(families))
-	for name := range families {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	for _, name := range names {
-		family := families[name]
-		if family.entries == 1 {
-			fmt.Fprintf(out, "  shared: %s cost %s, paid once per file and used by several rules\n",
-				name, formatMilliseconds(family.duration))
-			continue
-		}
-		fmt.Fprintf(out, "  shared: %s cost %s across %d entries, paid once per file and used by several rules\n",
-			name, formatMilliseconds(family.duration), family.entries)
+	for _, family := range families {
+		fmt.Fprintf(out, "  shared: %s cost %s of CPU, computed once per file and used by several rules\n",
+			family, formatMilliseconds(shared[family]))
 	}
 }
 
@@ -158,7 +150,7 @@ func printTimingNotes(out io.Writer, sorted []program.RuleTiming) {
 
 		perNode := ""
 		if timing.NodesOffered > 0 {
-			perNode = fmt.Sprintf(", %.0fns per node", float64(timing.TotalDuration().Nanoseconds())/float64(timing.NodesOffered))
+			perNode = fmt.Sprintf(", %.0fns per node", float64(timing.TotalCPU().Nanoseconds())/float64(timing.NodesOffered))
 		}
 		fmt.Fprintf(out,
 			"  note: %s saw the most nodes of any rule (%d%s) — compare a rule's cost against this one, not against its own node count\n",
@@ -239,7 +231,7 @@ func costRange(sorted []program.RuleTiming, names []string) costExtremes {
 		if !named[timing.Name] {
 			continue
 		}
-		total := timing.TotalDuration()
+		total := timing.TotalCPU()
 		if extremes.cheapestName == "" || total < extremes.cheapestCost {
 			extremes.cheapestName, extremes.cheapestCost = timing.Name, total
 		}
@@ -264,56 +256,42 @@ func formatMilliseconds(duration time.Duration) string {
 	return fmt.Sprintf("%.2fms", milliseconds)
 }
 
-// printCoverage says what fraction of the lint phase this table actually accounts for.
+// printCoverage says what share of the walk's CPU the rows account for, and what the rest was.
 //
-// Every number in the table is true and the table implies something false about what it covers.
-// The rows are rule listeners and per-file setup; the walk that offers nodes to those listeners is
-// not timed by anything. A reader sums the share column, gets 100 percent, and concludes the phase
-// is explained. It is not: the shares are of rule time, and rule time is a minority of the phase.
+// Every number in the table is true and the table implies something false about what it covers. The
+// rows are rule listeners and per-file setup, and a reader who sums the share column gets 100 percent
+// and concludes the phase is explained. It is not: the walk that offers nodes to those listeners costs
+// CPU too. On the wall-clock table this replaced, that walk could only be guessed at by subtracting
+// rule time from wall clock, which absorbed every wait, and in a parallel run it vanished entirely.
 //
-// Measured on the ahra tree at 02:31, load 4.92:
-//
-//	single-threaded    285ms rule time    1,024ms wall    the table covers ~28%
-//	parallel           314ms rule time      301ms wall    the table appears to cover ~104%
-//
-// The parallel reading is the dangerous one, and it is the default mode. Rule time slightly
-// exceeding wall clock reads as "rules are the entire phase and traversal is free." Traversal is
-// not free; it parallelizes almost perfectly across files, so roughly 700ms of walking collapses
-// into a few tens of milliseconds of wall clock and disappears underneath the rule time rather
-// than being cheap. Only single-threaded shows the shape of the real work.
-//
-// So this prints the ratio rather than a traversal row. A traversal row would be wall clock minus
-// attributed time, which is a number produced by subtraction rather than by measurement, and it
-// would absorb scheduling, contention, and anything else unaccounted for under a label claiming to
-// name one thing. Quoting an unmeasured residual as if it were measured is the failure this whole
-// instrument exists to prevent. A ratio makes the gap visible and stays honest about its size
-// without inventing an attribution for it.
-func printCoverage(out io.Writer, attributed time.Duration, lintDuration time.Duration) {
-	if lintDuration <= 0 || attributed <= 0 {
-		// No phase duration means no ratio to state. Saying nothing is correct here; printing a
-		// coverage claim computed from a zero would be worse than the silence it replaces.
-		return
+// The threads' clocks account for it. Each worker's CPU across its walk is read, the calls into rules,
+// derivations and the measurement itself are read inside it, and the walk is what of the worker's CPU
+// lay outside every call: a difference between readings of one thread's clock, which holds no waiting.
+// The process's CPU outside the workers is read the same way.
+func printCoverage(out io.Writer, timings *program.Timings) {
+	account := timings.Account
+	ruleCPU := timings.TotalCPU()
+	var sharedCPU time.Duration
+	for _, cost := range timings.SharedCPU() {
+		sharedCPU += cost
 	}
-
-	coverage := 100 * float64(attributed) / float64(lintDuration)
-
-	if coverage > 95 {
-		// Attributed time at or above wall clock means the run was parallel: listener time summed
-		// across workers, against wall clock that overlapped them. The ratio is not a coverage
-		// figure at all here, and printing it as one would be the exact misreading this line was
-		// added to prevent.
-		fmt.Fprintf(out,
-			"  coverage: rule time is summed across workers, so it exceeds wall clock and is not a share of this phase. "+
-				"Tree traversal is not timed by any row here. Run --single-threaded to see what the phase actually costs.\n")
+	workersCPU := ruleCPU + sharedCPU + account.InstrumentCPU + account.WalkCPU
+	if workersCPU <= 0 {
+		// Nothing measured on the walk workers means no share to state. A share computed from a zero
+		// would be worse than the silence it replaces.
 		return
 	}
 
 	fmt.Fprintf(out,
-		"  coverage: these rows account for %.0f%% of the %s lint phase. "+
-			"The remaining %.0f%% is tree traversal, which no row here measures.\n",
-		coverage,
-		formatMilliseconds(lintDuration),
-		100-coverage,
+		"  coverage: the walk workers spent %s of CPU: rules %.0f%%, shared derivations %.0f%%, measuring %.0f%%, and %.0f%% "+
+			"the walk itself (traversal, dispatch, configuration). Another %s of process CPU ran on no walk worker "+
+			"(the garbage collector, the runtime).\n",
+		formatMilliseconds(workersCPU),
+		100*float64(ruleCPU)/float64(workersCPU),
+		100*float64(sharedCPU)/float64(workersCPU),
+		100*float64(account.InstrumentCPU)/float64(workersCPU),
+		100*float64(account.WalkCPU)/float64(workersCPU),
+		formatMilliseconds(account.OtherCPU),
 	)
 }
 

@@ -256,6 +256,14 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			homeFiles[worker] = files[indices[0]]
 		}
 	}
+	// The process's CPU when the walk began, so the timing table can say what the rest of the process
+	// spent while the workers walked. Read only under --timing.
+	var processStart time.Duration
+	var processKnown bool
+	if timings != nil {
+		processStart, processKnown = processCPU()
+	}
+
 	var waitGroup sync.WaitGroup
 	for worker := range workers {
 		waitGroup.Add(1)
@@ -284,6 +292,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			if timings != nil {
 				localTimings = NewTimings(nil)
 			}
+			// Under --timing, this worker's thread CPU clock, read around every call into a rule. See
+			// Timings. Nil otherwise.
+			meter := startWorkerMeter(localTimings)
 
 			// walkFile walks one file on the checker that owns checkerFile.
 			walkFile := func(index int, checkerFile *ast.SourceFile) {
@@ -530,6 +541,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				}
 			}
 
+			// Stopped before the lock, so waiting for it is not counted as the walk's.
+			meter.finish()
+
 			// Appended in whichever order the workers finish. The order is fixed once, after the wait
 			// below, rather than here, where it would still depend on who took the lock first.
 			mutex.Lock()
@@ -568,6 +582,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 		}()
 	}
 	waitGroup.Wait()
+	timings.closeAccount(processStart, processKnown)
 
 	// What the design system read, if any rule loaded it, so the cache can key this walk's design-system
 	// findings on it. Asked of the program after the walk rather than of the rules during it: the design system
@@ -877,9 +892,10 @@ func dispatchFile(
 	// shared too.
 	fileCache := rule.NewFileCache()
 
-	// Which rule triggered each cache fill, so its cost can be moved off that rule's total.
-	fillPayer := map[string]string{}
-	seenFills := map[string]bool{}
+	// Under --timing, the worker's meter, which bills each call in this file to its rule and each cache
+	// fill to its derivation. Nil otherwise.
+	meter := timings.workerMeter()
+	meter.watchFills(fileCache)
 
 	containments := make([]*ruleContainment, 0, len(rules))
 	notes = RuleNotes{}
@@ -940,10 +956,15 @@ func dispatchFile(
 		containment := &ruleContainment{ruleName: ruleName, fileName: sourceFile.FileName()}
 		containments = append(containments, containment)
 
-		setupStart := timingNow(timing)
-		listeners := containment.run(subject, context, ruleOptions[ruleName])
-		if timing != nil {
-			timing.SetupDuration += time.Since(setupStart)
+		// Branched rather than always passing a closure, which would allocate once per rule per file on
+		// every run to serve a flag most runs don't set.
+		var listeners rule.Listeners
+		if meter == nil {
+			listeners = containment.run(subject, context, ruleOptions[ruleName])
+		} else {
+			meter.setup(timing, func() {
+				listeners = containment.run(subject, context, ruleOptions[ruleName])
+			})
 		}
 		if containment.crash != nil {
 			// Offered and crashed, so it neither declined nor listened.
@@ -967,22 +988,13 @@ func dispatchFile(
 			timing.FilesListened++
 		}
 		for kind, listener := range listeners {
-			merged[kind] = append(merged[kind], containment.listener(attributingListener(timing, listener, ruleName, fileCache, seenFills, fillPayer)))
+			merged[kind] = append(merged[kind], containment.listener(meter.listener(timing, listener)))
 			listened = true
 		}
 	}
 
 	if listened {
 		visitedNodes = walk(sourceFile.AsNode(), merged)
-	}
-
-	// A cached derivation is paid for by whichever rule asked first, and files are walked in
-	// parallel, so that identity is arbitrary. Move the cost off that rule and onto the derivation,
-	// or the table names a victim rather than a cause.
-	if timings != nil {
-		for key, cost := range fileCache.FillDurations() {
-			timings.RecordSharedFill(fillPayer[key], key, cost)
-		}
 	}
 
 	// The rules this run actually ran, so a directive naming only rules cohere has not ported can be

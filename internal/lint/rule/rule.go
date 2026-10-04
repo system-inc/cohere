@@ -11,8 +11,6 @@
 package rule
 
 import (
-	"time"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -113,36 +111,46 @@ type Context struct {
 type FileCache struct {
 	entries map[string]any
 
-	// fillDurations records what each derivation cost to compute, keyed the same way the entries
-	// are.
+	// fills counts how many times each derivation was computed, keyed the same way the entries are.
+	// Once per key is the cache working.
+	fills map[string]int
+
+	// aroundFill, when set, runs each fill, so the caller can say whose work the fill is.
 	//
 	// This exists because per-rule timing lies about shared work. Whichever rule asks for a
 	// derivation first pays for it, and since files are walked in parallel the identity of that
 	// rule varies per file. Measured on three comment rules sharing one scan: 171ms, 132ms, and
-	// 1.0ms for identical work, where the 1.0ms rule was simply the one that asked last.
-	//
-	// Attributing the cost here rather than to a rule is the only reading that stays true as the
-	// order changes.
-	fillDurations map[string]time.Duration
+	// 1.0ms for identical work, where the 1.0ms rule was simply the one that asked last. Under
+	// --timing the walk sets this to bill the fill to the derivation rather than to the rule that
+	// asked, which is the only reading that stays true as the order changes.
+	aroundFill func(key string, fill func())
 }
 
 // NewFileCache returns a cache for one file.
 func NewFileCache() *FileCache {
 	return &FileCache{
-		entries:       map[string]any{},
-		fillDurations: map[string]time.Duration{},
+		entries: map[string]any{},
+		fills:   map[string]int{},
 	}
 }
 
-// FillDurations reports what each derivation cost to compute in this file, by key.
+// Fills reports how many times each derivation was computed in this file, by key.
 //
 // Empty for a cache that was never filled, which is the common case for a file no comment rule
 // looked at.
-func (c *FileCache) FillDurations() map[string]time.Duration {
+func (c *FileCache) Fills() map[string]int {
 	if c == nil {
 		return nil
 	}
-	return c.fillDurations
+	return c.fills
+}
+
+// SetAroundFill makes every later fill run inside around. Nil restores plain fills.
+func (c *FileCache) SetAroundFill(around func(key string, fill func())) {
+	if c == nil {
+		return
+	}
+	c.aroundFill = around
 }
 
 // Cached returns the value stored under key, computing it once on the first ask.
@@ -161,9 +169,13 @@ func Cached[Value any](cache *FileCache, key string, compute func() Value) Value
 		// silent on purpose: the alternative is a rule package crashing a lint run over a cache.
 		return compute()
 	}
-	start := time.Now()
-	computed := compute()
-	cache.fillDurations[key] += time.Since(start)
+	var computed Value
+	if cache.aroundFill != nil {
+		cache.aroundFill(key, func() { computed = compute() })
+	} else {
+		computed = compute()
+	}
+	cache.fills[key]++
 
 	cache.entries[key] = computed
 	return computed

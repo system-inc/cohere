@@ -215,7 +215,7 @@ func mentionsManualMemoization(node *ast.Node) bool {
 // caller ever asks for a different node that happens to share a position with this one.
 //
 // A pointer address would be the obvious alternative and is worse: it is not printable in a way
-// `FillDurations` can report usefully, and it would silently key two runs of the same file
+// `Fills` can report usefully, and it would silently key two runs of the same file
 // differently.
 func cacheKeyFor(node *ast.Node) string {
 	return "hir.Function:" + strconv.Itoa(int(node.Kind)) + ":" + strconv.Itoa(node.Pos())

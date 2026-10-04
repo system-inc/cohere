@@ -221,7 +221,7 @@ func TestForFunctionRecordsOneFillPerFunction(t *testing.T) {
 							ForFunction(ctx, function)
 						}
 					})
-					for key := range ctx.FileCache.FillDurations() {
+					for key := range ctx.FileCache.Fills() {
 						fillKeys = append(fillKeys, key)
 					}
 				},

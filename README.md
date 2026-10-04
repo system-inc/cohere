@@ -158,7 +158,7 @@ root unless you name another).
 | `--phases` | put where the time went (graph, fix, format, types, lint) first in the footer's parentheses |
 | `--json` | print newline-delimited JSON for a program to read instead of the human view (see [Output](#output)) |
 | `--coverage` | name every rule under the coverage fact that describes it, not only count them |
-| `--timing` | report what building the graph and each rule cost, most expensive rule first |
+| `--timing` | report what building the graph cost and the CPU each rule cost, most expensive rule first |
 | `--single-threaded` | use one type checker instead of several |
 | `--profile FILE` | write a Go CPU profile of the run to FILE |
 | `--cache-dump` | print what this project's cache holds, and exit |
@@ -207,8 +207,9 @@ the time a format was running and 🪄 the rest of the fix phase, and together t
 { "output": { "phases": true } }
 ```
 
-`--timing` is separate and still prints what each rule cost, which adds overhead; the phase times are
-free.
+`--timing` is separate and still prints what each rule cost, as CPU read from each walk thread's own
+clock, so a rule that waits or is descheduled costs nothing. Reading that clock around every call adds
+overhead; the phase times are free.
 
 `--verbose` prints everything a run can say: each phase and why any did not run, the coverage summary,
 overrides, skips, notes, memory and the total. Its footer adds the syntax nodes the run walked, and

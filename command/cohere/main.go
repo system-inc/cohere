@@ -122,7 +122,7 @@ func run() error {
 	format := flag.Bool("format", false, "format the files not on record as formatted, or the paths named; a bare run, "+
 		"--fix and --no-fix already do, so naming it there changes nothing")
 	maxFixPasses := flag.Int("fix-passes", edit.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
-	showTiming := flag.Bool("timing", false, "report what building the graph and each rule cost, most expensive rule first")
+	showTiming := flag.Bool("timing", false, "report what building the graph cost and the CPU each rule cost, most expensive rule first")
 	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run, writing nothing")
 	// The counts print on every run; this names every rule once under the one coverage fact that
 	// describes it. Behind a flag because 170 per-rule notes on a clean run buried the lines that need
