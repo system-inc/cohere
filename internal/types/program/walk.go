@@ -170,7 +170,15 @@ type Result struct {
 	// FilesOnForeignCheckers is how many files were walked on a checker other than the one that owns them:
 	// taken by a worker whose own group was done, or every file under WalkOnForeignCheckers. See walkQueue.
 	FilesOnForeignCheckers int
+
+	// Notes is what each file's rules noted through rule.Context.Note, by file name. Kept per file and
+	// per rule rather than summed, because the findings cache stores a file's notes beside its findings
+	// and a refresh re-walks only some of a file's rules: a total could not be split back apart.
+	Notes map[string]RuleNotes
 }
+
+// RuleNotes is one file's notes: a count per key, per rule.
+type RuleNotes map[string]map[string]int
 
 // Walk visits every file in the given set once, dispatching every rule's listeners as it goes.
 //
@@ -223,6 +231,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	configFailures := []error{}
 	fileCrashes := []FileCrash{}
 	ruleCrashesAll := []RuleCrash{}
+	notes := map[string]RuleNotes{}
 
 	// Nil unless asked for, and every timing call below is guarded on it, so a run without --timing
 	// does not pay for the instrument at all.
@@ -266,6 +275,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			localFailures := []error{}
 			localCrashes := []FileCrash{}
 			localRuleCrashes := []RuleCrash{}
+			localNotes := map[string]RuleNotes{}
 			localForeign := 0
 
 			// Each worker accumulates locally and merges once under the mutex. Timing through a
@@ -425,7 +435,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					listeningTarget, offeredTarget = fileListening, fileOffered
 				}
 				diagnosticsBefore := len(localDiagnostics)
-				visited, silenced, ruleCrashes, crashed := dispatchFileSafely(sourceFile, func(diagnostic rule.Diagnostic) {
+				visited, silenced, fileNotes, ruleCrashes, crashed := dispatchFileSafely(sourceFile, func(diagnostic rule.Diagnostic) {
 					localDiagnostics = append(localDiagnostics, diagnostic)
 					localReporting[diagnostic.RuleName]++
 				}, walkRules, g, fileChecker, listeningTarget, offeredTarget, ruleOptions, localTimings, catalog, resolution)
@@ -473,6 +483,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					localNodes += visited
 				}
 				localSuppressed.add(silenced)
+				if len(fileNotes) > 0 {
+					localNotes[sourceFile.FileName()] = fileNotes
+				}
 
 				if recording && replayed == nil {
 					if entry, eligible := recordableEntry(sourceFile, keys,
@@ -537,6 +550,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			configFailures = append(configFailures, localFailures...)
 			fileCrashes = append(fileCrashes, localCrashes...)
 			ruleCrashesAll = append(ruleCrashesAll, localRuleCrashes...)
+			for fileName, fileNotes := range localNotes {
+				notes[fileName] = fileNotes
+			}
 			timings.merge(localTimings)
 			filesReplayed += localReplayed
 			typeAwareRerun += localTypeAwareRerun
@@ -572,6 +588,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 		DesignSystemRerun: designSystemRerun,
 
 		FilesOnForeignCheckers: filesOnForeignCheckers,
+		Notes:                  notes,
 		Coverage: Coverage{
 			FilesInProgram: len(g.Program.GetSourceFiles()),
 			FilesWalked:    len(files),
@@ -798,21 +815,22 @@ func dispatchFileSafely(
 	timings *Timings,
 	catalog *ruleNameCatalog,
 	resolution configuration.Resolved,
-) (visited int, silenced suppressionTally, ruleCrashes []RuleCrash, crashed error) {
+) (visited int, silenced suppressionTally, notes RuleNotes, ruleCrashes []RuleCrash, crashed error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			// The visited count is discarded along with the file. A file that crashed halfway
 			// contributed nodes to a total that would then describe a walk nobody completed.
 			visited = 0
 			silenced = suppressionTally{}
+			notes = nil
 			ruleCrashes = nil
 			crashed = fmt.Errorf("%v", recovered)
 		}
 	}()
 
-	visited, silenced, ruleCrashes = dispatchFile(sourceFile, report, applicable, g, fileChecker,
+	visited, silenced, notes, ruleCrashes = dispatchFile(sourceFile, report, applicable, g, fileChecker,
 		listeningCounts, offeredCounts, ruleOptions, timings, catalog, resolution)
-	return visited, silenced, ruleCrashes, nil
+	return visited, silenced, notes, ruleCrashes, nil
 }
 
 // dispatchFile asks every rule what it wants to hear about in this file, merges those answers into
@@ -834,7 +852,7 @@ func dispatchFile(
 	timings *Timings,
 	catalog *ruleNameCatalog,
 	resolution configuration.Resolved,
-) (visitedNodes int, silenced suppressionTally, ruleCrashes []RuleCrash) {
+) (visitedNodes int, silenced suppressionTally, notes RuleNotes, ruleCrashes []RuleCrash) {
 	// A kind may have listeners from several rules, so the merged table holds a slice per kind rather
 	// than one function. Indexed by kind rather than keyed by it: the walk reads it once per node, and a
 	// slice index is cheaper than a map lookup, about 100ms of CPU across a cold ahra walk (#zqsdzbq).
@@ -859,6 +877,7 @@ func dispatchFile(
 	seenFills := map[string]bool{}
 
 	containments := make([]*ruleContainment, 0, len(rules))
+	notes = RuleNotes{}
 
 	// Each rule reads the program through a view of what it declared (rule.ProgramReads), built for
 	// the whole file in one allocation.
@@ -896,6 +915,12 @@ func dispatchFile(
 				}
 
 				report(diagnostic)
+			},
+			RecordNote: func(key string) {
+				if notes[ruleName] == nil {
+					notes[ruleName] = map[string]int{}
+				}
+				notes[ruleName][key]++
 			},
 		}
 
@@ -976,7 +1001,7 @@ func dispatchFile(
 		}
 	}
 
-	return visitedNodes, tally(sourceFile.FileName(), directives, ranRule, resolution), ruleCrashes
+	return visitedNodes, tally(sourceFile.FileName(), directives, ranRule, resolution), notes, ruleCrashes
 }
 
 // suppressionTally is what one file's directives did, summed across the run.

@@ -219,7 +219,8 @@ func correctnessNoCallerDataMutationCheckTarget(ctx rule.Context, target *ast.No
 	if !correctnessNoCallerDataMutationWritesData(ctx, target) {
 		return
 	}
-	if correctnessNoCallerDataMutationIsProcessState(ctx, parameter) {
+	if tagged, isProcessState := correctnessNoCallerDataMutationProcessStateOf(ctx, parameter); isProcessState {
+		ctx.Note(tagged)
 		return
 	}
 	ctx.ReportNode(target, correctnessNoCallerDataMutationMessage())
@@ -248,7 +249,8 @@ func correctnessNoCallerDataMutationCheckCall(ctx rule.Context, call *ast.Node) 
 	if receiver.Kind != ast.KindIdentifier && !correctnessNoCallerDataMutationWritesData(ctx, receiver) {
 		return
 	}
-	if correctnessNoCallerDataMutationIsProcessState(ctx, parameter) {
+	if tagged, isProcessState := correctnessNoCallerDataMutationProcessStateOf(ctx, parameter); isProcessState {
+		ctx.Note(tagged)
 		return
 	}
 	ctx.ReportNode(callee, correctnessNoCallerDataMutationMessage())
@@ -441,14 +443,17 @@ func correctnessNoCallerDataMutationIsWriter(ctx rule.Context, name *ast.Node) b
 	return true
 }
 
-// correctnessNoCallerDataMutationIsProcessState says whether a parameter's declared type is a type
+// correctnessNoCallerDataMutationProcessStateOf says whether a parameter's declared type is a type
 // declared as process state: the type's own symbol, or the alias it was written through, carries a
 // `@processState` tag with a reason. Exact on purpose, so a union, a mapped or wrapped type, an array
 // and a subtype each fail it.
-func correctnessNoCallerDataMutationIsProcessState(ctx rule.Context, parameter *ast.Symbol) bool {
+//
+// It answers with the note key the exemption is counted under: the tagged type's name and the file
+// declaring it, so --coverage can say which type exempted how many writes.
+func correctnessNoCallerDataMutationProcessStateOf(ctx rule.Context, parameter *ast.Symbol) (string, bool) {
 	declared := checker.Checker_getTypeOfSymbol(ctx.TypeChecker, parameter)
 	if declared == nil {
-		return false
+		return "", false
 	}
 	candidates := []*ast.Symbol{checker.Type_symbol(declared)}
 	if alias := checker.Type_alias(declared); alias != nil {
@@ -467,12 +472,12 @@ func correctnessNoCallerDataMutationIsProcessState(ctx rule.Context, parameter *
 			file := ast.GetSourceFileOfNode(declaration)
 			for _, tag := range correctnessNoCallerDataMutationProcessStateTags(file, declaration) {
 				if correctnessNoCallerDataMutationTagReason(file, tag) != "" {
-					return true
+					return candidate.Name + " in " + file.FileName(), true
 				}
 			}
 		}
 	}
-	return false
+	return "", false
 }
 
 // correctnessNoCallerDataMutationProcessStateTags returns the `@processState` tags in a declaration's

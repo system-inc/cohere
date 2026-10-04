@@ -94,6 +94,10 @@ type Context struct {
 	// Nil is legal and means no caching, so a harness that builds a Context by hand keeps working
 	// and simply recomputes.
 	FileCache *FileCache
+
+	// RecordNote counts one note under a key. Rules call Note, which tolerates a nil RecordNote, so a
+	// harness that builds a Context by hand needs none.
+	RecordNote func(key string)
 }
 
 // FileCache memoizes per-file derived work across the rules that share it.
@@ -363,6 +367,15 @@ type Rule struct {
 // thing.
 //
 // A rule that genuinely wants the trivia included says so with ReportRange.
+// Note records one occurrence of a fact the rule wants counted rather than reported: an exemption it
+// applied, say, so that a tag silencing writes shows up as a number someone reads instead of as nothing.
+// A note is not a finding and fails nothing. The walk counts notes per file, per rule and per key.
+func (c Context) Note(key string) {
+	if c.RecordNote != nil {
+		c.RecordNote(key)
+	}
+}
+
 func (c Context) ReportNode(node *ast.Node, message Message) {
 	c.Report(Diagnostic{
 		Range:      TokenRange(c.SourceFile, node),
