@@ -110,12 +110,8 @@ func DecodeInitDeclarationsOptions(list []byte) (any, error) {
 	return options, nil
 }
 
-// initDeclarationsModeOf reads a mode name, and answers the unconfigured mode for anything else.
-//
-// Upstream's schema is an enum, so a value outside it is a configuration error ESLint refuses before
-// the rule runs rather than something the rule sees. There is no config-rejection surface to
-// reproduce here, so an unrecognized mode resolves to the unconfigured state, which is the closest
-// available spelling of "this rule never ran" and the same thing an absent mode does.
+// initDeclarationsModeOf reads a mode name, and answers the unconfigured mode for anything else, which
+// the decoder refuses: upstream's schema is an enum, so a value outside it is a configuration error.
 func initDeclarationsModeOf(name string) InitDeclarationsMode {
 	switch InitDeclarationsMode(name) {
 	case InitDeclarationsAlways:

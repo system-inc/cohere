@@ -2,6 +2,7 @@ package typescript
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -749,10 +750,6 @@ func TestClassLiteralPropertyStyleDecoderResolvesTheStyle(t *testing.T) {
 	}{
 		{"\"fields\"", ClassLiteralPropertyStyleFields},
 		{"\"getters\"", ClassLiteralPropertyStyleGetters},
-		// An unrecognized spelling keeps the default rather than producing an empty style that
-		// would match neither arm and silence the rule. Upstream refuses such a configuration at
-		// schema validation, which it can because it has an error channel to a user.
-		{"\"nonsense\"", ClassLiteralPropertyStyleFields},
 	}
 	for index, testCase := range cases {
 		t.Run(classLiteralPropertyStyleCaseName(index), func(t *testing.T) {
@@ -932,5 +929,48 @@ func TestClassLiteralPropertyStyleDeclinesAConversionThatCannotCompile(t *testin
 			}
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
+	}
+}
+
+// The decoder reads empty input and `null` as upstream's default and each of upstream's two styles as
+// itself, and refuses anything else, naming the value (#rfbha44). Each refused value used to decode to
+// the default, so a config naming one loaded clean and ran a style nobody wrote; upstream's schema is a
+// string enum and refuses every one at load.
+func TestClassLiteralPropertyStyleDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
+	t.Parallel()
+
+	for _, accepted := range []struct {
+		wire string
+		want ClassLiteralPropertyStyleSetting
+	}{
+		{"", ClassLiteralPropertyStyleFields},
+		{"null", ClassLiteralPropertyStyleFields},
+		{`"fields"`, ClassLiteralPropertyStyleFields},
+		{`"getters"`, ClassLiteralPropertyStyleGetters},
+	} {
+		decoded, err := DecodeClassLiteralPropertyStyleOptions([]byte(accepted.wire))
+		if err != nil {
+			t.Errorf("%s was refused: %v", accepted.wire, err)
+			continue
+		}
+		if got := decoded.(ClassLiteralPropertyStyleOptions).Style; got != accepted.want {
+			t.Errorf("%s decoded to %s, want %s", accepted.wire, got, accepted.want)
+		}
+	}
+	for _, refused := range []struct{ wire, named string }{
+		{`"getter"`, "getter"},
+		{`"Fields"`, "Fields"},
+		{`""`, `""`},
+		{`{"style": "getters"}`, "style"},
+		{`1`, "1"},
+	} {
+		_, err := DecodeClassLiteralPropertyStyleOptions([]byte(refused.wire))
+		if err == nil {
+			t.Errorf("%s decoded; it must be refused", refused.wire)
+			continue
+		}
+		if !strings.Contains(err.Error(), refused.named) {
+			t.Errorf("%s was refused without naming %s: %v", refused.wire, refused.named, err)
+		}
 	}
 }

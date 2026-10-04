@@ -2,6 +2,8 @@ package react
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
@@ -39,23 +41,30 @@ func DefaultJsxFragmentsOptions() JsxFragmentsOptions {
 // one. Our config layer unwraps the severity tuple before dispatch, so what arrives here is
 // upstream's `"syntax"` or `"element"` on its own rather than upstream's one-element array.
 //
-// An unrecognised value falls back to the default rather than erroring, matching upstream, whose
-// `configuration === 'element'` and `configuration === 'syntax'` tests both simply fail to match
-// and leave the rule reporting nothing. The schema would have rejected it before the rule ran; we
-// have no schema layer, so the fallback is where that lands.
+// Empty input and `null` are upstream's default. Anything else that is not one of the two modes is
+// refused, naming the value. This used to read an unknown value as the default, and its comment
+// claimed upstream did the same; it does not. Upstream's schema is `[{ enum: ["syntax", "element"] }]`,
+// measured on the installed build, and refuses any other value at load, the empty string included,
+// before `context.options[0] || 'syntax'` could ever see it. The config layer now refuses a decoder's
+// error by rule name, so refusing is what tells the author (#rfbha44).
 func DecodeJsxFragmentsOptions(raw []byte) (any, error) {
 	options := DefaultJsxFragmentsOptions()
-	if len(raw) == 0 {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
 		return options, nil
 	}
 	var mode string
 	if err := json.Unmarshal(raw, &mode); err != nil {
-		return options, err
+		return options, fmt.Errorf(`expected a mode string, "syntax" or "element", got %s`, trimmed)
 	}
-	if mode == "element" {
+	switch mode {
+	case "syntax":
+		return options, nil
+	case "element":
 		options.Mode = JsxFragmentsElement
+		return options, nil
 	}
-	return options, nil
+	return DefaultJsxFragmentsOptions(), fmt.Errorf(`mode %q is not "syntax" or "element"`, mode)
 }
 
 var messagePreferFragmentShorthand = rule.Message{

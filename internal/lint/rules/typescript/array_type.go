@@ -1,6 +1,9 @@
 package typescript
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimcore "github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/checking"
@@ -628,30 +631,39 @@ type arrayTypeRawOptions struct {
 // falls back to the RESOLVED `default` rather than to a constant, which is a dependency between two
 // fields that no struct tag can express.
 //
-// An unrecognized spelling falls back rather than erroring. Upstream refuses such a configuration at
-// schema validation, which it can because it has an error channel to a user; there is none here, so
-// keeping the documented behavior beats going quiet on a typo.
+// Empty input and `null` are upstream's defaults. A spelling outside upstream's three is refused,
+// naming the key and the value. This used to fall back to the default for an unknown spelling, which
+// ran a setting nobody wrote and loaded clean doing it; upstream's schema is an enum and refuses it at
+// load, and the config layer now refuses a decoder's error by rule name (#rfbha44).
 func DecodeArrayTypeOptions(raw []byte) (any, error) {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
+		return DefaultArrayTypeOptions(), nil
+	}
 	decoded, err := rule.DecodeOptionsInto[arrayTypeRawOptions]()(raw)
 	if err != nil {
-		return DefaultArrayTypeOptions(), err
+		return DefaultArrayTypeOptions(), fmt.Errorf("expected an object of default and readonly, got %s: %w", trimmed, err)
 	}
 
 	wire, _ := decoded.(arrayTypeRawOptions)
 	options := DefaultArrayTypeOptions()
 
 	if wire.Default != nil {
-		if setting, recognized := arrayTypeSettingFromWire(*wire.Default); recognized {
-			options.Default = setting
+		setting, recognized := arrayTypeSettingFromWire(*wire.Default)
+		if !recognized {
+			return DefaultArrayTypeOptions(), fmt.Errorf(`default %q is not "array", "array-simple" or "generic"`, *wire.Default)
 		}
+		options.Default = setting
 	}
 
 	// Resolved after `default`, and from it, which is upstream's `options.readonly ?? defaultOption`.
 	options.Readonly = options.Default
 	if wire.Readonly != nil {
-		if setting, recognized := arrayTypeSettingFromWire(*wire.Readonly); recognized {
-			options.Readonly = setting
+		setting, recognized := arrayTypeSettingFromWire(*wire.Readonly)
+		if !recognized {
+			return DefaultArrayTypeOptions(), fmt.Errorf(`readonly %q is not "array", "array-simple" or "generic"`, *wire.Readonly)
 		}
+		options.Readonly = setting
 	}
 
 	return options, nil

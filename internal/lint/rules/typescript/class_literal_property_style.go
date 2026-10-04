@@ -1,6 +1,8 @@
 package typescript
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -897,21 +899,26 @@ func DefaultClassLiteralPropertyStyleOptions() ClassLiteralPropertyStyleOptions 
 // default is `fields` rather than a Go zero value, so a generic decode would hand the rule an empty
 // style that matches no arm and silences it while every fixture stayed green.
 //
-// An unrecognized spelling falls back to the default rather than erroring. Upstream refuses such a
-// configuration at schema validation, which it can because it has an error channel to a user; there
-// is none here, so keeping the documented behavior beats going quiet on a typo.
+// Empty input and `null` are upstream's default. Anything else that is not one of the two spellings is
+// refused, naming the value. This used to read an unknown spelling as the default, on the reasoning
+// that a typo should not silence the rule; it did not silence it, it ran a style nobody wrote and
+// loaded clean doing it. Upstream's schema is a string enum and refuses it at load, and the config
+// layer now refuses a decoder's error by rule name, so refusing is what tells the author (#rfbha44).
 func DecodeClassLiteralPropertyStyleOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[string]()(raw)
-	if err != nil {
-		return DefaultClassLiteralPropertyStyleOptions(), err
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
+		return DefaultClassLiteralPropertyStyleOptions(), nil
 	}
-
-	wire, _ := decoded.(string)
+	var wire string
+	if err := json.Unmarshal(raw, &wire); err != nil {
+		return DefaultClassLiteralPropertyStyleOptions(),
+			fmt.Errorf(`expected a style string, "fields" or "getters", got %s`, trimmed)
+	}
 	switch ClassLiteralPropertyStyleSetting(wire) {
 	case ClassLiteralPropertyStyleFields:
 		return ClassLiteralPropertyStyleOptions{Style: ClassLiteralPropertyStyleFields}, nil
 	case ClassLiteralPropertyStyleGetters:
 		return ClassLiteralPropertyStyleOptions{Style: ClassLiteralPropertyStyleGetters}, nil
 	}
-	return DefaultClassLiteralPropertyStyleOptions(), nil
+	return DefaultClassLiteralPropertyStyleOptions(), fmt.Errorf(`style %q is not "fields" or "getters"`, wire)
 }

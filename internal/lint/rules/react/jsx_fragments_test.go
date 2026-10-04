@@ -235,7 +235,6 @@ func TestDecodeJsxFragmentsOptions(t *testing.T) {
 		{"absent configuration falls back to the default", "", JsxFragmentsSyntax},
 		{"the explicit default", `"syntax"`, JsxFragmentsSyntax},
 		{"the element mode", `"element"`, JsxFragmentsElement},
-		{"an unrecognised value falls back rather than erroring", `"nonsense"`, JsxFragmentsSyntax},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -516,5 +515,48 @@ func TestJsxFragmentsNonReactSources(t *testing.T) {
 				testCase.sourceText, JsxFragmentsOptions{Mode: JsxFragmentsSyntax})
 			rule_testing.ExpectClean(t, result)
 		})
+	}
+}
+
+// The decoder reads empty input and `null` as upstream's default and each of upstream's two modes as
+// itself, and refuses anything else, naming the value (#rfbha44). Upstream's schema is
+// `[{ enum: ["syntax", "element"] }]` on the installed build and refuses each of these at load, the
+// empty string included; they used to decode to the default here.
+func TestJsxFragmentsDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
+	t.Parallel()
+
+	for _, accepted := range []struct {
+		wire string
+		want JsxFragmentsMode
+	}{
+		{"", JsxFragmentsSyntax},
+		{"null", JsxFragmentsSyntax},
+		{`"syntax"`, JsxFragmentsSyntax},
+		{`"element"`, JsxFragmentsElement},
+	} {
+		decoded, err := DecodeJsxFragmentsOptions([]byte(accepted.wire))
+		if err != nil {
+			t.Errorf("%s was refused: %v", accepted.wire, err)
+			continue
+		}
+		if got := decoded.(JsxFragmentsOptions).Mode; got != accepted.want {
+			t.Errorf("%s decoded to %s, want %s", accepted.wire, got, accepted.want)
+		}
+	}
+	for _, refused := range []struct{ wire, named string }{
+		{`"elements"`, "elements"},
+		{`"Syntax"`, "Syntax"},
+		{`""`, `""`},
+		{`{"mode": "element"}`, "mode"},
+		{`true`, "true"},
+	} {
+		_, err := DecodeJsxFragmentsOptions([]byte(refused.wire))
+		if err == nil {
+			t.Errorf("%s decoded; it must be refused", refused.wire)
+			continue
+		}
+		if !strings.Contains(err.Error(), refused.named) {
+			t.Errorf("%s was refused without naming %s: %v", refused.wire, refused.named, err)
+		}
 	}
 }

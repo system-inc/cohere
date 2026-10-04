@@ -2,6 +2,7 @@ package typescript
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -1814,11 +1815,6 @@ func TestArrayTypeDecoderResolvesBothAxes(t *testing.T) {
 		{"{\"default\": \"array-simple\"}", ArrayTypeArraySimple, ArrayTypeArraySimple},
 		{"{\"default\": \"generic\", \"readonly\": \"array\"}", ArrayTypeGeneric, ArrayTypeArray},
 		{"{\"readonly\": \"generic\"}", ArrayTypeArray, ArrayTypeGeneric},
-		// An unrecognized spelling keeps the default rather than producing an empty setting that
-		// would match no arm. Upstream refuses such a configuration at schema validation, which it
-		// can because it has an error channel to a user; there is none here.
-		{"{\"default\": \"nonsense\"}", ArrayTypeArray, ArrayTypeArray},
-		{"{\"default\": \"generic\", \"readonly\": \"nonsense\"}", ArrayTypeGeneric, ArrayTypeGeneric},
 	}
 	for index, testCase := range cases {
 		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
@@ -1910,4 +1906,48 @@ func arrayTypeMessageForTest(id string, className string, elementType string, re
 		return messageArrayTypeGenericSimple(className, elementType, readonlyPrefix)
 	}
 	return rule.Message{Id: "unknown", Description: "no such message id: " + id}
+}
+
+// The decoder reads empty input and `null` as upstream's defaults and each of upstream's three
+// spellings as itself, under either key, and refuses a spelling outside them, naming the key and the
+// value (#rfbha44). Each refused value used to fall back to the default, so a config naming one loaded
+// clean and ran a setting nobody wrote; upstream's schema is an enum and refuses every one at load.
+func TestArrayTypeDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
+	t.Parallel()
+
+	for _, accepted := range []struct {
+		wire               string
+		default_, readonly ArrayTypeSetting
+	}{
+		{"", ArrayTypeArray, ArrayTypeArray},
+		{"null", ArrayTypeArray, ArrayTypeArray},
+		{`{}`, ArrayTypeArray, ArrayTypeArray},
+		{`{"default": "generic"}`, ArrayTypeGeneric, ArrayTypeGeneric},
+		{`{"default": "array-simple", "readonly": "array"}`, ArrayTypeArraySimple, ArrayTypeArray},
+	} {
+		decoded, err := DecodeArrayTypeOptions([]byte(accepted.wire))
+		if err != nil {
+			t.Errorf("%s was refused: %v", accepted.wire, err)
+			continue
+		}
+		options := decoded.(ArrayTypeOptions)
+		if options.Default != accepted.default_ || options.Readonly != accepted.readonly {
+			t.Errorf("%s decoded to %+v, want %s and %s", accepted.wire, options, accepted.default_, accepted.readonly)
+		}
+	}
+	for _, refused := range []struct{ wire, named string }{
+		{`{"default": "generics"}`, "generics"},
+		{`{"default": "array", "readonly": "Array"}`, "Array"},
+		{`{"readonly": "simple"}`, "simple"},
+		{`"generic"`, "generic"},
+	} {
+		_, err := DecodeArrayTypeOptions([]byte(refused.wire))
+		if err == nil {
+			t.Errorf("%s decoded; it must be refused", refused.wire)
+			continue
+		}
+		if !strings.Contains(err.Error(), refused.named) {
+			t.Errorf("%s was refused without naming %s: %v", refused.wire, refused.named, err)
+		}
+	}
 }
