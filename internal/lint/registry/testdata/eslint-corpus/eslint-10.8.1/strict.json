@@ -12,7 +12,7 @@
 {"code":"function foo() { return; }","options":["never"],"eslint":[]},
 {"code":"// Intentionally empty","options":["global"],"eslint":[]},
 {"code":"\"use strict\"; foo();","options":["global"],"eslint":[["module",0,13]]},
-{"code":"/* license */\n/* eslint-disable rule-to-test/strict */\nfoo();","options":["global"],"eslint":[[null,14,54]]},
+{"code":"/* license */\n/* eslint-disable rule-to-test/strict */\nfoo();","options":["global"],"eslint":[]},
 {"code":"foo();","options":["global"],"eslint":[]},
 {"code":"function foo() { return; }","options":["global"],"eslint":[]},
 {"code":"'use strict'; function foo() { return; }","options":["global"],"eslint":[["module",0,13]]},

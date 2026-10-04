@@ -211,9 +211,6 @@
         "9041ea6efa8f": "globals",
         "d464aa50bd94": "globals"
     },
-    "max-classes-per-file": {
-        "9075eba51011": "missing"
-    },
     "max-lines": {
         "03f9e79bba0c": "span",
         "058df14c8887": "span",
@@ -411,10 +408,6 @@
         "c4a0df8153ae": "extra",
         "f566c7fec265": "extra",
         "f6e094ad5c78": "extra"
-    },
-    "no-fallthrough": {
-        "77ee56e5f357": "missing",
-        "e1b7f57468c8": "missing"
     },
     "no-global-assign": {
         "82fe37afcc94": "globals",
@@ -750,10 +743,6 @@
         "f2497bbb6848": "missing"
     },
     "no-useless-assignment": {
-        "196652960b00": "missing",
-        "3878d34f5c49": "missing",
-        "457e20a11ecf": "missing",
-        "45ae26ab84b6": "missing",
         "b8bc60002605": "missing"
     },
     "no-useless-backreference": {
@@ -1034,13 +1023,10 @@
         "f32ce66981fd": "span"
     },
     "prefer-const": {
-        "06d55963534f": "missing",
         "144065a8e160": "missing",
         "163108b8667d": "missing",
-        "1cc7f9627767": "missing",
         "1f092eb44482": "missing",
         "69d5c04c6422": "missing",
-        "751f50a2e7d0": "missing",
         "7cb3a2753c54": "missing",
         "880c314aec58": "missing",
         "c6e4306f177e": "missing",

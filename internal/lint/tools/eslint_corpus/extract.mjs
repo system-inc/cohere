@@ -165,8 +165,11 @@ function eslintVerdict(ruleName, row, base) {
     const lineStarts = [0];
     for(const lineBreak of row.code.matchAll(/\r\n|[\r\n\u2028\u2029]/gu)) lineStarts.push(lineBreak.index + lineBreak[0].length);
     const offsetOf = (line, column) => lineStarts[line - 1] + column - 1;
+    // Only the row's own rule. A row may turn another rule on with an inline `/*eslint ...*/` comment,
+    // or name one ESLint cannot find, and either puts that rule's messages beside this one's: three of
+    // prefer-const's rows recorded no-undef-init's finding and a missing-definition error as its own.
     return {
-        findings: messages.map(function(message) {
+        findings: messages.filter((message) => message.ruleId === ruleName).map(function(message) {
             const start = offsetOf(message.line, message.column);
             const end = message.endLine ? offsetOf(message.endLine, message.endColumn) : start;
             return { messageId: message.messageId ?? null, start, end, text: row.code.slice(start, end) };
