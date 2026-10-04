@@ -445,8 +445,60 @@ func writeCoverageDetails(out io.Writer, summary coverageSummary) {
 	if summary.Suppression != nil && len(summary.Suppression.DeadSites) > 0 {
 		writeDeadSuppressions(out, summary.Suppression.DeadSites)
 	}
-	if len(summary.Notes) > 0 {
-		writeRuleNotes(out, summary.Notes)
+	skips, notes := splitRuleSkips(summary.Notes)
+	if len(skips) > 0 {
+		writeRuleSkips(out, skips)
+	}
+	if len(notes) > 0 {
+		writeRuleNotes(out, notes)
+	}
+}
+
+// splitRuleSkips separates the notes rule.Context.Skip recorded, keyed by reason without the prefix, from
+// every other note, so a skip is listed as a skip rather than as one more fact a rule counted.
+func splitRuleSkips(notes map[string]map[string]int) (skips, others map[string]map[string]int) {
+	skips = map[string]map[string]int{}
+	others = map[string]map[string]int{}
+	for ruleName, counts := range notes {
+		for key, count := range counts {
+			target, label := others, key
+			if reason, isSkip := strings.CutPrefix(key, rule.SkippedNotePrefix); isSkip {
+				target, label = skips, reason
+			}
+			if target[ruleName] == nil {
+				target[ruleName] = map[string]int{}
+			}
+			target[ruleName][label] += count
+		}
+	}
+	return skips, others
+}
+
+// skipLines renders each rule's skips as `rule: skipped on N files, reason`, sorted by rule and reason. A
+// skip is noted once per file the rule declined, so the count is a count of files.
+func skipLines(skips map[string]map[string]int) []string {
+	var lines []string
+	for ruleName, reasons := range skips {
+		for reason, count := range reasons {
+			files := "files"
+			if count == 1 {
+				files = "file"
+			}
+			lines = append(lines, fmt.Sprintf("%s: skipped on %d %s, %s", ruleName, count, files, reason))
+		}
+	}
+	sort.Strings(lines)
+	return lines
+}
+
+// writeRuleSkips lists the rules that declined files because a compiler option or a missing precondition
+// left them unable to judge, each with how many files and why. A rule that skips reads exactly like one
+// that found nothing unless it is named here (#pa7k7zv).
+func writeRuleSkips(out io.Writer, skips map[string]map[string]int) {
+	lines := skipLines(skips)
+	fmt.Fprintf(out, "  skipped (%d): rules that declined files on a compiler option or a missing precondition, so they checked nothing there\n", len(lines))
+	for _, line := range lines {
+		fmt.Fprintf(out, "    %s\n", line)
 	}
 }
 
@@ -701,6 +753,12 @@ func writeCoverageNotes(out io.Writer, summary coverageSummary, details bool) {
 	if details {
 		writeCoverageDetails(out, summary)
 		return
+	}
+	// A skip is named by default, not only under --coverage: a rule that declined every file is the case
+	// no other line shows, since it still counts as having run (#pa7k7zv).
+	skips, _ := splitRuleSkips(summary.Notes)
+	for _, line := range skipLines(skips) {
+		fmt.Fprintf(out, "  skipped: %s\n", line)
 	}
 	for _, entry := range summary.Entries {
 		if entry.OffWithoutReason {

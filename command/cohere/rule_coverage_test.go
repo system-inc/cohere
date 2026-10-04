@@ -583,3 +583,38 @@ func TestCoverageListsWhatRulesNoted(t *testing.T) {
 		t.Errorf("a default run listed notes:\n%s", plain)
 	}
 }
+
+// A skip is listed apart from what rules noted, by rule and reason with its count of files, under
+// `--coverage`, and named by default too, since a rule that declined every file still counts as having
+// run and no other line would show it (#pa7k7zv). A rule's other notes stay under notes.
+func TestCoverageNamesWhatRulesSkipped(t *testing.T) {
+	ruleName := "@typescript-eslint/no-useless-default-assignment"
+	skip := rule.SkippedNotePrefix + "strictNullChecks is off"
+	result := program.Result{
+		Coverage: program.Coverage{
+			RulesOffered:   map[string]int{ruleName: 3, "nexus/correctness-no-caller-data-mutation": 1},
+			RulesListening: map[string]int{"nexus/correctness-no-caller-data-mutation": 1},
+		},
+		Notes: map[string]program.RuleNotes{
+			"/project/a.ts": {ruleName: {skip: 1}},
+			"/project/b.ts": {ruleName: {skip: 1}},
+			"/project/c.ts": {ruleName: {skip: 1}, "nexus/correctness-no-caller-data-mutation": {"HubInterface in /project/Hub.ts": 2}},
+		},
+	}
+	rules := []rule.Rule{{Name: ruleName}, {Name: "nexus/correctness-no-caller-data-mutation"}}
+
+	detailed := renderLintReport(lintReport{Result: result, Rules: rules, WalkCost: "in 1s", Details: true})
+	requireLines(t, detailed,
+		"  skipped (1): rules that declined files on a compiler option or a missing precondition, so they checked nothing there\n"+
+			"    "+ruleName+": skipped on 3 files, strictNullChecks is off\n"+
+			"  notes (2): what rules counted rather than reported\n"+
+			"    nexus/correctness-no-caller-data-mutation\n"+
+			"      HubInterface in /project/Hub.ts: 2\n",
+	)
+	if strings.Contains(detailed, "      "+skip) {
+		t.Errorf("a skip was listed among the notes as well:\n%s", detailed)
+	}
+
+	plain := renderLintReport(lintReport{Result: result, Rules: rules, WalkCost: "in 1s"})
+	requireLines(t, plain, "  skipped: "+ruleName+": skipped on 3 files, strictNullChecks is off\n")
+}

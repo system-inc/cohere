@@ -538,6 +538,9 @@ var Dependencies = rule.Rule{
 		}
 		settings, configured := rule.OptionsAs[DependenciesOptions](options)
 		if !configured || len(settings.Elements) == 0 {
+			// The decoder refuses an empty element list, so this is a hand-built Context's case, and a
+			// skip rather than a silence if it is ever reached in a run (#pa7k7zv).
+			ctx.Skip("no elements are configured")
 			return nil
 		}
 

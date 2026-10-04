@@ -101,8 +101,11 @@ func DecodeNoUselessDefaultAssignmentOptions(raw []byte) (any, error) {
 // This port reproduces the gate by DECLINING to judge rather than by reporting at position zero,
 // and that is a stated divergence rather than an oversight. A file-level finding anchored at 0:0
 // has no node to point at, and the surrounding harness reports per node; more importantly the
-// finding says nothing about the code, it says something about the configuration, and this
-// codebase's tsconfig has `strict` on everywhere. Measured on the installed 8.67.0 build: under an
+// finding says nothing about the code, it says something about the configuration. The decline is
+// made once per file in Run and recorded through Skip, so --coverage names the rule and the reason
+// rather than letting a declined file read as a clean one (#pa7k7zv). Every project here resolves
+// `strictNullChecks` on, ahra and www by TypeScript 6's default and api by writing `strict`, so the
+// skip fires only on a project that turns it off (#6ar414z). Measured on the installed 8.67.0 build: under an
 // unstrict project, upstream emits the `noStrictNullCheck` finding AND the real one; under the
 // option, only the real one. The three corpus cases written against an unstrict project keep their
 // real findings here, which is the half that is about the code.
@@ -145,6 +148,18 @@ var NoUselessDefaultAssignment = rule.Rule{
 			return false
 		}
 
+		// Without strictNullChecks the checker does not track undefined at all, so canBeUndefined
+		// answers false for every type and the rule would report every default in the file. Upstream
+		// reports a file-level finding and keeps going; this port declines the file instead, and says
+		// so through Skip, since a declined file and a clean one otherwise read the same (#pa7k7zv).
+		// See the rule's doc comment for the measurement and the reasoning.
+		if ctx.Program != nil &&
+			!type_checking.IsStrictCompilerOptionEnabled(ctx.Program.Options(), ctx.Program.Options().StrictNullChecks) &&
+			!settings.AllowRuleToRunWithoutStrictNullChecks {
+			ctx.Skip("strictNullChecks is off")
+			return nil
+		}
+
 		return rule.Listeners{
 			ast.KindParameter: func(node *ast.Node) {
 				if ctx.TypeChecker == nil || ctx.Program == nil {
@@ -154,7 +169,7 @@ var NoUselessDefaultAssignment = rule.Rule{
 				if parameter.Initializer == nil {
 					return
 				}
-				checkUselessDefault(ctx, settings, canBeUndefined, node, parameter.Initializer,
+				checkUselessDefault(ctx, canBeUndefined, node, parameter.Initializer,
 					parameter.Name(), parameter.Type, "parameter")
 			},
 			ast.KindBindingElement: func(node *ast.Node) {
@@ -168,7 +183,7 @@ var NoUselessDefaultAssignment = rule.Rule{
 				// A binding element never carries its own type annotation; the annotation lives on
 				// whatever the pattern destructures. Passing nil here is what routes it to the
 				// property and tuple paths rather than the parameter one.
-				checkUselessDefault(ctx, settings, canBeUndefined, node, element.Initializer,
+				checkUselessDefault(ctx, canBeUndefined, node, element.Initializer,
 					element.Name(), nil, "property")
 			},
 		}
@@ -181,7 +196,6 @@ var NoUselessDefaultAssignment = rule.Rule{
 // which is the only thing that distinguishes the two paths through the `undefined` branch.
 func checkUselessDefault(
 	ctx rule.Context,
-	settings NoUselessDefaultAssignmentOptions,
 	canBeUndefined func(*checker.Type) bool,
 	node *ast.Node,
 	initializer *ast.Node,
@@ -189,21 +203,6 @@ func checkUselessDefault(
 	declarationType *ast.Node,
 	kindText string,
 ) {
-	// Without strictNullChecks the checker does not track undefined at all, so canBeUndefined
-	// answers false for every type and the rule would report every default in the file. Upstream
-	// reports a file-level finding and keeps going; this port declines instead. See the rule's doc
-	// comment for the measurement and the reasoning.
-	// Neutralizing this test to a constant FALSE survives every fixture, and the reason is the
-	// harness rather than a fixture gap: its tsconfig sets `strict`, so `strictNullChecks` is on
-	// for every case and the declining arm is never taken. Scored the other way to be sure the line
-	// is reached at all rather than assuming it: forcing the test to a constant TRUE fails 27 lines.
-	// So the statement is load-bearing and only its false arm is unreachable here.
-	if !type_checking.IsStrictCompilerOptionEnabled(
-		ctx.Program.Options(), ctx.Program.Options().StrictNullChecks) &&
-		!settings.AllowRuleToRunWithoutStrictNullChecks {
-		return
-	}
-
 	// `= undefined` is decided without asking what the target type is, because assigning the value
 	// a thing already has cannot help whatever the type says.
 	if isUndefinedIdentifier(initializer) {

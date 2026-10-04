@@ -130,7 +130,13 @@ var EnforceConsistentClassOrder = rule.Rule{
 		// and that is the one failure cohere exists to remove.
 		designSystem := DesignSystemForProgram(ctx.Program)
 		if designSystem.Err != nil {
-			if errors.Is(designSystem.Err, ErrNoTailwindEntryPoint) || ctx.Program == nil {
+			if ctx.Program == nil {
+				return nil
+			}
+			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
+			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
+			if errors.Is(designSystem.Err, ErrNoTailwindEntryPoint) {
+				ctx.Skip("no Tailwind entry point is configured")
 				return nil
 			}
 			return declineListeners(ctx, "enforce-consistent-class-order", designSystem)

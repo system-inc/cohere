@@ -376,6 +376,19 @@ func (c Context) Note(key string) {
 	}
 }
 
+// SkippedNotePrefix opens the key of every note Skip records, which is how --coverage tells a skip apart
+// from the facts a rule counts while it judges.
+const SkippedNotePrefix = "skipped: "
+
+// Skip records that the rule declined this file because a compiler option or a missing precondition left
+// it unable to judge, and says which. Call it once, then return no listeners. A rule that declines this
+// way otherwise reads exactly like a rule that looked and found nothing: no-useless-default-assignment
+// declined every file in ahra and www while every run read green (#6ar414z, #pa7k7zv). It is not for a
+// file the rule is simply not about, a `.d.ts` or a file outside its directory, which is its scope.
+func (c Context) Skip(reason string) {
+	c.Note(SkippedNotePrefix + reason)
+}
+
 func (c Context) ReportNode(node *ast.Node, message Message) {
 	c.Report(Diagnostic{
 		Range:      TokenRange(c.SourceFile, node),

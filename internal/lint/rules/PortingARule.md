@@ -1997,6 +1997,15 @@ The run's own output separates the two cases for you, and the wording is deliber
 works.** `was offered no files` is the failure signal. That separates "inert" from
 "correctly declining" in about ten seconds without building a probe tree.
 
+**A rule that declines on a compiler option or a missing precondition calls `ctx.Skip`.**
+`ctx.Skip("strictNullChecks is off")`, once, then return no listeners. The run names it
+by default and under `--coverage`, as `rule: skipped on N files, reason`. Without it, a
+rule that cannot judge reads exactly like one that judged and found nothing:
+no-useless-default-assignment declined every file in ahra and www while every run read
+green, because a shared helper read an unset `strict` as off (#6ar414z,
+#pa7k7zv). A file the rule is simply not about, a `.d.ts` or a file outside the directory
+it guards, is scope rather than a skip, and stays silent.
+
 **Except for a rule with a decoder, where it is not.** An author's rule reported 3,407
 registrations over 3,407 files and was completely broken. A rule configured as bare
 `"error"` is handed **nil** options: `rule.DecodeOptionsInto` errors on empty input,

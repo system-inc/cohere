@@ -62,6 +62,9 @@ var BoundaryNoProjectImport = rule.Rule{
 
 		settings, hasSettings := rule.OptionsAs[BoundaryNoProjectImportOptions](options)
 		if !hasSettings || settings.LibraryDirectory == "" {
+			// Failing closed is right, and silent is not: a rule enabled without the directory it guards
+			// checks nothing, so the skip names the missing option (#pa7k7zv).
+			ctx.Skip("no libraryDirectory is configured")
 			return nil
 		}
 		if !strings.Contains(imports.NormalizedFileName(ctx.SourceFile), settings.LibraryDirectory) {
