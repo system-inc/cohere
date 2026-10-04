@@ -588,7 +588,7 @@ func TestPerformanceNoIndependentAwaitInLoopSpanAndMessage(t *testing.T) {
 	if reported != "for (let index = 0; index < items.length; index++)" {
 		t.Fatalf("span: got %q", reported)
 	}
-	if diagnostic.Message.Description != messagePerformanceNoIndependentAwaitInLoop.Description {
+	if diagnostic.Message.Description != messagePerformanceNoIndependentAwaitInLoop().Description {
 		t.Fatalf("message: got %q", diagnostic.Message.Description)
 	}
 	for _, phrase := range []string{"Promise.all", "bounded", "cohere-disable-next-line nexus/performance-no-independent-await-in-loop -- "} {

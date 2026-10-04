@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/module"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // ConsistencyNoScreamingSnakeCaseOptions names constants that may keep the shouting form because
@@ -15,29 +16,27 @@ type ConsistencyNoScreamingSnakeCaseOptions struct {
 	Allow []string `json:"allow"`
 }
 
+// The rule's messages, whose wording lives in `policy/messages/consistency-no-screaming-snake-case.json`.
+// The reasoning is identical for both, so it is written once there as the `reasoning` phrase. A rule
+// that says only what is wrong gets disabled the first time it is inconvenient.
+var (
+	consistencyNoScreamingSnakeCaseExportedText = policy.MessageOf("nexus/consistency-no-screaming-snake-case", "noScreamingSnakeCaseExported")
+	consistencyNoScreamingSnakeCaseLocalText    = policy.MessageOf("nexus/consistency-no-screaming-snake-case", "noScreamingSnakeCaseLocal")
+)
+
 func messageScreamingSnakeCaseExported(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id: "noScreamingSnakeCaseExported",
-		Description: `Constant "` + name + `" is exported and should be PascalCase ("` + suggestion +
-			`"). ` + screamingSnakeReasoning,
+		Id:          consistencyNoScreamingSnakeCaseExportedText.Id,
+		Description: consistencyNoScreamingSnakeCaseExportedText.Render(map[string]string{"name": name, "suggestion": suggestion}),
 	}
 }
 
 func messageScreamingSnakeCaseLocal(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id: "noScreamingSnakeCaseLocal",
-		Description: `Constant "` + name + `" is file-local and should be camelCase ("` + suggestion +
-			`"). ` + screamingSnakeReasoning,
+		Id:          consistencyNoScreamingSnakeCaseLocalText.Id,
+		Description: consistencyNoScreamingSnakeCaseLocalText.Render(map[string]string{"name": name, "suggestion": suggestion}),
 	}
 }
-
-// The reasoning is identical for both messages, so it is written once. A rule that says only what
-// is wrong gets disabled the first time it is inconvenient.
-const screamingSnakeReasoning = "`const` already tells the reader and the compiler the value is " +
-	"immutable, so shouting adds no information. The casing is free to signal scope instead, the way " +
-	"Go does it: PascalCase means the value came from somewhere else, camelCase means it lives in " +
-	"this file. Reserve the shouting form for values that mirror an external system's grammar, where " +
-	"matching the upstream spelling keeps the value greppable across a boundary you do not control."
 
 // ConsistencyNoScreamingSnakeCase bans SCREAMING_SNAKE_CASE constant names in our own code.
 //

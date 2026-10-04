@@ -25,6 +25,10 @@ enum RuleMessages {
         "ToolchainRequireUpcomingFeatures.upcomingFeatureMissing",
     ]
 
+    /* cohere-swift/always-use-lower-camel-case */
+    enum AlwaysUseLowerCamelCase {
+    }
+
     /* cohere-swift/concurrency-no-check-then-write */
     enum ConcurrencyNoCheckThenWrite {
     }
@@ -42,6 +46,10 @@ enum RuleMessages {
                     #"\#(spelling) tells the compiler to trust this code instead of checking it. Say why that is safe in a comment directly above the declaration, so the next reader can check the reasoning the compiler no longer does."#,
             )
         }
+    }
+
+    /* cohere-swift/consistency-no-ambiguous-identifier */
+    enum ConsistencyNoAmbiguousIdentifier {
     }
 
     /* cohere-swift/consistency-no-bare-throw */
@@ -117,8 +125,20 @@ enum RuleMessages {
     enum CorrectnessNoWriteOnlyCollection {
     }
 
+    /* cohere-swift/correctness-require-response-status-check */
+    enum CorrectnessRequireResponseStatusCheck {
+    }
+
     /* cohere-swift/force-cast */
     enum ForceCast {
+    }
+
+    /* cohere-swift/performance-no-independent-await-in-loop */
+    enum PerformanceNoIndependentAwaitInLoop {
+    }
+
+    /* cohere-swift/security-no-interpolated-shell-command */
+    enum SecurityNoInterpolatedShellCommand {
     }
 
     /* cohere-swift/security-no-interpolated-sql-string */

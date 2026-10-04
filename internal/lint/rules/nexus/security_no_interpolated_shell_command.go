@@ -7,17 +7,17 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const securityNoInterpolatedShellCommandId = "interpolatedShellCommand"
 
-var securityNoInterpolatedShellCommandMessage = rule.Message{
-	Id: securityNoInterpolatedShellCommandId,
-	Description: "This command string is run by a shell, and a value built into it is not a literal, so the " +
-		"shell parses that value as code: a `\"`, `'` or space in it breaks the command, and a `$(...)` or " +
-		"backtick in it runs. Quoting it by hand is one escape away from the same bug. Pass the program " +
-		"and its arguments separately instead, `execFileSync('sqlite3', [databasePath, query])` (or " +
-		"`spawn` with an argument array and no `shell`), so no shell ever reads the value.",
+// securityNoInterpolatedShellCommandText is the rule's message, whose wording lives in
+// `policy/messages/security-no-interpolated-shell-command.json`.
+var securityNoInterpolatedShellCommandText = policy.MessageOf("nexus/security-no-interpolated-shell-command", securityNoInterpolatedShellCommandId)
+
+func securityNoInterpolatedShellCommandMessage() rule.Message {
+	return rule.Message{Id: securityNoInterpolatedShellCommandId, Description: securityNoInterpolatedShellCommandText.Render(nil)}
 }
 
 // SecurityNoInterpolatedShellCommand reports a shell command string built from a value whose type
@@ -147,7 +147,7 @@ var SecurityNoInterpolatedShellCommand = rule.Rule{
 				}
 				built := securityNoInterpolatedShellCommandBuilt(ctx, arguments[0], 0)
 				if built != nil && securityNoInterpolatedShellCommandJudge(ctx, built, 0) == securityNoInterpolatedShellCommandUnsafe {
-					ctx.ReportNode(arguments[0], securityNoInterpolatedShellCommandMessage)
+					ctx.ReportNode(arguments[0], securityNoInterpolatedShellCommandMessage())
 					return
 				}
 				if functionName == "exec" || functionName == "execSync" || len(arguments) < 2 {
@@ -164,7 +164,7 @@ var SecurityNoInterpolatedShellCommand = rule.Rule{
 						continue
 					}
 					if securityNoInterpolatedShellCommandJudge(ctx, element, 0) == securityNoInterpolatedShellCommandUnsafe {
-						ctx.ReportNode(element, securityNoInterpolatedShellCommandMessage)
+						ctx.ReportNode(element, securityNoInterpolatedShellCommandMessage())
 						return
 					}
 				}

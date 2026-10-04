@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/binding"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // alwaysAllowedSingleLetters are the coordinate and math names, where the single letter is the
@@ -18,28 +19,36 @@ var (
 	singleLowercaseLetter  = regexp.MustCompile(`^[a-z]$`)
 )
 
-func messageNoAmbiguousE(contextHint string, suggestedName string) rule.Message {
+// The rule's messages, whose wording lives in `policy/messages/consistency-no-ambiguous-identifier.json`.
+// An `e` finding says which way the rule guessed, as one of the `context` phrase's options.
+var (
+	consistencyNoAmbiguousIdentifierAmbiguousEText   = policy.MessageOf("nexus/consistency-no-ambiguous-identifier", "noAmbiguousE")
+	consistencyNoAmbiguousIdentifierErrorContext     = consistencyNoAmbiguousIdentifierAmbiguousEText.Option("context", "error")
+	consistencyNoAmbiguousIdentifierEventContext     = consistencyNoAmbiguousIdentifierAmbiguousEText.Option("context", "event")
+	consistencyNoAmbiguousIdentifierUnclearContext   = consistencyNoAmbiguousIdentifierAmbiguousEText.Option("context", "unclear")
+	consistencyNoAmbiguousIdentifierSingleLetterText = policy.MessageOf("nexus/consistency-no-ambiguous-identifier", "noSingleLetter")
+	consistencyNoAmbiguousIdentifierUnderscoreText   = policy.MessageOf("nexus/consistency-no-ambiguous-identifier", "noUnderscore")
+)
+
+func messageNoAmbiguousE(context policy.MessageOption, suggestedName string) rule.Message {
 	return rule.Message{
-		Id: "noAmbiguousE",
-		Description: `Variable named "e" is too ambiguous` + contextHint + `. It is the one name that ` +
-			`could be an error or an event, and a reader has to find the declaration to learn which. Use "` +
-			suggestedName + `" or a more descriptive name.`,
+		Id:          consistencyNoAmbiguousIdentifierAmbiguousEText.Id,
+		Description: consistencyNoAmbiguousIdentifierAmbiguousEText.Render(map[string]string{"suggestedName": suggestedName}, context),
 	}
 }
 
 func messageNoSingleLetter(name string) rule.Message {
 	return rule.Message{
-		Id: "noSingleLetter",
-		Description: `Single-letter identifier "` + name + `" is not descriptive enough. The name is read ` +
-			`everywhere it is used and declared only once, so the saving is at the declaration and the cost ` +
-			`is at every call site.`,
+		Id:          consistencyNoAmbiguousIdentifierSingleLetterText.Id,
+		Description: consistencyNoAmbiguousIdentifierSingleLetterText.Render(map[string]string{"name": name}),
 	}
 }
 
-var messageNoUnderscore = rule.Message{
-	Id: "noUnderscore",
-	Description: `Identifier "_" is not descriptive enough. Name it explicitly, or prefix an underscore ` +
-		`to a real name such as "_event" when the point is that the value is deliberately unused.`,
+func messageNoUnderscore() rule.Message {
+	return rule.Message{
+		Id:          consistencyNoAmbiguousIdentifierUnderscoreText.Id,
+		Description: consistencyNoAmbiguousIdentifierUnderscoreText.Render(nil),
+	}
 }
 
 // ConsistencyNoAmbiguousIdentifier bans single-letter identifiers and the bare underscore.
@@ -98,15 +107,15 @@ var ConsistencyNoAmbiguousIdentifier = rule.Rule{
 				}
 
 				if name == "_" {
-					ctx.ReportNode(node, messageNoUnderscore)
+					ctx.ReportNode(node, messageNoUnderscore())
 					return
 				}
 				if alwaysAllowedSingleLetters[name] {
 					return
 				}
 				if name == "e" {
-					suggestedName, contextHint := inferEventOrErrorContext(node)
-					ctx.ReportNode(node, messageNoAmbiguousE(contextHint, suggestedName))
+					suggestedName, context := inferEventOrErrorContext(node)
+					ctx.ReportNode(node, messageNoAmbiguousE(context, suggestedName))
 					return
 				}
 				// A sort comparator is the one place a and b read correctly.
@@ -154,14 +163,14 @@ func isInsideSortComparator(node *ast.Node) bool {
 
 // inferEventOrErrorContext guesses whether an `e` is an error or an event, and says which it
 // guessed so a reader can disagree with the reasoning rather than just the verdict.
-func inferEventOrErrorContext(node *ast.Node) (string, string) {
+func inferEventOrErrorContext(node *ast.Node) (string, policy.MessageOption) {
 	// A catch parameter is unambiguous. The identifier's parent is the VariableDeclaration that
 	// binds it, and the CatchClause is one level above that, so this reaches through both rather
 	// than testing the immediate parent.
 	if declaration := node.Parent; declaration != nil && declaration.Kind == ast.KindVariableDeclaration {
 		if clause := declaration.Parent; clause != nil && clause.Kind == ast.KindCatchClause {
 			if declaration.Name() == node {
-				return "error", " (appears to be an error)"
+				return "error", consistencyNoAmbiguousIdentifierErrorContext
 			}
 		}
 	}
@@ -178,7 +187,7 @@ func inferEventOrErrorContext(node *ast.Node) (string, string) {
 			assignment := parent.AsPropertyAssignment()
 			if assignment != nil && assignment.Initializer == current {
 				if key := assignment.Name(); key != nil && eventHandlerKeyPattern.MatchString(key.Text()) {
-					return "event", " (appears to be an event)"
+					return "event", consistencyNoAmbiguousIdentifierEventContext
 				}
 			}
 
@@ -188,7 +197,7 @@ func inferEventOrErrorContext(node *ast.Node) (string, string) {
 				jsxAttribute := attribute.AsJsxAttribute()
 				if jsxAttribute != nil {
 					if name := jsxAttribute.Name(); name != nil && eventHandlerKeyPattern.MatchString(name.Text()) {
-						return "event", " (appears to be an event)"
+						return "event", consistencyNoAmbiguousIdentifierEventContext
 					}
 				}
 			}
@@ -199,7 +208,7 @@ func inferEventOrErrorContext(node *ast.Node) (string, string) {
 			if declaration != nil && declaration.Initializer == current {
 				if name := declaration.Name(); name != nil && name.Kind == ast.KindIdentifier &&
 					handlerNamePattern.MatchString(name.Text()) {
-					return "event", " (appears to be an event)"
+					return "event", consistencyNoAmbiguousIdentifierEventContext
 				}
 			}
 		}
@@ -209,11 +218,11 @@ func inferEventOrErrorContext(node *ast.Node) (string, string) {
 			declaration := current.AsFunctionDeclaration()
 			if declaration != nil {
 				if name := declaration.Name(); name != nil && handlerNamePattern.MatchString(name.Text()) {
-					return "event", " (appears to be an event)"
+					return "event", consistencyNoAmbiguousIdentifierEventContext
 				}
 			}
 		}
 	}
 
-	return "event", " (context unclear)"
+	return "event", consistencyNoAmbiguousIdentifierUnclearContext
 }

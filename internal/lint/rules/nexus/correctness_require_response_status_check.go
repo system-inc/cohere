@@ -7,6 +7,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/control_flow_graph"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 const (
@@ -14,19 +15,18 @@ const (
 	correctnessRequireResponseStatusCheckDiscardId = "responseDiscarded"
 )
 
-var correctnessRequireResponseStatusCheckBodyMessage = rule.Message{
-	Id: correctnessRequireResponseStatusCheckBodyId,
-	Description: "This reads the body of a fetch Response on a path where neither `.ok` nor `.status` is read. " +
-		"fetch does not throw on an HTTP error, so a 401 or 500 body is parsed here and used as data " +
-		"(an error object returned as a task list, a failure cached as a success). Check `response.ok` " +
-		"before trusting the body, and throw or return the failure when it is false.",
+// The rule's messages, whose wording lives in `policy/messages/correctness-require-response-status-check.json`.
+var (
+	correctnessRequireResponseStatusCheckBodyText    = policy.MessageOf("nexus/correctness-require-response-status-check", correctnessRequireResponseStatusCheckBodyId)
+	correctnessRequireResponseStatusCheckDiscardText = policy.MessageOf("nexus/correctness-require-response-status-check", correctnessRequireResponseStatusCheckDiscardId)
+)
+
+func correctnessRequireResponseStatusCheckBodyMessage() rule.Message {
+	return rule.Message{Id: correctnessRequireResponseStatusCheckBodyId, Description: correctnessRequireResponseStatusCheckBodyText.Render(nil)}
 }
 
-var correctnessRequireResponseStatusCheckDiscardMessage = rule.Message{
-	Id: correctnessRequireResponseStatusCheckDiscardId,
-	Description: "This awaits a fetch Response and drops it. fetch does not throw on an HTTP error, so a " +
-		"request that fails with a 400 or 500 runs on as if it succeeded. Keep the Response and check " +
-		"`response.ok`, and throw or return the failure when it is false.",
+func correctnessRequireResponseStatusCheckDiscardMessage() rule.Message {
+	return rule.Message{Id: correctnessRequireResponseStatusCheckDiscardId, Description: correctnessRequireResponseStatusCheckDiscardText.Render(nil)}
 }
 
 // CorrectnessRequireResponseStatusCheck reports a fetch Response whose body is read on a path that
@@ -226,7 +226,7 @@ func correctnessRequireResponseStatusCheckScanFile(ctx rule.Context, sourceFile 
 			if awaited.Kind == ast.KindAwaitExpression {
 				call := ast.SkipParentheses(awaited.AsAwaitExpression().Expression)
 				if correctnessRequireResponseStatusCheckIsProducer(ctx, call) {
-					ctx.ReportNode(node, correctnessRequireResponseStatusCheckDiscardMessage)
+					ctx.ReportNode(node, correctnessRequireResponseStatusCheckDiscardMessage())
 				}
 			}
 		case ast.KindAwaitExpression:
@@ -235,7 +235,7 @@ func correctnessRequireResponseStatusCheckScanFile(ctx rule.Context, sourceFile 
 				if binding := correctnessRequireResponseStatusCheckConstBinding(ctx, node); binding != nil {
 					track(binding)
 				} else if use, report := correctnessRequireResponseStatusCheckClassify(node); use == correctnessRequireResponseStatusCheckBodyRead {
-					ctx.ReportNode(report, correctnessRequireResponseStatusCheckBodyMessage)
+					ctx.ReportNode(report, correctnessRequireResponseStatusCheckBodyMessage())
 				}
 			}
 		case ast.KindCallExpression:
@@ -511,7 +511,7 @@ func correctnessRequireResponseStatusCheckAnalyzeRoot(
 
 	for _, binding := range bindings {
 		if !binding.dropped && len(binding.references) == 0 {
-			ctx.ReportNode(binding.producer, correctnessRequireResponseStatusCheckDiscardMessage)
+			ctx.ReportNode(binding.producer, correctnessRequireResponseStatusCheckDiscardMessage())
 			binding.dropped = true
 		}
 	}
@@ -555,7 +555,7 @@ func correctnessRequireResponseStatusCheckAnalyzeRoot(
 			continue
 		}
 		for _, report := range correctnessRequireResponseStatusCheckUncheckedReads(graph, final, binding) {
-			ctx.ReportNode(report, correctnessRequireResponseStatusCheckBodyMessage)
+			ctx.ReportNode(report, correctnessRequireResponseStatusCheckBodyMessage())
 		}
 	}
 }

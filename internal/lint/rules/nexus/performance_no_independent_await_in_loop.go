@@ -8,18 +8,15 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-var messagePerformanceNoIndependentAwaitInLoop = rule.Message{
-	Id: "independentAwaitInLoop",
-	Description: "This loop awaits once per item, so the items run one after another, yet nothing " +
-		"carries from one iteration to the next: the awaited work reads only the item, its index and " +
-		"values the loop never changes, no outer variable is reassigned, nothing leaves the loop on an " +
-		"awaited result, and nothing prints, reports progress or sleeps between iterations. Start them " +
-		"together with `await Promise.all(items.map(async (item) => ...))`, or through a bounded " +
-		"concurrency helper when the collection can be large or the far side rate-limits. If the order " +
-		"is deliberate, say so where it lives: " +
-		"`// cohere-disable-next-line nexus/performance-no-independent-await-in-loop -- <why it is sequential>`.",
+// performanceNoIndependentAwaitInLoopText is the rule's message, whose wording lives in
+// `policy/messages/performance-no-independent-await-in-loop.json`.
+var performanceNoIndependentAwaitInLoopText = policy.MessageOf("nexus/performance-no-independent-await-in-loop", "independentAwaitInLoop")
+
+func messagePerformanceNoIndependentAwaitInLoop() rule.Message {
+	return rule.Message{Id: performanceNoIndependentAwaitInLoopText.Id, Description: performanceNoIndependentAwaitInLoopText.Render(nil)}
 }
 
 // PerformanceNoIndependentAwaitInLoop reports a loop over a collection whose iterations wait on
@@ -148,7 +145,7 @@ var PerformanceNoIndependentAwaitInLoop = rule.Rule{
 			if analysis == nil || !analysis.isIndependent() {
 				return
 			}
-			ctx.ReportRange(independentAwaitLoopHeaderRange(ctx.SourceFile, node, analysis.body), messagePerformanceNoIndependentAwaitInLoop)
+			ctx.ReportRange(independentAwaitLoopHeaderRange(ctx.SourceFile, node, analysis.body), messagePerformanceNoIndependentAwaitInLoop())
 		}
 
 		return rule.Listeners{

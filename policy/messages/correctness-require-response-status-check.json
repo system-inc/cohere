@@ -1,0 +1,20 @@
+{
+  "rules": {
+    "TypeScript": "nexus/correctness-require-response-status-check",
+    "Swift": "cohere-swift/correctness-require-response-status-check"
+  },
+  "messages": {
+    "bodyReadWithoutStatusCheck": {
+      "text": "This reads the body of a fetch Response on a path where neither `.ok` nor `.status` is read. fetch does not throw on an HTTP error, so a 401 or 500 body is parsed here and used as data (an error object returned as a task list, a failure cached as a success). Check `response.ok` before trusting the body, and throw or return the failure when it is false.",
+      "languages": [
+        "TypeScript"
+      ]
+    },
+    "responseDiscarded": {
+      "text": "This awaits a fetch Response and drops it. fetch does not throw on an HTTP error, so a request that fails with a 400 or 500 runs on as if it succeeded. Keep the Response and check `response.ok`, and throw or return the failure when it is false.",
+      "languages": [
+        "TypeScript"
+      ]
+    }
+  }
+}
