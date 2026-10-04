@@ -180,6 +180,12 @@
     "reason": "Swift closures (trailing closures, SwiftUI builders) are the idiom, with no hoisting difference and no function-identity listener removal."
   },
   {
+    "typeScriptRule": "nexus/consistency-no-property-alias",
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/consistency-no-property-alias",
+    "reason": null
+  },
+  {
     "typeScriptRule": "nexus/consistency-no-return-void",
     "verdict": "NotApplicable",
     "swiftRule": null,
@@ -394,12 +400,6 @@
     "verdict": "NotApplicable",
     "swiftRule": null,
     "reason": "Structure's Tailwind theme map has no Swift counterpart."
-  },
-  {
-    "typeScriptRule": "structure/consistency-no-property-alias",
-    "verdict": "Ported",
-    "swiftRule": "cohere-swift/consistency-no-property-alias",
-    "reason": null
   },
   {
     "typeScriptRule": "structure/consistency-require-matching-file-name",

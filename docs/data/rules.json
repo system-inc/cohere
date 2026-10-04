@@ -4980,7 +4980,7 @@
             "category": "consistency",
             "typeAware": false,
             "typeScriptRules": [
-                "structure/consistency-no-property-alias"
+                "nexus/consistency-no-property-alias"
             ]
         },
         {
@@ -6540,7 +6540,11 @@
                     "set": "cohere:typescript",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "Ported",
+                "swiftRule": "cohere-swift/consistency-no-property-alias"
+            }
         },
         {
             "name": "nexus/consistency-no-return-void",

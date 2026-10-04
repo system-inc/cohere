@@ -10,7 +10,7 @@ import SwiftSyntax
  a reader scroll up to learn it. A naked local should mean this scope made the value. The repair writes the reach
  where the local is used and deletes the declaration. No fix: the rewrite is the author's to read.
 
- It ports `structure/consistency-no-property-alias` (Kirk's "reach over alias"), shape for shape:
+ It ports `nexus/consistency-no-property-alias` (Kirk's "reach over alias"), shape for shape:
  - A `let` binding one name to a member read whose last name is that name: `let value = state.inner.value`. The
    chain is names and member reads at any depth (`self.model.review.takes.count`), through parentheses. TypeScript's
    `const` and `let` both map to Swift's `let`; a Swift `var` is a copy made to be changed, and is never judged.
