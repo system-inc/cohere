@@ -31,9 +31,10 @@ real sites that went silent: `libraries/structure/libraries/nexus/source/securit
 Fixtures: `TestNoConfusingVoidExpressionJudgesVoidNotUndefined` in
 `no_confusing_void_expression_test.go`, six silent rows (both real sites, and an undefined call in
 statement, assigned, arrow and return position) and four reporting controls with a real `void`. It
-replaced `TestNoConfusingVoidExpressionCoversUndefinedReturns`, which pinned upstream's breadth. The
-differential harness records both sites in `internal/differential/acknowledged.go` as gate-only
-findings.
+replaced `TestNoConfusingVoidExpressionCoversUndefinedReturns`, which pinned upstream's breadth.
+ESLint asks the same question through Nexus's `NexusTypeScriptEsLintPlugin`, whose wrapper drops a
+report whose constrained type carries no Void flag (Nexus 4e3395d), so the engines agree on both sites
+(#cn8sthd).
 
 ## Why this recommendation
 

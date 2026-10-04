@@ -28,10 +28,11 @@ So cohere is silent where the gate reports, on the four string sites ahra had:
 |---|---|
 | `libraries/structure/libraries/nexus/source/geography/Countries.ts:13` | `ISO` letters mapped to regional indicators |
 | `modules/openai/PngTextMetadata.ts:64` | a Latin-1 filter |
-| `modules/pensieve/PensieveDailies.ts:288` | quote-mark scanning |
-| `modules/pensieve/PensieveDailies.ts:326` | ignored characters filtered out |
+| `modules/pensieve/PensieveDailyQuotes.ts:163` | quote-mark scanning |
+| `modules/pensieve/PensieveDailyQuotes.ts:201` | ignored characters filtered out |
 
-Each is a gate-side entry in `internal/differential/acknowledged.go`. The fixture is
+ESLint draws the same line through Nexus's `NexusTypeScriptEsLintPlugin`, whose wrapper of this rule
+drops `noStringSpread` (Nexus 4e3395d), so the engines agree on all four (#cn8sthd). The fixture is
 `TestNoMisusedSpreadLeavesStringSpreadAlone`: upstream invalid 0 through 13 verbatim, the four ahra
 sites, the constructor shape, and a control proving the object cascade still reports in the same
 harness. The `allow` option is kept for parity of the option surface; nothing in ahra sets it.

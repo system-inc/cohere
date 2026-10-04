@@ -257,8 +257,8 @@ func TestDecodeMaxClassesPerFileOptions(t *testing.T) {
 // TestMaxClassesPerFileDoesNotCountAClassDeclaredInsideAFunction pins Kirk's ruling on #mbbg6js.
 //
 // A class declared inside any function body, a method's included, is not a design unit of the file,
-// so it does not count; ESLint counts it, and the sites where it still reports are recorded in
-// internal/differential/acknowledged.go. The first two cases are the ones upstream reports, measured
+// so it does not count; ESLint's core rule counts it, and Nexus's nexus/max-classes-per-file twin runs
+// these rows verbatim to draw the same line. The first two cases are the ones upstream reports, measured
 // at 10.8.1. The controls show the exclusion is about functions and nothing wider: a namespace is
 // not a function, a bare block is not either, and an expression still answers to ignoreExpressions.
 func TestMaxClassesPerFileDoesNotCountAClassDeclaredInsideAFunction(t *testing.T) {

@@ -43,8 +43,9 @@ loop, a hoisted handler further out registered after the loop starts) and ten re
 keep the detector alive (an awaiting loop with no writer, a handler beside a loop that never
 suspends, an `await` in a nested function, an `await` only in a `for` initializer, a write in the
 loop's own activation, a closure created after the loop, hoisted writers never registered or
-registered too late, and a closure writing a shadowing binding). The differential harness records the
-three sites in `internal/differential/acknowledged.go` as gate-only findings.
+registered too late, and a closure writing a shadowing binding). The three ahra sites were then
+rewritten so each flag is an AbortController (ahra ede7b594), whose `signal.aborted` is a member read
+both engines treat as dynamic, so neither reports them (#cn8sthd).
 
 ## Why this recommendation
 

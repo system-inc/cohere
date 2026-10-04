@@ -222,6 +222,12 @@ type Report struct {
 	// must say so.
 	ComparedRules   int
 	ConfiguredRules int
+	// StaleAcknowledgements match no current difference, and AmbiguousAcknowledgements match more
+	// than one. Either fails the run: a stale entry is an excuse waiting for whatever lands on its
+	// site next, and an ambiguous one would excuse more than its reason was written about, so the
+	// table is out of date until someone removes or re-anchors them.
+	StaleAcknowledgements     []AcknowledgedDifference
+	AmbiguousAcknowledgements []AcknowledgedDifference
 	// Provenance is what actually ran, and whether the harness was ever shown able to detect a
 	// difference at all.
 	//
@@ -247,6 +253,9 @@ func (report Report) Agreed() bool {
 	// report a difference, so its silence is not evidence. This is the guard that four vacuous
 	// probes in one night got past: every one of them had a plausible population.
 	if trustworthy, _ := report.Provenance.Trustworthy(); !trustworthy {
+		return false
+	}
+	if len(report.StaleAcknowledgements) > 0 || len(report.AmbiguousAcknowledgements) > 0 {
 		return false
 	}
 	// Observed only. A planted control is a difference this run caused on purpose, and counting it
@@ -276,12 +285,13 @@ type Inputs struct {
 	// Acknowledged are differences someone decided are correct, each with a reason. Nil means none,
 	// which is the honest default: an empty list excuses nothing.
 	Acknowledged []AcknowledgedDifference
+	// ReadSourceLine reads a line of the tree, which is how an acknowledgement's anchor is checked
+	// against the finding it names. Nil leaves every acknowledgement stale rather than trusted.
+	ReadSourceLine SourceLineReader
 }
 
 // Compare diffs two runs and classifies every difference.
 func Compare(inputs Inputs) Report {
-	acknowledged := acknowledgedIndex(inputs.Acknowledged)
-
 	// Per-rule tallies of how many differences were acknowledged, so a rule whose differences are
 	// all accounted for is not reported as an open disagreement.
 	type ruleDifferenceCounts struct{ total, acknowledged int }
@@ -338,12 +348,10 @@ func Compare(inputs Inputs) Report {
 			continue
 		}
 		agreement.OnlyCohere++
-		classification := classifyFinding(finding, SideCohere, inputs, acknowledged)
-		countDifference(finding.Rule, classification)
 		report.Differences = append(report.Differences, Difference{
 			Finding:        finding,
 			OnlyOn:         SideCohere,
-			Classification: classification,
+			Classification: classify(finding.Rule, SideCohere, inputs),
 		})
 	}
 
@@ -353,13 +361,28 @@ func Compare(inputs Inputs) Report {
 		}
 		agreement := agreementFor(finding.Rule)
 		agreement.OnlyGate++
-		classification := classifyFinding(finding, SideGate, inputs, acknowledged)
-		countDifference(finding.Rule, classification)
 		report.Differences = append(report.Differences, Difference{
 			Finding:        finding,
 			OnlyOn:         SideGate,
-			Classification: classification,
+			Classification: classify(finding.Rule, SideGate, inputs),
 		})
+	}
+
+	// Acknowledgements are matched once every difference is known, because an entry is judged by how
+	// many it names: exactly one is excused, none leaves the entry stale, and several leave it
+	// ambiguous with none of them excused.
+	for _, match := range matchAcknowledgements(inputs.Acknowledged, report.Differences, inputs.ReadSourceLine) {
+		switch len(match.differenceIndexes) {
+		case 0:
+			report.StaleAcknowledgements = append(report.StaleAcknowledgements, match.acknowledgement)
+		case 1:
+			report.Differences[match.differenceIndexes[0]].Classification = ClassificationAcknowledged
+		default:
+			report.AmbiguousAcknowledgements = append(report.AmbiguousAcknowledgements, match.acknowledgement)
+		}
+	}
+	for _, difference := range report.Differences {
+		countDifference(difference.Finding.Rule, difference.Classification)
 	}
 
 	// A rule's own classification is asked from the side that actually differed, because
@@ -397,20 +420,6 @@ func Compare(inputs Inputs) Report {
 	})
 
 	return report
-}
-
-// classifyFinding is classify plus the acknowledgement check, which needs the finding rather than
-// only its rule name.
-//
-// The acknowledgement is consulted first and matched on file, line, rule and side together. Anything
-// looser would excuse the next drift in the same rule, and the point of writing the reason down is
-// that it stays attached to the one case it was written about.
-func classifyFinding(finding Finding, onlyOn Side, inputs Inputs, acknowledged map[string]AcknowledgedDifference) Classification {
-	key := AcknowledgedDifference{File: finding.File, Line: finding.Line, Rule: finding.Rule, Side: onlyOn}.Key()
-	if _, known := acknowledged[key]; known {
-		return ClassificationAcknowledged
-	}
-	return classify(finding.Rule, onlyOn, inputs)
 }
 
 // classify decides why a rule's findings differ, from the two runs alone.
@@ -519,6 +528,18 @@ func Write(out *strings.Builder, report Report) {
 		)
 	}
 
+	// An out-of-date acknowledgement table prints before the per-rule table, because it is a reason
+	// the verdict below fails that the rule table cannot show: a stale entry differs from nothing.
+	if len(report.StaleAcknowledgements) > 0 || len(report.AmbiguousAcknowledgements) > 0 {
+		fmt.Fprintf(out, "\nacknowledgements that excuse no single current difference:\n")
+		for _, stale := range report.StaleAcknowledgements {
+			fmt.Fprintf(out, "  stale      %s  (matches none: remove it, or re-anchor it if its site moved)\n", stale.Key())
+		}
+		for _, ambiguous := range report.AmbiguousAcknowledgements {
+			fmt.Fprintf(out, "  ambiguous  %s  (matches several: narrow its anchor to one)\n", ambiguous.Key())
+		}
+	}
+
 	fmt.Fprintf(out, "\nper-rule agreement:\n")
 	for _, agreement := range report.Agreements {
 		verdict := "agree"
@@ -568,6 +589,9 @@ func Write(out *strings.Builder, report Report) {
 	fmt.Fprintf(out, "\n✗ disagrees: %d findings differ on rules both sides had enabled\n",
 		byClassification[ClassificationBothActive],
 	)
+	if outOfDate := len(report.StaleAcknowledgements) + len(report.AmbiguousAcknowledgements); outOfDate > 0 {
+		fmt.Fprintf(out, "  %d acknowledgements excuse no single current difference, listed above\n", outOfDate)
+	}
 	if acknowledgedCount := byClassification[ClassificationAcknowledged]; acknowledgedCount > 0 {
 		fmt.Fprintf(out, "  %d further differences were acknowledged and are not counted above\n", acknowledgedCount)
 	}

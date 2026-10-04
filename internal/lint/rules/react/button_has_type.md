@@ -33,8 +33,9 @@ switches off.
 Fixtures: `TestButtonHasTypeTrustsAProvenType` in `button_has_type_test.go` (five silent rows, the
 first being the `Button.tsx:222` shape, and seven reporting controls). One upstream-measured row moved:
 `` `bu${''}tton` `` folds to the literal `"button"` and is silent here, so the "interpolating template"
-row in `TestButtonHasTypeReadsStaticValuesUpstreamsWay` now interpolates a `string`. The differential
-harness records the site in `internal/differential/acknowledged.go` as a gate-only finding.
+row in `TestButtonHasTypeReadsStaticValuesUpstreamsWay` now interpolates a `string`. ESLint trusts the
+same proof through Nexus's `ReactButtonHasTypeRule`, which wraps this rule under its own name and runs
+these rows verbatim (Nexus fc3a1cc), so the engines agree on the site (#cn8sthd).
 
 ## Why this recommendation
 

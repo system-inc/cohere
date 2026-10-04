@@ -193,7 +193,8 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 		// The known gate defects are compiled in rather than passed at the command line: an
 		// acknowledgement that can be supplied per-run can be supplied by whoever wants a green
 		// result, and this list is reviewed like any other code.
-		Acknowledged: KnownGateDefects,
+		Acknowledged:   KnownGateDefects,
+		ReadSourceLine: sourceLineReaderAt(options.Root),
 	})
 
 	report.Provenance = Provenance{
@@ -713,4 +714,24 @@ func (report Report) ObservedDifferences() []Difference {
 		}
 	}
 	return observed
+}
+
+// sourceLineReaderAt reads lines of files under a root, each file read once, which is how an
+// acknowledgement's anchor is checked against the finding it names.
+func sourceLineReaderAt(root string) SourceLineReader {
+	linesByFile := map[string][]string{}
+	return func(file string, line int) (string, bool) {
+		lines, read := linesByFile[file]
+		if !read {
+			content, err := os.ReadFile(filepath.Join(root, file))
+			if err == nil {
+				lines = strings.Split(string(content), "\n")
+			}
+			linesByFile[file] = lines
+		}
+		if line < 1 || line > len(lines) {
+			return "", false
+		}
+		return lines[line-1], true
+	}
 }

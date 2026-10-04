@@ -11,19 +11,37 @@
 // numbers match, or to let the harness sit red and lose the signal it exists to give.
 package differential
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // AcknowledgedDifference is one finding we expect only one side to report, and why.
 //
-// Keyed to file, line, and rule rather than to the rule alone. A rule-wide excuse would also swallow
-// the next genuine drift in that rule, which is the failure this whole package is built to prevent:
-// an excuse broad enough to be convenient is an excuse broad enough to hide a defect.
+// # Keyed to a file, a rule, a side and an anchor, never to a line number
+//
+// Keyed to the one finding rather than to the rule alone. A rule-wide excuse would also swallow the
+// next genuine drift in that rule, which is the failure this whole package is built to prevent: an
+// excuse broad enough to be convenient is an excuse broad enough to hide a defect.
+//
+// The entries were first keyed by line, and a line is the wrong key for a table that lives in another
+// repository from the code it describes. Any edit above a site moves it, so by 2026-10-04 most of the
+// table named lines that no longer held its finding (Map.tsx 747, 765 and 784, Button.tsx 222, the
+// loop sites at 305, 548 and 689, a misused spread in a file since renamed), and every such entry went
+// on excusing whatever happened to land on that line next (#cn8sthd). So an entry names text from its
+// finding's own source line instead, the enclosing declaration's name when it sits there or the
+// expression the rule reports, which moves with the code and survives edits elsewhere in the file.
 type AcknowledgedDifference struct {
 	File string
-	Line int
 	Rule string
 	// Side is which gate is expected to report it alone.
 	Side Side
+	// Anchor is text on the line the finding sits on, compared against that line with its
+	// indentation trimmed. It must pick out exactly one of the side's findings for this rule in this
+	// file: an entry matching none excuses nothing and is reported stale, and one matching several is
+	// reported ambiguous and excuses none of them, since it would otherwise excuse more than its
+	// reason was written about.
+	Anchor string
 	// Reason is why this difference is correct, in a sentence a reader can check.
 	//
 	// Required rather than optional. An acknowledgement with no reason is indistinguishable from a
@@ -32,9 +50,9 @@ type AcknowledgedDifference struct {
 	Reason string
 }
 
-// Key is the identity an acknowledgement shares with the finding it excuses.
+// Key names an acknowledgement in output, the four things that pick out its finding.
 func (acknowledged AcknowledgedDifference) Key() string {
-	return fmt.Sprintf("%s:%d:%s:%s", acknowledged.File, acknowledged.Line, acknowledged.Rule, acknowledged.Side)
+	return fmt.Sprintf("%s:%s:%s:%q", acknowledged.File, acknowledged.Rule, acknowledged.Side, acknowledged.Anchor)
 }
 
 // KnownGateDefects are the differences where cohere is right and the gate is wrong.
@@ -49,214 +67,52 @@ func (acknowledged AcknowledgedDifference) Key() string {
 // doing rather than a cost of it. They are listed here, in source, rather than passed in at the
 // command line: an acknowledgement that can be supplied per-run can be supplied by whoever wants a
 // green result, and this list is reviewed like any other code.
-var KnownGateDefects = []AcknowledgedDifference{
-	{
-		File: "libraries/structure/source/services/network/NetworkService.ts",
-		Line: 228,
-		Rule: "storage-no-direct-local-storage",
-		Side: SideCohere,
-		Reason: "the gate's rule matches window.localStorage only as the object of an outer member " +
-			"expression, so it sees window.localStorage.getItem(...) and never window.localStorage " +
-			"passed as a value; this line is the latter and is a real violation of the rule's " +
-			"stated intent",
-	},
-	{
-		File: "libraries/structure/source/components/buttons/Button.tsx",
-		Line: 222,
-		Rule: "button-has-type",
-		Side: SideGate,
-		Reason: "the checker proves `type` is always 'button', 'submit' or 'reset' (a defaulted prop typed as that " +
-			"union), so nothing computed can submit a form; react/button_has_type.md, " +
-			"TestButtonHasTypeTrustsAProvenType",
-	},
-	{
-		File: "libraries/structure/libraries/nexus/source/types/UnionFromClasses.test.ts",
-		Line: 23,
-		Rule: "no-unnecessary-type-parameters",
-		Side: SideGate,
-		Reason: "both findings on this line are the exact type-equality idiom, where a type parameter used once as " +
-			"the check type of a deferred conditional is the mechanism; typescript/no_unnecessary_type_parameters.md, " +
-			"TestNoUnnecessaryTypeParametersRecognizesTheExactEqualityIdiom",
-	},
-	{
-		File: "libraries/structure/libraries/nexus/source/types/ObjectTypes.ts",
-		Line: 93,
-		Rule: "no-unnecessary-type-parameters",
-		Side: SideGate,
-		Reason: "`typeOnly<Shape>(): Shape` takes no value and uses `Shape` only in its return type, so it is a " +
-			"phantom-type witness rather than a disguised cast (nothing is handed in to cast from); the type-witness " +
-			"principle keeps it silent; typescript/no_unnecessary_type_parameters.md, " +
-			"TestNoUnnecessaryTypeParametersTypeWitnesses",
-	},
-	{
-		File: "libraries/structure/libraries/nexus/source/security/random/Random.test.ts",
-		Line: 6,
-		Rule: "no-confusing-void-expression",
-		Side: SideGate,
-		Reason: "the call types as undefined, a value, not void; typescript/no_confusing_void_expression.md, " +
-			"TestNoConfusingVoidExpressionJudgesVoidNotUndefined",
-	},
-	{
-		File: "libraries/structure/libraries/nexus/source/coordination/TrackedPromise.test.ts",
-		Line: 132,
-		Rule: "no-confusing-void-expression",
-		Side: SideGate,
-		Reason: "an await of Promise<undefined> is a value, not void; typescript/no_confusing_void_expression.md, " +
-			"TestNoConfusingVoidExpressionJudgesVoidNotUndefined",
-	},
-	{
-		File: "libraries/structure/libraries/nexus/source/validation/schema/StringSchema.ts",
-		Line: 37,
-		Rule: "class-literal-property-style",
-		Side: SideGate,
-		Reason: "the getter overrides a concrete base getter, so the suggested field is TS2610 and cannot compile; " +
-			"typescript/class_literal_property_style.md, " +
-			"TestClassLiteralPropertyStyleDeclinesAConversionThatCannotCompile",
-	},
-	{
-		File: "libraries/structure/source/components/maps/Map.tsx",
-		Line: 747,
-		Rule: "no-implicit-coercion",
-		Side: SideGate,
-		Reason: "`1 * zoom` with zoom already a number coerces nothing; core/no_implicit_coercion.md, " +
-			"TestNoImplicitCoercionIsSilentWhenNothingIsCoerced",
-	},
-	{
-		File: "libraries/structure/source/components/maps/Map.tsx",
-		Line: 765,
-		Rule: "no-implicit-coercion",
-		Side: SideGate,
-		Reason: "`1 * zoom` with zoom already a number coerces nothing; core/no_implicit_coercion.md, " +
-			"TestNoImplicitCoercionIsSilentWhenNothingIsCoerced",
-	},
-	{
-		File: "libraries/structure/source/components/maps/Map.tsx",
-		Line: 784,
-		Rule: "no-implicit-coercion",
-		Side: SideGate,
-		Reason: "`1 * zoom` with zoom already a number coerces nothing; core/no_implicit_coercion.md, " +
-			"TestNoImplicitCoercionIsSilentWhenNothingIsCoerced",
-	},
-	{
-		File: "libraries/structure/source/components/maps/MapDrawing.ts",
-		Line: 220,
-		Rule: "no-implicit-coercion",
-		Side: SideGate,
-		Reason: "`1.0 * zoom` with zoom already a number coerces nothing; core/no_implicit_coercion.md, " +
-			"TestNoImplicitCoercionIsSilentWhenNothingIsCoerced",
-	},
-	{
-		File: "modules/tasks/TasksWatchCommandLineInterface.ts",
-		Line: 305,
-		Rule: "no-unmodified-loop-condition",
-		Side: SideGate,
-		Reason: "the loop awaits and `stopping` is set by a SIGINT handler registered before it, which runs while " +
-			"the loop is suspended; core/no_unmodified_loop_condition.md, " +
-			"TestNoUnmodifiedLoopConditionSeesAWriterThatRunsWhileTheLoopIsSuspended",
-	},
-	{
-		File: "modules/os/sensation/AhraOsMonitors.ts",
-		Line: 548,
-		Rule: "no-unmodified-loop-condition",
-		Side: SideGate,
-		Reason: "the loop awaits and `abortRequested` is set by an abort closure created before it; " +
-			"core/no_unmodified_loop_condition.md, " +
-			"TestNoUnmodifiedLoopConditionSeesAWriterThatRunsWhileTheLoopIsSuspended",
-	},
-	{
-		File: "modules/os/boot-screens/RainbowMatrix.ts",
-		Line: 689,
-		Rule: "no-unmodified-loop-condition",
-		Side: SideGate,
-		Reason: "the loop awaits and `stopped` is set by teardown, reached through a SIGINT handler registered " +
-			"before it; core/no_unmodified_loop_condition.md, " +
-			"TestNoUnmodifiedLoopConditionSeesAWriterThatRunsWhileTheLoopIsSuspended",
-	},
-	{
-		File: "libraries/structure/libraries/nexus/source/text/Shouting.ts",
-		Line: 569,
-		Rule: "consistency-no-shouting",
-		Side: SideGate,
-		Reason: "the `NOT` sits inside a double-quoted phrase the block comment wrapped onto the next line, and a " +
-			"quoted all-caps phrase is a literal by ruling; the gate's double-quote mask stops at a newline; " +
-			"nexus/consistency_no_shouting.md, TestConsistencyNoShoutingMasksADoubleQuoteThatWraps",
-	},
-	{
-		File: "libraries/structure/libraries/nexus/source/geography/Countries.ts",
-		Line: 13,
-		Rule: "no-misused-spread",
-		Side: SideGate,
-		Reason: "a string spread walks code points, which is what mapping ISO letters to regional indicators wants; " +
-			"cohere drops upstream's string branch by ruling, since its only repair is Array.from, the same iteration; " +
-			"typescript/no_misused_spread.md, TestNoMisusedSpreadLeavesStringSpreadAlone",
-	},
-	{
-		File: "modules/openai/PngTextMetadata.ts",
-		Line: 64,
-		Rule: "no-misused-spread",
-		Side: SideGate,
-		Reason: "a Latin-1 filter that wants code points; typescript/no_misused_spread.md, " +
-			"TestNoMisusedSpreadLeavesStringSpreadAlone",
-	},
-	{
-		File: "modules/pensieve/PensieveDailies.ts",
-		Line: 288,
-		Rule: "no-misused-spread",
-		Side: SideGate,
-		Reason: "quote-mark scanning by code point; typescript/no_misused_spread.md, " +
-			"TestNoMisusedSpreadLeavesStringSpreadAlone",
-	},
-	{
-		File: "modules/pensieve/PensieveDailies.ts",
-		Line: 326,
-		Rule: "no-misused-spread",
-		Side: SideGate,
-		Reason: "ignored characters filtered by code point; typescript/no_misused_spread.md, " +
-			"TestNoMisusedSpreadLeavesStringSpreadAlone",
-	},
-	{
-		File: "libraries/structure/source/components/maps/MapProjection.ts",
-		Line: 5,
-		Rule: "consistency-require-constant-casing",
-		Side: SideGate,
-		Reason: "`DegreesToRadians` leaves the file through `export { DegreesToRadians }` and Map.tsx imports it, so " +
-			"PascalCase is right; the gate's rule sees only an `export` modifier and calls it file-local; " +
-			"TestConsistencyRequireConstantCasingCountsALocalExportClause",
-	},
-	{
-		File: "modules/ollama/OllamaApi.ts",
-		Line: 51,
-		Rule: "consistency-require-constant-casing",
-		Side: SideGate,
-		Reason: "`OllamaEnvironment` is exported through `export { OllamaEnvironment }`, which the gate's rule does " +
-			"not read; TestConsistencyRequireConstantCasingCountsALocalExportClause",
-	},
-	{
-		File: "app/(os-layout)/_components/row/TaskList.tsx",
-		Line: 61,
-		Rule: "consistency-require-constant-casing",
-		Side: SideGate,
-		Reason: "`PriorityOrder` leaves the file through `export { PriorityOrder }` and TaskDetailFields.tsx imports " +
-			"it, so PascalCase is right; the gate's rule sees only an `export` modifier and calls it file-local; " +
-			"TestConsistencyRequireConstantCasingCountsALocalExportClause",
-	},
-	{
-		File: "modules/google/ads/GoogleAdsClient.ts",
-		Line: 57,
-		Rule: "consistency-require-constant-casing",
-		Side: SideGate,
-		Reason: "`GoogleAdsCredentials` leaves the file through `export { GoogleAdsCredentials }` and " +
-			"seven Google Ads API files import it, so PascalCase is right; the gate's rule " +
-			"sees only an `export` modifier and calls it file-local; " +
-			"TestConsistencyRequireConstantCasingCountsALocalExportClause",
-	},
+//
+// Empty since 2026-10-04 (#cn8sthd). Every one of the 23 entries it held had stopped naming a
+// difference: the ESLint side now carries cohere's rulings through Nexus's twins and wrappers, the
+// gate's own rule bugs were fixed in Nexus, and the rest of the sites were rewritten so neither engine
+// reports them. Both engines read 0 on all 19 files the table named. An entry is added back when a
+// real difference is decided, with its anchor and its reason.
+var KnownGateDefects = []AcknowledgedDifference{}
+
+// acknowledgementMatch is what one acknowledgement matched among a run's differences.
+type acknowledgementMatch struct {
+	acknowledgement AcknowledgedDifference
+	// differenceIndexes are the positions in the difference list whose finding it names.
+	differenceIndexes []int
 }
 
-// acknowledgedIndex is the lookup the comparison uses, built once per run.
-func acknowledgedIndex(acknowledged []AcknowledgedDifference) map[string]AcknowledgedDifference {
-	index := make(map[string]AcknowledgedDifference, len(acknowledged))
-	for _, one := range acknowledged {
-		index[one.Key()] = one
+// SourceLineReader returns the text of a line in a file of the tree being compared, 1-based, and
+// false when the file or the line cannot be read.
+type SourceLineReader func(file string, line int) (string, bool)
+
+// matchAcknowledgements pairs each acknowledgement with the differences its anchor names.
+//
+// Only a difference on the acknowledgement's side, in its file and for its rule, can match, and only
+// when its source line contains the anchor. Without a line reader nothing matches, which reports
+// every acknowledgement stale: a comparison that cannot read the code cannot tell an anchor that
+// moved from one that holds, and a stale report is the honest answer to that.
+func matchAcknowledgements(
+	acknowledged []AcknowledgedDifference,
+	differences []Difference,
+	readSourceLine SourceLineReader,
+) []acknowledgementMatch {
+	matches := make([]acknowledgementMatch, 0, len(acknowledged))
+	for _, acknowledgement := range acknowledged {
+		match := acknowledgementMatch{acknowledgement: acknowledgement}
+		for index, difference := range differences {
+			if difference.OnlyOn != acknowledgement.Side ||
+				difference.Finding.File != acknowledgement.File ||
+				difference.Finding.Rule != acknowledgement.Rule ||
+				readSourceLine == nil {
+				continue
+			}
+			text, readable := readSourceLine(difference.Finding.File, difference.Finding.Line)
+			if readable && strings.Contains(strings.TrimSpace(text), acknowledgement.Anchor) {
+				match.differenceIndexes = append(match.differenceIndexes, index)
+			}
+		}
+		matches = append(matches, match)
 	}
-	return index
+	return matches
 }

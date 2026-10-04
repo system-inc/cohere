@@ -57,9 +57,9 @@ Go port afterwards and belongs in the original's list too.
   comment that reflowed `"the caller's job and you must NOT"` across two lines read the `NOT` as
   shouting; ahra's own `Shouting.ts:569` is that comment. The backtick mask already spans a wrap.
   `maskWrappedDoubleQuotes` pairs only the quotes the one-line pass left over, one on each of two
-  adjacent lines, so a stray inch mark cannot open a span that unmasks a later quote. That one site is
-  a gate-side entry in `internal/differential/acknowledged.go`, and the same change belongs in
-  `Shouting.ts` after the double-quote replace.
+  adjacent lines, so a stray inch mark cannot open a span that unmasks a later quote. Nexus's
+  `Shouting.ts` took the same mask after its double-quote replace (Nexus 68fc7fb, #dhaawhz), so the
+  engines agree on that site.
 - **Command lines are matched after the JSDoc gutter is stripped**, so a command inside a block
   comment is masked. Recorded in `maskCommandLines`.
 
