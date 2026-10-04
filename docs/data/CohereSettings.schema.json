@@ -617,6 +617,9 @@
                 "nexus/consistency-no-multiline-arrow-function": {
                     "$ref": "#/$defs/ruleSetting"
                 },
+                "nexus/consistency-no-property-alias": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
                 "nexus/consistency-no-return-void": {
                     "$ref": "#/$defs/ruleSetting"
                 },
@@ -1371,9 +1374,6 @@
                     "$ref": "#/$defs/ruleSetting"
                 },
                 "structure/boundary-no-project-theme-value": {
-                    "$ref": "#/$defs/ruleSetting"
-                },
-                "structure/consistency-no-property-alias": {
                     "$ref": "#/$defs/ruleSetting"
                 },
                 "structure/consistency-require-matching-file-name": {

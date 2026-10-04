@@ -5575,6 +5575,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-property-alias",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-no-return-void",
                 "severity": "error"
             },
@@ -6353,10 +6357,6 @@
             },
             {
                 "name": "structure/boundary-no-project-theme-value",
-                "severity": "error"
-            },
-            {
-                "name": "structure/consistency-no-property-alias",
                 "severity": "error"
             },
             {

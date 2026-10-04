@@ -1,6 +1,6 @@
 {
   "rules": {
-    "TypeScript": "structure/consistency-no-property-alias",
+    "TypeScript": "nexus/consistency-no-property-alias",
     "Swift": "cohere-swift/consistency-no-property-alias"
   },
   "messages": {

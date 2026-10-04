@@ -549,7 +549,7 @@ it records a decision about a rule, and is reported as unported rather than refu
 
 </details>
 
-<details><summary><code>nexus</code>, 49 rules</summary>
+<details><summary><code>nexus</code>, 50 rules</summary>
 
 - `nexus/boundary-no-internal-import`
 - `nexus/boundary-no-nexus-outside-import`
@@ -565,6 +565,7 @@ it records a decision about a rule, and is reported as unported rather than refu
 - `nexus/consistency-no-iso-string-date-cut`
 - `nexus/consistency-no-long-line-comment`
 - `nexus/consistency-no-multiline-arrow-function`
+- `nexus/consistency-no-property-alias`
 - `nexus/consistency-no-return-void`
 - `nexus/consistency-no-screaming-snake-case`
 - `nexus/consistency-no-shouting`
@@ -694,10 +695,9 @@ it records a decision about a rule, and is reported as unported rather than refu
 
 </details>
 
-<details><summary><code>structure</code>, 34 rules</summary>
+<details><summary><code>structure</code>, 33 rules</summary>
 
 - `structure/boundary-no-project-theme-value`
-- `structure/consistency-no-property-alias`
 - `structure/consistency-require-matching-file-name`
 - `structure/consistency-require-organized-imports`
 - `structure/import-require-react-namespace`

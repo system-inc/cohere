@@ -1,7 +1,8 @@
-package structure
+package nexus
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/scope"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -10,7 +11,7 @@ import (
 
 // consistencyNoPropertyAliasText is the rule's message, whose wording lives in
 // `policy/messages/consistency-no-property-alias.json`.
-var consistencyNoPropertyAliasText = policy.MessageOf("structure/consistency-no-property-alias", "noPropertyAlias")
+var consistencyNoPropertyAliasText = policy.MessageOf("nexus/consistency-no-property-alias", "noPropertyAlias")
 
 // ConsistencyNoPropertyAlias flags `const x = object.x`, a local that exists only to rename a
 // property onto a shorter, less-anchored name.
@@ -81,7 +82,7 @@ var consistencyNoPropertyAliasText = policy.MessageOf("structure/consistency-no-
 // `readonly` view of a mutable list, gives the local a type the reach does not have. Exempt when the
 // local's annotated type differs from its initializer's (3 sites).
 var ConsistencyNoPropertyAlias = rule.Rule{
-	Name: "structure/consistency-no-property-alias",
+	Name: "nexus/consistency-no-property-alias",
 	// Asked whether a link is a getter, what a link's declared and narrowed types are, and what an
 	// annotation names. The getter question reads an imported declaration, so the findings key on the
 	// closure's contents, the default; the release guard refuses a shapes claim here.
@@ -261,11 +262,11 @@ func isReadInsideHookDependencyArray(enclosing *ast.Node, localName string, decl
 		}
 		if node.Kind == ast.KindCallExpression {
 			call := node.AsCallExpression()
-			// The package's own isHookCall is used rather than a local one, and it is stricter
+			// The shelf's react.IsHookCall is used rather than a local one, and it is stricter
 			// than the obvious version: it requires the namespaced form to be React specifically,
 			// so `somethingElse.useThing(...)` is not a hook. A second copy written here accepted
 			// any namespace and would have exempted aliases the gate still reports.
-			if isHookCall(call) && call.Arguments != nil {
+			if react.IsHookCall(call) && call.Arguments != nil {
 				// The dependency array is the second argument onward, matching the original. A
 				// first-argument array is the callback position and means something else.
 				for index, argument := range call.Arguments.Nodes {

@@ -50,7 +50,7 @@ func searchForJsxOrHook(node *ast.Node, depth int) bool {
 	case ast.KindJsxElement, ast.KindJsxSelfClosingElement, ast.KindJsxFragment:
 		return true
 	case ast.KindCallExpression:
-		if isHookCall(node.AsCallExpression()) {
+		if react.IsHookCall(node.AsCallExpression()) {
 			return true
 		}
 	}
@@ -97,29 +97,6 @@ func descendsForJsxSearch(node *ast.Node) bool {
 		return false
 	}
 	return true
-}
-
-// isHookCall reports a direct useFoo(...) or a namespaced React.useFoo(...).
-//
-// The namespaced form is checked against the React object specifically, matching the original: a
-// call to somethingElse.useState is not a React hook, and reading every namespaced use* name as one
-// would count things the gate does not.
-func isHookCall(call *ast.CallExpression) bool {
-	if call == nil || call.Expression == nil {
-		return false
-	}
-
-	switch call.Expression.Kind {
-	case ast.KindIdentifier:
-		return react.IsHookName(call.Expression.Text())
-
-	case ast.KindPropertyAccessExpression:
-		// `react.IsNamespacedMember` rather than a hand-rolled receiver test, which additionally
-		// skips parentheses on the receiver: `(React).useState(...)` is the same call and the
-		// hand-rolled version declined it while looking correct.
-		return react.IsNamespacedMember(call.Expression, react.IsHookName)
-	}
-	return false
 }
 
 // IsLikelyReactComponent reports whether a function-like node looks like a React component.

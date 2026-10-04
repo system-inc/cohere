@@ -3,6 +3,8 @@ package react
 import (
 	"strings"
 	"unicode"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // The two name predicates React conventions rest on, lifted from `internal/rules/structure/` where
@@ -32,6 +34,27 @@ func IsHookName(name string) bool {
 		return false
 	}
 	return unicode.IsUpper([]rune(name[3:])[0])
+}
+
+// IsHookCall reports a direct `useFoo(...)` or a namespaced `React.useFoo(...)`.
+//
+// The namespaced form is checked against the React object specifically, through IsNamespacedMember: a
+// call to `somethingElse.useState` is not a React hook, and reading every namespaced `use*` name as one
+// would count things the gate does not. Lifted from the structure package when
+// consistency-no-property-alias moved to nexus (#kjnmdb1), so the two packages share one predicate.
+func IsHookCall(call *ast.CallExpression) bool {
+	if call == nil || call.Expression == nil {
+		return false
+	}
+
+	switch call.Expression.Kind {
+	case ast.KindIdentifier:
+		return IsHookName(call.Expression.Text())
+
+	case ast.KindPropertyAccessExpression:
+		return IsNamespacedMember(call.Expression, IsHookName)
+	}
+	return false
 }
 
 // IsLikelyComponentName reports a name starting with a capital.

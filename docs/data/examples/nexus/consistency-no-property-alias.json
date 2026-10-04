@@ -1,5 +1,5 @@
 {
-    "rule": "structure/consistency-no-property-alias",
+    "rule": "nexus/consistency-no-property-alias",
     "firing": {
         "file": "/repository/source/Thing.ts",
         "source": "export function run(a: AInterface) {\n    const value = a.one.two.three.value;\n    return value;\n}\n",

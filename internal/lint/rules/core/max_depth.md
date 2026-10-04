@@ -36,7 +36,7 @@ if(keys.length > 0) {
 
 > Blocks are nested too deeply (6). Maximum allowed is 4
 
-**`libraries/structure/code-quality/lint/rules/ConsistencyNoPropertyAliasRule.ts:65`**
+**`libraries/structure/libraries/nexus/code-quality/lint/rules/ConsistencyNoPropertyAliasRule.ts:65`**
 
 ```
 if(arrayParent.callee.type === 'Identifier' && isHookName(arrayParent.callee.name)) {
@@ -44,7 +44,7 @@ if(arrayParent.callee.type === 'Identifier' && isHookName(arrayParent.callee.nam
 
 > Blocks are nested too deeply (5). Maximum allowed is 4
 
-**`libraries/structure/code-quality/lint/rules/ConsistencyNoPropertyAliasRule.ts:69`**
+**`libraries/structure/libraries/nexus/code-quality/lint/rules/ConsistencyNoPropertyAliasRule.ts:69`**
 
 ```
 if(

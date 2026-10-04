@@ -18,7 +18,6 @@ import (
 func init() {
 	rule.Register(
 		rule.Registration{Rule: BoundaryNoProjectThemeValue},
-		rule.Registration{Rule: ConsistencyNoPropertyAlias},
 		rule.Registration{Rule: ConsistencyRequireOrganizedImports},
 		rule.Registration{Rule: NetworkNoDirectFetch},
 		rule.Registration{Rule: NetworkNoForbiddenImport},

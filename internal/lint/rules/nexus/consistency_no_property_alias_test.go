@@ -1,4 +1,4 @@
-package structure
+package nexus
 
 import (
 	"testing"

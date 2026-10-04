@@ -1778,6 +1778,7 @@
                 "elements": "one"
             },
             "messageIds": [
+                "meaninglessVoidOnNonCall",
                 "meaninglessVoidOperator"
             ],
             "fixKind": "both",
@@ -6505,6 +6506,23 @@
             }
         },
         {
+            "name": "nexus/consistency-no-property-alias",
+            "language": "TypeScript",
+            "namespace": "nexus",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true,
+            "messageIds": [
+                "noPropertyAlias"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                }
+            ]
+        },
+        {
             "name": "nexus/consistency-no-return-void",
             "language": "TypeScript",
             "namespace": "nexus",
@@ -6925,6 +6943,8 @@
             "typeAware": true,
             "messageIds": [
                 "callerDataMutation",
+                "mutatesUnknownParameter",
+                "mutatesWithoutReason",
                 "processStateWithoutReason"
             ],
             "sets": [
@@ -13982,6 +14002,7 @@
             "messageIds": [
                 "function",
                 "global",
+                "implied",
                 "module",
                 "multiple",
                 "never",
@@ -14036,27 +14057,6 @@
             ],
             "swift": {
                 "verdict": "NotApplicable"
-            }
-        },
-        {
-            "name": "structure/consistency-no-property-alias",
-            "language": "TypeScript",
-            "namespace": "structure",
-            "origin": "house",
-            "category": "consistency",
-            "typeAware": true,
-            "messageIds": [
-                "noPropertyAlias"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:system-inc/structure",
-                    "severity": "error"
-                }
-            ],
-            "swift": {
-                "verdict": "Ported",
-                "swiftRule": "cohere-swift/consistency-no-property-alias"
             }
         },
         {
