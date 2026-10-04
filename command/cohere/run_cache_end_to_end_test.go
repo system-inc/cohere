@@ -152,11 +152,11 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	}
 	// A replay says which run a phase's line came from; that label comes off before the comparison,
 	// and is required separately below so a replay that lost it fails.
-	provenance := regexp.MustCompile(`^fix \(from the cached run at \d\d:\d\d:\d\d\): `)
+	provenance := regexp.MustCompile(`^(fix|format scope|nested repositories) \(from the cached run at \d\d:\d\d:\d\d\): `)
 	replayBody := func(replay string) string {
 		lines := strings.Split(keepLines(replay, "cached: ", "phases: replayed ", "  this run: ", "  memory: "), "\n")
 		for index, line := range lines {
-			lines[index] = provenance.ReplaceAllString(line, "fix: ")
+			lines[index] = provenance.ReplaceAllString(line, "$1: ")
 		}
 		return strings.Join(lines, "\n")
 	}

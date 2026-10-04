@@ -117,6 +117,7 @@ func checkNestedRepositories(engine formatEngine, root string) (nestedDriftCheck
 		if err != nil {
 			return check, fmt.Errorf("reading nested repository %s: %w", relative, err)
 		}
+		declareFormatWalk(enumeration)
 		for _, fileName := range enumeration.Files {
 			check.Files++
 			contents, err := os.ReadFile(fileName)

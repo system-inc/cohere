@@ -111,8 +111,8 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(t *testing.T) {
 	}
 	cold := regexp.MustCompile(`(?m)^  cache: off, by --no-cache.*$`)
 	durations := regexp.MustCompile(`\d+(\.\d+)?(ms|s|µs)\b`)
-	// How a cached run's types line was paid for, which a cold run cannot share.
-	replayedClause := regexp.MustCompile(`; \d+ of \d+ files' semantic diagnostics replayed from cache`)
+	// How a cached run's types and lint lines were paid for, which a cold run cannot share.
+	replayedClause := regexp.MustCompile(`; \d+ of \d+ files(' semantic diagnostics)? replayed from cache`)
 	findings := func(output string) string {
 		kept := []string{}
 		for _, line := range strings.Split(output, "\n") {
@@ -122,8 +122,10 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(t *testing.T) {
 		}
 		return strings.Join(kept, "\n")
 	}
+	// The warm side reads the record and the findings cache, and is not a whole-run replay, which leaves the
+	// types and lint lines out: the same check in the other order is the same run under another run-cache key.
 	run(first, "--no-fix", "--format")
-	cached, _ := run(first, "--no-fix", "--format")
+	cached, _ := run(first, "--format", "--no-fix")
 	// The writing shape goes last: it fixes and formats the tree, which the comparison before it must not
 	// see.
 	for _, arguments := range [][]string{{"--no-cache", "--no-fix", "--format"}, {"--no-cache", "--no-fix"}, {"--no-cache", "--lint"}, {"--no-cache", "--types"}, {"--no-cache", "--fix", "--format"}} {

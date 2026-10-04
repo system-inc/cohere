@@ -625,7 +625,11 @@ func run() error {
 			// declared submodule, whose bytes are not on record as formatted. Measured on ahra's 3,084
 			// formattable files, the native printers format the whole tree in about 10 seconds, which the
 			// first run with no record pays once; every run after formats what was edited.
-			declineRunCache("a formatter enumerated the tree")
+			//
+			// The walk declares what it read, so a run that only checks can be replayed (#13a63n3). The scope it
+			// draws also reads the format record, which changes nothing a replay could print wrongly: an entry is
+			// a proof that bytes are already formatted, so the record decides how much is formatted again, never
+			// what would change.
 			scope, recordUniverse = unformattedScope(formatter, record, repositoryRoot)
 		}
 
@@ -667,8 +671,9 @@ func run() error {
 
 		// The scope is stated on every run rather than inferred from a file count. Named paths, the whole
 		// tree, and what is not on record as formatted are three different answers to "what was
-		// formatted", and a reader cannot tell which one they got from a number alone.
-		fmt.Printf("format scope: %s\n", scope.Description)
+		// formatted", and a reader cannot tell which one they got from a number alone. It describes the run
+		// that drew the scope, record included, so a replay says which run that was.
+		fmt.Fprintf(provenanceOutput(os.Stdout), "format scope: %s\n", scope.Description)
 		if mutate {
 			report.record(phaseFix, outcomeRan, fixDuration, "")
 		} else {
@@ -690,7 +695,7 @@ func run() error {
 				fixDuration += time.Since(nestedStart)
 				printNestedDrift(os.Stdout, nested)
 				findings += len(nested.Drift)
-				fmt.Printf("nested repositories: %d read, %d files, %d would change under their own run\n",
+				fmt.Fprintf(provenanceOutput(os.Stdout), "nested repositories: %d read, %d files, %d would change under their own run\n",
 					nested.Repositories, nested.Files, len(nested.Drift))
 			}
 			report.recordChecked(phaseFix, fixDuration, len(fixSummary.ChangedFiles))

@@ -314,13 +314,16 @@ func unformattedScope(engine formatEngine, record *formatRecord, root string) (f
 	universe, err := enumerateFormatUniverse(engine, root)
 	if err != nil {
 		// A failed walk withholds formatting and says why, rather than falling back to a universe that
-		// would format the wrong set. Fixing still runs. No universe means nothing is pruned.
+		// would format the wrong set. Fixing still runs. No universe means nothing is pruned, and nothing
+		// says what the walk read, so the run is not replayed.
+		declineRunCache("the format walk failed")
 		return formatScope{
 			index:       map[string]struct{}{},
 			Description: fmt.Sprintf("nothing (could not enumerate the tree: %v)", err),
 		}, nil
 	}
 
+	declareFormatWalk(universe.root)
 	unformatted := record.unformatted(universe.files, engine.OptionsFingerprint)
 	index := make(map[string]struct{}, len(unformatted))
 	for _, fileName := range unformatted {

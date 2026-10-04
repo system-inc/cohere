@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -30,9 +31,10 @@ import (
 //
 // # Which runs
 //
-// A bare `cohere`, or `cohere --no-fix`, and nothing else. Those are the runs people repeat, and every
-// other flag widens the set of things the output could depend on. The key covers arguments anyway, so
-// admitting more later is a change to one condition rather than to the proof.
+// A bare `cohere`, `cohere --no-fix`, and `cohere --no-fix --format`, and nothing else. Those are the runs
+// people repeat, and every other flag widens the set of things the output could depend on. The key covers
+// arguments anyway, so admitting more later is a change to one condition rather than to the proof, plus
+// declaring whatever the new run reads that the graph build does not.
 //
 // # Which exits
 //
@@ -73,6 +75,10 @@ type runCacheSession struct {
 	// is never recorded.
 	declared   bool
 	extraFiles []string
+
+	// extraDirectories is every directory a format walk listed, so a file added, removed or renamed in one
+	// moves an input. See declareFormatWalk.
+	extraDirectories []string
 
 	// declined is the reason this run must not be recorded, empty while it may be.
 	declined string
@@ -151,21 +157,24 @@ func (t *teeStream) stop(target **os.File) {
 
 // runCacheEligible reports whether this invocation may use the run cache at all.
 //
-// A bare run, and `--no-fix` alone. `--no-fix` runs every phase and writes nothing, so it is a pure
-// report, which suits a cache better than the bare run does; it is what a real-tree measurement uses,
-// so the probe asks to write nothing as well as being sandboxed. The key covers the arguments, so the
-// two never replay each other.
+// A bare run, `--no-fix` alone, and `--no-fix --format` in either order. `--no-fix` runs every phase and
+// writes nothing, so it is a pure report, which suits a cache better than the bare run does; it is what a
+// real-tree measurement uses, so the probe asks to write nothing as well as being sandboxed. With
+// `--format` it checks formatting too, still writing nothing, and its walk declares what it read (see
+// declareFormatWalk). The key covers the arguments, so none of them replays another.
 //
-// `--no-cache` is refused by name rather than left to the argument shape. Any flag makes a run
-// ineligible today, but the promise that flag makes, nothing read and nothing written, should not rest
-// on which arguments happen to be admitted next.
+// `--no-cache` is refused by name rather than left to the argument shape. Most flags make a run
+// ineligible, but the promise that flag makes, nothing read and nothing written, should not rest on which
+// arguments happen to be admitted next.
 func runCacheEligible() bool {
 	if cacheOff {
 		return false
 	}
-	switch {
-	case len(os.Args) == 1:
-	case len(os.Args) == 2 && os.Args[1] == "--no-fix":
+	switch arguments := os.Args[1:]; {
+	case len(arguments) == 0:
+	case len(arguments) == 1 && arguments[0] == "--no-fix":
+	case len(arguments) == 2 && (arguments[0] == "--no-fix" && arguments[1] == "--format" ||
+		arguments[0] == "--format" && arguments[1] == "--no-fix"):
 	default:
 		return false
 	}
@@ -179,9 +188,11 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	if !runCacheEligible() {
 		return nil
 	}
-	// No format scope is in the key, and that is only sound because an eligible run never formats: with
-	// no formatter its scope is the constant "formatting was not requested", so nothing it prints depends
-	// on which files changed. A run that formats is never eligible.
+	// No format scope is in the key. Without a formatter the scope is the constant "formatting was not
+	// requested". With one, under `--no-fix --format`, the scope is drawn from a walk that declares every
+	// file and directory it read, so a change that would move the scope moves an input instead (see
+	// declareFormatWalk). A run that writes formatting is never eligible. The printers need no fact of
+	// their own: the key covers the running binary, so any other build of the formatter misses.
 	key, err := program.RunCacheKey(os.Args[1:], location.Root,
 		"root="+location.Root,
 		"tsconfig="+location.ConfigFileName,
@@ -360,6 +371,54 @@ func declareRunCacheInputs(files ...string) {
 	activeRunCache.extraFiles = append(activeRunCache.extraFiles, files...)
 }
 
+// declareFormatWalk adds what one format walk depends on to this run's inputs, so a run that checks
+// formatting can be replayed (#13a63n3).
+//
+// What the walk's answer is a function of: the files it found, whose bytes decide what the formatter
+// reports; every directory it listed, whose modification time moves when an entry is added, removed or
+// renamed, which is also what catches a new .git, settings file or leftover Prettier config inside the
+// tree; and the files it read or would read, each recorded when present, since its directory already
+// covers its appearing. Those are the root's .gitignore and .gitmodules, the .prettierignore the walk
+// refuses, and every CohereSettings.json a directory resolves its options from, with the files it extends.
+// The formatter's own identity needs no input: the run's key covers the running binary (see beginRunCache).
+func declareFormatWalk(enumeration formatfiles.Enumeration) {
+	session := activeRunCache
+	if session == nil {
+		return
+	}
+	read := []string{
+		filepath.Join(enumeration.Root, ".gitignore"),
+		filepath.Join(enumeration.Root, ".gitmodules"),
+		filepath.Join(enumeration.Root, ".prettierignore"),
+	}
+	for _, directory := range enumeration.Directories {
+		read = append(read, filepath.Join(directory, formatoptions.SettingsFileName))
+	}
+	// The settings the root itself resolves to can sit above it, in a directory the walk never listed, and so
+	// can the directories between: a settings file created in one of those would take over the options.
+	if resolution, err := formatoptions.Resolve(enumeration.Root); err == nil && resolution.Source != "" {
+		read = append(read, resolution.Source)
+		for directory := filepath.Clean(enumeration.Root); directory != filepath.Dir(resolution.Source); directory = filepath.Dir(directory) {
+			session.extraDirectories = append(session.extraDirectories, directory)
+			if parent := filepath.Dir(directory); parent == directory {
+				break
+			}
+		}
+	}
+	for _, path := range read {
+		if _, err := os.Stat(path); err != nil {
+			continue
+		}
+		if filepath.Base(path) == formatoptions.SettingsFileName {
+			session.extraFiles = append(session.extraFiles, configuration.SourcesOnDisk(lintConfigSources(path))...)
+			continue
+		}
+		session.extraFiles = append(session.extraFiles, path)
+	}
+	session.extraFiles = append(session.extraFiles, enumeration.Files...)
+	session.extraDirectories = append(session.extraDirectories, enumeration.Directories...)
+}
+
 // declineRunCache records why this run must not be replayed. The first reason stands.
 func declineRunCache(reason string) {
 	if activeRunCache != nil && activeRunCache.declined == "" {
@@ -414,7 +473,7 @@ func finishRunCache(exitCode int) {
 func (session *runCacheSession) record(exitCode int) *program.RunCache {
 	present, absent := session.recorder.Inputs()
 	files := append(present, session.extraFiles...)
-	cache, err := program.RecordRunCache(session.key, files, nil, absent,
+	cache, err := program.RecordRunCache(session.key, files, session.extraDirectories, absent,
 		session.stdout.buffer.Bytes(), exitCode, session.readSince)
 	if err != nil {
 		// Not recording is always safe. Said on stderr because a cache that silently never records is
