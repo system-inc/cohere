@@ -211,6 +211,9 @@
         "9041ea6efa8f": "globals",
         "d464aa50bd94": "globals"
     },
+    "id-length": {
+        "549199ae55a5": "span"
+    },
     "max-lines": {
         "03f9e79bba0c": "span",
         "058df14c8887": "span",
@@ -218,10 +221,10 @@
         "464e6995f802": "span",
         "4d26a50855ab": "span",
         "4f49046778df": "missing",
-        "50b5044428be": "span",
         "537246a82930": "span",
         "76a62af6ed15": "span",
         "7c86e9819aeb": "span",
+        "7dc0e736768a": "span",
         "7e3d229385a7": "missing",
         "7f1b6b913f54": "span",
         "86027098f499": "span",
@@ -736,6 +739,9 @@
         "a736bde6e953": "span",
         "e5539827acb7": "span"
     },
+    "no-unused-private-class-members": {
+        "549d4b8dc61b": "span"
+    },
     "no-use-before-define": {
         "3d789b14eb0f": "missing",
         "7b18216de822": "missing",
@@ -1027,10 +1033,17 @@
         "163108b8667d": "missing",
         "1f092eb44482": "missing",
         "69d5c04c6422": "missing",
+        "71c4884e5926": "span",
+        "784f22dfa15c": "span",
         "7cb3a2753c54": "missing",
         "880c314aec58": "missing",
+        "baa249371984": "span",
         "c6e4306f177e": "missing",
-        "e80e4cab2908": "missing"
+        "d0369765dccd": "span",
+        "d0f30e5ffdcd": "span",
+        "e80e4cab2908": "missing",
+        "ee4d5059a44f": "span",
+        "f9d6ab4c3d8a": "span"
     },
     "prefer-promise-reject-errors": {
         "68f83719ed32": "globals",
@@ -1172,6 +1185,12 @@
         "f216029d13bf": "options",
         "f657e780488c": "options",
         "f9d9779c24ff": "options"
+    },
+    "unicode-bom": {
+        "0e42ef14ca94": "extra",
+        "19885cb5c7bb": "missing",
+        "cd1ccacafa34": "missing",
+        "de5578befadd": "span"
     },
     "use-isnan": {
         "687a41a8c83b": "globals"

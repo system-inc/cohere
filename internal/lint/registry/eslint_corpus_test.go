@@ -12,6 +12,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
@@ -23,8 +24,8 @@ import (
  *
  * The rows are vendored in testdata/eslint-corpus/eslint-10.8.1, one file per rule, each with ESLint's
  * verdict recorded when it was extracted (internal/lint/tools/eslint_corpus/extract.mjs, which nothing
- * runs). Every row runs as a module named Case.ts in both engines. A row agrees when cohere reports the
- * same source slices ESLint does.
+ * runs). Every row runs as a module named Case.ts in both engines. A row agrees when cohere reports
+ * findings at the same places ESLint does: the same start and end offsets, not only the same text.
  *
  * Every row that does not agree is listed in known-gaps.json under its rule, with the way it disagrees,
  * and the list is held exactly: an unlisted disagreement fails, a listed one that now disagrees
@@ -135,10 +136,17 @@ func corpusVerdict(t *testing.T, registration rule.Registration, row eslintCorpu
 	expected := make([]string, 0, len(row.ESLint))
 	for _, finding := range row.ESLint {
 		start, end := byteOffset[int(finding[1].(float64))], byteOffset[int(finding[2].(float64))]
-		expected = append(expected, row.Code[start:end])
+		expected = append(expected, corpusPlace(start, end))
 	}
-	// The harness writes the file trimmed, so cohere's offsets are in the trimmed text, and slices compare
+	// The harness writes the file trimmed, so cohere's offsets are in the trimmed text and are moved
+	// back by what the trim took off the front before they compare.
+	//
+	// The places compare as offsets and not as text. Comparing the text alone read a finding on the
+	// wrong occurrence of the same text as agreement: ESLint reports prefer-const at the write in
+	// `let x; x = 0;` and the port at the declaration, both slices are `x`, and the row agreed even
+	// across two lines (#jjfa7qb). TestCorpusVerdictComparesPlaces plants that shape.
 	source := rule_testing.FixtureText(row.Code)
+	leading := len(row.Code) - len(strings.TrimLeft(row.Code, " \t\r\n"))
 	reported := make([]string, 0, len(result.Diagnostics))
 	for _, diagnostic := range result.Diagnostics {
 		start, end := diagnostic.Range.Pos(), diagnostic.Range.End()
@@ -146,7 +154,7 @@ func corpusVerdict(t *testing.T, registration rule.Registration, row eslintCorpu
 			reported = append(reported, fmt.Sprintf("<range %d-%d>", start, end))
 			continue
 		}
-		reported = append(reported, source[start:end])
+		reported = append(reported, corpusPlace(start+leading, end+leading))
 	}
 	sort.Strings(expected)
 	sort.Strings(reported)
@@ -164,6 +172,11 @@ func corpusVerdict(t *testing.T, registration rule.Registration, row eslintCorpu
 	default:
 		return "missing"
 	}
+}
+
+// corpusPlace names a finding by where it is, as byte offsets into the row's code.
+func corpusPlace(start int, end int) string {
+	return fmt.Sprintf("%d-%d", start, end)
 }
 
 func TestCohereAgreesWithESLintsCoreCorpus(t *testing.T) {
@@ -279,5 +292,49 @@ func TestUTF16OffsetsBecomeByteOffsets(t *testing.T) {
 	}
 	if got := code[offsets[3]:offsets[4]]; got != "x" {
 		t.Fatalf("unit 3 slices to %q, want x", got)
+	}
+}
+
+// TestCorpusVerdictComparesPlaces plants the shape a text-only comparison read as agreement, and its
+// twin.
+//
+// The probe reports the first `x` in `let x; x = 0;`, at bytes 4 to 5. A row whose ESLint finding is
+// the second `x`, at 7 to 8, has the same text and a different place, and must not agree: it is a span
+// gap. The twin, whose finding is at 4 to 5, must agree. A leading blank line moves both, so the
+// trimmed fixture's offsets are shown to be mapped back.
+func TestCorpusVerdictComparesPlaces(t *testing.T) {
+	t.Parallel()
+
+	probe := rule.Registration{Rule: rule.Rule{
+		Name: "corpus-place-probe",
+		Run: func(ctx rule.Context, options any) rule.Listeners {
+			reported := false
+			return rule.Listeners{
+				ast.KindIdentifier: func(node *ast.Node) {
+					if !reported && node.Text() == "x" {
+						reported = true
+						ctx.ReportNode(node, rule.Message{Id: "probe", Description: "The first x."})
+					}
+				},
+			}
+		},
+	}}
+
+	cases := []struct {
+		name  string
+		code  string
+		start float64
+		want  string
+	}{
+		{"same text, another place", "let x; x = 0;", 7, "span"},
+		{"same text, the same place", "let x; x = 0;", 4, "agree"},
+		{"after a trimmed blank line, another place", "\nlet x; x = 0;", 8, "span"},
+		{"after a trimmed blank line, the same place", "\nlet x; x = 0;", 5, "agree"},
+	}
+	for _, testCase := range cases {
+		row := eslintCorpusRow{Code: testCase.code, ESLint: [][3]any{{"useConst", testCase.start, testCase.start + 1}}}
+		if verdict := corpusVerdict(t, probe, row); verdict != testCase.want {
+			t.Errorf("%s: the verdict is %q, want %q", testCase.name, verdict, testCase.want)
+		}
 	}
 }
