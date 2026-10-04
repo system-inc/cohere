@@ -83,7 +83,10 @@ The keys:
 - `rules`: each rule's severity, `"off"`, `"warn"` or `"error"`, with options where a rule takes them.
 - `overrides`: a list of `{ "files": [...], "rules": {...} }` blocks that change rules for matching
   paths.
-- `ignorePatterns`: paths cohere never checks.
+- `ignorePatterns`: paths cohere never checks, beyond what git ignores. Ignore matching follows
+  gitignore(5): every `.gitignore` from the root down and `.git/info/exclude` (not `core.excludesFile`),
+  case sensitive (`core.ignorecase` is not read). A `.gitignore` that is a symbolic link or larger than
+  100 MiB is refused by name rather than skipped.
 - `reasons` and `departures`: why this file turns a rule off, or sets it differently from the file it
   extends. Required in our tiers, optional elsewhere. cohere prints them, so a choice stays visible.
 - `format`: the formatter's options, `printWidth`, `tabWidth`, `useTabs`, `semi`, `singleQuote`,
