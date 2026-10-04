@@ -893,16 +893,25 @@ function Component(props) {
 	}
 }
 
-// TestPreserveManualMemoizationStaysSilentWhereTheInlinedIdsOverlap is www's StackIngredients hook cut
-// down: a `||` default feeding a second `||`, then an allocation. React Compiler 1.0.0 compiles it and
-// react-hooks 7.1.1 is silent. Inlining the callback used to map some of its lvalues twice, so the
-// scope's inferred dependency rooted at a value nothing defined and the rule reported a memoization
-// the compiler keeps (#p67vev4). This row reports with the double mapping put back, and
-// TestCopyNestedBodyMapsEveryPlaceOnce pins the mapping itself.
-func TestPreserveManualMemoizationStaysSilentWhereTheInlinedIdsOverlap(t *testing.T) {
+// TestPreserveManualMemoizationWhereTheInlinedIdsCanOverlap runs the shapes where an inlined memo
+// callback's ids can run past the parent's first fresh id. Inlining used to map some lvalues twice
+// there, so the scope's inferred dependency rooted at a value nothing defined and the rule reported a
+// memoization the compiler keeps (#p67vev4). Each verdict was read from babel-plugin-react-compiler
+// 1.0.0 at its defaults and from react-hooks 7.1.1's preserve-manual-memoization. With the double
+// mapping put back, the first two rows report; TestCopyNestedBodyMapsEveryPlaceOnce pins the mapping.
+// The last row is one upstream reports, so the fix is shown not to quiet a real finding.
+func TestPreserveManualMemoizationWhereTheInlinedIdsCanOverlap(t *testing.T) {
 	t.Parallel()
 
-	const source = `import React from 'react';
+	for _, row := range []struct {
+		name     string
+		source   string
+		reported bool
+	}{
+		{
+			name:     "a `||` default feeding a second `||`, then an allocation, as www's StackIngredients",
+			reported: false,
+			source: `import React from 'react';
 declare const Day: { title: string }[];
 declare const Night: { title: string }[];
 interface P { kind: 'A' | 'B' }
@@ -915,6 +924,153 @@ function useFilter(properties: P) {
     return value;
 }
 export function Component(properties: P) { const items = useFilter(properties); return <div>{items.length}</div>; }
-`
-	rule_testing.ExpectClean(t, runPreserveManualMemoization(t, "overlap.tsx", source))
+`,
+		},
+		{
+			name:     "nested callbacks inside the memo callback",
+			reported: false,
+			source: `import React from 'react';
+declare const Day: { title: string; kind: string }[];
+declare const Night: { title: string; kind: string }[];
+interface P { kind: 'A' | 'B' | undefined; mode: 'X' | 'Y' | undefined }
+
+function useNested(properties: P) {
+    const value = React.useMemo(function() {
+        const pick = function(list: { title: string; kind: string }[]) {
+            const k = properties.kind || 'A';
+            return list.filter(function(item) { const m = properties.mode || 'X'; return (k === 'A' || k === 'B') && (m === 'X' || item.kind === m); });
+        };
+        const x = properties.kind || 'A';
+        const y = x === 'A' || x === 'B';
+        return [pick(y ? Day : Night)];
+    }, [properties.kind, properties.mode]);
+    return value;
+}
+export function ZzNestedComponent(properties: P) { const result = useNested(properties); return <div>{String(result)}</div>; }
+`,
+		},
+		{
+			name:     "several memos in one hook",
+			reported: false,
+			source: `import React from 'react';
+declare const Day: { title: string; kind: string }[];
+declare const Night: { title: string; kind: string }[];
+interface P { kind: 'A' | 'B' | undefined; mode: 'X' | 'Y' | undefined }
+
+function useSeveral(properties: P) {
+    const first = React.useMemo(function() {
+        const x = properties.kind || 'A';
+        const y = x === 'A' || x === 'B';
+        return [y ? Day : Night];
+    }, [properties.kind]);
+    const second = React.useMemo(function() {
+        const m = properties.mode || 'X';
+        const n = m === 'X' || m === 'Y';
+        return [n ? Night : Day];
+    }, [properties.mode]);
+    const third = React.useMemo(function() {
+        const a = properties.kind || 'B';
+        const b = properties.mode || 'Y';
+        return { both: (a === 'A' || a === 'B') && (b === 'X' || b === 'Y') };
+    }, [properties.kind, properties.mode]);
+    return [first, second, third];
+}
+export function ZzSeveralComponent(properties: P) { const result = useSeveral(properties); return <div>{String(result)}</div>; }
+`,
+		},
+		{
+			name:     "a callback reading another memo's result",
+			reported: false,
+			source: `import React from 'react';
+declare const Day: { title: string; kind: string }[];
+declare const Night: { title: string; kind: string }[];
+interface P { kind: 'A' | 'B' | undefined; mode: 'X' | 'Y' | undefined }
+
+function useReadsMemo(properties: P) {
+    const list = React.useMemo(function() {
+        const x = properties.kind || 'A';
+        const y = x === 'A' || x === 'B';
+        return [y ? Day : Night];
+    }, [properties.kind]);
+    const onPick = React.useCallback(function() {
+        const m = properties.mode || 'X';
+        const n = m === 'X' || m === 'Y';
+        return n ? list.length : list.length + 1;
+    }, [list, properties.mode]);
+    return onPick;
+}
+export function ZzReadsMemoComponent(properties: P) { const result = useReadsMemo(properties); return <div>{String(result)}</div>; }
+`,
+		},
+		{
+			name:     "a useCallback of the same shape",
+			reported: false,
+			source: `import React from 'react';
+declare const Day: { title: string; kind: string }[];
+declare const Night: { title: string; kind: string }[];
+interface P { kind: 'A' | 'B' | undefined; mode: 'X' | 'Y' | undefined }
+
+function useCallbackShape(properties: P) {
+    const onPick = React.useCallback(function() {
+        const x = properties.kind || 'A';
+        const y = x === 'A' || x === 'B';
+        return [y ? Day : Night];
+    }, [properties.kind]);
+    return onPick;
+}
+export function ZzCallbackShapeComponent(properties: P) { const result = useCallbackShape(properties); return <div>{String(result)}</div>; }
+`,
+		},
+		{
+			name:     "a callback inside the memo reading the memo's own locals",
+			reported: false,
+			source: `import React from 'react';
+declare const Day: { title: string; kind: string }[];
+declare const Night: { title: string; kind: string }[];
+interface P { kind: 'A' | 'B' | undefined; mode: 'X' | 'Y' | undefined }
+
+function useMemoInMemo(properties: P) {
+    const outer = React.useMemo(function() {
+        const x = properties.kind || 'A';
+        const y = x === 'A' || x === 'B';
+        const inner = [y ? Day : Night].map(function(list) { const m = properties.mode || 'X'; return m === 'X' || m === 'Y' ? list : []; });
+        return { inner: inner };
+    }, [properties.kind, properties.mode]);
+    return outer;
+}
+export function ZzMemoInMemoComponent(properties: P) { const result = useMemoInMemo(properties); return <div>{String(result)}</div>; }
+`,
+		},
+		{
+			name:     "a dependency reassigned after the callback, which upstream reports",
+			reported: true,
+			source: `import React from 'react';
+declare function makeArray(): unknown[];
+interface P { kind: 'A' | 'B' | undefined }
+function useReassigned(properties: P) {
+    let x: unknown[] = [];
+    x.push(properties);
+    const onPick = React.useCallback(function() {
+        const k = properties.kind || 'A';
+        const y = k === 'A' || k === 'B';
+        return [y ? x : x];
+    }, [x, properties.kind]);
+    x = makeArray();
+    return onPick;
+}
+export function ZzReassignedComponent(properties: P) { const onPick = useReassigned(properties); return <button type="button" onClick={onPick}>pick</button>; }
+`,
+		},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			result := runPreserveManualMemoization(t, "overlap.tsx", row.source)
+			if row.reported {
+				if len(result.Diagnostics) == 0 {
+					t.Error("upstream reports this program and the rule is silent")
+				}
+				return
+			}
+			rule_testing.ExpectClean(t, result)
+		})
+	}
 }
