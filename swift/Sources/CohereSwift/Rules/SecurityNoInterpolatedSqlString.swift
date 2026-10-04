@@ -104,9 +104,6 @@ public struct SecurityNoInterpolatedSqlString: TypedFileRule {
 
     public init() {}
 
-    static let message =
-        "This value is written between the single quotes of a SQL string, so a quote in it ends the string early: the query breaks on ordinary input like O'Brien, and a crafted value runs as SQL. Bind it as a parameter instead (WHERE name = ? with the value in the parameters beside the statement). Where the query cannot take parameters, give the value a type that cannot hold a quote (an integer, a closed enum's case), or escape it in place by doubling backslashes and quotes: .replacingOccurrences(of: \"\\\\\", with: \"\\\\\\\\\").replacingOccurrences(of: \"'\", with: \"''\")."
-
     /*
      Every finding is an interpolation (`\(` or `\#(`, so a backslash) inside single quotes, in a literal that
      opens with a leading keyword or carries `LIKE`.
@@ -126,7 +123,11 @@ public struct SecurityNoInterpolatedSqlString: TypedFileRule {
         let values = ValueTypes(file: file, symbols: symbols, demangler: try? SwiftDemangler.shared())
         return visitor.found.compactMap { value in
             guard values.canHoldQuote(value), !values.isEscaped(value) else { return nil }
-            return file.finding(at: value, rule: name, messageId: "interpolatedSqlString", message: Self.message)
+            return file.finding(
+                at: value,
+                rule: name,
+                message: RuleMessages.SecurityNoInterpolatedSqlString.interpolatedSqlString(),
+            )
         }
     }
 

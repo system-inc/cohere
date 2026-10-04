@@ -51,7 +51,7 @@ struct ConsistencyNoBareThrowTests {
         let found = Self.findings(source)
         #expect(Self.positions(found) == ["3:11"])
         #expect(found.map(\.endColumn) == [107])
-        #expect(found.map(\.messageId) == ["noBareThrow"])
+        #expect(found.map(\.messageId) == ["bareThrow"])
     }
 
     /* The message names the domain, the one part that varies, and the repair; checked against a literal rather than the rule's own text. */
@@ -59,10 +59,21 @@ struct ConsistencyNoBareThrowTests {
         let found = Self.findings(#"func f() throws { throw NSError(domain: "bench", code: 1) }"#)
         #expect(
             found.map(\.message) == [
-                "This throws an NSError made up here, with the domain \"bench\", which names no declared failure: a caller can match it only by repeating that string and the code, and nothing keeps the two in step. Declare the failure as a case of an error type of our own (an enum conforming to Error, and LocalizedError for its text) and throw that case, so a caller catches it by case."
+                "This throws an NSError made up here, with the domain \"bench\", which names no declared failure. Declare the failure as a case of an error type of our own (an enum conforming to Error, and LocalizedError for its text) and throw that case, so a caller catches it by case. Until then a caller can match it only by repeating the domain string and the code, and nothing keeps the two in step."
             ]
         )
         #expect(found.map(\.rule) == ["cohere-swift/consistency-no-bare-throw"])
+    }
+
+    /*
+     The finding a user sees is the catalog's entry (policy/messages/consistency-no-bare-throw.json), id and text, so an
+     edited entry reaches the finding once regenerated. The literal above pins the words; this pins where they come from.
+     */
+    @Test func theFindingIsTheCatalogsMessage() {
+        let found = Self.findings(#"func f() throws { throw NSError(domain: "bench", code: 1) }"#)
+        let message = RuleMessages.ConsistencyNoBareThrow.bareThrow(domain: #""bench""#)
+        #expect(found.map(\.messageId) == [message.id])
+        #expect(found.map(\.message) == [message.text])
     }
 
     /* Presence's `DanceImport.swift:149`: the fallback after a framework's optional error is the same ad-hoc error. */

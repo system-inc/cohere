@@ -33,22 +33,32 @@ const swiftStringIndentation = "        "
 // swiftDirectory is where the generated sources live, from the module root.
 const swiftDirectory = "swift/Sources/CohereSwift/Policy/"
 
-// swiftPolicyFiles are the policy files the Swift engine compiles in, each with the type that carries it.
+// swiftPolicyFiles are the policy the Swift engine compiles in, each with the type that carries it and
+// what writes that type's source.
 var swiftPolicyFiles = []struct {
-	name     string
+	source   string
 	typeName string
-	contents []byte
+	generate func() ([]byte, error)
 }{
-	{"Abbreviations.json", "PolicyAbbreviations", abbreviationsFile},
+	{"Abbreviations.json", "PolicyAbbreviations", func() ([]byte, error) {
+		return swiftSource("Abbreviations.json", "PolicyAbbreviations", abbreviationsFile)
+	}},
+	{"messages/", "RuleMessages", func() ([]byte, error) {
+		digest, err := messagesDigest(MessageFiles())
+		if err != nil {
+			return nil, err
+		}
+		return swiftMessagesSource(Messages, digest)
+	}},
 }
 
-// SwiftFiles are the generated sources for every policy file the Swift engine compiles in.
+// SwiftFiles are the generated sources for all the policy the Swift engine compiles in.
 func SwiftFiles() ([]SwiftFile, error) {
 	files := make([]SwiftFile, 0, len(swiftPolicyFiles))
 	for _, policyFile := range swiftPolicyFiles {
-		contents, err := swiftSource(policyFile.name, policyFile.typeName, policyFile.contents)
+		contents, err := policyFile.generate()
 		if err != nil {
-			return nil, fmt.Errorf("policy/%s: %w", policyFile.name, err)
+			return nil, fmt.Errorf("policy/%s: %w", policyFile.source, err)
 		}
 		files = append(files, SwiftFile{Path: swiftDirectory + policyFile.typeName + ".generated.swift", Contents: contents})
 	}

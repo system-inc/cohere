@@ -85,9 +85,7 @@ public struct ConsistencyNoBareThrow: FileRule {
             file.finding(
                 at: construction,
                 rule: name,
-                messageId: "noBareThrow",
-                message:
-                    "This throws an NSError made up here, with the domain \(domain.trimmedDescription), which names no declared failure: a caller can match it only by repeating that string and the code, and nothing keeps the two in step. Declare the failure as a case of an error type of our own (an enum conforming to Error, and LocalizedError for its text) and throw that case, so a caller catches it by case.",
+                message: RuleMessages.ConsistencyNoBareThrow.bareThrow(domain: domain.trimmedDescription),
             )
         }
     }

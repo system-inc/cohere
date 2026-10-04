@@ -69,4 +69,24 @@ public struct ParsedFile: Sendable {
             suggestions: suggestions,
         )
     }
+
+    /* A finding whose id and text come from the house catalog (`RuleMessages`), so the two cannot be paired wrong. */
+    func finding(
+        at node: some SyntaxProtocol,
+        rule: String,
+        message: RuleMessages.Message,
+        severity: FindingRecord.Severity = .error,
+        fixes: [FindingRecord.Edit] = [],
+        suggestions: [FindingRecord.Suggestion] = [],
+    ) -> FindingRecord {
+        finding(
+            at: node,
+            rule: rule,
+            messageId: message.id,
+            message: message.text,
+            severity: severity,
+            fixes: fixes,
+            suggestions: suggestions,
+        )
+    }
 }
