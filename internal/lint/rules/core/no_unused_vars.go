@@ -2,7 +2,9 @@ package core
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -274,6 +276,12 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 
 	reads, writes, typeOnlyReads := collectReadSymbols(ctx, sourceFile, interesting)
 
+	// Compiled once per file. An unparseable pattern ignores nothing, as the other patterns do.
+	var destructuredArrayIgnore *regexp.Regexp
+	if settings.DestructuredArrayIgnorePattern != "" {
+		destructuredArrayIgnore, _ = regexp.Compile(settings.DestructuredArrayIgnorePattern)
+	}
+
 	for _, candidate := range candidates {
 		if isExemptFromUnusedReport(ctx, candidate, candidates, settings, reads) {
 			continue
@@ -286,7 +294,11 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 			usedOnlyAsType = typeOnlyReads[symbol]
 		}
 		// Before either report, as upstream's gate is: a rest sibling read only through `typeof` is
-		// silent too.
+		// silent too, and so is an ignored array element.
+		arrayElement := destructuredArrayIgnore != nil && isDestructuredFromAnArray(candidate, candidateWrites)
+		if arrayElement && destructuredArrayIgnore.MatchString(name) {
+			continue
+		}
 		if settings.IgnoreRestSiblings && hasRestSiblingDeclarationOrWrite(candidate, candidateWrites) {
 			continue
 		}
@@ -307,7 +319,8 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 			noUnusedVarsMessage(
 				name,
 				len(candidateWrites) != 0 || declaringNameIsInitialized(candidate.name),
-				nameMatchesIgnorePattern("_"+name, candidate.kind, settings),
+				nameMatchesIgnorePattern("_"+name, candidate.kind, settings) ||
+					(arrayElement && destructuredArrayIgnore.MatchString("_"+name)),
 			),
 		)
 	}
@@ -803,7 +816,11 @@ func collectCandidateBindings(sourceFile *ast.Node) []candidateBinding {
 
 		case ast.KindBindingElement:
 			if name := current.Name(); name != nil && name.Kind == ast.KindIdentifier {
-				candidates = append(candidates, candidateBinding{name, current, bindingVariable})
+				kind := bindingVariable
+				if isDestructuredFromACatchBinding(current) {
+					kind = bindingCaughtError
+				}
+				candidates = append(candidates, candidateBinding{name, current, kind})
 			}
 
 		case ast.KindParameter:
@@ -863,6 +880,113 @@ func collectCandidateBindings(sourceFile *ast.Node) []candidateBinding {
 	return candidates
 }
 
+// isDestructuredFromACatchBinding reports whether a binding element sits in the pattern a catch clause
+// binds, `catch ({ message })`.
+//
+// Upstream's definition type for every name in that pattern is CatchClause, not Variable, so each one
+// is a caught error: `caughtErrors: "none"` skips it and `caughtErrorsIgnorePattern` decides it, while
+// `varsIgnorePattern` does not apply. Measured on the installed 8.71.0: `catch ({ _message }) {}` is
+// silent under `caughtErrorsIgnorePattern: "^_"` and reports under `varsIgnorePattern: "^_"`, and
+// cohere had those two the other way round until #6esg2nx. The walk climbs patterns only, so a
+// pattern in a default's arrow function belongs to that function's parameter, not to the catch.
+func isDestructuredFromACatchBinding(element *ast.Node) bool {
+	for current := element.Parent; current != nil; current = current.Parent {
+		switch current.Kind {
+		case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern, ast.KindBindingElement:
+			continue
+		case ast.KindVariableDeclaration:
+			return current.Parent != nil && current.Parent.Kind == ast.KindCatchClause
+		}
+		return false
+	}
+	return false
+}
+
+// isGlobalScopeBinding reports whether a binding lives in the global scope, which `vars: "local"`
+// leaves alone because another script can read it.
+//
+// Only a script has a global scope. A module's top level is its own scope, so in a module nothing is
+// global and the option changes nothing; cohere reads a file with no top-level import or export as a
+// script, as TypeScript does and as no-implicit-globals and strict here do. ESLint's flat config
+// parses every `.ts` file as a module whatever its shape, so on a TypeScript file with no import or
+// export the two engines disagree under this option, and cohere's reading is the one the compiler
+// holds: that file's top-level names are visible to every other file in the program.
+//
+// In a script, measured on the installed 8.71.0 under `sourceType: "script"`:
+//
+//	var a; let b; const c; function f() {}; class C {}     global, at the top level
+//	interface I {}; type T = 1; enum E {}; namespace N {}  global too, as the scope manager places them
+//	{ var hoisted; }  if (x) { var v; }  for (var i ...)   global, because var climbs out of a block
+//	{ let b; function inBlock() {} }  for (let j ...)      a block's own, so reported
+//	function g(p) { var inner; }  namespace N { var m; }   a function's or a namespace's own
+//
+// Parameters, caught errors and imports are never global: a script cannot import, and the other two
+// belong to the function or the catch that binds them.
+func isGlobalScopeBinding(sourceFile *ast.SourceFile, candidate candidateBinding) bool {
+	if ast.IsExternalModule(sourceFile) {
+		return false
+	}
+	switch candidate.kind {
+	case bindingParameter, bindingCaughtError, bindingImport:
+		return false
+	}
+	declaration := candidate.declaration
+	if declaration.Kind == ast.KindVariableDeclaration || declaration.Kind == ast.KindBindingElement {
+		list := declaration.Parent
+		for list != nil && list.Kind != ast.KindVariableDeclarationList {
+			list = list.Parent
+		}
+		if list == nil {
+			return false
+		}
+		if list.Flags&(ast.NodeFlagsLet|ast.NodeFlagsConst|ast.NodeFlagsUsing|ast.NodeFlagsAwaitUsing) == 0 {
+			return enclosingVariableScope(list).Kind == ast.KindSourceFile
+		}
+		// A block-scoped declaration is global only when its statement sits directly in the file.
+		statement := list.Parent
+		return statement != nil && statement.Kind == ast.KindVariableStatement &&
+			statement.Parent != nil && statement.Parent.Kind == ast.KindSourceFile
+	}
+	return declaration.Parent != nil && declaration.Parent.Kind == ast.KindSourceFile
+}
+
+// isDestructuredFromAnArray reports whether a binding is declared, or written, directly as an element
+// of an array pattern, which is what `destructuredArrayIgnorePattern` applies to.
+//
+// Upstream asks it of the definition's ESTree parent and of every reference's, so the identifier has
+// to BE the element. Measured on the installed 8.71.0, each of these follows:
+//
+//	const [_a, b] = list            skipped       so is a parameter `([_a, b])`, a catch `([_e])`,
+//	const { x: [_a] } = n           skipped       and a for-of head `for (const [_k, v] of entries)`
+//	const [_a = 1] = list           reports       a default makes the parent an AssignmentPattern
+//	const [..._rest] = list         reports       so does rest, a RestElement
+//	const { _a } = o                reports       an object pattern is not covered
+//	let _a; [_a] = list             skipped       through the write, for a binding declared apart
+//	let _a; [(_a)] = list           skipped       ESTree drops the parentheses
+//	let _a; [_a = 1] = list         reports       as the declaration's default does
+//	let _a; [[_a]] = nested         skipped       the inner array is the parent
+//
+// A read never sits in a pattern, so only writes are asked on the reference side. The check gates
+// both reports, the unused one and "only used as a type", as upstream's `continue` does.
+func isDestructuredFromAnArray(candidate candidateBinding, writes []*ast.Node) bool {
+	declaration := candidate.declaration
+	if declaration.Kind == ast.KindBindingElement && declaration.Name() == candidate.name &&
+		declaration.Initializer() == nil && declaration.AsBindingElement().DotDotDotToken == nil &&
+		declaration.Parent != nil && declaration.Parent.Kind == ast.KindArrayBindingPattern {
+		return true
+	}
+	for _, write := range writes {
+		element := ast.WalkUpParenthesizedExpressions(write.Parent)
+		if element == nil {
+			continue
+		}
+		if element.Kind == ast.KindArrayLiteralExpression {
+			return true
+		}
+	}
+	return false
+}
+
 // isExemptFromUnusedReport reports whether a binding nothing reads is nonetheless not a finding.
 //
 // Every arm here is an upstream exemption rather than a judgment of ours, and each one is the
@@ -877,6 +1001,16 @@ func isExemptFromUnusedReport(
 	// The ignore pattern is checked before resolution because it is by far the cheapest test and it
 	// settles the majority of real-tree candidates on its own.
 	if matchesIgnorePattern(candidate, settings) {
+		return true
+	}
+
+	// `caughtErrors: "none"` skips every caught error, including each name destructured out of one.
+	if candidate.kind == bindingCaughtError && settings.CaughtErrors == "none" {
+		return true
+	}
+
+	// `vars: "local"` skips what another script could read. See isGlobalScopeBinding.
+	if settings.Vars == "local" && isGlobalScopeBinding(ctx.SourceFile, candidate) {
 		return true
 	}
 
@@ -1962,8 +2096,19 @@ func nameMatchesIgnorePattern(name string, kind unusedBindingKind, settings NoUn
 // ESLint's. Two are not the zero value and are pinned with fixtures: `args` defaults to
 // `after-used` rather than to `all`, and `caughtErrors` defaults to `all`. Every ignore pattern
 // defaults to nothing, so an unconfigured rule exempts no name.
+//
+// Every field is read. `vars`, `caughtErrors` and `destructuredArrayIgnorePattern` were decoded and
+// never consulted until #6esg2nx, so a config setting them changed nothing; the registry guard
+// TestEveryOptionFieldARuleDecodesIsRead now fails on a field like that.
+//
+// Upstream 8.71 has four more keys: `ignoreClassWithStaticInitBlock`, `ignoreUsingDeclarations`,
+// `reportUsedIgnorePattern` (a `usedIgnoredVar` finding on an ignored name that is used) and
+// `enableAutofixRemoval`. None is declared here, so a config writing one is refused at load by name
+// rather than loaded and ignored. No config in ahra, phi or connected sets any of them (2026-10-04);
+// porting one is a decision for the day one does.
 type NoUnusedVarsOptions struct {
-	// Vars is `all` or `local`. Default `all`.
+	// Vars is `all` or `local`. Default `all`. `local` skips a binding in the global scope, which
+	// only a script has; see isGlobalScopeBinding.
 	Vars string `json:"vars"`
 	// VarsIgnorePattern is a regular expression naming variables to skip.
 	VarsIgnorePattern string `json:"varsIgnorePattern"`
@@ -1972,16 +2117,63 @@ type NoUnusedVarsOptions struct {
 	// ArgsIgnorePattern is a regular expression naming parameters to skip.
 	ArgsIgnorePattern string `json:"argsIgnorePattern"`
 	// CaughtErrors is `all` or `none`. Default `all`, which is oxc's answer and differs from older
-	// ESLint releases where it defaulted to `none`.
+	// ESLint releases where it defaulted to `none`. `none` skips every caught error, including each
+	// name destructured out of one.
 	CaughtErrors string `json:"caughtErrors"`
-	// CaughtErrorsIgnorePattern is a regular expression naming catch bindings to skip.
+	// CaughtErrorsIgnorePattern is a regular expression naming catch bindings to skip, and names
+	// destructured out of a catch binding with them.
 	CaughtErrorsIgnorePattern string `json:"caughtErrorsIgnorePattern"`
 	// IgnoreRestSiblings keeps a binding alive when it sits beside a rest element, which is the
 	// idiom for omitting a property: `const { removed, ...rest } = o`. Default false, as upstream's.
 	// See hasRestSiblingDeclarationOrWrite.
 	IgnoreRestSiblings bool `json:"ignoreRestSiblings"`
-	// DestructuredArrayIgnorePattern names array-destructured elements to skip.
+	// DestructuredArrayIgnorePattern is a regular expression naming array-destructured elements to
+	// skip: `const [_first, second] = pair`. It is asked before the other patterns and applies to a
+	// parameter or a caught error destructured from an array too. See isDestructuredFromAnArray.
 	DestructuredArrayIgnorePattern string `json:"destructuredArrayIgnorePattern"`
+}
+
+// noUnusedVarsOptionFields is NoUnusedVarsOptions without its UnmarshalJSON, the shape the object
+// form decodes into.
+type noUnusedVarsOptionFields NoUnusedVarsOptions
+
+// noUnusedVarsModes are the spellings upstream's schema allows for each mode key. Any other value is
+// refused, because reading it as the default runs a mode nobody wrote (#p9s1131, #rfbha44).
+var noUnusedVarsModes = []struct {
+	key     string
+	allowed []string
+	value   func(*NoUnusedVarsOptions) string
+}{
+	{"vars", []string{"all", "local"}, func(options *NoUnusedVarsOptions) string { return options.Vars }},
+	{"args", []string{"all", "after-used", "none"}, func(options *NoUnusedVarsOptions) string { return options.Args }},
+	{"caughtErrors", []string{"all", "none"}, func(options *NoUnusedVarsOptions) string { return options.CaughtErrors }},
+}
+
+// UnmarshalJSON reads upstream's two forms: the object, decoded strictly, and the bare string
+// `"all"` or `"local"`, which is shorthand for `{"vars": ...}` (`["error", "local"]`). A mode value
+// outside upstream's enum is refused by key and value.
+func (options *NoUnusedVarsOptions) UnmarshalJSON(raw []byte) error {
+	var shorthand string
+	if err := json.Unmarshal(raw, &shorthand); err == nil {
+		if shorthand != "all" && shorthand != "local" {
+			return fmt.Errorf("the string form is \"all\" or \"local\", and the config gives %q", shorthand)
+		}
+		*options = NoUnusedVarsOptions{Vars: shorthand}
+		return nil
+	}
+	var fields noUnusedVarsOptionFields
+	if err := rule.UnmarshalOptions(raw, &fields); err != nil {
+		return err
+	}
+	decoded := NoUnusedVarsOptions(fields)
+	for _, mode := range noUnusedVarsModes {
+		value := mode.value(&decoded)
+		if value != "" && !slices.Contains(mode.allowed, value) {
+			return fmt.Errorf("%s is one of %q, and the config gives %q", mode.key, mode.allowed, value)
+		}
+	}
+	*options = decoded
+	return nil
 }
 
 // resolveNoUnusedVarsOptions applies the defaults to whatever the config supplied.
