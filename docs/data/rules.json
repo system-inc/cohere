@@ -10652,7 +10652,7 @@
             "language": "TypeScript",
             "origin": "core",
             "upstreamName": "no-setter-return",
-            "typeAware": false,
+            "typeAware": true,
             "messageIds": [
                 "noSetterReturn"
             ],
