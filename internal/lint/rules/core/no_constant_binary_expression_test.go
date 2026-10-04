@@ -79,7 +79,7 @@ func TestNoConstantBinaryExpressionFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoConstantBinaryExpression, constantBinaryFile,
+			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoConstantBinaryExpression, constantBinaryFile,
 				constantBinaryDeclarations+testCase.sourceText), testCase.wantId)
 		})
 	}
@@ -122,7 +122,7 @@ func TestNoConstantBinaryExpressionStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoConstantBinaryExpression, constantBinaryFile,
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoConstantBinaryExpression, constantBinaryFile,
 				constantBinaryDeclarations+testCase.sourceText))
 		})
 	}
@@ -138,15 +138,15 @@ func TestNoConstantBinaryExpressionRelationalArm(t *testing.T) {
 
 	source := constantBinaryDeclarations + "export const v = 1 < 2;\n"
 
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoConstantBinaryExpression, constantBinaryFile, source,
+	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoConstantBinaryExpression, constantBinaryFile, source,
 		NoConstantBinaryExpressionOptions{CheckRelationalComparisons: false}))
 
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoConstantBinaryExpression, constantBinaryFile, source,
+	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoConstantBinaryExpression, constantBinaryFile, source,
 		NoConstantBinaryExpressionOptions{CheckRelationalComparisons: true}),
 		"constantRelationalComparison")
 
 	// A variable operand is not a literal, so the arm stays silent even when enabled.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoConstantBinaryExpression, constantBinaryFile,
+	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoConstantBinaryExpression, constantBinaryFile,
 		constantBinaryDeclarations+"export const v = a < 2;\n",
 		NoConstantBinaryExpressionOptions{CheckRelationalComparisons: true}))
 }

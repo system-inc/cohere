@@ -52,7 +52,7 @@ func TestNoInvalidRegexpFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoInvalidRegexp, noInvalidRegexpFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoInvalidRegexp, noInvalidRegexpFile, testCase.sourceText),
 				"invalidRegexp")
 		})
 	}
@@ -100,7 +100,24 @@ func TestNoInvalidRegexpStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoInvalidRegexp, noInvalidRegexpFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoInvalidRegexp, noInvalidRegexpFile, testCase.sourceText))
 		})
 	}
+}
+
+// A local named RegExp is whatever the caller passed, and a pattern under `v` has a grammar the engine
+// does not parse, so both stay silent, as ESLint's corpus pins the first and its validator accepts the
+// second (#jjfa7qb). The global with a broken pattern still reports, so the silence is not the rule
+// going quiet.
+func TestNoInvalidRegexpAsksForTheGlobalAndLeavesVPatternsAlone(t *testing.T) {
+	t.Parallel()
+
+	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoInvalidRegexp, noInvalidRegexpFile,
+		"function foo(RegExp: (pattern: string) => void) { RegExp('['); }"))
+	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoInvalidRegexp, noInvalidRegexpFile,
+		"new RegExp('[A--[0-9]]', 'v');"))
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoInvalidRegexp, noInvalidRegexpFile,
+		"new RegExp('[');"), "invalidRegexp")
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoInvalidRegexp, noInvalidRegexpFile,
+		"new RegExp('.', 'vz');"), "invalidRegexp")
 }

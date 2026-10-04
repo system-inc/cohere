@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/gitignore"
 )
 
 // programExtensions are the extensions a tsconfig can put into a program at all. Anything else, a
@@ -60,7 +60,7 @@ func explainNamedPathsOutsideProgram(location projectLocation, names []string) s
 		}
 
 		if ignoredBy := ignoreSource(location.Root, path); ignoredBy != "" {
-			sentence += ", and the root's .gitignore leaves it out too (" + ignoredBy + ")"
+			sentence += ", and git's ignore rules leave it out too (" + ignoredBy + ")"
 		}
 		sentences = append(sentences, sentence+".")
 	}
@@ -68,21 +68,26 @@ func explainNamedPathsOutsideProgram(location projectLocation, names []string) s
 	return "nothing to check: none of the named paths is in the program. " + strings.Join(sentences, " ")
 }
 
-// ignoreSource names the line of the project root's `.gitignore` that covers a path, with the pattern
-// in backticks, or answers empty when none does or the file cannot be read.
+// ignoreSource names the ignore file and line that exclude a path, with the pattern in backticks, or
+// answers empty when nothing excludes it or the files cannot be read.
 //
-// Read natively, from the root's `.gitignore`, with the matcher the format walk uses. Git used to be
-// asked (`check-ignore --verbose`), which also saw nested ignore files and global excludes; this clause
-// is part of an explanation and decides nothing, so the narrower answer costs a reader at most a
-// missing clause, and cohere runs no git.
+// Read natively, with the matcher the format walk uses (internal/gitignore), so the line named is the one
+// git check-ignore would name: a nested `.gitignore` or info/exclude when one decides, or the line that
+// excluded a directory above the path. Only the user's global excludes file is not read. The clause is
+// part of an explanation and decides nothing.
 func ignoreSource(root string, path string) string {
 	relative, err := filepath.Rel(root, path)
 	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 		return ""
 	}
-	line, pattern, err := formatfiles.IgnoringLine(filepath.Join(root, ".gitignore"), relative)
-	if err != nil || line == 0 {
+	matcher, err := gitignore.New(root)
+	if err != nil {
 		return ""
 	}
-	return fmt.Sprintf("line %d, `%s`", line, pattern)
+	information, statError := os.Lstat(path)
+	ignored, source, err := matcher.IgnoredPath(filepath.ToSlash(relative), statError == nil && information.IsDir())
+	if err != nil || !ignored {
+		return ""
+	}
+	return fmt.Sprintf("%s line %d, `%s`", source.File, source.Line, source.Pattern)
 }

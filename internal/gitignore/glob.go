@@ -43,6 +43,10 @@ type glob struct {
 	never     bool
 	isLiteral bool
 	literal   string
+
+	// isSuffix marks a base-name glob that is one `*` and then literal text, `*.log`: matching it is a
+	// suffix comparison. It is the commonest shape after a plain name.
+	isSuffix bool
 }
 
 // compileGlob reads pattern. path says whether it will be matched against a path, which is what gives
@@ -109,6 +113,18 @@ func compileGlob(pattern string, path bool) glob {
 	if isLiteral {
 		compiled.isLiteral = true
 		compiled.literal = literal.String()
+		return compiled
+	}
+	if !path && len(compiled.tokens) > 0 && compiled.tokens[0].kind == starToken {
+		suffix := make([]byte, 0, len(compiled.tokens)-1)
+		for _, rest := range compiled.tokens[1:] {
+			if rest.kind != literalToken {
+				return compiled
+			}
+			suffix = append(suffix, rest.literal)
+		}
+		compiled.isSuffix = true
+		compiled.literal = string(suffix)
 	}
 	return compiled
 }
@@ -250,6 +266,9 @@ func (compiled *glob) matches(text string, path bool) bool {
 	}
 	if compiled.isLiteral {
 		return text == compiled.literal
+	}
+	if compiled.isSuffix {
+		return strings.HasSuffix(text, compiled.literal)
 	}
 
 	// One bit per place in the pattern, plus a second set for a directoriesToken that has consumed bytes

@@ -47,6 +47,18 @@ var validRegExpFlags = map[byte]bool{
 // combination that could reach it. A pattern valid under `u` and invalid without it is not a defect
 // here, because the flags argument may well supply the `u`.
 //
+// # A local named RegExp, and a pattern under `v`
+//
+// The constructor is checked only when `RegExp` is the global, asked of the checker, since
+// `function foo(RegExp) { RegExp('['); }` calls whatever the caller passed. ESLint's corpus pins three
+// such rows as clean, and they read as extra until the global was asked (#jjfa7qb).
+//
+// A pattern under `v` is not checked, only its flags. `v` has its own grammar (set operations like
+// `[A--B]`, nested classes, `\q{...}`), and the engine this compiles with does not speak it, so
+// reading the pattern as `u` reported valid `v` patterns, three of ESLint's rows, and passed invalid
+// ones. Silence is the honest answer when cohere cannot parse what it is asked about. The full answer
+// is an ECMAScript pattern validator in place of the engine (#4bgr3h2 tracks it).
+//
 // # The option we deliberately do not implement
 //
 // Upstream takes `allowConstructorFlags`, a case-sensitive list of flag characters that stop being
@@ -66,6 +78,10 @@ var validRegExpFlags = map[byte]bool{
 // would be wrong now.
 var NoInvalidRegexp = rule.Rule{
 	Name: "no-invalid-regexp",
+
+	// Whether `RegExp` is the global
+	NeedsTypeChecker: true,
+
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		check := func(node *ast.Node, callee *ast.Node, arguments *ast.NodeList) {
 			callee = ast.SkipParentheses(callee)
@@ -73,6 +89,9 @@ var NoInvalidRegexp = rule.Rule{
 				return
 			}
 			if callee.AsIdentifier().Text != "RegExp" {
+				return
+			}
+			if ctx.TypeChecker == nil || !rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(callee)) {
 				return
 			}
 			// `RegExp()` with no arguments produces the empty pattern and cannot fail.
@@ -108,6 +127,10 @@ var NoInvalidRegexp = rule.Rule{
 			pattern := patternNode.AsStringLiteral().Text
 
 			if flags != nil {
+				// Under `v` the pattern has a grammar the engine does not parse; see the doc above
+				if strings.ContainsRune(*flags, 'v') {
+					return
+				}
 				if message := invalidPatternMessage(pattern, *flags); message != "" {
 					ctx.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: message})
 				}
@@ -115,10 +138,11 @@ var NoInvalidRegexp = rule.Rule{
 			}
 
 			// Unknown flags: report only when no reachable flag combination accepts the pattern.
+			// `v` could also reach it, and is unknowable here, so a pattern is reported only when
+			// both readings the engine can check refuse it and `v` is the one left unasked
 			withUnicode := invalidPatternMessage(pattern, "u")
-			withSets := invalidPatternMessage(pattern, "v")
 			withNeither := invalidPatternMessage(pattern, "")
-			if withUnicode != "" && withSets != "" && withNeither != "" {
+			if withUnicode != "" && withNeither != "" {
 				ctx.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: withNeither})
 			}
 		}

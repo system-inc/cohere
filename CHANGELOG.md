@@ -54,3 +54,10 @@ chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
   names anything the run did not check even when it passes. `--verbose` prints everything a run printed
   before, and `--phases` (or `"output": { "phases": true }` in `CohereSettings.json`) adds the phase
   timings to the footer. Exit codes are unchanged.
+- `getter-return` checks TypeScript files, as ESLint does where a config turns it on there. It used to
+  skip every `.ts` and `.tsx` file. It also reports what ESLint reports: a bare `return;` at the
+  statement (`expected`), and a getter that falls off the end at its head, from the property to the
+  parameters' opening paren (`expectedAlways` when it returns on another path). `no-setter-return` now
+  reports a setter declared through a property descriptor (`Object.defineProperty`,
+  `Object.defineProperties`, `Object.create`, `Reflect.defineProperty`). Both rules count a descriptor
+  only where its method reads one, and only when `Object` or `Reflect` is the global.

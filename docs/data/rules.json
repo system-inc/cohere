@@ -5693,7 +5693,7 @@
             "language": "TypeScript",
             "origin": "core",
             "upstreamName": "getter-return",
-            "typeAware": false,
+            "typeAware": true,
             "options": {
                 "elements": "one"
             },
@@ -8273,7 +8273,7 @@
             "language": "TypeScript",
             "origin": "core",
             "upstreamName": "no-constant-binary-expression",
-            "typeAware": false,
+            "typeAware": true,
             "options": {
                 "elements": "one"
             },
@@ -9402,7 +9402,7 @@
             "language": "TypeScript",
             "origin": "core",
             "upstreamName": "no-invalid-regexp",
-            "typeAware": false,
+            "typeAware": true,
             "messageIds": [
                 "invalidRegexp"
             ],
@@ -9724,7 +9724,7 @@
             "language": "TypeScript",
             "origin": "core",
             "upstreamName": "no-misleading-character-class",
-            "typeAware": false,
+            "typeAware": true,
             "messageIds": [
                 "combiningClassInCharacterClass",
                 "emojiModifierInCharacterClass",

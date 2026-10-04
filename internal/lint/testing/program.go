@@ -39,6 +39,18 @@ const defaultTsConfig = `{
 // in the tree. `boundary-no-project-theme-value` gates on `/libraries/structure/source/` and cannot
 // be proven at all without real paths.
 
+// FixtureText is the bytes a typed fixture is written as: the source with leading and trailing ASCII
+// whitespace removed, and one newline. A test that slices the file by the rule's offsets reads this.
+//
+// ASCII only, and that is load-bearing. `strings.TrimSpace` also strips Unicode spaces, U+2028 and
+// U+2029, vertical tab and form feed, which are exactly what `no-irregular-whitespace` reports, so a
+// fixture of `foo\u2028` was written as `foo` and the rule was blamed for missing it: 30 of ESLint's
+// corpus rows read as missing for that reason alone (#jjfa7qb). Indentation and blank lines around a
+// backquoted fixture are all this trim exists for.
+func FixtureText(contents string) string {
+	return strings.Trim(contents, " \t\r\n") + "\n"
+}
+
 // RunTyped runs a rule against a real type graph, so a rule that asks the checker questions can
 // actually be proven.
 //
@@ -194,7 +206,7 @@ func runTypedFiles(
 			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 				t.Fatalf("creating the fixture directory for %s: %v", name, err)
 			}
-			if err := os.WriteFile(path, []byte(strings.TrimSpace(contents)+"\n"), 0o644); err != nil {
+			if err := os.WriteFile(path, []byte(FixtureText(contents)), 0o644); err != nil {
 				t.Fatalf("writing the fixture %s: %v", name, err)
 			}
 		}

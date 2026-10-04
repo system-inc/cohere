@@ -17,6 +17,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/formatfiles"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/gitignore"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -77,6 +78,10 @@ type runCacheSession struct {
 	// extraDirectories is every directory a format walk listed, so a file added, removed or renamed in one
 	// moves an input. See declareFormatWalk.
 	extraDirectories []string
+
+	// extraAbsent is every file a format walk looked for and did not find, an ignore file a directory
+	// does not have, so one appearing moves an input. See declareFormatWalk.
+	extraAbsent []string
 
 	// declined is the reason this run must not be recorded, empty while it may be.
 	declined string
@@ -305,8 +310,12 @@ func prepareCacheDirectory(root string) {
 			fmt.Fprintf(os.Stderr, "note: the cache directory %s could not be created: %v\n", cacheDirectory(root), firstLine(err.Error()))
 			return
 		}
-		ignoreFile := filepath.Join(root, ".gitignore")
-		if line, _, err := formatfiles.IgnoringLine(ignoreFile, filepath.Join(".cache", "cohere", "findings.gob")); err == nil && line == 0 {
+		ignoreFile := filepath.Join(root, gitignore.IgnoreFileName)
+		matcher, err := gitignore.New(root)
+		if err != nil {
+			return
+		}
+		if ignored, _, err := matcher.IgnoredPath(".cache/cohere/findings.gob", false); err == nil && !ignored {
 			fmt.Fprintf(os.Stderr, "note: %s does not ignore .cache/, so cohere's cache in %s would be tracked: add the line `.cache/` to it\n",
 				ignoreFile, cacheDirectory(root))
 		}
@@ -444,16 +453,26 @@ func declareRunCacheInputs(files ...string) {
 // reports; every directory it listed, whose modification time moves when an entry is added, removed or
 // renamed, which is also what catches a new .git, settings file or leftover Prettier config inside the
 // tree; and the files it read or would read, each recorded when present, since its directory already
-// covers its appearing. Those are the root's .gitignore and .gitmodules, the .prettierignore the walk
-// refuses, and every CohereSettings.json a directory resolves its options from, with the files it extends.
+// covers its appearing. Those are the root's .gitmodules, the .prettierignore the walk refuses, and every
+// CohereSettings.json a directory resolves its options from, with the files it extends.
+//
+// The git ignore files the walk read or looked for (Enumeration.IgnoreFiles: each entered directory's
+// .gitignore and info/exclude) are recorded present or absent. A content edit to a nested .gitignore moves
+// no directory's modification time, and info/exclude sits in .git/info, a directory the walk never lists.
 // The formatter's own identity needs no input: the run's key covers the running binary (see beginRunCache).
 func declareFormatWalk(enumeration formatfiles.Enumeration) {
 	session := activeRunCache
 	if session == nil {
 		return
 	}
+	for _, ignoreFile := range enumeration.IgnoreFiles {
+		if _, err := os.Stat(ignoreFile); err == nil {
+			session.extraFiles = append(session.extraFiles, ignoreFile)
+		} else {
+			session.extraAbsent = append(session.extraAbsent, ignoreFile)
+		}
+	}
 	read := []string{
-		filepath.Join(enumeration.Root, ".gitignore"),
 		filepath.Join(enumeration.Root, ".gitmodules"),
 		filepath.Join(enumeration.Root, ".prettierignore"),
 	}
@@ -545,6 +564,7 @@ func (session *runCacheSession) record(exitCode int) *program.RunCache {
 	}
 	present, absent, probed := session.recorder.Inputs()
 	files := append(present, session.extraFiles...)
+	absent = append(absent, session.extraAbsent...)
 	cache, err := program.RecordRunCache(session.key, files, session.extraDirectories, absent, probed,
 		session.stdout.buffer.Bytes(), exitCode, session.readSince)
 	if err != nil {

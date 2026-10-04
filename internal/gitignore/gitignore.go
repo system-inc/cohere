@@ -19,6 +19,11 @@
 //     and any other byte. A file's byte order mark and each line's carriage return are not part of a
 //     pattern.
 //
+// What git would read differently from its documentation is refused by name rather than followed: a
+// `.gitignore` that is a symbolic link (git does not follow one inside a working tree), one larger than
+// 100 MiB (git skips it with a warning), and a line holding a NUL byte. Each is an error naming the file,
+// because skipping one would leave its patterns unapplied without a word.
+//
 // The matcher only answers. Walking, and pruning what it excludes, belong to the caller: it enters each
 // directory it descends into with Enter, and asks Ignored about each entry it finds there.
 package gitignore
@@ -210,6 +215,60 @@ func (matcher *Matcher) Ignored(relativePath string, isDirectory bool) (bool, So
 	return !decided.negated, decided.source
 }
 
+// IgnoredPath is Ignored for a path anywhere below this matcher's directory: it enters the directories in
+// between first, reading their ignore files, so the answer names a nested file's line when one decides.
+// It is for a question about one path, such as explaining why a file was left out; a walk enters each
+// directory itself and asks Ignored, which reads every ignore file once.
+func (matcher *Matcher) IgnoredPath(relativePath string, isDirectory bool) (bool, Source, error) {
+	relativePath = cleanRelative(relativePath)
+	parent := path.Dir(relativePath)
+	if parent == "." {
+		parent = ""
+	}
+	scope, err := matcher.Enter(parent)
+	if err != nil {
+		return false, Source{}, err
+	}
+	ignored, source := scope.Ignored(relativePath, isDirectory)
+	return ignored, source, nil
+}
+
+// Patterns is a list of ignore-file lines that is not a file in the tree, read with the same syntax and
+// relative to the root it is applied at: a project setting that says what to skip in the words a
+// `.gitignore` would use. Within the list the last matching line decides, as within one file.
+type Patterns struct {
+	rules []rule
+}
+
+// CompilePatterns reads lines as the lines of an ignore file named name, which is what each Source
+// reports. A line holding a newline or a NUL byte cannot be an ignore-file line and is refused.
+func CompilePatterns(lines []string, name string) (*Patterns, error) {
+	patterns := &Patterns{}
+	for index, line := range lines {
+		if strings.ContainsAny(line, "\n\x00") {
+			return nil, fmt.Errorf("gitignore: %s entry %d, %q, holds a newline or a NUL byte, which no ignore-file line can", name, index+1, line)
+		}
+		line = strings.TrimSuffix(line, "\r")
+		if line == "" || line[0] == '#' {
+			continue
+		}
+		patterns.rules = append(patterns.rules, compileRule(trimTrailingSpaces(line), name, index+1, ""))
+	}
+	return patterns, nil
+}
+
+// Ignored reports whether the list excludes relativePath, given relative to the root it applies at, and
+// the line that decided. Unlike a Matcher it knows nothing of directories above the path: a walk applying
+// it prunes each directory it excludes, so a path below one is never asked about.
+func (patterns *Patterns) Ignored(relativePath string, isDirectory bool) (bool, Source) {
+	relativePath = cleanRelative(relativePath)
+	decided := lastMatching(patterns.rules, relativePath, path.Base(relativePath), isDirectory)
+	if decided == nil {
+		return false, Source{}
+	}
+	return !decided.negated, decided.source
+}
+
 // decide is the rule that decides relativePath among the first fileCount tree files and info/exclude,
 // or nil: the deepest file first, the last line of each first, info/exclude last.
 func (matcher *Matcher) decide(relativePath string, baseName string, isDirectory bool, fileCount int) *rule {
@@ -370,13 +429,39 @@ func compileRule(line string, file string, lineNumber int, base string) rule {
 	return compiled
 }
 
-// cleanRelative normalizes a relative path to the slash form the matcher keys on, "" for the root.
+// cleanRelative normalizes a relative path to the slash form the matcher keys on, "" for the root. A walk
+// passes paths already in that form, which are returned as they are without allocating.
 func cleanRelative(relative string) string {
+	if isCleanRelative(relative) {
+		return relative
+	}
 	relative = path.Clean(filepath.ToSlash(relative))
 	if relative == "." || relative == "/" {
 		return ""
 	}
 	return strings.TrimPrefix(relative, "/")
+}
+
+// isCleanRelative reports whether a path is already what cleanRelative would make it: slash separated, with
+// no empty, `.` or `..` segment and no leading or trailing slash.
+func isCleanRelative(relative string) bool {
+	if relative == "" {
+		return true
+	}
+	if strings.ContainsRune(relative, '\\') && filepath.Separator == '\\' {
+		return false
+	}
+	start := 0
+	for index := 0; index <= len(relative); index++ {
+		if index < len(relative) && relative[index] != '/' {
+			continue
+		}
+		if segment := relative[start:index]; segment == "" || segment == "." || segment == ".." {
+			return false
+		}
+		start = index + 1
+	}
+	return true
 }
 
 func joinRelative(directory string, name string) string {

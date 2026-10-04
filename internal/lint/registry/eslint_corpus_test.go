@@ -138,7 +138,7 @@ func corpusVerdict(t *testing.T, registration rule.Registration, row eslintCorpu
 		expected = append(expected, row.Code[start:end])
 	}
 	// The harness writes the file trimmed, so cohere's offsets are in the trimmed text, and slices compare
-	source := strings.TrimSpace(row.Code) + "\n"
+	source := rule_testing.FixtureText(row.Code)
 	reported := make([]string, 0, len(result.Diagnostics))
 	for _, diagnostic := range result.Diagnostics {
 		start, end := diagnostic.Range.Pos(), diagnostic.Range.End()
