@@ -1,0 +1,99 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "cohere --json",
+    "description": "One line of `cohere --json`: newline-delimited JSON, one object per line, told apart by `kind`. Findings and changed files come first, in any order; the summary is always the last line, so a reader that never sees one knows the run did not finish.",
+    "oneOf": [
+        { "$ref": "#/$defs/finding" },
+        { "$ref": "#/$defs/changedFile" },
+        { "$ref": "#/$defs/summary" }
+    ],
+    "$defs": {
+        "finding": {
+            "description": "One finding: a rule's, or a type error, whose rule is its TypeScript code (TS2322).",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "path", "line", "column", "severity", "rule", "message"],
+            "properties": {
+                "kind": { "const": "finding" },
+                "path": { "type": "string", "description": "The file, as an absolute path." },
+                "line": { "type": "integer", "minimum": 1 },
+                "column": { "type": "integer", "minimum": 1 },
+                "severity": { "enum": ["error", "warn"] },
+                "rule": { "type": "string", "description": "The rule's name, or the TypeScript code for a type error." },
+                "messageId": { "type": "string", "description": "Which of the rule's messages this is. Absent for a type error." },
+                "message": { "type": "string", "description": "The message, on one line." }
+            }
+        },
+        "changedFile": {
+            "description": "One file the run rewrote, by fixing or by formatting.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "path"],
+            "properties": {
+                "kind": { "enum": ["fixed", "formatted"] },
+                "path": { "type": "string" },
+                "rules": { "type": "array", "items": { "type": "string" }, "description": "The rules whose fixes were applied, for a fixed file." }
+            }
+        },
+        "summary": {
+            "description": "The run, the last line. `verdict` is what the exit code says; `gaps` is every way the run fell short of checking everything, which a reader deciding whether a passing run can be trusted reads too.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "schemaVersion", "verdict", "seconds", "phases", "cache", "typeErrors", "findings", "filesFixed", "filesFormatted", "wouldChange", "filesCohered", "filesCached", "nodes", "gaps"],
+            "properties": {
+                "kind": { "const": "summary" },
+                "schemaVersion": { "const": 1, "description": "Raised by any change a reader could notice; a new optional field does not raise it." },
+                "label": { "type": "string", "description": "The project's path, in a repository with several projects." },
+                "verdict": { "enum": ["pass", "fail"] },
+                "seconds": { "type": "number", "description": "The run's wall clock." },
+                "phases": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["name", "outcome", "seconds"],
+                        "properties": {
+                            "name": { "enum": ["fix", "types", "lint", "unused"] },
+                            "outcome": { "enum": ["ran", "skipped", "not reached", "reused", "checked"] },
+                            "seconds": { "type": "number" },
+                            "detail": { "type": "string" }
+                        }
+                    }
+                },
+                "formattingSeconds": { "type": "number", "description": "How long formatting took. Absent when it did not run." },
+                "cache": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["replayed", "filesReplayed", "off"],
+                    "properties": {
+                        "replayed": { "type": "boolean", "description": "The run was answered whole from the run cache, and ran no phase." },
+                        "filesReplayed": { "type": "integer", "description": "Files whose findings came from the cache in a run that computed the rest." },
+                        "off": { "type": "boolean", "description": "`--no-cache`: nothing read, nothing written." }
+                    }
+                },
+                "typeErrors": { "type": "integer" },
+                "findings": { "type": "integer", "description": "Rule findings, type errors not included." },
+                "filesFixed": { "type": "integer" },
+                "filesFormatted": { "type": "integer" },
+                "wouldChange": { "type": "integer", "description": "Under `--no-fix`, the files a fix or formatting would rewrite. They fail the run." },
+                "filesCohered": { "type": "integer", "description": "The files this run checked fresh." },
+                "filesCached": { "type": "integer", "description": "The files whose results came from the cache." },
+                "nodes": { "type": "integer", "description": "The syntax nodes visited in the cohered files." },
+                "gaps": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["filesInScope", "crashedFiles", "rulesSkippingEverything", "formattingNotChecked", "nothingToCheck", "modifiedBuild"],
+                    "properties": {
+                        "filesInScope": { "type": "integer", "description": "Set when the run was narrowed to some of the files; zero otherwise." },
+                        "crashedFiles": { "type": "integer", "description": "Files a rule crashed on, whose findings are incomplete." },
+                        "rulesSkippingEverything": { "type": "integer", "description": "Rules that declined every file they were offered." },
+                        "formattingNotChecked": { "type": "boolean" },
+                        "nothingToCheck": { "type": "boolean", "description": "The project had no files to check." },
+                        "modifiedBuild": { "type": "boolean", "description": "The binary was built from a modified tree, so no commit reproduces these findings." },
+                        "unread": { "type": "string", "description": "Files the run could not check for any other reason, as the run said it." }
+                    }
+                }
+            }
+        }
+    }
+}
