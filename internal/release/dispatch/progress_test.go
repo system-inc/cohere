@@ -146,3 +146,39 @@ func TestAPruneIsSilentUnlessVerbose(t *testing.T) {
 		}
 	}
 }
+
+// SwiftPM's own lines are kept off a default run, stream under --verbose, and are quoted by a build that
+// fails. The swift on the path here prints what SwiftPM prints and, asked where it put the product, names
+// a directory holding one.
+func TestSwiftPMSpeaksOnlyUnderVerboseOrOnFailure(t *testing.T) {
+	bin := t.TempDir()
+	product := t.TempDir()
+	writeFile(t, filepath.Join(product, "cohere-swift"), "#!/bin/sh\n")
+	fake := "#!/bin/sh\ncase \"$*\" in\n*--show-bin-path*) echo " + product + " ;;\n" +
+		"*) echo 'Building for production...'; echo '[Computing dependencies]'; exit ${FAKE_SWIFT_EXIT:-0} ;;\nesac\n"
+	if err := os.WriteFile(filepath.Join(bin, "swift"), []byte(fake), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	build := func(verbose bool) (string, error) {
+		t.Helper()
+		var out bytes.Buffer
+		previous := Report
+		Report = NewProgress(&out, verbose, false)
+		defer func() { Report = previous }()
+		err := buildSwiftProductWithSwiftPM(t.TempDir(), t.TempDir(), filepath.Join(t.TempDir(), "bin", "cohere-swift"))
+		return out.String(), err
+	}
+
+	if output, err := build(false); err != nil || output != "" {
+		t.Fatalf("a default build printed %q (%v)", output, err)
+	}
+	if output, err := build(true); err != nil || !strings.Contains(output, "Building for production...") {
+		t.Fatalf("a --verbose build did not stream SwiftPM's lines: %q (%v)", output, err)
+	}
+	t.Setenv("FAKE_SWIFT_EXIT", "1")
+	if _, err := build(false); err == nil || !strings.Contains(err.Error(), "[Computing dependencies]") {
+		t.Fatalf("a failed build does not quote what SwiftPM said: %v", err)
+	}
+}

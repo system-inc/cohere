@@ -90,6 +90,18 @@ func (progress *Progress) Fail(format string, arguments ...any) {
 	fmt.Fprintf(progress.out, format+"\n", arguments...)
 }
 
+// ToolOutput is where a tool the launcher runs, such as SwiftPM, should write its own output: the stream
+// under --verbose, after clearing a step, and nil otherwise, which keeps it for a failure to quote.
+func (progress *Progress) ToolOutput() io.Writer {
+	progress.lock.Lock()
+	defer progress.lock.Unlock()
+	if !progress.verbose {
+		return nil
+	}
+	progress.clearLocked()
+	return progress.out
+}
+
 // Clear removes a step's line, so what prints next starts on a clean row. The launcher calls it before
 // cohere runs, and cohere before it reports.
 func (progress *Progress) Clear() {

@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -173,6 +174,19 @@ var buildSwiftProduct = buildSwiftProductWithSwiftPM
 //
 // Copied rather than linked, because the next build replaces the product in place, and a link would
 // turn every hash-named binary into whichever engine was built last.
+// lastLines is a tool's kept output for an error: its last count lines, on lines of their own after the
+// error's, or nothing when it printed nothing.
+func lastLines(output string, count int) string {
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+	if len(lines) == 1 && lines[0] == "" {
+		return ""
+	}
+	if len(lines) > count {
+		lines = lines[len(lines)-count:]
+	}
+	return "\n" + strings.Join(lines, "\n")
+}
+
 func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory string, binaryPath string) error {
 	if err := os.MkdirAll(filepath.Dir(binaryPath), 0o755); err != nil {
 		return fmt.Errorf("creating the binary cache directory: %w", err)
@@ -193,11 +207,16 @@ func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory stri
 		"--manifest-cache", "none",
 		"--product", "cohere-swift",
 	}
+	// SwiftPM's own lines stream under --verbose. Otherwise they are kept, so a default run prints cohere's
+	// report alone (#ytqqv8v), and a build that fails quotes their end in its error.
 	build := exec.Command("swift", arguments...)
-	build.Stdout = os.Stderr
-	build.Stderr = os.Stderr
+	var kept bytes.Buffer
+	build.Stdout, build.Stderr = &kept, &kept
+	if stream := Report.ToolOutput(); stream != nil {
+		build.Stdout, build.Stderr = stream, stream
+	}
 	if err := build.Run(); err != nil {
-		return fmt.Errorf("building the Swift engine (swift %s): %w", strings.Join(arguments, " "), err)
+		return fmt.Errorf("building the Swift engine (swift %s): %w%s", strings.Join(arguments, " "), err, lastLines(kept.String(), 40))
 	}
 
 	binPath, err := exec.Command("swift", append(arguments, "--show-bin-path")...).Output()
