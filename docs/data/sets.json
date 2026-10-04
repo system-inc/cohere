@@ -4921,7 +4921,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 293,
+        "rulesOn": 294,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5727,6 +5727,15 @@
             {
                 "name": "nexus/import-require-node-namespace",
                 "severity": "error"
+            },
+            {
+                "name": "nexus/import-require-path-alias",
+                "severity": "error",
+                "options": [
+                    {
+                        "aliasesFromTsconfigPaths": true
+                    }
+                ]
             },
             {
                 "name": "nexus/localization-no-untranslated-value",
