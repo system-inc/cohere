@@ -89,26 +89,30 @@ func TestAbbreviationVocabularyJudgesEveryForm(t *testing.T) {
 	t.Parallel()
 
 	judged := 0
-	for word, entry := range vocabulary.wholeByName {
+	for word := range vocabulary.wholeByName {
 		finding, found := vocabulary.find(word)
-		if !found || finding.form != "whole" || finding.message.Id != entry.Whole.MessageId {
-			t.Errorf("whole %q: got %+v, want %s", word, finding, entry.Whole.MessageId)
+		if !found || finding.form != "whole" || finding.message.Id != abbreviatedIdentifierText.Id {
+			t.Errorf("whole %q: got %+v, want %s", word, finding, abbreviatedIdentifierText.Id)
 		}
 		judged++
 	}
 	for _, entry := range append(append([]*abbreviationEntry{}, vocabulary.earlyPrefixes...), vocabulary.latePrefixes...) {
 		name := entry.Abbreviation + "Widget"
 		finding, found := vocabulary.find(name)
-		if !found || finding.form != "prefix" || finding.message.Id != entry.Prefix.MessageId {
-			t.Errorf("prefix %q: got %+v, want %s", name, finding, entry.Prefix.MessageId)
+		if !found || finding.form != "prefix" || finding.message.Id != abbreviatedIdentifierText.Id {
+			t.Errorf("prefix %q: got %+v, want %s", name, finding, abbreviatedIdentifierText.Id)
 		}
 		judged++
 	}
 	for _, entry := range vocabulary.suffixes {
 		name := "widget" + capitalizeAbbreviation(entry.Abbreviation)
+		wantId := abbreviatedSuffixText.Id
+		if entry.Suffix.Matcher == "millisecondWord" {
+			wantId = millisecondSuffixText.Id
+		}
 		finding, found := vocabulary.find(name)
-		if !found || finding.form != "suffix" || finding.message.Id != entry.Suffix.MessageId {
-			t.Errorf("suffix %q: got %+v, want %s", name, finding, entry.Suffix.MessageId)
+		if !found || finding.form != "suffix" || finding.message.Id != wantId {
+			t.Errorf("suffix %q: got %+v, want %s", name, finding, wantId)
 		}
 		judged++
 	}
@@ -176,9 +180,9 @@ func TestAbbreviationVocabularyOrderIsObservableWhereItMatters(t *testing.T) {
 		wantId      string
 		wantMessage string
 	}{
-		{"themeVarsVar", "noWordSegment", `Use "themeVariablesVar".`},
-		{"timeoutMsRef", "noMsSuffix", `Use "timeoutInMillisecondsRef"`},
-		{"dbVal", "noDb", `Use "databaseVal".`},
+		{"themeVarsVar", "abbreviatedWordSegment", `Use "themeVariablesVar".`},
+		{"timeoutMsRef", "millisecondSuffix", `Use "timeoutInMillisecondsRef"`},
+		{"dbVal", "abbreviatedIdentifier", `Use "databaseVal".`},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

@@ -67,6 +67,9 @@ type abbreviationEntry struct {
 
 // abbreviationWholeForm judges a name that is the abbreviation entire.
 type abbreviationWholeForm struct {
+	// MessageId is retired: a finding's id names its shape, from policy/messages. The field is
+	// accepted only until policy/Abbreviations.json drops it, which the second engine to stop
+	// reading it does (#xd6f0n6).
 	MessageId string `json:"messageId"`
 	// Style is "orDescriptive" (use the expansion or a more descriptive name), "plain" (use the
 	// expansion), or "advice" (the entry's advice).
@@ -75,6 +78,9 @@ type abbreviationWholeForm struct {
 
 // abbreviationPrefixForm judges a camelCase name that begins with the abbreviation.
 type abbreviationPrefixForm struct {
+	// MessageId is retired: a finding's id names its shape, from policy/messages. The field is
+	// accepted only until policy/Abbreviations.json drops it, which the second engine to stop
+	// reading it does (#xd6f0n6).
 	MessageId string `json:"messageId"`
 	// Phase is "early", judged before any suffix, or "late", judged after them.
 	Phase string `json:"phase"`
@@ -84,6 +90,9 @@ type abbreviationPrefixForm struct {
 
 // abbreviationSuffixForm judges a name that ends with the abbreviation capitalized.
 type abbreviationSuffixForm struct {
+	// MessageId is retired: a finding's id names its shape, from policy/messages. The field is
+	// accepted only until policy/Abbreviations.json drops it, which the second engine to stop
+	// reading it does (#xd6f0n6).
 	MessageId string `json:"messageId"`
 	// Advice replaces the rename suggestion.
 	Advice string `json:"advice"`
@@ -211,9 +220,6 @@ func validateAbbreviationEntry(entry *abbreviationEntry) error {
 		default:
 			return fmt.Errorf("unknown whole style %q", entry.Whole.Style)
 		}
-		if entry.Whole.MessageId == "" {
-			return fmt.Errorf("whole form has no messageId")
-		}
 	}
 	if entry.Prefix != nil {
 		if entry.Prefix.Phase != "early" && entry.Prefix.Phase != "late" {
@@ -229,9 +235,6 @@ func validateAbbreviationEntry(entry *abbreviationEntry) error {
 		default:
 			return fmt.Errorf("unknown prefix style %q", entry.Prefix.Style)
 		}
-		if entry.Prefix.MessageId == "" {
-			return fmt.Errorf("prefix form has no messageId")
-		}
 	}
 	if entry.Suffix != nil {
 		if entry.Suffix.Matcher != "" && entry.Suffix.Matcher != "millisecondWord" {
@@ -239,9 +242,6 @@ func validateAbbreviationEntry(entry *abbreviationEntry) error {
 		}
 		if entry.Suffix.Advice == "" && entry.Suffix.Replacement == "" {
 			needsExpansion = true
-		}
-		if entry.Suffix.MessageId == "" {
-			return fmt.Errorf("suffix form has no messageId")
 		}
 	}
 	if entry.Segment != nil {
@@ -363,11 +363,11 @@ func (vocabulary *abbreviationVocabulary) find(name string) (abbreviationFinding
 func wholeAbbreviationMessage(entry *abbreviationEntry, name string) rule.Message {
 	switch entry.Whole.Style {
 	case "advice":
-		return abbreviatedIdentifierMessage(entry.Whole.MessageId, name, entry.Advice)
+		return abbreviatedIdentifierMessage(name, entry.Advice)
 	case "plain":
-		return abbreviatedIdentifierMessage(entry.Whole.MessageId, name, `Use "`+entry.Expansion+`".`)
+		return abbreviatedIdentifierMessage(name, `Use "`+entry.Expansion+`".`)
 	}
-	return abbreviatedIdentifierMessage(entry.Whole.MessageId, name,
+	return abbreviatedIdentifierMessage(name,
 		`Use "`+entry.Expansion+`" or a more descriptive name.`)
 }
 
@@ -377,10 +377,10 @@ func wholeAbbreviationMessage(entry *abbreviationEntry, name string) rule.Messag
 // `Identifier "arg" should not be abbreviated`. That is how the role words have always reported.
 func prefixAbbreviationMessage(entry *abbreviationEntry, name string) rule.Message {
 	if entry.Prefix.Style == "advice" {
-		return abbreviatedIdentifierMessage(entry.Prefix.MessageId, entry.Abbreviation, entry.Advice)
+		return abbreviatedIdentifierMessage(entry.Abbreviation, entry.Advice)
 	}
 	suggestion := entry.Expansion + strings.TrimPrefix(name, entry.Abbreviation)
-	return abbreviatedIdentifierMessage(entry.Prefix.MessageId, name, `Use "`+suggestion+`".`)
+	return abbreviatedIdentifierMessage(name, `Use "`+suggestion+`".`)
 }
 
 // suffixAbbreviationMessage is the finding for a name that ends with the abbreviation capitalized.
@@ -394,16 +394,15 @@ func suffixAbbreviationMessage(entry *abbreviationEntry, name string, suffix str
 		advice = `Use "` + strings.TrimSuffix(name, suffix) + replacement + `".`
 	}
 	return rule.Message{
-		Id: entry.Suffix.MessageId,
-		Description: `Identifier "` + name + `" should not end with "` + suffix + `". ` + advice + " " +
-			abbreviationReasoning,
+		Id:          abbreviatedSuffixText.Id,
+		Description: abbreviatedSuffixText.Render(map[string]string{"name": name, "suffix": suffix, "advice": advice}),
 	}
 }
 
 // abbreviatedIdentifierMessage is the shape every whole-word and prefix finding takes.
-func abbreviatedIdentifierMessage(messageId string, name string, advice string) rule.Message {
+func abbreviatedIdentifierMessage(name string, advice string) rule.Message {
 	return rule.Message{
-		Id:          messageId,
-		Description: `Identifier "` + name + `" should not be abbreviated. ` + advice + " " + abbreviationReasoning,
+		Id:          abbreviatedIdentifierText.Id,
+		Description: abbreviatedIdentifierText.Render(map[string]string{"name": name, "advice": advice}),
 	}
 }

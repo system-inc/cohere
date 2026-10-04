@@ -19,128 +19,128 @@ func TestConsistencyNoAbbreviatedIdentifierFires(t *testing.T) {
 		wantIds    []string
 	}{
 		// Whole-word abbreviations.
-		{"prop", "const prop = 1;\n", []string{"noProp"}},
-		{"props", "const props = 1;\n", []string{"noProps"}},
-		{"param", "const param = 1;\n", []string{"noParam"}},
-		{"params", "const params = 1;\n", []string{"noParams"}},
-		{"ref", "const ref = 1;\n", []string{"noRef"}},
-		{"config", "const config = 1;\n", []string{"noConfig"}},
-		{"idx", "const idx = 0;\n", []string{"noIdx"}},
-		{"arg", "const arg = 1;\n", []string{"noArg"}},
-		{"args", "const args = 1;\n", []string{"noArgs"}},
-		{"acc", "const acc = 0;\n", []string{"noAcc"}},
-		{"char", "const char = 'a';\n", []string{"noChar"}},
-		{"fn", "const fn = () => 1;\n", []string{"noFn"}},
-		{"str", "const str = 'a';\n", []string{"noStr"}},
-		{"val", "const val = 1;\n", []string{"noVal"}},
-		{"arr", "const arr = [];\n", []string{"noArr"}},
-		{"obj", "const obj = {};\n", []string{"noObj"}},
-		{"num", "const num = 1;\n", []string{"noNum"}},
-		{"res", "const res = 1;\n", []string{"noRes"}},
-		{"err", "const err = 1;\n", []string{"noErr"}},
-		{"req", "const req = 1;\n", []string{"noReq"}},
-		{"msg", "const msg = 1;\n", []string{"noMsg"}},
-		{"min", "const min = 1;\n", []string{"noMin"}},
-		{"max", "const max = 1;\n", []string{"noMax"}},
-		{"ctx", "const ctx = 1;\n", []string{"noCtx"}},
-		{"db", "const db = 1;\n", []string{"noDb"}},
-		{"tx", "const tx = 1;\n", []string{"noTx"}},
-		{"opts", "const opts = {};\n", []string{"noOpts"}},
-		{"cur", "const cur = 1;\n", []string{"noCur"}},
-		{"pct", "const pct = 1;\n", []string{"noPct"}},
-		{"prev", "const prev = 1;\n", []string{"noPrev"}},
+		{"prop", "const prop = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"props", "const props = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"param", "const param = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"params", "const params = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"ref", "const ref = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"config", "const config = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"idx", "const idx = 0;\n", []string{"abbreviatedIdentifier"}},
+		{"arg", "const arg = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"args", "const args = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"acc", "const acc = 0;\n", []string{"abbreviatedIdentifier"}},
+		{"char", "const char = 'a';\n", []string{"abbreviatedIdentifier"}},
+		{"fn", "const fn = () => 1;\n", []string{"abbreviatedIdentifier"}},
+		{"str", "const str = 'a';\n", []string{"abbreviatedIdentifier"}},
+		{"val", "const val = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"arr", "const arr = [];\n", []string{"abbreviatedIdentifier"}},
+		{"obj", "const obj = {};\n", []string{"abbreviatedIdentifier"}},
+		{"num", "const num = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"res", "const res = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"err", "const err = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"req", "const req = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"msg", "const msg = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"min", "const min = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"max", "const max = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"ctx", "const ctx = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"db", "const db = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"tx", "const tx = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"opts", "const opts = {};\n", []string{"abbreviatedIdentifier"}},
+		{"cur", "const cur = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"pct", "const pct = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"prev", "const prev = 1;\n", []string{"abbreviatedIdentifier"}},
 
 		// camelCase prefixes.
-		{"ctx prefix", "const ctxValue = 1;\n", []string{"noCtx"}},
-		{"db prefix", "const dbCode = 1;\n", []string{"noDb"}},
-		{"tx prefix", "const txHash = 1;\n", []string{"noTx"}},
-		{"opts prefix", "const optsForRun = 1;\n", []string{"noOpts"}},
-		{"cur prefix", "const curStep = 1;\n", []string{"noCur"}},
-		{"pct prefix", "const pctComplete = 1;\n", []string{"noPct"}},
-		{"prev prefix", "const prevStep = 1;\n", []string{"noPrev"}},
-		{"idx prefix", "const idxStart = 0;\n", []string{"noIdx"}},
-		{"config prefix", "const configValue = 1;\n", []string{"noConfig"}},
-		{"prop prefix", "const propName = 1;\n", []string{"noProp"}},
-		{"params prefix", "const paramsText = 1;\n", []string{"noParams"}},
-		{"ref prefix", "const refCount = 1;\n", []string{"noRef"}},
-		{"arg prefix", "const argCount = 1;\n", []string{"noArg"}},
-		{"args prefix", "const argsList = 1;\n", []string{"noArgs"}},
-		{"char prefix", "const charSet = 1;\n", []string{"noChar"}},
-		{"fn prefix", "const fnCache = 1;\n", []string{"noFn"}},
-		{"str prefix", "const strValue = 1;\n", []string{"noStr"}},
-		{"max prefix", "const maxAge = 1;\n", []string{"noMax"}},
-		{"err prefix", "const errCount = 1;\n", []string{"noErr"}},
+		{"ctx prefix", "const ctxValue = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"db prefix", "const dbCode = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"tx prefix", "const txHash = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"opts prefix", "const optsForRun = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"cur prefix", "const curStep = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"pct prefix", "const pctComplete = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"prev prefix", "const prevStep = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"idx prefix", "const idxStart = 0;\n", []string{"abbreviatedIdentifier"}},
+		{"config prefix", "const configValue = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"prop prefix", "const propName = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"params prefix", "const paramsText = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"ref prefix", "const refCount = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"arg prefix", "const argCount = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"args prefix", "const argsList = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"char prefix", "const charSet = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"fn prefix", "const fnCache = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"str prefix", "const strValue = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"max prefix", "const maxAge = 1;\n", []string{"abbreviatedIdentifier"}},
+		{"err prefix", "const errCount = 1;\n", []string{"abbreviatedIdentifier"}},
 
 		// Suffixes.
-		{"Prop suffix", "const rowProp = 1;\n", []string{"noPropSuffix"}},
-		{"Props suffix", "const rowProps = 1;\n", []string{"noPropsSuffix"}},
-		{"Param suffix", "const queryParam = 1;\n", []string{"noParamSuffix"}},
-		{"Params suffix", "const searchParams = 1;\n", []string{"noParamsSuffix"}},
-		{"Ref suffix", "const nodeRef = 1;\n", []string{"noRefSuffix"}},
-		{"Config suffix", "const buildConfig = 1;\n", []string{"noConfigSuffix"}},
-		{"Idx suffix", "const rowIdx = 1;\n", []string{"noIdxSuffix"}},
-		{"Arg suffix", "const firstArg = 1;\n", []string{"noArgSuffix"}},
-		{"Args suffix", "const esBuildArgs = 1;\n", []string{"noArgsSuffix"}},
-		{"Char suffix", "const lastChar = 1;\n", []string{"noCharSuffix"}},
-		{"Fn suffix", "const compareFn = 1;\n", []string{"noFnSuffix"}},
-		{"Str suffix", "const queryStr = 1;\n", []string{"noStrSuffix"}},
-		{"Val suffix", "const inputVal = 1;\n", []string{"noValSuffix"}},
-		{"Arr suffix", "const itemArr = 1;\n", []string{"noArrSuffix"}},
-		{"Obj suffix", "const targetObj = 1;\n", []string{"noObjSuffix"}},
-		{"Num suffix", "const pageNum = 1;\n", []string{"noNumSuffix"}},
-		{"Res suffix", "const fetchRes = 1;\n", []string{"noResSuffix"}},
-		{"Err suffix", "const parseErr = 1;\n", []string{"noErrSuffix"}},
-		{"Req suffix", "const httpReq = 1;\n", []string{"noReqSuffix"}},
-		{"Msg suffix", "const errorMsg = 1;\n", []string{"noMsgSuffix"}},
-		{"Min suffix", "const pageMin = 1;\n", []string{"noMinSuffix"}},
-		{"Max suffix", "const pageMax = 1;\n", []string{"noMaxSuffix"}},
+		{"Prop suffix", "const rowProp = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Props suffix", "const rowProps = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Param suffix", "const queryParam = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Params suffix", "const searchParams = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Ref suffix", "const nodeRef = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Config suffix", "const buildConfig = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Idx suffix", "const rowIdx = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Arg suffix", "const firstArg = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Args suffix", "const esBuildArgs = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Char suffix", "const lastChar = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Fn suffix", "const compareFn = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Str suffix", "const queryStr = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Val suffix", "const inputVal = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Arr suffix", "const itemArr = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Obj suffix", "const targetObj = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Num suffix", "const pageNum = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Res suffix", "const fetchRes = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Err suffix", "const parseErr = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Req suffix", "const httpReq = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Msg suffix", "const errorMsg = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Min suffix", "const pageMin = 1;\n", []string{"abbreviatedSuffix"}},
+		{"Max suffix", "const pageMax = 1;\n", []string{"abbreviatedSuffix"}},
 
 		// Milliseconds, matched wherever the word sits rather than only at the end. Anchoring to
 		// the end is how `maximumAgeMsHalf` sat unreported while every sibling was caught.
-		{"Ms at the end", "const maximumAgeMs = 1;\n", []string{"noMsSuffix"}},
-		{"Ms in the middle", "const maximumAgeMsHalf = 1;\n", []string{"noMsSuffix"}},
+		{"Ms at the end", "const maximumAgeMs = 1;\n", []string{"millisecondSuffix"}},
+		{"Ms in the middle", "const maximumAgeMsHalf = 1;\n", []string{"millisecondSuffix"}},
 
 		// Word segments, matched wherever they sit. The anchored branches miss these.
-		{"Cwd segment", "const originalInitCwd = 1;\n", []string{"noWordSegment"}},
-		{"Dir segment", "const outputDirPath = 1;\n", []string{"noWordSegment"}},
-		{"Env segment", "const buildEnvName = 1;\n", []string{"noWordSegment"}},
-		{"Cli segment", "const runCliCommand = 1;\n", []string{"noWordSegment"}},
-		{"Len segment", "const bufferLen = 1;\n", []string{"noWordSegment"}},
-		{"Seq segment", "const eventSeq = 1;\n", []string{"noWordSegment"}},
-		{"Db segment", "const primaryDbHost = 1;\n", []string{"noWordSegment"}},
-		{"Tx segment", "const pendingTxHash = 1;\n", []string{"noWordSegment"}},
-		{"Vars segment", "const themeVars = 1;\n", []string{"noWordSegment"}},
-		{"Var segment", "const themeVarName = 1;\n", []string{"noWordSegment"}},
+		{"Cwd segment", "const originalInitCwd = 1;\n", []string{"abbreviatedWordSegment"}},
+		{"Dir segment", "const outputDirPath = 1;\n", []string{"abbreviatedWordSegment"}},
+		{"Env segment", "const buildEnvName = 1;\n", []string{"abbreviatedWordSegment"}},
+		{"Cli segment", "const runCliCommand = 1;\n", []string{"abbreviatedWordSegment"}},
+		{"Len segment", "const bufferLen = 1;\n", []string{"abbreviatedWordSegment"}},
+		{"Seq segment", "const eventSeq = 1;\n", []string{"abbreviatedWordSegment"}},
+		{"Db segment", "const primaryDbHost = 1;\n", []string{"abbreviatedWordSegment"}},
+		{"Tx segment", "const pendingTxHash = 1;\n", []string{"abbreviatedWordSegment"}},
+		{"Vars segment", "const themeVars = 1;\n", []string{"abbreviatedWordSegment"}},
+		{"Var segment", "const themeVarName = 1;\n", []string{"abbreviatedWordSegment"}},
 
 		// A bare `queryFn` variable still fires; only the object-literal key is exempt. It lands on
 		// the `Fn` suffix branch rather than the `fn` prefix one, which is the order the original
 		// runs them in and the message a reader of `queryFn` needs: the repair is a role name.
-		{"bare queryFn", "const queryFn = () => 1;\n", []string{"noFnSuffix"}},
-		{"bare mutationFn", "const mutationFn = () => 1;\n", []string{"noFnSuffix"}},
+		{"bare queryFn", "const queryFn = () => 1;\n", []string{"abbreviatedSuffix"}},
+		{"bare mutationFn", "const mutationFn = () => 1;\n", []string{"abbreviatedSuffix"}},
 
 		// A destructure binds a name this file owns, unlike an object-literal key.
-		{"destructured binding", "const { props } = source;\n", []string{"noProps"}},
+		{"destructured binding", "const { props } = source;\n", []string{"abbreviatedIdentifier"}},
 
 		// `this.props` is ours: the declaration is a class property no member check protects, so a
 		// blind skip renames the declaration and leaves every read pointing at the old name.
-		{"this member read", "class Thing {\n    read() {\n        return this.props;\n    }\n}\n", []string{"noProps"}},
+		{"this member read", "class Thing {\n    read() {\n        return this.props;\n    }\n}\n", []string{"abbreviatedIdentifier"}},
 
 		// Every reference reports, not just the declaration.
-		{"declaration and reference", "const idx = 0;\nuse(idx);\n", []string{"noIdx", "noIdx"}},
+		{"declaration and reference", "const idx = 0;\nuse(idx);\n", []string{"abbreviatedIdentifier", "abbreviatedIdentifier"}},
 
 		// `Msg` continues in lowercase, so it is not the millisecond unit. It is still the `msg`
 		// prefix, which is a different branch with a different message.
-		{"msgText is the msg prefix, not the Ms unit", "const msgText = 1;\n", []string{"noMsg"}},
+		{"msgText is the msg prefix, not the Ms unit", "const msgText = 1;\n", []string{"abbreviatedIdentifier"}},
 
 		// A plain parameter or catch binding named `args` reports where it is declared and at every
 		// use. Once the file binds one, the rest-only exemption is off for the whole file, since
 		// without scope analysis a use cannot be traced to its binding (#e000k8d): the rest's own
 		// declaration stays exempt and its use reports.
-		{"a plain args parameter", "function run(args: string[]) {\n    use(args);\n}\n", []string{"noArgs", "noArgs"}},
-		{"a catch binding named args", "try {\n    run();\n} catch (args) {\n    use(args);\n}\n", []string{"noArgs", "noArgs"}},
+		{"a plain args parameter", "function run(args: string[]) {\n    use(args);\n}\n", []string{"abbreviatedIdentifier", "abbreviatedIdentifier"}},
+		{"a catch binding named args", "try {\n    run();\n} catch (args) {\n    use(args);\n}\n", []string{"abbreviatedIdentifier", "abbreviatedIdentifier"}},
 		// A file that binds no `args` at all has no rest to agree with, so a free reference reports.
-		{"an args the file never binds", "use(args);\n", []string{"noArgs"}},
-		{"a rest beside a plain args", "function run(...args: string[]) {\n    use(args);\n}\nfunction other(args: string[]) {\n    return args;\n}\n", []string{"noArgs", "noArgs", "noArgs"}},
+		{"an args the file never binds", "use(args);\n", []string{"abbreviatedIdentifier"}},
+		{"a rest beside a plain args", "function run(...args: string[]) {\n    use(args);\n}\nfunction other(args: string[]) {\n    return args;\n}\n", []string{"abbreviatedIdentifier", "abbreviatedIdentifier", "abbreviatedIdentifier"}},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -278,7 +278,7 @@ func TestConsistencyNoAbbreviatedIdentifierFrameworkExemptions(t *testing.T) {
 			"the same name outside a framework file is judged on its merits",
 			"/repository/source/Thing.tsx",
 			"export function read({ params }) {\n    return params;\n}\n",
-			[]string{"noParams", "noParams"},
+			[]string{"abbreviatedIdentifier", "abbreviatedIdentifier"},
 		},
 		{
 			"config in a middleware file is mandated",
@@ -290,7 +290,7 @@ func TestConsistencyNoAbbreviatedIdentifierFrameworkExemptions(t *testing.T) {
 			"config elsewhere still fires",
 			"/repository/source/Thing.tsx",
 			"export const config = { matcher: '/' };\n",
-			[]string{"noConfig"},
+			[]string{"abbreviatedIdentifier"},
 		},
 		{
 			"a framework scope name exempts wherever the file lives",
@@ -330,13 +330,13 @@ func TestConsistencyNoAbbreviatedIdentifierFrameworkExemptions(t *testing.T) {
 			"an interface key is judged as a property signature",
 			"/repository/source/Thing.tsx",
 			"interface ThingProperties {\n    params: string;\n}\n",
-			[]string{"noParams"},
+			[]string{"abbreviatedIdentifier"},
 		},
 		{
 			"a non-framework function in the same file is still judged",
 			"/repository/source/Thing.tsx",
 			"export function readThing({ params }) {\n    return params;\n}\n",
-			[]string{"noParams", "noParams"},
+			[]string{"abbreviatedIdentifier", "abbreviatedIdentifier"},
 		},
 	}
 	for _, testCase := range cases {
@@ -356,7 +356,7 @@ func TestConsistencyNoAbbreviatedIdentifierRunsWithoutOptions(t *testing.T) {
 
 	result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier,
 		"/repository/app/blog/page.tsx", "export default function Page({ params }) {\n    return params;\n}\n")
-	rule_testing.ExpectFindings(t, result, "noParams", "noParams")
+	rule_testing.ExpectFindings(t, result, "abbreviatedIdentifier", "abbreviatedIdentifier")
 }
 
 // The suggested name travels in the message, since there is no fix to carry it. A message naming
@@ -533,22 +533,22 @@ func TestConsistencyNoAbbreviatedIdentifierJudgesTypeMemberKeys(t *testing.T) {
 		{
 			"an interface member carrying a prefix abbreviation",
 			"interface BootstrapOptionsInterface {\n    maxAgentsBytes?: number;\n}\n",
-			[]string{"noMax"},
+			[]string{"abbreviatedIdentifier"},
 		},
 		{
 			"two interface members, the shape measured on the real tree",
 			"interface BootstrapOptionsInterface {\n    maxAgentsBytes?: number;\n    maxBootBytes?: number;\n}\n",
-			[]string{"noMax", "noMax"},
+			[]string{"abbreviatedIdentifier", "abbreviatedIdentifier"},
 		},
 		{
 			"a type literal member",
 			"type BootstrapOptionsType = {\n    maxBootBytes?: number;\n};\n",
-			[]string{"noMax"},
+			[]string{"abbreviatedIdentifier"},
 		},
 		{
 			"a method signature key",
 			"interface ReaderInterface {\n    maxDepth(): number;\n}\n",
-			[]string{"noMax"},
+			[]string{"abbreviatedIdentifier"},
 		},
 	}
 	for _, testCase := range cases {
@@ -607,11 +607,11 @@ func TestConsistencyNoAbbreviatedIdentifierSkipsNamesTheCodeOnlyReads(t *testing
 
 	fires := []struct{ name, sourceText, id string }{
 		// A shorthand destructure declares the abbreviated name in this file.
-		{"a shorthand destructure", "declare const query: { params: unknown[] };\nconst { params } = query;\nexport { params };\n", "noParams"},
+		{"a shorthand destructure", "declare const query: { params: unknown[] };\nconst { params } = query;\nexport { params };\n", "abbreviatedIdentifier"},
 		// The local half of a rename is this file's name.
-		{"a rename onto an abbreviation", "declare const entry: { maximumBitrate: number };\nconst { maximumBitrate: maxBitrate } = entry;\nexport { maxBitrate };\n", "noMax"},
+		{"a rename onto an abbreviation", "declare const entry: { maximumBitrate: number };\nconst { maximumBitrate: maxBitrate } = entry;\nexport { maxBitrate };\n", "abbreviatedIdentifier"},
 		// A file that shadows an import declares that name too, so it is judged rather than guessed.
-		{"a local that shadows an import", "import { char } from 'drizzle-orm/mysql-core';\nexport function build() {\n    const char = 1;\n    return char;\n}\nexport { char as column };\n", "noChar"},
+		{"a local that shadows an import", "import { char } from 'drizzle-orm/mysql-core';\nexport function build() {\n    const char = 1;\n    return char;\n}\nexport { char as column };\n", "abbreviatedIdentifier"},
 	}
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -645,9 +645,9 @@ func TestConsistencyNoAbbreviatedIdentifierLeavesNextRouteContractsAlone(t *test
 		wantIds    []string
 	}{
 		{"maxDuration in a route", routeFile, "export const maxDuration = 60;", nil},
-		{"maxDuration outside a route", abbreviatedFile, "export const maxDuration = 60;", []string{"noMax"}},
+		{"maxDuration outside a route", abbreviatedFile, "export const maxDuration = 60;", []string{"abbreviatedIdentifier"}},
 		{"generateStaticParams in a page", pageFile, "export async function generateStaticParams() { return []; }", nil},
-		{"generateStaticParams outside a route", abbreviatedFile, "export async function generateStaticParams() { return []; }", []string{"noParamsSuffix"}},
+		{"generateStaticParams outside a route", abbreviatedFile, "export async function generateStaticParams() { return []; }", []string{"abbreviatedSuffix"}},
 		{"dynamicParams in a page", pageFile, "export const dynamicParams = false;", nil},
 		{"config in a page", pageFile, "export const config = {};", nil},
 		{"a reference to the export is the export", pageFile, "export const maxDuration = 60;\nconsole.log(maxDuration);", nil},
@@ -655,8 +655,8 @@ func TestConsistencyNoAbbreviatedIdentifierLeavesNextRouteContractsAlone(t *test
 		// declaration reports and its reference does not: references are exempt by spelling, since
 		// telling a shadow from the export needs scope resolution this rule does not do. One finding,
 		// on the declaration, is enough for the author to rename both.
-		{"a nested config shadows the contract", pageFile, "export function load() {\n    const config = 1;\n    return config;\n}", []string{"noConfig"}},
-		{"a parameter named for the contract", pageFile, "export function load(maxDuration: number) {\n    return 1;\n}", []string{"noMax"}},
+		{"a nested config shadows the contract", pageFile, "export function load() {\n    const config = 1;\n    return config;\n}", []string{"abbreviatedIdentifier"}},
+		{"a parameter named for the contract", pageFile, "export function load(maxDuration: number) {\n    return 1;\n}", []string{"abbreviatedIdentifier"}},
 		// Contracts differ by file: a page has no http methods and a route has no metadata, and
 		// `params` is no contract export anywhere, so it keeps its own options-driven handling.
 		{"a page is not a route handler", routeFile, "export const generateViewport = () => ({});", nil},

@@ -9,6 +9,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
 // ConsistencyNoAbbreviatedIdentifierOptions names the files and scopes where a framework owns an
@@ -55,27 +56,28 @@ type wordSegmentPatterns struct {
 	replace  *regexp.Regexp
 }
 
-// abbreviationReasoning is written once and shared, because it is the same argument every time.
-const abbreviationReasoning = "A name is written once and read everywhere, so the letters saved at " +
-	"the declaration are paid back at every call site by a reader who has to expand the abbreviation " +
-	"themselves and hope they expanded it the way the author meant."
+// The rule's four messages, one per shape a finding takes, whose wording lives in
+// `policy/messages/consistency-no-abbreviated-identifier.json`. The reasoning they share is written
+// once there as the `reasoning` phrase, because it is the same argument every time. The id names the
+// shape, not the word: the word is already in the text, and the vocabulary's entries carry no id.
+var (
+	abbreviatedIdentifierText  = policy.MessageOf("nexus/consistency-no-abbreviated-identifier", "abbreviatedIdentifier")
+	abbreviatedSuffixText      = policy.MessageOf("nexus/consistency-no-abbreviated-identifier", "abbreviatedSuffix")
+	millisecondSuffixText      = policy.MessageOf("nexus/consistency-no-abbreviated-identifier", "millisecondSuffix")
+	abbreviatedWordSegmentText = policy.MessageOf("nexus/consistency-no-abbreviated-identifier", "abbreviatedWordSegment")
+)
 
 func messageNoMsSuffix(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id: "noMsSuffix",
-		Description: `Identifier "` + name + `" should not abbreviate milliseconds as "Ms". Use "` +
-			suggestion + `", which is how the rest of the tree spells a millisecond value: ` +
-			`"durationInMilliseconds" outnumbers "durationMs" more than two to one for the identical ` +
-			`value, so the rename follows what the codebase already decided rather than introducing a ` +
-			`third spelling.`,
+		Id:          millisecondSuffixText.Id,
+		Description: millisecondSuffixText.Render(map[string]string{"name": name, "suggestion": suggestion}),
 	}
 }
 
 func messageNoWordSegment(name string, word string, suggestion string) rule.Message {
 	return rule.Message{
-		Id: "noWordSegment",
-		Description: `Identifier "` + name + `" abbreviates "` + word + `". Use "` + suggestion +
-			`". ` + abbreviationReasoning,
+		Id:          abbreviatedWordSegmentText.Id,
+		Description: abbreviatedWordSegmentText.Render(map[string]string{"name": name, "word": word, "suggestion": suggestion}),
 	}
 }
 
