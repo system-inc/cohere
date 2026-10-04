@@ -617,4 +617,31 @@ func TestCoverageNamesWhatRulesSkipped(t *testing.T) {
 
 	plain := renderLintReport(lintReport{Result: result, Rules: rules, WalkCost: "in 1s"})
 	requireLines(t, plain, "  skipped: "+ruleName+": skipped on 3 files, strictNullChecks is off\n")
+
+	// The skip is the reason it registered nothing, so it is not also named as a rule that checked
+	// nothing for no reason (#yj96emr)
+	forbidLines(t, plain, "no listener:")
+	requireLines(t, detailed, "    "+ruleName+" (offered 3 files, skipped every file it was offered)\n")
+	if strings.Contains(detailed, "declares no reason to register none") {
+		t.Errorf("a rule that skipped every file it was offered reads as dead:\n%s", detailed)
+	}
+}
+
+// A rule that skipped some of the files it was offered and registered nothing on the rest gave no reason
+// for the rest, so it still prints as having checked nothing there
+func TestARuleThatSkippedSomeFilesStillNeedsActionForTheRest(t *testing.T) {
+	ruleName := "@typescript-eslint/no-useless-default-assignment"
+	result := program.Result{
+		Coverage: program.Coverage{RulesOffered: map[string]int{ruleName: 3}},
+		Notes: map[string]program.RuleNotes{
+			"/project/a.ts": {ruleName: {rule.SkippedNotePrefix + "strictNullChecks is off": 1}},
+		},
+	}
+	rules := []rule.Rule{{Name: ruleName}}
+
+	plain := renderLintReport(lintReport{Result: result, Rules: rules, WalkCost: "in 1s"})
+	requireLines(t, plain,
+		"  skipped: "+ruleName+": skipped on 1 file, strictNullChecks is off\n",
+		"  no listener: rule "+ruleName+" was offered 3 files and registered no listener on any",
+	)
 }

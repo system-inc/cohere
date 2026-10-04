@@ -518,6 +518,29 @@ func sumRuleNotes(notes map[string]program.RuleNotes) map[string]map[string]int 
 	return summed
 }
 
+// excuseRulesThatSkippedEveryFile clears the dead-rule signal from a rule whose skips cover every file it
+// was offered. A skip is a reason given at run time, as NoListener is one given at registration, and the
+// skipped line already names it, so the same rule must not also read as having checked nothing for no
+// reason: nexus/correctness-no-implicit-return stands down in every project that sets noImplicitReturns,
+// and printed both (#yj96emr). A rule that skipped some files and registered nothing on the rest still
+// needs action, since nothing explains the rest.
+func (summary *coverageSummary) excuseRulesThatSkippedEveryFile(coverage program.Coverage) {
+	skips, _ := splitRuleSkips(summary.Notes)
+	for index := range summary.Entries {
+		if !summary.Entries[index].NeedsAction {
+			continue
+		}
+		skipped := 0
+		for _, count := range skips[summary.Entries[index].Name] {
+			skipped += count
+		}
+		if skipped >= coverage.RulesOffered[summary.Entries[index].Name] {
+			summary.Entries[index].NeedsAction = false
+			summary.Entries[index].Details = append(summary.Entries[index].Details, "skipped every file it was offered")
+		}
+	}
+}
+
 // writeRuleNotes lists what each rule counted rather than reported, by rule and then by key, each with
 // its count over the run. A `@processState` tag lands here as the type and how many writes it exempted,
 // so a tag on a widely used type shows up as a number someone reads rather than as a silence.
@@ -679,6 +702,7 @@ func writeLintReport(out io.Writer, report lintReport) {
 
 	summary := classifyTypeScriptCoverage(report.Rules, coverage, report.LintConfig)
 	summary.Notes = sumRuleNotes(report.Result.Notes)
+	summary.excuseRulesThatSkippedEveryFile(coverage)
 	fmt.Fprintln(out, summary.coverageCountedLine())
 	fmt.Fprintln(out, summary.coverageFilesLine(report.Details))
 	writeParityCoverage(out, report.Rules, report.LintConfig)
