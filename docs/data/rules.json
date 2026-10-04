@@ -12365,10 +12365,13 @@
                 "elements": "one"
             },
             "messageIds": [
-                "missingCatchParameter",
-                "preserveCaughtError"
+                "caughtErrorShadowed",
+                "incorrectCause",
+                "missingCatchErrorParam",
+                "missingCause",
+                "partiallyLostError"
             ],
-            "fixKind": "fix",
+            "fixKind": "suggestion",
             "sets": [
                 {
                     "set": "cohere:next",

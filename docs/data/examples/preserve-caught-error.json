@@ -2,27 +2,29 @@
     "rule": "preserve-caught-error",
     "firing": {
         "file": "input.ts",
-        "source": "try { a(); } catch (err) {\n  throw new Error //\n  ();\n}\n",
+        "source": "try { a(); } catch (err) { throw new Error(\"m\"); }\n",
         "findings": [
             {
-                "line": 2,
-                "column": 3,
-                "endLine": 3,
-                "endColumn": 6,
-                "messageId": "preserveCaughtError",
+                "line": 1,
+                "column": 28,
+                "endLine": 1,
+                "endColumn": 49,
+                "messageId": "missingCause",
                 "message": "This throws a new error out of a catch block without attaching the error that was caught. The original stack, the original message, and whatever the underlying library said about what actually went wrong are all discarded at this line, and what reaches the log is a sentence somebody wrote by hand months ago. The failure that matters is the one you can no longer see. Pass the caught error as the `cause` option so both halves survive.",
-                "fix": true
+                "suggestions": 1
             }
-        ],
-        "fixedSource": "try { a(); } catch (err) {\n  throw new Error //\n  (\"\", { cause: err });\n}\n"
+        ]
     },
     "clean": {
         "file": "input.ts",
-        "source": "try {\n\t\t\t        doSomething();\n\t\t\t    } catch (e) {\n\t\t\t        console.error(e);\n\t\t\t    }\n"
+        "source": "try { a(); } catch { throw new Error(\"m\"); }\n"
     },
     "assertedMessageIds": [
-        "missingCatchParameter",
-        "preserveCaughtError"
+        "caughtErrorShadowed",
+        "incorrectCause",
+        "missingCatchErrorParam",
+        "missingCause",
+        "partiallyLostError"
     ],
-    "assertsFix": true
+    "assertsSuggestion": true
 }
