@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 267,
+        "rulesOn": 269,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -236,6 +236,10 @@
                 "severity": "error"
             },
             {
+                "name": "@typescript-eslint/no-inferrable-types",
+                "severity": "error"
+            },
+            {
                 "name": "@typescript-eslint/no-invalid-this",
                 "severity": "error"
             },
@@ -425,6 +429,10 @@
             },
             {
                 "name": "@typescript-eslint/prefer-reduce-type-parameter",
+                "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/prefer-regexp-exec",
                 "severity": "error"
             },
             {
@@ -1397,7 +1405,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 330,
+        "rulesOn": 333,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -1535,6 +1543,10 @@
             },
             {
                 "name": "@typescript-eslint/no-import-type-side-effects",
+                "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/no-inferrable-types",
                 "severity": "error"
             },
             {
@@ -1727,6 +1739,10 @@
             },
             {
                 "name": "@typescript-eslint/prefer-reduce-type-parameter",
+                "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/prefer-regexp-exec",
                 "severity": "error"
             },
             {
@@ -2746,6 +2762,10 @@
                 "severity": "error"
             },
             {
+                "name": "react/jsx-curly-brace-presence",
+                "severity": "error"
+            },
+            {
                 "name": "react/jsx-fragments",
                 "severity": "error"
             },
@@ -3047,7 +3067,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 263,
+        "rulesOn": 265,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -3281,6 +3301,10 @@
                 "severity": "error"
             },
             {
+                "name": "@typescript-eslint/no-inferrable-types",
+                "severity": "error"
+            },
+            {
                 "name": "@typescript-eslint/no-invalid-this",
                 "severity": "error"
             },
@@ -3470,6 +3494,10 @@
             },
             {
                 "name": "@typescript-eslint/prefer-reduce-type-parameter",
+                "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/prefer-regexp-exec",
                 "severity": "error"
             },
             {
@@ -4698,7 +4726,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 273,
+        "rulesOn": 275,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -4836,6 +4864,10 @@
             },
             {
                 "name": "@typescript-eslint/no-import-type-side-effects",
+                "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/no-inferrable-types",
                 "severity": "error"
             },
             {
@@ -5028,6 +5060,10 @@
             },
             {
                 "name": "@typescript-eslint/prefer-reduce-type-parameter",
+                "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/prefer-regexp-exec",
                 "severity": "error"
             },
             {
@@ -6250,7 +6286,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 257,
+        "rulesOn": 259,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6388,6 +6424,10 @@
             },
             {
                 "name": "@typescript-eslint/no-import-type-side-effects",
+                "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/no-inferrable-types",
                 "severity": "error"
             },
             {
@@ -6580,6 +6620,10 @@
             },
             {
                 "name": "@typescript-eslint/prefer-reduce-type-parameter",
+                "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/prefer-regexp-exec",
                 "severity": "error"
             },
             {
@@ -7593,7 +7637,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 245,
+        "rulesOn": 247,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -7731,6 +7775,10 @@
             },
             {
                 "name": "@typescript-eslint/no-import-type-side-effects",
+                "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/no-inferrable-types",
                 "severity": "error"
             },
             {
@@ -7923,6 +7971,10 @@
             },
             {
                 "name": "@typescript-eslint/prefer-reduce-type-parameter",
+                "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/prefer-regexp-exec",
                 "severity": "error"
             },
             {

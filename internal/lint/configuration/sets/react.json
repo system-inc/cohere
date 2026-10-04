@@ -83,6 +83,7 @@
         "react/no-unused-state": "error",
         "react/default-props-match-prop-types": "error",
         "react/no-invalid-html-attribute": "error",
+        "react/jsx-curly-brace-presence": "error",
         "structure/react-component-no-separate-named-export": "error",
         "structure/consistency-require-matching-file-name": "error",
         "structure/react-component-require-named-export": "error",

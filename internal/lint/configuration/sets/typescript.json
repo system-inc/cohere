@@ -387,6 +387,8 @@
         "no-use-before-define": "error",
         "@typescript-eslint/no-shadow": "error",
         "nexus/consistency-no-boolean-outcome": "error",
+        "@typescript-eslint/no-inferrable-types": "error",
+        "@typescript-eslint/prefer-regexp-exec": "error",
         "prefer-arrow-callback": "off",
         "no-inline-comments": "off",
         "prefer-destructuring": "off",
