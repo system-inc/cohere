@@ -2,11 +2,13 @@
     "extends": "cohere:typescript",
     "ignorePatterns": ["**/wasm/photon/core/photon_rs_bg.js", "**/wasm/photon/core/photon_rs_bg.d.ts"],
     "departures": {
+        "no-implicit-globals": "Base's tsconfig sets no moduleDetection, so a file with no import or export is a script whose top-level declarations are globals, and this rule is what stops them. It comes back out when Base adopts moduleDetection force (#tz23yx2, #rbvd7sv).",
         "@typescript-eslint/no-require-imports": "off for every .cjs: CommonJS has no import statement and import() is async, so require is the only module form a .cjs can use (#na0hgjz)",
         "@typescript-eslint/no-extraneous-class": "a decorated class is a registration, not a namespace: DI tokens and RPC and GraphQL services are empty by design (allowWithDecorator, ruled by @system_cohere in 17199, api b9d02dbc)",
         "@typescript-eslint/unified-signatures": "ignoreDifferentlyNamedParameters, ruled by @system_cohere in 17339 and corrected in 17361, mirrored in Base ESLint defaults c4d3916 (api 3f87fa5e)"
     },
     "rules": {
+        "no-implicit-globals": "error",
         "base/security-require-context-access": [
             "error",
             {

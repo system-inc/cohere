@@ -9255,6 +9255,12 @@
                 "globalLexicalBinding",
                 "globalNonLexicalBinding",
                 "globalVariableLeak"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                }
             ]
         },
         {

@@ -3201,7 +3201,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 285,
+        "rulesOn": 286,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -4309,7 +4309,7 @@
             },
             {
                 "name": "no-implicit-globals",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "no-implied-eval",
