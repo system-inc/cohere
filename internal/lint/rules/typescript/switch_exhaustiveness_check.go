@@ -1,12 +1,14 @@
 package typescript
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -93,24 +95,20 @@ import (
 // column, so the wrong value was inert rather than enforced — worth saying, because "the guard is
 // green" was not evidence the column was right.
 //
-// # And a FOURTH option that exists in the struct and is never read
+// # And a FOURTH option, which tsgolint declared and never read, now implemented
 //
-// `SwitchExhaustivenessCheckOptions` also declares `DefaultCaseCommentPattern *string`, and
-// tsgolint's rule body never mentions it: one occurrence in the file, the field declaration itself.
-// The feature — a `// no default` style comment standing in for a real default clause — is
-// implemented in `@typescript-eslint` and unimplemented here.
+// `defaultCaseCommentPattern` makes a comment stand in for a default clause. tsgolint declared the
+// field and never read it, and all six of its `Skip: true` cases were the ones that needed it. A
+// config writing it decoded clean and changed nothing, and worse, typescript-eslint applies its
+// DEFAULT pattern `/^no default$/iu` with the option unset, so a codebase that adopted the
+// `// no default` convention under typescript-eslint lit up here. Implemented in #6esg2nx from
+// 8.71's getCommentDefaultCase, found by the registry guard that fails on a decoded option nothing
+// reads; see defaultCaseComment for the shapes, each replayed through the installed 8.71.0.
 //
-// Upstream knows. All SIX of its `Skip: true` cases are exactly the cases that would need it, each
-// marked `TODO(port): add support for DefaultCaseCommentPattern`, so upstream does not run them
-// either. Those six are excluded here for the same reason and named individually in the test file,
-// rather than dropped silently.
-//
-// The trap is that the field is settable. A config writing `defaultCaseCommentPattern` binds
-// cleanly through `encoding/json`, produces no error, and does nothing at all. That is a silent
-// no-op reaching a user, so `TestSwitchExhaustivenessCheckIgnoresTheCommentPattern` pins it as a
-// measured fact: the same source reports identically with the pattern set and unset. The field is
-// kept rather than deleted because absorption is a move rather than a rewrite, and because that
-// test is the thing that would tell a future reader the option had come alive.
+// The comment is the default case for all three checks: it satisfies `requireDefaultForNonUnion`
+// and `considerDefaultExhaustiveForUnions`, and on an exhaustive switch under
+// `allowDefaultCaseForExhaustiveSwitch: false` it is itself reported as `dangerousDefaultCase`, on
+// the comment. A real default clause wins over it, as upstream's `defaultCase ?? comment` does.
 //
 // # There are no fixes and no suggestions, and the brief expected some
 //
@@ -154,13 +152,12 @@ import (
 //	SUGGESTIONS.   The same input carries one SUGGESTION and no fix there. We carry neither.
 //
 //	COMMENT PATTERN. `// no default` under `requireDefaultForNonUnion` produces an EMPTY diagnostic
-//	               list there, because its default pattern is `/^no default$/i`. We report.
+//	               list there, because its default pattern is `/^no default$/i`. We reported until
+//	               #6esg2nx and are silent now.
 //
-// The last one is the sharpest for a user: a codebase that adopted the `// no default` convention
-// under typescript-eslint lights up here. The suggestion and the comment pattern are still
-// reproduced from tsgolint rather than repaired; the message text is closed. They are gaps rather
-// than contradictions — no input makes the two report a DIFFERENT id, only inputs where one reports
-// and the other is silent.
+// The comment pattern was the sharpest of the three for a user, and it is closed (#6esg2nx); the
+// suggestion is still reproduced from tsgolint rather than repaired. It is a gap rather than a
+// contradiction: no input makes the two report a DIFFERENT id.
 //
 // # The checker, and the nil guard that now lives here
 //
@@ -206,6 +203,13 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		}
 		if opts.RequireDefaultForNonUnion == nil {
 			opts.RequireDefaultForNonUnion = type_checking.Ref(false)
+		}
+		// Upstream compiles the pattern with `new RegExp(pattern, 'u')`, so an invalid one throws
+		// when the rule is created. Here it matches no comment, which leaves the real default clause
+		// the only default, the reading that reports rather than the one that silences.
+		commentPattern := defaultCaseCommentPattern
+		if opts.DefaultCaseCommentPattern != nil {
+			commentPattern, _ = regexp.Compile(*opts.DefaultCaseCommentPattern)
 		}
 
 		isLiteralLikeType := func(t *checker.Type) bool {
@@ -280,17 +284,21 @@ var SwitchExhaustivenessCheck = rule.Rule{
 				return false
 			})
 
-			return &switchMetadata{
+			metadata := &switchMetadata{
 				ContainsNonLiteralType:    containsNonLiteralType,
 				DefaultCase:               defaultCase,
 				MissingLiteralBranchTypes: missingLiteralBranchTypes,
 			}
+			if defaultCase == nil {
+				metadata.DefaultCaseComment = defaultCaseComment(ctx, node, commentPattern)
+			}
+			return metadata
 		}
 
 		checkSwitchExhaustive := func(node *ast.SwitchStatement, metadata *switchMetadata) {
 			// If considerDefaultExhaustiveForUnions is enabled, the presence of a default case
 			// always makes the switch exhaustive.
-			if *opts.ConsiderDefaultExhaustiveForUnions && metadata.DefaultCase != nil {
+			if *opts.ConsiderDefaultExhaustiveForUnions && metadata.hasDefaultCase() {
 				return
 			}
 
@@ -306,9 +314,13 @@ var SwitchExhaustivenessCheck = rule.Rule{
 			}
 
 			if len(metadata.MissingLiteralBranchTypes) == 0 &&
-				metadata.DefaultCase != nil &&
+				metadata.hasDefaultCase() &&
 				!metadata.ContainsNonLiteralType {
-				ctx.ReportNode(&metadata.DefaultCase.Node, buildDangerousDefaultCaseMessage())
+				if metadata.DefaultCase != nil {
+					ctx.ReportNode(&metadata.DefaultCase.Node, buildDangerousDefaultCaseMessage())
+				} else {
+					ctx.ReportRange(metadata.DefaultCaseComment.Range, buildDangerousDefaultCaseMessage())
+				}
 			}
 		}
 		checkSwitchNoUnionDefaultCase := func(node *ast.SwitchStatement, metadata *switchMetadata) {
@@ -316,7 +328,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 				return
 			}
 
-			if metadata.ContainsNonLiteralType && metadata.DefaultCase == nil {
+			if metadata.ContainsNonLiteralType && !metadata.hasDefaultCase() {
 				ctx.ReportNode(node.Expression, buildSwitchIsNotExhaustiveMessage("default"))
 				// TODO(port): missing suggestion
 			}
@@ -351,10 +363,66 @@ var SwitchExhaustivenessCheck = rule.Rule{
 type switchMetadata struct {
 	ContainsNonLiteralType bool
 	// nil if there is no default case
-	DefaultCase               *ast.CaseOrDefaultClause
+	DefaultCase *ast.CaseOrDefaultClause
+	// DefaultCaseComment is the comment standing in for a default clause, when there is no clause and
+	// the last comment after the last case matches the pattern; nil otherwise.
+	DefaultCaseComment        *comments.Comment
 	MissingLiteralBranchTypes []*checker.Type
 	// TODO: add support for fixed (symbolname is used only for fixes)
 	// SymbolName string
+}
+
+// hasDefaultCase is upstream's `defaultCase != null`, which a matching comment satisfies too.
+func (metadata *switchMetadata) hasDefaultCase() bool {
+	return metadata.DefaultCase != nil || metadata.DefaultCaseComment != nil
+}
+
+// defaultCaseCommentPattern is typescript-eslint's DEFAULT_COMMENT_PATTERN, `/^no default$/iu`.
+var defaultCaseCommentPattern = regexp.MustCompile(`(?i)^no default$`)
+
+// defaultCaseComment is upstream's getCommentDefaultCase: the LAST comment between the end of the last
+// case clause and the switch's closing brace, when its text, delimiters stripped and trimmed, matches
+// the pattern. A nil pattern matches nothing.
+//
+// Measured on the installed 8.71.0 under `requireDefaultForNonUnion`, each of these follows:
+//
+//	case 0: break;  // no default            a default    so is `/* no default */`, `// No Default`,
+//	case 0: break; // no default              a default    `//no default` and a block over three lines
+//	case 0: { break; // no default }          not          inside the last case's block, not after it
+//	// no default                             not          before the first case, or with no case at all
+//	  // something else  (after it)           not          only the last comment is asked
+//	/** no default */                         not          its trimmed text starts with `*`
+//	// no default here                        not          the default pattern is anchored at both ends
+//
+// An empty pattern matches every comment, as `new RegExp(”)` does upstream.
+func defaultCaseComment(ctx rule.Context, statement *ast.SwitchStatement, pattern *regexp.Regexp) *comments.Comment {
+	if pattern == nil {
+		return nil
+	}
+	caseBlock := statement.CaseBlock
+	clauses := caseBlock.AsCaseBlock().Clauses.Nodes
+	if len(clauses) == 0 {
+		return nil
+	}
+	after, closingBrace := clauses[len(clauses)-1].End(), caseBlock.End()-1
+	var last *comments.Comment
+	all := comments.ForFile(ctx)
+	for index := range all {
+		if all[index].Range.Pos() >= after && all[index].Range.End() <= closingBrace {
+			last = &all[index]
+		}
+	}
+	if last == nil {
+		return nil
+	}
+	value := last.Text[2:]
+	if last.IsBlock {
+		value = strings.TrimSuffix(value, "*/")
+	}
+	if !pattern.MatchString(strings.TrimSpace(value)) {
+		return nil
+	}
+	return last
 }
 
 // SwitchExhaustivenessCheckOptions is the configuration surface, named once so the registration and

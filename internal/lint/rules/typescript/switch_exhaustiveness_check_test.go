@@ -1402,89 +1402,79 @@ export namespace A {
 	rule_testing.ExpectFindings(t, result, "switchIsNotExhaustive")
 }
 
-// TestSwitchExhaustivenessCheckIgnoresTheCommentPattern pins a SETTABLE OPTION THAT DOES NOTHING.
+// TestSwitchExhaustivenessCheckReadsTheDefaultCaseComment replays the comment that stands in for a
+// default clause through typescript-eslint 8.71.0 (#6esg2nx).
 //
-// `SwitchExhaustivenessCheckOptions` declares `DefaultCaseCommentPattern *string`, and tsgolint's
-// rule body never reads it: the field declaration is the only occurrence of that name in the whole
-// file. The feature it names — a `// no default` comment standing in for a real default clause —
-// is implemented in `@typescript-eslint` and unimplemented here.
-//
-// Upstream knows and does not hide it. All six of its `Skip: true` cases are exactly the ones that
-// would need the option, each marked `TODO(port): add support for DefaultCaseCommentPattern`.
-//
-// The hazard is that the field still BINDS. A config writing `defaultCaseCommentPattern` decodes
-// with no error and then changes nothing, which is a silent no-op reaching a user rather than a
-// loud refusal. So this states the no-op as a measurement instead of a comment: the same source,
-// carrying the very comment the pattern describes, reports identically with the option set and
-// unset.
-//
-// It is also the tripwire for the next tsgolint sync. If upstream implements the feature, the
-// second call goes silent, this fails, and the next reader is told the option came alive rather
-// than discovering it from a user's bug report.
-func TestSwitchExhaustivenessCheckIgnoresTheCommentPattern(t *testing.T) {
+// tsgolint declared `defaultCaseCommentPattern` and never read it, and this test used to pin that
+// no-op, as the tripwire for the day the option came alive. It came alive here, ported from 8.71's
+// getCommentDefaultCase, so the tripwire is now the replay: the first six rows are every row in
+// upstream's v8.71.0 test file that carries a comment or the pattern, the six tsgolint skipped, and
+// the rest are edge rows for each shape the comment lookup has to get right. Each was run through the
+// installed rule on a typed scratch project and the findings written here, id and span.
+func TestSwitchExhaustivenessCheckReadsTheDefaultCaseComment(t *testing.T) {
 	t.Parallel()
 
-	const sourceText = `
-declare const literal: 'a' | 'b' | 'c';
+	cases := []struct {
+		options string
+		code    string
+		want    []string
+	}{
+		{"{\"requireDefaultForNonUnion\":true}", "\ndeclare const value: number;\nswitch (value) {\n  case 0:\n    break;\n  case 1:\n    break;\n  // no default\n}\n      ", nil},
+		{"{\"considerDefaultExhaustiveForUnions\":true}", "\ndeclare const value: 'a' | 'b';\nswitch (value) {\n  case 'a':\n    break;\n  // no default\n}\n      ", nil},
+		{"{\"considerDefaultExhaustiveForUnions\":true,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}", "\ndeclare const value: 'a' | 'b';\nswitch (value) {\n  case 'a':\n    break;\n  // skip default\n}\n      ", nil},
+		{"{\"allowDefaultCaseForExhaustiveSwitch\":false}", "\ndeclare const myValue: 'a' | 'b';\nswitch (myValue) {\n  case 'a':\n    return 'a';\n  case 'b':\n    return 'b';\n  // no default\n}\n      ", []string{"dangerousDefaultCase // no default"}},
+		{"{\"considerDefaultExhaustiveForUnions\":false}", "\ndeclare const literal: 'a' | 'b' | 'c';\n\nswitch (literal) {\n  case 'a':\n    break;\n  // no default\n}\n      ", []string{"switchIsNotExhaustive literal"}},
+		{"{\"considerDefaultExhaustiveForUnions\":false,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}", "\ndeclare const literal: 'a' | 'b' | 'c';\n\nswitch (literal) {\n  case 'a':\n    break;\n  // skip default\n}\n      ", []string{"switchIsNotExhaustive literal"}},
+		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default\n}", nil},
+		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // No Default\n}", nil},
+		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  /* no default */\n}", nil},
+		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break; // no default\n}", nil},
+		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0: {\n    break;\n    // no default\n  }\n}", []string{"switchIsNotExhaustive v"}},
+		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default\n  // something else\n}", []string{"switchIsNotExhaustive v"}},
+		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // something else\n  // no default\n}", nil},
+		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  // no default\n}", []string{"switchIsNotExhaustive v"}},
+		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  // no default\n  case 0:\n    break;\n}", []string{"switchIsNotExhaustive v"}},
+		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default here\n}", []string{"switchIsNotExhaustive v"}},
+		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // skip default\n}", nil},
+		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default\n}", []string{"switchIsNotExhaustive v"}},
+		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // SKIP default\n}", []string{"switchIsNotExhaustive v"}},
+		{"{\"considerDefaultExhaustiveForUnions\":true}", "declare const literal: 'a' | 'b';\nswitch (literal) {\n  case 'a':\n    break;\n  // no default\n}", nil},
+		{"{}", "declare const literal: 'a' | 'b';\nswitch (literal) {\n  case 'a':\n    break;\n  // no default\n}", []string{"switchIsNotExhaustive literal"}},
+		{"{\"allowDefaultCaseForExhaustiveSwitch\":false}", "declare const literal: 'a' | 'b';\nswitch (literal) {\n  case 'a':\n    break;\n  case 'b':\n    break;\n  // no default\n}", []string{"dangerousDefaultCase // no default"}},
+		{"{\"allowDefaultCaseForExhaustiveSwitch\":false}", "declare const literal: 'a' | 'b';\nswitch (literal) {\n  case 'a':\n    break;\n  case 'b':\n    break;\n  default:\n    break;\n  // no default\n}", []string{"dangerousDefaultCase default:\n    break;"}},
+		{"{\"allowDefaultCaseForExhaustiveSwitch\":false}", "declare const literal: 'a' | 'b';\nswitch (literal) {\n  case 'a':\n    break;\n  case 'b':\n    break;\n  /* no default */\n}", []string{"dangerousDefaultCase /* no default */"}},
+		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  //no default\n}", nil},
+		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  /**\n   * no default\n   */\n}", []string{"switchIsNotExhaustive v"}},
+		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  /*\n    no default\n  */\n}", nil},
+		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n  // no default\n}", nil},
+		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // skip\n}", nil},
+		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n}\n// no default", []string{"switchIsNotExhaustive v"}},
+		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\ndeclare const w: number;\nswitch (v) {\n  case 0:\n    switch (w) {\n      case 1:\n        break;\n      // no default\n    }\n}", []string{"switchIsNotExhaustive v"}},
+	}
+	if len(cases) != 31 {
+		t.Fatalf("%d rows, and 31 were replayed", len(cases))
+	}
 
-switch (literal) {
-  case 'a':
-    break;
-  // skip default
-}
-`
+	for _, testCase := range cases {
+		t.Run(testCase.options+" "+testCase.code, func(t *testing.T) {
+			t.Parallel()
 
-	withoutPattern := rule_testing.RunTypedWithOptions(
-		t, SwitchExhaustivenessCheck, switchExhaustivenessFile, sourceText,
-		SwitchExhaustivenessCheckOptions{ConsiderDefaultExhaustiveForUnions: type_checking.Ref(false)},
-	)
-	rule_testing.ExpectFindings(t, withoutPattern, "switchIsNotExhaustive")
-
-	// Upstream's own skipped case expects this to still report, which is the only reason it is a
-	// skip rather than a valid case. We report, so we agree with the expectation while not having
-	// the feature — and that agreement is a coincidence worth naming, because the pattern is
-	// inert rather than considered and rejected.
-	withPattern := rule_testing.RunTypedWithOptions(
-		t, SwitchExhaustivenessCheck, switchExhaustivenessFile, sourceText,
-		SwitchExhaustivenessCheckOptions{
-			ConsiderDefaultExhaustiveForUnions: type_checking.Ref(false),
-			DefaultCaseCommentPattern:          type_checking.Ref(`^skip\sdefault`),
-		},
-	)
-	rule_testing.ExpectFindings(t, withPattern, "switchIsNotExhaustive")
-
-	// And the direction that actually proves inertness rather than restating the line above. With
-	// `considerDefaultExhaustiveForUnions` true and no real default clause, an implemented pattern
-	// would make this silent. It reports, so the comment is not being read at all.
-	wouldBeSilentIfImplemented := rule_testing.RunTypedWithOptions(
-		t, SwitchExhaustivenessCheck, switchExhaustivenessFile, sourceText,
-		SwitchExhaustivenessCheckOptions{
-			ConsiderDefaultExhaustiveForUnions: type_checking.Ref(true),
-			DefaultCaseCommentPattern:          type_checking.Ref(`^skip\sdefault`),
-		},
-	)
-	rule_testing.ExpectFindings(t, wouldBeSilentIfImplemented, "switchIsNotExhaustive")
-
-	// And the same divergence on the option's OTHER half, measured against the executable
-	// reference rather than reasoned about. `@typescript-eslint`'s default comment pattern is
-	// `/^no default$/i`, so a bare `// no default` satisfies `requireDefaultForNonUnion` there with
-	// no option set at all. Driven through its Linter API on a real program this input produces an
-	// EMPTY diagnostic list; here it reports.
-	//
-	// This is the sharpest user-visible difference between the two references for this rule: a
-	// codebase that adopted the `// no default` convention under typescript-eslint would light up
-	// under oxlint. tsgolint wins anyway, because oxlint runs tsgolint and the differential harness
-	// compares against oxlint, but the next reader should know it is a gap rather than a fix.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(
-		t, SwitchExhaustivenessCheck, switchExhaustivenessFile, `
-declare const value: number;
-switch (value) {
-  case 0:
-    break;
-  // no default
-}
-`, SwitchExhaustivenessCheckOptions{RequireDefaultForNonUnion: type_checking.Ref(true)},
-	), "switchIsNotExhaustive")
+			var options SwitchExhaustivenessCheckOptions
+			if err := rule.UnmarshalOptions([]byte(testCase.options), &options); err != nil {
+				t.Fatalf("decoding %s: %v", testCase.options, err)
+			}
+			// The harness writes the file trimmed, so positions are in the trimmed text.
+			source := strings.TrimSpace(testCase.code) + "\n"
+			result := rule_testing.RunTypedWithOptions(t, SwitchExhaustivenessCheck, switchExhaustivenessFile, source, options)
+			var got []string
+			for _, diagnostic := range result.Diagnostics {
+				got = append(got, diagnostic.Message.Id+" "+source[diagnostic.Range.Pos():diagnostic.Range.End()])
+			}
+			if strings.Join(got, " | ") != strings.Join(testCase.want, " | ") {
+				t.Fatalf("reported %q, typescript-eslint reports %q", got, testCase.want)
+			}
+		})
+	}
 }
 
 // TestSwitchExhaustivenessCheckShipsNoRepairs pins the absence of fixes and suggestions.
@@ -1692,7 +1682,7 @@ func TestSwitchExhaustivenessCheckOptionsBindFromCamelCaseJson(t *testing.T) {
 		t.Fatalf("decoding the inert option: %v", err)
 	}
 	if patternOptions, _ := withPattern.(SwitchExhaustivenessCheckOptions); patternOptions.DefaultCaseCommentPattern == nil {
-		t.Fatal("defaultCaseCommentPattern did not bind; it is inert in the rule but must still decode")
+		t.Fatal("defaultCaseCommentPattern did not bind")
 	}
 }
 
@@ -1702,11 +1692,10 @@ func TestSwitchExhaustivenessCheckOptionsBindFromCamelCaseJson(t *testing.T) {
 // Nine of upstream's hundred and six cases are excluded, in two groups, and neither group is a
 // judgment of mine about what matters.
 //
-// SIX are upstream's own `Skip: true` cases, every one of them a `DefaultCaseCommentPattern` case
-// marked `TODO(port): add support for DefaultCaseCommentPattern`. Upstream does not run them
-// either, because the feature does not exist, so carrying them would mean asserting behavior no
-// implementation has. Their subject is covered instead by
-// TestSwitchExhaustivenessCheckIgnoresTheCommentPattern, which measures the inertness directly.
+// SIX are tsgolint's own `Skip: true` cases, every one of them a `DefaultCaseCommentPattern` case
+// marked `TODO(port): add support for DefaultCaseCommentPattern`. The feature exists here now
+// (#6esg2nx), and those six are carried, from typescript-eslint 8.71.0's test file and replayed
+// through its rule, in TestSwitchExhaustivenessCheckReadsTheDefaultCaseComment rather than here.
 //
 // THREE need `noUncheckedIndexedAccess`, which changes `x[0]` on a `string[]` from `string` to
 // `string | undefined` and is therefore the entire point of those cases. `rule_testing`'s tsconfig is a
