@@ -160,20 +160,40 @@ func TestAChainRefusesWhatOneFileWouldBeRefusedFor(t *testing.T) {
 	})
 }
 
-// TestALeftoverIsComparedWithTheResolvedOptions: old Prettier config agrees or disagrees with what the
-// Nexus tier resolves to, not with a block of its own.
-func TestALeftoverIsComparedWithTheResolvedOptions(t *testing.T) {
-	root := t.TempDir()
-	project(t, root, `{"tabWidth": 4, "printWidth": 120}`)
-
-	writeFile(t, filepath.Join(root, "package.json"), `{"name": "x", "prettier": {"tabWidth": 4, "printWidth": 120}}`)
-	if _, err := Resolve(root); err != nil {
-		t.Fatalf("a leftover agreeing with the Nexus tier was refused: %v", err)
+// TestALeftoverIsRefusedEvenWhenItAgrees: old Prettier config is refused whatever it says. Agreeing
+// with the Nexus tier today is no reason to keep a second statement of the options that nothing reads,
+// since nothing would notice the day it stopped agreeing. ahra's move was the last one the tolerance
+// served (#dv5ng7g).
+func TestALeftoverIsRefusedEvenWhenItAgrees(t *testing.T) {
+	for name, leftover := range map[string]struct{ file, contents string }{
+		"package.json, the house options":        {"package.json", `{"name": "x", "prettier": {"tabWidth": 4, "singleQuote": true, "printWidth": 120}}`},
+		"package.json, with the Tailwind plugin": {"package.json", `{"name": "x", "prettier": {"plugins": ["prettier-plugin-tailwindcss"], "tabWidth": 4, "singleQuote": true, "printWidth": 120, "tailwindFunctions": ["mergeClassNames"]}}`},
+		".prettierrc, the house options":         {".prettierrc", `{"tabWidth": 4, "singleQuote": true, "printWidth": 120}`},
+		"package.json, an empty prettier key":    {"package.json", `{"name": "x", "prettier": {}}`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			project(t, root, `{"tabWidth": 4, "singleQuote": true, "printWidth": 120}`)
+			writeFile(t, filepath.Join(root, leftover.file), leftover.contents)
+			resolution, err := Resolve(root)
+			if !errors.Is(err, ErrPrettierConfigRemains) {
+				t.Fatalf("a leftover %s resolved to %+v, %v; want it refused", leftover.file, resolution.Options, err)
+			}
+			if !strings.Contains(err.Error(), filepath.Join(root, leftover.file)) || !strings.Contains(err.Error(), "delete it") {
+				t.Fatalf("refusal %v does not name %s and say to delete it", err, leftover.file)
+			}
+		})
 	}
+}
 
-	writeFile(t, filepath.Join(root, "package.json"), `{"name": "x", "prettier": {"tabWidth": 4}}`)
-	if _, err := Resolve(root); !errors.Is(err, ErrPrettierConfigRemains) {
-		t.Fatalf("a leftover missing the Nexus tier's print width was not refused as disagreeing: %v", err)
+// TestALeftoverBelowTheSettingsIsRefused: the walk up refuses old config in every directory it passes,
+// not only beside the settings, so a package in a workspace cannot keep its own.
+func TestALeftoverBelowTheSettingsIsRefused(t *testing.T) {
+	root := t.TempDir()
+	project(t, root, houseBlock)
+	writeFile(t, filepath.Join(root, "packages", "inner", "package.json"), `{"name": "inner", "prettier": {"printWidth": 120}}`)
+	if _, err := Resolve(filepath.Join(root, "packages", "inner", "source")); !errors.Is(err, ErrPrettierConfigRemains) {
+		t.Fatalf("a leftover below the settings was not refused: %v", err)
 	}
 }
 
@@ -203,8 +223,8 @@ func TestResolveRefusesEveryOptionNobodyChose(t *testing.T) {
 		"plugin key in the block":    {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {"plugins": ["prettier-plugin-tailwindcss"]}}`}},
 		"crlf":                       {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {"endOfLine": "crlf"}}`}},
 		"settings without a format":  {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"rules": {}}`}},
-		"disagreeing package.json":   {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {"tabWidth": 4}}`, "package.json": `{"prettier": {"tabWidth": 2}}`}, leftover: true},
-		"disagreeing .prettierrc":    {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {"tabWidth": 4}}`, ".prettierrc": `{"printWidth": 100, "tabWidth": 4}`}, leftover: true},
+		"package.json":               {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {"tabWidth": 4}}`, "package.json": `{"prettier": {"tabWidth": 2}}`}, leftover: true},
+		".prettierrc":                {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {"tabWidth": 4}}`, ".prettierrc": `{"printWidth": 100, "tabWidth": 4}`}, leftover: true},
 		"old config and no settings": {files: map[string]string{"package.json": `{"prettier": {"tabWidth": 4}}`}, leftover: true},
 		"javascript config":          {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {}}`, "prettier.config.js": `module.exports = {}`}, leftover: true},
 	} {
@@ -250,26 +270,9 @@ func TestAPackageJSONWithoutPrettierIsNotALeftover(t *testing.T) {
 	}
 }
 
-// TestALeftoverThatAgreesIsTolerated: a repository mid-move keeps package.json's prettier block with
-// the same options as the Nexus tier plus the Tailwind plugin's keys. It keeps formatting, from the
-// Nexus tier, and the old copy is only compared. The tolerance goes with #dv5ng7g.
-func TestALeftoverThatAgreesIsTolerated(t *testing.T) {
-	root := t.TempDir()
-	project(t, root, `{"tabWidth": 4, "singleQuote": true, "printWidth": 120}`)
-	writeFile(t, filepath.Join(root, "package.json"), `{"name": "x", "prettier": {"plugins": ["prettier-plugin-tailwindcss"], "tabWidth": 4, "singleQuote": true, "printWidth": 120, "tailwindFunctions": ["mergeClassNames"]}}`)
-	resolution, err := Resolve(root)
-	if err != nil {
-		t.Fatalf("an agreeing leftover was refused: %v", err)
-	}
-	if resolution.Source != filepath.Join(root, SettingsFileName) || resolution.Options.PrintWidth != 120 {
-		t.Fatalf("resolved %+v from %s, want the Nexus tier's", resolution.Options, resolution.Source)
-	}
-}
-
 // TestTheHouseIgnoreListRidesInTheFormatBlock: the block's `ignore` is the house list, not a printing
 // option. It is read beside the options, declared only when written, and a value that is not a list of
-// patterns is refused naming the Nexus tier. Prettier config never had the key, so a leftover carrying
-// it cannot agree with anything.
+// patterns is refused naming the Nexus tier.
 func TestTheHouseIgnoreListRidesInTheFormatBlock(t *testing.T) {
 	declared := t.TempDir()
 	project(t, declared, `{"tabWidth": 4, "ignore": ["pnpm-lock.yaml", "*.sqlite"]}`)
@@ -293,12 +296,6 @@ func TestTheHouseIgnoreListRidesInTheFormatBlock(t *testing.T) {
 		t.Fatalf("an ignore that is not a list was accepted or not named: %v", err)
 	}
 
-	leftover := t.TempDir()
-	project(t, leftover, `{"tabWidth": 4}`)
-	writeFile(t, filepath.Join(leftover, ".prettierrc"), `{"tabWidth": 4, "ignore": ["x"]}`)
-	if _, err := Resolve(leftover); err == nil {
-		t.Fatal("a leftover Prettier config carrying \"ignore\" was tolerated")
-	}
 }
 
 // TestIgnorePatternsResolveWithTheOptions: the walk takes the chain's ignorePatterns from the same

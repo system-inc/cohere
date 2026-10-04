@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/system-inc/cohere/internal/lint/configuration"
 )
@@ -24,9 +23,9 @@ import (
  * `extends` chain as the lint loader does, and takes the block from the Nexus tier alone. It refuses
  * every case that would otherwise format with options nobody chose or chose in two places: a `format`
  * key in any other file of the chain, a chain without a Nexus tier, a Nexus tier without the block,
- * and Prettier config left behind in its old place. The only way to get Prettier's defaults is to
- * configure nothing anywhere, which is the honest meaning of a default. A refusal says which file and
- * why.
+ * and Prettier config left behind in its old place, whatever it says. The only way to get Prettier's
+ * defaults is to configure nothing anywhere, which is the honest meaning of a default. A refusal says
+ * which file and why.
  */
 
 // SettingsFileName is the file a repository's cohere configuration lives in.
@@ -109,39 +108,25 @@ func Resolve(directory string) (Resolution, error) {
 		return Resolution{}, err
 	}
 
-	// Old config is collected on the way up, in every directory up to and including the one whose
-	// settings win, and checked against the options once they are known.
-	var leftovers []leftoverConfig
+	// Old config is refused wherever the walk up meets it, up to and including the directory whose
+	// settings win: cohere never reads it, so keeping it is a second statement of the options that
+	// nothing checks.
 	for current := absolute; ; current = filepath.Dir(current) {
 		leftover, found, err := prettierConfigIn(current)
 		if err != nil {
 			return Resolution{}, err
 		}
 		if found {
-			leftovers = append(leftovers, leftover)
+			return Resolution{}, fmt.Errorf("%s: %w; delete it, since cohere formats with the format block in the Nexus tier (%s)",
+				leftover, ErrPrettierConfigRemains, NexusTierFileName)
 		}
 
 		path := filepath.Join(current, SettingsFileName)
 		if _, err := os.Stat(path); err == nil {
-			resolution, err := resolveChain(path)
-			if err != nil {
-				return Resolution{}, err
-			}
-			for _, leftover := range leftovers {
-				if err := leftover.agreesWith(resolution); err != nil {
-					return Resolution{}, err
-				}
-			}
-			return resolution, nil
+			return resolveChain(path)
 		}
 
 		if parent := filepath.Dir(current); parent == current {
-			// Old config with no settings above it means the options were never moved, and formatting
-			// with Prettier's defaults would silently be a different width than the repository chose.
-			if len(leftovers) > 0 {
-				return Resolution{}, fmt.Errorf("%s: %w and no %s with a \"format\" block is above it; move its options there",
-					leftovers[0].path, ErrPrettierConfigRemains, SettingsFileName)
-			}
 			return Resolution{Options: PrettierDefaults()}, nil
 		}
 	}
@@ -203,7 +188,7 @@ func resolveChain(path string) (Resolution, error) {
 	if block == nil {
 		return Resolution{}, fmt.Errorf("%s, the Nexus tier %s extends, has no \"format\" block, so the chain does not say how to format", nexusTier, path)
 	}
-	options, err := applyFormatBlock(nexusTier, block, PrettierDefaults(), false)
+	options, err := applyFormatBlock(nexusTier, block, PrettierDefaults())
 	if err != nil {
 		return Resolution{}, err
 	}
@@ -227,63 +212,26 @@ func resolveChain(path string) (Resolution, error) {
 	return resolution, nil
 }
 
-// leftoverConfig is Prettier config found where cohere no longer reads it.
-//
-// It is tolerated only while it agrees with the format block, key for key, so a repository mid-move
-// keeps formatting and nothing can drift: the old copy is never read for options, only compared. The
-// tolerance exists for ahra's move, which waits on its editor (#3w83j3k); once that lands, any leftover
-// is refused outright.
-type leftoverConfig struct {
-	path string
-
-	// raw is the options as JSON, or nil for a form cohere cannot read (a JavaScript config), which can
-	// never be shown to agree.
-	raw json.RawMessage
-}
-
-// agreesWith refuses the leftover unless its options decode to exactly the format block's.
-func (leftover leftoverConfig) agreesWith(resolution Resolution) error {
-	if leftover.raw == nil {
-		return fmt.Errorf("%s: %w in a form cohere cannot compare with %s; delete it",
-			leftover.path, ErrPrettierConfigRemains, resolution.Source)
-	}
-	old, err := applyFormatBlock(leftover.path, leftover.raw, PrettierDefaults(), true)
-	if err != nil {
-		return fmt.Errorf("%s: %w and cannot be read: %v", leftover.path, ErrPrettierConfigRemains, err)
-	}
-	if old != resolution.Options {
-		return fmt.Errorf("%s: %w and disagrees with %s (%+v against %+v); delete it, since cohere formats with the format block",
-			leftover.path, ErrPrettierConfigRemains, resolution.Source, old, resolution.Options)
-	}
-	return nil
-}
-
-// prettierConfigIn finds the Prettier config in a directory, if any.
-func prettierConfigIn(directory string) (leftoverConfig, bool, error) {
+// prettierConfigIn names the Prettier config in a directory, if any: a package.json carrying a
+// "prettier" key, or one of Prettier's config files.
+func prettierConfigIn(directory string) (string, bool, error) {
 	manifestPath := filepath.Join(directory, "package.json")
 	if contents, err := os.ReadFile(manifestPath); err == nil {
 		var manifest map[string]json.RawMessage
 		if err := json.Unmarshal(contents, &manifest); err != nil {
-			return leftoverConfig{}, false, fmt.Errorf("%s is not valid JSON: %w", manifestPath, err)
+			return "", false, fmt.Errorf("%s is not valid JSON: %w", manifestPath, err)
 		}
-		if value, present := manifest["prettier"]; present {
-			return leftoverConfig{path: manifestPath + " (its \"prettier\" key)", raw: value}, true, nil
+		if _, present := manifest["prettier"]; present {
+			return manifestPath + " (its \"prettier\" key)", true, nil
 		}
 	}
 	for _, candidate := range prettierConfigFiles {
 		path := filepath.Join(directory, candidate)
-		if _, err := os.Stat(path); err != nil {
-			continue
+		if _, err := os.Stat(path); err == nil {
+			return path, true, nil
 		}
-		leftover := leftoverConfig{path: path}
-		if candidate == ".prettierrc" || candidate == ".prettierrc.json" {
-			if contents, err := os.ReadFile(path); err == nil && json.Valid(contents) {
-				leftover.raw = contents
-			}
-		}
-		return leftover, true, nil
 	}
-	return leftoverConfig{}, false, nil
+	return "", false, nil
 }
 
 // BlockKey is one key the format block accepts. The table is the decoder itself, and the settings
@@ -327,10 +275,8 @@ func blockKeyNamed(name string) (BlockKey, bool) {
 }
 
 // applyFormatBlock decodes one format block over the options given, refusing any key it would have to
-// ignore. ignorePluginKeys lets a leftover Prettier config through with its Tailwind plugin settings
-// (plugins, tailwind*), which were never format options, so it can be compared with the format block;
-// a format block itself must not carry them.
-func applyFormatBlock(path string, raw json.RawMessage, over Options, ignorePluginKeys bool) (Options, error) {
+// ignore.
+func applyFormatBlock(path string, raw json.RawMessage, over Options) (Options, error) {
 	var block map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &block); err != nil {
 		return Options{}, fmt.Errorf("%s: the \"format\" block is not a JSON object: %w", path, err)
@@ -350,16 +296,10 @@ func applyFormatBlock(path string, raw json.RawMessage, over Options, ignorePlug
 		blockKey, known := blockKeyNamed(key)
 		if known && blockKey.Option == nil {
 			// The house ignore list rides in the format block but is no printing option: resolveChain
-			// reads it. Prettier config never had the key, so a leftover carrying it is refused.
-			if ignorePluginKeys {
-				return Options{}, fmt.Errorf("%s: format option %q is not one cohere applies; add it to Options rather than formatting without it", path, key)
-			}
+			// reads it.
 			continue
 		}
 		if !known {
-			if ignorePluginKeys && (key == "plugins" || strings.HasPrefix(key, "tailwind")) {
-				continue
-			}
 			return Options{}, fmt.Errorf("%s: format option %q is not one cohere applies; add it to Options rather than formatting without it", path, key)
 		}
 		if err := json.Unmarshal(value, blockKey.Option(options)); err != nil {
