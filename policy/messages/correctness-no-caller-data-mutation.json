@@ -5,6 +5,9 @@
   "messages": {
     "callerDataMutation": {
       "text": "This writes into data the caller passed in. The change reaches the caller, and nothing at the call site says it will: the call reads like it hands data over, and the caller's data comes back different. Return what changed and let the caller write it, or build a new value from the parameter."
+    },
+    "processStateWithoutReason": {
+      "text": "This `@processState` tag gives no reason. The tag exempts every write through a parameter of this type from nexus/correctness-no-caller-data-mutation, so it has to say why the type is state the process shares rather than data a caller hands over: `@processState <why>`. Until it does, it exempts nothing."
     }
   }
 }

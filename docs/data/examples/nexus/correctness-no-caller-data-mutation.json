@@ -19,6 +19,7 @@
         "source": "interface UsageInterface { inputTokens: number; outputTokens: number; dollars: number }\ninterface DiffInterface { path: string }\ninterface MessageInterface { createdAt: number; body: string }\ninterface EntryInterface { status: string; position: number; child?: EntryInterface }\ninterface HubInterface { watchersByPath: Map<string, number>; seen: Set<string>; debounceTimer: number | null }\ninterface RequestInterface { headers: Record<string, string> }\ninterface PanelInterface { canvas: CanvasContextInterface; label: string }\ndeclare function use(value: unknown): void;\nexport function truncate(diffs: DiffInterface[]): void {\n    diffs.length = 0;\n}\n"
     },
     "assertedMessageIds": [
-        "callerDataMutation"
+        "callerDataMutation",
+        "processStateWithoutReason"
     ]
 }

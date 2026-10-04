@@ -1,6 +1,8 @@
 package nexus
 
 import (
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
@@ -11,9 +13,14 @@ import (
 
 const correctnessNoCallerDataMutationId = "callerDataMutation"
 
-// correctnessNoCallerDataMutationText is the rule's message, whose wording lives in
-// `policy/messages/correctness-no-caller-data-mutation.json`.
-var correctnessNoCallerDataMutationText = policy.MessageOf("nexus/correctness-no-caller-data-mutation", correctnessNoCallerDataMutationId)
+// The rule's messages, whose wording lives in `policy/messages/correctness-no-caller-data-mutation.json`.
+var (
+	correctnessNoCallerDataMutationText             = policy.MessageOf("nexus/correctness-no-caller-data-mutation", correctnessNoCallerDataMutationId)
+	correctnessNoCallerDataMutationBareProcessState = policy.MessageOf("nexus/correctness-no-caller-data-mutation", "processStateWithoutReason")
+)
+
+// correctnessNoCallerDataMutationProcessStateTag declares a type as state the process shares.
+const correctnessNoCallerDataMutationProcessStateTag = "processState"
 
 func correctnessNoCallerDataMutationMessage() rule.Message {
 	return rule.Message{
@@ -87,6 +94,26 @@ func correctnessNoCallerDataMutationMessage() rule.Message {
 //   - A write through `this`, through a call's result, or through an `as` cast: the chain must reach the
 //     parameter by plain access.
 //   - A write whose target type is `any`: no declaration, and no receiver type to read.
+//   - A write through a parameter whose declared type is process state (below).
+//
+// # Process state: `@processState <why>`
+//
+// Some objects are not a caller's data but state the whole process shares: a long-lived hub on
+// `globalThis` that every helper is handed, an observer, a registry. Writing through one is what it is
+// for, and suppressing each write says the same sentence at every site. So a type can declare it once,
+// at its own declaration, with a doc tag and the reason:
+//
+//	/** The kingdom's live observer, one per process. @processState every helper updates its counters */
+//	export interface AhraOsObserverInterface { ... }
+//
+// A write through a parameter whose declared type is that type is then exempt. The match is exact:
+// the parameter's declared type, after alias resolution, is the tagged symbol itself (an interface,
+// a class, or a type alias). A union containing it, `Partial<Hub>`, `Readonly<Hub>`, `Hub[]`, and an
+// interface extending it are each a different type and are not exempt, so a tag cannot spread past the
+// one type that says it. An optional parameter is a union with `undefined` and is not exempt either.
+//
+// The reason is required. A bare `@processState` is reported where it is written, and it exempts
+// nothing, so a tag can never hide a write without saying why.
 //
 // # No fix
 //
@@ -107,7 +134,20 @@ var CorrectnessNoCallerDataMutation = rule.Rule{
 		if ctx.TypeChecker == nil {
 			return nil
 		}
+		reportBareTags := func(node *ast.Node) {
+			for _, tag := range correctnessNoCallerDataMutationProcessStateTags(ctx.SourceFile, node) {
+				if correctnessNoCallerDataMutationTagReason(ctx.SourceFile, tag) == "" {
+					ctx.ReportNode(tag, rule.Message{
+						Id:          correctnessNoCallerDataMutationBareProcessState.Id,
+						Description: correctnessNoCallerDataMutationBareProcessState.Render(nil),
+					})
+				}
+			}
+		}
 		return rule.Listeners{
+			ast.KindInterfaceDeclaration: reportBareTags,
+			ast.KindTypeAliasDeclaration: reportBareTags,
+			ast.KindClassDeclaration:     reportBareTags,
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
 				if !ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
@@ -172,10 +212,14 @@ func correctnessNoCallerDataMutationCheckTarget(ctx rule.Context, target *ast.No
 	if target.Kind != ast.KindPropertyAccessExpression && target.Kind != ast.KindElementAccessExpression {
 		return
 	}
-	if !correctnessNoCallerDataMutationReachesParameter(ctx, target) {
+	parameter := correctnessNoCallerDataMutationParameterReached(ctx, target)
+	if parameter == nil {
 		return
 	}
 	if !correctnessNoCallerDataMutationWritesData(ctx, target) {
+		return
+	}
+	if correctnessNoCallerDataMutationIsProcessState(ctx, parameter) {
 		return
 	}
 	ctx.ReportNode(target, correctnessNoCallerDataMutationMessage())
@@ -193,7 +237,8 @@ func correctnessNoCallerDataMutationCheckCall(ctx rule.Context, call *ast.Node) 
 		return
 	}
 	receiver := ast.SkipParentheses(access.Expression)
-	if !correctnessNoCallerDataMutationReachesParameter(ctx, receiver) {
+	parameter := correctnessNoCallerDataMutationParameterReached(ctx, receiver)
+	if parameter == nil {
 		return
 	}
 	if !correctnessNoCallerDataMutationIsWriter(ctx, method) {
@@ -203,12 +248,16 @@ func correctnessNoCallerDataMutationCheckCall(ctx rule.Context, call *ast.Node) 
 	if receiver.Kind != ast.KindIdentifier && !correctnessNoCallerDataMutationWritesData(ctx, receiver) {
 		return
 	}
+	if correctnessNoCallerDataMutationIsProcessState(ctx, parameter) {
+		return
+	}
 	ctx.ReportNode(callee, correctnessNoCallerDataMutationMessage())
 }
 
-// correctnessNoCallerDataMutationReachesParameter walks an access chain to its root and says whether
-// the root is a parameter this rule judges: not a callback's, and never reassigned.
-func correctnessNoCallerDataMutationReachesParameter(ctx rule.Context, expression *ast.Node) bool {
+// correctnessNoCallerDataMutationParameterReached walks an access chain to its root and returns the
+// root's symbol when it is a parameter this rule judges (not a callback's, and never reassigned), or
+// nil.
+func correctnessNoCallerDataMutationParameterReached(ctx rule.Context, expression *ast.Node) *ast.Symbol {
 	root := expression
 	for {
 		root = ast.SkipParentheses(root)
@@ -226,18 +275,21 @@ func correctnessNoCallerDataMutationReachesParameter(ctx rule.Context, expressio
 		break
 	}
 	if root.Kind != ast.KindIdentifier {
-		return false
+		return nil
 	}
 	symbol := ctx.TypeChecker.GetSymbolAtLocation(root)
 	parameter := correctnessNoCallerDataMutationParameterOf(ctx, symbol)
 	if parameter == nil {
-		return false
+		return nil
 	}
 	function := parameter.Parent
 	if function == nil || correctnessNoCallerDataMutationIsCallback(function) {
-		return false
+		return nil
 	}
-	return !correctnessNoCallerDataMutationIsReassigned(ctx, function, symbol)
+	if correctnessNoCallerDataMutationIsReassigned(ctx, function, symbol) {
+		return nil
+	}
+	return symbol
 }
 
 // correctnessNoCallerDataMutationParameterOf returns the parameter a symbol is declared by, directly or
@@ -387,4 +439,78 @@ func correctnessNoCallerDataMutationIsWriter(ctx rule.Context, name *ast.Node) b
 		}
 	}
 	return true
+}
+
+// correctnessNoCallerDataMutationIsProcessState says whether a parameter's declared type is a type
+// declared as process state: the type's own symbol, or the alias it was written through, carries a
+// `@processState` tag with a reason. Exact on purpose, so a union, a mapped or wrapped type, an array
+// and a subtype each fail it.
+func correctnessNoCallerDataMutationIsProcessState(ctx rule.Context, parameter *ast.Symbol) bool {
+	declared := checker.Checker_getTypeOfSymbol(ctx.TypeChecker, parameter)
+	if declared == nil {
+		return false
+	}
+	candidates := []*ast.Symbol{checker.Type_symbol(declared)}
+	if alias := checker.Type_alias(declared); alias != nil {
+		candidates = append(candidates, alias.Symbol())
+	}
+	for _, candidate := range candidates {
+		if candidate == nil {
+			continue
+		}
+		for _, declaration := range candidate.Declarations {
+			switch declaration.Kind {
+			case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration, ast.KindClassDeclaration:
+			default:
+				continue
+			}
+			file := ast.GetSourceFileOfNode(declaration)
+			for _, tag := range correctnessNoCallerDataMutationProcessStateTags(file, declaration) {
+				if correctnessNoCallerDataMutationTagReason(file, tag) != "" {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// correctnessNoCallerDataMutationProcessStateTags returns the `@processState` tags in a declaration's
+// doc comments.
+func correctnessNoCallerDataMutationProcessStateTags(file *ast.SourceFile, declaration *ast.Node) []*ast.Node {
+	if file == nil {
+		return nil
+	}
+	var tags []*ast.Node
+	for _, doc := range declaration.JSDoc(file) {
+		list := doc.AsJSDoc().Tags
+		if list == nil {
+			continue
+		}
+		for _, tag := range list.Nodes {
+			if tag.Kind != ast.KindJSDocUnknownTag {
+				continue
+			}
+			if name := tag.TagName(); name != nil && name.Text() == correctnessNoCallerDataMutationProcessStateTag {
+				tags = append(tags, tag)
+			}
+		}
+	}
+	return tags
+}
+
+// correctnessNoCallerDataMutationTagReason is the text a tag carries after its name, with the comment's
+// line-leading asterisks and the surrounding space removed. Empty for a bare tag.
+func correctnessNoCallerDataMutationTagReason(file *ast.SourceFile, tag *ast.Node) string {
+	text := file.Text()[tag.Pos():tag.End()]
+	_, reason, _ := strings.Cut(text, "@"+correctnessNoCallerDataMutationProcessStateTag)
+	reason = strings.TrimSuffix(strings.TrimSpace(reason), "*/")
+	var words []string
+	for _, line := range strings.Split(reason, "\n") {
+		line = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "*"))
+		if line != "" {
+			words = append(words, line)
+		}
+	}
+	return strings.Join(words, " ")
 }

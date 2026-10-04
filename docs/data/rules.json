@@ -6740,7 +6740,8 @@
             "category": "correctness",
             "typeAware": true,
             "messageIds": [
-                "callerDataMutation"
+                "callerDataMutation",
+                "processStateWithoutReason"
             ],
             "swift": {
                 "verdict": "Compiler"

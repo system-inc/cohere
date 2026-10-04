@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Recommendation** | **Kirk's call on the 144 ahra sites first** (below), then `error`. Registered off in ahra until then |
+| **Recommendation** | `error`. On at error in ahra since the 144 sites below were restructured or stated (`#0hredns`) |
 | Findings | **ahra 144** (measured 2026-10-03, cohere's real config plus this rule) |
 | Measured precision | 144 of 144 land in data a source file declares, reached through a parameter; none is a host object |
 | Plugin | cohere-native, `nexus` |
@@ -24,6 +24,27 @@ file declares is the caller's data. A property a declaration file declares (`lib
 declared property (an array element, an index-signature key) counts when the receiver is itself the
 caller's data and is an array, a tuple, a `Record`, `Partial`, `Required`, `Pick` or `Omit`, or a type a
 source file declares.
+
+## Process state: `@processState <why>`
+
+Some objects are not a caller's data but state the whole process shares: a long-lived hub every helper
+is handed, an observer, a registry. Writing through one is what it is for. Rather than a suppression at
+every write, the type says so once, at its own declaration, with a doc tag and the reason:
+
+```ts
+/** The kingdom's live hub, one per process. @processState every emit and watcher keeps it current in place */
+export interface KingdomLiveHubInterface { ... }
+```
+
+A write through a parameter whose declared type is that type is then exempt. The tag goes on an
+interface, a class or a type alias.
+
+- **The match is exact.** The parameter's declared type, after alias resolution, must be the tagged type
+  itself. A union containing it, `Partial<Hub>`, `Readonly<Hub>`, `Hub[]`, an interface extending it, and
+  an optional parameter (a union with `undefined`) are each a different type and still report, so a tag
+  never spreads past the one type that says it.
+- **The reason is required.** A bare `@processState` is reported where it is written
+  (`processStateWithoutReason`), and it exempts nothing.
 
 ## Where it came from
 
@@ -67,6 +88,12 @@ deliberate ones should be restructured (return the value, take a copy) and which
 suppression stating the out-parameter contract is Kirk's call.
 
 ## Verification
+
+Process state (`#dz42gce`): an interface, a class and a type alias tagged with a reason are exempt, through
+an assignment, an update and a collection call. A plain interface of the same shape, a union, `Partial`,
+`Readonly`, an array, an extending interface and an optional parameter each still report in the same file,
+and a bare tag reports and exempts nothing. Mutants killed: the exemption never applied, a bare tag never
+reported, a bare tag exempting.
 
 - Fixtures from the real site: `addUsage` as it stands (three writes fire) and fixed to return the sum
   (silent). 15 firing shapes and 20 silent ones, including a host type in a declaration file, the

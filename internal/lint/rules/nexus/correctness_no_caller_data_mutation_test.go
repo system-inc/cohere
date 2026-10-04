@@ -390,3 +390,67 @@ func TestCorrectnessNoCallerDataMutationStaysSilent(t *testing.T) {
 		})
 	}
 }
+
+// correctnessNoCallerDataMutationHubs declares process state three ways, an interface, a class and a
+// type alias, each with a reason, beside an untagged interface of the same shape and the near misses
+// the match must not reach.
+var correctnessNoCallerDataMutationHubs = strings.Join([]string{
+	"/**",
+	" * The live observer, one per process.",
+	" * @processState every helper updates its counters",
+	" */",
+	"interface ObserverInterface { count: number; names: string[] }",
+	"/** @processState the feed's one connection table */",
+	"class FeedHub { count = 0; names: string[] = [] }",
+	"/** @processState shared by every report */",
+	"type ReportHubType = { count: number; names: string[] };",
+	"interface PlainInterface { count: number; names: string[] }",
+	"interface ExtendedObserverInterface extends ObserverInterface { label: string }",
+	"",
+}, "\n")
+
+// A write through a parameter whose declared type is process state is exempt, through an interface, a
+// class and a type alias, and through a collection method as well as an assignment.
+func TestCorrectnessNoCallerDataMutationExemptsProcessState(t *testing.T) {
+	t.Parallel()
+
+	result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+		correctnessNoCallerDataMutationHubs,
+		"export function observe(observer: ObserverInterface) { observer.count += 1; observer.names.push('x'); }",
+		"export function feed(hub: FeedHub) { hub.count = 2; }",
+		"export function report(hub: ReportHubType) { hub.count++; }",
+	))
+	rule_testing.ExpectClean(t, result)
+}
+
+// The match is exact: only the tagged type itself. Each of these is a different type, so each write
+// reports, in the same file as the exempt ones (#dz42gce).
+func TestCorrectnessNoCallerDataMutationProcessStateIsExact(t *testing.T) {
+	t.Parallel()
+
+	result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+		correctnessNoCallerDataMutationHubs,
+		"export function plain(state: PlainInterface) { state.count = 1; }",
+		"export function union(state: ObserverInterface | PlainInterface) { state.count = 1; }",
+		"export function partial(state: Partial<ObserverInterface>) { state.count = 1; }",
+		"export function readonly(state: Readonly<ObserverInterface>) { state.names.push('x'); }",
+		"export function many(states: ObserverInterface[]) { states.push({ count: 0, names: [] }); }",
+		"export function extended(state: ExtendedObserverInterface) { state.count = 1; }",
+		"export function optional(state?: ObserverInterface) { if(state) { state.count = 1; } }",
+	))
+	correctnessNoCallerDataMutationExpect(t, result,
+		"state.count", "state.count", "state.count", "state.names.push", "states.push", "state.count", "state.count")
+}
+
+// A bare tag is reported where it is written, and it exempts nothing: the write through its type
+// still reports.
+func TestCorrectnessNoCallerDataMutationReportsABareProcessStateTag(t *testing.T) {
+	t.Parallel()
+
+	result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+		"/** The hub. @processState */",
+		"interface BareHubInterface { count: number }",
+		"export function touch(hub: BareHubInterface) { hub.count = 1; }",
+	))
+	rule_testing.ExpectFindings(t, result, "processStateWithoutReason", correctnessNoCallerDataMutationId)
+}
