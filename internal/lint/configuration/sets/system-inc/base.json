@@ -2,6 +2,7 @@
     "extends": "cohere:typescript",
     "ignorePatterns": ["**/wasm/photon/core/photon_rs_bg.js", "**/wasm/photon/core/photon_rs_bg.d.ts"],
     "departures": {
+        "no-restricted-globals": "Adds Buffer to the house list: our code runs on Cloudflare Workers, where @cloudflare/workers-types declares Buffer as any, and @nexus/source/encoding/ByteEncoding replaces it. Every other entry is cohere:typescript's.",
         "no-implicit-globals": "Base's tsconfig sets no moduleDetection, so a file with no import or export is a script whose top-level declarations are globals, and this rule is what stops them. It comes back out when Base adopts moduleDetection force (#tz23yx2, #rbvd7sv).",
         "@typescript-eslint/no-require-imports": "off for every .cjs: CommonJS has no import statement and import() is async, so require is the only module form a .cjs can use (#na0hgjz)",
         "@typescript-eslint/no-extraneous-class": "a decorated class is a registration, not a namespace: DI tokens and RPC and GraphQL services are empty by design (allowWithDecorator, ruled by @system_cohere in 17199, api b9d02dbc)",
