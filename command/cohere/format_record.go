@@ -371,6 +371,7 @@ func unformattedScope(engine formatEngine, record *formatRecord, root string) (f
 		return formatScope{
 			index:       map[string]struct{}{},
 			Description: fmt.Sprintf("nothing (could not enumerate the tree: %v)", err),
+			failure:     err,
 		}, nil
 	}
 

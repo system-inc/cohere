@@ -102,6 +102,10 @@ type phaseRecord struct {
 	Elapsed  time.Duration
 	Detail   string
 	Findings int
+
+	// Narrowed says which part of the phase ran when a flag narrowed it, printed beside the phase's time
+	// so a narrowed run cannot read as the whole phase. See narrow.
+	Narrowed string
 }
 
 // pipelineReport is what the whole run did, phase by phase.
@@ -180,6 +184,16 @@ func (r *pipelineReport) recordChecked(name phaseName, elapsed time.Duration, wo
 		Elapsed:  elapsed,
 		Findings: wouldChange,
 	})
+}
+
+// narrow notes that only part of an already recorded phase ran, such as the fix phase under
+// `--format-only`, which formats and proposes no fixes.
+func (r *pipelineReport) narrow(name phaseName, part string) {
+	for index := range r.records {
+		if r.records[index].Name == name {
+			r.records[index].Narrowed = part
+		}
+	}
 }
 
 // requested records which phases the caller actually asked for.
@@ -302,6 +316,14 @@ func (r *pipelineReport) checkedEveryRequestedPhase() bool {
 	return true
 }
 
+// narrowedNote is a record's narrowing in parentheses, or nothing for a whole phase.
+func narrowedNote(record phaseRecord) string {
+	if record.Narrowed == "" {
+		return ""
+	}
+	return " (" + record.Narrowed + ")"
+}
+
 // Write prints the phase line: which phases ran, which did not, and why.
 //
 // It prints on every run rather than only on failures. The whole argument of this project is that a
@@ -317,7 +339,7 @@ func (r *pipelineReport) Write(out io.Writer) {
 			}
 			switch record.Outcome {
 			case outcomeRan:
-				parts = append(parts, fmt.Sprintf("%s ran in %s", record.Name, round(record.Elapsed)))
+				parts = append(parts, fmt.Sprintf("%s ran in %s%s", record.Name, round(record.Elapsed), narrowedNote(record)))
 			case outcomeSkipped:
 				parts = append(parts, fmt.Sprintf("%s skipped (%s)", record.Name, record.Detail))
 			case outcomeNotReached:
@@ -329,8 +351,8 @@ func (r *pipelineReport) Write(out io.Writer) {
 			case outcomeChecked:
 				// The count rides on the phase, zero included, so a clean `--no-fix` run states that it
 				// looked and found nothing to change rather than leaving that to be inferred.
-				parts = append(parts, fmt.Sprintf("%s checked in %s, %d file%s would change",
-					record.Name, round(record.Elapsed), record.Findings, plural(record.Findings)))
+				parts = append(parts, fmt.Sprintf("%s checked in %s%s, %d file%s would change",
+					record.Name, round(record.Elapsed), narrowedNote(record), record.Findings, plural(record.Findings)))
 			}
 		}
 	}

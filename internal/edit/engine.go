@@ -557,6 +557,22 @@ type Summary struct {
 	// Checked is set when the run computed what it would write and wrote nothing, so the summary line
 	// says "would be rewritten" rather than claiming a rewrite that never happened.
 	Checked bool
+
+	// NotTransformed names every file the transform declined or failed on, with its reason, sorted by
+	// name. The counts above say how many; a caller whose verdict is the transform alone needs to know
+	// which, since a file the formatter could not read is a file nobody checked.
+	NotTransformed []NotTransformedFile
+}
+
+// NotTransformedFile is one file the whole-text transform left as it was without having shaped it.
+type NotTransformedFile struct {
+	FileName string
+
+	// Reason is the transform's own words for a skip, or the failure it reported.
+	Reason string
+
+	// Failed is a transform that broke rather than declined.
+	Failed bool
 }
 
 // ChangedFile is one file a run rewrote, or under `--no-fix` would rewrite, and what rewrote it.
@@ -594,6 +610,7 @@ func Summarize(results []FileResult) Summary {
 		if result.TransformSkipped {
 			summary.FilesTransformSkipped++
 			summary.TransformSkipReasons[result.TransformSkipReason]++
+			summary.NotTransformed = append(summary.NotTransformed, NotTransformedFile{FileName: result.FileName, Reason: result.TransformSkipReason})
 		}
 		summary.FixesApplied += len(result.Applied)
 		summary.FixesRefused += len(result.Rejected)
@@ -620,8 +637,14 @@ func Summarize(results []FileResult) Summary {
 				summary.FilesRefused = append(summary.FilesRefused, result.FileName)
 				refusedHere = true
 			}
+			if rejection.Proposal.RuleName == transformRuleName {
+				summary.NotTransformed = append(summary.NotTransformed, NotTransformedFile{FileName: result.FileName, Reason: rejection.Reason, Failed: true})
+			}
 		}
 	}
+	sort.SliceStable(summary.NotTransformed, func(first, second int) bool {
+		return summary.NotTransformed[first].FileName < summary.NotTransformed[second].FileName
+	})
 
 	sort.Strings(summary.FilesNotConverged)
 	sort.Strings(summary.FilesRefused)

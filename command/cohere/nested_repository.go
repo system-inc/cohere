@@ -66,11 +66,13 @@ func unwritableRepository(repositoryRoot string, fileName string) string {
 	return ""
 }
 
-// nestedDrift is one file in a nested repository that the repository's own run would rewrite.
+// nestedDrift is one file in a nested repository that the repository's own run would rewrite, or, in
+// Unchecked, one it could not read, with Reason saying why.
 type nestedDrift struct {
 	// Repository is the nested repository's root, relative to the project.
 	Repository string
 	FileName   string
+	Reason     string
 }
 
 // nestedDriftCheck is what reading the nested repositories found.
@@ -80,6 +82,10 @@ type nestedDriftCheck struct {
 	// Repositories and Files are what was read, so a check that found nothing still says it looked.
 	Repositories int
 	Files        int
+
+	// Unchecked is each nested file the formatter was asked about and could not read, such as one that does
+	// not parse, so it was neither found to drift nor found clean.
+	Unchecked []nestedDrift
 
 	// Checked is how many of those files went through the formatter: under `--format-all` every one, and
 	// otherwise the ones not on their repository's record as formatted at their current bytes. The rest
@@ -172,6 +178,9 @@ func checkNestedRepositories(engine formatEngine, root string, formatAll bool) (
 			if outcome.drifted {
 				check.Drift = append(check.Drift, nestedDrift{Repository: relative, FileName: unformatted[index]})
 			}
+			if outcome.unchecked != "" {
+				check.Unchecked = append(check.Unchecked, nestedDrift{Repository: relative, FileName: unformatted[index], Reason: outcome.unchecked})
+			}
 		}
 
 		// Not writing it costs the next check a format of files already formatted, never a skip.
@@ -182,6 +191,9 @@ func checkNestedRepositories(engine formatEngine, root string, formatAll bool) (
 
 	sort.Slice(check.Drift, func(first, second int) bool {
 		return check.Drift[first].FileName < check.Drift[second].FileName
+	})
+	sort.Slice(check.Unchecked, func(first, second int) bool {
+		return check.Unchecked[first].FileName < check.Unchecked[second].FileName
 	})
 	return check, nil
 }
@@ -210,6 +222,10 @@ func startNestedCheck(engine formatEngine, root string, formatAll bool) <-chan n
 type nestedOutcome struct {
 	drifted bool
 	err     error
+
+	// unchecked is why the formatter declined the file, which for a file the walk offered it means the file
+	// could not be read as its language (see unparseableSkipReason).
+	unchecked string
 }
 
 // formatNestedFiles asks the formatter about each file at once, through as many workers as the fix
@@ -237,6 +253,7 @@ func formatNestedFiles(transform edit.Transform, fileNames []string) []nestedOut
 				formatted, err := transform(fileNames[index], string(contents))
 				switch {
 				case errors.Is(err, edit.ErrSkipped):
+					outcomes[index] = nestedOutcome{unchecked: strings.TrimPrefix(err.Error(), edit.ErrSkipped.Error()+": ")}
 				case err != nil:
 					outcomes[index] = nestedOutcome{err: err}
 				default:
@@ -273,13 +290,17 @@ func nestedSummary(check nestedDriftCheck) string {
 	onRecord := check.Files - check.Checked
 	switch {
 	case check.Checked == 0 && onRecord > 0:
-		return line + fmt.Sprintf("none checked by the formatter, all %d taken on their record's word as formatted at their current bytes", onRecord)
+		line += fmt.Sprintf("none checked by the formatter, all %d taken on their record's word as formatted at their current bytes", onRecord)
 	case onRecord == 0:
-		return line + fmt.Sprintf("%d checked by the formatter, %d would change under their own run", check.Checked, len(check.Drift))
+		line += fmt.Sprintf("%d checked by the formatter, %d would change under their own run", check.Checked, len(check.Drift))
 	default:
-		return line + fmt.Sprintf("%d checked by the formatter, %d would change under their own run; %d taken on their record's word as formatted at their current bytes",
+		line += fmt.Sprintf("%d checked by the formatter, %d would change under their own run; %d taken on their record's word as formatted at their current bytes",
 			check.Checked, len(check.Drift), onRecord)
 	}
+	if len(check.Unchecked) > 0 {
+		line += fmt.Sprintf("; %d the formatter could not read", len(check.Unchecked))
+	}
+	return line
 }
 
 // printNestedDrift reports each drifted file as a finding, in the shape every other finding prints,

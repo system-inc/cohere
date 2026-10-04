@@ -84,6 +84,12 @@ func run() error {
 		"mutate no source in the checked project: report what would change without writing a byte of it "+
 			"(cohere still keeps its own cache in the project's .cache/cohere, unless --no-cache)")
 	formatAll := flag.Bool("format-all", false, "format every file, not only the ones not on record as formatted (implies --format)")
+	// The fix phase narrowed to formatting, the way --types and --lint narrow the run to theirs, for a gate
+	// whose question is formatting alone: a lint finding has no say in its exit.
+	formatOnly := flag.Bool("format-only", false,
+		"format only, proposing no fixes and running no other phase (implies --format); with --no-fix, the commit gate's "+
+			"format check: every file formatting would change here or in a nested repository is a finding, and so is "+
+			"one the formatter could not read, and the exit is 0 only when there are none")
 	// A cold run on purpose: for measuring one, and for anyone who suspects a cache. Every cache cohere
 	// keeps for a project is named here, so a cold number cannot be read as a warm one: the cache table
 	// (the run replay, the per-file findings, the signatures, the format record) and the tsconfig's
@@ -300,8 +306,8 @@ func run() error {
 	// A bare `cohere` runs the whole pipeline. The phase flags isolate one phase for someone
 	// debugging it; they are not the default path, and nothing about running the tool with no
 	// arguments should be a partial check.
-	anyPhaseNamed := *typesOnly || *lintOnly || *fixOnly
-	runFix := *fixOnly || !anyPhaseNamed
+	anyPhaseNamed := *typesOnly || *lintOnly || *fixOnly || *formatOnly
+	runFix := *fixOnly || *formatOnly || !anyPhaseNamed
 	runTypes := *typesOnly || !anyPhaseNamed
 	runLint := *lintOnly || !anyPhaseNamed
 
@@ -334,6 +340,26 @@ func run() error {
 			return fmt.Errorf("--explain and --fix contradict each other: --explain reads the file as it stands and writes nothing, --fix only writes")
 		}
 		*noFix = true
+	}
+
+	// `--format-only` is formatting and nothing else, so naming it beside a flag that asks for other work
+	// is a contradiction, refused by name like `--fix --no-fix` rather than resolved one way silently.
+	if *formatOnly {
+		for _, other := range []struct {
+			named bool
+			flag  string
+			asks  string
+		}{
+			{*fixOnly, "--fix", "applies lint fixes"},
+			{*typesOnly, "--types", "runs the type check"},
+			{*lintOnly, "--lint", "runs the lint rules"},
+			{runUnused, "--unused", "runs the unused-code report"},
+			{*explainFile != "", "--explain", "explains what the rules did"},
+		} {
+			if other.named {
+				return fmt.Errorf("--format-only and %s contradict each other: --format-only runs formatting alone, and %s %s", other.flag, other.flag, other.asks)
+			}
+		}
 	}
 
 	// `--no-fix` mutates nothing, which is what continuous integration needs and what anyone asking
@@ -513,7 +539,8 @@ func run() error {
 	// is why one nil check covers them.
 	var reusableWalk *program.Result
 
-	if runFix || runLint {
+	// `--format-only` proposes no fixes, so it reads no rules and its verdict cannot hang on their config.
+	if (runFix && !*formatOnly) || runLint {
 		loaded, err := configureLint(graph, location)
 		if err != nil {
 			return err
@@ -550,7 +577,7 @@ func run() error {
 		// `--format-all` asks for formatting by naming its scope, so it turns the formatter on. Alone it
 		// used to configure none: `cohere --format-all` formatted nothing, and `cohere --no-fix
 		// --format-all` checked nothing, each printing a clean run.
-		formatter, err := configuredFormatter(*format || *formatAll)
+		formatter, err := configuredFormatter(*format || *formatAll || *formatOnly)
 		if err != nil {
 			return err
 		}
@@ -627,7 +654,7 @@ func run() error {
 			if enumerateError != nil {
 				// A failed walk withholds formatting and says why, rather than falling back to a universe
 				// that would format the wrong set. Fixing still runs.
-				scope = formatScope{Description: fmt.Sprintf("nothing (could not enumerate the tree: %v)", enumerateError)}
+				scope = formatScope{Description: fmt.Sprintf("nothing (could not enumerate the tree: %v)", enumerateError), failure: enumerateError}
 			} else {
 				scope = scope.narrowToEnumeration(enumeration)
 			}
@@ -654,9 +681,16 @@ func run() error {
 			nestedCheck = startNestedCheck(formatter, repositoryRoot, *formatAll)
 		}
 
+		// `--format-only` asks no rule for a fix: no program files to walk, no rules to walk them with, so the
+		// fix phase's candidates are the format scope's and nothing else.
+		fixFiles, fixRules := projectFiles, registry.All()
+		if *formatOnly {
+			fixFiles, fixRules = nil, nil
+		}
+
 		fixStart := time.Now()
 		fixSummary, fixWalk, err := applyProposedFixes(
-			ctx, graph, projectFiles, registry.All(),
+			ctx, graph, fixFiles, fixRules,
 			scopedTransform(record.observe(formatTransform(formatter), optionsFingerprintOf(formatter)), scope),
 			scope.formatCandidates(),
 			writeScope,
@@ -695,6 +729,15 @@ func run() error {
 		// formatted", and a reader cannot tell which one they got from a number alone. It describes the run
 		// that drew the scope, record included, so a replay says which run that was.
 		fmt.Fprintf(provenanceOutput(os.Stdout), "format scope: %s\n", scope.Description)
+
+		// A run whose verdict is formatting alone counts every file it could not read: an empty scope from
+		// a failed walk, or a file the formatter declined because it does not parse, or broke on, would
+		// otherwise read as a clean tree. Other runs leave those to the phases that report them.
+		if *formatOnly {
+			unchecked := formatOnlyUnchecked(fixSummary, scope)
+			printUnchecked(os.Stdout, unchecked)
+			findings += len(unchecked)
+		}
 		if mutate {
 			report.record(phaseFix, outcomeRan, fixDuration, "")
 		} else {
@@ -721,9 +764,16 @@ func run() error {
 				}
 				printNestedDrift(os.Stdout, nested)
 				findings += len(nested.Drift)
+				if *formatOnly {
+					printUnchecked(os.Stdout, nestedUnchecked(nested))
+					findings += len(nested.Unchecked)
+				}
 				fmt.Fprintln(provenanceOutput(os.Stdout), nestedSummary(nested))
 			}
 			report.recordChecked(phaseFix, fixDuration, len(fixSummary.ChangedFiles))
+		}
+		if *formatOnly {
+			report.narrow(phaseFix, "formatting only, no fixes proposed")
 		}
 
 		// Files were rewritten, so the graph built from the old bytes no longer describes the tree.

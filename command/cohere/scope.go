@@ -54,6 +54,10 @@ type formatScope struct {
 	// file hands the transform text the record never saw, so it is formatted after all: the record
 	// proves the bytes it hashed, not whatever a fixer makes of them.
 	recorded func(fileName string, text string) bool
+
+	// failure is why the scope holds nothing when the walk that should have drawn it failed. A run whose
+	// verdict is formatting alone must not read that empty scope as a clean tree.
+	failure error
 }
 
 // narrowTo reports how many of the scope's files are in a given population, and re-describes the

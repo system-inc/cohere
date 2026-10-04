@@ -107,7 +107,7 @@ func formatTransform(engine formatEngine) edit.Transform {
 				// complaint from the formatter adds noise rather than information. Only on the first
 				// pass, though: the formatter's own output failing to parse is the formatter breaking.
 				if pass == 1 && isUnparseable(err) {
-					return "", fmt.Errorf("%w: the file does not parse, so there is nothing to format", edit.ErrSkipped)
+					return "", fmt.Errorf("%w: %s", edit.ErrSkipped, unparseableSkipReason)
 				}
 				return "", err
 			}
@@ -123,6 +123,11 @@ func formatTransform(engine formatEngine) edit.Transform {
 		return "", fmt.Errorf("%s is not idempotent under the formatter: pass %d still changed it", fileName, formatPassLimit)
 	}
 }
+
+// unparseableSkipReason is the skip a file that does not parse gets. A run whose verdict is formatting
+// alone counts it as a file it could not check (see formatOnlyUnchecked), where every other skip is a file
+// the formatter was never asked about.
+const unparseableSkipReason = "the file does not parse, so there is nothing to format"
 
 // formatPassLimit bounds how many times one file is formatted while its text keeps changing. Every
 // non-idempotent input measured on ahra settled on the second pass, so a third that still changes

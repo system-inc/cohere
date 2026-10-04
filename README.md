@@ -111,6 +111,7 @@ root unless you name another).
 | `--no-fix` | write nothing to your source; report what would change |
 | `--format` | format the files not on record as formatted, or the paths you name; with `--no-fix`, report them |
 | `--format-all` | format every file, not only the ones not already on record as formatted (implies `--format`) |
+| `--format-only` | format only, proposing no fixes and running no other phase (implies `--format`); with `--no-fix`, the commit gate's format check (see [Before you commit](#before-you-commit)) |
 | `--lint` | run the lint rules only, reporting what they find without fixing it, and without TypeScript's diagnostics |
 | `--types` | report TypeScript's diagnostics only, running no rules and fixing nothing |
 | `--unused` | report code that is never used: unreferenced exports and unreachable statements |
@@ -141,6 +142,24 @@ root unless you name another).
 | `2` | the command line was wrong, such as an unknown flag |
 
 `1` covers both findings and failures, so in CI the output says which one it was.
+
+## Before you commit
+
+```sh
+cohere --no-fix --format-only --format-all
+```
+
+This is the commit gate's format check, and its exit code answers one question: would formatting change
+any file, in this repository or in the nested repositories (declared submodules) it reads? It runs no
+fixes, no type check and no lint, so a lint finding has no say in it.
+
+- `0`: no file would change, here or in any nested repository.
+- nonzero: each file that would change is a finding, a nested one naming its repository. So is each file
+  the formatter could not read, such as one that does not parse, and a format walk that failed. A run that
+  could not check a file never exits `0`.
+
+Drop `--format-all` to check only the files not on record as formatted at their current bytes, or name
+paths to check only those. Without `--no-fix`, `cohere --format-only` formats and writes nothing else.
 
 ## Caching
 
