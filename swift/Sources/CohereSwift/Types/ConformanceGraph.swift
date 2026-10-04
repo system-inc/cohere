@@ -1,7 +1,8 @@
 /*
  What a type conforms to and inherits from, followed to the end through the index's base-of relations: the
- question `unused-declaration` asks before it reports a stored property, since a conformance that reaches
- `Encodable` or `Decodable` reads every stored property whether or not the program names it.
+ question `unused-declaration` asks before it reports what only synthesis reads. A conformance that reaches
+ `Encodable` or `Decodable` reads every stored property and the coding keys, and one that reaches `Equatable`
+ compares every stored property, whether or not the program names any of them.
 
  The index records an inheritance clause as a reference to each protocol or superclass, related base-of to the
  type, protocol or extension that names it. `Codable` arrives as two implicit references, to `Encodable`
@@ -18,8 +19,8 @@
  */
 struct ConformanceGraph {
     enum Reach: Equatable {
-        /* Some path reaches `Encodable` or `Decodable`. */
-        case codable
+        /* Some path reaches one of the protocols asked about. */
+        case reached
         /* No path does, but some path reaches something the index cannot see into. */
         case unseen
         case clear
@@ -27,11 +28,15 @@ struct ConformanceGraph {
 
     static let encodable = "s:SE"
     static let decodable = "s:Se"
+    static let codable: Set<String> = [encodable, decodable]
+    /* `Equatable`, and `Hashable` and `Comparable`, which refine it: named here so no standard library record has to be read to see it. */
+    static let equatable: Set<String> = ["s:SQ", "s:SH", "s:SL"]
 
     /* What each type, protocol or extension names in its inheritance clause. */
     private var parents: [String: Set<String>] = [:]
-    /* Each extension of a type, by the type. */
+    /* Each extension of a type, by the type, and the type each extension extends. */
     private var extensions: [String: Set<String>] = [:]
+    private var extended: [String: String] = [:]
     /* The kind of every symbol a record read so far declares. */
     private var kinds: [String: Int32] = [:]
     /* Each imported Swift module's records, read on first need, and the modules it imports. */
@@ -69,21 +74,26 @@ struct ConformanceGraph {
                 }
                 if relation.roles & IndexStore.extendedByRole != 0 {
                     extensions[occurrence.symbol, default: []].insert(relation.symbol)
+                    extended[relation.symbol] = occurrence.symbol
                 }
             }
         }
     }
 
-    /* Where the type's conformances and superclasses lead, its extensions' included. */
-    mutating func reach(of type: String) -> Reach {
+    /*
+     Whether the type's conformances and superclasses, its extensions' included, lead to one of `targets`. Given an
+     extension, it asks about the type the extension extends, since a member declared there belongs to that type.
+     */
+    mutating func reach(of type: String, toward targets: Set<String> = Self.codable) -> Reach {
+        let type = extended[type] ?? type
         var visited: Set<String> = [type]
         var queue = [type]
         var unseen = false
         while let node = queue.popLast() {
             let named = (parents[node] ?? []).union((extensions[node] ?? []).flatMap { parents[$0] ?? [] })
             for parent in named where visited.insert(parent).inserted {
-                if parent == Self.encodable || parent == Self.decodable {
-                    return .codable
+                if targets.contains(parent) {
+                    return .reached
                 }
                 switch kind(of: parent) {
                     case IndexStore.protocolKind, IndexStore.classKind:

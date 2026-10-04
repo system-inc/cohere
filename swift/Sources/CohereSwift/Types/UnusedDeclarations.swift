@@ -23,12 +23,17 @@ import SwiftSyntax
  list: protocol witnesses and overrides; anything the Objective-C runtime reaches (`@objc`, `@IBAction`,
  `@IBOutlet`, `@NSManaged`, `dynamic`); entry points and previews; members the compiler calls by name
  (a property wrapper's `wrappedValue`, a result builder's `build` methods, `callAsFunction`, dynamic member
- lookup); a declaration carrying an attribute that may register it, a macro such as `@Test`; Codable's coding
- keys. Some are left alone because removing them changes what the program does without breaking the build:
- an initializer, which may exist to keep a type from being built; a stored property of a type whose
- conformances reach `Encodable` or `Decodable` (`ConformanceGraph`, through protocols of ours and extensions
- anywhere in the module), or reach what the index cannot see into, a C or Objective-C type or a protocol with no
- record; a stored property of a type a macro may expand; an instance's stored property whose initializer runs
+ lookup); a declaration carrying an attribute that may register it, a macro such as `@Test`. Some are left
+ alone because removing them changes what the program does without breaking the build: an initializer, which
+ may exist to keep a type from being built; a stored property of a type whose conformances reach `Encodable` or
+ `Decodable` (`ConformanceGraph`, through protocols of ours and extensions anywhere in the module), or reach what
+ the index cannot see into, a C or Objective-C type or a protocol with no record; the coding keys such a type's
+ synthesized conformance reads by name, `CodingKeys` and, for an enum case with associated values, the case's
+ own `<Case>CodingKeys`, which name its labels on the wire (macos's `FetchHistoryCodingKeys` keeps
+ `maximumBytes` as `maxBytes`: removed, the wire key changed and the build stayed green); a stored property of a
+ type whose conformances reach `Equatable` (`Hashable` and `Comparable` refine it), which synthesized `==` and
+ `hash(into:)` compare, so removing one nothing names makes two values that differed by it equal; a stored
+ property of a type a macro may expand; an instance's stored property whose initializer runs
  code, which may be held for what it does or keeps alive (a subscription, an observer token); a field of a
  struct made only of numbers and SIMD vectors, whose bytes a shader or C may read whole, so an unread field is
  padding that holds the layout (found on Presence, where LockerBloom's `unused: Int32` pads the constants its
@@ -67,10 +72,13 @@ struct UnusedDeclarations {
     static let registered = "an attribute that may register it, a macro such as @Test"
     static let compilerCalled =
         "called by the compiler by name: a property wrapper's or result builder's members, callAsFunction, dynamic member lookup"
-    static let codingKeys = "Codable's coding keys, read by the synthesized conformance"
+    static let codingKeys =
+        "coding keys (CodingKeys, or a case's <Case>CodingKeys) of a type whose conformances reach Encodable or Decodable, read by the synthesized conformance"
     static let initializer = "an initializer, which may exist to keep its type from being built another way"
     static let reflectedStorage =
         "a stored property of a type whose conformances reach Encodable or Decodable, which read every stored property"
+    static let synthesizedEquality =
+        "a stored property of a type whose conformances reach Equatable or Hashable, which synthesized == and hash(into:) compare"
     static let unseenConformance =
         "a stored property of a type that conforms to or inherits from what the index cannot see into (a C or Objective-C type, a type alias, a protocol with no record)"
     static let lifetime =
@@ -275,6 +283,11 @@ struct UnusedDeclarations {
             /* The type holding it, by the index's child-of relation, and what that type descends from. */
             let holder = definition.relations.first { $0.roles & IndexStore.childOfRole != 0 }?.symbol
             let holderAncestors = holder.map { graph.ancestors(of: $0) } ?? []
+            /* Coding keys are read by the synthesized conformance, so they are used wherever one may be synthesized: only a holder that clearly is not Codable leaves them to the references. */
+            if candidate.isCodingKeys, (holder.map { graph.reach(of: $0) } ?? .unseen) != .clear {
+                result.skipped[Self.codingKeys, default: 0] += 1
+                continue
+            }
             if candidate.isType, graph.ancestors(of: definition.symbol).contains(where: { $0.hasPrefix("c:objc(cs)") })
             {
                 result.skipped[Self.objectiveCClass, default: 0] += 1
@@ -289,13 +302,17 @@ struct UnusedDeclarations {
             if candidate.isInstanceStorage {
                 /* What the holding type's conformances reach decides whether a conformance reads it. */
                 switch holder.map({ graph.reach(of: $0) }) ?? .unseen {
-                    case .codable:
+                    case .reached:
                         result.skipped[Self.reflectedStorage, default: 0] += 1
                         continue
                     case .unseen:
                         result.skipped[Self.unseenConformance, default: 0] += 1
                         continue
                     case .clear:
+                        if let holder, graph.reach(of: holder, toward: ConformanceGraph.equatable) == .reached {
+                            result.skipped[Self.synthesizedEquality, default: 0] += 1
+                            continue
+                        }
                         if holderAncestors.contains(where: {
                             ["SwiftUI", "SwiftUICore"].contains(ConformanceGraph.swiftModule(of: $0) ?? "")
                         }) {
@@ -415,6 +432,8 @@ struct UnusedDeclarations {
         /* A property with an attribute, whose projection (`$name`) and storage (`_name`) are its uses too. */
         var isWrapped = false
         var isOverride = false
+        /* `CodingKeys`, or the `<Case>CodingKeys` of one of its enum's cases: used when its type's conformances reach Codable. */
+        var isCodingKeys = false
         /* An instance's stored property, which a conformance of its type may read whole. */
         var isInstanceStorage = false
         /* Why the stored property is never reported if no conformance reads it: what its initializer keeps alive, or a layout. */
@@ -449,6 +468,8 @@ struct UnusedDeclarations {
         private var fileScopedTypes: [String: Bool] = [:]
         /* What each type conforms to or inherits from, by qualified name: its declaration's clause and every extension's in the file. */
         private var conformances: [String: Set<String>] = [:]
+        /* The keys synthesized Codable reads for each enum case with associated values, by the enum's qualified name: `case fetchHistory(...)` reads `FetchHistoryCodingKeys`. */
+        private var perCaseKeys: [String: Set<String>] = [:]
 
         init(tree: SourceFileSyntax) {
             self.tree = tree
@@ -489,6 +510,11 @@ struct UnusedDeclarations {
             fileScopedTypes[name] = (fileScopedTypes[name] ?? true) && scoped
             conformances[name, default: []].formUnion(Self.inherited(group.inheritanceClause))
             for member in group.memberBlock.members {
+                if let cases = member.decl.as(EnumCaseDeclSyntax.self) {
+                    for element in cases.elements where element.parameterClause != nil {
+                        perCaseKeys[name, default: []].insert(Self.perCaseKeysName(of: element.name.text))
+                    }
+                }
                 survey(member.decl, enclosing: name, fileScoped: scoped)
             }
         }
@@ -547,9 +573,7 @@ struct UnusedDeclarations {
                     else if !attributes.subtracting(Self.knownAttributes).isEmpty {
                         exemption = UnusedDeclarations.registered
                     }
-                    else if named.name.text == "CodingKeys" {
-                        exemption = UnusedDeclarations.codingKeys
-                    }
+                    let keysName = named.name.text
                     candidates.append(
                         Candidate(
                             node: Syntax(declaration),
@@ -558,6 +582,8 @@ struct UnusedDeclarations {
                             exemption: exemption,
                             reach: reach,
                             isType: true,
+                            isCodingKeys: keysName == "CodingKeys"
+                                || scope.typeName.map { perCaseKeys[$0]?.contains(keysName) == true } == true,
                         )
                     )
                 }
@@ -735,6 +761,11 @@ struct UnusedDeclarations {
                     )
                 )
             }
+        }
+
+        /* The keys enum Swift's synthesized Codable reads for a case with associated values: the case's name, first letter capitalized, then `CodingKeys`. */
+        static func perCaseKeysName(of caseName: String) -> String {
+            caseName.prefix(1).uppercased() + caseName.dropFirst() + "CodingKeys"
         }
 
         /* `private` or `fileprivate` on the declaration itself, and not on its setter alone (`private(set)`). */

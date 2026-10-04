@@ -13,8 +13,9 @@ import Testing
  properties the synthesized conformance reads; an instance property that holds an observer token beside one
  that holds a plain value; a struct of plain numbers whose padding is never named; stored properties of types
  whose conformances reach Codable through a protocol of ours, a type alias or an extension in another file, of
- a type inheriting from NSObject, and of a Hashable type, the one that is reported; a protocol witness; an
- `@objc` method; a file with `#if`; an internal function nothing calls; and, judged across the package, public
+ a type inheriting from NSObject, of a Hashable type, whose synthesized hash reads them, and of its twin with
+ no Hashable, the one that is reported; the per-case coding keys of a Codable enum, declared in it and in an
+ extension, and of the same enum without Codable, which are reported; a protocol witness; an `@objc` method; a file with `#if`; an internal function nothing calls; and, judged across the package, public
  API of a library product, a function only a test calls, one named only in a `#if` branch the build never
  compiled, and a wrapped property read only through its projection. The records are a report, so the summary
  counts no findings.
@@ -157,6 +158,11 @@ struct UnusedDeclarationsTests {
             var unusedField = 0
         }
 
+        private struct Untagged: Named {
+            var label = "tag"
+            var unusedField = 0
+        }
+
         final class Watcher: NSObject {
             private var count = 0
         }
@@ -166,7 +172,40 @@ struct UnusedDeclarationsTests {
         }
 
         func conformances() -> [Any] {
-            [ViaOurs().kept, Wired().kept, Tag().label, Watcher(), Later()]
+            [ViaOurs().kept, Wired().kept, Tag().label, Untagged().label, Watcher(), Later()]
+        }
+
+        """,
+        "Control/Requests.swift": """
+        /* The wire keeps `maxBytes` and `file`: only the synthesized Codable reads the per-case keys that say so. */
+        enum Request: Codable {
+            case fetch(sessionId: Int, maximumBytes: Int)
+            case store(path: String)
+
+            enum FetchCodingKeys: String, CodingKey {
+                case sessionId
+                case maximumBytes = "maxBytes"
+            }
+        }
+
+        extension Request {
+            enum StoreCodingKeys: String, CodingKey {
+                case path = "file"
+            }
+        }
+
+        /* The same keys with no Codable to read them. */
+        enum Plain {
+            case fetch(sessionId: Int, maximumBytes: Int)
+
+            enum FetchCodingKeys: String, CodingKey {
+                case sessionId
+                case maximumBytes = "maxBytes"
+            }
+        }
+
+        func requests() -> [Any] {
+            [Request.fetch(sessionId: 1, maximumBytes: 2), Request.store(path: "/"), Plain.fetch(sessionId: 1, maximumBytes: 2)]
         }
 
         """,
@@ -196,6 +235,7 @@ struct UnusedDeclarationsTests {
             _ = makeHolder()
             _ = describe()
             _ = conformances()
+            _ = requests()
             _ = Panel()
             _ = Target()
             return entry() + constantsSize() + Meter().report().count
@@ -288,27 +328,35 @@ struct UnusedDeclarationsTests {
          observer for as long as a `Holder` lives, so it is never reported; `plain` holds a number nobody reads.
          `internalUnused` is internal, and nothing in the package or its tests calls it.
          `Constants.padding` is never named, but a struct of plain numbers is read by its bytes, and the padding
-         holds the layout. `Tag.unusedField` is reported: Tag conforms to Hashable and to a protocol of ours that
-         refines nothing, so no conformance reads it.
+         holds the layout. `Tag.unusedField` is never reported: Tag is Hashable, and its synthesized `==` and
+         `hash(into:)` read every stored property, so removing it would make two tags that differ by it equal.
+         `Untagged.unusedField`, the same field with no Hashable, is reported. `Plain.FetchCodingKeys` is reported:
+         Plain is not Codable, so nothing reads its keys, while Request's, in its body and in an extension, keep
+         its wire keys.
          */
         #expect(
             run.items.sorted() == [
-                "Control/Conformances.swift:19 var unusedField",
+                "Control/Conformances.swift:24 var unusedField",
                 "Control/Helpers.swift:1 func unusedHelper()",
                 "Control/Helpers.swift:2 let unusedConstant",
                 "Control/Helpers.swift:3 func countdown(_:)",
                 "Control/Helpers.swift:7 func internalUnused()",
                 "Control/Holder.swift:5 var plain",
                 "Control/Panel.swift:12 func extensionHelper()",
+                "Control/Requests.swift:22 enum FetchCodingKeys",
                 "Control/Types.swift:2 struct Lonely",
             ],
             "\(run.items)",
         )
-        #expect(run.coverage["found"] as? Int == 8)
+        #expect(run.coverage["found"] as? Int == 9)
         let notChecked = run.coverage["filesNotChecked"] as? [String: Int] ?? [:]
         #expect(notChecked == [UnusedImports.conditional: 1], "only the #if file is left unchecked: \(notChecked)")
         let skipped = run.coverage["skipped"] as? [String: Int] ?? [:]
-        #expect(skipped[UnusedDeclarations.codingKeys] == 3, "CodingKeys and its two cases: \(skipped)")
+        #expect(
+            skipped[UnusedDeclarations.codingKeys] == 10,
+            "Payload's CodingKeys and its two cases, Request's two per-case enums and their three cases, and Plain's two cases, which go with their enum: \(skipped)",
+        )
+        #expect(skipped[UnusedDeclarations.synthesizedEquality] == 2, "Tag's two fields: \(skipped)")
         /*
          Codable reaches every stored property: Payload's two directly, ViaOurs's two through `Stored`, a protocol of
          ours that refines Codable, Wired's two through `Wire`, a type alias the index spells as Encodable and
