@@ -1,21 +1,21 @@
 package nexus
 
 import (
-	"bytes"
-	_ "embed"
 	"fmt"
 	"regexp"
 	"strings"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/policy"
 )
 
-// The abbreviation vocabulary, read from abbreviations.json rather than written here as code.
+// The abbreviation vocabulary, read from cohere's policy/Abbreviations.json rather than written here as
+// code.
 //
 // It is data because two engines read it. The Swift engine's naming rules must judge the same words
-// this rule does, and a copy of the list in Swift would drift from this one the first time either
-// was edited. So the list lives in one file, embedded here and read there, and each entry carries
-// its reason with it so the file can be pruned by someone who was not there when it was written.
+// this rule does, so the list lives in one file under policy/, which both engines compile in (#2cqemcd).
+// Each entry carries its reason with it, so the file can be pruned by someone who was not there when it
+// was written.
 //
 // What stays in Go is policy: the framework exemptions in the rule's listener, and the millisecond
 // message, which cites a measurement about this tree rather than a fact about the word.
@@ -39,17 +39,6 @@ import (
 // every entry rather than reasoned per word, then measured: dropping all of them left the
 // 82,704-name run byte-identical. They were not moved into the data, because Swift would have copied them and
 // someone would have tried to tune a guard that changes nothing.
-
-//go:embed abbreviations.json
-var abbreviationsFile []byte
-
-// AbbreviationsFile is the vocabulary exactly as embedded, for the front door to hand the Swift engine.
-// A released engine has no checkout to read the file from, and handing it this copy keeps one list for
-// both engines. A copy, so a caller that writes into it cannot change what the next caller hands Swift.
-// The Go rule is not what the copy protects: it parsed its own words at package init.
-func AbbreviationsFile() []byte {
-	return bytes.Clone(abbreviationsFile)
-}
 
 // abbreviationVocabularyFile is the file's shape. Unknown keys are refused when it is read, so a
 // misspelled form is a startup failure rather than an entry that silently never matches.
@@ -134,14 +123,14 @@ type abbreviationVocabulary struct {
 	segmentPatterns map[string]wordSegmentPatterns
 }
 
-// vocabulary is the embedded file, read once. An invalid file panics at startup, which is the loud
+// vocabulary is policy's file, read once. An invalid file panics at startup, which is the loud
 // failure: a vocabulary read wrongly would make the rule quietly judge less than it appears to.
-var vocabulary = mustLoadAbbreviationVocabulary(abbreviationsFile)
+var vocabulary = mustLoadAbbreviationVocabulary(policy.AbbreviationsFile())
 
 func mustLoadAbbreviationVocabulary(data []byte) *abbreviationVocabulary {
 	loaded, err := loadAbbreviationVocabulary(data)
 	if err != nil {
-		panic(fmt.Sprintf("abbreviations.json: %v", err))
+		panic(fmt.Sprintf("policy/Abbreviations.json: %v", err))
 	}
 	return loaded
 }

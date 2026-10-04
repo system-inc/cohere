@@ -15,7 +15,7 @@ package nexus
 // Every alternative in that pattern was a literal word, or a literal word plus a case boundary, so
 // there was no backtracking behavior to preserve and a map lookup answers the same question. The
 // pattern itself is gone: it was kept as the specification this gate was tested against, and once
-// the vocabulary moved into abbreviations.json a pattern derived from the same file would only have
+// the vocabulary moved into policy/Abbreviations.json a pattern derived from the same file would only have
 // compared the file to itself.
 //
 // The direction of error is the whole discipline here: this must be a **superset** of what the
@@ -28,7 +28,7 @@ package nexus
 
 // abbreviationGate is the vocabulary turned into the lookups below, one set per form.
 //
-// Derived from abbreviations.json rather than written out, so a word added to the file is admitted
+// Derived from policy/Abbreviations.json rather than written out, so a word added to the file is admitted
 // by the gate in the same edit. When these were four hand-written maps beside a hand-written list,
 // the two could disagree, and a word the gate did not admit was a word the rule never judged.
 type abbreviationGate struct {

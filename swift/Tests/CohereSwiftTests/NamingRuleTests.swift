@@ -10,7 +10,7 @@ import Testing
  */
 struct NamingRuleTests {
     static func vocabulary() throws -> AbbreviationVocabulary {
-        try AbbreviationVocabulary.load(contentsOf: AbbreviationVocabulary.defaultFile)
+        try AbbreviationVocabulary.compiledIn()
     }
 
     static func file(_ source: String, name: String = "Subject.swift") -> ParsedFile {
@@ -116,6 +116,20 @@ struct NamingRuleTests {
     ])
     func aMalformedFileIsRefused(file: String) {
         #expect(throws: (any Error).self) { try AbbreviationVocabulary.load(data: Data(file.utf8)) }
+    }
+
+    /*
+     The compiled-in words are cohere's `policy/Abbreviations.json`, byte for byte. A word added to the file
+     and not regenerated (`go run ./policy/tools/generate`) fails here, so the two engines cannot drift.
+     */
+    @Test func theCompiledInVocabularyIsPolicysFile() throws {
+        let policyFile = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("policy/Abbreviations.json")
+        let onDisk = try Data(contentsOf: policyFile)
+        #expect(!onDisk.isEmpty)
+        #expect(Data(PolicyAbbreviations.file.utf8) == onDisk, "run go run ./policy/tools/generate")
     }
 
     @Test func declaredNamesAreJudgedAndReferencesAreNot() throws {

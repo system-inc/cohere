@@ -197,8 +197,8 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 					return
 				}
 
-				// The vocabulary says what the word is; abbreviations.json holds it, and Swift reads
-				// the same file. What follows is policy, which stays here.
+				// The vocabulary says what the word is; policy/Abbreviations.json holds it, and Swift
+				// compiles in the same file. What follows is policy, which stays here.
 				finding, found := vocabulary.find(name)
 				if !found {
 					return

@@ -69,23 +69,22 @@ public struct Pipeline {
         }
 
         /*
-         The abbreviation vocabulary, read before anything is checked. Missing or unreadable, it refuses the run
-         with exit 2 and the path it looked at: a naming rule with no words to judge would report nothing and
-         read as a clean tree, the silent green this tool exists to stop. A run with the rule turned off reads
-         nothing, and its rule list holds an empty vocabulary that is never consulted.
+         The abbreviation vocabulary, loaded before anything is checked. A compiled-in copy that would not load
+         refuses the run with exit 2: a naming rule with no words to judge would report nothing and read as a
+         clean tree, the silent green this tool exists to stop. A run with the rule turned off loads nothing,
+         and its rule list holds an empty vocabulary that is never consulted.
          */
         var vocabulary = AbbreviationVocabulary()
         if configuration.severity(of: ConsistencyNoAbbreviatedIdentifier.ruleName) != .off
             && (options.runFix || options.runLint)
         {
-            let vocabularyFile = options.abbreviations ?? AbbreviationVocabulary.defaultFile
             do {
-                vocabulary = try AbbreviationVocabulary.load(contentsOf: vocabularyFile)
+                vocabulary = try AbbreviationVocabulary.compiledIn()
             }
             catch {
                 throw RunFailure(
                     description:
-                        "the naming rules read their words from \(vocabularyFile.path), and it could not be loaded, so nothing was checked: \(error)"
+                        "the naming rules' compiled-in words (policy/Abbreviations.json) could not be loaded, so nothing was checked: \(error)"
                 )
             }
         }

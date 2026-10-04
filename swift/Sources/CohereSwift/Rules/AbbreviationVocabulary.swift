@@ -1,9 +1,8 @@
 import Foundation
 
 /*
- The abbreviation vocabulary, read from the same `abbreviations.json` the Go rule
+ The abbreviation vocabulary, cohere's `policy/Abbreviations.json`, the same file the Go rule
  `nexus/consistency-no-abbreviated-identifier` embeds, so Swift and TypeScript judge the same words.
- Never copied: two lists drift the first time either is edited.
 
  The evaluation is a port of `abbreviation_vocabulary.go`, and its order is observable, so it is kept
  exactly: allowed name, whole word, early prefixes, suffixes, late prefixes, then stop if an allowed
@@ -14,11 +13,10 @@ import Foundation
  Names are scanned as ASCII bytes, the way Go's regular expressions read them, rather than through
  Swift's Unicode-aware `Character`: `[a-z]` means those 26 bytes in both engines.
 
- The file is `--abbreviations <path>` when the front door passes one, and otherwise the one beside the
- engine's own source, which the front door builds from. A shipped binary has no source checkout, so the
- front door will hand it the path (@system_cohere_release). A file that is missing, unreadable or malformed
- refuses the run with exit 2, naming the path it looked at (`Pipeline`), never a rule that quietly judges
- nothing.
+ The words are compiled in (`PolicyAbbreviations`, generated from the file), so a released engine carries
+ them with no checkout and nothing handed to it at run time (#2cqemcd). A test fails while the compiled-in
+ copy and the file differ. A copy that would not load refuses the run with exit 2 (`Pipeline`), never a
+ rule that quietly judges nothing.
  */
 public struct AbbreviationVocabulary: Sendable {
     /* One abbreviated word and the forms it is judged in. */
@@ -47,15 +45,6 @@ public struct AbbreviationVocabulary: Sendable {
     static let reasoning =
         "A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call site by a reader who has to expand the abbreviation themselves and hope they expanded it the way the author meant."
 
-    /* `swift/Sources/CohereSwift/Rules/` up to cohere's root, then the Go rule's directory. */
-    public static let defaultFile = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .appendingPathComponent("internal/lint/rules/nexus/abbreviations.json")
-
     private(set) var wholeByName: [String: Entry] = [:]
     private(set) var earlyPrefixes: [Entry] = []
     private(set) var latePrefixes: [Entry] = []
@@ -67,17 +56,10 @@ public struct AbbreviationVocabulary: Sendable {
     /* An empty vocabulary judges nothing, which is right only where nothing is judged: listing rule names, or a run with the rule off. */
     public init() {}
 
-    /* The reason alone, in words: the caller names the path once, in the sentence a person reads. */
-    public static func load(contentsOf file: URL) throws -> AbbreviationVocabulary {
-        let data: Data
+    /* The compiled-in words. The reason alone, in words: the caller says what failed to load, once, in the sentence a person reads. */
+    public static func compiledIn() throws -> AbbreviationVocabulary {
         do {
-            data = try Data(contentsOf: file)
-        }
-        catch {
-            throw LoadFailure(description: "it could not be read (\((error as NSError).localizedDescription))")
-        }
-        do {
-            return try load(data: data)
+            return try load(data: Data(PolicyAbbreviations.file.utf8))
         }
         catch let failure as LoadFailure {
             throw failure

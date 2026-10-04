@@ -35,6 +35,8 @@ import SwiftSyntax
    ruling said they need not nest, and this rule then told the file to be renamed after the helper. A file
    whose only face is a helper still answers to the plain naming rule.
  - A file with no types and no extensions (free functions, a script) has no name to match.
+ - `Name.generated.swift` is named `Name`. The marker says a generator wrote the file (Kirk's convention, shared
+   with TypeScript), not what it holds, and a generated file answers to this rule like any other.
  */
 public struct ConsistencyRequireMatchingFileName: FileRule {
     public let name = "cohere-swift/consistency-require-matching-file-name"
@@ -48,7 +50,11 @@ public struct ConsistencyRequireMatchingFileName: FileRule {
     }
 
     public func findings(in file: ParsedFile) -> [FindingRecord] {
-        let stem = file.url.deletingPathExtension().lastPathComponent
+        let fileName = file.url.lastPathComponent
+        var stem = file.url.deletingPathExtension().lastPathComponent
+        if stem.hasSuffix(Self.generatedMarker) {
+            stem.removeLast(Self.generatedMarker.count)
+        }
         let declarations = TopLevelDeclarations(file.tree)
         var findings: [FindingRecord] = []
 
@@ -69,7 +75,7 @@ public struct ConsistencyRequireMatchingFileName: FileRule {
                     rule: name,
                     messageId: "fileNotNamedForType",
                     message:
-                        "This file is \(stem).swift and declares \(declared.name). Name it \(declared.name).swift, so a reader looking for \(declared.name) opens it without a search.",
+                        "This file is \(fileName) and declares \(declared.name). Name it \(declared.name).swift, so a reader looking for \(declared.name) opens it without a search.",
                 )
             )
         }
@@ -97,13 +103,16 @@ public struct ConsistencyRequireMatchingFileName: FileRule {
                 declaredName.map {
                     "An extension of \(extended.name) in the file for \($0). Extensions of another type belong in that type's own file, such as \(suggestion), so everything added to \(extended.name) is found together."
                 }
-                ?? "This file is \(stem).swift and extends \(extended.name). Name it \(suggestion) after what it adds, so everything added to \(extended.name) is found together."
+                ?? "This file is \(fileName) and extends \(extended.name). Name it \(suggestion) after what it adds, so everything added to \(extended.name) is found together."
             findings.append(
                 file.finding(at: extended.token, rule: name, messageId: "extensionOutsideItsFile", message: message)
             )
         }
         return findings
     }
+
+    /* What Kirk's convention puts between a generated file's name and `.swift`. */
+    static let generatedMarker = ".generated"
 
     /* The most lines a struct or enum may have and still count as a helper in a purpose file. */
     static let smallValueTypeLines = 30

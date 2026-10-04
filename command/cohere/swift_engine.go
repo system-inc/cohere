@@ -2,8 +2,6 @@ package main
 
 import (
 	"bufio"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -16,8 +14,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/lint/rules/nexus"
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
@@ -51,13 +47,6 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 	if err != nil {
 		return 1, err
 	}
-
-	vocabulary, removeVocabulary, err := swiftVocabularyFile(location.Root, cacheOff)
-	if err != nil {
-		return 1, err
-	}
-	defer removeVocabulary()
-	arguments = append(arguments, "--abbreviations", vocabulary)
 
 	run := newSwiftRun(os.Stdout, mode, location.rootNote(), processStart)
 	run.details = given["coverage"] && flagValue("coverage") == "true"
@@ -168,68 +157,6 @@ func flagValue(name string) string {
 		return found.Value.String()
 	}
 	return ""
-}
-
-// swiftVocabularyFile writes the abbreviation vocabulary this cohere embeds where the Swift engine can
-// read it, and returns the path and what removes it after the run.
-//
-// The engine reads its words from a file. Left to itself it reads the one beside its own source, which
-// exists only on the machine that built it, so a released engine would refuse every run. Handing it
-// the copy compiled into this binary works for every build, a development one included, and keeps
-// one list for both engines. Every run passes it, so there is one path to test.
-//
-// The file is `<root>/.cache/cohere/abbreviations-<hash>.json`, written once and then reused. The
-// name is the content's hash, so a file that exists already holds these bytes and is not read back.
-// A cohere with other words writes another name beside it. The write is atomic, so a run beside it
-// never reads half a file.
-//
-// Nothing is ever deleted. Two cohere builds with different words run on one root daily, a member's
-// development cohere beside the one a project pins, and each must find its file where it returned it.
-// Removing another's, even by age, races that: a file in use for a week is never rewritten, so it
-// looks as old as one nobody uses. Each version is about 12 KB, and the directory is the project's to
-// delete.
-//
-// Under `--no-cache` nothing is written to `.cache`, as that flag promises, and the file is a
-// temporary one removed after the run instead.
-func swiftVocabularyFile(root string, noCache bool) (string, func(), error) {
-	contents := nexus.AbbreviationsFile()
-
-	if noCache {
-		temporary, err := os.CreateTemp("", "cohere-abbreviations-*.json")
-		if err != nil {
-			return "", nil, fmt.Errorf("writing the abbreviation vocabulary for the Swift engine: %w", err)
-		}
-		remove := func() { os.Remove(temporary.Name()) }
-		if _, err := temporary.Write(contents); err != nil {
-			temporary.Close()
-			remove()
-			return "", nil, fmt.Errorf("writing the abbreviation vocabulary for the Swift engine: %w", err)
-		}
-		if err := temporary.Close(); err != nil {
-			remove()
-			return "", nil, fmt.Errorf("writing the abbreviation vocabulary for the Swift engine: %w", err)
-		}
-		return temporary.Name(), remove, nil
-	}
-
-	sum := sha256.Sum256(contents)
-	path := filepath.Join(cacheDirectory(root), "abbreviations-"+hex.EncodeToString(sum[:6])+".json")
-	keep := func() {}
-	if isRegularFile(path) {
-		return path, keep, nil
-	}
-
-	// prepareCacheDirectory owns the warning about an unignored `.cache`, and it runs once per process,
-	// for whichever root asked first. The directory is made here as well, so the write never depends on
-	// that root having been this one.
-	prepareCacheDirectory(root)
-	if err := os.MkdirAll(cacheDirectory(root), 0o755); err != nil {
-		return "", nil, fmt.Errorf("creating %s for the Swift engine's abbreviation vocabulary: %w", cacheDirectory(root), err)
-	}
-	if err := edit.WriteAtomically(path, string(contents)); err != nil {
-		return "", nil, fmt.Errorf("writing the abbreviation vocabulary for the Swift engine to %s: %w", path, err)
-	}
-	return path, keep, nil
 }
 
 // swiftEngineArguments builds the engine's command line, `--contract 1 --root <root> [flags] [paths]`,

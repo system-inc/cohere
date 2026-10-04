@@ -29,6 +29,15 @@ struct FileShapeRuleTests {
         #expect(Self.messages(ConsistencyRequireMatchingFileName(), "Pane.swift", source).isEmpty)
     }
 
+    /* A generated file is named for its type before the marker, and still answers to the rule. */
+    @Test func aGeneratedFileIsNamedBeforeItsMarker() {
+        let source = "enum PolicyAbbreviations {}\n"
+        let rule = ConsistencyRequireMatchingFileName()
+        #expect(Self.messages(rule, "PolicyAbbreviations.generated.swift", source).isEmpty)
+        #expect(Self.messages(rule, "Policy.generated.swift", source) == ["fileNotNamedForType"])
+        #expect(Self.messages(rule, "PolicyAbbreviations.swift", source).isEmpty)
+    }
+
     /* How many types a file holds is not judged; the name must lead to one of them, the main one. */
     @Test func aFileOfSeveralTypesIsNamedForTheMainOne() {
         let source = "struct Pane {}\nfinal class Box {}\nactor Worker {}\nprotocol Drawable {}\n"
