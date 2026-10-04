@@ -692,6 +692,30 @@ func attachFindingsCache(graph *program.Graph, location projectLocation) {
 	}
 }
 
+// carryCaches gives the graph rebuilt after a fix rewrite what the graph it replaces was given: the findings
+// cache, and the shapes, recomputed only for the files whose bytes the fixer changed (#891h54d).
+//
+// The rebuild used to leave both off. With no shapes the types section cannot replay, so a run whose fixer
+// rewrote one file full-checked the whole program, 380 to 1,270ms on ahra against 42 to 72ms replayed; with
+// no findings cache, lint walked every rule over every file. Shapes are keyed per file on its bytes
+// (Graph.Signatures), so seeding from the replaced graph's recomputes exactly the rewritten files, and the
+// findings cache is per file on bytes and fingerprints, so the one cache serves both graphs.
+func carryCaches(replaced *program.Graph, rebuilt *program.Graph) {
+	rebuilt.FindingsReuse = replaced.FindingsReuse
+	if replaced.Shapes == nil {
+		return
+	}
+	shapes, computed := rebuilt.Signatures(context.Background(), replaced.Shapes)
+	rebuilt.Shapes = shapes
+	if session := activeRunCache; session != nil && session.shapes != nil {
+		session.shapes = shapes
+	}
+	if record := pendingTypes; record != nil {
+		record.shapes = shapes
+		record.computedShapes += computed
+	}
+}
+
 // activeTypesReuse is the types section a check in this run reads and records, nil when the cache is off
 // or the run never reached a check.
 func activeTypesReuse() *program.TypeDiagnosticsReuse {

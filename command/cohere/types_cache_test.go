@@ -194,3 +194,57 @@ func TestTypeDiagnosticsDoNotReplayAcrossCompilerOptions(t *testing.T) {
 			len(warmErrors), len(coldErrors), warm, cold)
 	}
 }
+
+// A run whose fixer rewrites a file still replays what the rewrite left alone (#891h54d). The rewrite
+// rebuilds the graph, and the rebuilt graph used to carry neither shapes nor the findings cache, so the
+// types phase full-checked the program and lint walked every rule over every file, though one file had
+// changed. Here one file of seven gains a debugger statement the fixer removes: the run after the rewrite
+// replays the other files' types and findings, and reports exactly what a run with no cache reports.
+func TestARunWhoseFixRewritesAFileStillReplays(t *testing.T) {
+	binary := buildCohere(t)
+	root := t.TempDir()
+	write := func(name string, contents string) {
+		t.Helper()
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
+	write("CohereSettings.json", `{"rules":{"no-debugger":"error"}}`)
+	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
+	write(".gitignore", ".cache/\nnode_modules/\n")
+	write("source/a.ts", "export function value(): number {\n    return 1;\n}\n")
+	for index := range 6 {
+		write(fmt.Sprintf("source/c%d.ts", index), fmt.Sprintf("import { value } from './a';\nexport const c%d: number = value() + %d;\n", index, index))
+	}
+	runCohere(t, binary, root)
+	runCohere(t, binary, root)
+
+	write("source/a.ts", "export function value(): number {\n    debugger;\n    return 1;\n}\n")
+	warm, _ := runCohere(t, binary, root)
+	if !strings.Contains(warm, "graph rebuilt") {
+		t.Fatalf("the fixer rewrote nothing, so the rebuild this test is about never ran:\n%s", warm)
+	}
+	for _, clause := range []string{"files' semantic diagnostics replayed from cache", "files replayed from cache"} {
+		if !strings.Contains(warm, clause) {
+			t.Errorf("after the rewrite the run replayed nothing (%q missing):\n%s", clause, warm)
+		}
+	}
+	cold, _ := runCohere(t, binary, root, "--no-cache")
+	findings := func(output string) string {
+		kept := []string{}
+		for _, line := range strings.Split(output, "\n") {
+			if strings.Contains(line, " - ") {
+				kept = append(kept, line)
+			}
+		}
+		return strings.Join(kept, "\n")
+	}
+	if findings(warm) != findings(cold) {
+		t.Errorf("the run after the rewrite found something other than a run with no cache:\n--- warm\n%s\n--- cold\n%s", warm, cold)
+	}
+}

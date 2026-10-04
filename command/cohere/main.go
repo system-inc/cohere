@@ -743,6 +743,7 @@ func run() error {
 			// way, which killed the gate itself (#sm79kfv). Its graph records nothing, and its result is
 			// dropped with the reference.
 			graph.Retire()
+			carryCaches(graph, rebuiltGraph)
 			graph = rebuiltGraph
 			earlyTypeCheck = nil
 			// The scope survives the rebuild. Taking every project file here turned a run scoped to
