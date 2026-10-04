@@ -134,8 +134,8 @@ func DecodeMaxClassesPerFileOptions(raw []byte) (any, error) {
 // names the design unit a reader greps for and whose history they read, and a class declared
 // inside a function, the shape a test's `describe` or `it` fixture takes, is not one. Four nexus
 // type tests carried nothing but those. So a declaration counts only outside every function body; a
-// class in a namespace still counts, since a namespace is not a function. The divergence is
-// recorded in internal/differential/acknowledged.go at each site where ESLint still reports.
+// class in a namespace or a static block still counts, since neither is a function. ESLint draws the
+// same line through Nexus's `nexus/max-classes-per-file` twin, which shares this rule's fixture rows.
 //
 // Upstream's own `ignoreExpressions` is the other half of the ruling, and it is configuration rather
 // than code here: ahra sets it, and so does the ESLint side, so expressions need no divergence.
