@@ -1,26 +1,12 @@
 package core
 
 import (
-	"strings"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/descriptor"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
-
-// isJavaScriptSourceFile answers whether the rule should run on this file at all.
-//
-// Upstream skips TypeScript outright: `should_run` reads `!ctx.source_type().is_typescript()`,
-// because the compiler already reports a getter with a non-returning path, and a getter annotated
-// `: boolean | undefined` is *correct* TypeScript that this rule would wrongly flag. That is
-// upstream's entire second Tester block, one pass case pinning exactly this.
-func isJavaScriptSourceFile(fileName string) bool {
-	return strings.HasSuffix(fileName, ".js") ||
-		strings.HasSuffix(fileName, ".jsx") ||
-		strings.HasSuffix(fileName, ".mjs") ||
-		strings.HasSuffix(fileName, ".cjs")
-}
 
 // GetterReturnOptions configures whether a bare `return;` satisfies the rule.
 //
@@ -95,8 +81,19 @@ type GetterReturnOptions struct {
 // the loop runs. A CFG gets this right by having a bypass edge around the loop, and the tree gets
 // it right by declining to credit the body.
 //
-// The cost of this decision is that no checker is acquired, so this rule does not pay the per-file
-// exclusive lock at all.
+// The checker is asked one thing only: whether the `Object` or `Reflect` of a descriptor call is the
+// global, so `let Object; Object.defineProperty(...)` is not a descriptor. Reachability never asks it.
+//
+// # TypeScript files are checked too
+//
+// The port this rule followed skipped TypeScript outright, as oxc does, because the compiler reports
+// a `get` accessor with no return (TS2378), and typescript-eslint's eslint-recommended turns the rule
+// off for .ts files for the same reason. The house does not: Kirk ruled on 2026-08-25 (#mnmx9s4)
+// that the core correctness rules stay on in TypeScript in both engines, so that the engines agree on
+// what runs, and Nexus turns getter-return on there. Skipping .ts files left cohere silent where
+// ESLint reports, which every consumer's zero hid, and all 35 of ESLint's corpus rows read as missing
+// (#jjfa7qb). It also missed what the compiler never checks: a descriptor's `get` is a plain function
+// to TypeScript, so `Object.defineProperty(o, 'k', { get() {} })` was caught nowhere.
 //
 // # What this deliberately does not catch, matching upstream
 //
@@ -105,44 +102,64 @@ type GetterReturnOptions struct {
 // this. Conversely `return` inside a nested function must not credit the outer getter, which is why
 // the walk stops at every function boundary.
 var GetterReturn = rule.Rule{
-	Name:       "getter-return",
-	NoListener: rule.NoListenerDeclinesIrrelevantFiles,
+	Name: "getter-return",
+
+	// Whether the `Object` or `Reflect` of a descriptor call is the global
+	NeedsTypeChecker: true,
+
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		allowImplicit := false
 		if parsed, isParsed := rule.OptionsAs[GetterReturnOptions](options); isParsed {
 			allowImplicit = parsed.AllowImplicit
 		}
 
-		// TypeScript checks this itself, so upstream skips typed files outright rather than
-		// duplicating an error the compiler already reports. Its `should_run` reads
-		// `!ctx.source_type().is_typescript()`, and its second Tester block exists only to pin
-		// that: a getter typed `boolean | undefined` with a non-returning path is clean there.
-		//
-		// Matching that here means the rule declines the file, not the case. Declining by
-		// returning nil listeners is also the cheapest possible decline, which matters more in
-		// this tree than upstream because our walk is shared.
-		if !isJavaScriptSourceFile(ctx.SourceFile.FileName()) {
-			return nil
+		isGlobal := func(identifier *ast.Node) bool {
+			return ctx.TypeChecker != nil && rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(identifier))
 		}
 
 		check := func(node *ast.Node, body *ast.Node) {
 			if body == nil || body.Kind != ast.KindBlock {
 				return
 			}
-			if !isGetterFunction(node) {
+			if !isGetterFunction(node, isGlobal) {
 				return
 			}
-			if bodyDefinitelyExits(body, allowImplicit) {
+			if bodyDefinitelyExits(body) {
 				return
 			}
-			ctx.ReportRange(getterHeadRange(ctx.SourceFile, node, body), rule.Message{
+			// ESLint's two ids: `expected` for a getter that never returns, `expectedAlways` for one
+			// that returns on some paths and falls off the end on another
+			if returnsAnywhere(body) {
+				ctx.ReportRange(getterHeadRange(ctx.SourceFile, node), rule.Message{
+					Id: "expectedAlways",
+					Description: "This getter returns a value on some paths and falls off the end on " +
+						"another, where reading the property yields undefined. Return a value from every path.",
+				})
+				return
+			}
+			ctx.ReportRange(getterHeadRange(ctx.SourceFile, node), rule.Message{
 				Id: "expected",
-				Description: "This getter can finish without returning a value, so reading the " +
-					"property yields undefined on that path. Return a value from every path.",
+				Description: "This getter never returns a value, so reading the property yields " +
+					"undefined. Return the value it stands for.",
 			})
 		}
 
 		return rule.Listeners{
+			// A bare `return;` in a getter yields undefined, and ESLint reports the statement
+			ast.KindReturnStatement: func(node *ast.Node) {
+				if allowImplicit || node.AsReturnStatement().Expression != nil {
+					return
+				}
+				function := ast.FindAncestor(node.Parent, ast.IsFunctionLike)
+				if function == nil || function.Body() == nil || function.Body().Kind != ast.KindBlock || !isGetterFunction(function, isGlobal) {
+					return
+				}
+				ctx.ReportNode(node, rule.Message{
+					Id: "expected",
+					Description: "This bare return leaves the getter with undefined, so reading the " +
+						"property yields nothing. Return the value it stands for.",
+				})
+			},
 			ast.KindGetAccessor: func(node *ast.Node) {
 				check(node, bodyOf(node))
 			},
@@ -195,36 +212,64 @@ func bodyOf(node *ast.Node) *ast.Node {
 
 // getterHeadRange is where the finding points: the getter's head, not its whole body.
 //
-// Anchoring on the head rather than the node keeps the caret on the declaration a reader has to
-// change, and keeps a multi-hundred-line getter from underlining itself entirely. `headEnd` is the
-// body's start, so the range runs from the declaration's first token to just before the brace.
-func getterHeadRange(file *ast.SourceFile, node *ast.Node, body *ast.Node) core.TextRange {
+// ESLint's `getFunctionHeadLoc`, which keeps the caret on the declaration a reader has to change and
+// keeps a multi-hundred-line getter from underlining itself. It runs from the property to the opening
+// paren of the parameters, so `get bar() {}` reports `get bar` and `{ get: function () {} }` reports
+// `get: function `. Where the function is a property's value, the property is where it starts. An arrow
+// whose one parameter has no parentheses ends at that parameter. The old span ran to the body and
+// read as a different finding on all 35 of ESLint's rows (#jjfa7qb).
+func getterHeadRange(file *ast.SourceFile, node *ast.Node) core.TextRange {
 	// TokenRange is what ReportNode uses, and it is what skips the leading trivia. Building the
 	// range from node.Pos() directly is the defect that helper exists to prevent: a getter preceded
 	// by a comment would report at the comment, and a `-next-line` suppression written above it
 	// could never match.
-	head := rule.TokenRange(file, node)
-	start := head.Pos()
-	end := body.Pos()
-	if end <= start {
-		end = head.End()
+	owner := node
+	if node.Parent != nil && node.Parent.Kind == ast.KindPropertyAssignment {
+		owner = node.Parent
+	}
+	start := rule.TokenRange(file, owner).Pos()
+	text := file.Text()
+	end := node.ParameterList().Pos()
+	if end > 0 && text[end-1] == '(' {
+		end--
+	} else {
+		end = scanner.SkipTrivia(text, end)
 	}
 	return core.NewTextRange(start, end)
+}
+
+// returnsAnywhere answers whether a getter body holds a return of its own, outside any nested function
+func returnsAnywhere(body *ast.Node) bool {
+	found := false
+	var visit func(node *ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if found || ast.IsFunctionLike(node) {
+			return found
+		}
+		if node.Kind == ast.KindReturnStatement {
+			found = true
+			return true
+		}
+		return node.ForEachChild(visit)
+	}
+	body.ForEachChild(visit)
+	return found
 }
 
 // isGetterFunction answers whether this function-like node is in getter position: a `get` accessor in
 // a class or object literal, or the `get` of a property descriptor, which the `descriptor` shelf
 // recognizes and `no-setter-return` shares for `set`.
 //
-// The descriptor's `Object` is matched by spelling here, since this rule runs without the checker and
-// only on JavaScript files.
-func isGetterFunction(node *ast.Node) bool {
+// isGlobal answers whether the descriptor call's `Object` or `Reflect` is the global. ESLint's
+// getter-return matches the spelling alone, and the global is asked here as no-setter-return does,
+// since a shadowing local's `defineProperty` is not the platform method.
+func isGetterFunction(node *ast.Node, isGlobal func(identifier *ast.Node) bool) bool {
 	if node.Kind == ast.KindGetAccessor {
 		// A `get` accessor is a getter in both a class and an object literal, and there is no
 		// other thing it can be.
 		return true
 	}
-	return descriptor.IsFunctionUnder(node, "get", func(*ast.Node) bool { return true }, descriptor.AnyArgument)
+	return descriptor.IsFunctionUnder(node, "get", isGlobal)
 }
 
 // bodyDefinitelyExits answers whether every path through a statement leaves the enclosing function.
@@ -237,18 +282,16 @@ func isGetterFunction(node *ast.Node) bool {
 // is assumed not to exit, so the rule reports rather than staying silent. That is the correct bias
 // for a correctness rule but it is also the one that produces false positives, which is why the
 // recognized set covers every construct upstream's corpus exercises.
-func bodyDefinitelyExits(node *ast.Node, allowImplicit bool) bool {
+func bodyDefinitelyExits(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
 	switch node.Kind {
 	case ast.KindReturnStatement:
-		// A bare `return;` yields undefined, which is the thing the rule is looking for unless
-		// the reader has said they meant it.
-		if allowImplicit {
-			return true
-		}
-		return node.AsReturnStatement().Expression != nil
+		// A bare `return;` ends the path too. It yields undefined, which is reported at the
+		// statement itself unless allowImplicit says it was meant, as ESLint reports it, so the
+		// head is reported only for a path that falls off the end.
+		return true
 
 	case ast.KindThrowStatement:
 		return true
@@ -258,7 +301,7 @@ func bodyDefinitelyExits(node *ast.Node, allowImplicit bool) bool {
 		// unreachable, so scanning past the first is harmless and stopping early is not required
 		// for correctness.
 		for _, statement := range node.AsBlock().Statements.Nodes {
-			if bodyDefinitelyExits(statement, allowImplicit) {
+			if bodyDefinitelyExits(statement) {
 				return true
 			}
 		}
@@ -276,22 +319,22 @@ func bodyDefinitelyExits(node *ast.Node, allowImplicit bool) bool {
 		// because none can exist. Deleted rather than tested, so the next reader does not spend the
 		// same hour proving the same thing.
 		statement := node.AsIfStatement()
-		return bodyDefinitelyExits(statement.ThenStatement, allowImplicit) &&
-			bodyDefinitelyExits(statement.ElseStatement, allowImplicit)
+		return bodyDefinitelyExits(statement.ThenStatement) &&
+			bodyDefinitelyExits(statement.ElseStatement)
 
 	case ast.KindTryStatement:
-		return tryStatementExits(node.AsTryStatement(), allowImplicit)
+		return tryStatementExits(node.AsTryStatement())
 
 	case ast.KindSwitchStatement:
-		return switchStatementExits(node.AsSwitchStatement(), allowImplicit)
+		return switchStatementExits(node.AsSwitchStatement())
 
 	case ast.KindLabeledStatement:
 		// A label wraps a statement without changing whether it exits. `break label` would, but a
 		// break out of a getter body reaches the end of the body, which is already not an exit.
-		return bodyDefinitelyExits(node.AsLabeledStatement().Statement, allowImplicit)
+		return bodyDefinitelyExits(node.AsLabeledStatement().Statement)
 
 	case ast.KindWithStatement:
-		return bodyDefinitelyExits(node.AsWithStatement().Statement, allowImplicit)
+		return bodyDefinitelyExits(node.AsWithStatement().Statement)
 	}
 
 	// Loops land here and answer false on purpose. A `for`, `while`, or `for-in` body may run zero
@@ -308,20 +351,20 @@ func bodyDefinitelyExits(node *ast.Node, allowImplicit bool) bool {
 // `try { return a(); } finally {}` passing against `try { return a(); } catch {}` failing. The
 // difference is that a catch introduces a path: the try may throw partway through, and then only
 // the catch runs. A finally introduces no path of its own.
-func tryStatementExits(statement *ast.TryStatement, allowImplicit bool) bool {
+func tryStatementExits(statement *ast.TryStatement) bool {
 	// A finally that exits wins outright, since it runs on every path out of the try and the
 	// catch both, and its own exit overrides theirs.
 	if statement.FinallyBlock != nil &&
-		bodyDefinitelyExits(statement.FinallyBlock.AsNode(), allowImplicit) {
+		bodyDefinitelyExits(statement.FinallyBlock.AsNode()) {
 		return true
 	}
-	if !bodyDefinitelyExits(statement.TryBlock.AsNode(), allowImplicit) {
+	if !bodyDefinitelyExits(statement.TryBlock.AsNode()) {
 		return false
 	}
 	if statement.CatchClause == nil {
 		return true
 	}
-	return bodyDefinitelyExits(statement.CatchClause.AsCatchClause().Block.AsNode(), allowImplicit)
+	return bodyDefinitelyExits(statement.CatchClause.AsCatchClause().Block.AsNode())
 }
 
 // switchStatementExits answers whether a switch exits on every path.
@@ -332,7 +375,7 @@ func tryStatementExits(statement *ast.TryStatement, allowImplicit bool) bool {
 //
 // An empty clause is not a failure: `case A: case B: return x;` is a deliberate fallthrough and
 // the empty `case A` exits by way of `case B`. Only a trailing empty clause genuinely falls out.
-func switchStatementExits(statement *ast.SwitchStatement, allowImplicit bool) bool {
+func switchStatementExits(statement *ast.SwitchStatement) bool {
 	clauses := statement.CaseBlock.AsCaseBlock().Clauses.Nodes
 
 	hasDefault := false
@@ -357,7 +400,7 @@ func switchStatementExits(statement *ast.SwitchStatement, allowImplicit bool) bo
 		}
 		exits := false
 		for _, inner := range statements {
-			if bodyDefinitelyExits(inner, allowImplicit) {
+			if bodyDefinitelyExits(inner) {
 				exits = true
 				break
 			}

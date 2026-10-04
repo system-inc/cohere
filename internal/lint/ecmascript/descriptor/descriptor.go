@@ -39,11 +39,11 @@ func KeyName(name *ast.Node) string {
 // Object.defineProperty(...)` as clean. A rule without the checker passes a function answering true,
 // which reads the spelling alone.
 //
-// position says whether the descriptor must also sit at the argument the method reads it from. ESLint's
-// two rules differ here, and each is matched: no-setter-return requires it, so
-// `Object.defineProperty(foo, { set() {} }, 'bar')` is clean there, while getter-return checks only the
-// shape.
-func IsFunctionUnder(node *ast.Node, key string, isGlobal func(identifier *ast.Node) bool, position Position) bool {
+// The descriptor must sit at the argument its method reads it from: the third of `defineProperty`, the
+// second of `defineProperties` and `create`. ESLint's getter-return and no-setter-return share one
+// `isPropertyDescriptor` that checks this, so `Object.defineProperty({ get() {} }, 'k', d)` is clean in
+// both.
+func IsFunctionUnder(node *ast.Node, key string, isGlobal func(identifier *ast.Node) bool) bool {
 	parent := node.Parent
 	if parent == nil {
 		return false
@@ -65,19 +65,8 @@ func IsFunctionUnder(node *ast.Node, key string, isGlobal func(identifier *ast.N
 	if propertyName != key || propertyHolder == nil || propertyHolder.Kind != ast.KindObjectLiteralExpression {
 		return false
 	}
-	return isDescriptorObject(propertyHolder, isGlobal, position)
+	return isDescriptorObject(propertyHolder, isGlobal)
 }
-
-// Position is whether a descriptor must sit at the argument its method reads it from.
-type Position int
-
-const (
-	// AnyArgument accepts a descriptor in any argument of the call, as getter-return does.
-	AnyArgument Position = iota
-	// DescriptorArgument requires the third argument of `defineProperty` and the second of
-	// `defineProperties` and `create`, as no-setter-return does.
-	DescriptorArgument
-)
 
 // isDescriptorObject answers whether this object literal is being passed somewhere that treats it as a
 // property descriptor.
@@ -92,7 +81,7 @@ const (
 // So `Object.create(o, { set() {} })` is not a descriptor: the object create reads holds descriptors,
 // it is not one. Counting kinds rather than parents is what is done here, because the parent count
 // changes with parenthesization while the shape does not.
-func isDescriptorObject(descriptor *ast.Node, isGlobal func(identifier *ast.Node) bool, position Position) bool {
+func isDescriptorObject(descriptor *ast.Node, isGlobal func(identifier *ast.Node) bool) bool {
 	argument := descriptor
 	nested := false
 	// `{ k: { get: fn } }`: step out through the property to the object literal that is the
@@ -119,15 +108,13 @@ func isDescriptorObject(descriptor *ast.Node, isGlobal func(identifier *ast.Node
 	default:
 		return false
 	}
-	if position == DescriptorArgument {
-		wanted := 2
-		if nested {
-			wanted = 1
-		}
-		arguments := call.AsCallExpression().Arguments.Nodes
-		if len(arguments) <= wanted || skipParenthesesDownward(arguments[wanted]) != argument {
-			return false
-		}
+	wanted := 2
+	if nested {
+		wanted = 1
+	}
+	arguments := call.AsCallExpression().Arguments.Nodes
+	if len(arguments) <= wanted || skipParenthesesDownward(arguments[wanted]) != argument {
+		return false
 	}
 	return isGlobal(object)
 }

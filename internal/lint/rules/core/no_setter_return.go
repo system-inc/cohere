@@ -90,7 +90,7 @@ var NoSetterReturn = rule.Rule{
 				if body == nil || body.Kind == ast.KindBlock {
 					return
 				}
-				if descriptor.IsFunctionUnder(node, "set", isGlobal, descriptor.DescriptorArgument) {
+				if descriptor.IsFunctionUnder(node, "set", isGlobal) {
 					report(body)
 				}
 			},
@@ -106,7 +106,7 @@ var NoSetterReturn = rule.Rule{
 				if function == nil {
 					return
 				}
-				if ast.IsSetAccessorDeclaration(function) || descriptor.IsFunctionUnder(function, "set", isGlobal, descriptor.DescriptorArgument) {
+				if ast.IsSetAccessorDeclaration(function) || descriptor.IsFunctionUnder(function, "set", isGlobal) {
 					report(node)
 				}
 			},

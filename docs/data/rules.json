@@ -5693,7 +5693,7 @@
             "language": "TypeScript",
             "origin": "core",
             "upstreamName": "getter-return",
-            "typeAware": false,
+            "typeAware": true,
             "options": {
                 "elements": "one"
             },

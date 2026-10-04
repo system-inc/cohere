@@ -286,7 +286,7 @@ func (scanner *superScanner) scanStatements(node *ast.Node) bool {
 			// ESLint's `isCalled` answers true for any unreachable segment, and oxc's edge filter
 			// maps `EdgeType::Unreachable` to `No`. Two pass cases pin it, one per class kind,
 			// and they exist because of eslint/eslint#5894.
-			if bodyDefinitelyExits(statement, true) {
+			if bodyDefinitelyExits(statement) {
 				return false
 			}
 		}
@@ -529,7 +529,7 @@ func clauseExits(statement *ast.Node) bool {
 	if statement.Kind == ast.KindBreakStatement {
 		return true
 	}
-	return bodyDefinitelyExits(statement, true)
+	return bodyDefinitelyExits(statement)
 }
 
 // scanExpression walks an expression, handling the two shapes that are about `super` itself.

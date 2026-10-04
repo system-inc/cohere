@@ -6,14 +6,11 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// getterReturnFile is where the fixtures pretend to live.
-//
-// A `.js` extension rather than `.ts`, and that is load-bearing rather than cosmetic. The rule
-// declines TypeScript outright, matching upstream's `should_run`, so every one of these fixtures
-// run against a `.ts` name would pass by the rule never listening. The StaysSilent half would be
-// entirely vacuous. `TestGetterReturnDeclinesTypeScript` below pins the decline itself so that this
-// choice cannot silently become the reason the suite is green.
-const getterReturnFile = "/repository/source/Getter.js"
+// getterReturnFile is where the fixtures live: a TypeScript file in a real program, since the rule
+// asks the checker whether a descriptor's `Object` is the global, and since it checks TypeScript files
+// as ESLint does under the house config (#mnmx9s4). It ran against a `.js` name while the rule
+// declined TypeScript, and `TestGetterReturnChecksTypeScript` below pins that it no longer does.
+const getterReturnFile = "Getter.ts"
 
 // The corpus is oxc's, copied rather than rewritten.
 //
@@ -29,36 +26,39 @@ const getterReturnFile = "/repository/source/Getter.js"
 func TestGetterReturnFires(t *testing.T) {
 	t.Parallel()
 
+	// ESLint's id: `expected` for a getter with no return of its own, or at a bare `return;`, and
+	// `expectedAlways` at the head of one that returns on some paths and falls off the end on another
 	cases := []struct {
 		name       string
 		sourceText string
+		id         string
 	}{
-		{"an empty object getter", "var foo = { get bar() {} };"},
-		{"an empty getter with a newline in its head", "var foo = { get\n bar () {} };"},
-		{"an if with no else", "var foo = { get bar(){if(baz) {return true;}} };"},
-		{"a return inside a nested function only", "var foo = { get bar() { ~function () {return true;}} };"},
-		{"a bare return with allowImplicit off", "var foo = { get bar() { return; } };"},
-		{"an empty class getter", "class foo { get bar(){} }"},
-		{"a static getter with a newline in its head", "var foo = class {\n  static get\nbar(){} }"},
-		{"a class getter whose if has no else", "class foo { get bar(){ if (baz) { return true; }}}"},
-		{"a class getter returning only from a nested function", "class foo { get bar(){ ~function () { return true; }()}}"},
-		{"an empty defineProperty getter", "Object.defineProperty(foo, 'bar', { get: function (){}});"},
-		{"an empty named defineProperty getter", "Object.defineProperty(foo, 'bar', { get: function getfoo (){}});"},
-		{"an empty defineProperty shorthand getter", "Object.defineProperty(foo, 'bar', { get(){} });"},
-		{"an empty defineProperty arrow getter", "Object.defineProperty(foo, 'bar', { get: () => {}});"},
-		{"a defineProperty getter whose if has no else", "Object.defineProperty(foo, \"bar\", { get: function (){if(bar) {return true;}}});"},
-		{"a defineProperty getter returning only from a nested function", "Object.defineProperty(foo, \"bar\", { get: function (){ ~function () { return true; }()}});"},
-		{"an empty Reflect.defineProperty getter", "Reflect.defineProperty(foo, 'bar', { get: function (){}});"},
-		{"an empty Object.create getter", "Object.create(foo, { bar: { get: function() {} } })"},
-		{"an empty Object.create shorthand getter", "Object.create(foo, { bar: { get() {} } })"},
-		{"an empty Object.create arrow getter", "Object.create(foo, { bar: { get: () => {} } })"},
-		{"an optional-chained defineProperty", "Object?.defineProperty(foo, 'bar', { get: function (){} });"},
-		{"a parenthesized optional-chained defineProperty", "(Object?.defineProperty)(foo, 'bar', { get: function (){} });"},
+		{"an empty object getter", "var foo = { get bar() {} };", "expected"},
+		{"an empty getter with a newline in its head", "var foo = { get\n bar () {} };", "expected"},
+		{"an if with no else", "var foo = { get bar(){if(baz) {return true;}} };", "expectedAlways"},
+		{"a return inside a nested function only", "var foo = { get bar() { ~function () {return true;}} };", "expected"},
+		{"a bare return with allowImplicit off", "var foo = { get bar() { return; } };", "expected"},
+		{"an empty class getter", "class foo { get bar(){} }", "expected"},
+		{"a static getter with a newline in its head", "var foo = class {\n  static get\nbar(){} }", "expected"},
+		{"a class getter whose if has no else", "class foo { get bar(){ if (baz) { return true; }}}", "expectedAlways"},
+		{"a class getter returning only from a nested function", "class foo { get bar(){ ~function () { return true; }()}}", "expected"},
+		{"an empty defineProperty getter", "Object.defineProperty(foo, 'bar', { get: function (){}});", "expected"},
+		{"an empty named defineProperty getter", "Object.defineProperty(foo, 'bar', { get: function getfoo (){}});", "expected"},
+		{"an empty defineProperty shorthand getter", "Object.defineProperty(foo, 'bar', { get(){} });", "expected"},
+		{"an empty defineProperty arrow getter", "Object.defineProperty(foo, 'bar', { get: () => {}});", "expected"},
+		{"a defineProperty getter whose if has no else", "Object.defineProperty(foo, \"bar\", { get: function (){if(bar) {return true;}}});", "expectedAlways"},
+		{"a defineProperty getter returning only from a nested function", "Object.defineProperty(foo, \"bar\", { get: function (){ ~function () { return true; }()}});", "expected"},
+		{"an empty Reflect.defineProperty getter", "Reflect.defineProperty(foo, 'bar', { get: function (){}});", "expected"},
+		{"an empty Object.create getter", "Object.create(foo, { bar: { get: function() {} } })", "expected"},
+		{"an empty Object.create shorthand getter", "Object.create(foo, { bar: { get() {} } })", "expected"},
+		{"an empty Object.create arrow getter", "Object.create(foo, { bar: { get: () => {} } })", "expected"},
+		{"an optional-chained defineProperty", "Object?.defineProperty(foo, 'bar', { get: function (){} });", "expected"},
+		{"a parenthesized optional-chained defineProperty", "(Object?.defineProperty)(foo, 'bar', { get: function (){} });", "expected"},
 		// A quoted `get` key, written here. Every descriptor case upstream ships spells the key as
 		// the bare identifier `get`, so the arm of the key reader that handles a string literal was
 		// never exercised and a mutant blanking it survived the whole corpus. `{ 'get': fn }` is the
 		// same property as `{ get: fn }` and has to be read the same way.
-		{"a descriptor with a quoted get key", "Object.defineProperty(foo, 'bar', { 'get': function (){} });"},
+		{"a descriptor with a quoted get key", "Object.defineProperty(foo, 'bar', { 'get': function (){} });", "expected"},
 		// Two cases written here rather than imported, and they are what keeps the upward paren walk
 		// alive. Every parenthesized case upstream ships parenthesizes the CALLEE, and that is the
 		// downward walk's job. A mutant neutering the upward walk survived the entire corpus.
@@ -66,14 +66,14 @@ func TestGetterReturnFires(t *testing.T) {
 		// The upward walk exists for a parenthesized DESCRIPTOR, where the parentheses sit between
 		// the object literal and the call argument list, so the parent chain gains a level and the
 		// descriptor stops being found without it.
-		{"a parenthesized descriptor argument", "Object.defineProperty(foo, 'bar', ({ get: function (){} }));"},
-		{"a parenthesized descriptor map argument", "Object.create(foo, ({ bar: { get: function (){} } }));"},
-		{"a try whose catch does not return", "var foo = { get bar() { try { return a(); } catch {} } };"},
-		{"a try whose catch and finally do not return", "var foo = { get bar() { try { return a(); } catch {  } finally {  } } };"},
+		{"a parenthesized descriptor argument", "Object.defineProperty(foo, 'bar', ({ get: function (){} }));", "expected"},
+		{"a parenthesized descriptor map argument", "Object.create(foo, ({ bar: { get: function (){} } }));", "expected"},
+		{"a try whose catch does not return", "var foo = { get bar() { try { return a(); } catch {} } };", "expectedAlways"},
+		{"a try whose catch and finally do not return", "var foo = { get bar() { try { return a(); } catch {  } finally {  } } };", "expectedAlways"},
 		// A labeled block and a `with` block, both written here. Upstream ships neither, so mutants
 		// making the rule stop unwrapping them survived the whole corpus. These are the fail halves:
 		// a label or a `with` wrapping a block that does NOT exit is still a path through.
-		{"a labeled block that does not return", "var foo = { get bar() { outer: { qux(); } } };"},
+		{"a labeled block that does not return", "var foo = { get bar() { outer: { qux(); } } };", "expected"},
 		// Three switch cases written here rather than imported, all three earned by surviving
 		// mutants. Upstream's whole corpus contains exactly ONE switch, and it is the friendliest
 		// possible shape: a default is present and every single clause returns. So three separate
@@ -82,7 +82,7 @@ func TestGetterReturnFires(t *testing.T) {
 		// This one kills the mutant that dropped the every-clause-exits gate. A clause that falls
 		// out of the switch is a path through the getter, and the presence of a default says
 		// nothing about it.
-		{"a switch with a default whose other clause does not return", "var foo = { get bar(){ switch (baz) { case 1: qux(); break; default: return d; } } };"},
+		{"a switch with a default whose other clause does not return", "var foo = { get bar(){ switch (baz) { case 1: qux(); break; default: return d; } } };", "expectedAlways"},
 		// And this one kills the mutant that looked for a CaseClause instead of a DefaultClause when
 		// deciding whether a default exists. Under that mutant a switch made only of case clauses
 		// reads as having a default, every clause returns, and the getter is credited even though a
@@ -94,15 +94,16 @@ func TestGetterReturnFires(t *testing.T) {
 		// mutant and under the original alike, because the block exits on the trailing return and
 		// the switch's own verdict is never consulted. The mutant survived that fixture and the
 		// re-score is the only reason it was noticed.
-		{"a switch with no default at all", "var foo = { get bar(){ switch (baz) { case 1: return a; case 2: return b; } } };"},
+		{"a switch with no default at all", "var foo = { get bar(){ switch (baz) { case 1: return a; case 2: return b; } } };", "expectedAlways"},
 		// And this one kills the mutant that let a TRAILING empty clause pass. `case 1:` with no
 		// statements and nothing after it falls straight out of the switch. An empty clause in the
 		// middle is a deliberate fallthrough and is fine, which is why the check is positional
 		// rather than a blanket refusal of empty clauses.
-		{"a switch whose default is empty and last", "var foo = { get bar(){ switch (baz) { case 1: return a; default: } } };"},
+		{"a switch whose default is empty and last", "var foo = { get bar(){ switch (baz) { case 1: return a; default: } } };", "expectedAlways"},
 		{
 			"a for loop whose only return is inside the body",
 			"\n        var foo = {\n            get bar() {\n                for (let i = 0; i<10; i++) {\n                    return i;\n                }\n            }\n        }",
+			"expectedAlways",
 		},
 		// Written here rather than imported, because upstream has no case like it and a mutation
 		// sweep proved the gap. Its whole corpus contains exactly one `if` carrying an `else`, and
@@ -110,18 +111,19 @@ func TestGetterReturnFires(t *testing.T) {
 		// upstream fixture. Two mutants survived on exactly that: dropping the then-arm conjunct,
 		// and dropping the else-arm conjunct. These two cases are the distinguishing inputs, one
 		// for each conjunct, and each one alone kills only its own mutant.
-		{"an if whose else returns but whose then does not", "var foo = { get bar(){ if (baz) { qux(); } else { return false; } } };"},
-		{"an if whose then returns but whose else does not", "var foo = { get bar(){ if (baz) { return true; } else { qux(); } } };"},
+		{"an if whose else returns but whose then does not", "var foo = { get bar(){ if (baz) { qux(); } else { return false; } } };", "expectedAlways"},
+		{"an if whose then returns but whose else does not", "var foo = { get bar(){ if (baz) { return true; } else { qux(); } } };", "expectedAlways"},
 		{
 			"a while loop whose only return is inside the body",
 			"\n        var foo = {\n            get bar() {\n                let i = 0;\n                while (i < 10) {\n                    return i;\n                }\n            }\n        }",
+			"expectedAlways",
 		},
 	}
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, GetterReturn, getterReturnFile, testCase.sourceText), "expected")
+				rule_testing.RunTyped(t, GetterReturn, getterReturnFile, testCase.sourceText), testCase.id)
 		})
 	}
 }
@@ -135,30 +137,33 @@ func TestGetterReturnFires(t *testing.T) {
 func TestGetterReturnFiresWithAllowImplicit(t *testing.T) {
 	t.Parallel()
 
+	// ESLint's id: `expected` for a getter with no return of its own, or at a bare `return;`, and
+	// `expectedAlways` at the head of one that returns on some paths and falls off the end on another
 	cases := []struct {
 		name       string
 		sourceText string
+		id         string
 	}{
-		{"an empty object getter", "var foo = { get bar() {} };"},
-		{"an if with no else returning implicitly", "var foo = { get bar() {if (baz) {return;}} };"},
-		{"an empty class getter", "class foo { get bar(){} }"},
-		{"a class getter whose if has no else", "class foo { get bar(){if (baz) {return true;} } }"},
-		{"an empty defineProperties getter", "Object.defineProperties(foo, { bar: { get: function () {}} });"},
-		{"a defineProperties getter whose if has no else", "Object.defineProperties(foo, { bar: { get: function (){if(bar) {return true;}}}});"},
-		{"a defineProperties getter returning only from a nested function", "Object.defineProperties(foo, { bar: { get: function () {~function () { return true; }()}} });"},
-		{"an empty defineProperty getter", "Object.defineProperty(foo, \"bar\", { get: function (){}});"},
-		{"an empty Object.create getter", "Object.create(foo, { bar: { get: function (){} } });"},
-		{"an empty Reflect.defineProperty getter", "Reflect.defineProperty(foo, \"bar\", { get: function (){}});"},
-		{"an optional-chained defineProperty", "Object?.defineProperty(foo, 'bar', { get: function (){} });"},
-		{"a parenthesized optional-chained defineProperty", "(Object?.defineProperty)(foo, 'bar', { get: function (){} });"},
-		{"a parenthesized optional-chained Object.create", "(Object?.create)(foo, { bar: { get: function (){} } });"},
+		{"an empty object getter", "var foo = { get bar() {} };", "expected"},
+		{"an if with no else returning implicitly", "var foo = { get bar() {if (baz) {return;}} };", "expectedAlways"},
+		{"an empty class getter", "class foo { get bar(){} }", "expected"},
+		{"a class getter whose if has no else", "class foo { get bar(){if (baz) {return true;} } }", "expectedAlways"},
+		{"an empty defineProperties getter", "Object.defineProperties(foo, { bar: { get: function () {}} });", "expected"},
+		{"a defineProperties getter whose if has no else", "Object.defineProperties(foo, { bar: { get: function (){if(bar) {return true;}}}});", "expectedAlways"},
+		{"a defineProperties getter returning only from a nested function", "Object.defineProperties(foo, { bar: { get: function () {~function () { return true; }()}} });", "expected"},
+		{"an empty defineProperty getter", "Object.defineProperty(foo, \"bar\", { get: function (){}});", "expected"},
+		{"an empty Object.create getter", "Object.create(foo, { bar: { get: function (){} } });", "expected"},
+		{"an empty Reflect.defineProperty getter", "Reflect.defineProperty(foo, \"bar\", { get: function (){}});", "expected"},
+		{"an optional-chained defineProperty", "Object?.defineProperty(foo, 'bar', { get: function (){} });", "expected"},
+		{"a parenthesized optional-chained defineProperty", "(Object?.defineProperty)(foo, 'bar', { get: function (){} });", "expected"},
+		{"a parenthesized optional-chained Object.create", "(Object?.create)(foo, { bar: { get: function (){} } });", "expected"},
 	}
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			rule_testing.ExpectFindings(t,
-				rule_testing.RunWithOptions(t, GetterReturn, getterReturnFile, testCase.sourceText,
-					GetterReturnOptions{AllowImplicit: true}), "expected")
+				rule_testing.RunTypedWithOptions(t, GetterReturn, getterReturnFile, testCase.sourceText,
+					GetterReturnOptions{AllowImplicit: true}), testCase.id)
 		})
 	}
 }
@@ -266,7 +271,7 @@ func TestGetterReturnStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			rule_testing.ExpectClean(t, rule_testing.Run(t, GetterReturn, getterReturnFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, GetterReturn, getterReturnFile, testCase.sourceText))
 		})
 	}
 }
@@ -297,26 +302,33 @@ func TestGetterReturnStaysSilentWithAllowImplicit(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			rule_testing.ExpectClean(t,
-				rule_testing.RunWithOptions(t, GetterReturn, getterReturnFile, testCase.sourceText,
+				rule_testing.RunTypedWithOptions(t, GetterReturn, getterReturnFile, testCase.sourceText,
 					GetterReturnOptions{AllowImplicit: true}))
 		})
 	}
 }
 
-// Upstream's second Tester block, which is the whole of what it says about TypeScript.
-//
-// One pass case, not snapshotted. A getter annotated `boolean | undefined` with a path that returns
-// nothing is correct TypeScript, and upstream declines the entire file rather than reasoning about
-// the annotation. This reproduces the decline rather than the reasoning, which is the same choice
-// upstream made and for the same reason: the compiler already reports the real cases.
-//
-// Written against a `.ts` name deliberately. Every other fixture here uses `.js`, so without this
-// one nothing would notice if the decline were removed.
-func TestGetterReturnDeclinesTypeScript(t *testing.T) {
+// A TypeScript file is checked, as ESLint checks it where the house config turns the rule on in .ts
+// files (#mnmx9s4). oxc's second Tester block pinned the opposite, a getter annotated
+// `boolean | undefined` with a path that returns nothing as clean, by declining every TypeScript file.
+// ESLint reports it, since the rule reads no types, and ESLint is the authority here (#jjfa7qb).
+func TestGetterReturnChecksTypeScript(t *testing.T) {
 	t.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, GetterReturn, "/repository/source/Getter.ts",
-		"var foo = {\n            get bar(): boolean | undefined {\n                if (Math.random() > 0.5) {\n                    return true;\n                }\n            }\n        };"))
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, GetterReturn, getterReturnFile,
+		"var foo = {\n            get bar(): boolean | undefined {\n                if (Math.random() > 0.5) {\n                    return true;\n                }\n            }\n        };"),
+		"expectedAlways")
+}
+
+// A descriptor call whose `Object` is a local is not the platform method, so its `get` is not a
+// getter, as no-setter-return reads it.
+func TestGetterReturnAsksWhetherObjectIsTheGlobal(t *testing.T) {
+	t.Parallel()
+
+	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, GetterReturn, getterReturnFile,
+		"declare let Object: { defineProperty(target: object, key: string, value: object): void };\nObject.defineProperty({}, 'bar', { get: function () {} });"))
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, GetterReturn, getterReturnFile,
+		"Object.defineProperty({}, 'bar', { get: function () {} });"), "expected")
 }
 
 // The span, which the message-id fixtures above cannot see.
@@ -326,22 +338,15 @@ func TestGetterReturnDeclinesTypeScript(t *testing.T) {
 // assertion above. Upstream anchors on the function's head via `getFunctionHeadLoc`, and this pins
 // that we do too, by slicing the source with the finding's own range.
 //
-// Six cases rather than one, because the head is exactly what varies: an object getter's head is
-// `get bar()`, a descriptor getter's is a bare `function ()`, a shorthand's is `get()`, and an
-// arrow's is `() =>`. A range built from the wrong node would still look right on one of them.
+// Six cases rather than one, because the head is exactly what varies. ESLint's `getFunctionHeadLoc`
+// runs from the property to the opening paren of the parameters: an object getter's head is `get bar`,
+// a descriptor function's is `get: function ` (the property is where it starts), a shorthand's is
+// `get`, and an arrow's is `get: `. A range built from the wrong node would still look right on one
+// of them.
 //
-// Upstream oxc labels the whole function span, which is the one place this port deliberately
-// diverges, and it diverges toward ESLint rather than away from both. ESLint reports at
-// `astUtils.getFunctionHeadLoc(node, sourceCode)` (getter-return.js line 91), which is the head and
-// not the body, so the caret lands on the declaration a reader has to change instead of underlining
-// a multi-hundred-line getter entirely. Naming it here because a divergence is fine when it is
-// stated and invisible when it is not.
-//
-// These `want` strings were wrong on the first run and the rule was right. They had been written
-// before the fixtures had ever executed, as `"get bar() "` with a trailing space and
-// `"function (){"` with the brace, on the assumption that the body's start position includes the
-// brace and the whitespace before it. It does not: the range is trivia-trimmed at both ends. That
-// is the case for asserting a span by slicing the source rather than by reasoning about offsets.
+// The port this rule followed ran the head to the body's start, `get bar()` and `function ()`, so
+// every one of ESLint's 35 corpus rows read as a different span until the head followed ESLint's
+// (#jjfa7qb). The newline cases keep the whitespace before the paren, as ESLint's range does.
 func TestGetterReturnPointsAtTheGetterHead(t *testing.T) {
 	t.Parallel()
 
@@ -353,22 +358,22 @@ func TestGetterReturnPointsAtTheGetterHead(t *testing.T) {
 		{
 			"an object getter",
 			"var foo = { get bar() {} };",
-			"get bar()",
+			"get bar",
 		},
 		{
 			"a descriptor getter",
 			"Object.defineProperty(foo, 'bar', { get: function (){}});",
-			"function ()",
+			"get: function ",
 		},
 		{
 			"a descriptor shorthand getter",
 			"Object.defineProperty(foo, 'bar', { get(){} });",
-			"get()",
+			"get",
 		},
 		{
 			"a descriptor arrow getter",
 			"Object.defineProperty(foo, 'bar', { get: () => {}});",
-			"() =>",
+			"get: ",
 		},
 		// Two of upstream's fail cases put a newline inside the head, and they are the reason the
 		// range is built from the declaration's first token to the body's start rather than from
@@ -378,18 +383,18 @@ func TestGetterReturnPointsAtTheGetterHead(t *testing.T) {
 		{
 			"an object getter with a newline in its head",
 			"var foo = { get\n bar () {} };",
-			"get\n bar ()",
+			"get\n bar ",
 		},
 		{
 			"a static class getter with a newline in its head",
 			"var foo = class {\n  static get\nbar(){} }",
-			"static get\nbar()",
+			"static get\nbar",
 		},
 	}
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := rule_testing.Run(t, GetterReturn, getterReturnFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, GetterReturn, getterReturnFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
