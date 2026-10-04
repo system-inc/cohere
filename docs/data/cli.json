@@ -37,6 +37,10 @@
             "usage": "format every file, not only the ones not on record as formatted (implies --format)"
         },
         {
+            "name": "format-only",
+            "usage": "format only, proposing no fixes and running no other phase (implies --format); with --no-fix, the commit gate's format check: every file formatting would change here or in a nested repository is a finding, and so is one the formatter could not read, and the exit is 0 only when there are none"
+        },
+        {
             "name": "lint",
             "usage": "run the lint rules only, reporting their findings without fixing them and without TypeScript's diagnostics"
         },
