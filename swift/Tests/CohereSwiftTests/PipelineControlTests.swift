@@ -193,6 +193,44 @@ struct PipelineControlTests {
         #expect(run.findings == ["cohere-swift/consistency-no-abbreviated-identifier:2"])
     }
 
+    /*
+     The fix record names every file it wrote, once each, with the fixes by rule and whether the formatter changed it, so
+     the front door can list what a run cohered and the count equals the list. A fix, a reformat, and a run that writes
+     nothing.
+     */
+    @Test func theFixRecordNamesEachRewrittenFile() async throws {
+        let fixed = try await Self.run(
+            source: Self.cleanSource + "\nfileprivate func helper() {}\n",
+            mutating: true,
+        )
+        let fixRecord = try #require(fixed.of("fix").first)
+        let changed = try #require(fixRecord["changedFiles"] as? [[String: Any]])
+        #expect(changed.count == fixRecord["filesRewritten"] as? Int)
+        #expect(changed.count == 1)
+        #expect((changed.first?["file"] as? String)?.hasSuffix("Sources/Control/Control.swift") == true)
+        #expect(changed.first?["fixedBy"] as? [String: Int] == ["cohere-swift/private-over-fileprivate": 1])
+        #expect(changed.first?["formatted"] as? Bool == false)
+
+        let reformatted = try await Self.run(
+            source: Self.cleanSource.replacingOccurrences(of: "value * 2", with: "value  *  2"),
+            mutating: true,
+        )
+        let reformattedRecord = try #require(reformatted.of("fix").first)
+        let reformattedFiles = try #require(reformattedRecord["changedFiles"] as? [[String: Any]])
+        #expect(reformattedFiles.count == reformattedRecord["filesRewritten"] as? Int)
+        #expect(reformattedFiles.first?["fixedBy"] as? [String: Int] == [:])
+        #expect(reformattedFiles.first?["formatted"] as? Bool == true)
+
+        let untouched = try await Self.run(source: Self.cleanSource)
+        let untouchedRecord = try #require(untouched.of("fix").first)
+        #expect(
+            untouchedRecord["changedFiles"] as? [[String: Any]] != nil,
+            "an engine that writes the list writes it empty",
+        )
+        #expect((untouchedRecord["changedFiles"] as? [[String: Any]])?.isEmpty == true)
+        #expect(untouchedRecord["filesRewritten"] as? Int == 0)
+    }
+
     /* Contract 2: a file the engine cannot read is a record, between `project` and the first `phase`, and the run is incomplete. */
     @Test func anUnreadableFileIsNamedInARecord() async throws {
         let latin1 = Data("// caf".utf8) + Data([0xE9, 0x0A])

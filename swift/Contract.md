@@ -245,7 +245,9 @@ shader's constants), cases an enum's conformances or raw values may reach, and a
 ```json
 {"kind":"fix","filesConsidered":149,"filesRewritten":2,"fixesApplied":5,"fixesRefused":1,
  "refusalsByReason":{"overlaps another fix":1},"filesReformatted":2,"filesNotFormatted":0,
- "notFormattedReasons":{},"formatScope":"Sources/AhraOsCore"}
+ "notFormattedReasons":{},"formatScope":"Sources/AhraOsCore",
+ "changedFiles":[{"file":"/…/Pane.swift","fixedBy":{"cohere-swift/private-over-fileprivate":3},"formatted":true},
+                 {"file":"/…/Ring.swift","fixedBy":{"cohere-swift/legacy-constructors":2},"formatted":true}]}
 ```
 
 The front door fills an `edit.Summary` from it and prints that summary's `String()`, then
@@ -254,6 +256,19 @@ TypeScript. Every file in scope is formatted the house way. A file the formatter
 (the formatter failed on it, or a file in scope does not parse, so nothing was rewritten) counts in
 `filesNotFormatted` with its reason. A formatter that formatted nothing therefore never reads like
 a formatter that found everything already correct.
+
+`changedFiles` names every file the phase wrote, once each. Each entry carries `fixedBy`, the fixes that
+landed in it counted by the rule that proposed them (empty when only the formatter changed it), and
+`formatted`, whether the formatter changed it. Its length is `filesRewritten`. A run that writes nothing,
+under `--no-fix` or with nothing to change, writes it empty. The front door reads it with #ytqqv8v's
+output: it lists these files and counts them as cohered, and refuses a stream whose list length differs
+from `filesRewritten`. Until then it ignores the field, as below.
+
+The field is additive within contract 3 (@system_cohere_build's ruling on #s4k5yb9). A field this
+document does not list is ignored by the front door, so an older front door loses only the list, never a
+count or a verdict. The counts stay what the verdict reads, and the list never changes an exit code. An
+engine from before the field writes no `changedFiles` at all. The front door reads that as *not listed*,
+never as *no files changed*, and renders the counts alone. `Clean.jsonl` is such a stream.
 
 ### `types`
 

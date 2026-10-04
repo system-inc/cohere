@@ -24,6 +24,8 @@ struct FileFixer {
     struct Result {
         var file: ParsedFile
         var applied: Int
+        /* The applied fixes by the rule that made them, across every pass; its values add up to `applied`. */
+        var appliedByRule: [String: Int]
         var refusalsByReason: [String: Int]
         /* Each enabled rule that applies, with what it found in `file` as returned; nil when the text moved after the last walk. */
         var findingsOfFinalText: [String: [FindingRecord]]?
@@ -36,19 +38,20 @@ struct FileFixer {
     func fix(_ file: ParsedFile) -> Result {
         var current = file
         var applied = 0
+        var appliedByRule: [String: Int] = [:]
         var refusals: [String: Int] = [:]
         var findingsOfFinalText: [String: [FindingRecord]]?
         for _ in 0..<maximumPasses {
             var findingsByRule: [String: [FindingRecord]] = [:]
-            var edits: [FindingRecord.Edit] = []
+            var proposals: [FixApplier.Proposal] = []
             for rule in rules where configuration.severity(of: rule.name) != .off && rule.applies(to: current) {
                 let found = rule.findings(in: current)
                 findingsByRule[rule.name] = found
-                edits.append(contentsOf: found.flatMap(\.fixes))
+                proposals.append(contentsOf: FixApplier.proposals(from: found))
             }
             findingsOfFinalText = findingsByRule
-            guard !edits.isEmpty else { break }
-            let result = FixApplier.apply(edits, to: current.source)
+            guard !proposals.isEmpty else { break }
+            let result = FixApplier.apply(proposals, to: current.source)
             refusals["overlaps another fix", default: 0] += result.refusedOverlapping
             refusals["invalid range", default: 0] += result.refusedInvalidRange
             guard result.applied > 0, result.text != current.source else { break }
@@ -69,12 +72,14 @@ struct FileFixer {
                 packageRoot: current.packageRoot,
             )
             applied += result.applied
+            appliedByRule.merge(result.appliedByRule, uniquingKeysWith: +)
             /* The text moved past what this pass found; only a later pass over it can stand for lint. */
             findingsOfFinalText = nil
         }
         return Result(
             file: current,
             applied: applied,
+            appliedByRule: appliedByRule,
             refusalsByReason: refusals.filter { $0.value > 0 },
             findingsOfFinalText: findingsOfFinalText,
         )

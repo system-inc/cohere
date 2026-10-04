@@ -6,6 +6,19 @@
  a formatter that found every file already correct otherwise print the same zero.
  */
 public struct FixRecord: Codable, Equatable, Sendable {
+    /* One file the phase wrote: the fixes that landed in it by rule, and whether the formatter changed it. */
+    public struct ChangedFile: Codable, Equatable, Sendable {
+        public var file: String
+        public var fixedBy: [String: Int]
+        public var formatted: Bool
+
+        public init(file: String, fixedBy: [String: Int], formatted: Bool) {
+            self.file = file
+            self.fixedBy = fixedBy
+            self.formatted = formatted
+        }
+    }
+
     public var kind = "fix"
     public var filesConsidered: Int
     public var filesRewritten: Int
@@ -16,6 +29,11 @@ public struct FixRecord: Codable, Equatable, Sendable {
     public var filesNotFormatted: Int
     public var notFormattedReasons: [String: Int]
     public var formatScope: String
+    /*
+     Every file written, once each, so its length is `filesRewritten`. Additive within contract 3 (Contract.md): this
+     engine always writes it, and a stream from an engine before it has none, which decodes as nil.
+     */
+    public var changedFiles: [ChangedFile]?
 
     public init(
         filesConsidered: Int,
@@ -27,6 +45,7 @@ public struct FixRecord: Codable, Equatable, Sendable {
         filesNotFormatted: Int,
         notFormattedReasons: [String: Int],
         formatScope: String,
+        changedFiles: [ChangedFile]?,
     ) {
         self.filesConsidered = filesConsidered
         self.filesRewritten = filesRewritten
@@ -37,5 +56,6 @@ public struct FixRecord: Codable, Equatable, Sendable {
         self.filesNotFormatted = filesNotFormatted
         self.notFormattedReasons = notFormattedReasons
         self.formatScope = formatScope
+        self.changedFiles = changedFiles
     }
 }

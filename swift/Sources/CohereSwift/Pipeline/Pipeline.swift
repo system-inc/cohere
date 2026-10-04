@@ -150,7 +150,7 @@ public struct Pipeline {
                 fixRecord(
                     scope: scope,
                     considered: parsed.files.count,
-                    rewritten: 0,
+                    rewritten: [],
                     fixesApplied: 0,
                     refusals: [:],
                     reformatted: 0,
@@ -171,6 +171,7 @@ public struct Pipeline {
             var refusals: [String: Int] = [:]
             var toFormat = parsed.files
             var fixerFindings: [String: [String: [FindingRecord]]] = [:]
+            var fixedByFile: [String: [String: Int]] = [:]
             if options.mutate {
                 let fixer = FileFixer(configuration: configuration, rules: fileRules, maximumPasses: options.fixPasses)
                 /* Each file is fixed on its own, so the files are fixed side by side; results are gathered back in input order. */
@@ -188,6 +189,9 @@ public struct Pipeline {
                 toFormat = zip(files, results).map { file, result in
                     guard let result else { return file }
                     fixesApplied += result.applied
+                    if !result.appliedByRule.isEmpty {
+                        fixedByFile[file.url.path] = result.appliedByRule
+                    }
                     refusals.merge(result.refusalsByReason, uniquingKeysWith: +)
                     if let found = result.findingsOfFinalText {
                         fixerFindings[file.url.path] = found
@@ -201,10 +205,12 @@ public struct Pipeline {
             )
             let formatting = await FormatPhase().run(toFormat)
             var rewritten: [FileSet.OwnedFile] = []
+            var changedFiles: [FixRecord.ChangedFile] = []
             var reformatted = 0
             var notFormatted: [String: Int] = [:]
             for (file, outcome) in formatting.outcomes {
                 var final = file.source
+                var formattedHere = false
                 switch outcome {
                     case .unchanged:
                         break
@@ -212,6 +218,7 @@ public struct Pipeline {
                         if options.mutate {
                             final = formatted
                             reformatted += 1
+                            formattedHere = true
                         }
                         else {
                             /* `--no-fix` writes nothing and reports what it would have changed, one finding per file, at the first line that moves. */
@@ -240,6 +247,13 @@ public struct Pipeline {
                 /* One write per file, of the fixed and formatted text, and only when it differs from what was read. */
                 if options.mutate, final != originals[file.url.path] {
                     try final.write(to: file.url, atomically: true, encoding: .utf8)
+                    changedFiles.append(
+                        FixRecord.ChangedFile(
+                            file: file.url.path,
+                            fixedBy: fixedByFile[file.url.path] ?? [:],
+                            formatted: formattedHere,
+                        )
+                    )
                     rewritten.append(
                         FileSet.OwnedFile(
                             url: file.url,
@@ -264,7 +278,7 @@ public struct Pipeline {
                 fixRecord(
                     scope: scope,
                     considered: parsed.files.count,
-                    rewritten: rewritten.count,
+                    rewritten: changedFiles,
                     fixesApplied: fixesApplied,
                     refusals: refusals,
                     reformatted: reformatted,
@@ -556,7 +570,7 @@ public struct Pipeline {
     private func fixRecord(
         scope: FileScope,
         considered: Int,
-        rewritten: Int,
+        rewritten: [FixRecord.ChangedFile],
         fixesApplied: Int,
         refusals: [String: Int],
         reformatted: Int,
@@ -564,7 +578,7 @@ public struct Pipeline {
     ) -> FixRecord {
         FixRecord(
             filesConsidered: considered,
-            filesRewritten: rewritten,
+            filesRewritten: rewritten.count,
             fixesApplied: fixesApplied,
             fixesRefused: refusals.values.reduce(0, +),
             refusalsByReason: refusals,
@@ -572,6 +586,7 @@ public struct Pipeline {
             filesNotFormatted: notFormatted.values.reduce(0, +),
             notFormattedReasons: notFormatted,
             formatScope: scope.everything ? "every file in the package" : scope.description,
+            changedFiles: rewritten,
         )
     }
 

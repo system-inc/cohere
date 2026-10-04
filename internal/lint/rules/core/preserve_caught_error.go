@@ -1,13 +1,17 @@
 package core
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messagePreserveCaughtError = rule.Message{
-	Id: "preserveCaughtError",
+var messageMissingCause = rule.Message{
+	Id: "missingCause",
 	Description: "This throws a new error out of a catch block without attaching the error that " +
 		"was caught. The original stack, the original message, and whatever the underlying " +
 		"library said about what actually went wrong are all discarded at this line, and what " +
@@ -16,659 +20,519 @@ var messagePreserveCaughtError = rule.Message{
 		"so both halves survive.",
 }
 
-var messageMissingCatchParameter = rule.Message{
-	Id: "missingCatchParameter",
-	Description: "This catch clause declares no parameter, so the error it caught cannot be " +
-		"reached at all. Nothing in the block can log it, inspect it, or re-attach it to " +
-		"whatever gets thrown next, and the information is gone before the first statement " +
-		"runs. Name the parameter so the caught error stays available.",
+var messageIncorrectCause = rule.Message{
+	Id: "incorrectCause",
+	Description: "This error is thrown out of a catch block with a `cause`, but the cause is not " +
+		"the error that was caught. A property of it, a copy made earlier, or an unrelated value " +
+		"each loses something the original carried, usually its stack, and the reader of the log " +
+		"has no way to tell that the chain was cut here. Attach the caught error itself.",
 }
 
-// PreserveCaughtErrorOptions configures whether a bare `catch {}` is itself a finding.
-//
-// The authoritative surface is oxc's `PreserveCaughtErrorOptions`, which derives `JsonSchema` under
-// `serde(rename_all = "camelCase", default, deny_unknown_fields)` and carries exactly one field.
-// The rule inventory records `options: "no"` for this rule and that is wrong: the option exists,
-// upstream's own corpus configures it in both directions, and one of the thirty failing cases
-// reports the second message only because it is set.
-//
-// The default is `false`, which is the Go zero value, so no inversion is needed here. That is
-// checked rather than assumed: the derive is `#[derive(Debug, Default, ...)]` on a struct whose
-// only field is a plain `bool`, and upstream's corpus carries a passing case with
-// `requireCatchParameter: false` alongside a failing case with `true` on the same input. The
-// zero-value fixture below pins it.
+var messageMissingCatchErrorParam = rule.Message{
+	Id: "missingCatchErrorParam",
+	Description: "This throws a new error out of a catch clause that declares no parameter, so the " +
+		"error it caught cannot be reached at all. Nothing in the block can log it, inspect it, or " +
+		"attach it as the `cause` of what is thrown here, and the information is gone before the " +
+		"first statement runs. Name the parameter so the caught error stays available.",
+}
+
+var messagePartiallyLostError = rule.Message{
+	Id: "partiallyLostError",
+	Description: "This catch clause destructures the error it caught, so only the parts it names " +
+		"survive. The stack, and whatever else the pattern does not pick out, is gone before the " +
+		"block runs, and an error thrown from here cannot attach the original as its `cause`. Bind " +
+		"the whole error to a name and destructure it inside the block where that is still useful.",
+}
+
+var messageCaughtErrorShadowed = rule.Message{
+	Id: "caughtErrorShadowed",
+	Description: "This attaches a `cause` spelled like the caught error, but a closer declaration " +
+		"of the same name shadows the catch parameter, so what is attached is that other value. " +
+		"The line reads as preserving the original and does not. Rename the inner declaration so " +
+		"the caught error is the one attached.",
+}
+
+var messageIncludeCause = rule.Message{
+	Id: "includeCause",
+	Description: "Attach the caught error as the `cause` option. This changes what the thrown " +
+		"error carries, so it is offered rather than applied.",
+}
+
+// PreserveCaughtErrorOptions mirrors ESLint's two options. Both default off, which is the Go zero
+// value, so a rule configured as bare `"error"` and an empty object read the same.
 type PreserveCaughtErrorOptions struct {
-	// RequireCatchParameter makes a catch clause with no parameter a finding in its own right.
-	//
-	// Note what it does NOT do. When it fires, the throw statements inside that catch block are not
-	// examined at all: upstream's `check_catch_clause` is an `if let ... else if`, so a parameterless
-	// catch either walks its body (impossible, there is no parameter to compare against) or reports
-	// this one finding about the clause. So the option does not add a second finding to an input
-	// that already reports; it turns silence into exactly one finding, on the clause rather than on
-	// the throw.
+	// RequireCatchParameter makes a throw of a new error inside a catch clause with no parameter a
+	// finding of its own. It reports at each such throw, not at the clause, so a parameterless catch
+	// that throws nothing is still silent.
 	RequireCatchParameter bool `json:"requireCatchParameter"`
+
+	// ErrorClassNames adds constructors beyond the built-in error types, each with the position its
+	// options argument takes. A bare name takes position 2, the built-in Error's own shape.
+	ErrorClassNames []PreserveCaughtErrorClassName `json:"errorClassNames"`
 }
 
-// PreserveCaughtError flags a `throw new Error(...)` inside a catch block that does not attach the
-// caught error as `{ cause: err }`.
+// PreserveCaughtErrorClassName is one entry of `errorClassNames`, in either of its two spellings.
+type PreserveCaughtErrorClassName struct {
+	Name string
+
+	// ArgumentPosition is one-based, as ESLint's schema writes it: 2 means the second argument.
+	ArgumentPosition int
+}
+
+// UnmarshalJSON accepts a bare string or a `{ name, argumentPosition }` object, which is ESLint's
+// `oneOf`.
+//
+// The object is read strictly, which is ESLint's `additionalProperties: false`, and both keys are
+// required. A position below 1 is refused rather than clamped: it would index the arguments at -1,
+// and ESLint's schema sets `minimum: 1` for the same reason.
+func (entry *PreserveCaughtErrorClassName) UnmarshalJSON(raw []byte) error {
+	var name string
+	if err := rule.UnmarshalOptions(raw, &name); err == nil {
+		entry.Name = name
+		entry.ArgumentPosition = 2
+		return nil
+	}
+	var object struct {
+		Name             *string `json:"name"`
+		ArgumentPosition *int    `json:"argumentPosition"`
+	}
+	if err := rule.UnmarshalOptions(raw, &object); err != nil {
+		return err
+	}
+	if object.Name == nil || object.ArgumentPosition == nil {
+		return fmt.Errorf("an errorClassNames object needs both name and argumentPosition")
+	}
+	if *object.ArgumentPosition < 1 {
+		return fmt.Errorf("errorClassNames argumentPosition is %d, and the first argument is 1", *object.ArgumentPosition)
+	}
+	entry.Name = *object.Name
+	entry.ArgumentPosition = *object.ArgumentPosition
+	return nil
+}
+
+// builtInErrorTypes are the global constructors that take a `cause` option, which is ESLint's list
+// and TypeScript's es2022.error.d.ts. AggregateError takes it third, after the errors iterable and
+// the message; every other one takes it second.
+var builtInErrorTypes = map[string]bool{
+	"Error":          true,
+	"EvalError":      true,
+	"RangeError":     true,
+	"ReferenceError": true,
+	"SyntaxError":    true,
+	"TypeError":      true,
+	"URIError":       true,
+	"AggregateError": true,
+}
+
+// PreserveCaughtError flags a new error thrown out of a catch block that does not carry the caught
+// error as its `cause`, following ESLint's rule of the same name.
 //
 //	valid:   try { a() } catch (err) { throw new Error("m", { cause: err }) }
-//	valid:   try { a() } catch (err) { throw new Error("m", { cause: err, extra: 42 }) }
-//	valid:   try { a() } catch (err) { throw new Error("m", { ...opts }) }      // spread may carry it
-//	valid:   try { a() } catch (err) { throw new Error(...args) }               // spread argument
-//	valid:   try { a() } catch (err) { throw new RangeError("m") }              // not one of the three
-//	valid:   import { Error } from "./mine"; try { a() } catch (e) { throw Error("m") }
-//	valid:   try { a() } catch (e) { o = { bar() { throw new Error() } } }      // a nested function
-//	invalid: try { a() } catch (err) { throw new Error("m") }
-//	invalid: try { a() } catch (err) { throw new Error("m", { cause: other }) }
-//	invalid: try { a() } catch (err) { throw new Error("m", { cause: err.message }) }
-//	invalid: try { a() } catch { throw new Error("m") }                         // under the option
+//	valid:   try { a() } catch (err) { throw new Error("m", { "cause": err }) }   // any static key
+//	valid:   try { a() } catch (err) { throw new Error("m", { ...opts }) }        // spread may carry it
+//	valid:   try { a() } catch (err) { throw new Error("m", o) }                  // options it can't see
+//	valid:   try { a() } catch (err) { const f = () => { throw new Error() } }   // a nested function
+//	invalid: try { a() } catch (err) { throw new RangeError("m") }               // missingCause
+//	invalid: try { a() } catch (err) { throw new Error("m", { cause: err.message }) }  // incorrectCause
+//	invalid: try { a() } catch ({ message }) { throw new Error(message) }        // partiallyLostError
 //
-// # The three constructors, and why the list is short
+// # Which throws are examined
 //
-// oxc recognizes exactly `Error`, `TypeError` (options at argument 1) and `AggregateError` (options
-// at argument 2, because its first argument is the errors array). Nothing else. That is narrower
-// than it looks like it should be: `RangeError`, `SyntaxError`, `EvalError`, `ReferenceError` and
-// `URIError` all accept a `cause` option and all are silent here.
+// A throw is examined when its nearest enclosing catch clause is reached without first crossing a
+// function or a class static block. A throw inside a function defined in the catch block runs
+// whenever that function is called, which is not necessarily while the caught error means anything,
+// and that holds for an arrow as much as for a `function`. The port this replaced followed oxc,
+// which stops at a `function` and walks through an arrow; ESLint stops at both, and so does this.
 //
-// ESLint's implementation of the same rule checks eight built-in types and additionally takes an
-// `errorClassNames` option for custom ones. Measured on the release binary rather than reasoned
-// about: `throw new RangeError("m")` in a catch block is silent under oxlint and reports under
-// ESLint. oxc is what the differential harness compares against, so the short list is what ships,
-// and the divergence is recorded here rather than quietly improved on.
+// A throw inside a nested catch is examined against that nested catch, since it is the nearest. A
+// throw in a nested try block or finally block inside an outer catch is examined against the outer
+// one, because no catch clause sits between them.
 //
-// # Global reference, not name matching
+// # Which constructors count
 //
-// The identifier has to resolve to the global. `import { Error } from "./my-custom-error.js"` puts
-// a local `Error` in scope whose constructor signature nobody here knows, and upstream's own corpus
-// carries that exact input as a passing case. This asks the checker where the name is declared: a
-// global is declared in the TypeScript standard library, which is a declaration file, and anything
-// declared in source is a shadow. `resolvesToAGlobal` in this package already answers that question
-// for `no-new-native-nonconstructor` and is reused rather than duplicated.
+// The eight built-in error types, when the name is the global rather than a local binding that
+// shares its spelling: `import { Error } from "./mine"` puts a constructor in scope whose signature
+// nobody here knows. `errorClassNames` adds others by name, as a bare identifier or the property of
+// a dotted member (`new errors.AppError()`), whether or not the name is global, since a project
+// naming its own class means its own class. A built-in global takes its own position even when
+// `errorClassNames` also names it.
 //
-// # Two deliberate non-descents, and one that upstream does NOT make
+// Parentheses are transparent, as they are to ESLint, whose tree has no node for them:
+// `throw (new (Error)("m"))` is a new Error. An optional call (`Error?.("m")`) is not a construction
+// ESLint recognizes, and neither is a type assertion around the thrown value.
 //
-// oxc's walker stubs `visit_function` and `visit_catch_clause` to empty bodies, which are two
-// independent guards holding two different behaviors:
+// # Reading the options argument
 //
-//	a nested function     the caught error is not what that function is throwing about
-//	a nested catch        it has its own caught error and is analyzed on its own try statement
+// The `cause` is the LAST property whose static key is `cause`, because the last one is what the
+// object holds at runtime. A quoted key, a template key and a bracketed literal (`{ ["cause"]: err }`)
+// all name it; a bracketed variable does not, since it names whatever the variable holds. The port
+// this replaced read only a plain identifier key and the first match, as oxc does, so
+// `{ "cause": err }` reported and `{ cause: err, cause: other }` was clean while attaching `other`.
 //
-// Both are reproduced. But `visit_function` covers oxc's `Function` node, and an arrow function is
-// a separate node kind with its own visitor that upstream never stubbed. So an arrow inside a catch
-// block IS descended into and its throws DO report, while a `function` expression, a function
-// declaration, an object method and a class method are all silent. That asymmetry is upstream's
-// and it is almost certainly a bug rather than a decision, but it is measured rather than guessed:
-// on the release binary, `catch (err) { const f = () => { throw new Error("m"); }; f(); }` reports
-// and `catch (err) { const f = function () { throw new Error("m"); }; f(); }` does not. Reproduced,
-// because the harness compares against oxlint and improving on it here would read as a difference.
+// Three shapes are declined rather than guessed at: a spread argument at or before the options
+// position (the positions can't be counted), a spread property in the options (it may carry the
+// cause), and an options argument that is not an object literal (`new Error("m", o)`).
 //
-// # Symbol identity, not name matching, on the cause value
+// # What each finding names
 //
-// `{ cause: err }` is only correct when that `err` is the caught one. Upstream resolves the
-// identifier to a `symbol_id` and compares it against the catch binding's own symbol, so a
-// same-named binding that shadows the parameter is a finding rather than a pass. Upstream's corpus
-// carries that input directly:
+//	missingCause            no `cause` at all, at the throw
+//	incorrectCause          a `cause` naming something else, at that value
+//	caughtErrorShadowed     a `cause` spelled like the parameter but bound by a closer declaration, at the throw
+//	missingCatchErrorParam  a catch with no parameter, under requireCatchParameter, at the throw
+//	partiallyLostError      a destructured catch parameter, at the catch clause, once per such throw
+//
+// The value of a method or accessor named `cause` is its function, which ESLint's tree spans from the
+// type parameters or the opening parenthesis to the end of the body, so that is the span reported.
+// Two `cause` keys report the last one's value with no suggestion, as ESLint does, since rewriting one
+// of two keys reads as fixing a line that still holds a duplicate.
+//
+// # Shadowing
+//
+// A `cause` spelled like the caught error is compared by symbol, not by name. Upstream's corpus
+// carries the case that settles it:
 //
 //	catch (error) { if (whatever) { const error = anotherError; throw new Error("m", { cause: error }); } }
 //
-// Name matching calls that clean. Symbol comparison reports it, which is why this rule declares the
-// checker. Both directions are pinned by fixtures below.
+// A shorthand `{ cause }` names the variable `cause`, so it is the caught error exactly when the
+// parameter is spelled `cause`; its symbol is the value's, read through the shorthand.
 //
-// The comparison is on the symbol pointer rather than through `symbol.Declarations[0]`, because the
-// question here is "are these two identifiers the same binding" rather than "which declaration is
-// this name". A catch parameter has exactly one declaration and cannot merge, so the two spellings
-// agree on this rule's inputs; the pointer comparison is used because it answers the question
-// asked, not because indexing would have been wrong here.
+// # The repair is a suggestion
 //
-// # No parenthesis skipping, in either position, and both were measured
+// Attaching a cause, or replacing a wrong one, changes what the thrown error carries, so the repair
+// needs a person to agree, which is ESLint's reading too. Its shapes are ESLint's: missing arguments
+// before the options slot are written as `""` (and `[]` for AggregateError's errors), an existing
+// options object gains `cause` after its last property (`{}` becomes `{cause: err}`, ESLint's own
+// spacing), and a method, accessor or shorthand `cause` is replaced whole. A custom class missing an
+// argument before its options slot gets no suggestion, since its signature is unknown.
 //
-// Upstream destructures `Expression::Identifier` directly at the callee and at the cause value, so
-// a parenthesis defeats each one. Measured on the release binary: `throw new (Error)("m")` in a
-// catch block is **silent**, and `throw new Error("m", { cause: (err) })` **reports**. Two positions,
-// opposite-looking outcomes, one cause. Adding a paren skip at either site would flip a real
-// verdict, so neither is added and this paragraph is why.
-//
-// # Which `cause` wins when there are two
-//
-// Upstream's scan returns on the FIRST property whose key is the identifier `cause`, so a later one
-// is never read. Measured: `{ cause: err, cause: other }` is **silent** and `{ cause: other, cause: err }`
-// **reports**, which is the opposite of what JavaScript does at runtime, where the last one wins.
-// ESLint takes the last (`causeProperties.at(-1)`) and therefore disagrees on both inputs. oxc's
-// answer is reproduced.
-//
-// The key must be a plain identifier. A string-literal key is not read as `cause` at all:
-// `{ "cause": err }` **reports** on the release binary, where ESLint's `getStaticPropertyName`
-// resolves it and stays clean. Reproduced, and this is also why the fix declines that shape (below).
-//
-// # What is exempt
-//
-//	a spread argument       `throw new Error(...args)` — the arguments cannot be counted
-//	a spread property       `{ ...opts }` — the cause may be in there
-//	a destructured param    `catch ({ message })` has no single name to compare or to write
-//
-// The last is worth naming because ESLint treats it as a distinct finding — `partiallyLostError`,
-// reported on the catch clause. oxc has no such message: a destructured parameter still walks the
-// body, every throw is still checked, and `is_catch_parameter` simply answers false for every value
-// because the binding is not an identifier. So the throw reports with the ordinary message and the
-// clause reports nothing. Upstream's corpus carries `catch ({ message }) { throw new Error(message) }`
-// as a failing case with one diagnostic, which is what settles it.
-//
-// # The repair, and the two shapes it declines
-//
-// Five fix shapes ship, each measured against the release binary rather than read off the source:
-//
-//	no arguments            `new Error()`           → `new Error("", { cause: err })`
-//	no arguments, aggregate `new AggregateError()`  → `new AggregateError([], "", { cause: err })`
-//	arguments short of the  `new Error("m")`        → `new Error("m", { cause: err })`
-//	  options slot          `new AggregateError([])`→ `new AggregateError([], "", { cause: err })`
-//	an empty options object `{}`                    → `{ cause: err }`
-//	options with properties `{ a: 1 }`              → `{ a: 1, cause: err }`
-//	a wrong `cause` value   `{ cause: other }`      → `{ cause: err }`
-//
-// Two shapes report with NO repair, and that is a deliberate narrowing of upstream rather than a
-// gap. Both were measured by running `oxlint --fix` and reading the file it wrote:
-//
-//	{ "cause": err }              upstream writes `{ "cause": err, cause: err }`
-//	{ cause: other, cause: err }  upstream writes `{ cause: err, cause: err }`
-//
-// Both outputs carry a duplicate `cause` key. That is a `no-dupe-keys` violation upstream itself
-// reports, and it changes what the code does, since the last key wins at runtime and the first one
-// is what this rule was reading. A fix is applied unattended, so shipping one that writes a
-// duplicate key into Kirk's tree is worse than shipping no fix for those two inputs. They still
-// report; they simply carry no repair, which is the subset this port can show correct.
-//
-// Upstream also proposes no fix for several inputs it reports, and those are reproduced as-is:
-// an options argument that is not an object literal (`new Error("m", o)`, `new Error("m", 5)`),
-// more arguments than the constructor takes (`new Error("m", {}, 3)`), and an `AggregateError`
-// whose third argument is not an object. All four were measured to report-without-fixing.
-//
-// The repair is a fix rather than a suggestion because attaching a cause cannot change what the
-// surrounding code means: the thrown value is the same error with one more property set, and there
-// is no second valid answer to choose between.
+// One place differs from ESLint on purpose. With type arguments and no arguments,
+// `new Error<() => void>()`, ESLint inserts at the first parenthesis after the callee, which is the
+// one inside the type arguments, and writes `new Error<("", { cause: err }) => void>()`. This inserts
+// at the argument list the parser found, which is the code ESLint meant to write.
 var PreserveCaughtError = rule.Rule{
 	Name: "preserve-caught-error",
 
-	// See the doc above: the discriminations are which binding a `cause` value names, and whether
-	// `Error` is the global or a local shadowing it. Both are symbol questions.
+	// Whether a constructor is the global and whether a `cause` names the caught binding are both
+	// symbol questions.
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		// A rule configured as bare `"error"` is handed nil options rather than a zero struct, so
-		// the assertion below fails and leaves the zero value. That is the correct default here
-		// (upstream's `requireCatchParameter` defaults to false), but it is written as an explicit
-		// two-value assertion rather than a bare one so that the nil path is visible at the site
-		// rather than implied.
+		// A rule configured as bare `"error"` is handed nil options, and the zero struct is the
+		// documented default for both options.
 		parsed, _ := rule.OptionsAs[PreserveCaughtErrorOptions](options)
 
+		// Later entries win, as ESLint's Map.set does: naming one class twice with two positions
+		// takes the second.
+		errorClassPositions := map[string]int{}
+		for _, entry := range parsed.ErrorClassNames {
+			errorClassPositions[entry.Name] = entry.ArgumentPosition
+		}
+
 		return rule.Listeners{
-			ast.KindCatchClause: func(node *ast.Node) {
-				// Reporting on a nil checker would mean reporting every `throw new Error` in every
-				// catch block in the tree, since neither the global test nor the cause comparison
-				// can answer without one. Silence is the only safe direction.
+			ast.KindThrowStatement: func(node *ast.Node) {
+				// Without a checker neither the global test nor the cause comparison can answer, and
+				// a file whose program failed to build should read as a rule that could not run, not
+				// as one complaining only about the findings that need no types. Silence throughout.
 				if ctx.TypeChecker == nil {
 					return
 				}
-
-				clause := node.AsCatchClause()
-				if clause.Block == nil {
-					return
-				}
-
-				binding := catchClauseBinding(clause)
-				if binding == nil {
-					// Upstream's `else if`: a parameterless catch either reports this one finding
-					// or nothing at all, and never walks its body. The throws inside it are not
-					// examined even when the option is on, because there is no caught error to
-					// compare a cause against.
-					if parsed.RequireCatchParameter {
-						ctx.ReportNode(node, messageMissingCatchParameter)
-					}
-					return
-				}
-
-				// The binding may be a destructuring pattern, in which case there is no identifier
-				// to compare a cause value against and no name to write into a repair. Upstream
-				// still walks the body and still reports every throw; `is_catch_parameter` just
-				// answers false for everything. `bindingIdentifier` is nil in that case and the
-				// code below treats it as "nothing can match, and no fix can be built".
-				bindingIdentifier := binding
-				if bindingIdentifier.Kind != ast.KindIdentifier {
-					bindingIdentifier = nil
-				}
-
-				var catchSymbol *ast.Symbol
-				if bindingIdentifier != nil {
-					catchSymbol = ctx.TypeChecker.GetSymbolAtLocation(bindingIdentifier)
-				}
-
-				visitCatchBodyForThrows(ctx, clause.Block, func(throwStatement *ast.Node) {
-					checkThrownError(ctx, throwStatement, bindingIdentifier, catchSymbol)
-				})
+				checkThrowInCatch(ctx, node, parsed.RequireCatchParameter, errorClassPositions)
 			},
 		}
 	},
 }
 
-// catchClauseBinding returns the name node a catch clause binds, or nil for a bare `catch {}`.
-//
-// TypeScript spells the catch parameter as a `VariableDeclaration` hanging off the clause rather
-// than as a parameter, so the name lives one level down. A bare `catch {}` has no declaration at
-// all, which is the case the option above turns into a finding.
-func catchClauseBinding(clause *ast.CatchClause) *ast.Node {
-	if clause.VariableDeclaration == nil {
-		return nil
-	}
-	return clause.VariableDeclaration.Name()
+// constructedError is a thrown `new X(...)` or `X(...)`, with the pieces the rule reads off it.
+type constructedError struct {
+	node          *ast.Node
+	callee        *ast.Node
+	typeArguments *ast.NodeList
+	argumentList  *ast.NodeList
+	arguments     []*ast.Node
 }
 
-// visitCatchBodyForThrows walks a catch block's statements and calls back on every throw statement
-// that upstream's walker would reach.
+// thrownConstruction reads a thrown expression as a construction or call, or answers false.
 //
-// The two stubs upstream writes are reproduced here as two separate early returns, deliberately not
-// merged, because they hold two independent behaviors and a mutation sweep has to be able to tell
-// them apart. See the rule doc for why an arrow function is NOT one of them.
-func visitCatchBodyForThrows(ctx rule.Context, node *ast.Node, onThrow func(*ast.Node)) {
-	if node == nil {
-		return
-	}
-
-	switch node.Kind {
-	case ast.KindThrowStatement:
-		onThrow(node)
-		// A throw's argument can contain another throw only inside a function expression, which
-		// the guard below already declines, so there is nothing further to walk here. Falling
-		// through to the children would be harmless and is omitted only because upstream's
-		// visitor does the same.
-		return
-
-	case ast.KindCatchClause:
-		// A nested catch has its own caught error and is analyzed when the walk reaches its own
-		// try statement. Descending here would compare its throws against the OUTER catch's
-		// parameter, so `catch (a) { try {} catch (b) { throw new Error("m", { cause: b }) } }`
-		// would report despite being upstream's own passing case.
-		return
-
-	case ast.KindFunctionDeclaration, ast.KindFunctionExpression,
-		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor,
-		ast.KindConstructor:
-		// oxc's `visit_function` stub. A throw inside a function defined in the catch block runs
-		// whenever that function is called, which is not necessarily while the caught error is
-		// meaningful. Upstream's corpus pins this with `foo = { bar() { throw new Error(); } }`
-		// as a PASSING case.
-		//
-		// An arrow function is deliberately absent from this list. See the rule doc: oxc's
-		// stub covers its `Function` node only, arrows have their own unstubbed visitor, and
-		// the release binary reports through them. Adding `ast.KindArrowFunction` here would
-		// silence four inputs oxlint reports.
-		return
-	}
-
-	node.ForEachChild(func(child *ast.Node) bool {
-		visitCatchBodyForThrows(ctx, child, onThrow)
-		return false
-	})
-}
-
-// errorOptionsArgumentIndex reports which argument position carries the error options object, and
-// whether the callee is a constructor this rule recognizes at all.
-//
-// The second return is the "is this ours" answer and is why this is one function rather than two:
-// upstream's `error_options_argument_index` returns an `Option<usize>`, where `None` means both
-// "unrecognized name" and "not the global", and every caller treats them identically.
-func errorOptionsArgumentIndex(ctx rule.Context, callee *ast.Node) (int, bool) {
-	// No parenthesis skip. `new (Error)("m")` is silent on the release binary because upstream
-	// destructures the identifier directly, and reproducing that is the whole reason this is a
-	// kind test rather than a call into a skipping accessor.
-	if callee == nil || callee.Kind != ast.KindIdentifier {
-		return 0, false
-	}
-
-	name := callee.Text()
-	if name != "Error" && name != "TypeError" && name != "AggregateError" {
-		return 0, false
-	}
-
-	// A local binding of the same name shadows the global and its signature is unknown, so the
-	// options position cannot be assumed. Upstream's corpus carries the import form as a passing
-	// case.
-	if !resolvesToAGlobal(ctx, callee) {
-		return 0, false
-	}
-
-	if name == "AggregateError" {
-		// AggregateError's first argument is the errors iterable, so the message is second and the
-		// options object is third.
-		return 2, true
-	}
-	return 1, true
-}
-
-// checkThrownError decides whether one throw statement inside a catch block reports, and builds the
-// repair when one can be shown correct.
-func checkThrownError(ctx rule.Context, throwStatement *ast.Node, bindingIdentifier *ast.Node, catchSymbol *ast.Symbol) {
-	thrown := throwStatement.AsThrowStatement().Expression
+// An optional call is declined: ESLint's tree wraps it in a chain expression, which is neither a new
+// expression nor a call, so `throw Error?.("m")` is silent there.
+func thrownConstruction(thrown *ast.Node) (constructedError, bool) {
+	thrown = ast.SkipParentheses(thrown)
 	if thrown == nil {
-		return
+		return constructedError{}, false
 	}
-
-	var callee *ast.Node
-	var arguments []*ast.Node
-	var typeArguments *ast.NodeList
-
+	construction := constructedError{node: thrown}
 	switch thrown.Kind {
 	case ast.KindNewExpression:
 		expression := thrown.AsNewExpression()
-		callee = expression.Expression
-		typeArguments = expression.TypeArguments
-		if expression.Arguments != nil {
-			arguments = expression.Arguments.Nodes
-		}
+		construction.callee = expression.Expression
+		construction.typeArguments = expression.TypeArguments
+		construction.argumentList = expression.Arguments
 	case ast.KindCallExpression:
+		if ast.IsOptionalChain(thrown) {
+			return constructedError{}, false
+		}
 		expression := thrown.AsCallExpression()
-		callee = expression.Expression
-		typeArguments = expression.TypeArguments
-		if expression.Arguments != nil {
-			arguments = expression.Arguments.Nodes
-		}
+		construction.callee = expression.Expression
+		construction.typeArguments = expression.TypeArguments
+		construction.argumentList = expression.Arguments
 	default:
-		// `throw err`, `throw "string"`, `throw foo()` where foo is not an error constructor.
+		return constructedError{}, false
+	}
+	if construction.argumentList != nil {
+		construction.arguments = construction.argumentList.Nodes
+	}
+	return construction, true
+}
+
+// enclosingCatchClause returns the catch clause a throw belongs to, or nil when it is in none or a
+// function or static block comes first.
+func enclosingCatchClause(throwStatement *ast.Node) *ast.Node {
+	for current := throwStatement.Parent; current != nil; current = current.Parent {
+		switch current.Kind {
+		case ast.KindCatchClause:
+			return current
+		case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
+			ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor,
+			ast.KindConstructor, ast.KindClassStaticBlockDeclaration:
+			return nil
+		}
+	}
+	return nil
+}
+
+// errorClassName returns the name a constructor is recognized by: the identifier itself, or the
+// property of a dotted member. A bracketed member and a private name answer empty.
+func errorClassName(callee *ast.Node) string {
+	switch callee.Kind {
+	case ast.KindIdentifier:
+		return callee.Text()
+	case ast.KindPropertyAccessExpression:
+		name := callee.AsPropertyAccessExpression().Name()
+		if name.Kind == ast.KindIdentifier {
+			return name.Text()
+		}
+	}
+	return ""
+}
+
+// checkThrowInCatch decides whether one throw statement reports, and with what.
+func checkThrowInCatch(ctx rule.Context, throwStatement *ast.Node, requireCatchParameter bool, errorClassPositions map[string]int) {
+	construction, isConstruction := thrownConstruction(throwStatement.AsThrowStatement().Expression)
+	if !isConstruction {
+		return
+	}
+	catchClause := enclosingCatchClause(throwStatement)
+	if catchClause == nil {
 		return
 	}
 
-	optionsIndex, recognized := errorOptionsArgumentIndex(ctx, callee)
-	if !recognized {
+	// The structural tests come first and the checker last: most throws in a catch block construct
+	// nothing this rule names.
+	callee := ast.SkipParentheses(construction.callee)
+	className := errorClassName(callee)
+	if className == "" {
+		return
+	}
+	builtIn := callee.Kind == ast.KindIdentifier && builtInErrorTypes[className] && resolvesToAGlobal(ctx, callee)
+	customPosition, isCustom := errorClassPositions[className]
+	if !builtIn && !isCustom {
 		return
 	}
 
-	// An options object already carrying the right cause is the clean case, and it is checked
-	// before the spread test because upstream checks it first.
-	if optionsIndex < len(arguments) && arguments[optionsIndex].Kind == ast.KindObjectLiteralExpression {
-		if objectHasCorrectCause(ctx, arguments[optionsIndex], catchSymbol) {
+	declaration := catchClause.AsCatchClause().VariableDeclaration
+	if declaration == nil {
+		if requireCatchParameter {
+			ctx.ReportNode(throwStatement, messageMissingCatchErrorParam)
+		}
+		return
+	}
+	binding := declaration.Name()
+	if binding.Kind != ast.KindIdentifier {
+		ctx.ReportNode(catchClause, messagePartiallyLostError)
+		return
+	}
+
+	optionsIndex := customPosition - 1
+	if builtIn {
+		optionsIndex = 1
+		if className == "AggregateError" {
+			optionsIndex = 2
+		}
+	}
+
+	causeProperty, known, multipleDefinitions := errorCauseProperty(construction.arguments, optionsIndex)
+	if !known {
+		return
+	}
+
+	if causeProperty == nil {
+		fix, hasFix := missingCauseFix(ctx, construction, builtIn, className == "AggregateError", optionsIndex, binding.Text())
+		if !hasFix {
+			ctx.ReportNode(throwStatement, messageMissingCause)
 			return
 		}
-	}
-
-	// A spread argument makes the positions unknowable: `new Error(...args)` may already be
-	// supplying an options object with a cause in it. Upstream declines the whole throw rather
-	// than guessing, and its corpus carries that input as a passing case.
-	for _, argument := range arguments {
-		if argument.Kind == ast.KindSpreadElement {
-			return
-		}
-	}
-
-	fixes := buildCauseFix(ctx, thrown, callee, typeArguments, arguments, optionsIndex, bindingIdentifier, catchSymbol)
-	if len(fixes) == 0 {
-		ctx.ReportNode(throwStatement, messagePreserveCaughtError)
+		ctx.ReportNodeWithSuggestions(throwStatement, messageMissingCause,
+			rule.Suggestion{Message: messageIncludeCause, Fixes: []rule.Fix{fix}})
 		return
 	}
-	ctx.ReportNodeWithFixes(throwStatement, messagePreserveCaughtError, fixes...)
+
+	value := causePropertyValue(causeProperty)
+	if value == nil || value.Kind != ast.KindIdentifier || value.Text() != binding.Text() {
+		reportIncorrectCause(ctx, causeProperty, value, multipleDefinitions, binding.Text())
+		return
+	}
+
+	var valueSymbol *ast.Symbol
+	if causeProperty.Kind == ast.KindShorthandPropertyAssignment {
+		valueSymbol = ctx.TypeChecker.GetShorthandAssignmentValueSymbol(causeProperty)
+	} else {
+		valueSymbol = ctx.TypeChecker.GetSymbolAtLocation(value)
+	}
+	if valueSymbol != nil && valueSymbol != ctx.TypeChecker.GetSymbolAtLocation(binding) {
+		ctx.ReportNode(throwStatement, messageCaughtErrorShadowed)
+	}
 }
 
-// objectHasCorrectCause reports whether an options object already attaches the caught error.
+// errorCauseProperty finds the property supplying `cause` in the options argument.
 //
-// It answers true in two shapes, and the second is not an approximation of the first. A spread
-// property may expand to a `cause` nobody here can see, so upstream returns true on the first one
-// it meets and stops. A `cause` key whose value is the caught binding is the ordinary clean case.
-//
-// The scan returns on the FIRST `cause` key rather than the last, which is upstream's structure and
-// is measured to matter: `{ cause: err, cause: other }` is silent and `{ cause: other, cause: err }`
-// reports. JavaScript's own answer is the opposite, and ESLint's is too.
-func objectHasCorrectCause(ctx rule.Context, object *ast.Node, catchSymbol *ast.Symbol) bool {
-	for _, property := range object.AsObjectLiteralExpression().Properties.Nodes {
-		if property.Kind == ast.KindSpreadAssignment {
-			return true
+// It answers known false where ESLint answers UNKNOWN_CAUSE and stays silent: a spread argument at or
+// before the options position, a spread property in the options, or options that are not an object
+// literal. Known with a nil property is "no cause at all".
+func errorCauseProperty(arguments []*ast.Node, optionsIndex int) (causeProperty *ast.Node, known bool, multipleDefinitions bool) {
+	for index, argument := range arguments {
+		if argument.Kind == ast.KindSpreadElement && index <= optionsIndex {
+			return nil, false, false
 		}
-		key := causePropertyKeyName(property)
-		if key != "cause" {
-			continue
+	}
+	if optionsIndex >= len(arguments) {
+		return nil, true, false
+	}
+
+	options := ast.SkipParentheses(arguments[optionsIndex])
+	if options.Kind != ast.KindObjectLiteralExpression {
+		return nil, false, false
+	}
+
+	count := 0
+	for _, member := range options.AsObjectLiteralExpression().Properties.Nodes {
+		if member.Kind == ast.KindSpreadAssignment {
+			return nil, false, false
 		}
-		return isCatchParameterValue(ctx, causePropertyValue(property), catchSymbol)
+		if name, isStatic := property.Name(member.Name(), property.Named|property.Quoted|property.Templated|property.Computed); isStatic && name == "cause" {
+			causeProperty = member
+			count++
+		}
 	}
-	return false
+	return causeProperty, true, count > 1
 }
 
-// causePropertyKeyName returns a property's key text, but ONLY when the key is a plain identifier.
-//
-// This is deliberately narrower than `ast.TryGetTextOfPropertyName`, which is the shelf helper a
-// reader will reach for and which resolves a string-literal key, a numeric key, and a computed key
-// holding a literal. Upstream matches `PropertyKey::StaticIdentifier` and nothing else, so
-// `{ "cause": err }` is not read as a cause at all and reports on the release binary. Using the
-// broader helper would silence that input, which is a real divergence rather than a refinement.
-//
-// The narrowness also protects the fix: because a string-literal key is invisible here, a repair
-// that appended `cause: err` to such an object would produce a duplicate key. That fix is declined
-// for exactly this reason, and the two decisions are kept in step by both reading this function.
-func causePropertyKeyName(property *ast.Node) string {
-	name := property.Name()
-	if name == nil || name.Kind != ast.KindIdentifier {
-		return ""
+// causePropertyValue returns the expression a `cause` property holds, with parentheses read through:
+// the initializer, or the name of a shorthand. A method or accessor answers nil, since its value is
+// a function and never the caught error.
+func causePropertyValue(causeProperty *ast.Node) *ast.Node {
+	switch causeProperty.Kind {
+	case ast.KindPropertyAssignment:
+		return ast.SkipParentheses(causeProperty.AsPropertyAssignment().Initializer)
+	case ast.KindShorthandPropertyAssignment:
+		return causeProperty.Name()
 	}
-	return name.Text()
+	return nil
 }
 
-// causePropertyValue returns the value expression of an object literal member, or nil where the
-// member has no value expression of its own.
-//
-// A shorthand (`{ cause }`), a method (`{ cause() {} }`) and an accessor (`{ get cause() {} }`) all
-// return nil, which makes `isCatchParameterValue` answer false for each. That matches upstream,
-// where every one of those falls out of the `Expression::Identifier` destructure, and all three are
-// failing cases in upstream's corpus.
-//
-// This package already has a `propertyValue`, in no_self_assign.go, and it is deliberately NOT
-// reused. That one resolves a shorthand to the name node, which is the right answer for a
-// self-assignment comparison and the wrong one here: it would make `{ cause }` resolve to an
-// identifier spelled `cause`, and the symbol comparison below would then answer on whatever
-// `cause` happens to be in scope. Upstream reports `{ cause }` unconditionally, and its corpus
-// carries that input as a failing case with a fix that rewrites the whole property. Reusing the
-// shelf function here would have silenced it wherever an unrelated `cause` binding existed.
-func causePropertyValue(property *ast.Node) *ast.Node {
-	if property.Kind != ast.KindPropertyAssignment {
-		return nil
-	}
-	return property.AsPropertyAssignment().Initializer
-}
-
-// isCatchParameterValue reports whether an expression is exactly the caught error binding.
-//
-// No parenthesis skip and no unwrapping of any kind. `{ cause: (err) }` and `{ cause: err! }` both
-// report on the release binary because upstream destructures `Expression::Identifier` directly, and
-// this reproduces that by testing the kind rather than reaching through an accessor that skips.
-//
-// The comparison is symbol identity rather than text, which is the whole reason this rule declares
-// the checker. `catch (error) { if (w) { const error = other; throw new Error("m", { cause: error }) } }`
-// is a failing case in upstream's corpus and is clean under any name comparison.
-func isCatchParameterValue(ctx rule.Context, value *ast.Node, catchSymbol *ast.Symbol) bool {
-	if value == nil || catchSymbol == nil {
-		return false
-	}
-	if value.Kind != ast.KindIdentifier {
-		return false
-	}
-	return ctx.TypeChecker.GetSymbolAtLocation(value) == catchSymbol
-}
-
-// buildCauseFix assembles the repair for one reporting throw, or returns nil where no repair can be
-// shown correct.
-//
-// Every shape here was measured by running `oxlint --fix` on the input and reading the file it
-// wrote, rather than by reading the fixer source. Two shapes upstream repairs are deliberately not
-// repaired here because upstream's output carries a duplicate `cause` key; see the rule doc.
-func buildCauseFix(
-	ctx rule.Context,
-	thrown *ast.Node,
-	callee *ast.Node,
-	typeArguments *ast.NodeList,
-	arguments []*ast.Node,
-	optionsIndex int,
-	bindingIdentifier *ast.Node,
-	catchSymbol *ast.Symbol,
-) []rule.Fix {
-	// A destructured catch parameter has no name to write, so upstream returns `fixer.noop()` and
-	// so does this. The finding still lands; only the repair is withheld.
-	if bindingIdentifier == nil {
-		return nil
-	}
-	causeText := "cause: " + bindingIdentifier.Text()
-
-	isAggregate := callee.Kind == ast.KindIdentifier && callee.Text() == "AggregateError"
-
+// reportIncorrectCause reports a `cause` that names something other than the caught error, at its
+// value, with the suggestion to attach the caught one unless there are two `cause` keys.
+func reportIncorrectCause(ctx rule.Context, causeProperty *ast.Node, value *ast.Node, multipleDefinitions bool, caughtName string) {
+	var reported core.TextRange
+	var fix rule.Fix
 	switch {
-	case len(arguments) == 0:
-		// The insertion point is just inside the opening parenthesis of the argument list, which is
-		// NOT simply the character after the callee. Two of upstream's own cases exist to say so:
-		// `new Error/* ( */()` has a parenthesis inside a comment and `new Error<() => void>()` has
-		// two inside the type arguments. Starting the scan after the type arguments where they
-		// exist, and after the callee otherwise, is what steps past both.
-		scanFrom := callee.End()
-		if typeArguments != nil {
-			scanFrom = typeArguments.End()
+	case value == nil:
+		// A method or accessor. ESLint's tree spans the function from its type parameters, or its
+		// opening parenthesis, to the end of its body, and the repair replaces the whole member.
+		start := causeProperty.ParameterList().Pos() - 1
+		if typeParameters := causeProperty.TypeParameterList(); typeParameters != nil {
+			start = typeParameters.Pos() - 1
 		}
-		openParenthesis := findOpeningParenthesis(ctx, scanFrom, thrown.End())
-		if openParenthesis < 0 {
-			// `throw new Error` with no argument list at all is valid JavaScript and there is no
-			// parenthesis to insert after. Upstream reaches `fixer.noop()` here for the same
-			// reason.
-			return nil
-		}
-		inserted := "\"\", { " + causeText + " }"
-		if isAggregate {
-			inserted = "[], " + inserted
-		}
-		return []rule.Fix{rule.ReplaceRange(
-			core.NewTextRange(openParenthesis+1, openParenthesis+1), inserted)}
-
-	case len(arguments) <= optionsIndex:
-		// Arguments are present but stop short of the options slot, so any missing positional
-		// argument between the last one written and the options slot is synthesized as an empty
-		// string before it. For a plain Error, where options are at index 1, the loop body never
-		// runs and this is the plain `new Error("m")` append. For AggregateError, where options
-		// are at index 2, `new AggregateError([])` needs a message inserted first, which is the
-		// case the loop exists for and which upstream's own fix vectors assert.
-		last := arguments[len(arguments)-1]
-		inserted := ", { " + causeText + " }"
-		for position := len(arguments); position < optionsIndex; position++ {
-			inserted = ", \"\"" + inserted
-		}
-		return []rule.Fix{rule.ReplaceRange(
-			core.NewTextRange(last.End(), last.End()), inserted)}
+		reported = core.NewTextRange(start, causeProperty.End())
+		fix = ctx.ReplaceNode(causeProperty, "cause: "+caughtName)
+	case causeProperty.Kind == ast.KindShorthandPropertyAssignment:
+		reported = rule.TokenRange(ctx.SourceFile, value)
+		fix = ctx.ReplaceNode(causeProperty, "cause: "+caughtName)
+	default:
+		reported = rule.TokenRange(ctx.SourceFile, value)
+		fix = ctx.ReplaceNode(value, caughtName)
 	}
 
-	optionsArgument := arguments[optionsIndex]
-	if optionsArgument.Kind != ast.KindObjectLiteralExpression {
-		// `new Error("m", o)` and `new Error("m", 5)`. Upstream reports these and proposes nothing,
-		// because it cannot see inside a value it does not own. Measured on the release binary:
-		// both report and `--fix` leaves the file unchanged.
-		return nil
+	if multipleDefinitions {
+		ctx.ReportRange(reported, messageIncorrectCause)
+		return
 	}
-
-	// More arguments than the constructor takes. `new Error("m", {}, 3)` reports with no repair
-	// upstream, and this reproduces that rather than editing an object whose role is unclear.
-	if len(arguments) > optionsIndex+1 {
-		return nil
-	}
-
-	properties := optionsArgument.AsObjectLiteralExpression().Properties.Nodes
-
-	if len(properties) == 0 {
-		// `{}` → `{ cause: err }`. The insertion goes inside the braces, so the range is the point
-		// just before the closing brace rather than the object's own end.
-		return []rule.Fix{rule.ReplaceRange(
-			core.NewTextRange(optionsArgument.End()-1, optionsArgument.End()-1), " "+causeText+" ")}
-	}
-
-	// An existing `cause` key. The first one is the one upstream reads, so it is the one replaced.
-	for index, property := range properties {
-		if causePropertyKeyName(property) != "cause" {
-			continue
-		}
-
-		// A later `cause` key means the repair would leave two of them in the object, which is
-		// what upstream writes and what this declines. Measured: upstream turns
-		// `{ cause: other, cause: err }` into `{ cause: err, cause: err }`.
-		for _, later := range properties[index+1:] {
-			if causePropertyKeyName(later) == "cause" {
-				return nil
-			}
-		}
-
-		value := causePropertyValue(property)
-		if value == nil {
-			// Shorthand, method, or accessor. Upstream replaces the whole property rather than a
-			// value it does not have, and its corpus asserts exactly that for all three shapes:
-			// `{ cause }`, `{ cause() {} }`, `{ get cause() {} }` all become `{ cause: err }`.
-			return []rule.Fix{ctx.ReplaceNode(property, causeText)}
-		}
-		return []rule.Fix{ctx.ReplaceNode(value, bindingIdentifier.Text())}
-	}
-
-	// No `cause` key that this rule can see. A string-literal key spelled "cause" is invisible to
-	// `causePropertyKeyName` by design, and appending here would produce a duplicate key that
-	// changes what the object means at runtime. Upstream writes that duplicate; this declines.
-	for _, property := range properties {
-		if isStringLiteralCauseKey(property) {
-			return nil
-		}
-	}
-
-	// `{ a: 1 }` → `{ a: 1, cause: err }`. A computed key is deliberately not a reason to decline:
-	// upstream appends past it on the reasoning that a computed key cannot be proven to be
-	// `cause`, and its corpus asserts `{ [cause]: "Some error" }` becoming
-	// `{ [cause]: "Some error", cause: error }`.
-	last := properties[len(properties)-1]
-	return []rule.Fix{rule.ReplaceRange(
-		core.NewTextRange(last.End(), last.End()), ", "+causeText)}
+	ctx.ReportRangeWithSuggestions(reported, messageIncorrectCause,
+		rule.Suggestion{Message: messageIncludeCause, Fixes: []rule.Fix{fix}})
 }
 
-// isStringLiteralCauseKey reports whether a property's key is the string literal "cause".
-//
-// It exists only so the fix can decline that shape. The rule's own reading deliberately does not
-// recognize such a key, matching upstream, so an object carrying one still REPORTS; what this
-// prevents is the repair writing a second `cause` beside it.
-func isStringLiteralCauseKey(property *ast.Node) bool {
-	name := property.Name()
-	if name == nil {
-		return false
+// missingCauseFix builds the edit that attaches the caught error to a construction carrying none, or
+// answers false where ESLint offers nothing.
+func missingCauseFix(ctx rule.Context, construction constructedError, builtIn bool, aggregate bool, optionsIndex int, caughtName string) (rule.Fix, bool) {
+	causeObject := "{ cause: " + caughtName + " }"
+	arguments := construction.arguments
+
+	// The positional arguments a built-in needs before its options, written as ESLint writes them.
+	if builtIn {
+		leading := []string{`""`}
+		if aggregate {
+			leading = []string{"[]", `""`}
+		}
+		if len(arguments) < len(leading) {
+			missing := append(leading[len(arguments):], causeObject)
+			if len(arguments) == 0 {
+				return insertIntoEmptyCall(construction, strings.Join(missing, ", ")), true
+			}
+			return appendAfterLastArgument(arguments, ", "+strings.Join(missing, ", ")), true
+		}
+	} else if len(arguments) < optionsIndex {
+		// A custom signature is unknown, so placeholder arguments would be a guess.
+		return rule.Fix{}, false
 	}
-	if name.Kind != ast.KindStringLiteral && name.Kind != ast.KindNoSubstitutionTemplateLiteral {
-		return false
+
+	if optionsIndex >= len(arguments) {
+		if len(arguments) == 0 {
+			return insertIntoEmptyCall(construction, causeObject), true
+		}
+		return appendAfterLastArgument(arguments, ", "+causeObject), true
 	}
-	return name.Text() == "cause"
+
+	options := ast.SkipParentheses(arguments[optionsIndex])
+	if options.Kind != ast.KindObjectLiteralExpression {
+		return rule.Fix{}, false
+	}
+	properties := options.AsObjectLiteralExpression().Properties
+	if len(properties.Nodes) == 0 {
+		// Directly after the brace, as ESLint inserts: `{}` becomes `{cause: err}`. The list's
+		// position is the point just past the opening brace.
+		return rule.ReplaceRange(core.NewTextRange(properties.Pos(), properties.Pos()), "cause: "+caughtName), true
+	}
+	last := properties.Nodes[len(properties.Nodes)-1]
+	return rule.ReplaceRange(core.NewTextRange(last.End(), last.End()), ", cause: "+caughtName), true
 }
 
-// findOpeningParenthesis returns the offset of the argument list's opening parenthesis, scanning
-// forward from a position the caller has already stepped past the callee and its type arguments.
+// insertIntoEmptyCall writes arguments into a construction that has none.
 //
-// A plain search for the next `(` in the source text would be wrong, and upstream carries two
-// corpus cases proving it: `new Error/* ( */()` puts one inside a comment and
-// `new Error<() => void>()` puts two inside the type arguments. The type-argument half is handled
-// by the caller's scan start; the comment half is handled here by scanning tokens rather than
-// characters.
-func findOpeningParenthesis(ctx rule.Context, from int, to int) int {
-	text := ctx.SourceFile.Text()
-	if from < 0 || to > len(text) || from >= to {
-		return -1
+// The argument list's position is the point just past its opening parenthesis, which the parser
+// found, so a parenthesis inside a comment (`new Error/* ( */()`) or inside type arguments
+// (`new Error<() => void>()`) is never mistaken for it. With no argument list at all,
+// `new Error`, the parentheses are written too, after the callee and any type arguments.
+func insertIntoEmptyCall(construction constructedError, text string) rule.Fix {
+	if construction.argumentList == nil {
+		end := construction.node.End()
+		return rule.ReplaceRange(core.NewTextRange(end, end), "("+text+")")
 	}
+	position := construction.argumentList.Pos()
+	return rule.ReplaceRange(core.NewTextRange(position, position), text)
+}
 
-	position := from
-	for position < to {
-		switch {
-		case text[position] == '(':
-			return position
-		case text[position] == '/' && position+1 < to && text[position+1] == '/':
-			for position < to && text[position] != '\n' {
-				position++
-			}
-		case text[position] == '/' && position+1 < to && text[position+1] == '*':
-			position += 2
-			for position+1 < to && !(text[position] == '*' && text[position+1] == '/') {
-				position++
-			}
-			position += 2
-		default:
-			position++
-		}
-	}
-	return -1
+// appendAfterLastArgument inserts after the last argument, past any parentheses wrapping it and
+// before a trailing comma or comment.
+func appendAfterLastArgument(arguments []*ast.Node, text string) rule.Fix {
+	end := arguments[len(arguments)-1].End()
+	return rule.ReplaceRange(core.NewTextRange(end, end), text)
 }

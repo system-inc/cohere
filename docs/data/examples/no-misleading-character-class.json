@@ -2,7 +2,7 @@
     "rule": "no-misleading-character-class",
     "firing": {
         "file": "/repository/source/Pattern.ts",
-        "source": "/[Á]/",
+        "source": "/[Á]/\n",
         "findings": [
             {
                 "line": 1,
@@ -16,7 +16,7 @@
     },
     "clean": {
         "file": "/repository/source/Pattern.ts",
-        "source": "new RegExp()"
+        "source": "new RegExp()\n"
     },
     "assertedMessageIds": [
         "combiningClassInCharacterClass",

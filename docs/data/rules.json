@@ -975,6 +975,11 @@
             "options": {
                 "elements": "one"
             },
+            "messageIds": [
+                "useBrackets",
+                "useDot"
+            ],
+            "fixKind": "fix",
             "sets": [
                 {
                     "set": "cohere:next",
@@ -5698,7 +5703,8 @@
                 "elements": "one"
             },
             "messageIds": [
-                "expected"
+                "expected",
+                "expectedAlways"
             ],
             "sets": [
                 {
@@ -7233,6 +7239,9 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
+            "messageIds": [
+                "implicitReturn"
+            ],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -7258,7 +7267,10 @@
                     "set": "cohere:typescript",
                     "severity": "error"
                 }
-            ]
+            ],
+            "swift": {
+                "verdict": "Compiler"
+            }
         },
         {
             "name": "nexus/correctness-no-import-cycle-load-time-read",
@@ -12353,10 +12365,13 @@
                 "elements": "one"
             },
             "messageIds": [
-                "missingCatchParameter",
-                "preserveCaughtError"
+                "caughtErrorShadowed",
+                "incorrectCause",
+                "missingCatchErrorParam",
+                "missingCause",
+                "partiallyLostError"
             ],
-            "fixKind": "fix",
+            "fixKind": "suggestion",
             "sets": [
                 {
                     "set": "cohere:next",

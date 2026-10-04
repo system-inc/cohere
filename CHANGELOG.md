@@ -61,3 +61,12 @@ chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
   reports a setter declared through a property descriptor (`Object.defineProperty`,
   `Object.defineProperties`, `Object.create`, `Reflect.defineProperty`). Both rules count a descriptor
   only where its method reads one, and only when `Object` or `Reflect` is the global.
+- `preserve-caught-error` matches ESLint on cause selection and keys. The last `cause` key is the one
+  read, as it is at runtime, and a quoted, template or bracketed-literal key named `cause` counts. A
+  wrong cause reports at its value (`incorrectCause`), a destructured catch parameter at the catch
+  clause (`partiallyLostError`), a cause shadowed by a closer declaration at the throw
+  (`caughtErrorShadowed`), and `requireCatchParameter` at each throw rather than at the clause
+  (`missingCatchErrorParam`); the uncaused throw is `missingCause`. All eight built-in error types
+  count, `errorClassNames` names more, a throw inside an arrow function or static block is no longer
+  examined, parentheses are read through, and options that are not an object literal are left alone.
+  The repair is a suggestion now, not a fix, since attaching a cause changes what the error carries.

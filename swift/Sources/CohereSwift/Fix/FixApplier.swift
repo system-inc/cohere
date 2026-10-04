@@ -7,40 +7,57 @@
  so a fixer that keeps losing to another is visible rather than inert.
  */
 enum FixApplier {
+    /* An edit a rule proposed, kept with the rule's name, so what landed can be told by the rule that made it. */
+    struct Proposal: Equatable {
+        var rule: String
+        var edit: FindingRecord.Edit
+    }
+
     /* The rewritten text and what happened to every edit offered. */
     struct Result: Equatable {
         var text: String
         var applied: Int
+        /* The applied edits by the rule that proposed them; its values add up to `applied`. */
+        var appliedByRule: [String: Int]
         var refusedOverlapping: Int
         var refusedInvalidRange: Int
     }
 
-    static func apply(_ edits: [FindingRecord.Edit], to text: String) -> Result {
+    /* Every fix the findings carry, each with its finding's rule. */
+    static func proposals(from findings: [FindingRecord]) -> [Proposal] {
+        findings.flatMap { finding in finding.fixes.map { Proposal(rule: finding.rule, edit: $0) } }
+    }
+
+    static func apply(_ proposals: [Proposal], to text: String) -> Result {
         var bytes = Array(text.utf8)
         var applied = 0
+        var appliedByRule: [String: Int] = [:]
         var refusedOverlapping = 0
         var refusedInvalidRange = 0
 
         /* Accepted in source order, so "first one wins" means the earliest in the file, the same every run. */
-        var accepted: [FindingRecord.Edit] = []
-        for edit in edits.sorted(by: { ($0.start, $0.end) < ($1.start, $1.end) }) {
+        var accepted: [Proposal] = []
+        for proposal in proposals.sorted(by: { ($0.edit.start, $0.edit.end) < ($1.edit.start, $1.edit.end) }) {
+            let edit = proposal.edit
             guard edit.start >= 0, edit.start <= edit.end, edit.end <= bytes.count else {
                 refusedInvalidRange += 1
                 continue
             }
-            if let previous = accepted.last, edit.start < previous.end {
+            if let previous = accepted.last, edit.start < previous.edit.end {
                 refusedOverlapping += 1
                 continue
             }
-            accepted.append(edit)
+            accepted.append(proposal)
         }
-        for edit in accepted.reversed() {
-            bytes.replaceSubrange(edit.start..<edit.end, with: Array(edit.text.utf8))
+        for proposal in accepted.reversed() {
+            bytes.replaceSubrange(proposal.edit.start..<proposal.edit.end, with: Array(proposal.edit.text.utf8))
             applied += 1
+            appliedByRule[proposal.rule, default: 0] += 1
         }
         return Result(
             text: String(decoding: bytes, as: UTF8.self),
             applied: applied,
+            appliedByRule: appliedByRule,
             refusedOverlapping: refusedOverlapping,
             refusedInvalidRange: refusedInvalidRange,
         )

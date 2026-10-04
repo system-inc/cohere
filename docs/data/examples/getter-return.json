@@ -1,24 +1,25 @@
 {
     "rule": "getter-return",
     "firing": {
-        "file": "/repository/source/Getter.js",
-        "source": "class foo { get bar(){} }",
+        "file": "Getter.ts",
+        "source": "class foo { get bar(){} }\n",
         "findings": [
             {
                 "line": 1,
                 "column": 13,
                 "endLine": 1,
-                "endColumn": 22,
+                "endColumn": 20,
                 "messageId": "expected",
-                "message": "This getter can finish without returning a value, so reading the property yields undefined on that path. Return a value from every path."
+                "message": "This getter never returns a value, so reading the property yields undefined. Return the value it stands for."
             }
         ]
     },
     "clean": {
-        "file": "/repository/source/Getter.js",
-        "source": "var foo = { bar(){} };"
+        "file": "Getter.ts",
+        "source": "var foo = { bar(){} };\n"
     },
     "assertedMessageIds": [
-        "expected"
+        "expected",
+        "expectedAlways"
     ]
 }
