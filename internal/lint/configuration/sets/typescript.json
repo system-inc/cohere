@@ -168,8 +168,8 @@
                 "message": "`JSON.parse` returns `any`, and that `any` flows unchecked into every read downstream, which is where most no-unsafe findings come from. Parse through @nexus/source/structured-text/json/Json instead: `parseJsonOrThrow(text, context, isValue)` with a guard from @nexus/source/validation/Guard when the code reads fields, or `parseJson(text, context)` and handle its 'Invalid' outcome where bad input already falls back. Name the source in `context`. For a deep clone, use `structuredClone`."
             }
         ],
-        "@typescript-eslint/no-base-to-string": "off",
-        "@typescript-eslint/restrict-template-expressions": "off",
+        "@typescript-eslint/no-base-to-string": "error",
+        "@typescript-eslint/restrict-template-expressions": ["error", { "allowNever": true }],
         "@typescript-eslint/unbound-method": "off",
         "@typescript-eslint/no-meaningless-void-operator": "off",
         "@typescript-eslint/require-array-sort-compare": "off",
@@ -428,8 +428,6 @@
         "nexus/correctness-no-process-exit-after-output": "Off on purpose, by @system_cohere's ruling of 2026-10-03 (#h1jwmmz). Its findings are true, but every process entry blocks stdout and stderr, which correctness-require-blocking-standard-streams requires, so an exit after a write has nothing queued to lose. Turn it on only for a project whose entries don't block.",
         "no-useless-rename": "Off until its fix wave reads 0 (#smnjh4c).",
         "strict": "Off until its fix wave reads 0 (#smnjh4c).",
-        "@typescript-eslint/no-base-to-string": "Off until its fix wave reads 0 (#smnjh4c).",
-        "@typescript-eslint/restrict-template-expressions": "Off until its fix wave reads 0 (#smnjh4c).",
         "@typescript-eslint/unbound-method": "Off until its fix wave reads 0 (#smnjh4c).",
         "@typescript-eslint/no-meaningless-void-operator": "Off until its fix wave reads 0 (#smnjh4c).",
         "@typescript-eslint/require-array-sort-compare": "Off until its fix wave reads 0 (#smnjh4c).",
