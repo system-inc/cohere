@@ -139,7 +139,7 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "cohere: building from commit %s, its committed tree only\n", release.ShortCommit(build.Commit))
+	Report.Step("cohere: building from commit %s, its committed tree only", release.ShortCommit(build.Commit))
 
 	// A directory of its own, so two runs building at once never extract over each other.
 	created, err := os.MkdirTemp(paths.SnapshotDirectory(), release.ShortCommit(build.Commit)+"-*")
@@ -201,29 +201,29 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 //
 // It never fails the build: the binary is built and proven, and a prune that could not finish leaves
 // the cache as large as it was, which is the state it started in. It says so instead. Every outcome
-// goes to the prune log, a prune that removed nothing included, and stderr hears only when something
-// was removed, so an ordinary build stays quiet.
+// goes to the prune log, a prune that removed nothing included, and what was removed is a note for
+// --verbose, so an ordinary build stays quiet.
 func pruneAfterBuild(paths Paths, keep string, currentCompiler string) {
 	now := time.Now()
 	plan, err := PlanPrune(paths, []string{keep}, currentCompiler, now)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere: the cache was not pruned: %v\n", err)
+		Report.Fail("cohere: the cache was not pruned: %v", err)
 		return
 	}
 	removed, applyErr := ApplyPrune(paths, plan)
 	if err := RecordPrune(paths, plan, removed, now); err != nil {
-		fmt.Fprintf(os.Stderr, "cohere: the prune log was not written: %v\n", err)
+		Report.Fail("cohere: the prune log was not written: %v", err)
 	}
 	if len(removed) > 0 {
 		bytes := int64(0)
 		for _, file := range removed {
 			bytes += file.Bytes
 		}
-		fmt.Fprintf(os.Stderr, "cohere: pruned %d cached binaries and extractions (%.1f GB) unused for over an hour; names in %s\n",
+		Report.Note("cohere: pruned %d cached binaries and extractions (%.1f GB) unused for over an hour; names in %s",
 			len(removed), float64(bytes)/1e9, paths.PruneLogPath())
 	}
 	if applyErr != nil {
-		fmt.Fprintf(os.Stderr, "cohere: the prune stopped part way: %v\n", applyErr)
+		Report.Fail("cohere: the prune stopped part way: %v", applyErr)
 	}
 	boundGoCacheAfterBuild(paths)
 }
@@ -245,8 +245,7 @@ func ensureCompiler(paths Paths, compilerCommit string) (string, error) {
 		return compiler, nil
 	}
 
-	fmt.Fprintf(os.Stderr, "cohere: extracting the compiler at %s, once per pin (about seven seconds)\n",
-		release.ShortCommit(compilerCommit))
+	Report.Step("cohere: extracting the compiler at %s, once per pin (about seven seconds)", release.ShortCommit(compilerCommit))
 
 	partial, err := os.MkdirTemp(paths.CompilerDirectory(), key+".partial-*")
 	if err != nil {

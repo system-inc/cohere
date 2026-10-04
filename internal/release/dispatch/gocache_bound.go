@@ -131,17 +131,17 @@ func trimAndLog(paths Paths, directory string, capBytes int64, now time.Time) (G
 	return bound, err
 }
 
-// boundGoCacheAfterBuild runs BoundGoCache and says on stderr what it trimmed, or why it could not. It
-// never fails the build that called it: the binary is already built, and a cache over its cap is trimmed
-// by the next build that can.
+// boundGoCacheAfterBuild runs BoundGoCache, noting what it trimmed for --verbose and saying why it could
+// not. It never fails the build that called it: the binary is already built, and a cache over its cap is
+// trimmed by the next build that can.
 func boundGoCacheAfterBuild(paths Paths) {
 	bound, err := BoundGoCache(paths, time.Now())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere: the Go build cache was not bounded: %v\n", err)
+		Report.Fail("cohere: the Go build cache was not bounded: %v", err)
 		return
 	}
 	if bound.Trimmed.Removed > 0 {
-		fmt.Fprintf(os.Stderr, "cohere: trimmed the launcher's Go build cache from %.1f GiB to %.1f GiB, over its %d GiB cap\n",
+		Report.Note("cohere: trimmed the launcher's Go build cache from %.1f GiB to %.1f GiB, over its %d GiB cap",
 			float64(bound.Trimmed.Before)/(1<<30), float64(bound.Trimmed.After)/(1<<30), goCacheCap>>30)
 	}
 }

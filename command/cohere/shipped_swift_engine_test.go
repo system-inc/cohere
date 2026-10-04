@@ -83,7 +83,9 @@ func TestAReleasedCohereRunsTheEngineShippedBesideIt(t *testing.T) {
 	}
 	root := swiftPackage(t, "")
 
-	output, exitCode := runInstalled(t, link, root, "--no-fix")
+	// --verbose, so an engine build would say so: by default a build is silent off a terminal (#ytqqv8v),
+	// and the check below would pass over one.
+	output, exitCode := runInstalled(t, link, root, "--no-fix", "--verbose")
 	if exitCode != 0 {
 		t.Fatalf("a released cohere with its engine beside it exited %d:\n%s", exitCode, output)
 	}
@@ -122,7 +124,8 @@ func TestAReleasedCohereWithNoEngineBesideItNeverBuildsOne(t *testing.T) {
 	})
 	root := swiftPackage(t, checkout)
 
-	output, exitCode := runInstalled(t, binary, root, "--no-fix")
+	// --verbose, so a build from the checkout would say so (see above).
+	output, exitCode := runInstalled(t, binary, root, "--no-fix", "--verbose")
 	if exitCode != 1 {
 		t.Fatalf("a released cohere with no engine exited %d, expected 1:\n%s", exitCode, output)
 	}
