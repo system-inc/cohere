@@ -36,7 +36,7 @@
         "react-hooks/unsupported-syntax": "error",
         "react-hooks/use-memo": "error",
         "react-hooks/void-use-memo": "error",
-        "react/jsx-key": "off",
+        "react/jsx-key": "error",
         "react/no-is-mounted": "error",
         "react/no-render-return-value": "error",
         "react/void-dom-elements-no-children": "error",
@@ -97,7 +97,6 @@
         "react/sort-comp": "off"
     },
     "reasons": {
-        "react/jsx-key": "Off until its fix wave reads 0 (#7hx7g79).",
         "react/boolean-prop-naming": "Upstream's pattern flags open, disabled, active and enabled, which are the DOM's own names (#e4cn6wq Block 4).",
         "react/sort-comp": "We write no class components (#e4cn6wq Block 4)."
     }

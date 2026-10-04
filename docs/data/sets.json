@@ -1458,7 +1458,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 344,
+        "rulesOn": 345,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2877,7 +2877,7 @@
             },
             {
                 "name": "react/jsx-key",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "react/jsx-no-comment-textnodes",

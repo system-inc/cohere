@@ -12717,6 +12717,12 @@
                 "missingIterKey",
                 "missingIterKeyUsePrag",
                 "nonUniqueKeys"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                }
             ]
         },
         {
