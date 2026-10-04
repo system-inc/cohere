@@ -49,12 +49,11 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(t *testing.T) {
 	}
 
 	first := project("tsconfig.tsbuildinfo\n.cache/\n")
-	table := filepath.Join(first, ".cache", "cohere", "table.gob")
 	if _, stderr := run(first, "--no-fix"); strings.Contains(stderr, "does not ignore .cache/") {
 		t.Errorf("a project that ignores .cache/ was warned anyway:\n%s", stderr)
 	}
-	if _, err := os.Stat(table); err != nil {
-		t.Fatalf("the table is not in the project: %v", err)
+	if len(cacheTableFiles(t, first)) == 0 {
+		t.Fatalf("the table is not in the project %s", first)
 	}
 	if entries, _ := os.ReadDir(filepath.Join(home, "Library", "Caches", "cohere")); len(entries) > 0 {
 		t.Fatalf("a project run wrote to the user cache: %v", entries)
@@ -64,8 +63,8 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(t *testing.T) {
 		!strings.Contains(stderr, "add the line `.cache/`") {
 		t.Errorf("a project that does not ignore .cache/ was not told:\n%s", stderr)
 	}
-	if _, err := os.Stat(filepath.Join(second, ".cache", "cohere", "table.gob")); err != nil {
-		t.Fatalf("a second root did not get a table of its own: %v", err)
+	if len(cacheTableFiles(t, second)) == 0 {
+		t.Fatalf("a second root %s did not get a table of its own", second)
 	}
 
 	// The table's own writes move nothing the run records: an unchanged tree replays, and keeps replaying.
@@ -89,9 +88,7 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(t *testing.T) {
 	// Each shape of --no-cache leaves both caches exactly as they were. A writing types run makes the
 	// build info first, so there is one to leave alone. Without the table, since its types section would let
 	// that run replay every file and never open the build info; the run writes a new table too.
-	if err := os.Remove(table); err != nil {
-		t.Fatal(err)
-	}
+	removeCacheTable(t, first)
 	run(first, "--types")
 	// Then a new file, so the build info is behind the tree: an incremental check would rewrite it, and
 	// only a run that does not use it leaves it alone.
@@ -99,7 +96,7 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(t *testing.T) {
 	buildInfo := filepath.Join(first, "tsconfig.tsbuildinfo")
 	snapshot := func() map[string]string {
 		state := map[string]string{}
-		for _, path := range []string{table, buildInfo} {
+		for _, path := range append(cacheTableFiles(t, first), buildInfo) {
 			information, err := os.Stat(path)
 			if err != nil {
 				t.Fatalf("%s: %v", path, err)
@@ -132,9 +129,15 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(t *testing.T) {
 		before := snapshot()
 		output, stderr := run(first, arguments...)
 		after := snapshot()
+		// Both ways, so a table file the run added is caught as surely as one it rewrote.
 		for path := range before {
 			if before[path] != after[path] {
 				t.Errorf("cohere %v changed %s\n--- output\n%s\n--- stderr\n%s", arguments, path, output, stderr)
+			}
+		}
+		for path := range after {
+			if _, existed := before[path]; !existed {
+				t.Errorf("cohere %v created %s\n--- output\n%s\n--- stderr\n%s", arguments, path, output, stderr)
 			}
 		}
 		if !cold.MatchString(output) {

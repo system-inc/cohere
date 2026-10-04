@@ -375,14 +375,15 @@ func TestRunCacheEndToEnd(t *testing.T) {
 		}
 	})
 
-	// A cache table that cannot be trusted is thrown away whole, said so once, and replaced. Overwritten
-	// rather than deleted, because a missing table is a first run and proves nothing about the discard.
+	// A cache table that cannot be trusted is thrown away, file by file, said so once, and replaced.
+	// Overwritten rather than deleted, because a missing table is a first run and proves nothing about the
+	// discard.
 	t.Run("a corrupt cache table is discarded, said so, and rewritten", func(t *testing.T) {
 		establishHit()
 		// The table is the project's own, and the isolated home holds none.
-		tables := []string{cacheTablePath(root)}
-		if _, err := os.Stat(tables[0]); err != nil {
-			t.Fatalf("no cache table in the project: %v", err)
+		tables := cacheTableFiles(t, root)
+		if len(tables) == 0 {
+			t.Fatalf("no cache table in the project %s", root)
 		}
 		filepath.WalkDir(home, func(path string, entry os.DirEntry, err error) error {
 			if err == nil && !entry.IsDir() && strings.HasSuffix(entry.Name(), ".gob") {
@@ -393,8 +394,10 @@ func TestRunCacheEndToEnd(t *testing.T) {
 		if dump, _ := run(true, "--cache-dump"); !strings.Contains(dump, "runs: ") || !strings.Contains(dump, "(bare): recorded ") {
 			t.Fatalf("--cache-dump did not show the bare run it just recorded:\n%s", dump)
 		}
-		if err := os.WriteFile(tables[0], []byte("not a cache table"), 0o600); err != nil {
-			t.Fatal(err)
+		for _, table := range tables {
+			if err := os.WriteFile(table, []byte("not a cache table"), 0o600); err != nil {
+				t.Fatal(err)
+			}
 		}
 		if dump, _ := run(true, "--cache-dump"); !strings.Contains(dump, "cache table discarded") {
 			t.Fatalf("--cache-dump printed a table this build would discard as though it were in use:\n%s", dump)

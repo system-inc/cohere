@@ -54,15 +54,12 @@ import (
 var activeRunCache *runCacheSession
 
 type runCacheSession struct {
-	// tablePath is where this root's cache table lives, invocation the name this run's record goes under
-	// in it, and table what was read from it when the run began.
-	tablePath  string
+	// directory is where this root's cache table lives, invocation the name this run's record goes under
+	// in it, and table what was read from it when the run began: this invocation's run and the sections a
+	// walk reuses.
+	directory  string
 	invocation string
 	table      *program.CacheTable
-
-	// tableSignature is the table file's size and time just before it was read, so the write at the end can
-	// tell whether anything has replaced it since. See write.
-	tableSignature fileSignature
 
 	key      string
 	recorder *program.InputRecorder
@@ -203,32 +200,39 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	}
 
 	prepareCacheDirectory(location.Root)
-	tablePath := cacheTablePath(location.Root)
+	directory := cacheDirectory(location.Root)
+	printPreviousNotes(directory)
 	// The run before this one may still be writing the table after answering its caller, and reading
-	// before its rename would miss what it recorded. See table_lock.go.
-	waitForTableWriter(tablePath, tableWriterWait)
-	// Statted before it is read, never after: a table replaced between the two then reads as replaced at the
-	// end, and is read again, where the other order could keep a stale copy.
-	printPreviousNotes(tablePath)
-	tableSignature := signatureOfFile(tablePath)
-	table, err := program.ReadCacheTable(tablePath, cacheTableIdentity())
-	if errors.Is(err, program.ErrCacheTableUnreadable) || errors.Is(err, program.ErrCacheTablePartlyKept) {
-		// Said once, before the recording starts, so it reaches the terminal and never a replay. A table
-		// thrown away on every run would otherwise look like a cache that is merely cold.
-		fmt.Fprintf(os.Stderr, "note: %v; this run starts cold and writes a new one\n", err)
-	}
+	// before its renames would miss what it recorded, or see its run beside the findings before them. So the
+	// lock is held shared across every file read here. See table_lock.go.
+	release, _ := holdTableReadLock(directory, tableWriterWait)
+	identity := cacheTableIdentity()
+	// This invocation's run first and alone: a replay needs nothing else, and the run is a sixth of the
+	// table's bytes where the whole table was all of them (#45ekc65).
 	invocation := program.CacheTableInvocation(os.Args[1:])
+	table, err := program.ReadCacheTable(directory, identity, program.CacheTableSections{Runs: []string{invocation}})
 	if stored := table.Runs[invocation]; stored.Check(key) == nil {
+		release()
 		replayRunCache(stored)
+	}
+	sections, sectionsError := program.ReadCacheTable(directory, identity,
+		program.CacheTableSections{Findings: true, Signatures: true, Types: true})
+	release()
+	table.Findings, table.Signatures, table.Types = sections.Findings, sections.Signatures, sections.Types
+	for _, readError := range []error{err, sectionsError} {
+		if errors.Is(readError, program.ErrCacheTableUnreadable) || errors.Is(readError, program.ErrCacheTablePartlyKept) {
+			// Said once, before the recording starts, so it reaches the terminal and never a replay. A table
+			// thrown away on every run would otherwise look like a cache that is merely cold.
+			fmt.Fprintf(os.Stderr, "note: %v; this run starts cold and writes what it drops anew\n", readError)
+		}
 	}
 
 	session := &runCacheSession{
-		tablePath:      tablePath,
-		invocation:     invocation,
-		table:          table,
-		tableSignature: tableSignature,
-		key:            key,
-		recorder:       program.NewInputRecorder(),
+		directory:  directory,
+		invocation: invocation,
+		table:      table,
+		key:        key,
+		recorder:   program.NewInputRecorder(),
 		// Taken here, after the cache directory exists and before the build reads anything, so an input
 		// changed after it is one the run may have read before the change. See program.RecordRunCache.
 		readSince: time.Now(),
@@ -244,18 +248,14 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	return session.recorder
 }
 
-// cacheTablePath is the project's cache table, in the project: `<root>/.cache/cohere/table.gob`.
+// cacheDirectory is where cohere keeps what it caches for one project, the cache table's files among it:
+// `<root>/.cache/cohere/`.
 //
 // It lived in the user cache under a hash of the root path, which nothing ever reclaimed. A moved or
 // deleted project left its table behind for good, and 38 of them had piled up by 2026-10-02. In the
 // project it is one folder per project that deleting is always a correct answer for, and a worktree has
 // its own because it is its own root. Every eligible invocation shares it; their recorded runs sit side
-// by side under their own invocation, and their findings are the same findings.
-func cacheTablePath(root string) string {
-	return filepath.Join(cacheDirectory(root), "table.gob")
-}
-
-// cacheDirectory is where cohere keeps what it caches for one project.
+// by side, each in its own file, and their findings are the same findings.
 func cacheDirectory(root string) string {
 	return filepath.Join(root, ".cache", "cohere")
 }
@@ -279,7 +279,7 @@ func prepareCacheDirectory(root string) {
 			return
 		}
 		ignoreFile := filepath.Join(root, ".gitignore")
-		if line, _, err := formatfiles.IgnoringLine(ignoreFile, filepath.Join(".cache", "cohere", "table.gob")); err == nil && line == 0 {
+		if line, _, err := formatfiles.IgnoringLine(ignoreFile, filepath.Join(".cache", "cohere", "findings.gob")); err == nil && line == 0 {
 			fmt.Fprintf(os.Stderr, "note: %s does not ignore .cache/, so cohere's cache in %s would be tracked: add the line `.cache/` to it\n",
 				ignoreFile, cacheDirectory(root))
 		}
@@ -292,38 +292,38 @@ func readFormatSection(root string) *program.FormatSection {
 	if cacheOff {
 		return nil
 	}
-	waitForTableWriter(cacheTablePath(root), tableWriterWait)
-	table, _ := program.ReadCacheTable(cacheTablePath(root), cacheTableIdentity())
+	release, _ := holdTableReadLock(cacheDirectory(root), tableWriterWait)
+	table, _ := program.ReadCacheTable(cacheDirectory(root), cacheTableIdentity(), program.CacheTableSections{Formatted: true})
+	release()
 	return table.Formatted
 }
 
-// writeFormatSection replaces the format record's section and keeps every other section as it is on disk.
-// It stands alone because a run that formats is never a recorded run, so no session is there to carry it.
+// writeFormatSection replaces the format record's file and touches no other. The record is saved where the
+// format phase ends, mid-run, for any run that formats, writing or not; its own file makes that a write of
+// the record alone, about a megabyte on ahra, where it used to be a read and a write of the whole table
+// (#45ekc65).
 func writeFormatSection(root string, section *program.FormatSection) error {
 	if cacheOff {
 		return nil
 	}
 	prepareCacheDirectory(root)
-	path := cacheTablePath(root)
-	identity := cacheTableIdentity()
-	// Held across the read and the write, so a run still writing in the background after answering its
-	// caller cannot land its table between the two and have this write drop what it recorded.
-	release := holdTableLock(path)
+	directory := cacheDirectory(root)
+	release := holdTableLock(directory)
 	defer release()
-	table, _ := program.ReadCacheTable(path, identity)
-	table.Formatted = section
-	return program.WriteCacheTable(path, table, identity)
+	return program.WriteCacheTable(directory, &program.CacheTable{Formatted: section}, cacheTableIdentity(),
+		program.CacheTableSections{Formatted: true})
 }
 
 // dumpCacheTable is `--cache-dump`: what this project's table holds, read by the same build that would use
 // it, so a table this binary would discard says so rather than printing as though it were in use.
 func dumpCacheTable(location projectLocation) error {
-	path := cacheTablePath(location.Root)
-	waitForTableWriter(path, tableWriterWait)
-	table, err := program.ReadCacheTable(path, cacheTableIdentity())
+	directory := cacheDirectory(location.Root)
+	release, _ := holdTableReadLock(directory, tableWriterWait)
+	table, err := program.ReadCacheTable(directory, cacheTableIdentity(), program.EveryCacheTableSection)
+	release()
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			fmt.Printf("no cache table for %s (looked at %s)\n", location.Root, path)
+			fmt.Printf("no cache table for %s (looked in %s)\n", location.Root, directory)
 			return nil
 		}
 		fmt.Printf("%v\n", err)
@@ -331,7 +331,7 @@ func dumpCacheTable(location projectLocation) error {
 			return nil
 		}
 	}
-	program.DumpCacheTable(os.Stdout, path, table, cacheTableIdentity())
+	program.DumpCacheTable(os.Stdout, directory, table, cacheTableIdentity())
 	return nil
 }
 
@@ -450,7 +450,7 @@ func finishRunCache(exitCode int) {
 		// The report is out, so the caller can have its answer while the run is recorded. See sendVerdict.
 		// The table's lock is taken first and held until the table is in place, so a run the caller starts
 		// next waits for this write rather than reading around it. See table_lock.go.
-		release := holdTableLock(session.tablePath)
+		release := holdTableLock(session.directory)
 		sendVerdict(exitCode)
 		var recorded *program.RunCache
 		if session.declared && session.declined == "" {
@@ -461,7 +461,7 @@ func finishRunCache(exitCode int) {
 	} else if record := pendingTypes; record != nil {
 		// A run nothing records still leaves the types section for the next, after its caller has the answer.
 		pendingTypes = nil
-		release := holdTableLock(record.tablePath)
+		release := holdTableLock(record.directory)
 		sendVerdict(exitCode)
 		record.write()
 		release()
@@ -486,77 +486,58 @@ func (session *runCacheSession) record(exitCode int) *program.RunCache {
 	return cache
 }
 
-// write puts this run's record and findings into the table, once.
+// write puts this run's record, findings, shapes and types into the table, each into its own file, once.
 //
-// The table is read again here when anything has replaced it since the run began, because another
-// invocation can have recorded into it: a bare run and `--no-fix` started together each own their own entry,
-// and writing back the copy read seconds ago would erase the other's. Every writer renames a new file into
-// place, which moves the size or the time, so an unchanged signature means the copy read at the start is
-// what is on disk, and decoding the same bytes again would only cost the time (about 13ms on ahra,
-// #a66sfmh). What is lost to a race is a record, which costs a miss; nothing here can make a stale entry
-// match, since every entry carries its own proof.
+// Only this run's files are written: its own invocation's run, and the sections it produced. Another
+// invocation's run is another file, so a bare run and `--no-fix` started together never erase each other's
+// record, and nothing has to be read back first to keep it. Two runs writing the same section is a race the
+// later one wins, which costs a miss; nothing here can make a stale entry match, since every entry carries
+// its own proof.
 //
 // The findings are saved even when the run itself was declined. Their entries are keyed on each file's
 // bytes, so a file the fix phase rewrote left an entry for bytes that no longer exist, which can never
 // match.
 func (session *runCacheSession) write(recorded *program.RunCache) {
-	if recorded == nil && session.findings == nil && session.shapes == nil {
-		return
-	}
-	identity := cacheTableIdentity()
-	table := session.table
-	if current := signatureOfFile(session.tablePath); !current.exists || current != session.tableSignature {
-		table, _ = program.ReadCacheTable(session.tablePath, identity)
-	}
+	table := program.NewCacheTable()
+	var sections program.CacheTableSections
 	if recorded != nil {
 		table.Runs[session.invocation] = recorded
+		sections.Runs = []string{session.invocation}
 	}
 	if session.findings != nil {
 		table.Findings = session.findings.Recorded()
+		sections.Findings = true
 	}
 	if session.shapes != nil {
 		table.Signatures = session.shapes
+		sections.Signatures = true
 	}
 	if session.types != nil {
 		if recorded := session.types.Recorded(); recorded != nil {
 			table.Types = recorded
+			sections.Types = true
 		}
 	}
-	if err := program.WriteCacheTable(session.tablePath, table, identity); err != nil {
+	if err := program.WriteCacheTable(session.directory, table, cacheTableIdentity(), sections); err != nil {
 		session.note(fmt.Sprintf("the cache table could not be written: %v", firstLine(err.Error())))
 	}
-}
-
-// fileSignature is what a stat says about a file: whether it is there, its size and its modification time.
-type fileSignature struct {
-	exists              bool
-	size                int64
-	modifiedNanoseconds int64
-}
-
-func signatureOfFile(path string) fileSignature {
-	information, err := os.Stat(path)
-	if err != nil {
-		return fileSignature{}
-	}
-	return fileSignature{exists: true, size: information.Size(), modifiedNanoseconds: information.ModTime().UnixNano()}
 }
 
 // note says something about recording this run. Before the caller has its verdict it goes to stderr, as
 // it always did; after, the caller has moved on and its terminal may hold someone else's prompt, so it is
 // kept beside the table for the next run to say instead (printPreviousNotes).
 func (session *runCacheSession) note(text string) {
-	cacheNote(session.tablePath, text)
+	cacheNote(session.directory, text)
 }
 
-// cacheNote says something about the cache beside tablePath: on stderr while the caller is still waiting,
-// and to the next run once it has its verdict.
-func cacheNote(tablePath string, text string) {
+// cacheNote says something about the cache in directory: on stderr while the caller is still waiting, and to
+// the next run once it has its verdict.
+func cacheNote(directory string, text string) {
 	if !verdictSent {
 		fmt.Fprintf(os.Stderr, "note: %s\n", text)
 		return
 	}
-	file, err := os.OpenFile(previousNotesPath(tablePath), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	file, err := os.OpenFile(previousNotesPath(directory), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return
 	}
@@ -565,14 +546,14 @@ func cacheNote(tablePath string, text string) {
 }
 
 // previousNotesPath is where a run that answered its caller early keeps what it had to say afterward.
-func previousNotesPath(tablePath string) string {
-	return filepath.Join(filepath.Dir(tablePath), "notes-after-return.txt")
+func previousNotesPath(directory string) string {
+	return filepath.Join(directory, "notes-after-return.txt")
 }
 
 // printPreviousNotes says, once, what the last run recorded after it had already returned, and clears it.
 // A cache write that failed in the background otherwise fails silently forever, the saving quietly gone.
-func printPreviousNotes(tablePath string) {
-	path := previousNotesPath(tablePath)
+func printPreviousNotes(directory string) {
+	path := previousNotesPath(directory)
 	contents, err := os.ReadFile(path)
 	if err != nil {
 		return
@@ -732,7 +713,7 @@ var pendingTypes *typesRecord
 // 3,889. The section is keyed per file on the shape fingerprint and on the compiler options, never on the
 // arguments, so a scoped run may replay what a bare run recorded and the other way round.
 type typesRecord struct {
-	tablePath string
+	directory string
 	reuse     *program.TypeDiagnosticsReuse
 
 	// shapes is every project file's shape this run, kept for the next when computedShapes says any was
@@ -752,31 +733,34 @@ func attachTypesCache(graph *program.Graph, location projectLocation) {
 		return
 	}
 	prepareCacheDirectory(location.Root)
-	tablePath := cacheTablePath(location.Root)
-	waitForTableWriter(tablePath, tableWriterWait)
-	table, _ := program.ReadCacheTable(tablePath, cacheTableIdentity())
-	record := &typesRecord{tablePath: tablePath, reuse: program.NewTypeDiagnosticsReuse(table.Types, typesKey)}
+	directory := cacheDirectory(location.Root)
+	release, _ := holdTableReadLock(directory, tableWriterWait)
+	table, _ := program.ReadCacheTable(directory, cacheTableIdentity(), program.CacheTableSections{Signatures: true, Types: true})
+	release()
+	record := &typesRecord{directory: directory, reuse: program.NewTypeDiagnosticsReuse(table.Types, typesKey)}
 	record.shapes, record.computedShapes = graph.Signatures(context.Background(), graph.SeedSignatures(table.Signatures))
 	graph.Shapes = record.shapes
 	pendingTypes = record
 }
 
-// write puts the section, and the shapes when any was computed, into the table as it is on disk now, and
-// writes nothing when neither moved. The caller holds the table's lock.
+// write puts the section, and the shapes when any was computed, into their files, and writes nothing when
+// neither moved. The caller holds the table's lock.
 func (record *typesRecord) write() {
 	if record.reuse.Unchanged() && record.computedShapes == 0 {
 		return
 	}
-	identity := cacheTableIdentity()
-	table, _ := program.ReadCacheTable(record.tablePath, identity)
+	table := program.NewCacheTable()
+	var sections program.CacheTableSections
 	if recorded := record.reuse.Recorded(); recorded != nil {
 		table.Types = recorded
+		sections.Types = true
 	}
 	if record.computedShapes > 0 {
 		table.Signatures = record.shapes
+		sections.Signatures = true
 	}
-	if err := program.WriteCacheTable(record.tablePath, table, identity); err != nil {
-		cacheNote(record.tablePath, fmt.Sprintf("the cache table could not be written: %v", firstLine(err.Error())))
+	if err := program.WriteCacheTable(record.directory, table, cacheTableIdentity(), sections); err != nil {
+		cacheNote(record.directory, fmt.Sprintf("the cache table could not be written: %v", firstLine(err.Error())))
 	}
 }
 

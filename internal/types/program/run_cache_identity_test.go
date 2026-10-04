@@ -122,7 +122,7 @@ func TestTheCacheDumpNamesTheInputThatKeepsARunFromReplaying(t *testing.T) {
 	table.Runs["--no-fix"] = cache
 	dump := func() string {
 		var out bytes.Buffer
-		program.DumpCacheTable(&out, filepath.Join(directory, "table.gob"), table, program.CacheTableIdentity{})
+		program.DumpCacheTable(&out, directory, table, program.CacheTableIdentity{})
 		return out.String()
 	}
 	if got := dump(); !strings.Contains(got, "now: every input as recorded") {

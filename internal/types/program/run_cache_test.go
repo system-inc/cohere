@@ -273,13 +273,14 @@ func TestRunCacheRecordWatchesEveryDirectoryItself(t *testing.T) {
 // exited zero would pass CI while describing a failure.
 func TestRunCacheReplaysOutputAndExitCodeThroughDisk(t *testing.T) {
 	tree := newRunCacheTree(t)
-	path := filepath.Join(t.TempDir(), "nested", "table.gob")
+	directory := filepath.Join(t.TempDir(), "nested")
 	table := program.NewCacheTable()
 	table.Runs["--no-fix"] = tree.record(t)
-	if err := program.WriteCacheTable(path, table, testIdentity); err != nil {
+	sections := program.CacheTableSections{Runs: []string{"--no-fix"}}
+	if err := program.WriteCacheTable(directory, table, testIdentity, sections); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	read, err := program.ReadCacheTable(path, testIdentity)
+	read, err := program.ReadCacheTable(directory, testIdentity, sections)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -294,7 +295,7 @@ func TestRunCacheReplaysOutputAndExitCodeThroughDisk(t *testing.T) {
 		t.Errorf("exit code %d, want 1: a failing run would replay as passing", loaded.ExitCode)
 	}
 
-	entries, _ := os.ReadDir(filepath.Dir(path))
+	entries, _ := os.ReadDir(directory)
 	if len(entries) != 1 {
 		t.Errorf("the directory holds %d entries, want only the manifest: a temporary was left behind", len(entries))
 	}

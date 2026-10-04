@@ -76,11 +76,11 @@ func TestReturningEarlyChangesNothingTheCallerSees(t *testing.T) {
 					waited.code, waited.stdout, waited.stderr, early.code, early.stdout, early.stderr)
 			}
 
-			// The engine finishes alone after an early return, and what it finishes is the cache table.
-			table := filepath.Join(early.root, ".cache", "cohere", "table.gob")
+			// The engine finishes alone after an early return, and what it finishes is the cache table: a run that
+			// rewrote files records no run of its own, and still writes the sections it produced.
 			deadline := time.Now().Add(30 * time.Second)
 			for {
-				if _, err := os.Stat(table); err == nil {
+				if files, _ := filepath.Glob(filepath.Join(early.root, ".cache", "cohere", "*.gob")); len(files) > 0 {
 					break
 				}
 				if time.Now().After(deadline) {

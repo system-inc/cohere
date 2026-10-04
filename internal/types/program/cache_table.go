@@ -16,12 +16,22 @@ import (
 	"github.com/system-inc/cohere/internal/replace"
 )
 
-// The cache table: everything cohere keeps between runs for one project root, in one file.
+// The cache table: everything cohere keeps between runs for one project root, in one directory.
 //
-// It holds the run cache's recorded runs, one per invocation, and the findings cache's per-file entries.
-// Each section keeps its own key and its own proof, exactly as when they were two JSON files; what
-// changed is that they share one file, one encoding, and one header that decides whether the file may
-// be read at all.
+// It holds the run cache's recorded runs, one per invocation, the findings cache's per-file entries, the
+// shapes, the format record and the types section. Each section keeps its own key and its own proof, and
+// each lives in a file of its own with its own header, so a run reads and writes only the sections it
+// uses (#45ekc65).
+//
+// # Why a file per section
+//
+// They shared one file until 2026-10-04, and replacing any section re-encoded all of them. Measured on
+// ahra's 16 MB table: the format record encodes alone in 0.5ms, and saving it cost a 15ms read and a 21ms
+// write of everything else. Three quarters of the bytes were the recorded runs, about 38,000 inputs per
+// invocation, which only a replay reads, and only its own. Since every section carries its own proof, no
+// section depends on another being written in the same instant, so the files need no atomicity across
+// them: each is written whole and renamed into place, and the table's lock (command/cohere) keeps a reader
+// from seeing one writer's run beside another's findings.
 //
 // # Why gob
 //
@@ -35,22 +45,25 @@ import (
 //
 // gob matches fields by name and skips what it does not recognize, in both directions. A field renamed,
 // added or removed decodes without error into a zero value, which is the silent-default failure this
-// format was chosen to escape, arriving by another door. So the header carries cacheTableVersion, and
-// TestCacheTableShapeIsPinnedToItsVersion fails whenever the shape of what is encoded changes and the
+// format was chosen to escape, arriving by another door. So every file's header carries cacheTableVersion,
+// and TestCacheTableShapeIsPinnedToItsVersion fails whenever the shape of what is encoded changes and the
 // version does not. A changed shape always arrives as a discard, never as a partial read.
 //
 // # Discard, never repair
 //
-// The header names the format, the cohere commit, the compiler commit, the Go toolchain and the platform
-// that wrote the file. Any of them differing, a decode error, or a byte left over after the body is a
-// discard of the whole file: the run starts cold, says so once on stderr, and writes a fresh table. A
-// discard costs one ordinary run. A repaired cache that is wrong costs a green run over a broken tree.
+// Each file's header names the format, the cohere commit, the compiler commit, the Go toolchain, the
+// platform that wrote it, and the section it holds. Any of them differing, a decode error, or a byte left
+// over after the body is a discard of that file alone: the run reads the section as empty, says so once on
+// stderr, and its next write of the section replaces the file. A discard costs one ordinary run. A repaired
+// cache that is wrong costs a green run over a broken tree. The single file the table used to be,
+// table.gob, is removed on sight and never read.
 //
-// One exception, and it is narrow. A table written by another cohere commit, with the same format, compiler,
-// toolchain and platform, keeps its format record and drops everything else. The format record is keyed by
-// the formatter's own identity (FormatSection.Key), which moves only when the formatter can print
-// differently, so a cohere commit that never touched the formatter need not reformat every file. The
-// encoding is still guaranteed by the format version, so nothing here reads a field from the wrong place.
+// One exception, and it is narrow. A format record written by another cohere commit, with the same format,
+// compiler, toolchain and platform, is kept, while every other file from that commit is dropped. The format
+// record is keyed by the formatter's own identity (FormatSection.Key), which moves only when the formatter
+// can print differently, so a cohere commit that never touched the formatter need not reformat every file.
+// The encoding is still guaranteed by the format version, so nothing here reads a field from the wrong
+// place.
 type CacheTable struct {
 	// Runs is one recorded run per invocation, keyed by CacheTableInvocation. A bare run and `--no-fix`
 	// print different reports under different keys, and kept apart they never overwrite each other.
@@ -104,6 +117,8 @@ type CacheTableIdentity struct {
 // half is enforced by TestCacheTableShapeIsPinnedToItsVersion; the meaning half is the reason each
 // section also keeps its own version.
 //
+// 8: one file per section and per recorded run, each with its own header, which names its section.
+//
 // 7: findings entries carry their rules' notes.
 //
 // 6: the types section carries its compiler-options key.
@@ -116,33 +131,83 @@ type CacheTableIdentity struct {
 // design system's key.
 //
 // 2: findings entries carry shape-keyed rules and their fingerprint, and the table holds Signatures.
-const cacheTableVersion = 7
+const cacheTableVersion = 8
 
-// cacheTableMagic opens every table, so a file that is not one is refused on its first field.
+// cacheTableMagic opens every file of the table, so a file that is not one is refused on its first field.
 const cacheTableMagic = "cohere cache table"
 
-// ErrCacheTableUnreadable means the file is not a table this build may use. Never a reason to fail a run:
-// the answer is to run cold and write a new one.
+// ErrCacheTableUnreadable means one or more of the table's files are not ones this build may use. Never a
+// reason to fail a run: the answer is to run without those sections and write them anew.
 var ErrCacheTableUnreadable = errors.New("cache table discarded")
 
-// ErrCacheTablePartlyKept means the table was written by another cohere commit: its format record is kept,
-// for its own key to decide, and its runs and findings are dropped. Reported like a discard, since most of
-// what the table held is gone.
+// ErrCacheTablePartlyKept means the table's files were written by another cohere commit: its format record
+// is kept, for its own key to decide, and every other file is dropped. Reported like a discard, since most
+// of what the table held is gone.
 var ErrCacheTablePartlyKept = errors.New("cache table written by another cohere commit")
 
+// cacheTableHeader opens every file of the table. Section names what the body holds, so a file renamed
+// into another section's place is refused rather than decoded as it.
 type cacheTableHeader struct {
 	Magic    string
 	Version  int
 	Identity CacheTableIdentity
+	Section  string
 }
 
-// cacheTableBody is what follows the header.
-type cacheTableBody struct {
-	Runs       map[string]*RunCache
+// The table's sections, by the name each file's header gives and the file it lives in. A recorded run's
+// file is named for its invocation (cacheTableRunFile).
+const (
+	cacheTableRunSection        = "run"
+	cacheTableFindingsSection   = "findings"
+	cacheTableSignaturesSection = "signatures"
+	cacheTableFormatSection     = "format"
+	cacheTableTypesSection      = "types"
+)
+
+// legacyCacheTableFile is the single file the table was until format 8, removed on sight.
+const legacyCacheTableFile = "table.gob"
+
+// cacheTableRunBody is a recorded run's file. Invocation is checked against the one the file is read for,
+// so a file never answers for an invocation it was not recorded under.
+type cacheTableRunBody struct {
+	Invocation string
+	Run        *RunCache
+}
+
+// cacheTableBodies is every body a file of the table can hold, one field per section, for the shape pin
+// alone: each file holds exactly one of them.
+type cacheTableBodies struct {
+	Run        cacheTableRunBody
 	Findings   *lintCacheWire
 	Signatures map[string]SignatureEntry
 	Formatted  *FormatSection
 	Types      *TypesSection
+}
+
+// CacheTableSections names the parts of a table a read loads or a write replaces. Runs names invocations;
+// AllRuns is every recorded run, which only --cache-dump reads.
+type CacheTableSections struct {
+	Runs       []string
+	AllRuns    bool
+	Findings   bool
+	Signatures bool
+	Formatted  bool
+	Types      bool
+}
+
+// EveryCacheTableSection is the whole table.
+var EveryCacheTableSection = CacheTableSections{AllRuns: true, Findings: true, Signatures: true, Formatted: true, Types: true}
+
+// cacheTableRunFile is the file a recorded run lives in: a hash of its invocation, since an invocation is
+// arguments joined by NUL and no file name can hold it.
+func cacheTableRunFile(invocation string) string {
+	sum := sha256.Sum256([]byte(invocation))
+	return fmt.Sprintf("run-%x.gob", sum[:8])
+}
+
+// cacheTableFile is the file a section other than a run lives in.
+func cacheTableFile(section string) string {
+	return section + ".gob"
 }
 
 // lintCacheWire is the findings section as encoded. Rule lists are stored once and referenced by index:
@@ -226,78 +291,63 @@ func CacheTableInvocation(arguments []string) string {
 	return strings.Join(arguments, "\x00")
 }
 
-// EncodeCacheTable writes a table, header first.
-func EncodeCacheTable(table *CacheTable, identity CacheTableIdentity) ([]byte, error) {
+// encodeCacheTableFile encodes one file of the table: its header, then the section's body.
+func encodeCacheTableFile(section string, body any, identity CacheTableIdentity) ([]byte, error) {
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
-	if err := encoder.Encode(cacheTableHeader{Magic: cacheTableMagic, Version: cacheTableVersion, Identity: identity}); err != nil {
-		return nil, fmt.Errorf("encoding the cache table's header: %w", err)
-	}
-	body := cacheTableBody{Runs: table.Runs, Signatures: table.Signatures, Formatted: table.Formatted, Types: table.Types}
-	if table.Findings != nil {
-		body.Findings = table.Findings.wire()
+	if err := encoder.Encode(cacheTableHeader{Magic: cacheTableMagic, Version: cacheTableVersion, Identity: identity, Section: section}); err != nil {
+		return nil, fmt.Errorf("encoding the %s file's header: %w", section, err)
 	}
 	if err := encoder.Encode(body); err != nil {
-		return nil, fmt.Errorf("encoding the cache table: %w", err)
+		return nil, fmt.Errorf("encoding the %s file: %w", section, err)
 	}
 	return buffer.Bytes(), nil
 }
 
-// DecodeCacheTable reads a table written by EncodeCacheTable under the same identity. Anything else is
-// ErrCacheTableUnreadable, with the reason.
-func DecodeCacheTable(buffer []byte, identity CacheTableIdentity) (*CacheTable, error) {
-	reader := bytes.NewReader(buffer)
+// errWrittenByAnotherCommit is a file whose header differs from this build's only in the cohere commit, the
+// one difference the format record survives.
+var errWrittenByAnotherCommit = errors.New("written by another cohere commit")
+
+// decodeCacheTableFile decodes one file of the table into body, a pointer to the section's type. Anything but
+// a file of this section, written by this build, with nothing after its body, is an error: a file from
+// another cohere commit that differs in nothing else wraps errWrittenByAnotherCommit, and body is still
+// filled, for the one section that may keep it.
+func decodeCacheTableFile(contents []byte, section string, identity CacheTableIdentity, body any) error {
+	reader := bytes.NewReader(contents)
 	decoder := gob.NewDecoder(reader)
 
 	var header cacheTableHeader
 	if err := decoder.Decode(&header); err != nil {
-		return nil, fmt.Errorf("%w: unreadable header: %v", ErrCacheTableUnreadable, err)
+		return fmt.Errorf("unreadable header: %v", err)
 	}
 	if header.Magic != cacheTableMagic {
-		return nil, fmt.Errorf("%w: not a cache table", ErrCacheTableUnreadable)
+		return errors.New("not a cache table file")
 	}
 	if header.Version != cacheTableVersion {
-		return nil, fmt.Errorf("%w: format version %d, this build reads %d", ErrCacheTableUnreadable, header.Version, cacheTableVersion)
+		return fmt.Errorf("format version %d, this build reads %d", header.Version, cacheTableVersion)
 	}
-	onlySelfCommitDiffers := false
+	if header.Section != section {
+		return fmt.Errorf("holds the %s section, read for %s", header.Section, section)
+	}
+	var otherCommit error
 	if header.Identity != identity {
-		otherCommit := header.Identity
-		otherCommit.SelfCommit = identity.SelfCommit
-		if otherCommit != identity {
-			return nil, fmt.Errorf("%w: written by %s, this is %s", ErrCacheTableUnreadable, header.Identity, identity)
+		other := header.Identity
+		other.SelfCommit = identity.SelfCommit
+		if other != identity {
+			return fmt.Errorf("written by %s, this is %s", header.Identity, identity)
 		}
-		onlySelfCommitDiffers = true
+		otherCommit = fmt.Errorf("%w (%s, this is %s)", errWrittenByAnotherCommit, orUnknown(header.Identity.SelfCommit), orUnknown(identity.SelfCommit))
 	}
 
-	var body cacheTableBody
-	if err := decoder.Decode(&body); err != nil {
-		return nil, fmt.Errorf("%w: unreadable body: %v", ErrCacheTableUnreadable, err)
+	if err := decoder.Decode(body); err != nil {
+		return fmt.Errorf("unreadable body: %v", err)
 	}
 	// gob stops at the end of the value it was asked for, so bytes after it would otherwise go unread. A
 	// file longer than its contents is a file something else wrote into.
 	if reader.Len() != 0 {
-		return nil, fmt.Errorf("%w: %d bytes after the body", ErrCacheTableUnreadable, reader.Len())
+		return fmt.Errorf("%d bytes after the body", reader.Len())
 	}
-
-	if onlySelfCommitDiffers {
-		table := NewCacheTable()
-		table.Formatted = body.Formatted
-		return table, fmt.Errorf("%w (%s, this is %s): its runs and findings are dropped, and its format record is kept for its own key to decide",
-			ErrCacheTablePartlyKept, orUnknown(header.Identity.SelfCommit), orUnknown(identity.SelfCommit))
-	}
-
-	table := &CacheTable{Runs: body.Runs, Signatures: body.Signatures, Formatted: body.Formatted, Types: body.Types}
-	if table.Runs == nil {
-		table.Runs = map[string]*RunCache{}
-	}
-	if body.Findings != nil {
-		findings, err := body.Findings.cache()
-		if err != nil {
-			return nil, fmt.Errorf("%w: findings: %v", ErrCacheTableUnreadable, err)
-		}
-		table.Findings = findings
-	}
-	return table, nil
+	return otherCommit
 }
 
 func (identity CacheTableIdentity) String() string {
@@ -412,46 +462,179 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 	return cache, nil
 }
 
-// ReadCacheTable loads a table. It always returns one: the table on disk when it is readable, what may be
-// kept of it when another cohere commit wrote it, and an empty one otherwise. The error says why it is not
-// whole. A missing file wraps os.ErrNotExist, which is a first run and nothing to report. Anything else
-// wraps ErrCacheTableUnreadable or ErrCacheTablePartlyKept, which a caller reports, because a cache that
-// is silently thrown away every run is a saving that quietly never appears.
-func ReadCacheTable(path string, identity CacheTableIdentity) (*CacheTable, error) {
-	contents, err := os.ReadFile(path)
-	if err != nil {
+// ReadCacheTable loads the named sections of the table in directory. It always returns a table: every
+// section whose file is readable, the format record from another cohere commit, and nothing for the rest.
+// The error says what was not kept. Nothing on disk at all wraps os.ErrNotExist, which is a first run and
+// nothing to report. Anything else wraps ErrCacheTableUnreadable or ErrCacheTablePartlyKept, which a
+// caller reports, because a cache that is silently thrown away every run is a saving that quietly never
+// appears.
+//
+// The single table.gob of earlier formats is removed here, unread.
+func ReadCacheTable(directory string, identity CacheTableIdentity, sections CacheTableSections) (*CacheTable, error) {
+	os.Remove(filepath.Join(directory, legacyCacheTableFile))
+	table := NewCacheTable()
+	found := false
+	var dropped []string
+	anotherCommit := ""
+	onlyAnotherCommit := true
+	read := func(name string, section string, body any) bool {
+		contents, err := os.ReadFile(filepath.Join(directory, name))
 		if errors.Is(err, os.ErrNotExist) {
-			return NewCacheTable(), err
+			return false
 		}
-		return NewCacheTable(), fmt.Errorf("%w: %v", ErrCacheTableUnreadable, err)
+		found = true
+		if err == nil {
+			err = decodeCacheTableFile(contents, section, identity, body)
+		}
+		switch {
+		case err == nil:
+			return true
+		case errors.Is(err, errWrittenByAnotherCommit):
+			if section == cacheTableFormatSection {
+				return true
+			}
+			anotherCommit = strings.TrimPrefix(err.Error(), errWrittenByAnotherCommit.Error()+" ")
+			dropped = append(dropped, name)
+		default:
+			onlyAnotherCommit = false
+			dropped = append(dropped, fmt.Sprintf("%s (%v)", name, err))
+		}
+		return false
 	}
-	table, err := DecodeCacheTable(contents, identity)
-	if errors.Is(err, ErrCacheTablePartlyKept) {
-		return table, err
+
+	invocations := sections.Runs
+	if sections.AllRuns {
+		invocations = nil
+		names, _ := filepath.Glob(filepath.Join(directory, "run-*.gob"))
+		for _, name := range names {
+			var body cacheTableRunBody
+			if read(filepath.Base(name), cacheTableRunSection, &body) && body.Run != nil {
+				table.Runs[body.Invocation] = body.Run
+			}
+		}
 	}
-	if err != nil {
-		return NewCacheTable(), err
+	for _, invocation := range invocations {
+		var body cacheTableRunBody
+		name := cacheTableRunFile(invocation)
+		if !read(name, cacheTableRunSection, &body) || body.Run == nil {
+			continue
+		}
+		if body.Invocation != invocation {
+			onlyAnotherCommit = false
+			dropped = append(dropped, fmt.Sprintf("%s (recorded for another invocation)", name))
+			continue
+		}
+		table.Runs[invocation] = body.Run
 	}
-	return table, nil
+	if sections.Findings {
+		var wire *lintCacheWire
+		if read(cacheTableFile(cacheTableFindingsSection), cacheTableFindingsSection, &wire) && wire != nil {
+			findings, err := wire.cache()
+			if err != nil {
+				onlyAnotherCommit = false
+				dropped = append(dropped, fmt.Sprintf("%s (%v)", cacheTableFile(cacheTableFindingsSection), err))
+			} else {
+				table.Findings = findings
+			}
+		}
+	}
+	if sections.Signatures {
+		var signatures map[string]SignatureEntry
+		if read(cacheTableFile(cacheTableSignaturesSection), cacheTableSignaturesSection, &signatures) {
+			table.Signatures = signatures
+		}
+	}
+	if sections.Formatted {
+		var formatted *FormatSection
+		if read(cacheTableFile(cacheTableFormatSection), cacheTableFormatSection, &formatted) {
+			table.Formatted = formatted
+		}
+	}
+	if sections.Types {
+		var types *TypesSection
+		if read(cacheTableFile(cacheTableTypesSection), cacheTableTypesSection, &types) {
+			table.Types = types
+		}
+	}
+
+	switch {
+	case len(dropped) == 0 && !found:
+		return table, fmt.Errorf("no cache table in %s: %w", directory, os.ErrNotExist)
+	case len(dropped) == 0:
+		return table, nil
+	case onlyAnotherCommit:
+		return table, fmt.Errorf("%w %s: %s dropped, and its format record is kept for its own key to decide",
+			ErrCacheTablePartlyKept, anotherCommit, strings.Join(dropped, ", "))
+	default:
+		return table, fmt.Errorf("%w: %s", ErrCacheTableUnreadable, strings.Join(dropped, ", "))
+	}
 }
 
-// beforeCacheTableRename, when set, runs between writing the temporary and renaming it into place. Only a
-// test sets it, to stop a writer at the one moment a kill could matter.
+// beforeCacheTableRename, when set, runs between writing a temporary and renaming it into place. Only a test
+// sets it, to stop a writer at the one moment a kill could matter.
 var beforeCacheTableRename func(temporaryName string)
 
-// WriteCacheTable persists a table atomically: a temporary in the destination directory, then a rename.
-// Two runs can share a tree, and a reader must never see half a table. A run that returned to its caller
-// early writes after the caller has moved on, where nothing stops a kill landing mid-write; the rename is
-// what keeps the old table whole if one does (TestAWriterKilledBeforeItsRenameLeavesTheOldTable).
-func WriteCacheTable(path string, table *CacheTable, identity CacheTableIdentity) error {
-	encoded, err := EncodeCacheTable(table, identity)
-	if err != nil {
-		return err
-	}
-	directory := filepath.Dir(path)
+// WriteCacheTable writes the named sections of table into directory, each to its own file, and leaves every
+// other file as it is. A section named but nil in table is not written, so a run that has nothing to say
+// about a section never erases what another run left there.
+//
+// Each file is written atomically: a temporary in the directory, then a rename. Two runs can share a tree,
+// and a reader must never see half a file. A run that returned to its caller early writes after the caller
+// has moved on, where nothing stops a kill landing mid-write; the rename is what keeps the old file whole if
+// one does (TestAWriterKilledBeforeItsRenameLeavesTheOldTable). Files are not atomic with each other, and
+// need not be: each carries its own proof, and the table's lock orders whole writes against reads.
+func WriteCacheTable(directory string, table *CacheTable, identity CacheTableIdentity, sections CacheTableSections) error {
 	if err := os.MkdirAll(directory, 0o755); err != nil {
 		return fmt.Errorf("creating %s: %w", directory, err)
 	}
+	write := func(name string, section string, body any) error {
+		encoded, err := encodeCacheTableFile(section, body, identity)
+		if err != nil {
+			return err
+		}
+		return writeCacheTableFile(filepath.Join(directory, name), encoded)
+	}
+	invocations := sections.Runs
+	if sections.AllRuns {
+		invocations = invocations[:0:0]
+		for invocation := range table.Runs {
+			invocations = append(invocations, invocation)
+		}
+		sort.Strings(invocations)
+	}
+	for _, invocation := range invocations {
+		if run := table.Runs[invocation]; run != nil {
+			if err := write(cacheTableRunFile(invocation), cacheTableRunSection, cacheTableRunBody{Invocation: invocation, Run: run}); err != nil {
+				return err
+			}
+		}
+	}
+	if sections.Findings && table.Findings != nil {
+		if err := write(cacheTableFile(cacheTableFindingsSection), cacheTableFindingsSection, table.Findings.wire()); err != nil {
+			return err
+		}
+	}
+	if sections.Signatures && table.Signatures != nil {
+		if err := write(cacheTableFile(cacheTableSignaturesSection), cacheTableSignaturesSection, table.Signatures); err != nil {
+			return err
+		}
+	}
+	if sections.Formatted && table.Formatted != nil {
+		if err := write(cacheTableFile(cacheTableFormatSection), cacheTableFormatSection, table.Formatted); err != nil {
+			return err
+		}
+	}
+	if sections.Types && table.Types != nil {
+		if err := write(cacheTableFile(cacheTableTypesSection), cacheTableTypesSection, table.Types); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// writeCacheTableFile writes one file through a temporary beside it and a rename.
+func writeCacheTableFile(path string, encoded []byte) error {
+	directory := filepath.Dir(path)
 	temporary, err := os.CreateTemp(directory, ".cachetable-*")
 	if err != nil {
 		return fmt.Errorf("creating a temporary in %s: %w", directory, err)
@@ -472,9 +655,9 @@ func WriteCacheTable(path string, table *CacheTable, identity CacheTableIdentity
 	if beforeCacheTableRename != nil {
 		beforeCacheTableRename(temporaryName)
 	}
-	// replace.File, which retries through Windows refusing the rename while another run reads the table.
+	// replace.File, which retries through Windows refusing the rename while another run reads the file.
 	if err := replace.File(temporaryName, path); err != nil {
-		return fmt.Errorf("renaming the cache table into place: %w", err)
+		return fmt.Errorf("renaming %s into place: %w", filepath.Base(path), err)
 	}
 	temporaryName = ""
 	return nil
@@ -482,8 +665,8 @@ func WriteCacheTable(path string, table *CacheTable, identity CacheTableIdentity
 
 // DumpCacheTable prints a table for a person: every run and every file entry, one line each, so a cache
 // that looks wrong can be read rather than guessed at.
-func DumpCacheTable(out io.Writer, path string, table *CacheTable, identity CacheTableIdentity) {
-	fmt.Fprintf(out, "cache table %s\n", path)
+func DumpCacheTable(out io.Writer, directory string, table *CacheTable, identity CacheTableIdentity) {
+	fmt.Fprintf(out, "cache table %s\n", directory)
 	fmt.Fprintf(out, "  format %d, written by %s\n", cacheTableVersion, identity)
 
 	invocations := make([]string, 0, len(table.Runs))

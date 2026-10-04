@@ -76,24 +76,24 @@ func sampleLintCache() *program.LintCache {
 // testIdentity is the build a test's tables are written and read by.
 var testIdentity = program.CacheTableIdentity{SelfCommit: "test", CompilerCommit: "test", GoToolchain: "go-test", Platform: "test/test"}
 
-// roundTripLintCache sends a findings cache through the cache table's encoding and back, the only way
-// one reaches disk.
+// roundTripLintCache sends a findings cache through the cache table's file and back, the only way one
+// reaches disk.
 func roundTripLintCache(t *testing.T, cache *program.LintCache) *program.LintCache {
 	t.Helper()
 	table := program.NewCacheTable()
 	table.Findings = cache
-	encoded, err := program.EncodeCacheTable(table, testIdentity)
-	if err != nil {
-		t.Fatalf("encoding: %v", err)
+	directory := t.TempDir()
+	if err := program.WriteCacheTable(directory, table, testIdentity, program.CacheTableSections{Findings: true}); err != nil {
+		t.Fatalf("writing: %v", err)
 	}
-	decoded, err := program.DecodeCacheTable(encoded, testIdentity)
+	read, err := program.ReadCacheTable(directory, testIdentity, program.CacheTableSections{Findings: true})
 	if err != nil {
-		t.Fatalf("decoding what we just encoded: %v", err)
+		t.Fatalf("reading what we just wrote: %v", err)
 	}
-	if decoded.Findings == nil {
+	if read.Findings == nil {
 		t.Fatal("the findings section came back absent")
 	}
-	return decoded.Findings
+	return read.Findings
 }
 
 // TestLintCacheRoundTripsEveryField compares every field rather than spot-checking, because a field

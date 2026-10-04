@@ -500,15 +500,15 @@ func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(t *testing.T) {
 		t.Helper()
 		table := program.NewCacheTable()
 		table.Findings = cache
-		encoded, err := program.EncodeCacheTable(table, testIdentity)
-		if err != nil {
-			t.Fatalf("encoding: %v", err)
+		directory := t.TempDir()
+		if err := program.WriteCacheTable(directory, table, testIdentity, program.CacheTableSections{Findings: true}); err != nil {
+			t.Fatalf("writing: %v", err)
 		}
-		decoded, err := program.DecodeCacheTable(encoded, testIdentity)
+		read, err := program.ReadCacheTable(directory, testIdentity, program.CacheTableSections{Findings: true})
 		if err != nil {
-			t.Fatalf("decoding: %v", err)
+			t.Fatalf("reading: %v", err)
 		}
-		return decoded.Findings
+		return read.Findings
 	}
 	sameNotes := func(when string, cached program.Result) {
 		t.Helper()

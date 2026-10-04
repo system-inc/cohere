@@ -236,7 +236,7 @@ func TestARecordFromAnotherCohereSaysNothing(t *testing.T) {
 	}
 
 	// An unreadable table is the same answer, never an error.
-	if err := os.WriteFile(cacheTablePath(fixture.root), []byte("not a cache table"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(cacheDirectory(fixture.root), "format.gob"), []byte("not a cache table"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	files, _, _, _ = fixture.scope(t)

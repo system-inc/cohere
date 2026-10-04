@@ -15,8 +15,8 @@ import (
 //
 // flock belongs to the open file, so the kernel drops it when the holder exits however it exits, and a
 // killed writer can never leave the next run waiting on a lock nobody holds.
-func holdTableLock(tablePath string) func() {
-	file, err := os.OpenFile(tableLockPath(tablePath), os.O_CREATE|os.O_RDWR, 0o644)
+func holdTableLock(directory string) func() {
+	file, err := os.OpenFile(tableLockPath(directory), os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
 		return func() {}
 	}
@@ -30,24 +30,30 @@ func holdTableLock(tablePath string) func() {
 	}
 }
 
-// waitForTableWriter returns once no run holds the table's lock, or after bound. It reports whether it
-// returned because the writer finished (or there was none).
-func waitForTableWriter(tablePath string, bound time.Duration) bool {
-	file, err := os.Open(tableLockPath(tablePath))
+// holdTableReadLock takes the table's lock shared, waiting up to bound for a writer to finish, and returns
+// its release and whether it was taken. Past bound it gives up and returns a release that does nothing, and
+// the run reads without it, where the worst outcome is a miss, never a stale hit.
+//
+// The lock file is created here as a writer would, so a reader racing the very first write in a directory
+// holds the same lock that write is about to take, rather than finding no file and reading around it. With no
+// directory at all there is nothing to read, and no lock is taken.
+func holdTableReadLock(directory string, bound time.Duration) (func(), bool) {
+	file, err := os.OpenFile(tableLockPath(directory), os.O_CREATE|os.O_RDONLY, 0o644)
 	if err != nil {
-		// No lock file, so no run has ever written after answering here.
-		return true
+		return func() {}, true
 	}
-	defer file.Close()
 	deadline := time.Now().Add(bound)
 	for {
 		err := syscall.Flock(int(file.Fd()), syscall.LOCK_SH|syscall.LOCK_NB)
 		if err == nil {
-			syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
-			return true
+			return func() {
+				syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+				file.Close()
+			}, true
 		}
 		if !errors.Is(err, syscall.EWOULDBLOCK) || time.Now().After(deadline) {
-			return false
+			file.Close()
+			return func() {}, false
 		}
 		time.Sleep(2 * time.Millisecond)
 	}
