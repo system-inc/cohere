@@ -7,7 +7,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 277,
+        "rulesOn": 278,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -717,6 +717,10 @@
             },
             {
                 "name": "nexus/correctness-no-mock-on-module-namespace",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-nullish-stripping-assertion",
                 "severity": "error"
             },
             {
@@ -1440,7 +1444,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 342,
+        "rulesOn": 343,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2062,6 +2066,10 @@
             },
             {
                 "name": "nexus/correctness-no-mock-on-module-namespace",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-nullish-stripping-assertion",
                 "severity": "error"
             },
             {
@@ -3141,7 +3149,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 273,
+        "rulesOn": 274,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -4013,6 +4021,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/correctness-no-nullish-stripping-assertion",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/correctness-no-test-on-global-regex",
                 "severity": "error"
             },
@@ -4831,7 +4843,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 282,
+        "rulesOn": 283,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5574,6 +5586,10 @@
             },
             {
                 "name": "nexus/correctness-no-mock-on-module-namespace",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-nullish-stripping-assertion",
                 "severity": "error"
             },
             {
@@ -6422,7 +6438,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 267,
+        "rulesOn": 268,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -7092,6 +7108,10 @@
             },
             {
                 "name": "nexus/correctness-no-mock-on-module-namespace",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-nullish-stripping-assertion",
                 "severity": "error"
             },
             {
@@ -7808,7 +7828,7 @@
     },
     {
         "name": "cohere:typescript",
-        "rulesOn": 255,
+        "rulesOn": 256,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8430,6 +8450,10 @@
             },
             {
                 "name": "nexus/correctness-no-mock-on-module-namespace",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/correctness-no-nullish-stripping-assertion",
                 "severity": "error"
             },
             {
