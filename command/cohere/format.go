@@ -49,7 +49,7 @@ type formatEngine interface {
 	// It belongs on the engine rather than in the pipeline because it is extension and ignore-file
 	// knowledge, the same knowledge Handles already encodes. The pipeline decides which of those
 	// files are in scope; the engine decides which files are formattable at all.
-	Enumerate(root string, structureIgnorePath string) (formatfiles.Enumeration, error)
+	Enumerate(root string) (formatfiles.Enumeration, error)
 
 	// OptionsFingerprint names the options a file formats with, so the format record can tell bytes
 	// formatted under one config from the same bytes under another. A config edit changes the

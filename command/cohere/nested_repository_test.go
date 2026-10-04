@@ -85,30 +85,6 @@ func TestARunWritesOnlyItsOwnRepository(t *testing.T) {
 	}
 }
 
-// TestALibraryWalkReadsItsOwnIgnoreDefaults: a walk rooted at Structure reads Structure's own
-// defaults, a project's walk reads the copy under libraries/structure, and a repository with neither
-// reads none.
-func TestALibraryWalkReadsItsOwnIgnoreDefaults(t *testing.T) {
-	host := t.TempDir()
-	structure := filepath.Join(host, "libraries", "structure")
-	writeTree(t, structure, map[string]string{"code-quality/prettier/PrettierIgnoreDefaults": "pnpm-lock.yaml\n"})
-	nexus := filepath.Join(structure, "libraries", "nexus")
-	if err := os.MkdirAll(nexus, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	defaults := filepath.Join(structure, "code-quality", "prettier", "PrettierIgnoreDefaults")
-	if got := resolveRepositoryIgnorePath(host); got != defaults {
-		t.Errorf("the host's walk reads %q, want %q", got, defaults)
-	}
-	if got := resolveRepositoryIgnorePath(structure); got != defaults {
-		t.Errorf("Structure's own walk reads %q, want its own %q", got, defaults)
-	}
-	if got := resolveRepositoryIgnorePath(nexus); got != "" {
-		t.Errorf("Nexus's walk reads %q, want no defaults layer", got)
-	}
-}
-
 // TestTheProjectReadsItsLibrariesDrift: every declared submodule is read, recursively, each with its own
 // ignore layers, and each file its own run would rewrite is reported under that repository. A clone
 // nobody declared is not read, and nothing is written.
@@ -116,7 +92,7 @@ func TestTheProjectReadsItsLibrariesDrift(t *testing.T) {
 	root := nestedTree(t)
 	engine := prettierLike()
 	engine.enumerate = func(walkRoot string) (formatfiles.Enumeration, error) {
-		return formatfiles.Enumerate(walkRoot, "", engine.Handles)
+		return formatfiles.Enumerate(walkRoot, engine.Handles)
 	}
 	before := treeSnapshot(t, root)
 
@@ -150,7 +126,7 @@ func TestALibraryIsFormattedFromItsOwnRootAndReadFromItsProject(t *testing.T) {
 	writeTree(t, root, map[string]string{
 		"tsconfig.json":            fixScopeTsconfig,
 		"CohereSettings.json":      `{"extends":"./NexusCohereSettings.json","rules":{"no-debugger":"error"}}`,
-		"NexusCohereSettings.json": `{"format":{}}`,
+		"NexusCohereSettings.json": `{"format":{"ignore":[]}}`,
 		// The project's own files: a fixable finding and a formatting one, which no run inside the
 		// library may touch.
 		"Producer.ts":         "export function value(): number {\n  debugger;\n  return 1;\n}\n",

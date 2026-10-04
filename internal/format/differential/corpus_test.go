@@ -109,20 +109,16 @@ func TestCorpora(t *testing.T) {
 			t.Fatalf("resolving the format options for %s: %v", root, err)
 		}
 
-		structureIgnore := formatfiles.StructureIgnorePath(root)
-		enumeration, err := enumerator.Enumerate(root, structureIgnore)
+		// A leftover .prettierignore is Prettier config too, refused by the walk rather than the resolver,
+		// and skipped or fatal on the same terms.
+		enumeration, err := enumerator.Enumerate(root)
+		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) && !named[root] {
+			t.Logf("skipping %s, a nested repository not yet adopted: %v", root, err)
+			skipped = append(skipped, root)
+			continue
+		}
 		if err != nil {
 			t.Fatalf("enumerating %s: %v", root, err)
-		}
-		// A named corpus with Structure and no defaults file means the path went stale, and the run would
-		// measure files `s pnc` never formats: the harness did, for two months, with pnpm-lock.yaml in its
-		// yaml column. A nested repository pins its own Structure, which may predate the defaults, so there
-		// the gap is stated rather than refused.
-		if _, statError := os.Stat(filepath.Join(root, "libraries", "structure")); statError == nil && len(enumeration.MissingLayers) > 0 {
-			if named[root] {
-				t.Fatalf("refusing to measure %s: Structure's ignore defaults are missing at %v", root, enumeration.MissingLayers)
-			}
-			t.Logf("%s pins a Structure with no ignore defaults at %v", root, enumeration.MissingLayers)
 		}
 
 		options := resolution.Options

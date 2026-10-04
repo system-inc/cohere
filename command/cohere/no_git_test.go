@@ -59,7 +59,7 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 	writeTree(t, root, map[string]string{
 		"tsconfig.json":            fixScopeTsconfig,
 		"CohereSettings.json":      `{"extends":"./NexusCohereSettings.json","rules":{"no-debugger":"error"}}`,
-		"NexusCohereSettings.json": `{"format":{}}`,
+		"NexusCohereSettings.json": `{"format":{"ignore":[]}}`,
 		".gitignore":               "ignored/\n",
 		"Producer.ts":              "export function value(): number {\n  debugger;\n  return 1;\n}\n",
 		"Tidy.ts":                  formatted,

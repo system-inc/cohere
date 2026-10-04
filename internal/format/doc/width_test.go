@@ -161,7 +161,7 @@ func nonASCIILines(t *testing.T, root string, seen map[string]bool) []string {
 			pending = append(pending, filepath.Join(current, nested))
 		}
 
-		enumeration, err := engine.Enumerate(current, formatfiles.StructureIgnorePath(current))
+		enumeration, err := engine.Enumerate(current)
 		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
 			t.Logf("skipping %s, not yet adopted: %v", current, err)
 			continue

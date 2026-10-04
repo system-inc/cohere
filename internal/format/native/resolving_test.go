@@ -70,7 +70,7 @@ func TestResolvingOffersOnlyWhatAPrinterHandles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	enumeration, err := resolving.Enumerate(root, "")
+	enumeration, err := resolving.Enumerate(root)
 	if err != nil {
 		t.Fatal(err)
 	}

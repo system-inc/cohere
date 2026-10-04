@@ -296,19 +296,19 @@ func TestIgnoreLayersAndNestedRepositoriesAreReported(t *testing.T) {
 	enumeration := enumerationOf(
 		"/repo", []string{"/repo/a.ts"}, 500, nil,
 		[]string{"libraries/structure", "projects/ahraos-macos"},
-		map[string]int{".gitignore": 400, "PrettierIgnoreDefaults": 28, ".prettierignore": 0},
+		map[string]int{".gitignore": 400, formatfiles.HouseIgnoreLayer: 28, formatfiles.IgnorePatternsLayer: 0},
 	)
 
 	description := wholeTreeScope().narrowToEnumeration(enumeration).Description
 
-	for _, want := range []string{"400 by .gitignore", "28 by PrettierIgnoreDefaults", "libraries/structure", "projects/ahraos-macos"} {
+	for _, want := range []string{"400 by .gitignore", "28 by format.ignore", "libraries/structure", "projects/ahraos-macos"} {
 		if !strings.Contains(description, want) {
 			t.Fatalf("want %q in %q", want, description)
 		}
 	}
 	// A layer that removed nothing is not printed. Printing a zero every run trains the reader to
 	// stop looking at the line.
-	if strings.Contains(description, "0 by .prettierignore") {
+	if strings.Contains(description, "0 by ignorePatterns") {
 		t.Fatalf("a layer that removed nothing was printed: %q", description)
 	}
 }
@@ -526,32 +526,5 @@ func TestNarrowToAppendsToTheScopesOwnWording(t *testing.T) {
 	// did.
 	if described == named.narrowTo(population).Description {
 		t.Error("both kinds of scope described themselves identically")
-	}
-}
-
-// A missing ignore layer is printed, because the zero it would otherwise contribute is hidden by
-// design and was hiding exactly this.
-func TestDescribeEnumerationNamesAMissingLayer(t *testing.T) {
-	description := describeEnumeration(formatfiles.Enumeration{
-		Root:          "/project",
-		MissingLayers: []string{"/project/libraries/structure/code-quality/prettier/PrettierIgnoreDefaults"},
-	}, 0)
-	if !strings.Contains(description, "ignore file missing at /project/libraries/structure/code-quality/prettier/PrettierIgnoreDefaults") {
-		t.Fatalf("the missing layer was not named: %s", description)
-	}
-}
-
-// A project without Structure names no Structure layer, so it is never reported missing; a project
-// with Structure names the one path.
-func TestStructureIgnorePathIsNamedOnlyWithStructure(t *testing.T) {
-	root := t.TempDir()
-	if path := resolveStructureIgnorePath(root); path != "" {
-		t.Fatalf("a project without Structure named %s", path)
-	}
-	if err := os.MkdirAll(filepath.Join(root, "libraries", "structure"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if path := resolveStructureIgnorePath(root); path != formatfiles.StructureIgnorePath(root) {
-		t.Fatalf("a project with Structure named %q", path)
 	}
 }

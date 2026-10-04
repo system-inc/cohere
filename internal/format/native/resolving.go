@@ -37,8 +37,8 @@ func (resolving *Resolving) Handles(fileName string) bool {
 }
 
 // Enumerate walks a tree for the files a native printer handles.
-func (resolving *Resolving) Enumerate(root string, structureIgnorePath string) (formatfiles.Enumeration, error) {
-	return formatfiles.Enumerate(root, structureIgnorePath, resolving.Handles)
+func (resolving *Resolving) Enumerate(root string) (formatfiles.Enumeration, error) {
+	return formatfiles.Enumerate(root, resolving.Handles)
 }
 
 // Format formats one file with the options its own directory resolves to.

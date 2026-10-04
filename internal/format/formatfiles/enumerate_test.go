@@ -1,11 +1,14 @@
 package formatfiles
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 )
 
 // writeTree materializes a fixture project and returns its root.
@@ -39,7 +42,7 @@ func TestEnumerateOffersEveryLanguage(t *testing.T) {
 		"f.graphql": "type F { g: Int }\n",
 	})
 
-	enumeration, err := Enumerate(root, "", handlesEveryLanguage)
+	enumeration, err := Enumerate(root, handlesEveryLanguage)
 	if err != nil {
 		t.Fatalf("enumerate: %v", err)
 	}
@@ -73,7 +76,7 @@ func TestEnumerateNamesWhatItDeclined(t *testing.T) {
 		"README":    "no extension\n",
 	})
 
-	enumeration, err := Enumerate(root, "", handlesEveryLanguage)
+	enumeration, err := Enumerate(root, handlesEveryLanguage)
 	if err != nil {
 		t.Fatalf("enumerate: %v", err)
 	}
@@ -97,46 +100,11 @@ func TestEnumerateNamesWhatItDeclined(t *testing.T) {
 	}
 }
 
-// TestEnumerateAppliesEveryIgnoreLayer proves each layer is read and counted separately, as the walk
-// reads them before a Nexus tier declares the house list: the two old files are still layers then.
-//
-// Counted separately because a layer that silently fails to load removes nothing, and a slightly
-// smaller total is not a detectable signal. A zero next to a layer name is.
-func TestEnumerateAppliesEveryIgnoreLayer(t *testing.T) {
-	root := writeTree(t, map[string]string{
-		".gitignore":      "built.ts\n",
-		".prettierignore": "archived/\n",
-		"a.ts":            "export const a = 1;\n",
-		"built.ts":        "export const built = 1;\n",
-		"archived/old.md": "# old\n",
-		"pnpm-lock.yaml":  "lockfileVersion: 1\n",
-	})
-	structureIgnore := filepath.Join(root, "PrettierIgnoreDefaults")
-	if err := os.WriteFile(structureIgnore, []byte("pnpm-lock.yaml\n"), 0o644); err != nil {
-		t.Fatalf("write structure ignore: %v", err)
-	}
-
-	enumeration, err := Enumerate(root, structureIgnore, handlesEveryLanguage)
-	if err != nil {
-		t.Fatalf("enumerate: %v", err)
-	}
-	for layer, want := range map[string]int{
-		".gitignore": 1, "PrettierIgnoreDefaults": 1, ".prettierignore": 1,
-	} {
-		if enumeration.IgnoredByLayer[layer] != want {
-			t.Errorf("layer %s removed %d, want %d", layer, enumeration.IgnoredByLayer[layer], want)
-		}
-	}
-	if len(enumeration.Files) != 1 || filepath.Base(enumeration.Files[0]) != "a.ts" {
-		t.Errorf("survivors = %v, want just a.ts", enumeration.Files)
-	}
-}
-
 // TestEnumerateRefusesNestedRepositories proves the walk does not descend into somebody else's tree.
 //
 // The ignore layers do not cover this and cannot: a submodule is tracked by the parent as a gitlink
-// rather than as ignored paths, so nothing in .gitignore or .prettierignore names it. Verified
-// against the real repository -- neither file mentions libraries/structure.
+// rather than as ignored paths, so no ignore list names it. Verified against the real repository --
+// none of them mentions libraries/structure.
 //
 // The cost of not having this is measured rather than hypothetical. A whole-tree run tonight wrote
 // a line into a submodule; the change was correct and still unrequested, which is the worst shape
@@ -149,7 +117,7 @@ func TestEnumerateRefusesNestedRepositories(t *testing.T) {
 		"vendor/deep/x.md": "# x\n",
 	})
 
-	enumeration, err := Enumerate(root, "", handlesEveryLanguage)
+	enumeration, err := Enumerate(root, handlesEveryLanguage)
 	if err != nil {
 		t.Fatalf("enumerate: %v", err)
 	}
@@ -166,35 +134,6 @@ func TestEnumerateRefusesNestedRepositories(t *testing.T) {
 	}
 }
 
-// TestAMissingStructureLayerIsNamed: a named layer that is not there must say so. Read as an empty
-// file, it removed nothing and the summary hid the zero, which is how the defaults moving in August
-// left every walk offering pnpm-lock.yaml until October.
-func TestAMissingStructureLayerIsNamed(t *testing.T) {
-	root := t.TempDir()
-	missing := StructureIgnorePath(root)
-	enumeration, err := Enumerate(root, missing, func(string) bool { return true })
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(enumeration.MissingLayers) != 1 || enumeration.MissingLayers[0] != missing {
-		t.Fatalf("missing layers %v, want %s named", enumeration.MissingLayers, missing)
-	}
-
-	if err := os.MkdirAll(filepath.Dir(missing), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(missing, []byte("pnpm-lock.yaml\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	enumeration, err = Enumerate(root, missing, func(string) bool { return true })
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(enumeration.MissingLayers) != 0 {
-		t.Fatalf("a present layer was named missing: %v", enumeration.MissingLayers)
-	}
-}
-
 // settingsTree writes a repository whose CohereSettings.json extends a Nexus tier, with the format
 // block's `ignore` (omitted when house is empty) and the project's own ignorePatterns.
 func settingsTree(t *testing.T, house string, ignorePatterns string, files map[string]string) string {
@@ -208,32 +147,30 @@ func settingsTree(t *testing.T, house string, ignorePatterns string, files map[s
 	return writeTree(t, files)
 }
 
-// TestTheHouseListRetiresTheOldFiles is the walk once the Nexus tier declares its list: `.gitignore`,
-// then the format block's `ignore`, then the project's ignorePatterns, each counted under its own name,
-// and the two old files counted nowhere because they no longer remove anything themselves.
-func TestTheHouseListRetiresTheOldFiles(t *testing.T) {
+// TestEnumerateAppliesEveryIgnoreLayer is the walk's three layers: `.gitignore`, then the format block's
+// `ignore`, then the project's ignorePatterns, each counted under its own name.
+//
+// Counted separately because a layer that silently fails to load removes nothing, and a slightly
+// smaller total is not a detectable signal. A zero next to a layer name is.
+func TestEnumerateAppliesEveryIgnoreLayer(t *testing.T) {
 	root := settingsTree(t, `["pnpm-lock.yaml"]`, `["archived/**"]`, map[string]string{
 		".gitignore":      "built.ts\n",
-		".prettierignore": "archived/\n",
 		"a.ts":            "export const a = 1;\n",
 		"built.ts":        "export const built = 1;\n",
 		"archived/old.md": "# old\n",
 		"pnpm-lock.yaml":  "lockfileVersion: 1\n",
-		"defaults":        "pnpm-lock.yaml\n",
 	})
 
-	enumeration, err := Enumerate(root, filepath.Join(root, "defaults"), handlesEveryLanguage)
+	enumeration, err := Enumerate(root, handlesEveryLanguage)
 	if err != nil {
 		t.Fatalf("enumerate: %v", err)
+	}
+	if len(enumeration.IgnoredByLayer) != 3 {
+		t.Errorf("layers %v, want exactly .gitignore, %s and %s", enumeration.IgnoredByLayer, HouseIgnoreLayer, IgnorePatternsLayer)
 	}
 	for layer, want := range map[string]int{".gitignore": 1, HouseIgnoreLayer: 1, IgnorePatternsLayer: 1} {
 		if enumeration.IgnoredByLayer[layer] != want {
 			t.Errorf("layer %s removed %d, want %d", layer, enumeration.IgnoredByLayer[layer], want)
-		}
-	}
-	for _, retired := range []string{"PrettierIgnoreDefaults", ".prettierignore"} {
-		if _, counted := enumeration.IgnoredByLayer[retired]; counted {
-			t.Errorf("%s is still a layer once the house list is declared", retired)
 		}
 	}
 	survivors := map[string]bool{}
@@ -246,34 +183,65 @@ func TestTheHouseListRetiresTheOldFiles(t *testing.T) {
 	}
 }
 
-// TestARetiringFileThatDisagreesIsRefused: once the house list is declared, an old file that would skip
-// a file the lists offer is refused, naming the file, its pattern and the path, rather than read as a
-// layer that quietly keeps a rule nobody moved. Both old files, one at a time.
-func TestARetiringFileThatDisagreesIsRefused(t *testing.T) {
+// TestALeftoverPrettierignoreIsRefused: cohere no longer reads a `.prettierignore`, so one left in the
+// walk root is refused, naming the file and saying to delete it, rather than kept as a list that looks
+// like it still skips something. With a chain and without one, since the file is read nowhere either way.
+func TestALeftoverPrettierignoreIsRefused(t *testing.T) {
 	for _, testCase := range []struct {
-		name, house, ignorePatterns, oldFile, pattern, path string
+		name string
+		root func() string
 	}{
-		{"the project's .prettierignore", `["pnpm-lock.yaml"]`, `[]`, ".prettierignore", "archived/", "archived/old.md"},
-		{"Structure's defaults", `[]`, `["archived/**"]`, "defaults", "pnpm-lock.yaml", "pnpm-lock.yaml"},
+		{"with a settings chain", func() string {
+			return settingsTree(t, `["pnpm-lock.yaml"]`, `[]`, map[string]string{".prettierignore": "archived/\n", "a.ts": "export const a = 1;\n"})
+		}},
+		{"without settings", func() string {
+			return writeTree(t, map[string]string{".prettierignore": "archived/\n", "a.ts": "export const a = 1;\n"})
+		}},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			root := settingsTree(t, testCase.house, testCase.ignorePatterns, map[string]string{
-				".prettierignore": "archived/\n",
-				"defaults":        "pnpm-lock.yaml\n",
-				"a.ts":            "export const a = 1;\n",
-				"archived/old.md": "# old\n",
-				"pnpm-lock.yaml":  "lockfileVersion: 1\n",
-			})
-			_, err := Enumerate(root, filepath.Join(root, "defaults"), handlesEveryLanguage)
-			if err == nil {
-				t.Fatal("a retiring file that skips more than the lists was accepted")
+			root := testCase.root()
+			_, err := Enumerate(root, handlesEveryLanguage)
+			if !errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
+				t.Fatalf("a leftover .prettierignore was not refused as Prettier config: %v", err)
 			}
-			for _, want := range []string{filepath.Join(root, testCase.oldFile), `"` + testCase.pattern + `"`, testCase.path} {
+			for _, want := range []string{filepath.Join(root, ".prettierignore"), "delete it"} {
 				if !strings.Contains(err.Error(), want) {
-					t.Errorf("refusal %q does not name %s", err, want)
+					t.Errorf("refusal %q does not say %s", err, want)
 				}
 			}
 		})
+	}
+
+	// Only the walk root's: one inside the tree is a file like any other, and nothing reads it.
+	root := settingsTree(t, `["pnpm-lock.yaml"]`, `[]`, map[string]string{"fixtures/.prettierignore": "x\n", "a.ts": "export const a = 1;\n"})
+	if _, err := Enumerate(root, handlesEveryLanguage); err != nil {
+		t.Errorf("a .prettierignore below the root was refused: %v", err)
+	}
+}
+
+// TestAChainWithoutTheHouseListIsRefused: a chain whose Nexus tier declares no `ignore` says nothing
+// about what no repository formats, and a walk without that list would offer pnpm-lock.yaml and every
+// database file. So it is refused, naming the settings and the Nexus tier, rather than walked. A root
+// with no settings at all has no chain to ask and walks with `.gitignore` alone.
+func TestAChainWithoutTheHouseListIsRefused(t *testing.T) {
+	root := settingsTree(t, "", `[]`, map[string]string{"a.ts": "export const a = 1;\n", "pnpm-lock.yaml": "lockfileVersion: 1\n"})
+	_, err := Enumerate(root, handlesEveryLanguage)
+	if !errors.Is(err, ErrHouseIgnoreUndeclared) {
+		t.Fatalf("a chain without the house list was walked: %v", err)
+	}
+	for _, want := range []string{filepath.Join(root, "CohereSettings.json"), formatoptions.NexusTierFileName} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("refusal %q does not name %s", err, want)
+		}
+	}
+
+	bare := writeTree(t, map[string]string{".gitignore": "built.ts\n", "a.ts": "export const a = 1;\n", "built.ts": "export const built = 1;\n"})
+	enumeration, err := Enumerate(bare, handlesEveryLanguage)
+	if err != nil {
+		t.Fatalf("a root with no settings was refused: %v", err)
+	}
+	if len(enumeration.Files) != 1 || len(enumeration.IgnoredByLayer) != 1 || enumeration.IgnoredByLayer[".gitignore"] != 1 {
+		t.Errorf("a root with no settings walked %v with layers %v, want a.ts by .gitignore alone", enumeration.Files, enumeration.IgnoredByLayer)
 	}
 }
 
@@ -288,7 +256,7 @@ func TestIgnorePatternsReadAsLintReadsThem(t *testing.T) {
 		"source/odd.code.js/keep.ts": "export const keep = 1;\n",
 	})
 
-	enumeration, err := Enumerate(filepath.Join(root, "source"), "", handlesEveryLanguage)
+	enumeration, err := Enumerate(filepath.Join(root, "source"), handlesEveryLanguage)
 	if err != nil {
 		t.Fatalf("enumerate: %v", err)
 	}
@@ -377,7 +345,7 @@ func TestIgnorePatternsCoverNestedPaths(t *testing.T) {
 		"logs/nested/run.log":          "line\n",
 	})
 
-	enumeration, err := Enumerate(root, "", handlesEveryLanguage)
+	enumeration, err := Enumerate(root, handlesEveryLanguage)
 	if err != nil {
 		t.Fatalf("enumerate: %v", err)
 	}
@@ -418,7 +386,7 @@ func TestNestedRepositoriesAreFoundUnderAPathTheProjectNeverFormats(t *testing.T
 	}
 
 	// The host's own walk still offers nothing under projects/, and finds no repository there either.
-	enumeration, err := Enumerate(root, "", handlesEveryLanguage)
+	enumeration, err := Enumerate(root, handlesEveryLanguage)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -438,7 +406,7 @@ func TestANestedRepositoryDoesNotInheritItsHostsIgnorePatterns(t *testing.T) {
 		"projects/listed/b.ts":           "export const b = 1;\n",
 		"projects/listed/pnpm-lock.yaml": "lockfileVersion: 1\n",
 	})
-	enumeration, err := Enumerate(filepath.Join(root, "projects", "listed"), "", handlesEveryLanguage)
+	enumeration, err := Enumerate(filepath.Join(root, "projects", "listed"), handlesEveryLanguage)
 	if err != nil {
 		t.Fatal(err)
 	}

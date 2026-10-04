@@ -611,10 +611,7 @@ func run() error {
 				scope = writeScope
 			}
 			declineRunCache("a formatter enumerated the tree")
-			enumeration, enumerateError := formatter.Enumerate(
-				repositoryRoot,
-				resolveRepositoryIgnorePath(repositoryRoot),
-			)
+			enumeration, enumerateError := formatter.Enumerate(repositoryRoot)
 			if enumerateError != nil {
 				// A failed walk withholds formatting and says why, rather than falling back to a universe
 				// that would format the wrong set. Fixing still runs.
@@ -629,11 +626,7 @@ func run() error {
 			// formattable files, the native printers format the whole tree in about 10 seconds, which the
 			// first run with no record pays once; every run after formats what was edited.
 			declineRunCache("a formatter enumerated the tree")
-			scope, recordUniverse = unformattedScope(
-				formatter, record,
-				repositoryRoot,
-				resolveRepositoryIgnorePath(repositoryRoot),
-			)
+			scope, recordUniverse = unformattedScope(formatter, record, repositoryRoot)
 		}
 
 		fixStart := time.Now()

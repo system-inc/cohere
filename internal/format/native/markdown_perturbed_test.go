@@ -118,8 +118,7 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 			pending = append(pending, filepath.Join(root, nested))
 		}
 
-		structureIgnore := formatfiles.StructureIgnorePath(root)
-		enumeration, err := enumerator.Enumerate(root, structureIgnore)
+		enumeration, err := enumerator.Enumerate(root)
 		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
 			t.Logf("skipping %s, not yet adopted: %v", root, err)
 			continue

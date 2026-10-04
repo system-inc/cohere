@@ -50,21 +50,6 @@ func writeRepositoryRoot(start string, projectRoot string) string {
 	}
 }
 
-// resolveRepositoryIgnorePath is the Structure ignore-defaults layer for a format walk rooted at a
-// repository: the host project's copy under libraries/structure, Structure's own when the walk is
-// rooted at Structure, and none for a repository that is neither, such as Nexus, whose walk reads its
-// own .gitignore and .prettierignore only.
-func resolveRepositoryIgnorePath(repositoryRoot string) string {
-	if path := resolveStructureIgnorePath(repositoryRoot); path != "" {
-		return path
-	}
-	own := filepath.Join(repositoryRoot, "code-quality", "prettier", "PrettierIgnoreDefaults")
-	if isRegularFile(own) {
-		return own
-	}
-	return ""
-}
-
 // unwritableRepository says why a run writing repositoryRoot may not write fileName, as the phrase a
 // note prints: "nested repository X" for a repository below the root that holds it, or "the project
 // outside X" when the file lies outside the root altogether, as the project's files do for a run inside
@@ -128,7 +113,7 @@ func checkNestedRepositories(engine formatEngine, root string) (nestedDriftCheck
 		}
 		pending = append(pending, inner...)
 
-		enumeration, err := engine.Enumerate(repositoryRoot, resolveRepositoryIgnorePath(repositoryRoot))
+		enumeration, err := engine.Enumerate(repositoryRoot)
 		if err != nil {
 			return check, fmt.Errorf("reading nested repository %s: %w", relative, err)
 		}

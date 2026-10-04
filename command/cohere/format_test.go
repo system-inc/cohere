@@ -19,13 +19,12 @@ import (
 // it, which is what makes these fixtures a test of the mapping rather than a test of goja. The real
 // engine drops in behind the same interface and these keep meaning what they mean.
 type fakeEngine struct {
-	handled              []string
-	format               func(fileName string, text string) (string, error)
-	enumerate            func(root string) (formatfiles.Enumeration, error)
-	options              func(fileName string) (string, error)
-	askedFor             []string
-	enumeratedRoot       string
-	enumeratedIgnorePath string
+	handled        []string
+	format         func(fileName string, text string) (string, error)
+	enumerate      func(root string) (formatfiles.Enumeration, error)
+	options        func(fileName string) (string, error)
+	askedFor       []string
+	enumeratedRoot string
 }
 
 func (e *fakeEngine) Handles(fileName string) bool {
@@ -42,9 +41,8 @@ func (e *fakeEngine) Handles(fileName string) bool {
 //
 // It returns whatever the fixture set, including the account of what the walk removed, because the
 // numbers in that account are the thing under test rather than the walk itself.
-func (e *fakeEngine) Enumerate(root string, structureIgnorePath string) (formatfiles.Enumeration, error) {
+func (e *fakeEngine) Enumerate(root string) (formatfiles.Enumeration, error) {
 	e.enumeratedRoot = root
-	e.enumeratedIgnorePath = structureIgnorePath
 	if e.enumerate != nil {
 		return e.enumerate(root)
 	}

@@ -253,7 +253,7 @@ func TestCorpusParseMatchesUpstream(t *testing.T) {
 			pending = append(pending, filepath.Join(root, nested))
 		}
 
-		enumeration, err := enumerator.Enumerate(root, formatfiles.StructureIgnorePath(root))
+		enumeration, err := enumerator.Enumerate(root)
 		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
 			t.Logf("skipping %s, not yet adopted: %v", root, err)
 			continue

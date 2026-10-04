@@ -27,7 +27,7 @@ import (
 func TestTheParallelFormatPassMatchesTheSerialOne(t *testing.T) {
 	files := map[string]string{
 		"CohereSettings.json":      "{ \"extends\": \"./NexusCohereSettings.json\", \"rules\": { \"no-debugger\": \"error\" } }\n",
-		"NexusCohereSettings.json": "{ \"format\": {} }\n",
+		"NexusCohereSettings.json": "{ \"format\": { \"ignore\": [] } }\n",
 		"Ugly.ts":                  "export const ugly   =   1\n",
 		"Fixable.ts":               "export function fixable(): number {\n  debugger;\n  return 1;\n}\n",
 		"FixableUgly.ts":           "export function both(): number {\n    debugger;\n    return 2\n}\n",
@@ -55,7 +55,7 @@ func TestTheParallelFormatPassMatchesTheSerialOne(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		enumeration, err := engine.Enumerate(directory, "")
+		enumeration, err := engine.Enumerate(directory)
 		if err != nil {
 			t.Fatal(err)
 		}

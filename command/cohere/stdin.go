@@ -106,7 +106,7 @@ func stdinTransform(formatter formatEngine, location projectLocation, path strin
 		Description:        "1 named path",
 		RequestDescription: path,
 	}
-	enumeration, err := formatter.Enumerate(location.Root, resolveStructureIgnorePath(location.Root))
+	enumeration, err := formatter.Enumerate(location.Root)
 	if err != nil {
 		// The gate withholds formatting when the walk fails; a save fails loudly instead, because a
 		// hook that silently stopped formatting would read as files that need none.

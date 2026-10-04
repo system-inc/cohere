@@ -62,8 +62,8 @@ func (resolving *Resolving) Handles(fileName string) bool {
 }
 
 // Enumerate walks a tree for formattable files. Options do not change which files those are.
-func (resolving *Resolving) Enumerate(root string, structureIgnorePath string) (formatfiles.Enumeration, error) {
-	return resolving.first.Enumerate(root, structureIgnorePath)
+func (resolving *Resolving) Enumerate(root string) (formatfiles.Enumeration, error) {
+	return resolving.first.Enumerate(root)
 }
 
 // Format formats one file with the options its own directory resolves to.

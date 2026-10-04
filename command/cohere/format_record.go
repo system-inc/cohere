@@ -261,8 +261,8 @@ type formatUniverse struct {
 	files []string
 }
 
-func enumerateFormatUniverse(engine formatEngine, root string, structureIgnorePath string) (formatUniverse, error) {
-	rootEnumeration, err := engine.Enumerate(root, structureIgnorePath)
+func enumerateFormatUniverse(engine formatEngine, root string) (formatUniverse, error) {
+	rootEnumeration, err := engine.Enumerate(root)
 	if err != nil {
 		return formatUniverse{}, err
 	}
@@ -310,8 +310,8 @@ func (universe formatUniverse) describe() string {
 
 // unformattedScope is the default format scope: every file in the universe whose bytes are not on record
 // as formatted. It returns the universe's files too, so the record can drop entries outside it.
-func unformattedScope(engine formatEngine, record *formatRecord, root string, structureIgnorePath string) (formatScope, []string) {
-	universe, err := enumerateFormatUniverse(engine, root, structureIgnorePath)
+func unformattedScope(engine formatEngine, record *formatRecord, root string) (formatScope, []string) {
+	universe, err := enumerateFormatUniverse(engine, root)
 	if err != nil {
 		// A failed walk withholds formatting and says why, rather than falling back to a universe that
 		// would format the wrong set. Fixing still runs. No universe means nothing is pruned.

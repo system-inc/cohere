@@ -98,8 +98,11 @@ func TestDumpDifferences(t *testing.T) {
 			t.Fatalf("resolving the format options for %s: %v", root, err)
 		}
 
-		structureIgnore := formatfiles.StructureIgnorePath(root)
-		enumeration, err := enumerator.Enumerate(root, structureIgnore)
+		enumeration, err := enumerator.Enumerate(root)
+		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
+			t.Logf("skipping %s, not yet adopted: %v", root, err)
+			continue
+		}
 		if err != nil {
 			t.Fatalf("enumerating %s: %v", root, err)
 		}

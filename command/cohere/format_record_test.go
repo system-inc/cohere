@@ -45,7 +45,7 @@ func newRecordFixture(t *testing.T) recordFixture {
 	})
 	engine := &fakeEngine{handled: []string{".ts"}}
 	engine.enumerate = func(directory string) (formatfiles.Enumeration, error) {
-		return formatfiles.Enumerate(directory, "", engine.Handles)
+		return formatfiles.Enumerate(directory, engine.Handles)
 	}
 	return recordFixture{root: root, engine: engine}
 }
@@ -59,7 +59,7 @@ func (fixture recordFixture) path(name string) string {
 func (fixture recordFixture) scope(t *testing.T) ([]string, []string, *formatRecord, string) {
 	t.Helper()
 	record := loadFormatRecord(fixture.root)
-	scope, universe := unformattedScope(fixture.engine, record, fixture.root, "")
+	scope, universe := unformattedScope(fixture.engine, record, fixture.root)
 	return fixture.relative(t, scope.FileNames), universe, record, scope.Description
 }
 
@@ -81,7 +81,7 @@ func (fixture recordFixture) relative(t *testing.T, files []string) []string {
 func (fixture recordFixture) formatEverything(t *testing.T) {
 	t.Helper()
 	record := loadFormatRecord(fixture.root)
-	scope, universe := unformattedScope(fixture.engine, record, fixture.root, "")
+	scope, universe := unformattedScope(fixture.engine, record, fixture.root)
 	transform := record.observe(formatTransform(fixture.engine), fixture.engine.OptionsFingerprint)
 	for _, fileName := range scope.FileNames {
 		if _, err := transform(fileName, readForTest(t, fileName)); err != nil {
@@ -325,7 +325,7 @@ func TestTheRecordFollowsTheFormatterNotTheBinary(t *testing.T) {
 	writeTree(t, root, map[string]string{
 		"tsconfig.json":            fixScopeTsconfig,
 		"CohereSettings.json":      "{ \"extends\": \"./NexusCohereSettings.json\", \"rules\": {} }\n",
-		"NexusCohereSettings.json": "{ \"format\": {} }\n",
+		"NexusCohereSettings.json": "{ \"format\": { \"ignore\": [] } }\n",
 		"Tidy.ts":                  "export const tidy = 1;\n",
 		"Ugly.ts":                  "export const ugly   =   1\n",
 	})

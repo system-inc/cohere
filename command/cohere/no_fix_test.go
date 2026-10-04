@@ -63,7 +63,7 @@ func TestNoFixReportsWhatFixAndFormatWouldChange(t *testing.T) {
 	writeTree(t, root, map[string]string{
 		"tsconfig.json":            fixScopeTsconfig,
 		"CohereSettings.json":      `{"extends":"./NexusCohereSettings.json","rules":{"no-debugger":"error"}}`,
-		"NexusCohereSettings.json": `{"format":{}}`,
+		"NexusCohereSettings.json": `{"format":{"ignore":[]}}`,
 		"Clean.ts":                 "export const clean = 1;\n",
 	})
 
