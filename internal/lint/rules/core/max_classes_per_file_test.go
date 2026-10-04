@@ -275,6 +275,7 @@ func TestMaxClassesPerFileDoesNotCountAClassDeclaredInsideAFunction(t *testing.T
 		{"a class inside an arrow beside a top-level one", "class A {}\nconst f = () => { class B {} };", false},
 		{"a class in a namespace still counts", "class A {}\nnamespace N { class B {} }", true},
 		{"a class in a bare block still counts", "class A {}\n{ class B {} }", true},
+		{"a class in a static block still counts", "class A { static { class B {} } }", true},
 		{"an expression inside a function still counts without ignoreExpressions", "class A {}\nfunction f() { return class {}; }", true},
 		{"two top-level classes beside a nested one still report", "class A {}\nclass B {}\nfunction f() { class C {} }", true},
 		// After a function the walk is at the top level again, so later classes count.

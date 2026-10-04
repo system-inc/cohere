@@ -28,6 +28,22 @@ shapes, each reported where upstream anchors it:
 The whole-file `noStrictNullCheck` complaint is not implemented. It needs a program compiled without
 `strictNullChecks`, which no tree we lint has.
 
+## Where cohere is deliberately quieter than ESLint
+
+The `if` check is silent inside a function React Compiler compiles, decided by the same
+`IsInsideComponentOrHook` that `logical-assignment-operators` and the react rules use. Its repair is
+`??=`, and babel-plugin-react-compiler 1.0.0 refuses every logical assignment shorthand (`Handle ??=
+operators in AssignmentExpression`), so the suggestion costs the whole component or hook its
+compilation. The waves that took it showed it: SecretRow (ahra), WebSocketViaSharedWorkerProviderInternal
+(Structure) and ChatReasoningAndTools (www) each went from CompileSuccess to CompileError on one `??=`,
+and compiled again in the long form (#cn8sthd). `logical-assignment-operators` already stays silent
+there, so without this gate the two rules pulled one site in opposite directions.
+
+The option is ours, `reactCompiler`, on by default because every tree we lint runs the compiler; a
+project without it sets `{"reactCompiler": false}`. The ternary and `||` checks are not gated: `??` is
+an expression the compiler lowers, and a `||=` was refused before any rewrite. ESLint runs the same
+gate through `NexusTypeScriptEsLintPlugin`'s wrapper of this rule.
+
 ## Why this recommendation
 
 `??` says what the code means where the left side can be missing, and leaves the valid falsy values

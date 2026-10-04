@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	type_checking "github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -117,6 +118,18 @@ func preferNullishCoalescingJudgeTernary(ctx rule.Context, node *ast.Node,
 
 // preferNullishCoalescingJudgeIf is upstream's `IfStatement` listener: an `if` with no `else` whose
 // body is one assignment to the subject it tested.
+//
+// # Silent inside a function React Compiler compiles, unless the option says the compiler is off
+//
+// The repair is `??=`, and babel-plugin-react-compiler 1.0.0 refuses all three logical assignment
+// shorthands (BuildHIR, `Handle ??= operators in AssignmentExpression`), so taking the suggestion in a
+// component or a hook costs that whole function its compilation. Measured on the waves that took it
+// (#cn8sthd): SecretRow in ahra, WebSocketViaSharedWorkerProviderInternal in Structure and
+// ChatReasoningAndTools in www each went from CompileSuccess to CompileError on the one `??=`, and
+// compiled again in the long form. `logical-assignment-operators` already stays silent there for the
+// same reason, through the same `IsInsideComponentOrHook`, so the two rules no longer pull one site in
+// opposite directions. The ternary and `||` checks are not gated: `??` is an ordinary expression the
+// compiler lowers, and a `||=` it would rewrite was already refused before the rewrite.
 func preferNullishCoalescingJudgeIf(ctx rule.Context, node *ast.Node,
 	settings PreferNullishCoalescingOptions) (preferNullishCoalescingFinding, bool) {
 
@@ -172,6 +185,10 @@ func preferNullishCoalescingJudgeIf(ctx rule.Context, node *ast.Node,
 	// suggests `foo.a ??= b`: the left side of an assignment cannot carry `?.`, and the test's
 	// spelling would be a syntax error. Measured: two corpus cases differ only in this.
 	if _, fixable := preferNullishCoalescingParams(ctx, node, test, target, reading, settings); !fixable {
+		return preferNullishCoalescingFinding{}, false
+	}
+	// Asked last, at a finding: the ancestor walk is paid only where the rule has something to say.
+	if settings.ReactCompiler && react.IsInsideComponentOrHook(node) {
 		return preferNullishCoalescingFinding{}, false
 	}
 

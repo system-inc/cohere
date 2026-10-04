@@ -1,6 +1,7 @@
 package typescript
 
 import (
+	"encoding/json"
 	"sort"
 	"strings"
 	"testing"
@@ -2132,4 +2133,193 @@ c !== null ? c : c ? 1 : 2;
 c ?? (c ? 1 : 2);
 `},
 	}},
+}
+
+// TestPreferNullishCoalescingIfIsSilentInsideReactCompiledFunctions covers the `reactCompiler` option,
+// which is ours rather than upstream's, on the if-statement check it gates.
+//
+// The rows are shared verbatim with Nexus's NexusTypeScriptEsLintPlugin.test.ts, whose wrapper draws the
+// same line in ESLint, so one table proves the ruling in both engines (#cn8sthd). Three are the sites
+// the waves rewrote to `??=`, each of which lost its compilation to the rewrite, in their long form:
+// SecretRow, WebSocketViaSharedWorkerProviderInternal and ChatReasoningAndTools' component body. The
+// rest pin where the compiled region ends, from the measurements recorded in the react shelf's
+// compiled.go: a bare block, an outer function whose name claims nothing, a call wrapper, a non-ASCII
+// capital, primitive props, a second parameter that is not a ref, and JSX only inside a closure.
+//
+// Every row runs with the compiler on and off, so a silent row is shown to be the gate rather than a
+// shape the check never reported. The harness has no React types, so each ref is annotated: read as
+// `any`, its `current` is not nullable and the check would never fire.
+func TestPreferNullishCoalescingIfIsSilentInsideReactCompiledFunctions(t *testing.T) {
+	t.Parallel()
+
+	decode := func(raw string) PreferNullishCoalescingOptions {
+		decoded, err := DecodePreferNullishCoalescingOptions(json.RawMessage(raw))
+		if err != nil {
+			t.Fatalf("decoding %s: %v", raw, err)
+		}
+		return decoded.(PreferNullishCoalescingOptions)
+	}
+	compilerOn := decode(`{}`)
+	compilerOff := decode(`{"reactCompiler": false}`)
+
+	for _, testCase := range preferNullishCoalescingCompiledRows {
+		t.Run(testCase.name, func(t *testing.T) {
+			off := rule_testing.RunTypedWithOptions(t, PreferNullishCoalescing, "Compiled.tsx", testCase.sourceText, compilerOff)
+			rule_testing.ExpectFindings(t, off, "preferNullishOverAssignment")
+			on := rule_testing.RunTypedWithOptions(t, PreferNullishCoalescing, "Compiled.tsx", testCase.sourceText, compilerOn)
+			if testCase.compiled {
+				rule_testing.ExpectClean(t, on)
+				return
+			}
+			rule_testing.ExpectFindings(t, on, "preferNullishOverAssignment")
+		})
+	}
+
+	// The ternary's repair is `??`, an expression the compiler lowers, so it still reports in a
+	// component with the compiler on.
+	ternary := rule_testing.RunTypedWithOptions(t, PreferNullishCoalescing, "Compiled.tsx", `
+export function Badge(properties: { label: string | null }) {
+    const label = properties.label !== null ? properties.label : 'none';
+    return <span>{label}</span>;
+}`, compilerOn)
+	rule_testing.ExpectFindings(t, ternary, "preferNullishOverTernary")
+}
+
+// preferNullishCoalescingCompiledRows is the table both engines run: each source holds one `if` the
+// check reports with the compiler off, and `compiled` says whether React Compiler compiles the function
+// holding it.
+var preferNullishCoalescingCompiledRows = []struct {
+	name       string
+	sourceText string
+	compiled   bool
+}{
+	{"a component", `export function Badge(properties: { label: string | null }) {
+    let label = properties.label;
+    if(label === null) label = 'none';
+    return <span>{label}</span>;
+}
+`, true},
+	{"an async callback inside a component, as SecretRow", `import React from 'react';
+declare function reveal(): Promise<string | null>;
+export function SecretRow(properties: { revealed: string | null }) {
+    const onCopy = React.useCallback(async function() {
+        let value: string | null = properties.revealed;
+        if(value === null) {
+            value = await reveal();
+        }
+        return value;
+    }, [properties.revealed]);
+    return <button onClick={onCopy}>copy</button>;
+}
+`, true},
+	{"an effect callback inside a provider, as WebSocketViaSharedWorkerProviderInternal", `import React from 'react';
+declare function createMonitor(): object;
+export function WebSocketProviderInternal(properties: { children: React.ReactNode }) {
+    const monitorReference: { current: object | null } = React.useRef(null);
+    React.useEffect(function() {
+        if(monitorReference.current === null) {
+            monitorReference.current = createMonitor();
+        }
+    }, []);
+    return <>{properties.children}</>;
+}
+`, true},
+	{"a hook body", `import React from 'react';
+export function useStart(initial: number | null) {
+    const [count] = React.useState(0);
+    let start = initial;
+    if(start === null) start = count;
+    return start;
+}
+`, true},
+	{"a hook named with a digit after use", `import { useState } from 'react';
+export function use2Things(initial: number | null) {
+    const [count] = useState(0);
+    let start = initial;
+    if(start === null) start = count;
+    return start;
+}
+`, true},
+	{"a component inside a component-named function with no evidence of its own", `export function Outer() {
+    const Inner = (properties: { label: string | null }) => {
+        let label = properties.label;
+        if(label === null) label = 'none';
+        return <span>{label}</span>;
+    };
+    return Inner;
+}
+`, true},
+	{"a component that takes a ref second", `export function Field(properties: { label: string | null }, forwardedRef: unknown) {
+    let label = properties.label;
+    if(label === null) label = 'none';
+    return <span ref={forwardedRef}>{label}</span>;
+}
+`, true},
+	{"a helper outside any component", `export function normalize(stored: string | null) {
+    let label = stored;
+    if(label === null) label = 'none';
+    return label;
+}
+`, false},
+	{"a hook-named function that calls no hook and writes no JSX", `export function useLabel(stored: string | null) {
+    let label = stored;
+    if(label === null) label = 'none';
+    return label;
+}
+`, false},
+	{"a component-named function with no JSX and no hooks", `export function Defaults(properties: { label: string | null }) {
+    let label = properties.label;
+    if(label === null) label = 'none';
+    return label;
+}
+`, false},
+	{"a component inside a bare block", `{
+    function Badge(properties: { label: string | null }) {
+        let label = properties.label;
+        if(label === null) label = 'none';
+        return <span>{label}</span>;
+    }
+    console.info(Badge);
+}
+`, false},
+	{"a component inside a function whose name claims nothing", `export function plainOuter() {
+    const Inner = (properties: { label: string | null }) => {
+        let label = properties.label;
+        if(label === null) label = 'none';
+        return <span>{label}</span>;
+    };
+    return Inner;
+}
+`, false},
+	{"a component wrapped in a call, which names nothing", `declare function memo<Type>(component: Type): Type;
+export const Badge = memo(function(properties: { label: string | null }) {
+    let label = properties.label;
+    if(label === null) label = 'none';
+    return <span>{label}</span>;
+});
+`, false},
+	{"a component name with a non-ASCII capital", `export function Émile(properties: { label: string | null }) {
+    let label = properties.label;
+    if(label === null) label = 'none';
+    return <span>{label}</span>;
+}
+`, false},
+	{"a component whose props are annotated as a primitive", `export function Badge(text: string) {
+    let label: string | null = text.length > 0 ? text : null;
+    if(label === null) label = 'none';
+    return <span>{label}</span>;
+}
+`, false},
+	{"a component whose second parameter is not a ref", `export function Badge(properties: { label: string | null }, other: unknown) {
+    let label = properties.label;
+    if(label === null) label = 'none';
+    return <span>{label}{String(other)}</span>;
+}
+`, false},
+	{"a component whose only JSX is inside a closure", `export function Badge(properties: { label: string | null }) {
+    let label = properties.label;
+    if(label === null) label = 'none';
+    return () => <span>{label}</span>;
+}
+`, false},
 }

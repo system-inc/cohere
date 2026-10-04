@@ -60,11 +60,17 @@ type PreferNullishCoalescingOptions struct {
 	IgnorePrimitives PreferNullishCoalescingPrimitives
 	// IgnoreTernaryTests exempts a ternary that could become `??`.
 	IgnoreTernaryTests bool
+	// ReactCompiler is ours, not upstream's, and defaults to TRUE: the if-statement check is silent
+	// inside a function React Compiler compiles, because the `??=` it suggests is a shorthand the
+	// compiler refuses. It is `logical-assignment-operators`' option of the same name, for the same
+	// reason; see preferNullishCoalescingJudgeIf.
+	ReactCompiler bool
 }
 
-// DefaultPreferNullishCoalescingOptions is upstream's defaultOptions, with the one non-false entry.
+// DefaultPreferNullishCoalescingOptions is upstream's defaultOptions, with the one non-false entry,
+// and the React Compiler assumed on.
 func DefaultPreferNullishCoalescingOptions() PreferNullishCoalescingOptions {
-	return PreferNullishCoalescingOptions{IgnoreConditionalTests: true}
+	return PreferNullishCoalescingOptions{IgnoreConditionalTests: true, ReactCompiler: true}
 }
 
 type preferNullishCoalescingWire struct {
@@ -74,6 +80,7 @@ type preferNullishCoalescingWire struct {
 	IgnoreIfStatements                                     *bool `json:"ignoreIfStatements"`
 	IgnoreMixedLogicalExpressions                          *bool `json:"ignoreMixedLogicalExpressions"`
 	IgnoreTernaryTests                                     *bool `json:"ignoreTernaryTests"`
+	ReactCompiler                                          *bool `json:"reactCompiler"`
 	// Polymorphic, so raw. No struct tag can express `oneOf(object, enum:[true])`, and this is the
 	// same shape `ban_ts_comment` keeps raw for the same reason.
 	IgnorePrimitives json.RawMessage `json:"ignorePrimitives"`
@@ -131,6 +138,9 @@ func DecodePreferNullishCoalescingOptions(raw []byte) (any, error) {
 	}
 	if wire.IgnoreTernaryTests != nil {
 		options.IgnoreTernaryTests = *wire.IgnoreTernaryTests
+	}
+	if wire.ReactCompiler != nil {
+		options.ReactCompiler = *wire.ReactCompiler
 	}
 
 	primitives, err := decodePreferNullishCoalescingPrimitives(wire.IgnorePrimitives)
