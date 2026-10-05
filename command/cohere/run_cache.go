@@ -349,6 +349,10 @@ func startRunCacheClock(location projectLocation, locateError error) {
 	if locateError == nil && runCacheEligible() {
 		prepareCacheDirectory(location.Root)
 	}
+	// Any run that keeps a cache may read the libraries' records, eligible for replay or not.
+	if locateError == nil && !cacheOff {
+		prepareNestedCacheDirectories(writeRepositoryRoot(location.ArgumentBase, location.Root))
+	}
 	runCacheClock = time.Now()
 }
 
