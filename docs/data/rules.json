@@ -12571,13 +12571,14 @@
                 "exhaustiveDepsMissing",
                 "exhaustiveDepsMissingCallback",
                 "exhaustiveDepsNotArrayLiteral",
+                "exhaustiveDepsRequireExplicitEffectDeps",
                 "exhaustiveDepsSetStateNoDependencies",
                 "exhaustiveDepsSpread",
                 "exhaustiveDepsUnknownDependencies",
                 "exhaustiveDepsUnnecessary",
                 "exhaustiveDepsUselessWithoutDependencies"
             ],
-            "fixKind": "suggestion",
+            "fixKind": "both",
             "sets": [
                 {
                     "set": "cohere:react",
@@ -13439,7 +13440,9 @@
                 "elements": "one"
             },
             "messageIds": [
-                "noChildrenProp"
+                "nestFunction",
+                "noChildrenProp",
+                "passFunctionAsArgs"
             ],
             "sets": [
                 {

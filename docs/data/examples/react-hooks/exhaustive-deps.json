@@ -28,11 +28,13 @@
         "exhaustiveDepsMissing",
         "exhaustiveDepsMissingCallback",
         "exhaustiveDepsNotArrayLiteral",
+        "exhaustiveDepsRequireExplicitEffectDeps",
         "exhaustiveDepsSetStateNoDependencies",
         "exhaustiveDepsSpread",
         "exhaustiveDepsUnknownDependencies",
         "exhaustiveDepsUnnecessary",
         "exhaustiveDepsUselessWithoutDependencies"
     ],
+    "assertsFix": true,
     "assertsSuggestion": true
 }
