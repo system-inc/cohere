@@ -54,6 +54,8 @@ function useEverything(properties: { items: number[]; flag: boolean }) {
 				Construct(original)
 				untouched := Lower(node, ctx.TypeChecker)
 				Construct(untouched)
+				forgetIdentifierSlabs(original)
+				forgetIdentifierSlabs(untouched)
 				if !reflect.DeepEqual(original, untouched) {
 					t.Fatal("two lowerings of one function differ, so this test cannot tell a shared write from noise")
 				}
@@ -90,5 +92,17 @@ export function useSyncExternalStore<T>(subscribe: (onStoreChange: () => void) =
 	}, "/fixture.tsx")
 	if visited != 1 {
 		t.Fatalf("visited %d functions, want one", visited)
+	}
+}
+
+// forgetIdentifierSlabs drops the chunk NewIdentifier carves from, in a function and its nested ones.
+//
+// The chunk is where identifiers are allocated, not part of the graph: a copy starts without one, and
+// comparing it would report a difference no pass can see. The identifiers themselves stay where they
+// are, so the graph compares exactly as before.
+func forgetIdentifierSlabs(function *Function) {
+	function.identifierSlab = nil
+	for _, nested := range function.Functions {
+		forgetIdentifierSlabs(nested)
 	}
 }

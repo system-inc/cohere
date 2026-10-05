@@ -281,6 +281,9 @@ type Function struct {
 
 	blocksById map[BlockId]*BasicBlock
 	nextBlock  BlockId
+
+	// identifierSlab is the chunk NewIdentifier carves identifiers from. See NewIdentifier.
+	identifierSlab []Identifier
 }
 
 // FunctionKind is what a function syntactically looked like.
@@ -654,7 +657,19 @@ func (f *Function) NewIdentifier(name string, node *ast.Node, declaration Declar
 	if declaration == 0 {
 		declaration = DeclarationId(id) + 1
 	}
-	identifier := &Identifier{Id: id, Declaration: declaration, Name: name, Node: node}
+	// Identifiers are carved from a chunk this function owns rather than allocated one at a time,
+	// which was 1.28M objects on a cold ahra run, the most of any allocation in lowering (#rwsffzm).
+	// A chunk is only ever appended to within its capacity, so a pointer into it stays put; a full
+	// chunk is left as it is and a new one started, sized to the function so far, from 4 to 256. The
+	// first chunk is small because most functions are small: a callback's handful of values, and a
+	// first chunk of 16 cost 0.07 GB of unused slots on a cold ahra run. Each function has its own
+	// chunks, so no identifier of one shares storage with another's, which
+	// TestIdentifiersShareNoStorageAcrossFunctions holds.
+	if len(f.identifierSlab) == cap(f.identifierSlab) {
+		f.identifierSlab = make([]Identifier, 0, min(max(4, len(f.Identifiers)), 256))
+	}
+	f.identifierSlab = append(f.identifierSlab, Identifier{Id: id, Declaration: declaration, Name: name, Node: node})
+	identifier := &f.identifierSlab[len(f.identifierSlab)-1]
 	f.Identifiers = append(f.Identifiers, identifier)
 	return identifier
 }
