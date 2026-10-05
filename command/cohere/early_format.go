@@ -31,6 +31,10 @@ type earlyFormat struct {
 	err         error
 	scope       formatScope
 	speculation *formatSpeculation
+
+	// programs is where the graph's program arrives once it is built, for the speculation to format TypeScript
+	// from its trees (speculateFormat).
+	programs programOffer
 }
 
 // startEarlyFormat begins the default scope's walk and its speculation, and returns at once. record is the one the
@@ -41,12 +45,12 @@ func startEarlyFormat(engine formatEngine, record *formatRecord, root string, ma
 		defer close(early.ready)
 		early.universe, early.err = enumerateFormatUniverse(engine, root)
 		if early.err != nil {
-			early.speculation = speculateFormatOn(nil, nil, maxPasses, 0)
+			early.speculation = speculateFormatOn(nil, nil, maxPasses, 0, nil)
 			return
 		}
 		early.scope = unformattedScopeOf(engine, record, early.universe)
 		transform := early.lineEndings.observing(early.transform(engine))
-		early.speculation = speculateFormatOn(early.scope.formatCandidates(), transform, maxPasses, earlyFormatWorkers())
+		early.speculation = speculateFormatOn(early.scope.formatCandidates(), transform, maxPasses, earlyFormatWorkers(), &early.programs)
 	}()
 	return early
 }

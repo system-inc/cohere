@@ -99,7 +99,7 @@ func TestDesignSystemRulesReplayUntilWhatTheDesignSystemReadChanges(t *testing.T
 			t.Errorf("%s: the cached walk differs from an uncached one:\n cached %v\n truth  %v",
 				step.name, diagnosticKeys(result.Diagnostics), diagnosticKeys(truth.Diagnostics))
 		}
-		if !reflect.DeepEqual(result.Coverage, truth.Coverage) {
+		if !reflect.DeepEqual(foldedCoverage(result.Coverage), foldedCoverage(truth.Coverage)) {
 			t.Errorf("%s: coverage differs from an uncached walk", step.name)
 		}
 		if result.FilesReplayed == 0 {

@@ -201,6 +201,11 @@ type cacheKeys struct {
 	shaped           []string
 	shapeFingerprint [sha256.Size]byte
 	design           []string
+
+	// derived is the rules declaring rule.ProgramFingerprint, and derivedFingerprint their key (derivedKey),
+	// zero when one has no fingerprint this run.
+	derived            []string
+	derivedFingerprint [sha256.Size]byte
 }
 
 // lookup reports whether a file's pure rules can be replayed, and whether each keyed class can be too. All
@@ -230,13 +235,15 @@ func (r *FindingsReuse) lookup(path string, keys cacheKeys) (entry LintCacheEntr
 		shaped: equalStrings(entry.ShapedRules, keys.shaped) && entry.ShapeFingerprint == keys.shapeFingerprint,
 		design: equalStrings(entry.DesignRules, keys.design) && (len(keys.design) == 0 ||
 			r.designFingerprint != [sha256.Size]byte{} && entry.DesignFingerprint == r.designFingerprint),
+		derived: equalStrings(entry.DerivedRules, keys.derived) && (len(keys.derived) == 0 ||
+			keys.derivedFingerprint != [sha256.Size]byte{} && entry.DerivedFingerprint == keys.derivedFingerprint),
 	}
 }
 
-// classHits is which of a file's classes replay: pure, the two type-aware ones, and the design-system rules.
-// The others need pure.
+// classHits is which of a file's classes replay: pure, the two type-aware ones, the design-system rules and the
+// derived ones. The others need pure.
 type classHits struct {
-	pure, typed, shaped, design bool
+	pure, typed, shaped, design, derived bool
 }
 
 func (r *FindingsReuse) keep(entry LintCacheEntry) {
@@ -261,9 +268,10 @@ func ruleNames(rules []rule.Rule) []string {
 // file and counts its own coverage and notes, so replaying them here would count them twice.
 func replayEntry(entry LintCacheEntry, hits classHits, sourceFile *ast.SourceFile, diagnostics *[]rule.Diagnostic,
 	reporting map[string]int, offered map[string]int, listening map[string]int) RuleNotes {
-	replays := make(map[string]bool, len(entry.Rules)+len(entry.TypedRules)+len(entry.ShapedRules)+len(entry.DesignRules))
+	replays := make(map[string]bool, len(entry.Rules)+len(entry.TypedRules)+len(entry.ShapedRules)+len(entry.DesignRules)+
+		len(entry.DerivedRules))
 	for _, names := range [][]string{entry.Rules, classIf(hits.typed, entry.TypedRules), classIf(hits.shaped, entry.ShapedRules),
-		classIf(hits.design, entry.DesignRules)} {
+		classIf(hits.design, entry.DesignRules), classIf(hits.derived, entry.DerivedRules)} {
 		for _, name := range names {
 			replays[name] = true
 			offered[name]++
@@ -293,7 +301,7 @@ func replayEntry(entry LintCacheEntry, hits classHits, sourceFile *ast.SourceFil
 // entry has none. The walk adds what the rules it ran measured.
 func replayedAdamic(entry LintCacheEntry, hits classHits) *AdamicRecord {
 	return adamicOf(entry.Adamic, ruleSet(entry.Rules, classIf(hits.typed, entry.TypedRules),
-		classIf(hits.shaped, entry.ShapedRules), classIf(hits.design, entry.DesignRules)))
+		classIf(hits.shaped, entry.ShapedRules), classIf(hits.design, entry.DesignRules), classIf(hits.derived, entry.DerivedRules)))
 }
 
 // ruleSet is every name in the lists, as a set.
@@ -363,23 +371,26 @@ func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics
 	if silenced.applied != 0 || silenced.unusedDirectives != 0 {
 		return LintCacheEntry{}, false
 	}
-	cacheable := append(append(append(append([]string{}, keys.pure...), keys.typed...), keys.shaped...), keys.design...)
+	cacheable := append(append(append(append(append([]string{}, keys.pure...), keys.typed...), keys.shaped...), keys.design...),
+		keys.derived...)
 	isCacheable := make(map[string]bool, len(cacheable))
 	for _, name := range cacheable {
 		isCacheable[name] = true
 	}
 	entry := LintCacheEntry{
-		Path:             sourceFile.FileName(),
-		ContentHash:      keys.contentHash,
-		Rules:            keys.pure,
-		TypedRules:       keys.typed,
-		TypeFingerprint:  keys.typeFingerprint,
-		ShapedRules:      keys.shaped,
-		ShapeFingerprint: keys.shapeFingerprint,
-		DesignRules:      keys.design,
-		VisitedNodes:     visited,
-		Notes:            notesOf(fileNotes, isCacheable),
-		Adamic:           adamicOf(fileAdamic, isCacheable),
+		Path:               sourceFile.FileName(),
+		ContentHash:        keys.contentHash,
+		Rules:              keys.pure,
+		TypedRules:         keys.typed,
+		TypeFingerprint:    keys.typeFingerprint,
+		ShapedRules:        keys.shaped,
+		ShapeFingerprint:   keys.shapeFingerprint,
+		DesignRules:        keys.design,
+		DerivedRules:       keys.derived,
+		DerivedFingerprint: keys.derivedFingerprint,
+		VisitedNodes:       visited,
+		Notes:              notesOf(fileNotes, isCacheable),
+		Adamic:             adamicOf(fileAdamic, isCacheable),
 	}
 	for _, name := range cacheable {
 		if fileListening[name] > 0 {
@@ -416,27 +427,29 @@ func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics
 func refreshClasses(old LintCacheEntry, keys cacheKeys, hits classHits,
 	fileDiagnostics []rule.Diagnostic, fileListening map[string]int, fileNotes RuleNotes, fileAdamic *AdamicRecord) (LintCacheEntry, bool) {
 	ran := map[string]bool{}
-	for _, name := range append(append(append([]string{}, classIf(!hits.typed, keys.typed)...), classIf(!hits.shaped, keys.shaped)...),
-		classIf(!hits.design, keys.design)...) {
+	for _, name := range append(append(append(append([]string{}, classIf(!hits.typed, keys.typed)...), classIf(!hits.shaped, keys.shaped)...),
+		classIf(!hits.design, keys.design)...), classIf(!hits.derived, keys.derived)...) {
 		ran[name] = true
 	}
-	kept := make(map[string]bool, len(old.Rules)+len(old.TypedRules)+len(old.ShapedRules)+len(old.DesignRules))
-	for _, name := range append(append(append(append([]string{}, old.Rules...), classIf(hits.typed, old.TypedRules)...),
-		classIf(hits.shaped, old.ShapedRules)...), classIf(hits.design, old.DesignRules)...) {
+	kept := make(map[string]bool, len(old.Rules)+len(old.TypedRules)+len(old.ShapedRules)+len(old.DesignRules)+len(old.DerivedRules))
+	for _, name := range append(append(append(append(append([]string{}, old.Rules...), classIf(hits.typed, old.TypedRules)...),
+		classIf(hits.shaped, old.ShapedRules)...), classIf(hits.design, old.DesignRules)...), classIf(hits.derived, old.DerivedRules)...) {
 		kept[name] = true
 	}
 	refreshed := LintCacheEntry{
-		Path:             old.Path,
-		ContentHash:      old.ContentHash,
-		Rules:            old.Rules,
-		TypedRules:       keys.typed,
-		TypeFingerprint:  keys.typeFingerprint,
-		ShapedRules:      keys.shaped,
-		ShapeFingerprint: keys.shapeFingerprint,
-		DesignRules:      keys.design,
-		VisitedNodes:     old.VisitedNodes,
-		Notes:            mergeNotes(notesOf(old.Notes, kept), notesOf(fileNotes, ran)),
-		Adamic:           mergeAdamic(adamicOf(old.Adamic, kept), adamicOf(fileAdamic, ran)),
+		Path:               old.Path,
+		ContentHash:        old.ContentHash,
+		Rules:              old.Rules,
+		TypedRules:         keys.typed,
+		TypeFingerprint:    keys.typeFingerprint,
+		ShapedRules:        keys.shaped,
+		ShapeFingerprint:   keys.shapeFingerprint,
+		DesignRules:        keys.design,
+		DerivedRules:       keys.derived,
+		DerivedFingerprint: keys.derivedFingerprint,
+		VisitedNodes:       old.VisitedNodes,
+		Notes:              mergeNotes(notesOf(old.Notes, kept), notesOf(fileNotes, ran)),
+		Adamic:             mergeAdamic(adamicOf(old.Adamic, kept), adamicOf(fileAdamic, ran)),
 	}
 	if hits.design {
 		refreshed.DesignFingerprint = old.DesignFingerprint
@@ -446,7 +459,7 @@ func refreshClasses(old LintCacheEntry, keys cacheKeys, hits classHits,
 			refreshed.Listening = append(refreshed.Listening, name)
 		}
 	}
-	for _, names := range [][]string{keys.typed, keys.shaped, keys.design} {
+	for _, names := range [][]string{keys.typed, keys.shaped, keys.design, keys.derived} {
 		for _, name := range names {
 			if ran[name] && fileListening[name] > 0 {
 				refreshed.Listening = append(refreshed.Listening, name)

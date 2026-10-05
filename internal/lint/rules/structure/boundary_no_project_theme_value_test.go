@@ -1,8 +1,11 @@
 package structure
 
 import (
+	"crypto/sha256"
+	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -243,4 +246,69 @@ func TestBoundaryNoProjectThemeValueCachesPerProgram(t *testing.T) {
 			rule_testing.RunTypedFiles(t, BoundaryNoProjectThemeValue, firstProgram, libraryFilePath),
 			"forbiddenThemeValue")
 	})
+}
+
+// themeFingerprintOf is the rule's program fingerprint over a fixture, read through the Program the walk hands
+// the rule, viewed under its own reads.
+func themeFingerprintOf(t *testing.T, files map[string]string) [sha256.Size]byte {
+	t.Helper()
+	var fingerprint [sha256.Size]byte
+	probe := BoundaryNoProjectThemeValue
+	probe.Run = func(ctx rule.Context, options any) rule.Listeners {
+		fingerprint = BoundaryNoProjectThemeValue.ProgramFingerprint(ctx.Program)
+		return nil
+	}
+	rule_testing.RunTypedFiles(t, probe, files, libraryFilePath)
+	if fingerprint == ([sha256.Size]byte{}) {
+		t.Fatal("the probe never ran, so no fingerprint was read")
+	}
+	return fingerprint
+}
+
+// The fingerprint is the whole of what a file's verdict reads beyond the file (#kdee854), proven both ways:
+// every change to the theme map moves it, a value's order included since the message lists them in order, and
+// an edit that cannot change any verdict leaves it, so the findings cache replays across it.
+func TestBoundaryNoProjectThemeValueFingerprintsExactlyTheThemeMap(t *testing.T) {
+	t.Parallel()
+	base := map[string]string{
+		themeFilePath:   buttonThemeSource,
+		libraryFilePath: "export const a = <Button variant=\"Ghost\" />;\n",
+		projectFilePath: "export const b = 1;\n",
+	}
+	with := func(path string, text string) map[string]string {
+		files := map[string]string{}
+		for name, contents := range base {
+			files[name] = contents
+		}
+		files[path] = text
+		return files
+	}
+	original := themeFingerprintOf(t, base)
+
+	moves := map[string]map[string]string{
+		"a value added":   with(themeFilePath, strings.Replace(buttonThemeSource, "Outline: string;", "Outline: string;\n    Emphasized: string;", 1)),
+		"a value renamed": with(themeFilePath, strings.Replace(buttonThemeSource, "Ghost", "Spectral", 1)),
+		"two values swapped": with(themeFilePath, strings.Replace(buttonThemeSource, "Ghost: string;\n    Outline: string;",
+			"Outline: string;\n    Ghost: string;", 1)),
+		"a theme file added": with("/repository/libraries/structure/source/components/cards/CardTheme.ts",
+			"export interface CardVariantsInterface {\n    Flat: string;\n}\n"),
+	}
+	for name, files := range moves {
+		if themeFingerprintOf(t, files) == original {
+			t.Errorf("%s left the fingerprint unchanged, so a stale finding would replay", name)
+		}
+	}
+
+	holds := map[string]map[string]string{
+		"a library file edited":       with(libraryFilePath, "export const a = <Button variant=\"Outline\" />;\n"),
+		"a project file edited":       with(projectFilePath, "export const b = 2;\n"),
+		"a comment in the theme file": with(themeFilePath, "// The button's looks.\n"+buttonThemeSource),
+		"an unexported interface beside the theme": with(themeFilePath,
+			buttonThemeSource+"\ninterface ButtonKindsInterface {\n    Secret: string;\n}\n"),
+	}
+	for name, files := range holds {
+		if themeFingerprintOf(t, files) != original {
+			t.Errorf("%s moved the fingerprint, so files whose verdicts cannot change were walked again", name)
+		}
+	}
 }

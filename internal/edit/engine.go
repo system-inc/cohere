@@ -107,7 +107,7 @@ type Propose func(fileName string, text string) ([]Proposal, error)
 // alone and every proposal in the pass is reported as refused, so the reader learns which file and
 // which rules to look at.
 func FixText(fileName string, text string, propose Propose, maxPasses int) (FileResult, error) {
-	result, _, err := fixText(fileName, text, propose, maxPasses)
+	result, _, err := fixText(fileName, text, nil, propose, maxPasses)
 	return result, err
 }
 
@@ -115,11 +115,14 @@ func FixText(fileName string, text string, propose Propose, maxPasses int) (File
 // the last accepted pass's. Nil where the guard built none (a file the TypeScript parser does not own), and
 // for a file whose passes ran out and were discarded.
 //
+// seed is a tree of text someone already parsed, or nil: the starting guard takes it rather than parsing where
+// it is the tree the guard would build (seedFor), and every later guard parses as always.
+//
 // One tree is held at a time. Keeping the starting tree through every pass, for the rare file that runs out
 // and reverts, held two whole trees and a third being built on a file with fixes, and a 2.8 MB bundle is a
 // file with fixes (#xn1k1gz). The formatter parses a reverted file again, as it did before it was handed
 // trees at all. Found by @system_cohere_lint_fix in review.
-func fixText(fileName string, text string, propose Propose, maxPasses int) (FileResult, *ast.SourceFile, error) {
+func fixText(fileName string, text string, seed *ast.SourceFile, propose Propose, maxPasses int) (FileResult, *ast.SourceFile, error) {
 	if maxPasses <= 0 {
 		maxPasses = DefaultMaxPasses
 	}
@@ -130,7 +133,14 @@ func fixText(fileName string, text string, propose Propose, maxPasses int) (File
 	// broken is not this package's problem to report — the types phase does that, loudly — but it is
 	// this package's problem not to make worse, and "the result parses" is a guarantee that says
 	// nothing if the input did not.
-	parses, reason, currentTree := parsesWithTree(fileName, text)
+	var parses bool
+	var reason string
+	var currentTree *ast.SourceFile
+	if seedFor(fileName, text, seed) {
+		parses, reason, currentTree = verdictOf(seed)
+	} else {
+		parses, reason, currentTree = parsesWithTree(fileName, text)
+	}
 	if !parses {
 		return result, nil, fmt.Errorf("%s does not parse before any fix is applied (%s)", fileName, reason)
 	}
@@ -368,11 +378,19 @@ func FixAndTransformFile(fileName string, propose Propose, transform Transform, 
 // through the same function the writing run calls before it writes, so a file this reports as
 // unchanged is a file `--fix` would leave alone, and the two cannot drift apart.
 func CheckFile(fileName string, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
+	return CheckFileSeeded(fileName, nil, propose, transform, maxPasses)
+}
+
+// CheckFileSeeded is CheckFile given a tree of the file that someone already parsed, the program's, or nil.
+// The file is still read now, and the tree is taken only if it is of exactly the bytes read and is the tree
+// the guard would build (seedFor), so a tree of a stale copy, or of another script kind, is parsed past as if
+// it were not there. Taken, it is the starting guard's tree and the transform's (#dk2502g).
+func CheckFileSeeded(fileName string, seed *ast.SourceFile, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
 	text, err := readFile(fileName)
 	if err != nil {
 		return FileResult{FileName: fileName}, err
 	}
-	return FixAndTransformText(fileName, text, propose, transform, maxPasses)
+	return fixAndTransformText(fileName, text, seed, propose, transform, maxPasses)
 }
 
 // FixAndTransformText is FixAndTransformFile on text in hand, writing nothing: the fixpoint, then the
@@ -390,7 +408,13 @@ func CheckFile(fileName string, propose Propose, transform Transform, maxPasses 
 // FormatFixRoundLimit rounds. A file still changing after that is left exactly as it was found and
 // reported as not converged, naming the rules and the formatter, never written half-settled.
 func FixAndTransformText(fileName string, text string, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
-	result, tree, err := fixText(fileName, text, propose, maxPasses)
+	return fixAndTransformText(fileName, text, nil, propose, transform, maxPasses)
+}
+
+// fixAndTransformText is FixAndTransformText with a seed for the starting guard (fixText).
+func fixAndTransformText(fileName string, text string, seed *ast.SourceFile, propose Propose, transform Transform,
+	maxPasses int) (FileResult, error) {
+	result, tree, err := fixText(fileName, text, seed, propose, maxPasses)
 	if err != nil || transform == nil {
 		return result, err
 	}
@@ -450,7 +474,7 @@ func FixAndTransformText(fileName string, text string, propose Propose, transfor
 			}
 			return propose(name, current)
 		}
-		next, nextTree, err := fixText(fileName, result.Text, startingWith, maxPasses)
+		next, nextTree, err := fixText(fileName, result.Text, nil, startingWith, maxPasses)
 		if err != nil {
 			return result, err
 		}

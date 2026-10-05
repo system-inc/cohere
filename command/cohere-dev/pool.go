@@ -39,6 +39,11 @@ const threadsVariable = "COHERE_DEV_THREADS"
 // heldTokenVariable is set, to the token's number, in the environment of everything a token's run starts.
 const heldTokenVariable = "COHERE_DEV_TOKEN"
 
+// coresVariable is set, in the environment of everything a token's run starts, to the cores the token is
+// worth: its packages times its threads. A runner that is not Go (Jest's workers, node's test concurrency)
+// sizes itself by it, through `cohere-dev exec --`, without knowing Go's split (#wrawfdb).
+const coresVariable = "COHERE_DEV_CORES"
+
 // The pool's shape: four runs at once, each two packages at a time on two threads, sixteen threads on a
 // sixteen-core machine. Measured in a quiet window on 2026-10-05 replaying the morning's mix, four gates and
 // two builds started at once: this shape finished in 112s at a mean load of 28, against 113s at 119 for
@@ -113,14 +118,33 @@ func withToken(what string, work func(environment []string) int) int {
 		return 1
 	}
 
+	held, err := waitInLine(directory, tokens, what, "token", func() {
+		fmt.Fprintf(os.Stderr, "cohere-dev: waiting for a token; the machine runs %d heavy Go runs at once, each %d packages "+
+			"at a time on %d threads, and these hold them (cohere-dev status shows the line):\n", tokens, shape.packages, shape.threads)
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+		return 1
+	}
+	code := work(budgetEnvironment(os.Environ(), held.number, shape))
+	held.release()
+	// The run is over and its token free, so this is when the cache is looked at (cache.go).
+	startCacheTrim(directory)
+	return code
+}
+
+// waitInLine takes one of a directory's slots in arrival order, waiting its turn, and returns it held. The
+// slots are the pool's tokens, or land's one lock (land.go). noun names a slot in what a waiting run prints,
+// and explain opens what it prints when it first finds every slot held, before the holders' lines.
+func waitInLine(directory string, slots int, what string, noun string, explain func()) (*heldSlot, error) {
 	// In line, in arrival order, where a lock holds; see queueTicket.
 	var ticket *queueTicket
+	var err error
 	if filesLock {
 		if ticket, err = joinQueue(directory); err != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: joining the line for a token: %v\n", err)
-			return 1
+			return nil, fmt.Errorf("joining the line for a %s: %w", noun, err)
 		}
-		// Left as soon as a token is taken, so the next in line moves up while this one runs; this covers
+		// Left as soon as a slot is taken, so the next in line moves up while this one runs; this covers
 		// every way out before that.
 		defer func() {
 			if ticket != nil {
@@ -136,16 +160,14 @@ func withToken(what string, work func(environment []string) int) int {
 		ahead, waiting := 0, 0
 		if ticket != nil {
 			if ahead, waiting, err = ticket.place(); err != nil {
-				fmt.Fprintf(os.Stderr, "cohere-dev: reading the line for a token: %v\n", err)
-				return 1
+				return nil, fmt.Errorf("reading the line for a %s: %w", noun, err)
 			}
 		}
-		// Only the first in line, as many as there are tokens, may take one, so no later arrival passes them.
-		if ahead < tokens {
-			held, err := takeSlot(directory, tokens, what)
+		// Only the first in line, as many as there are slots, may take one, so no later arrival passes them.
+		if ahead < slots {
+			held, err := takeSlot(directory, slots, what)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "cohere-dev: taking a token: %v\n", err)
-				return 1
+				return nil, fmt.Errorf("taking a %s: %w", noun, err)
 			}
 			if held != nil {
 				if ticket != nil {
@@ -153,16 +175,14 @@ func withToken(what string, work func(environment []string) int) int {
 					ticket = nil
 				}
 				if announced {
-					fmt.Fprintf(os.Stderr, "cohere-dev: took token %d after waiting %s\n", held.number, time.Since(waitingSince).Round(time.Second))
+					fmt.Fprintf(os.Stderr, "cohere-dev: took %s %d after waiting %s\n", noun, held.number, time.Since(waitingSince).Round(time.Second))
 				}
-				defer held.release()
-				return work(budgetEnvironment(os.Environ(), held.number, shape))
+				return held, nil
 			}
 		}
 		if !announced {
-			fmt.Fprintf(os.Stderr, "cohere-dev: waiting for a token; the machine runs %d heavy Go runs at once, each %d packages "+
-				"at a time on %d threads, and these hold them (cohere-dev status shows the line):\n", tokens, shape.packages, shape.threads)
-			for _, holder := range holders(directory, tokens) {
+			explain()
+			for _, holder := range holders(directory, slots) {
 				fmt.Fprintf(os.Stderr, "  %s\n", holder)
 			}
 			announced = true
@@ -184,7 +204,7 @@ func budgetEnvironment(base []string, token int, shape poolShape) []string {
 	for _, variable := range base {
 		name, value, _ := strings.Cut(variable, "=")
 		switch name {
-		case "GOMAXPROCS", heldTokenVariable:
+		case "GOMAXPROCS", heldTokenVariable, coresVariable:
 			continue
 		case "GOFLAGS":
 			for _, flag := range strings.Fields(value) {
@@ -198,7 +218,7 @@ func budgetEnvironment(base []string, token int, shape poolShape) []string {
 	}
 	flags = append(flags, "-p="+strconv.Itoa(shape.packages))
 	return append(environment, "GOFLAGS="+strings.Join(flags, " "), "GOMAXPROCS="+strconv.Itoa(shape.threads),
-		heldTokenVariable+"="+strconv.Itoa(token))
+		heldTokenVariable+"="+strconv.Itoa(token), coresVariable+"="+strconv.Itoa(shape.packages*shape.threads))
 }
 
 // status prints the pool: its shape, who holds each token, and who waits in line, oldest first.
@@ -222,6 +242,7 @@ func status() int {
 		}
 		fmt.Printf("  token %d: %s\n", token, holder)
 	}
+	fmt.Println(cacheStatus(directory))
 	waiting := waiters(directory)
 	fmt.Printf("line: %d waiting\n", len(waiting))
 	for place, waiter := range waiting {

@@ -27,7 +27,7 @@ func TestAnEarlyFormatResultIsDiscardedWhenTheFileChangesBeforeTheBuild(t *testi
 				t.Fatal(err)
 			}
 			unchanged := func(_ string, text string, _ *ast.SourceFile) (string, error) { return text, nil }
-			speculation := speculateFormatOn([]string{fileName}, unchanged, 1, 1)
+			speculation := speculateFormatOn([]string{fileName}, unchanged, 1, 1, nil)
 			speculation.wait()
 			if _, attempted := speculation.attempts[fileName]; !attempted {
 				t.Fatal("the speculation attempted nothing, so nothing below is about keeping it")
@@ -92,7 +92,7 @@ func TestANarrowedSpeculationRunsOnFewerWorkersAndStillReachesEveryFile(t *testi
 		return text, nil
 	}
 
-	speculation := speculateFormatOn(candidates, holding, 1, workers)
+	speculation := speculateFormatOn(candidates, holding, 1, workers, nil)
 	for range workers {
 		<-started
 	}

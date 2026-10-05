@@ -50,7 +50,7 @@ func TestAStoppedSpeculationBeginsNoMoreFiles(t *testing.T) {
 		return format(fileName, text, parsed)
 	}
 
-	stopped := speculateFormat(candidates, holding, 1)
+	stopped := speculateFormat(candidates, holding, 1, nil)
 	for range workers {
 		<-started
 	}
@@ -75,7 +75,7 @@ func TestAStoppedSpeculationBeginsNoMoreFiles(t *testing.T) {
 		}
 	}
 
-	free := speculateFormat(candidates, format, 1)
+	free := speculateFormat(candidates, format, 1, nil)
 	free.wait()
 	if want := len(candidates) - (len(candidates)+2)/3; len(free.attempts) != want {
 		t.Fatalf("never stopped, the speculation kept %d of %d files, want the %d it leaves unchanged", len(free.attempts), len(candidates), want)
