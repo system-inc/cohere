@@ -454,7 +454,7 @@ func (fixture *runCacheFixture) run(cached bool, arguments ...string) (string, i
 	if !isExit {
 		fixture.t.Fatalf("running cohere: %v\n%s", err, output)
 	}
-	return string(output), exitError.ExitCode()
+	return string(output), childExitCode(fixture.t, exitError)
 }
 
 // establishHit runs twice and requires the second to replay the first.
