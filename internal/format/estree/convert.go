@@ -11,6 +11,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 /*
@@ -1244,7 +1245,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 	case ast.KindStringLiteral:
 		value := node.Text()
 		if parent.Kind == ast.KindJsxAttribute {
-			value = unescapeStringLiteralText(value)
+			value = ecmascripttext.UnescapeStringLiteralText(value)
 		}
 		return converter.createNode(node, "Literal",
 			"raw", converter.getText(node),
@@ -1351,7 +1352,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 		text := converter.text[start:end]
 		return converter.createNodeWithRange("JSXText", [2]int{start, end},
 			"raw", text,
-			"value", unescapeStringLiteralText(text))
+			"value", ecmascripttext.UnescapeStringLiteralText(text))
 
 	case ast.KindJsxSpreadAttribute:
 		return converter.createNode(node, "JSXSpreadAttribute",
