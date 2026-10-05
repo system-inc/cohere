@@ -27,8 +27,13 @@ const defaultTsConfig = `{
 		"moduleDetection": "force",
 		"types": []
 	},
-	"include": ["**/*.ts", "**/*.tsx"]
+	"sourceExtensions": [".a"],
+	"include": ["**/*.ts", "**/*.tsx", "**/*.a"]
 }`
+
+// An Adamic `.a` fixture is TypeScript source under its own name (#6mhafvb), so the fixture program
+// lists ".a" in "sourceExtensions" and includes it, and a rule's fixture can show `.a` reports as `.ts`
+// does (#kwt1htp).
 
 // The include pattern recurses, and it did not until a fixture needed a nested path.
 //
