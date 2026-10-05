@@ -629,15 +629,13 @@ func unknownFixtureLiveSystem(t *testing.T) *tailwindengine.LoadedDesignSystem {
 func independentLiveSystem(t *testing.T) *tailwindengine.LoadedDesignSystem {
 	t.Helper()
 
-	repositoryRoot, err := filepath.Abs(filepath.Join("..", "..", "..", "..", ".."))
-	if err != nil {
-		t.Fatalf("resolving the repository root: %v", err)
-	}
-	source := filepath.Join(repositoryRoot,
-		"tools", "generate_descriptor_base", "testdata", "independent_theme.css")
+	// The theme is this package's own testdata, under its generator, so it is read from the package
+	// directory and is never absent. It used to be read from five directories up, outside the repository,
+	// where it never was, so every test that asked for it skipped on every machine (#sycrdr6).
+	source := filepath.Join("tools", "generate_descriptor_base", "testdata", "independent_theme.css")
 	contents, err := os.ReadFile(source)
 	if err != nil {
-		t.Skipf("no independent theme at %s: %v", source, err)
+		t.Fatalf("reading the independent theme: %v", err)
 	}
 
 	packageRoot := unknownFixturePackageRoot()
