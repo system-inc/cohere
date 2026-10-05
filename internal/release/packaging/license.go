@@ -27,13 +27,14 @@ const copyrightHolderPlaceholder = "[[COPYRIGHT HOLDER PENDING"
 
 // requireConfirmedCopyright refuses a release whose license still carries the placeholder copyright
 // holder. A license naming no one grants nothing clearly, and npm cannot take a published version back.
-func requireConfirmedCopyright(moduleDirectory string) error {
+// A dry run is let through, since nothing it stages is published, but the licenses must still be there.
+func requireConfirmedCopyright(moduleDirectory string, dryRun bool) error {
 	for _, name := range LicenseFileNames {
 		contents, err := os.ReadFile(filepath.Join(moduleDirectory, name))
 		if err != nil {
 			return fmt.Errorf("reading the license a release ships: %w", err)
 		}
-		if bytes.Contains(contents, []byte(copyrightHolderPlaceholder)) {
+		if bytes.Contains(contents, []byte(copyrightHolderPlaceholder)) && !dryRun {
 			return fmt.Errorf("%s still names a placeholder as the copyright holder, so it is refused until the legal name is written in", name)
 		}
 	}
