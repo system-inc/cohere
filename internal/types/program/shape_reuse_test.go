@@ -108,7 +108,7 @@ func TestABodyEditReplaysShapeKeyedFindingsOnImporters(t *testing.T) {
 				t.Fatalf("findings after a body edit differ from an uncached walk:\n cached %v\n truth  %v",
 					diagnosticKeys(after.Diagnostics), diagnosticKeys(truth.Diagnostics))
 			}
-			if !reflect.DeepEqual(after.Coverage, truth.Coverage) {
+			if !reflect.DeepEqual(foldedCoverage(after.Coverage), foldedCoverage(truth.Coverage)) {
 				t.Errorf("coverage after a body edit differs from an uncached walk")
 			}
 			ranOnConsumer := ran["consumer.ts"] > 0

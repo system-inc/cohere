@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -45,6 +46,20 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// nodeCounts is the lint line's node account: what the walk visited, and what the cache covered by replay.
+var nodeCounts = regexp.MustCompile(`(\d+) nodes visited(?:, (\d+) more covered by replay)?`)
+
+// foldNodeCounts writes each lint line's node account as one total, the form a warm run and a cold run agree on:
+// the warm one walked fewer nodes and replayed the rest (#kdee854).
+func foldNodeCounts(output string) string {
+	return nodeCounts.ReplaceAllStringFunc(output, func(account string) string {
+		parts := nodeCounts.FindStringSubmatch(account)
+		visited, _ := strconv.Atoi(parts[1])
+		replayed, _ := strconv.Atoi(parts[2])
+		return fmt.Sprintf("%d nodes visited", visited+replayed)
+	})
+}
+
 // TestRunCacheEndToEnd is the run cache's proof against the real binary over a real git repository.
 //
 // For each input category: establish a hit, make the change, and require that the next run does not
@@ -79,7 +94,7 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// cache answered for, which a warm run and a cold one differ in by design.
 	footerLine := regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) .*\n?`)
 	normalized := func(output string) string {
-		output = missLine.ReplaceAllString(contentKeyedLine.ReplaceAllString(output, ""), "")
+		output = foldNodeCounts(missLine.ReplaceAllString(contentKeyedLine.ReplaceAllString(output, ""), ""))
 		return typesClause.ReplaceAllString(footerLine.ReplaceAllString(totalLine.ReplaceAllString(cacheOffLine.ReplaceAllString(layerTwoClause.ReplaceAllString(durations.ReplaceAllString(output, "T"), ""), ""), ""), ""), "")
 	}
 	keepLines := func(output string, drop ...string) string {

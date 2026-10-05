@@ -117,6 +117,9 @@ type CacheTableIdentity struct {
 // half is enforced by TestCacheTableShapeIsPinnedToItsVersion; the meaning half is the reason each
 // section also keeps its own version.
 //
+// 13: a signature entry carries Abandoned, set on a file whose emit outran the post-verdict graduation, so it is
+// never emitted again while its bytes are the same (#9knyr86).
+//
 // 12: paths below the project root are stored relative to it, and every fingerprint hashes them that way, so
 // every spelling of the root reads one table; recorded runs and the findings section carry their key's parts,
 // so a miss can say which moved (#547dhjz).
@@ -141,7 +144,7 @@ type CacheTableIdentity struct {
 // design system's key.
 //
 // 2: findings entries carry shape-keyed rules and their fingerprint, and the table holds Signatures.
-const cacheTableVersion = 12
+const cacheTableVersion = 13
 
 // cacheTableMagic opens every file of the table, so a file that is not one is refused on its first field.
 const cacheTableMagic = "cohere cache table"

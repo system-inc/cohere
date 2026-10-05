@@ -120,7 +120,7 @@ func TestAReplayingWalkReportsWhatAPlainWalkReports(t *testing.T) {
 	if !reflect.DeepEqual(diagnosticKeys(plain.Diagnostics), diagnosticKeys(replayed.Diagnostics)) {
 		t.Errorf("findings differ:\n plain    %v\n replayed %v", diagnosticKeys(plain.Diagnostics), diagnosticKeys(replayed.Diagnostics))
 	}
-	if !reflect.DeepEqual(plain.Coverage, replayed.Coverage) {
+	if !reflect.DeepEqual(foldedCoverage(plain.Coverage), foldedCoverage(replayed.Coverage)) {
 		t.Errorf("coverage differs:\n plain    %+v\n replayed %+v", plain.Coverage, replayed.Coverage)
 	}
 }
@@ -202,11 +202,18 @@ func TestAFindingsCacheUnderAnotherKeyServesNothing(t *testing.T) {
 	}
 }
 
+// foldedCoverage is a walk's coverage with its node split folded into one total, the form a cached walk and an
+// uncached one must agree on: the cached one walked fewer nodes and replayed the rest (#kdee854).
+func foldedCoverage(coverage program.Coverage) program.Coverage {
+	coverage.NodesVisited, coverage.NodesReplayed = coverage.NodesCovered(), 0
+	return coverage
+}
+
 // With only pure rules, a replayed file has nothing left to walk at all, and its coverage still matches.
 //
 // This is the path the mixed rule set above never reaches: no uncacheable rule applies, so the walk is
-// skipped and the file's node count comes from its entry. Counted as zero, the coverage line would
-// change on every such file.
+// skipped and the file's node count comes from its entry, as covered by replay. Counted as zero, the
+// coverage line would lose every such file; counted as visited, it claimed a walk that never happened.
 func TestAFileWithNothingLeftToWalkKeepsItsCoverage(t *testing.T) {
 	t.Parallel()
 	root := writeProject(t, map[string]string{
@@ -248,8 +255,14 @@ func TestAFileWithNothingLeftToWalkKeepsItsCoverage(t *testing.T) {
 	if plain.Coverage.NodesVisited == 0 {
 		t.Fatal("the plain walk visited no nodes, so a zero below would match for nothing")
 	}
-	if !reflect.DeepEqual(plain.Coverage, replayed.Coverage) {
-		t.Errorf("coverage differs: plain visited %d nodes, replayed %d", plain.Coverage.NodesVisited, replayed.Coverage.NodesVisited)
+	// The replayed walk touched nothing, and says so: every node is covered by replay, and the total is the
+	// plain walk's (#kdee854). Everything else in the coverage is the same.
+	if replayed.Coverage.NodesVisited != 0 || replayed.Coverage.NodesReplayed != plain.Coverage.NodesVisited {
+		t.Errorf("the replayed walk says it visited %d nodes and replayed %d, want 0 and the plain walk's %d",
+			replayed.Coverage.NodesVisited, replayed.Coverage.NodesReplayed, plain.Coverage.NodesVisited)
+	}
+	if !reflect.DeepEqual(foldedCoverage(plain.Coverage), foldedCoverage(replayed.Coverage)) {
+		t.Errorf("coverage differs beyond the node split:\n plain    %+v\n replayed %+v", plain.Coverage, replayed.Coverage)
 	}
 	if !reflect.DeepEqual(diagnosticKeys(plain.Diagnostics), diagnosticKeys(replayed.Diagnostics)) {
 		t.Errorf("findings differ:\n plain    %v\n replayed %v", diagnosticKeys(plain.Diagnostics), diagnosticKeys(replayed.Diagnostics))
@@ -380,14 +393,14 @@ func TestAnEditToADependencyReachesItsImportersTypeAwareFindings(t *testing.T) {
 		t.Errorf("the run after the refresh replayed a finding the edit removed:\n cached %v\n truth  %v",
 			diagnosticKeys(again.Diagnostics), diagnosticKeys(truth.Diagnostics))
 	}
-	if !reflect.DeepEqual(again.Coverage, truth.Coverage) {
+	if !reflect.DeepEqual(foldedCoverage(again.Coverage), foldedCoverage(truth.Coverage)) {
 		t.Errorf("coverage differs from an uncached walk on the run after the refresh")
 	}
 	if !reflect.DeepEqual(diagnosticKeys(after.Diagnostics), diagnosticKeys(truth.Diagnostics)) {
 		t.Errorf("a type-aware finding was replayed over the edit to its dependency:\n cached %v\n truth  %v",
 			diagnosticKeys(after.Diagnostics), diagnosticKeys(truth.Diagnostics))
 	}
-	if !reflect.DeepEqual(after.Coverage, truth.Coverage) {
+	if !reflect.DeepEqual(foldedCoverage(after.Coverage), foldedCoverage(truth.Coverage)) {
 		t.Errorf("coverage differs from an uncached walk after the edit:\n cached %+v\n truth  %+v", after.Coverage, truth.Coverage)
 	}
 	if after.FilesReplayed == 0 {
