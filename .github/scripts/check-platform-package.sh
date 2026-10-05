@@ -26,12 +26,27 @@ npm pack --silent --pack-destination "$gate/packs" "./dist/cohere-$platform" > /
 # The project every case starts from: a clean file, the house tier and a config that turns one rule on.
 template="$gate/template"
 mkdir -p "$template"
-printf '{ "compilerOptions": { "strict": true, "noEmit": true, "target": "ES2022", "module": "esnext", "moduleResolution": "bundler" }, "include": ["**/*.ts"], "exclude": ["node_modules", "**/dist"] }\n' > "$template/tsconfig.json"
+# The JSON is written the way Prettier formats it, since a bare run formats JSON too (73d2b8a7) and the
+# clean case would otherwise fail on the fixture's own files. npm keeps package.json's indentation when it
+# adds the dependency.
+cat > "$template/tsconfig.json" <<'JSON'
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "esnext",
+    "moduleResolution": "bundler"
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "**/dist"]
+}
+JSON
 printf '{ "format": {} }\n' > "$template/NexusCohereSettings.json"
 printf '{ "extends": "./NexusCohereSettings.json", "rules": { "no-debugger": "error" } }\n' > "$template/CohereSettings.json"
 printf 'node_modules\n.cache/\ndist\n' > "$template/.gitignore"
 printf 'export const clean = 1;\n' > "$template/Clean.ts"
-printf '{ "name": "gate", "private": true }\n' > "$template/package.json"
+printf '{\n  "name": "gate",\n  "private": true\n}\n' > "$template/package.json"
 (cd "$template" && npm install --silent --no-audit --no-fund "$gate"/packs/*.tgz)
 
 failures=0
@@ -86,12 +101,14 @@ directory=$(project version)
 status=$(run "$directory" version.log --version)
 expect "--version runs and names the platform" 0 "$status" version.log "platform:"
 
-# A clean tree passes, and the same run again replays from the cache.
+# A clean tree passes, and the same run again replays from the cache. The replay says so under --verbose:
+# a default run prints its findings and one footer line (#ytqqv8v). Both runs pass --verbose, since the
+# run cache keys on the arguments and a run printed another way is a record of its own.
 directory=$(project clean)
-status=$(run "$directory" clean.log --no-fix)
+status=$(run "$directory" clean.log --no-fix --verbose)
 expect "a clean tree passes" 0 "$status" clean.log
 start=$(milliseconds)
-status=$(run "$directory" replay.log --no-fix)
+status=$(run "$directory" replay.log --no-fix --verbose)
 finish=$(milliseconds)
 expect "an unchanged tree replays" 0 "$status" replay.log "cached: "
 echo "     replay took $((finish - start))ms through npx, the launcher and the binary"
@@ -129,10 +146,10 @@ else
     echo "ok   Ugly.ts was formatted"
 fi
 
-# A CRLF file is named with the .gitattributes fix.
+# A CRLF file is named with the .gitattributes fix, which --verbose prints.
 directory=$(project crlf)
 printf 'export const crlf = 1;\r\n' > "$directory/Crlf.ts"
-status=$(run "$directory" crlf.log --no-fix --format)
+status=$(run "$directory" crlf.log --no-fix --format --verbose)
 expect "a CRLF file is reported, with the fix" 1 "$status" crlf.log "text=auto eol=lf"
 
 # The installed binary is checked against the dispatcher's SHA256SUMS before it runs. It passes once, so

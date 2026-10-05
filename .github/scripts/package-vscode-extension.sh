@@ -1,7 +1,7 @@
 #!/bin/bash
 # Packages the VS Code extension as a .vsix, versioned with the cohere release it ships beside.
 #
-#     package-vscode-extension.sh <version> <output-directory>
+#     package-vscode-extension.sh <version> <output-directory> [--dry-run]
 #     package-vscode-extension.sh 1.0.0 dist
 #
 # The extension is versioned in lockstep with cohere, 1.0.0 with 1.0.0, so the version is stamped here
@@ -17,12 +17,14 @@ set -euo pipefail
 
 version=$1
 output=$(mkdir -p "$2" && cd "$2" && pwd)
+dry_run=${3:-}
 source=$(cd "$(dirname "$0")/../../editors/vscode" && pwd)
 root=$(cd "$(dirname "$0")/../.." && pwd)
 vsix="$output/cohere-$version.vsix"
 
-# The npm release refuses this placeholder too (internal/release/packaging/license.go).
-if grep -Fq "[[COPYRIGHT HOLDER PENDING" "$root/LICENSE-MIT"; then
+# The npm release refuses this placeholder too (internal/release/packaging/license.go), and lets a dry run
+# through the same way, since nothing a dry run packages is published.
+if grep -Fq "[[COPYRIGHT HOLDER PENDING" "$root/LICENSE-MIT" && [ "$dry_run" != "--dry-run" ]; then
     echo "LICENSE-MIT still names a placeholder as the copyright holder, so the extension is not packaged"
     exit 1
 fi

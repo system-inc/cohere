@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -132,30 +133,102 @@ func TestTheLicenseTextsAreTheStandardOnes(t *testing.T) {
 	}
 }
 
-func TestReleaseRefusesAPlaceholderCopyrightHolder(t *testing.T) {
+func TestReleaseRefusesAPlaceholderCopyrightHolderUnlessItIsADryRun(t *testing.T) {
 	t.Parallel()
 
 	// The placeholder stays in the repository until Kirk confirms the legal name, and the release is what
-	// refuses it, so a contributor's tests pass meanwhile and nothing can publish it.
+	// refuses it, so a contributor's tests pass meanwhile and nothing can publish it. A dry run stages
+	// with it, so the packaging is proven before the name lands, and publishes nothing.
 	pending := t.TempDir()
 	writeFile(t, filepath.Join(pending, "LICENSE-APACHE"), "terms\n")
 	writeFile(t, filepath.Join(pending, "LICENSE-MIT"), "MIT License\n\nCopyright (c) 2026 "+copyrightHolderPlaceholder+": the legal name]]\n")
-	if err := requireConfirmedCopyright(pending); err == nil || !strings.Contains(err.Error(), "LICENSE-MIT") {
+	if err := requireConfirmedCopyright(pending, false); err == nil || !strings.Contains(err.Error(), "LICENSE-MIT") {
 		t.Fatalf("a placeholder copyright holder was not refused by name: %v", err)
+	}
+	if err := requireConfirmedCopyright(pending, true); err != nil {
+		t.Fatalf("a dry run was refused the placeholder it is allowed: %v", err)
 	}
 
 	confirmed := t.TempDir()
 	writeFile(t, filepath.Join(confirmed, "LICENSE-APACHE"), "terms\n")
 	writeFile(t, filepath.Join(confirmed, "LICENSE-MIT"), "MIT License\n\nCopyright (c) 2026 Example, Inc.\n")
-	if err := requireConfirmedCopyright(confirmed); err != nil {
+	if err := requireConfirmedCopyright(confirmed, false); err != nil {
 		t.Fatalf("a named copyright holder was refused: %v", err)
 	}
 
-	// And Build reaches the check, before it reads the compiler pin or compiles anything.
+	// A dry run is excused the name, not the licenses.
+	if err := requireConfirmedCopyright(t.TempDir(), true); err == nil {
+		t.Fatalf("a dry run staged with no license at all")
+	}
+
+	// And Build reaches the check, before it reads the compiler pin or compiles anything: a publish is
+	// refused there, and a dry run passes it and is refused later, by the pin this fixture lacks.
 	_, err := Build(Options{ModuleDirectory: pending, OutputDirectory: t.TempDir(), Version: "1.0.0", SwiftScratchDirectory: t.TempDir()})
 	if err == nil || !strings.Contains(err.Error(), "placeholder") {
-		t.Fatalf("Build did not refuse a placeholder copyright holder: %v", err)
+		t.Fatalf("Build did not refuse a placeholder copyright holder for a publish: %v", err)
 	}
+	_, err = Build(Options{ModuleDirectory: pending, OutputDirectory: t.TempDir(), Version: "1.0.0", SwiftScratchDirectory: t.TempDir(), DryRun: true})
+	if err == nil || strings.Contains(err.Error(), "placeholder") || !strings.Contains(err.Error(), "compiler") {
+		t.Fatalf("a dry run did not get past the copyright check to the compiler pin: %v", err)
+	}
+}
+
+func TestTheWorkflowDryRunsExactlyWhenItDoesNotPublish(t *testing.T) {
+	t.Parallel()
+
+	// release.yml decides --dry-run in shell, twice: for the npm staging and for the extension. Each
+	// decision is run here for both inputs, so a publish that would pass --dry-run, and slip the
+	// placeholder past the release, fails here rather than on the registry.
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Fatalf("bash runs the workflow's steps, and it is not installed: %v", err)
+	}
+	workflow, err := os.ReadFile(filepath.Join(moduleRoot(t), ".github", "workflows", "release.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	decisions := dryRunDecisions(string(workflow))
+	if len(decisions) != 2 {
+		t.Fatalf("release.yml decides --dry-run %d times, wanted twice (staging and the extension)", len(decisions))
+	}
+	for index, decision := range decisions {
+		for publish, wanted := range map[string]string{"true": "", "false": "--dry-run"} {
+			script := strings.ReplaceAll(decision, "${{ inputs.publish }}", publish) + "\nprintf '%s' \"${dry_run[*]}\"\n"
+			output, err := exec.Command(bash, "-c", script).CombinedOutput()
+			if err != nil {
+				t.Fatalf("decision %d with publish=%s did not run: %v\n%s", index, publish, err, output)
+			}
+			if string(output) != wanted {
+				t.Errorf("decision %d with publish=%s passes %q, wanted %q", index, publish, output, wanted)
+			}
+		}
+	}
+}
+
+// dryRunDecisions are release.yml's blocks that set dry_run, from `dry_run=()` to the `fi` closing them.
+func dryRunDecisions(workflow string) []string {
+	var decisions []string
+	for {
+		start := strings.Index(workflow, "dry_run=()")
+		if start < 0 {
+			return decisions
+		}
+		closing := strings.Index(workflow[start:], "fi\n")
+		if closing < 0 {
+			return decisions
+		}
+		decisions = append(decisions, dedent(workflow[start:start+closing+2]))
+		workflow = workflow[start+closing+2:]
+	}
+}
+
+// dedent strips each line's leading spaces, which YAML indents a run block by and bash does not need.
+func dedent(block string) string {
+	lines := strings.Split(block, "\n")
+	for index, line := range lines {
+		lines[index] = strings.TrimLeft(line, " ")
+	}
+	return strings.Join(lines, "\n")
 }
 
 // mitTerms is an MIT license from its first paragraph on, past the title and the copyright line.
