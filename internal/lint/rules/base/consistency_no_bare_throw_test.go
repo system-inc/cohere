@@ -183,9 +183,11 @@ func consistencyNoBareThrowWording(constructorName string) string {
 }
 
 // TestNoBareThrowRendersAnEditedEntry: the finding's words come from policy/messages, so an edit to the
-// entry shows up in the finding. Not parallel, since it swaps the catalog every render reads.
+// entry shows up in the finding.
+//
+// Not parallel: it swaps the catalog every render reads with policy.UseMessages, so a test rendering beside
+// it finds only this one entry (a parallel run failed rules/base with "has no message", #nxgt2ca).
 func TestNoBareThrowRendersAnEditedEntry(t *testing.T) {
-	t.Parallel()
 	original, err := fs.ReadFile(policy.MessageFiles(), "consistency-no-bare-throw.json")
 	if err != nil {
 		t.Fatal(err)
