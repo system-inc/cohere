@@ -198,6 +198,11 @@ type Options struct {
 	// Timing, when set, is filled with what the build cost by part. Nil reads no clocks and wraps
 	// nothing, so a build nobody is timing costs what it did before this existed. See GraphTiming.
 	Timing *GraphTiming
+
+	// FileSystem, when set, is the disk the build reads instead of the real one: a MemoryFS, for a test
+	// that builds its fixture from a map. The bundled lib files are laid over it as over the real disk.
+	// Nil reads the real disk, as before.
+	FileSystem vfs.FS
 }
 
 // Build resolves a tsconfig and constructs the program and its checkers.
@@ -218,13 +223,13 @@ func Build(options Options) (*Graph, error) {
 	// broken config, so it gets one fresh build, from a fresh filesystem cache, before anything is
 	// reported. Measured on 2026-10-03: with a root listed and unloadable, the guard this replaced
 	// panicked and blamed path casing.
-	verdict, missing := graph.timedVerify(options.Timing)
+	verdict, missing := graph.timedVerify(options)
 	if verdict == rootsMoved {
 		graph, err = buildOnce(options)
 		if err != nil {
 			return nil, err
 		}
-		verdict, missing = graph.timedVerify(options.Timing)
+		verdict, missing = graph.timedVerify(options)
 		if verdict == rootsMoved {
 			return nil, fmt.Errorf("program: files %s named disappeared before they could be read, in two "+
 				"builds in a row: %s. Something is rewriting the tree faster than a build; run again once "+
@@ -243,13 +248,24 @@ func Build(options Options) (*Graph, error) {
 	return graph, nil
 }
 
-// timedVerify is verifyProjectFiles against the disk, timed when the build is.
-func (g *Graph) timedVerify(timing *GraphTiming) (rootsVerdict, []string) {
+// timedVerify is verifyProjectFiles against the disk, timed when the build is. A build over another
+// filesystem asks that one, since the real disk knows nothing of its files.
+func (g *Graph) timedVerify(options Options) (rootsVerdict, []string) {
+	inspect := inspectRootOnDisk
+	if options.FileSystem != nil {
+		inspect = func(fileName string) rootState {
+			if options.FileSystem.FileExists(fileName) {
+				return rootReadable
+			}
+			return rootAbsent
+		}
+	}
+	timing := options.Timing
 	if timing == nil {
-		return g.verifyProjectFiles(inspectRootOnDisk)
+		return g.verifyProjectFiles(inspect)
 	}
 	started := time.Now()
-	verdict, missing := g.verifyProjectFiles(inspectRootOnDisk)
+	verdict, missing := g.verifyProjectFiles(inspect)
 	timing.Verify += time.Since(started)
 	return verdict, missing
 }
@@ -385,6 +401,9 @@ func buildOnce(options Options) (*Graph, error) {
 	//
 	// The content pack is beneath even that, so a file it serves is still a file the recorder saw read.
 	var disk vfs.FS = osvfs.FS()
+	if options.FileSystem != nil {
+		disk = options.FileSystem
+	}
 	if options.ContentPack != nil {
 		disk = options.ContentPack.wrap(disk)
 	}
