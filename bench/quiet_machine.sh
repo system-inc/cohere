@@ -107,14 +107,25 @@ prepare_copy
 # The first mode's template: the copy without its cache, made once per copy and cloned for each first run,
 # so a first run never sees what an earlier run of any mode left behind. Its tree is the copy's, or it is
 # refused, the same as the copy.
+#
+# Its ready marker is written here, never copied: written only once the template's tree matches the copy's,
+# so a copy that died part way is never taken for a finished one. And a TypeScript build info anywhere in it
+# (tsc's default puts one beside the tsconfig, outside .cache) would make a first run not first, so a
+# template holding one is refused rather than measured.
 template=$work/${copy:t}-first-template
 if [[ ! -f $template/bench-ready ]]; then
   [[ -e $template ]] && fail "$template exists but was never finished; remove it and run again"
   mkdir -p $template
-  rsync -a --exclude=/.cache "$copy/" "$template/" || fail "copying the copy into $template"
+  rsync -a --exclude=/.cache --exclude=/bench-ready "$copy/" "$template/" || fail "copying the copy into $template"
+  [[ $(copy=$template tree_hash) == $expected_tree ]] ||
+    fail "the first runs' template at $template does not match the copy; remove it and run again"
+  print $expected_tree > $template/bench-ready
 fi
-[[ $(copy=$template tree_hash) == $expected_tree ]] ||
+[[ $(copy=$template tree_hash) == $(< $template/bench-ready) && $(< $template/bench-ready) == $expected_tree ]] ||
   fail "the first runs' template at $template no longer matches the copy; remove it and run again"
+build_infos=(${(f)"$(cd $template && find . -name '*.tsbuildinfo' -not -path './.cache/*' -not -path '*/node_modules/*')"})
+(( ${#build_infos} == 0 )) ||
+  fail "the copy holds a TypeScript build info outside .cache (${build_infos[1]}), so a first run there would not be first"
 
 logs=$copy/.cache/quiet-machine-$(date +%Y%m%d-%H%M%S)
 mkdir -p $logs
@@ -194,7 +205,9 @@ for round in $(seq 1 $runs); do
   # there, then held to the copy's tree: a first run must write nothing but its cache.
   first_copy=$logs/first-$round
   cp -c -R $template $first_copy 2> /dev/null || cp -R $template $first_copy || fail "cloning $template"
-  copy=$first_copy measure_table=$first_table measure first $round
+  # A first run has no primes, so its row says 0. The clone stays in the logs with its cache, for a slow
+  # first run to be read; on a volume without clones that is a full tree per round, under the logs.
+  copy=$first_copy measure_table=$first_table primes=0 measure first $round
   [[ $(copy=$first_copy tree_hash) == $expected_tree ]] ||
     fail "the first run in round $round changed the tree it ran in; see $first_copy"
 done
