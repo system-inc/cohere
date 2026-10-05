@@ -527,6 +527,24 @@ func declareRunCacheInputs(files ...string) {
 	activeRunCache.extraFiles = append(activeRunCache.extraFiles, files...)
 }
 
+// declareLintConfigInputs adds the lint config and every file it extends to this run's inputs, each present or
+// absent by what is on disk. Zero config is the default settings file missing (#e0tybvv): declared as a file the
+// run read, recording stat'ed a file that was not there and refused the record, so a zero-config project never
+// replayed. Its absence is the input, since creating the file changes what runs.
+func declareLintConfigInputs(path string) {
+	session := activeRunCache
+	if session == nil {
+		return
+	}
+	for _, source := range configuration.SourcesOnDisk(lintConfigSources(path)) {
+		if _, err := os.Stat(source); err == nil {
+			session.extraFiles = append(session.extraFiles, source)
+		} else {
+			session.extraAbsent = append(session.extraAbsent, source)
+		}
+	}
+}
+
 // declareFormatWalk adds what one format walk depends on to this run's inputs, so a run that checks
 // formatting can be replayed (#13a63n3).
 //
