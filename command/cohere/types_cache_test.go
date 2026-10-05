@@ -144,9 +144,15 @@ func TestTypeDiagnosticsReplayOnAScopedRun(t *testing.T) {
 				t.Errorf("%s: the replay clause counts %d of %d files on a run scoped to one:\n%s", step.name, replayedCount, total, warm)
 			}
 		}
-		// A body edit leaves the scoped file's shape fingerprint where it was, so its one file replays.
-		if step.name == "a body edit" && (clause == nil || clause[1] != "1") {
-			t.Fatalf("%s: the scoped run did not replay its one file, so it proves nothing about replaying:\n%s", step.name, warm)
+		// This fixture has no build info, so no file has a recorded declaration signature and every shape is
+		// keyed on content (#5txm9gg): a body edit moves a.ts's shape and so b.ts's fingerprint, and b.ts is
+		// checked again rather than replayed. That it is checked, and agrees with cold above, is the claim here.
+		// Shape replay across a body edit is proven where a real signature is recorded (shape_reuse_test.go).
+		if step.name == "a body edit" && clause != nil && clause[1] != "0" {
+			t.Fatalf("%s: the scoped run replayed its one file across a body edit to a content-keyed import:\n%s", step.name, warm)
+		}
+		if step.name == "a body edit" && !strings.Contains(warm, "keyed on content") {
+			t.Fatalf("%s: the run does not say its shapes are keyed on content:\n%s", step.name, warm)
 		}
 	}
 }
