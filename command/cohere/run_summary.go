@@ -162,7 +162,8 @@ func (summary runSummary) filesFormatted() int {
 type cacheUse struct {
 	// Replayed is a run answered whole from the run cache, which ran no phase.
 	Replayed bool `json:"replayed"`
-	// FilesReplayed is the files whose findings came from the cache in a run that computed the rest.
+	// FilesReplayed is the files whose findings came from the cache: in a run that computed the rest, those it
+	// did not, and in a whole replay, every file in scope.
 	FilesReplayed int `json:"filesReplayed"`
 	// Off is `--no-cache`: nothing read, nothing written.
 	Off bool `json:"off"`

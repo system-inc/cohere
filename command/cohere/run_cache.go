@@ -496,7 +496,9 @@ func replayedSummary(recorded runSummary, elapsed time.Duration) runSummary {
 			replayed.Phases = append(replayed.Phases, record)
 		}
 	}
-	replayed.Cache = cacheUse{Replayed: true}
+	// Every file in scope was answered by the cache, so the count says so: --json read 0 here, the number a run
+	// that replayed nothing reads, and a reader took a whole replay for a full check (#547dhjz).
+	replayed.Cache = cacheUse{Replayed: true, FilesReplayed: recorded.FilesInScope}
 	replayed.FilesChecked, replayed.FilesCached = 0, recorded.FilesInScope
 	replayed.Changed = nil
 	replayed.Nodes = 0
