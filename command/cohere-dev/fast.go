@@ -87,14 +87,8 @@ var landingGateOnly = []landingGateEntry{
 	},
 }
 
-// fastTest runs the fast tier and returns go test's exit code.
-func fastTest(arguments []string) int {
-	// The fast tier rests on Go's test cache, and runs nearly every package with no slot, so -count=1 here
-	// is the costliest run there is on a loaded machine (@system_cohere_build's catch).
-	if countsOnce(arguments) {
-		refuseCountOnce()
-		return 2
-	}
+// fastTest runs the fast tier in the environment given and returns go test's exit code.
+func fastTest(base []string, arguments []string) int {
 	fmt.Fprintf(os.Stderr, "cohere-dev: fast tier, at load %s\n", machineLoad())
 
 	packages, err := modulePackages()
@@ -122,7 +116,7 @@ func fastTest(arguments []string) int {
 	}
 	sort.Strings(selected)
 
-	environment, uncovered, err := testEnvironment()
+	environment, uncovered, err := testEnvironment(base)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
 		return 2

@@ -35,23 +35,23 @@ func TestASlotIsHeldUntilReleased(t *testing.T) {
 		t.Skip("slots are a Unix lock")
 	}
 	directory := t.TempDir()
-	first, err := takeSlot(directory, 1, []string{"./..."})
+	first, err := takeSlot(directory, 1, "go test ./...")
 	if err != nil || first == nil {
 		t.Fatalf("an empty machine gave no slot: %v", err)
 	}
-	if second, err := takeSlot(directory, 1, []string{"./..."}); err != nil || second != nil {
+	if second, err := takeSlot(directory, 1, "go test ./..."); err != nil || second != nil {
 		t.Fatalf("a held slot was taken again (%v)", err)
 	}
 	if lines := holders(directory, 1); len(lines) != 1 || !strings.Contains(lines[0], "go test ./...") {
 		t.Fatalf("the holder is not named: %v", lines)
 	}
-	if two, err := takeSlot(directory, 2, []string{"./..."}); err != nil || two == nil {
+	if two, err := takeSlot(directory, 2, "go test ./..."); err != nil || two == nil {
 		t.Fatalf("with two slots the second was not free (%v)", err)
 	} else {
 		two.release()
 	}
 	first.release()
-	if again, err := takeSlot(directory, 1, []string{"./..."}); err != nil || again == nil {
+	if again, err := takeSlot(directory, 1, "go test ./..."); err != nil || again == nil {
 		t.Fatalf("a released slot was not free (%v)", err)
 	} else {
 		again.release()
@@ -80,8 +80,8 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(t *testing.T) {
 		t.Fatal(err)
 	}
 	home := t.TempDir()
-	environment := append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
-		"HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"), slotsVariable+"=1")
+	environment := append(outsideThePool(os.Environ()), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"), tokensVariable+"=1")
 
 	run := func(arguments ...string) (string, error) {
 		command := exec.Command(wrapper, append([]string{"test"}, arguments...)...)
@@ -117,8 +117,8 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(t *testing.T) {
 	if elapsed := time.Since(began); elapsed < 4*time.Second {
 		t.Errorf("two runs on one slot finished in %s, so they overlapped", elapsed)
 	}
-	if !strings.Contains(outputs[1], "waiting for a test slot") || !strings.Contains(outputs[1], "go test ./...") ||
-		!strings.Contains(outputs[1], "took a test slot after waiting") {
+	if !strings.Contains(outputs[1], "waiting for a token") || !strings.Contains(outputs[1], "go test ./...") ||
+		!strings.Contains(outputs[1], "after waiting") {
 		t.Errorf("the second run did not say it waited and for whom:\n%s", outputs[1])
 	}
 	if strings.Contains(outputs[0], "waiting") {
@@ -183,8 +183,8 @@ func TestWaitersTakeTheSlotInArrivalOrder(t *testing.T) {
 	runs := map[string]*exec.Cmd{}
 	for index, name := range []string{"A", "B", "C", "D", "E"} {
 		command := exec.Command(wrapper, "test", "./...")
-		command.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
-			"HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"), slotsVariable+"=1", "COHERE_DEV_TEST_RUN="+name)
+		command.Env = append(outsideThePool(os.Environ()), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+			"HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"), tokensVariable+"=1", "COHERE_DEV_TEST_RUN="+name)
 		if err := command.Start(); err != nil {
 			t.Fatal(err)
 		}
@@ -243,15 +243,29 @@ func TestARunIsNiceUnlessItAsksForFullPriority(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\necho nice=$(ps -o nice= -p $$ | tr -d ' ') \"$@\"\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// A pool of its own, so the run never waits in line behind the machine's real ones.
+	home := t.TempDir()
 	niceOf := func(arguments ...string) (int, string) {
 		t.Helper()
 		command := exec.Command(wrapper, append([]string{"test"}, arguments...)...)
-		command.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), nicenessVariable+"=19")
+		command.Env = append(outsideThePool(os.Environ()), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+			"HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"), nicenessVariable+"=19")
 		output, err := command.CombinedOutput()
 		if err != nil {
 			t.Fatalf("cohere-dev test %v: %v\n%s", arguments, err, output)
 		}
-		fields := strings.Fields(strings.TrimPrefix(strings.TrimSpace(string(output)), "nice="))
+		// The stand-in's own line; the wrapper's notes, such as the corpora a private home leaves uncovered,
+		// are around it.
+		line := ""
+		for _, candidate := range strings.Split(string(output), "\n") {
+			if strings.HasPrefix(candidate, "nice=") {
+				line = candidate
+			}
+		}
+		fields := strings.Fields(strings.TrimPrefix(line, "nice="))
+		if len(fields) == 0 {
+			t.Fatalf("the stand-in go printed no nice line: %q", output)
+		}
 		nice, err := strconv.Atoi(fields[0])
 		if err != nil {
 			t.Fatalf("the stand-in go printed %q", output)
@@ -275,5 +289,115 @@ func TestARunIsNiceUnlessItAsksForFullPriority(t *testing.T) {
 	}
 	if nice, asked := niceOf("--full-priority", "./internal/edit"); nice != own || asked != "test ./internal/edit" {
 		t.Errorf("a --full-priority run's go ran at nice %d asked %q, want this test's own nice %d and the flag left out", nice, asked, own)
+	}
+}
+
+// outsideThePool is an environment with no token held, for a wrapper a test starts: the test itself may run
+// under a gate's token, and a wrapper that inherited it would run inside that share rather than queue.
+func outsideThePool(environment []string) []string {
+	kept := make([]string, 0, len(environment))
+	for _, variable := range environment {
+		if !strings.HasPrefix(variable, heldTokenVariable+"=") && !strings.HasPrefix(variable, "GOMAXPROCS=") &&
+			!strings.HasPrefix(variable, "GOFLAGS=") {
+			kept = append(kept, variable)
+		}
+	}
+	return kept
+}
+
+// A token's run starts its commands with Go held to the token's packages and threads and the token named,
+// replacing any -p and GOMAXPROCS the caller had and keeping its other GOFLAGS, so every go command and test
+// binary beneath it stays in its share (#qhg0ntb).
+func TestABudgetHoldsGoToTheTokensThreads(t *testing.T) {
+	t.Parallel()
+	environment := budgetEnvironment([]string{"HOME=/home", "GOMAXPROCS=16", "GOFLAGS=-trimpath -p=16 -buildvcs=false", heldTokenVariable + "=9"},
+		2, poolShape{tokens: 4, packages: 3, threads: 5})
+	want := []string{"HOME=/home", "GOFLAGS=-trimpath -buildvcs=false -p=3", "GOMAXPROCS=5", heldTokenVariable + "=2"}
+	if strings.Join(environment, "|") != strings.Join(want, "|") {
+		t.Errorf("the budget environment is %q, want %q", environment, want)
+	}
+}
+
+// The pool runs as many commands at once as it has tokens, each held to its threads and named by its
+// token, and the next waits; a command started beneath a token's run runs in that share and takes no
+// second token, which would wait forever in a pool its parent fills. Shown through every verb.
+func TestThePoolRunsAsManyAsItHasTokens(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("tokens are a Unix lock")
+	}
+	wrapper := filepath.Join(t.TempDir(), "cohere-dev")
+	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
+		t.Fatalf("building: %v\n%s", err, output)
+	}
+	// A go, and a tool, that log when they start and end, with their share, and take a second.
+	bin := t.TempDir()
+	log := filepath.Join(bin, "log")
+	stand := "#!/bin/sh\necho \"start $COHERE_DEV_TEST_RUN token=$" + heldTokenVariable + " flags=$GOFLAGS threads=$GOMAXPROCS $*\" >> '" + log + "'\n" +
+		"sleep 1\necho \"end $COHERE_DEV_TEST_RUN\" >> '" + log + "'\n"
+	for _, name := range []string{"go", "tool"} {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte(stand), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	home := t.TempDir()
+	start := func(name string, environment []string, arguments ...string) *exec.Cmd {
+		command := exec.Command(wrapper, arguments...)
+		command.Env = append(environment, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+			"HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"), tokensVariable+"=2", packagesVariable+"=4", threadsVariable+"=3",
+			"COHERE_DEV_TEST_RUN="+name)
+		if err := command.Start(); err != nil {
+			t.Fatal(err)
+		}
+		return command
+	}
+	runs := []*exec.Cmd{
+		start("test", outsideThePool(os.Environ()), "test", "./internal/edit"),
+		start("build", outsideThePool(os.Environ()), "build", "./command/cohere"),
+		start("vet", outsideThePool(os.Environ()), "vet", "./..."),
+		start("exec", outsideThePool(os.Environ()), "exec", "--", "tool", "--flag"),
+	}
+	// Already under a token: runs at once, in its parent's share.
+	nested := start("nested", append(outsideThePool(os.Environ()), heldTokenVariable+"=7", "GOMAXPROCS=5", "GOFLAGS=-p=6"), "test", "./internal/edit")
+	for _, command := range append(runs, nested) {
+		if err := command.Wait(); err != nil {
+			t.Errorf("a run failed: %v", err)
+		}
+	}
+
+	contents, err := os.ReadFile(log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	running, most := 0, 0
+	started := map[string]string{}
+	for _, line := range strings.Split(strings.TrimSpace(string(contents)), "\n") {
+		fields := strings.Fields(line)
+		if fields[1] == "nested" {
+			continue
+		}
+		if fields[0] == "start" {
+			running++
+			most = max(most, running)
+			started[fields[1]] = strings.Join(fields[2:], " ")
+		} else {
+			running--
+		}
+	}
+	if most != 2 {
+		t.Errorf("at most %d ran at once on a two-token pool, want 2:\n%s", most, contents)
+	}
+	for name, want := range map[string]string{
+		"test":  "flags=-p=4 threads=3 test ./internal/edit",
+		"build": "flags=-p=4 threads=3 build ./command/cohere",
+		"vet":   "flags=-p=4 threads=3 vet ./...",
+		"exec":  "flags=-p=4 threads=3 --flag",
+	} {
+		if got := started[name]; !strings.HasSuffix(got, want) || (!strings.HasPrefix(got, "token=1 ") && !strings.HasPrefix(got, "token=2 ")) {
+			t.Errorf("%s ran with %q, want a token of the two and %q", name, got, want)
+		}
+	}
+	if !strings.Contains(string(contents), "start nested token=7 flags=-p=6 threads=5 test ./internal/edit") {
+		t.Errorf("a run already under a token did not run in its parent's share:\n%s", contents)
 	}
 }

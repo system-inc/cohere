@@ -72,12 +72,14 @@ go run ./command/cohere
 `cohere` cannot cohere itself — it is a Go program and its phases check TypeScript. This repo is
 gated by Go's own toolchain: `gofmt -l .`, `go vet ./...`, `go test ./...`, `go build ./...`.
 
-A whole-module test run goes through `go run ./command/cohere-dev test ./...`, which takes the
-machine's one slot for it and otherwise waits, naming whose run holds the slot (#3kr3x59). Several
-whole-module runs at once each build and run every test binary on every core, and measured at the
-house's load, three started together all timed out where one at a time finished. Inside a run nothing
-is held back: packages and `t.Parallel` tests run at full width. One package runs at once, through the
-wrapper or plain `go test`.
+Heavy Go work goes through `cohere-dev`, which takes a token from the machine's pool and runs with Go
+held to the token's share of the cores, niced (#qhg0ntb): `go run ./command/cohere-dev test ./...` for the
+landing gate, `test <package>` or `test --fast` while editing, `build` and `vet`, and `exec -- <command>`
+for anything else heavy, a bench or a cohere run. A run that finds every token held waits its turn in
+arrival order and names who holds them; `cohere-dev status` shows the pool and the line. Plain `go test`,
+`go build` and `go vet` run unbudgeted on every core, and a dozen of them at once held the machine at load
+110 to 180, made a 27s gate take 7 to 10 minutes, and failed tests on their deadlines. Inside a token's run
+nothing more is held back: its packages and `t.Parallel` tests use the whole share.
 
 A gate run never passes `-count=1`, and the wrapper refuses one for the whole module. Go's test cache
 skips every package whose inputs did not change, and after a one-file change `-count=1` cost 81% more
