@@ -306,14 +306,15 @@ func outsideThePool(environment []string) []string {
 	return kept
 }
 
-// A token's run starts its commands with Go held to the token's packages and threads and the token named,
+// A token's run starts its commands with Go held to the token's packages and threads, the token named, and
+// the cores it is worth for a runner that is not Go,
 // replacing any -p and GOMAXPROCS the caller had and keeping its other GOFLAGS, so every go command and test
 // binary beneath it stays in its share (#qhg0ntb).
 func TestABudgetHoldsGoToTheTokensThreads(t *testing.T) {
 	t.Parallel()
 	environment := budgetEnvironment([]string{"HOME=/home", "GOMAXPROCS=16", "GOFLAGS=-trimpath -p=16 -buildvcs=false", heldTokenVariable + "=9"},
 		2, poolShape{tokens: 4, packages: 3, threads: 5})
-	want := []string{"HOME=/home", "GOFLAGS=-trimpath -buildvcs=false -p=3", "GOMAXPROCS=5", heldTokenVariable + "=2"}
+	want := []string{"HOME=/home", "GOFLAGS=-trimpath -buildvcs=false -p=3", "GOMAXPROCS=5", heldTokenVariable + "=2", coresVariable + "=15"}
 	if strings.Join(environment, "|") != strings.Join(want, "|") {
 		t.Errorf("the budget environment is %q, want %q", environment, want)
 	}
