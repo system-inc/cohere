@@ -98,3 +98,9 @@ chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
   and flags that cannot be read count as none. Every regex literal is checked under its own flags, one
   passed to `RegExp` too. A named reference to a duplicated group reports only when every group of that
   name is out of its reach.
+- `no-misleading-character-class` finds `RegExp` calls as ESLint's reference tracker does, so a local
+  named `RegExp` is not the global, and an alias or `globalThis.RegExp` is. A pattern or flags held in a
+  `const` or never-written binding, or built by concatenation, is read. A pattern that reached the call
+  that way reports once per kind at the argument, and a string or template still reports at the
+  characters. A pattern whose value is a RegExp object is not read, and flags that cannot be read still
+  decline the call.

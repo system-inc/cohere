@@ -351,3 +351,43 @@ func TestConstantStringIn(t *testing.T) {
 		}
 	}
 }
+
+// TestIsConstantRegExpIn pins which arguments hold a RegExp object rather than a string: a regex
+// literal, or a constant binding initialized with one, through any number of such bindings.
+func TestIsConstantRegExpIn(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]bool{
+		`probe(/x/);`:                           true,
+		`probe((/x/));`:                         true,
+		`const r = /x/; probe(r);`:              true,
+		`const r = /x/; const s = r; probe(s);`: true,
+		`let r = /x/; probe(r);`:                true,
+		`let r = /x/; r = /y/; probe(r);`:       false,
+		`const r = "x"; probe(r);`:              false,
+		`const r = /x/; probe(r + "");`:         false,
+		`probe(new RegExp("x"));`:               false,
+		`const a = b, b = a; probe(a);`:         false,
+		`probe(undeclared);`:                    false,
+	}
+	for code, want := range cases {
+		var got bool
+		rule_testing.RunTyped(t, rule.Rule{
+			Name:             "constant-regexp-probe",
+			NeedsTypeChecker: true,
+			Run: func(ctx rule.Context, options any) rule.Listeners {
+				return rule.Listeners{
+					ast.KindCallExpression: func(node *ast.Node) {
+						call := node.AsCallExpression()
+						if call.Expression.Text() == "probe" {
+							got = reference.IsConstantRegExpIn(ctx, call.Arguments.Nodes[0])
+						}
+					},
+				}
+			},
+		}, "input.ts", code)
+		if got != want {
+			t.Errorf("%s: IsConstantRegExpIn is %v, want %v", code, got, want)
+		}
+	}
+}
