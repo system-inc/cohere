@@ -3,6 +3,7 @@ package rule
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -45,9 +46,10 @@ type Registration struct {
 	RequiresOptions bool
 }
 
-// OptionsBase is where a config's paths are anchored, for the decoders that read paths.
+// OptionsBase is what a decoder registered with DecodeAt knows beyond its own option element: where
+// the config's paths are anchored, and the project's per-plugin settings.
 //
-// Either field may be empty, which means the caller does not know it. A decoder that needs one it
+// Either path may be empty, which means the caller does not know it. A decoder that needs one it
 // was not given fails rather than guessing, because guessing is how a root ends up matching nothing.
 type OptionsBase struct {
 	// ConfigDirectory is the absolute directory of the config file the options were written in. A
@@ -56,6 +58,64 @@ type OptionsBase struct {
 
 	// ProjectRoot is the absolute root of the project being checked, as cohere discovered it.
 	ProjectRoot string
+
+	// Settings is the project's own `settings`, keyed by plugin namespace, each value as written. A
+	// decoder reads only its own plugin's, and only a namespace some package registered with
+	// RegisterSettings is ever here: the run refuses any other before a rule decodes (see
+	// registry.CheckSettings).
+	Settings map[string]json.RawMessage
+}
+
+// SettingsRegistration is how a rule package says it reads one plugin's `settings`, the way ESLint
+// hands every rule `context.settings` and a plugin reads its own namespace from it.
+type SettingsRegistration struct {
+	// Namespaces are the keys under `settings` this plugin reads, in the order it prefers them when
+	// more than one is written. better-tailwindcss reads two spellings of its own name.
+	Namespaces []string
+
+	// Split hands back the part of one namespace's settings each rule reads, keyed by rule name, or
+	// an error naming every key no rule of the plugin reads. A key nothing reads is refused rather
+	// than dropped, for the reason an unknown option key is: it loads clean and does nothing.
+	Split func(raw []byte) (map[string]json.RawMessage, error)
+}
+
+var (
+	settingsMutex      sync.Mutex
+	settingsRegistered []SettingsRegistration
+)
+
+// RegisterSettings records that a rule package reads a plugin's settings.
+func RegisterSettings(registration SettingsRegistration) {
+	settingsMutex.Lock()
+	defer settingsMutex.Unlock()
+	settingsRegistered = append(settingsRegistered, registration)
+}
+
+// RegisteredSettings returns every settings registration, for the check that refuses a namespace no
+// package reads.
+func RegisteredSettings() []SettingsRegistration {
+	settingsMutex.Lock()
+	defer settingsMutex.Unlock()
+	return append([]SettingsRegistration(nil), settingsRegistered...)
+}
+
+// OptionKeys returns every key an options struct declares, the way UnmarshalOptions reads them: the
+// `json` tag's name, or the Go field name for an untagged field, with an embedded struct's keys
+// promoted. Sorted.
+func OptionKeys(target any) []string {
+	targetType := reflect.TypeOf(target)
+	for targetType != nil && targetType.Kind() == reflect.Pointer {
+		targetType = targetType.Elem()
+	}
+	if targetType == nil || targetType.Kind() != reflect.Struct {
+		return nil
+	}
+	keys := make([]string, 0, targetType.NumField())
+	for key := range declaredFields(targetType) {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // registered is every rule any linked package has registered, keyed by name.

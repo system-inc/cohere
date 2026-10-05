@@ -137,7 +137,7 @@ var checkedRequiresTargetProperties = map[string]bool{
 // it inline here. This is that rule.
 //
 // The pragma is fixed at `React` here. Upstream reads it from a `@jsx` comment or from
-// `settings.react.pragma`, and cohere has no settings surface, so the second is unreachable by any
+// `settings.react.pragma`, and cohere reads no React settings, so the second is unreachable by any
 // route. The first is reachable and is NOT implemented; see `pragmaFromJsxComment` below for the
 // measurement and the reasoning.
 var CheckedRequiresOnChangeOrReadOnly = rule.Rule{

@@ -15,9 +15,10 @@ import (
  * Adamic readiness (#drbrp8c): how much of the project is TypeScript whose types are true, the language
  * Adamic compiles native. A file is Adamic-ready when the type phase reports nothing in it and no
  * cohere:adamic rule finds anything in it, before suppression, whatever the project's chain enables. The
- * share of ready files is a segment of every run's footer, and the `adamic` object of the --json summary:
+ * share of ready files is a segment of the footer, and the `adamic` object of the --json summary, on a run
+ * that passes --adamic-readiness:
  *
- *	✓ 💎 2.4s (480 rules • 3,926 checked) • 87% Adamic-ready (3,814 of 4,387)
+ *	✓ 💎 2.4s (488 rules • 3,926 checked) • 87% Adamic-ready (3,814 of 4,387)
  *	✗ ☠️ 0.8s • 2 findings (…) • 87% Adamic-ready (3,814 of 4,387; tsconfig lacks exactOptionalPropertyTypes)
  *	✗ ☠️ 1.1s • 4 type errors (…) • Adamic readiness not measured: types bailed
  *
@@ -26,8 +27,10 @@ import (
  * a set rule skipped, or the findings cache replayed without a count, is unmeasured, never ready, and the
  * segment names how many when there are any.
  *
- * Decided for zero config and every other configuration alike: readiness shows on every run that lints
- * (@system_cohere under Kirk's "use your best judgment", 2026-10-05).
+ * Measured only when asked (Kirk, 2026-10-05 09:25, #9tgm3dq, reversing "readiness on every run" from 00:42):
+ * the measure-only rules cost a cold run about 1.6 CPU-s and 4M objects before #m6tyg79's cut, which a run
+ * that does not want the number should not pay. Unasked, none of them runs, and the footer and --json say
+ * nothing about readiness.
  */
 
 // readinessSetName is the set a readiness run measures against.
@@ -209,6 +212,20 @@ func readinessSet() (*program.Readiness, error) {
 		readinessLoaded.readiness, readinessLoaded.err = loadReadiness()
 	})
 	return readinessLoaded.readiness, readinessLoaded.err
+}
+
+// adamicReadinessRequested is --adamic-readiness: whether this run measures readiness at all.
+var adamicReadinessRequested bool
+
+// requestedReadiness is the set this run measures against, nil unless --adamic-readiness asked: a run that did
+// not ask runs none of the set's measure-only rules, and its findings cache records no readiness, which a later
+// run that asks misses on rather than replays (FindingsReuse.MeasureReadiness).
+func requestedReadiness() *program.Readiness {
+	if !adamicReadinessRequested {
+		return nil
+	}
+	readiness, _ := readinessSet()
+	return readiness
 }
 
 // readinessOf is the run's readiness from its walk.

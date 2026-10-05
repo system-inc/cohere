@@ -34,8 +34,7 @@ const willUpdateSetStateFile = "/repository/source/WillUpdate.tsx"
 //
 // Upstream's sixth pass case is an `UNSAFE_componentWillUpdate` under
 // `settings.react.version = "16.2.0"`, and it is clean upstream only because that version predates
-// the prefix. Our `internal/config` has no settings surface at all: `Config` carries `Rules` and
-// `Overrides` and nothing else, so no react version can reach a rule here and oxc's own default
+// the prefix. cohere reads no React settings, so no react version can reach a rule here and oxc's own default
 // branch, `is_none_or(supports_unsafe_lifecycle_prefix)`, is the only reachable one. Measured on the
 // release binary rather than reasoned about: with no version configured that exact source reports,
 // and with `"version": "16.2.0"` configured it is silent, in the same run against the same file.

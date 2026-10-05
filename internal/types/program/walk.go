@@ -944,6 +944,10 @@ type ruleSlot struct {
 
 	report     func(rule.Diagnostic)
 	recordNote func(key string)
+
+	// programView is the rule's view of the program, pointed at each file this worker dispatches and
+	// released when the file ends.
+	programView rule.ProgramViewSlot
 }
 
 // listenerCall is one rule's listener for one kind in the merged table. It is called through its rule's
@@ -1127,8 +1131,8 @@ func (d *fileDispatcher) dispatchFile(
 	d.readiness = newFileReadiness(d.graph.Readiness, rules, measureOnly)
 	readiness = d.readiness
 	// However the dispatch ends, a panic included, so the next file starts from an empty table and no slot
-	// can report into a file that is over.
-	defer d.endFile()
+	// can report into a file that is over, or read the program through it.
+	defer d.endFile(slots)
 
 	// One cache per file, shared by every rule that runs on it. Work a rule derives from the file
 	// outside the walk is paid for by that rule alone, so three rules deriving the same thing pay
@@ -1142,16 +1146,14 @@ func (d *fileDispatcher) dispatchFile(
 	meter := d.timings.workerMeter()
 	meter.watchFills(fileCache)
 
-	// Each rule reads the program through a view of what it declared (rule.ProgramReads), built for
-	// the whole file in one allocation.
-	programViews := rule.ViewProgramForEach(d.graph.Program, sourceFile, rules)
-
 	for ruleIndex, subject := range rules {
 		slot := slots[ruleIndex]
 
+		// The rule reads the program through a view of what it declared (rule.ProgramReads), kept in its
+		// slot rather than built for each file.
 		context := rule.Context{
 			SourceFile:  sourceFile,
-			Program:     programViews[ruleIndex],
+			Program:     slot.programView.Point(d.graph.Program, sourceFile, subject),
 			TypeChecker: fileChecker,
 			FileCache:   fileCache,
 			Report:      slot.report,
@@ -1245,7 +1247,11 @@ func (d *fileDispatcher) dispatchFile(
 
 // endFile empties the table the file filled and lets go of the file. Each emptied kind is cleared before it
 // is shortened, so the table keeps no listener, and through it no rule's state, from a file that is over.
-func (d *fileDispatcher) endFile() {
+// Each slot's program view is released, so a rule that kept its Program past the file fails on its next read.
+func (d *fileDispatcher) endFile(slots []*ruleSlot) {
+	for _, slot := range slots {
+		slot.programView.Release()
+	}
 	for _, kind := range d.used {
 		clear(d.listeners[kind])
 		d.listeners[kind] = d.listeners[kind][:0]

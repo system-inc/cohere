@@ -103,10 +103,8 @@ type noStringRefsWireOptions struct {
 // Measured on the running rule, one class, five configurations: no settings reports nothing,
 // `18.2.0` and `17.0.0` report, `18.3.0` and `19.0.0` report nothing.
 //
-// Our `internal/config` has no settings surface at all. `Config` carries `Rules`,
-// `IgnorePatterns`, `Overrides`, `Plugins` and `Root`, established with a control grep that found
-// `Rules` in the same command that found no `Settings`, so no React version can reach a rule here
-// by any route. The faithful reading of that is not "pick a version" but "reproduce the answer
+// cohere reads no React settings. The loader reads `settings` for better-tailwindcss only and
+// refuses `settings.react` by name, so no React version can reach a rule here by any route. The faithful reading of that is not "pick a version" but "reproduce the answer
 // upstream gives under this repository's configuration", and that answer is silence: this tree
 // configures no React version, and it runs React 19.2.8, where the deprecation is genuinely not in
 // force.

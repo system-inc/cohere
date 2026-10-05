@@ -110,7 +110,7 @@ var messagePreferFragmentPragma = rule.Message{
 // # The pragma is fixed at React.Fragment
 //
 // Upstream reads both halves from `settings.react.pragma` and `settings.react.fragment`, and
-// cohere has no settings surface at all, so both are unreachable by any route. Upstream's entire
+// cohere reads no React settings, so both are unreachable by any route. Upstream's entire
 // corpus configures them to `Act` and `Frag`, which is why every imported case below was replayed
 // against the installed build under the DEFAULT settings before being written down; nineteen of
 // the twenty two reproduced exactly, including the fixer output, and the three that did not are

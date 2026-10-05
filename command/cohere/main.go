@@ -122,6 +122,11 @@ func run() error {
 	format := flag.Bool("format", false, "format the files not on record as formatted, or the paths named; a bare run, "+
 		"--fix and --no-fix already do, so naming it there changes nothing")
 	maxFixPasses := flag.Int("fix-passes", edit.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
+	// Readiness is measured only when asked (#9tgm3dq): unasked, none of cohere:adamic's measure-only rules runs,
+	// so a default run pays nothing for it. The set's own findings report whenever a project enables it; this
+	// flag governs only the measurement.
+	adamicReadiness := flag.Bool("adamic-readiness", false,
+		"say what share of the files are Adamic-ready, measured with cohere:adamic at the set's own options, in the footer and in --json")
 	showTiming := flag.Bool("timing", false, "report what building the graph cost and the CPU each rule cost, most expensive rule first")
 	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run, writing nothing")
 	// The counts print on every run; this names every rule once under the one coverage fact that
@@ -155,6 +160,8 @@ func run() error {
 	if *verbose && *jsonOutput {
 		return fmt.Errorf("--verbose and --json contradict each other: --verbose prints the human account in full, --json prints JSON for a program")
 	}
+	adamicReadinessRequested = *adamicReadiness
+	activeSummary.AdamicRequested = *adamicReadiness
 	activeOutput = outputSettings{Mode: outputHuman, Phases: *showPhases, Style: styleFor(os.Stdout)}
 	switch {
 	case *verbose:
@@ -1100,7 +1107,9 @@ func run() error {
 			if reusableWalk != nil {
 				activeSummary.Skips = rulesSkippingEveryFile(sumRuleNotes(reusableWalk.Notes), reusableWalk.Coverage.RulesOffered)
 			}
-			activeSummary.Adamic = notMeasured("types bailed")
+			if adamicReadinessRequested {
+				activeSummary.Adamic = notMeasured("types bailed")
+			}
 			writeRunEnd(report, os.Stdout)
 			finishRunCache(1)
 		}
@@ -1166,7 +1175,9 @@ func run() error {
 		}
 
 		findings += len(result.Diagnostics)
-		activeSummary.Adamic = readinessOf(graph, result, runTypes, typeErrorFiles)
+		if adamicReadinessRequested {
+			activeSummary.Adamic = readinessOf(graph, result, runTypes, typeErrorFiles)
+		}
 
 		// The findings, the lint line, and the coverage block, which prints unconditionally. See
 		// writeLintReport.
@@ -1305,7 +1316,7 @@ func rebuildGraph(
 	rebuilt.LintConfig = lintConfig
 	rebuilt.RuleOptions = registry.OptionsAt(optionsBase(lintConfig, directory))
 	rebuilt.RegisteredRuleNames = registry.Names()
-	rebuilt.Readiness, _ = readinessSet()
+	rebuilt.Readiness = requestedReadiness()
 	return rebuilt, time.Since(start), nil
 }
 
@@ -1342,10 +1353,14 @@ func configureLint(graph *program.Graph, location projectLocation) (*configurati
 	if err := lintConfig.ValidateSelectors(projectFileNames); err != nil {
 		return nil, fmt.Errorf("validating the lint config: %w", err)
 	}
+	base := optionsBase(lintConfig, location.Root)
+	if err := registry.CheckSettings(base); err != nil {
+		return nil, fmt.Errorf("validating the lint config: %w", err)
+	}
 	graph.LintConfig = lintConfig
-	graph.RuleOptions = registry.OptionsAt(optionsBase(lintConfig, location.Root))
+	graph.RuleOptions = registry.OptionsAt(base)
 	graph.RegisteredRuleNames = registry.Names()
-	graph.Readiness, _ = readinessSet()
+	graph.Readiness = requestedReadiness()
 	return lintConfig, nil
 }
 
@@ -1353,6 +1368,7 @@ func optionsBase(lintConfig *configuration.Config, projectRoot string) rule.Opti
 	base := rule.OptionsBase{ProjectRoot: projectRoot}
 	if lintConfig != nil {
 		base.ConfigDirectory = lintConfig.Root
+		base.Settings = lintConfig.Settings
 	}
 	return base
 }

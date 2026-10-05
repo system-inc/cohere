@@ -383,7 +383,7 @@ func TestJsxNoScriptUrlRefusesIncludeFromSettings(t *testing.T) {
 		}
 		// The refusal says why (no shared settings) and where the components go instead (ruled on
 		// #e06zm4b), so an author copying an ESLint config is told what to write.
-		for _, want := range []string{"no shared settings", `[{"name": "Link", "props": ["to"]}]`} {
+		for _, want := range []string{"does not read settings.linkComponents", `[{"name": "Link", "props": ["to"]}]`} {
 			if !strings.Contains(err.Error(), want) {
 				t.Errorf("%s: the refusal does not say %q: %v", raw, want, err)
 			}

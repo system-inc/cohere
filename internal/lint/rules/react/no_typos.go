@@ -542,7 +542,7 @@ func (s *noTyposState) checkEs5Specification(node *ast.Node) {
 //
 // Written inline rather than through the shelf's `react.IsEs5ComponentCall`, which accepts
 // `createClass` in both spellings. Upstream's `isES5Component` compares the callee against the
-// createClass PRAGMA, which is `createReactClass` with no settings surface here to change it, so
+// createClass PRAGMA, which is `createReactClass` with no React settings read here to change it, so
 // `createClass` fails in either spelling. Measured on the installed build, all five:
 //
 //	createReactClass({...})          counts

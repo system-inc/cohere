@@ -125,10 +125,9 @@ const (
 // # The React version gate is upstream's and is not reachable here, so its default branch is all
 //
 // oxc reads `settings.react.version` and drops the prefixed spellings entirely when the configured
-// version predates 16.3, where the prefix was introduced. Our `internal/config` has no settings
-// surface: `Config` carries `Rules` and `Overrides` and nothing else, established with a control
-// grep that found `Rules` in the same command that found no `settings`. So no version can reach a
-// rule here, and oxc's own default, `is_none_or(supports_unsafe_lifecycle_prefix)`, answers true.
+// version predates 16.3, where the prefix was introduced. cohere reads no React settings: the
+// loader reads `settings` for better-tailwindcss only and refuses `settings.react` by name. So no
+// version can reach a rule here, and oxc's own default, `is_none_or(supports_unsafe_lifecycle_prefix)`, answers true.
 //
 // Stating the measurement rather than the reasoning, because this is the shape of divergence claim
 // that inoculates the next reader against checking: with no version configured, a class carrying

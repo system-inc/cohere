@@ -5085,7 +5085,8 @@
             "upstreamName": "better-tailwindcss/enforce-canonical-classes",
             "typeAware": false,
             "options": {
-                "elements": "one"
+                "elements": "one",
+                "anchorsPaths": true
             },
             "messageIds": [
                 "canonicalCollapse"
@@ -5105,7 +5106,8 @@
             "upstreamName": "better-tailwindcss/enforce-consistent-class-order",
             "typeAware": false,
             "options": {
-                "elements": "one"
+                "elements": "one",
+                "anchorsPaths": true
             },
             "messageIds": [
                 "inconsistentClassOrder"
@@ -5126,7 +5128,8 @@
             "upstreamName": "better-tailwindcss/enforce-consistent-important-position",
             "typeAware": false,
             "options": {
-                "elements": "one"
+                "elements": "one",
+                "anchorsPaths": true
             },
             "messageIds": [
                 "importantPosition"
@@ -5146,7 +5149,8 @@
             "upstreamName": "better-tailwindcss/enforce-consistent-variable-syntax",
             "typeAware": false,
             "options": {
-                "elements": "one"
+                "elements": "one",
+                "anchorsPaths": true
             },
             "messageIds": [
                 "variableSyntax"
@@ -5166,7 +5170,8 @@
             "upstreamName": "better-tailwindcss/enforce-consistent-variant-order",
             "typeAware": false,
             "options": {
-                "elements": "one"
+                "elements": "one",
+                "anchorsPaths": true
             },
             "messageIds": [
                 "variantOrder"
@@ -5186,7 +5191,8 @@
             "upstreamName": "better-tailwindcss/enforce-shorthand-classes",
             "typeAware": false,
             "options": {
-                "elements": "one"
+                "elements": "one",
+                "anchorsPaths": true
             },
             "messageIds": [
                 "shorthandClasses"
@@ -5206,7 +5212,8 @@
             "upstreamName": "better-tailwindcss/no-concatenated-classes",
             "typeAware": false,
             "options": {
-                "elements": "one"
+                "elements": "one",
+                "anchorsPaths": true
             },
             "messageIds": [
                 "concatenatedClass"
@@ -5226,7 +5233,8 @@
             "upstreamName": "better-tailwindcss/no-conflicting-classes",
             "typeAware": false,
             "options": {
-                "elements": "one"
+                "elements": "one",
+                "anchorsPaths": true
             },
             "messageIds": [
                 "conflictingClasses"
@@ -5246,7 +5254,8 @@
             "upstreamName": "better-tailwindcss/no-deprecated-classes",
             "typeAware": false,
             "options": {
-                "elements": "one"
+                "elements": "one",
+                "anchorsPaths": true
             },
             "messageIds": [
                 "deprecatedClassIrreplaceable",
@@ -5268,7 +5277,8 @@
             "upstreamName": "better-tailwindcss/no-duplicate-classes",
             "typeAware": false,
             "options": {
-                "elements": "one"
+                "elements": "one",
+                "anchorsPaths": true
             },
             "messageIds": [
                 "duplicateClass"
@@ -5289,7 +5299,8 @@
             "upstreamName": "better-tailwindcss/no-unknown-classes",
             "typeAware": false,
             "options": {
-                "elements": "one"
+                "elements": "one",
+                "anchorsPaths": true
             },
             "messageIds": [
                 "unknownClass"
@@ -5309,7 +5320,8 @@
             "upstreamName": "better-tailwindcss/no-unnecessary-whitespace",
             "typeAware": false,
             "options": {
-                "elements": "one"
+                "elements": "one",
+                "anchorsPaths": true
             },
             "messageIds": [
                 "unnecessaryWhitespace"

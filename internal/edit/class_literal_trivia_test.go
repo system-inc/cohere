@@ -27,13 +27,13 @@ func TestATailwindFixAfterTriviaNoLongerTakesTheFileBatchDown(t *testing.T) {
 	t.Parallel()
 	source := "import * as NodeFileSystem from 'fs';\n" +
 		"\n" +
-		"export const merged = mergeClassNames(\n" +
+		"export const merged = cn(\n" +
 		"    'flex flex',\n" +
 		");\n" +
 		"export const roots = [NodeFileSystem];\n"
 	want := "import * as NodeFileSystem from 'node:fs';\n" +
 		"\n" +
-		"export const merged = mergeClassNames(\n" +
+		"export const merged = cn(\n" +
 		"    'flex',\n" +
 		");\n" +
 		"export const roots = [NodeFileSystem];\n"

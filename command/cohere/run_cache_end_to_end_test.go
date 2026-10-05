@@ -457,11 +457,11 @@ func (fixture *runCacheFixture) run(cached bool, arguments ...string) (string, i
 	return string(output), exitError.ExitCode()
 }
 
-// establishHit runs twice and requires the second to replay the first.
-func (fixture *runCacheFixture) establishHit() {
+// establishHit runs twice with arguments and requires the second to replay the first.
+func (fixture *runCacheFixture) establishHit(arguments ...string) {
 	fixture.t.Helper()
-	fixture.run(true)
-	if output, _ := fixture.run(true); !isRunCacheReplay(output) {
+	fixture.run(true, arguments...)
+	if output, _ := fixture.run(true, arguments...); !isRunCacheReplay(output) {
 		fixture.t.Fatalf("an unchanged tree did not replay, so nothing below can show a change was noticed:\n%s", output)
 	}
 }

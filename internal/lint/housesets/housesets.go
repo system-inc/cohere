@@ -10,6 +10,7 @@
 package housesets
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -29,8 +30,10 @@ type FileSystem interface {
 // Detect reads which house sets fit which of the project's files.
 //
 // projectRoot is the directory whose tsconfig the run uses: Next's file conventions and the Tailwind
-// stylesheet are found relative to it.
-func Detect(files []*ast.SourceFile, projectRoot string, fileSystem FileSystem) configuration.HouseDetection {
+// stylesheet are found relative to it. settings are the project's own, from the file in
+// settingsDirectory, nil when it writes none: a Tailwind location they name is where the stylesheet is
+// looked for, as the rules will look.
+func Detect(files []*ast.SourceFile, projectRoot string, fileSystem FileSystem, settings map[string]json.RawMessage, settingsDirectory string) configuration.HouseDetection {
 	detection := configuration.HouseDetection{ReactFiles: map[string]bool{}, NextFiles: map[string]bool{}}
 
 	importsNext := map[string]bool{}
@@ -64,7 +67,7 @@ func Detect(files []*ast.SourceFile, projectRoot string, fileSystem FileSystem) 
 		}
 	}
 
-	detection.TailwindEntryPoint, detection.TailwindSkipped = detectTailwind(projectRoot, fileSystem)
+	detection.TailwindEntryPoint, detection.TailwindSkipped = detectTailwind(projectRoot, fileSystem, settings, settingsDirectory)
 	return detection
 }
 
@@ -118,7 +121,19 @@ var tailwindConfigFiles = []string{
 
 // detectTailwind returns the root stylesheet when it makes the project Tailwind's, or else why not, as
 // a clause for the run's first line.
-func detectTailwind(projectRoot string, fileSystem FileSystem) (string, string) {
+//
+// A project whose settings["better-tailwindcss"] name a location (entryPoint, tailwindConfig or cwd)
+// is Tailwind's wherever that location resolves, by the search the rules make (#gj5nm6e): the project
+// said where its stylesheet is, and upstream runs the rules there, on Tailwind's default theme when
+// the stylesheet is not found. Without one, the stylesheet is probed for where the rules probe.
+func detectTailwind(projectRoot string, fileSystem FileSystem, settings map[string]json.RawMessage, settingsDirectory string) (string, string) {
+	if location, named := tailwind.LocationInSettings(settings, settingsDirectory); named {
+		entryPoint, _, err := tailwind.ConfiguredEntryPoint(projectRoot, location, fileSystem.FileExists)
+		if err != nil {
+			return "", "the location settings[\"better-tailwindcss\"] name does not resolve (" + err.Error() + "), so its rules are skipped"
+		}
+		return entryPoint, ""
+	}
 	entryPoint := tailwind.FindEntryPoint(projectRoot, fileSystem.FileExists)
 	if entryPoint == "" {
 		return "", "no Tailwind stylesheet at any of the places its rules look (app/globals.css and the others), so its rules are skipped"

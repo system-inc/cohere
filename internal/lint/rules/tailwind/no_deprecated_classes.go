@@ -31,9 +31,8 @@ func messageDeprecatedClassIrreplaceable(className string) rule.Message {
 
 // NoDeprecatedClassesOptions lets a project name the surfaces that carry class strings.
 type NoDeprecatedClassesOptions struct {
-	Attributes []string `json:"attributes"`
-	Callees    []string `json:"callees"`
-	Variables  []string `json:"variables"`
+	TailwindLocationOptions
+	TailwindClassLiteralOptions
 }
 
 // deprecation is one renamed or removed utility.
@@ -129,15 +128,7 @@ var NoDeprecatedClasses = rule.Rule{
 
 		settings := DefaultClassLiteralSettings()
 		if configured, isConfigured := rule.OptionsAs[NoDeprecatedClassesOptions](options); isConfigured {
-			if len(configured.Attributes) > 0 {
-				settings.AttributeNames = configured.Attributes
-			}
-			if len(configured.Callees) > 0 {
-				settings.CalleeNames = configured.Callees
-			}
-			if len(configured.Variables) > 0 {
-				settings.VariablePatterns = configured.Variables
-			}
+			settings = configured.ClassLiteralSettings()
 		}
 
 		reader := ClassLiteralReaderFor(ctx.FileCache, settings)

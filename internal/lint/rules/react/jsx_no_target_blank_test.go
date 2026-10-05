@@ -27,8 +27,8 @@ const jsxNoTargetBlankFile = "/repository/source/JsxNoTargetBlank.tsx"
 //
 // # Five cases carry `linkComponents` settings, and all five go clean without them
 //
-// `linkComponentsUtil` starts from `['a']` and concatenates `settings.linkComponents`. Our
-// `internal/config` has no settings surface, so `<Link>` is not a link component here by any route.
+// `linkComponentsUtil` starts from `['a']` and concatenates `settings.linkComponents`. cohere
+// reads no React settings, so `<Link>` is not a link component here by any route.
 // Each of the five was re-run against the installed build with its settings REMOVED and every one
 // went clean, which is the answer this port has to produce. They are recorded as clean fixtures
 // with the note at the line.
@@ -275,9 +275,9 @@ func TestJsxNoTargetBlankStaysSilent(t *testing.T) {
 		{"upstream valid-36", "<a target=\"_blank\" href={ dynamicLink }></a>", "{\"enforceDynamicLinks\": \"never\"}"},
 		{"upstream valid-37", "<a target={\"_blank\"} href={ dynamicLink }></a>", "{\"enforceDynamicLinks\": \"never\"}"},
 		{"upstream valid-38", "<a target={'_blank'} href={ dynamicLink }></a>", "{\"enforceDynamicLinks\": \"never\"}"},
-		{"upstream valid-39", "<Link target=\"_blank\" href={ dynamicLink }></Link>", "{\"enforceDynamicLinks\": \"never\"}"}, // upstream sets linkComponents; our config has no settings surface, so this is the unconfigured answer
-		{"upstream valid-40", "<Link target=\"_blank\" to={ dynamicLink }></Link>", "{\"enforceDynamicLinks\": \"never\"}"},   // upstream sets linkComponents; our config has no settings surface, so this is the unconfigured answer
-		{"upstream valid-41", "<Link target=\"_blank\" to={ dynamicLink }></Link>", "{\"enforceDynamicLinks\": \"never\"}"},   // upstream sets linkComponents; our config has no settings surface, so this is the unconfigured answer
+		{"upstream valid-39", "<Link target=\"_blank\" href={ dynamicLink }></Link>", "{\"enforceDynamicLinks\": \"never\"}"}, // upstream sets linkComponents; cohere reads no React settings, so this is the unconfigured answer
+		{"upstream valid-40", "<Link target=\"_blank\" to={ dynamicLink }></Link>", "{\"enforceDynamicLinks\": \"never\"}"},   // upstream sets linkComponents; cohere reads no React settings, so this is the unconfigured answer
+		{"upstream valid-41", "<Link target=\"_blank\" to={ dynamicLink }></Link>", "{\"enforceDynamicLinks\": \"never\"}"},   // upstream sets linkComponents; cohere reads no React settings, so this is the unconfigured answer
 		{"upstream valid-42", "<a href=\"foobar\" target=\"_blank\" rel=\"noopener\"></a>", "{\"allowReferrer\": true}"},
 		{"upstream valid-43", "<a href=\"foobar\" target=\"_blank\" rel=\"noreferrer\"></a>", "{\"allowReferrer\": true}"},
 		{"upstream valid-44", "<a target={3} />", ""},
@@ -299,8 +299,8 @@ func TestJsxNoTargetBlankStaysSilent(t *testing.T) {
 		{"upstream valid-60", "<a href={href} target={isExternal ? \"_blank\" : undefined} rel={isExternal ? \"noopener noreferrer\" : undefined} />", ""},
 		{"upstream valid-61", "<form action={action} />", "{\"forms\": true}"},
 		{"upstream valid-62", "<form action={action} {...spread} />", "{\"forms\": true}"},
-		{"upstream invalid-29", "<Link target=\"_blank\" href={ dynamicLink }></Link>", "{\"enforceDynamicLinks\": \"always\"}"}, // upstream sets linkComponents; our config has no settings surface, so this is the unconfigured answer
-		{"upstream invalid-30", "<Link target=\"_blank\" to={ dynamicLink }></Link>", "{\"enforceDynamicLinks\": \"always\"}"},   // upstream sets linkComponents; our config has no settings surface, so this is the unconfigured answer
+		{"upstream invalid-29", "<Link target=\"_blank\" href={ dynamicLink }></Link>", "{\"enforceDynamicLinks\": \"always\"}"}, // upstream sets linkComponents; cohere reads no React settings, so this is the unconfigured answer
+		{"upstream invalid-30", "<Link target=\"_blank\" to={ dynamicLink }></Link>", "{\"enforceDynamicLinks\": \"always\"}"},   // upstream sets linkComponents; cohere reads no React settings, so this is the unconfigured answer
 
 		// --- cases upstream does not cover, each measured against the installed build 7.37.5 ---
 

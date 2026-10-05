@@ -27,9 +27,8 @@ func messageDuplicateClass(className string) rule.Message {
 // rule that declines every file when unconfigured reports a clean tree and is indistinguishable
 // from one with nothing to say.
 type NoDuplicateClassesOptions struct {
-	Attributes []string `json:"attributes"`
-	Callees    []string `json:"callees"`
-	Variables  []string `json:"variables"`
+	TailwindLocationOptions
+	TailwindClassLiteralOptions
 }
 
 // NoDuplicateClasses reports a class name written twice in the same string.
@@ -68,15 +67,7 @@ var NoDuplicateClasses = rule.Rule{
 
 		settings := DefaultClassLiteralSettings()
 		if configured, isConfigured := rule.OptionsAs[NoDuplicateClassesOptions](options); isConfigured {
-			if len(configured.Attributes) > 0 {
-				settings.AttributeNames = configured.Attributes
-			}
-			if len(configured.Callees) > 0 {
-				settings.CalleeNames = configured.Callees
-			}
-			if len(configured.Variables) > 0 {
-				settings.VariablePatterns = configured.Variables
-			}
+			settings = configured.ClassLiteralSettings()
 		}
 
 		reader := ClassLiteralReaderFor(ctx.FileCache, settings)

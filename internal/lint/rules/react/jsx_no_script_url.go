@@ -32,7 +32,7 @@ var jsxNoScriptUrlMessage = rule.Message{
 //	[{includeFromSettings}]                     the object alone
 //
 // `includeFromSettings` has no field here. Upstream reads `settings.linkComponents` from ESLint's
-// shared settings when it is true, and cohere has no shared-settings surface, so `true` cannot be
+// shared settings when it is true, and cohere does not read settings.linkComponents, so `true` cannot be
 // honoured and the decoder refuses it by name; `false` is what the rule already does and is
 // accepted.
 type JsxNoScriptUrlOptions struct {
@@ -120,7 +120,7 @@ func DecodeJsxNoScriptUrlOptions(list []byte) (any, error) {
 	}
 	if object.IncludeFromSettings {
 		return JsxNoScriptUrlOptions{}, fmt.Errorf("jsx-no-script-url: includeFromSettings: true " +
-			"reads ESLint's shared settings.linkComponents, and cohere carries no shared settings, so " +
+			"reads ESLint's shared settings.linkComponents, and cohere does not read settings.linkComponents, so " +
 			"it would be accepted and never honoured. List the link components in this rule's own " +
 			`first option instead: ["error", [{"name": "Link", "props": ["to"]}]]`)
 	}

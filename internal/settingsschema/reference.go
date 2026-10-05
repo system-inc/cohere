@@ -22,7 +22,7 @@ var examples = map[string]string{
 	"cohere":         `"^1.0.0"`,
 	"plugins":        `["react"]`,
 	"jsPlugins":      `["./code-quality/lint/rules/index.js"]`,
-	"settings":       `{ "react": { "version": "19.0" } }`,
+	"settings":       `{ "better-tailwindcss": { "entryPoint": "./app/theme.css", "callees": ["cn", "clsx"] } }`,
 	"output":         `{ "phases": true }`,
 	FormatKey:        `{ "printWidth": 120, "tabWidth": 4, "singleQuote": true, "ignore": ["pnpm-lock.yaml", "*.sqlite"] }`,
 }

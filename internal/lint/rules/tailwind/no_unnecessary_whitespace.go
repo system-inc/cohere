@@ -20,9 +20,8 @@ func messageUnnecessaryWhitespace() rule.Message {
 
 // NoUnnecessaryWhitespaceOptions lets a project name the surfaces that carry class strings.
 type NoUnnecessaryWhitespaceOptions struct {
-	Attributes []string `json:"attributes"`
-	Callees    []string `json:"callees"`
-	Variables  []string `json:"variables"`
+	TailwindLocationOptions
+	TailwindClassLiteralOptions
 	// AllowMultiline is upstream's `allowMultiline`, on by default: a run holding a newline keeps it
 	// and its indentation, losing only the spaces before the newline. Off, it is whitespace like any
 	// other, shortened to one space between classes and removed at the edges.
@@ -71,15 +70,7 @@ var NoUnnecessaryWhitespace = rule.Rule{
 			if configured.AllowMultiline != nil {
 				allowMultiline = *configured.AllowMultiline
 			}
-			if len(configured.Attributes) > 0 {
-				settings.AttributeNames = configured.Attributes
-			}
-			if len(configured.Callees) > 0 {
-				settings.CalleeNames = configured.Callees
-			}
-			if len(configured.Variables) > 0 {
-				settings.VariablePatterns = configured.Variables
-			}
+			settings = configured.ClassLiteralSettings()
 		}
 
 		reader := ClassLiteralReaderFor(ctx.FileCache, settings)
