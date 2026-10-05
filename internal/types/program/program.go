@@ -92,6 +92,10 @@ type Graph struct {
 	// and records this run's for the next. Nil walks everything, exactly as before it existed.
 	FindingsReuse *FindingsReuse
 
+	// Readiness, when set, measures every walked file against cohere:adamic for the run's readiness, whatever
+	// the project's chain enables. Nil measures nothing and the walk is exactly as before. See Readiness.
+	Readiness *Readiness
+
 	// Shapes is every project file's shape for this run (Graph.Signatures), when the caller computed them.
 	// Walk keys shape-keyed rules on them; without them it keys those rules on the type fingerprint.
 	Shapes map[string]SignatureEntry

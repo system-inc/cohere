@@ -62,6 +62,9 @@ type runSummary struct {
 	// Nodes is the syntax nodes walked this run, so only in the checked files.
 	Nodes int
 
+	// Adamic is the run's readiness, nil for a run that did not lint. See readiness.go.
+	Adamic *readinessSummary
+
 	// Skips is each rule that declined every file it was offered. Whether one is a gap depends on its cover
 	// having run, which uncoveredSkips decides once the phases are known, into Gaps.
 	Skips []ruleSkip

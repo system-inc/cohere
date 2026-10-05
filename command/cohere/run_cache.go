@@ -800,6 +800,11 @@ func attachFindingsCache(graph *program.Graph, location projectLocation) {
 		session.shapes = shapes
 	}
 	graph.FindingsReuse = session.findings
+	// An entry recorded by a run that did not measure readiness was never measured, so a run that does must
+	// miss on it rather than replay it as clean (#drbrp8c).
+	if graph.Readiness != nil {
+		session.findings.MeasureReadiness()
+	}
 	if typesKey, err := typesCacheKey(graph, location); err == nil {
 		session.types = program.NewTypeDiagnosticsReuse(session.table.Types, typesKey)
 	}

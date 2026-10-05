@@ -185,9 +185,9 @@ A run prints three things, in order:
   it cohered, and in the parentheses how much it covered.
 
 ```
-✓ 💎 2.4s (480 rules • 3,926 checked)
-✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3,923 cached)
-✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3 checked • 3,923 cached)
+✓ 💎 2.4s (480 rules • 3,926 checked) • 87% Adamic-ready (3,412 of 3,926)
+✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3,923 cached) • 87% Adamic-ready (3,412 of 3,926)
+✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3 checked • 3,923 cached) • 87% Adamic-ready (3,411 of 3,926)
 ```
 
 The words mean exactly this:
@@ -197,6 +197,12 @@ The words mean exactly this:
 - **cached:** files the cache answered for, unchanged since a run that checked them. Checked and cached
   together are every file in scope.
 - **rules:** the rules that ran.
+- **Adamic-ready:** the share of linted files whose types are true: no type error and no `cohere:adamic`
+  finding, counted before any disable comment and whatever your settings turn on, since Adamic, which
+  compiles TypeScript native, reads neither. It names the compiler options Adamic sets that your tsconfig
+  leaves off (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`), and says `not measured`
+  with the reason when it could not measure, never a number it didn't. `--json` gives it as the summary's
+  `adamic`.
 
 A count is exact, with its thousands grouped (`3,923`); `--json` gives the plain integer. A count of zero
 is left out, so a cold run shows no `cached` and a run with nothing changed no `checked`.

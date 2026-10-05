@@ -1027,6 +1027,9 @@ func run() error {
 
 	releaseEarlyTypeCheck()
 
+	// The files the type phase reported in, which no readiness can call ready. See readiness.go.
+	typeErrorFiles := map[string]bool{}
+
 	// Phase 3: types. This is the phase that bails alone and loudly.
 	if !runTypes {
 		report.record(phaseTypes, outcomeSkipped, 0, "not requested")
@@ -1050,6 +1053,9 @@ func run() error {
 
 		for _, diagnostic := range typeDiagnostics {
 			printCompilerDiagnostic(diagnostic)
+			if file := diagnostic.File(); file != nil && !graph.IsOptionsDiagnostic(diagnostic) {
+				typeErrorFiles[file.FileName()] = true
+			}
 		}
 		findings += len(typeDiagnostics)
 		activeSummary.TypeErrors += len(typeDiagnostics)
@@ -1094,6 +1100,7 @@ func run() error {
 			if reusableWalk != nil {
 				activeSummary.Skips = rulesSkippingEveryFile(sumRuleNotes(reusableWalk.Notes), reusableWalk.Coverage.RulesOffered)
 			}
+			activeSummary.Adamic = notMeasured("types bailed")
 			writeRunEnd(report, os.Stdout)
 			finishRunCache(1)
 		}
@@ -1159,6 +1166,7 @@ func run() error {
 		}
 
 		findings += len(result.Diagnostics)
+		activeSummary.Adamic = readinessOf(graph, result, runTypes, typeErrorFiles)
 
 		// The findings, the lint line, and the coverage block, which prints unconditionally. See
 		// writeLintReport.
@@ -1297,6 +1305,7 @@ func rebuildGraph(
 	rebuilt.LintConfig = lintConfig
 	rebuilt.RuleOptions = registry.OptionsAt(optionsBase(lintConfig, directory))
 	rebuilt.RegisteredRuleNames = registry.Names()
+	rebuilt.Readiness, _ = readinessSet()
 	return rebuilt, time.Since(start), nil
 }
 
@@ -1336,6 +1345,7 @@ func configureLint(graph *program.Graph, location projectLocation) (*configurati
 	graph.LintConfig = lintConfig
 	graph.RuleOptions = registry.OptionsAt(optionsBase(lintConfig, location.Root))
 	graph.RegisteredRuleNames = registry.Names()
+	graph.Readiness, _ = readinessSet()
 	return lintConfig, nil
 }
 

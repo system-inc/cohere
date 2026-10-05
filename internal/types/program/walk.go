@@ -181,6 +181,11 @@ type Result struct {
 	// taken by a worker whose own group was done, or every file under WalkOnForeignCheckers. See walkQueue.
 	FilesOnForeignCheckers int
 
+	// Adamic is each walked file's readiness measurement, by file name, when Graph.Readiness asked for one: what
+	// the walk ran, with what the findings cache replayed for the rest. A file whose record is nil was never
+	// measured, and reads unmeasured, not ready. See Readiness.
+	Adamic map[string]*AdamicRecord
+
 	// Notes is what each file's rules noted through rule.Context.Note, by file name. Kept per file and
 	// per rule rather than summed, because the findings cache stores a file's notes beside its findings
 	// and a refresh re-walks only some of a file's rules: a total could not be split back apart.
@@ -243,6 +248,10 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	fileCrashes := []FileCrash{}
 	ruleCrashesAll := []RuleCrash{}
 	notes := map[string]RuleNotes{}
+	var adamic map[string]*AdamicRecord
+	if g.Readiness != nil {
+		adamic = map[string]*AdamicRecord{}
+	}
 
 	// Nil unless asked for, and every timing call below is guarded on it, so a run without --timing
 	// does not pay for the instrument at all.
@@ -298,6 +307,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			localCrashes := []FileCrash{}
 			localRuleCrashes := []RuleCrash{}
 			localNotes := map[string]RuleNotes{}
+			localAdamic := map[string]*AdamicRecord{}
 			localForeign := 0
 
 			// Each worker accumulates locally and merges once under the mutex. Timing through a
@@ -367,6 +377,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				walkRules, walkSlots := selection.applicable, dispatcher.slotsFor(selection)
 				var replayed *LintCacheEntry
 				var replayedNotes RuleNotes
+				var replayedRecord *AdamicRecord
 				var hits classHits
 				var keys cacheKeys
 				if reuse != nil {
@@ -410,10 +421,16 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 							localDesignSystemRerun++
 						}
 						replayedNotes = replayEntry(entry, hits, sourceFile, &localDiagnostics, localReporting, localOffered, localListening)
+						if g.Readiness != nil {
+							replayedRecord = replayedAdamic(entry, hits)
+						}
 						if len(walkRules) == 0 {
 							localNodes += entry.VisitedNodes
 							if len(replayedNotes) > 0 {
 								localNotes[sourceFile.FileName()] = replayedNotes
+							}
+							if g.Readiness != nil {
+								localAdamic[sourceFile.FileName()] = replayedRecord
 							}
 							return
 						}
@@ -477,8 +494,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					listeningTarget, offeredTarget = fileListening, fileOffered
 				}
 				diagnosticsBefore := len(localDiagnostics)
-				visited, silenced, fileNotes, ruleCrashes, crashed := dispatcher.dispatchFileSafely(sourceFile, report,
-					walkRules, walkSlots, fileChecker, listeningTarget, offeredTarget, selection.options, resolution)
+				visited, silenced, fileNotes, ruleCrashes, fileAdamic, crashed := dispatcher.dispatchFileSafely(sourceFile, report,
+					walkRules, walkSlots, fileChecker, listeningTarget, offeredTarget, selection.options, selection.measureOnly,
+					resolution)
 
 				release()
 
@@ -523,6 +541,15 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					localNodes += visited
 				}
 				localSuppressed.add(silenced)
+				// What the walk measured, and for a replayed file what the cache replayed for the rest. A replayed
+				// part that is nil leaves the whole unmeasured.
+				walkedRecord := fileAdamic.record()
+				if g.Readiness != nil {
+					localAdamic[sourceFile.FileName()] = walkedRecord
+					if replayed != nil {
+						localAdamic[sourceFile.FileName()] = mergeAdamic(replayedRecord, walkedRecord)
+					}
+				}
 				// The walked rules' notes beside the replayed rules' notes: the two are disjoint by rule.
 				if allNotes := mergeNotes(replayedNotes, fileNotes); len(allNotes) > 0 {
 					localNotes[sourceFile.FileName()] = allNotes
@@ -530,13 +557,13 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 				if recording && replayed == nil {
 					if entry, eligible := recordableEntry(sourceFile, keys,
-						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes, nil, visited, silenced); eligible {
+						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes, walkedRecord, visited, silenced); eligible {
 						reuse.keep(entry)
 					}
 				}
 				if recording && replayed != nil {
 					if entry, eligible := refreshClasses(*replayed, keys, hits,
-						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes, nil); eligible {
+						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes, walkedRecord); eligible {
 						reuse.keep(entry)
 					}
 				}
@@ -597,6 +624,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			for fileName, fileNotes := range localNotes {
 				notes[fileName] = fileNotes
 			}
+			for fileName, record := range localAdamic {
+				adamic[fileName] = record
+			}
 			timings.merge(localTimings)
 			filesReplayed += localReplayed
 			typeAwareRerun += localTypeAwareRerun
@@ -637,6 +667,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 		FilesOnForeignCheckers: filesOnForeignCheckers,
 		Notes:                  notes,
+		Adamic:                 adamic,
 		Coverage: Coverage{
 			FilesInProgram: len(g.Program.GetSourceFiles()),
 			FilesWalked:    len(files),
@@ -897,6 +928,9 @@ type fileDispatcher struct {
 	directives *suppression.Index
 	notes      RuleNotes
 	report     func(rule.Diagnostic)
+
+	// readiness is the file's readiness measurement, nil when the run measures none. See Readiness.
+	readiness *fileReadiness
 }
 
 // ruleSlot is one rule on one worker: what dispatching the rule needs that does not change between files.
@@ -966,6 +1000,14 @@ func (d *fileDispatcher) slotFor(ruleName string) *ruleSlot {
 			slot.timing.Findings++
 		}
 
+		// Readiness counts before suppression, since Adamic reads no disable comment, and a rule running
+		// measure-only reports nothing at all: its findings never print, fail the run or reach the edit
+		// engine with a fix.
+		d.readiness.count(ruleName)
+		if d.readiness.hidden(ruleName) {
+			return
+		}
+
 		if d.directives.Suppresses(diagnostic.RuleName, diagnostic.Range.Pos()) {
 			return
 		}
@@ -974,6 +1016,10 @@ func (d *fileDispatcher) slotFor(ruleName string) *ruleSlot {
 	}
 	slot.recordNote = func(key string) {
 		d.requireFile(ruleName, "RecordNote")
+		d.readiness.note(ruleName, key)
+		if d.readiness.hidden(ruleName) {
+			return
+		}
 		// Made for the file on its first note, and never reused: the file's notes outlive its dispatch, in
 		// the walk's result and the findings cache.
 		if d.notes == nil {
@@ -1030,8 +1076,9 @@ func (d *fileDispatcher) dispatchFileSafely(
 	listeningCounts map[string]int,
 	offeredCounts map[string]int,
 	ruleOptions map[string]any,
+	measureOnly map[string]bool,
 	resolution configuration.Resolved,
-) (visited int, silenced suppressionTally, notes RuleNotes, ruleCrashes []RuleCrash, crashed error) {
+) (visited int, silenced suppressionTally, notes RuleNotes, ruleCrashes []RuleCrash, readiness *fileReadiness, crashed error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			// The visited count is discarded along with the file. A file that crashed halfway
@@ -1040,13 +1087,14 @@ func (d *fileDispatcher) dispatchFileSafely(
 			silenced = suppressionTally{}
 			notes = nil
 			ruleCrashes = nil
+			readiness = nil
 			crashed = fmt.Errorf("%v", recovered)
 		}
 	}()
 
-	visited, silenced, notes, ruleCrashes = d.dispatchFile(sourceFile, report, rules, slots, fileChecker,
-		listeningCounts, offeredCounts, ruleOptions, resolution)
-	return visited, silenced, notes, ruleCrashes, nil
+	visited, silenced, notes, ruleCrashes, readiness = d.dispatchFile(sourceFile, report, rules, slots, fileChecker,
+		listeningCounts, offeredCounts, ruleOptions, measureOnly, resolution)
+	return visited, silenced, notes, ruleCrashes, readiness, nil
 }
 
 // dispatchFile asks every rule what it wants to hear about in this file, merges those answers into
@@ -1064,8 +1112,9 @@ func (d *fileDispatcher) dispatchFile(
 	listeningCounts map[string]int,
 	offeredCounts map[string]int,
 	ruleOptions map[string]any,
+	measureOnly map[string]bool,
 	resolution configuration.Resolved,
-) (visitedNodes int, silenced suppressionTally, notes RuleNotes, ruleCrashes []RuleCrash) {
+) (visitedNodes int, silenced suppressionTally, notes RuleNotes, ruleCrashes []RuleCrash, readiness *fileReadiness) {
 	listened := false
 
 	// Directives are read once per file, before any rule runs, because every rule's findings filter
@@ -1075,6 +1124,8 @@ func (d *fileDispatcher) dispatchFile(
 	reportUnknownRuleReferences(sourceFile, directives, d.catalog, report, d.unrunRuleReferences)
 
 	d.sourceFile, d.directives, d.report = sourceFile, directives, report
+	d.readiness = newFileReadiness(d.graph.Readiness, rules, measureOnly)
+	readiness = d.readiness
 	// However the dispatch ends, a panic included, so the next file starts from an empty table and no slot
 	// can report into a file that is over.
 	defer d.endFile()
@@ -1189,7 +1240,7 @@ func (d *fileDispatcher) dispatchFile(
 		}
 	}
 
-	return visitedNodes, tally(sourceFile.FileName(), directives, ranRule, resolution), d.notes, ruleCrashes
+	return visitedNodes, tally(sourceFile.FileName(), directives, ranRule, resolution), d.notes, ruleCrashes, readiness
 }
 
 // endFile empties the table the file filled and lets go of the file. Each emptied kind is cleared before it
@@ -1200,7 +1251,7 @@ func (d *fileDispatcher) endFile() {
 		d.listeners[kind] = d.listeners[kind][:0]
 	}
 	d.used = d.used[:0]
-	d.sourceFile, d.directives, d.notes, d.report = nil, nil, nil, nil
+	d.sourceFile, d.directives, d.notes, d.report, d.readiness = nil, nil, nil, nil, nil
 }
 
 // walk is the package's walk over the dispatcher's table: every node once, each listener called through its
@@ -1447,6 +1498,10 @@ type ruleSelection struct {
 	// err is a rule's options failing to decode, which fails the run.
 	err error
 
+	// measureOnly is the cohere:adamic rules the chain leaves off or never names, run for readiness alone,
+	// empty when the run measures no readiness. See Readiness.
+	measureOnly map[string]bool
+
 	// classes is the applicable rules' findings-cache classes by name, made on first use. See classNames.
 	classes *ruleClassNames
 
@@ -1479,7 +1534,27 @@ func (s *ruleSelection) classNames() *ruleClassNames {
 func (g *Graph) selectRules(rules []rule.Rule, resolution configuration.Resolved) *ruleSelection {
 	selection := &ruleSelection{applicable: make([]rule.Rule, 0, len(rules)), options: map[string]any{}}
 	for _, subject := range rules {
-		switch status, _ := resolution.StatusOf(subject.Name); status {
+		status, _ := resolution.StatusOf(subject.Name)
+		if g.Readiness.Measures(subject.Name) {
+			if status == configuration.StatusScopedOff || status == configuration.StatusUnconfigured {
+				// Off for the chain and run for readiness: still counted as off below, since that is what
+				// the chain says, and run at the set's own options.
+				decoded, err := g.RuleOptions.Decode(subject.Name, g.Readiness.Options[subject.Name])
+				if err != nil {
+					selection.err = err
+					return selection
+				}
+				if decoded != nil {
+					selection.options[subject.Name] = decoded
+				}
+				if selection.measureOnly == nil {
+					selection.measureOnly = map[string]bool{}
+				}
+				selection.measureOnly[subject.Name] = true
+				selection.applicable = append(selection.applicable, subject)
+			}
+		}
+		switch status {
 		case configuration.StatusScopedOff:
 			// Someone configured this rule off, here or tree-wide. Counted rather than dropped
 			// silently, because a rule absent across a directory is otherwise indistinguishable

@@ -109,6 +109,9 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 		line += " " + style.dim("("+strings.Join(inside, " • ")+")")
 	}
 
+	if segment := summary.Adamic.segment(); segment != "" {
+		line += " • " + segment
+	}
 	if markers := uncheckedMarkers(summary); len(markers) > 0 {
 		line += " • " + strings.Join(markers, " • ")
 	}
