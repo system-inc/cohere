@@ -32,8 +32,8 @@ import (
 // formatterPackage is the package whose transitive sources decide what the formatter prints.
 const formatterPackage = "./internal/format/native"
 
-// formatterPassLoop is the one file outside it that decides what the formatter's output means.
-const formatterPassLoop = "command/cohere/format.go"
+// FormatterPassLoop is the one file outside it that decides what the formatter's output means.
+const FormatterPassLoop = "command/cohere/format.go"
 
 // FormatterIdentity hashes the formatter's inputs in moduleDirectory. environment is added to the `go
 // list` that finds them, which a snapshot needs to point GOWORK at its own workspace.
@@ -46,22 +46,22 @@ func FormatterIdentity(moduleDirectory string, goVersion string, environment []s
 	if _, err := os.Stat(filepath.Join(moduleDirectory, filepath.FromSlash(formatterPackage))); errors.Is(err, os.ErrNotExist) {
 		return "", nil
 	}
-	inputs, err := formatterInputs(moduleDirectory, environment)
+	inputs, err := FormatterInputs(moduleDirectory, environment)
 	if err != nil {
 		return "", err
 	}
 	return hashFormatterInputs(goVersion, inputs), nil
 }
 
-// formatterInput is one file the formatter is built from: its name by import path, and its content's
+// FormatterInput is one file the formatter is built from: its name by import path, and its content's
 // SHA-256.
-type formatterInput struct {
+type FormatterInput struct {
 	Name string
 	Sum  string
 }
 
-// formatterInputs lists every file the formatter is built from.
-func formatterInputs(moduleDirectory string, environment []string) ([]formatterInput, error) {
+// FormatterInputs lists every file the formatter is built from.
+func FormatterInputs(moduleDirectory string, environment []string) ([]FormatterInput, error) {
 	const template = `{{if not .Standard}}{{$package := .ImportPath}}{{$directory := .Dir}}` +
 		`{{range .GoFiles}}{{$package}}{{"\t"}}{{$directory}}{{"\t"}}{{.}}{{"\n"}}{{end}}` +
 		`{{range .EmbedFiles}}{{$package}}{{"\t"}}{{$directory}}{{"\t"}}{{.}}{{"\n"}}{{end}}` +
@@ -78,7 +78,7 @@ func formatterInputs(moduleDirectory string, environment []string) ([]formatterI
 		return nil, fmt.Errorf("listing the formatter's inputs: %w", err)
 	}
 
-	inputs := []formatterInput{}
+	inputs := []FormatterInput{}
 	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
 		fields := strings.Split(line, "\t")
 		if len(fields) != 3 {
@@ -88,7 +88,7 @@ func formatterInputs(moduleDirectory string, environment []string) ([]formatterI
 		if err != nil {
 			return nil, err
 		}
-		inputs = append(inputs, formatterInput{Name: fields[0] + "/" + filepath.ToSlash(fields[2]), Sum: sum})
+		inputs = append(inputs, FormatterInput{Name: fields[0] + "/" + filepath.ToSlash(fields[2]), Sum: sum})
 	}
 	// The printers alone are dozens of files, so a short list is a `go list` that answered about
 	// something else, and an identity hashed from it would match a formatter it does not describe.
@@ -96,15 +96,15 @@ func formatterInputs(moduleDirectory string, environment []string) ([]formatterI
 		return nil, fmt.Errorf("go list found %d formatter inputs in %s, which cannot be right", len(inputs), moduleDirectory)
 	}
 
-	sum, err := fileSum(filepath.Join(moduleDirectory, formatterPassLoop))
+	sum, err := fileSum(filepath.Join(moduleDirectory, FormatterPassLoop))
 	if err != nil {
 		return nil, err
 	}
-	return append(inputs, formatterInput{Name: formatterPassLoop, Sum: sum}), nil
+	return append(inputs, FormatterInput{Name: FormatterPassLoop, Sum: sum}), nil
 }
 
 // hashFormatterInputs is the identity of a set of inputs under a toolchain, whatever order they came in.
-func hashFormatterInputs(goVersion string, inputs []formatterInput) string {
+func hashFormatterInputs(goVersion string, inputs []FormatterInput) string {
 	lines := make([]string, 0, len(inputs))
 	for _, input := range inputs {
 		lines = append(lines, input.Name+"\x00"+input.Sum)
