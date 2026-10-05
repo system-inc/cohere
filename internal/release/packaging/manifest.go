@@ -71,15 +71,15 @@ func PlatformManifest(target Target, version string) ([]byte, error) {
 		"name":        target.PackageName(),
 		"version":     version,
 		"description": fmt.Sprintf("The cohere binary for %s.", target),
-		"license":     "MIT",
+		"license":     LicenseExpression,
 		"repository":  map[string]string{"type": "git", "url": RepositoryURL},
 
 		"os":  []string{NpmOperatingSystem(target.GoOperatingSystem)},
 		"cpu": []string{NpmArchitecture(target.GoArchitecture)},
 
-		// Only the binary ships. Without this npm includes whatever is in the directory, and a
-		// stray file in a 15 MB package is the kind of thing nobody notices until it is a secret.
-		"files": []string{"bin/"},
+		// Only the binary and its licenses ship. Without this npm includes whatever is in the directory,
+		// and a stray file in a 15 MB package is the kind of thing nobody notices until it is a secret.
+		"files": append([]string{"bin/"}, LicenseFileNames...),
 
 		// Deliberately no `bin` field. The platform packages are data, not commands: the dispatcher
 		// owns the `cohere` name, and a second package claiming it would race for the same link in
@@ -108,7 +108,7 @@ func DispatcherManifest(version string) ([]byte, error) {
 		"name":        DispatcherPackageName,
 		"version":     version,
 		"description": "Type-check, lint, fix, and format a TypeScript codebase in one process.",
-		"license":     "MIT",
+		"license":     LicenseExpression,
 		"repository":  map[string]string{"type": "git", "url": RepositoryURL},
 
 		"bin": map[string]string{
@@ -118,8 +118,8 @@ func DispatcherManifest(version string) ([]byte, error) {
 		// schema/ is there so a settings file's "$schema" can name a path inside the install and be
 		// validated offline, in any editor, against the schema of the cohere that reads it. SHA256SUMS
 		// is what the launcher checks the platform binary against, and a launcher installed without it
-		// refuses to run anything.
-		"files": []string{"bin/", SchemaDirectoryName + "/", ChecksumsFileName},
+		// refuses to run anything. The licenses ship in every package, this one included.
+		"files": append([]string{"bin/", SchemaDirectoryName + "/", ChecksumsFileName}, LicenseFileNames...),
 
 		"optionalDependencies": optionalDependencies,
 	}

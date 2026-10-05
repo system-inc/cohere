@@ -115,6 +115,13 @@ func Build(options Options) (Result, error) {
 	}
 	options.SwiftScratchDirectory = scratch
 
+	// Before anything builds, so a release with no copyright holder fails in a second, not after the
+	// cross-compiles and two Swift builds. The compiler fixture carries licenses so the refusals after
+	// this one stay reachable through Build.
+	if err := requireConfirmedCopyright(options.ModuleDirectory); err != nil {
+		return Result{}, err
+	}
+
 	// Read before the minimum is checked, though neither depends on the other, because a fixture can
 	// pin a compiler and cannot contain MinimumReleaseCommit. In the other order no test could reach
 	// this refusal through Build, and a test that drives readCompilerPin directly passes with the call
@@ -298,6 +305,11 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 		return StagedPackage{}, fmt.Errorf("writing the package manifest: %w", err)
 	}
 
+	// Beside bin/, not in it, so the checksums stay a list of executables.
+	if err := stageLicenses(options.ModuleDirectory, directory); err != nil {
+		return StagedPackage{}, err
+	}
+
 	return StagedPackage{
 		Name:        target.PackageName(),
 		Directory:   directory,
@@ -351,6 +363,10 @@ func buildDispatcherPackage(options Options, checksums []byte) (StagedPackage, e
 	}
 
 	if err := stageSettingsSchemas(options.ModuleDirectory, directory); err != nil {
+		return StagedPackage{}, err
+	}
+
+	if err := stageLicenses(options.ModuleDirectory, directory); err != nil {
 		return StagedPackage{}, err
 	}
 

@@ -4,7 +4,7 @@
     "description": "Format on save with cohere: the same lint fixes and formatting as the cohere gate, computed from the buffer, so the editor and CI never disagree.",
     "publisher": "system-inc",
     "version": "1.0.0",
-    "license": "UNLICENSED",
+    "license": "MIT OR Apache-2.0",
     "icon": "icon.png",
     "repository": {
         "type": "git",

@@ -314,3 +314,13 @@ The commands are written for a macOS or Linux shell.
 ## Contributing
 
 How cohere is built, and why, is in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+cohere is licensed under either of the Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+or the MIT license ([LICENSE-MIT](LICENSE-MIT)), at your option. Every package it publishes carries both
+texts.
+
+Unless you explicitly state otherwise, any contribution you intentionally submit for inclusion in cohere,
+as defined in the Apache-2.0 license, is dual licensed as above, without any additional terms or
+conditions.
