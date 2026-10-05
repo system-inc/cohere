@@ -17,6 +17,7 @@ import (
 // Each case plants a repeat in exactly one position, so a finding there is proof that position is
 // read, and the fix is asserted so the range is proven to land on the right string.
 func TestNestedClassLiteralsAreRead(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name, source, want string
 	}{
@@ -63,6 +64,7 @@ func TestNestedClassLiteralsAreRead(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", testCase.source)
 			rule_testing.ExpectFixedSource(t, result, testCase.want)
 		})
@@ -76,6 +78,7 @@ func TestNestedClassLiteralsAreRead(t *testing.T) {
 // would send `'primary large'` from a comparison to `no-unknown-classes`, and a condition is not a
 // class list. Each source below holds a repeat that only a wrong reading would find.
 func TestNonValueStringsAreNotRead(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		name, source string
 	}{
@@ -101,6 +104,7 @@ func TestNonValueStringsAreNotRead(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -115,7 +119,9 @@ func TestNonValueStringsAreNotRead(t *testing.T) {
 // string outside a template is trimmed, which is the discrimination that makes the first case mean
 // something.
 func TestWhitespaceAtAHoleLiteralsEdgeIsASeparator(t *testing.T) {
+	t.Parallel()
 	t.Run("inside a hole, the edge keeps one character", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx",
 			"const element = <div className={`flex${open ? '   hidden' : ''}`} />;")
 		rule_testing.ExpectFixedSource(t, result,
@@ -123,12 +129,14 @@ func TestWhitespaceAtAHoleLiteralsEdgeIsASeparator(t *testing.T) {
 	})
 
 	t.Run("inside a hole, a single edge space is no finding", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx",
 			"const element = <div className={`flex${open ? ' hidden' : ''}`} />;")
 		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("outside a template, the same edge is padding", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx",
 			"const element = <div className={open ? ' hidden' : ''} />;")
 		rule_testing.ExpectFixedSource(t, result,
@@ -138,6 +146,7 @@ func TestWhitespaceAtAHoleLiteralsEdgeIsASeparator(t *testing.T) {
 	// The hole's text still reads as segments when a hole holds a string. They used to be
 	// alternatives, and this doubled space was the casualty.
 	t.Run("the template's own text is still read", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx",
 			"const element = <div className={`flex  ${open ? 'hidden' : ''}`} />;")
 		rule_testing.ExpectFixedSource(t, result,
@@ -150,6 +159,7 @@ func TestWhitespaceAtAHoleLiteralsEdgeIsASeparator(t *testing.T) {
 // `\“ decodes to a backtick, so writing the decoded classes back over the source would close the
 // template early, the file would stop parsing, and the engine would refuse every fix in it.
 func TestAnEscapedTemplateIsReportedWithoutAFix(t *testing.T) {
+	t.Parallel()
 	result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx",
 		"const element = <div className={`flex flex content-['\\`']`} />;")
 	rule_testing.ExpectFindings(t, result, "duplicateClass")
@@ -162,6 +172,7 @@ func TestAnEscapedTemplateIsReportedWithoutAFix(t *testing.T) {
 // them. Before, a template after `? ` or a span after `${ x }` read as untokenizable, and every rule
 // that edits runs skipped it; the direct template, with nothing in front of its backtick, was fine.
 func TestTemplateRunsAfterTriviaAreFixed(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		name, source, want string
 	}{
@@ -177,6 +188,7 @@ func TestTemplateRunsAfterTriviaAreFixed(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", testCase.source)
 			rule_testing.ExpectFixedSource(t, result, testCase.want)
 		})
@@ -190,6 +202,7 @@ func TestTemplateRunsAfterTriviaAreFixed(t *testing.T) {
 // where the plugin is wrong: it trims them too, so `flex${c ? '  block  ' : ”}` became
 // `flex${c ? 'block' : ”}` and two classes fused into `flexblock`. See holeEdges.
 func TestHoleStringEdgesTrimOnlyWhereTheTemplateSeparates(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		name, source, want string
 	}{
@@ -226,6 +239,7 @@ func TestHoleStringEdgesTrimOnlyWhereTheTemplateSeparates(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", testCase.source)
 			rule_testing.ExpectFixedSource(t, result, testCase.want)
 		})

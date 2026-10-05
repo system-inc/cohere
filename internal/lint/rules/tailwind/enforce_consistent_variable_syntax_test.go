@@ -20,6 +20,7 @@ func runVariableSyntaxFixture(t *testing.T, source string) rule_testing.Result {
 
 // TestEnforceConsistentVariableSyntaxReports covers what upstream reports.
 func TestEnforceConsistentVariableSyntaxReports(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name       string
 		source     string
@@ -71,6 +72,7 @@ func TestEnforceConsistentVariableSyntaxReports(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runVariableSyntaxFixture(t, testCase.source)
 			rule_testing.ExpectFindings(t, result, "variableSyntax")
 			if len(result.Diagnostics) == 0 {
@@ -86,6 +88,7 @@ func TestEnforceConsistentVariableSyntaxReports(t *testing.T) {
 
 // TestEnforceConsistentVariableSyntaxStaysSilent covers what upstream leaves alone.
 func TestEnforceConsistentVariableSyntaxStaysSilent(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name   string
 		source string
@@ -124,6 +127,7 @@ func TestEnforceConsistentVariableSyntaxStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runVariableSyntaxFixture(t, testCase.source))
 		})
 	}
@@ -131,6 +135,7 @@ func TestEnforceConsistentVariableSyntaxStaysSilent(t *testing.T) {
 
 // TestEnforceConsistentVariableSyntaxVariableForm pins the configured direction.
 func TestEnforceConsistentVariableSyntaxVariableForm(t *testing.T) {
+	t.Parallel()
 	variableForm := EnforceConsistentVariableSyntaxOptions{Syntax: variableSyntaxVariable}
 
 	reported := rule_testing.RunWithOptions(t, EnforceConsistentVariableSyntax, "Component.tsx",

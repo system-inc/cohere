@@ -32,6 +32,7 @@ import (
 // same class as two probes that searched for invented harness names and returned confident wrong
 // answers.
 func TestEveryRuleShipsAFixturePair(t *testing.T) {
+	t.Parallel()
 	rules := ruleDeclarationsByFile(t)
 	if len(rules) == 0 {
 		// A sweep that finds nothing to check passes for the wrong reason, which is the same shape

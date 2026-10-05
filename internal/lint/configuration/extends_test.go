@@ -50,6 +50,7 @@ func refusedWith(t *testing.T, path string, want string) {
 }
 
 func TestExtendsInheritsEveryRuleTheProjectDoesNotWrite(t *testing.T) {
+	t.Parallel()
 	directory := writeConfigs(t, map[string]string{
 		"nexus/CohereSettings.json": `{"rules": {"no-var": "error", "eqeqeq": ["error", "always"]}}`,
 		"CohereSettings.json":       `{"extends": "./nexus/CohereSettings.json", "rules": {"project-only": "error"}}`,
@@ -69,9 +70,11 @@ func TestExtendsInheritsEveryRuleTheProjectDoesNotWrite(t *testing.T) {
 // A bare severity keeps the inherited options, as ESLint does. Both halves, because a merge that
 // always replaced would pass the first and one that always kept would pass the second.
 func TestABareSeverityKeepsTheInheritedOptionsAndATupleReplacesThem(t *testing.T) {
+	t.Parallel()
 	base := `{"rules": {"max-classes-per-file": ["error", {"ignoreExpressions": true}]}}`
 
 	t.Run("bare severity", func(t *testing.T) {
+		t.Parallel()
 		directory := writeConfigs(t, map[string]string{
 			"base.json": base,
 			"CohereSettings.json": `{"extends": "./base.json",
@@ -88,6 +91,7 @@ func TestABareSeverityKeepsTheInheritedOptionsAndATupleReplacesThem(t *testing.T
 	})
 
 	t.Run("tuple", func(t *testing.T) {
+		t.Parallel()
 		directory := writeConfigs(t, map[string]string{
 			"base.json": base,
 			"CohereSettings.json": `{"extends": "./base.json",
@@ -103,6 +107,8 @@ func TestABareSeverityKeepsTheInheritedOptionsAndATupleReplacesThem(t *testing.T
 
 // The guard this whole change exists for. Each case is the drift #rkm5a31 measured, written as the
 // overlay that would have hidden it.
+// Not parallel: it swaps the package's setFiles for a stand-in tier set through withOurTierForTest
+// (withSetFiles), which every test that reads a set would see.
 func TestADepartureFromAnInheritedRulingMustSayWhy(t *testing.T) {
 	withOurTierForTest(t)
 	base := `{"extends": "cohere:system-inc/test", "rules": {"no-implied-eval": "error", "guard-for-in": "off", "eqeqeq": ["error", {"null": "ignore"}]},
@@ -111,6 +117,7 @@ func TestADepartureFromAnInheritedRulingMustSayWhy(t *testing.T) {
 	// The positive case first, so every refusal below is shown to come from the guard under test
 	// rather than from a fixture that never loaded.
 	t.Run("a declared departure loads and is recorded", func(t *testing.T) {
+		t.Parallel()
 		directory := writeConfigs(t, map[string]string{
 			"base.json": base,
 			"CohereSettings.json": `{"extends": "./base.json",
@@ -128,6 +135,7 @@ func TestADepartureFromAnInheritedRulingMustSayWhy(t *testing.T) {
 	})
 
 	t.Run("an undeclared departure is refused", func(t *testing.T) {
+		t.Parallel()
 		directory := writeConfigs(t, map[string]string{
 			"base.json":           base,
 			"CohereSettings.json": `{"extends": "./base.json", "rules": {"no-implied-eval": "off"}}`,
@@ -136,6 +144,7 @@ func TestADepartureFromAnInheritedRulingMustSayWhy(t *testing.T) {
 	})
 
 	t.Run("a reason of only whitespace is no reason", func(t *testing.T) {
+		t.Parallel()
 		directory := writeConfigs(t, map[string]string{
 			"base.json": base,
 			"CohereSettings.json": `{"extends": "./base.json",
@@ -145,6 +154,7 @@ func TestADepartureFromAnInheritedRulingMustSayWhy(t *testing.T) {
 	})
 
 	t.Run("a changed option is a departure", func(t *testing.T) {
+		t.Parallel()
 		directory := writeConfigs(t, map[string]string{
 			"base.json":           base,
 			"CohereSettings.json": `{"extends": "./base.json", "rules": {"eqeqeq": ["error", {"null": "always"}]}}`,
@@ -153,6 +163,7 @@ func TestADepartureFromAnInheritedRulingMustSayWhy(t *testing.T) {
 	})
 
 	t.Run("restating the ruling is not a departure, whatever the whitespace", func(t *testing.T) {
+		t.Parallel()
 		directory := writeConfigs(t, map[string]string{
 			"base.json":           base,
 			"CohereSettings.json": `{"extends": "./base.json", "rules": {"eqeqeq": ["error", { "null" :  "ignore" }]}}`,
@@ -164,6 +175,7 @@ func TestADepartureFromAnInheritedRulingMustSayWhy(t *testing.T) {
 	})
 
 	t.Run("a departure entry that departs from nothing is refused", func(t *testing.T) {
+		t.Parallel()
 		directory := writeConfigs(t, map[string]string{
 			"base.json": base,
 			"CohereSettings.json": `{"extends": "./base.json",
@@ -174,6 +186,7 @@ func TestADepartureFromAnInheritedRulingMustSayWhy(t *testing.T) {
 	})
 
 	t.Run("a departure entry for a rule the file never writes is refused", func(t *testing.T) {
+		t.Parallel()
 		directory := writeConfigs(t, map[string]string{
 			"base.json":           base,
 			"CohereSettings.json": `{"extends": "./base.json", "departures": {"guard-for-in": "stale"}}`,
@@ -184,6 +197,8 @@ func TestADepartureFromAnInheritedRulingMustSayWhy(t *testing.T) {
 
 // A project cannot step around a house ruling by spelling the key differently. Both directions,
 // because the resolver's own matching is one-way and this check must not be.
+// Not parallel: it swaps the package's setFiles for a stand-in tier set through withOurTierForTest
+// (withSetFiles), which every test that reads a set would see.
 func TestADepartureCannotHideBehindAnotherSpelling(t *testing.T) {
 	// Only the bare name is registered, so the two spellings reach one rule: a respelling.
 	withOurTierForTest(t)
@@ -200,6 +215,7 @@ func TestADepartureCannotHideBehindAnotherSpelling(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			undeclared := writeConfigs(t, map[string]string{
 				"base.json":           `{"extends": "cohere:system-inc/test", "rules": {"` + testCase.base + `": "error"}}`,
 				"CohereSettings.json": `{"extends": "./base.json", "rules": {"` + testCase.project + `": "off"}}`,
@@ -239,6 +255,7 @@ func TestADepartureCannotHideBehindAnotherSpelling(t *testing.T) {
 // fixture built from them passes whether or not the layer compares against its own rules: this test
 // was first written that way and a mutant comparing against the live map survived it.
 func TestTwoSpellingsInOneFileAreNeverADeparture(t *testing.T) {
+	t.Parallel()
 	directory := writeConfigs(t, map[string]string{
 		"base.json": `{"rules": {"eqeqeq": "error"}}`,
 		"CohereSettings.json": `{"extends": "./base.json",
@@ -253,6 +270,7 @@ func TestTwoSpellingsInOneFileAreNeverADeparture(t *testing.T) {
 }
 
 func TestPluginsUnionAndTheirDefaultsAreComputedOverTheMergedRules(t *testing.T) {
+	t.Parallel()
 	directory := writeConfigs(t, map[string]string{
 		"structure.json": `{"plugins": ["react"], "rules": {"react/no-children-prop": "off"}, "reasons": {"react/no-children-prop": "turned off on purpose"}}`,
 		"CohereSettings.json": `{"extends": "./structure.json", "plugins": ["react", "@typescript-eslint"],
@@ -276,6 +294,7 @@ func TestPluginsUnionAndTheirDefaultsAreComputedOverTheMergedRules(t *testing.T)
 // The base's blocks come first so the project's still win, and every pattern resolves against the
 // project root, not the base's directory.
 func TestOverridesAndIgnorePatternsConcatenateBaseFirst(t *testing.T) {
+	t.Parallel()
 	directory := writeConfigs(t, map[string]string{
 		"libraries/nexus/CohereSettings.json": `{
 			"rules": {"no-console": "error"},
@@ -309,6 +328,7 @@ func TestOverridesAndIgnorePatternsConcatenateBaseFirst(t *testing.T) {
 }
 
 func TestAChainOfThreeMergesInOrderAndListsEverySource(t *testing.T) {
+	t.Parallel()
 	directory := writeConfigs(t, map[string]string{
 		"structure/nexus/CohereSettings.json": `{"rules": {"no-var": "error", "guard-for-in": "off"},
 			"reasons": {"guard-for-in": "nexus/consistency-no-for-in replaces it"}}`,
@@ -334,6 +354,7 @@ func TestAChainOfThreeMergesInOrderAndListsEverySource(t *testing.T) {
 }
 
 func TestAFileWithoutExtendsListsOnlyItself(t *testing.T) {
+	t.Parallel()
 	directory := writeConfigs(t, map[string]string{"CohereSettings.json": `{"rules": {"no-var": "error"}}`})
 	loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
 	if len(loaded.Sources) != 1 || loaded.Sources[0] != filepath.Join(directory, "CohereSettings.json") {
@@ -342,7 +363,9 @@ func TestAFileWithoutExtendsListsOnlyItself(t *testing.T) {
 }
 
 func TestABrokenChainRefusesTheWholeLoad(t *testing.T) {
+	t.Parallel()
 	t.Run("a missing base", func(t *testing.T) {
+		t.Parallel()
 		directory := writeConfigs(t, map[string]string{
 			"CohereSettings.json": `{"extends": "./nexus/CohereSettings.json", "rules": {}}`,
 		})
@@ -350,6 +373,7 @@ func TestABrokenChainRefusesTheWholeLoad(t *testing.T) {
 	})
 
 	t.Run("a cycle", func(t *testing.T) {
+		t.Parallel()
 		directory := writeConfigs(t, map[string]string{
 			"a.json":              `{"extends": "./b.json"}`,
 			"b.json":              `{"extends": "./a.json"}`,
@@ -359,6 +383,7 @@ func TestABrokenChainRefusesTheWholeLoad(t *testing.T) {
 	})
 
 	t.Run("a base with a key the loader does not implement", func(t *testing.T) {
+		t.Parallel()
 		directory := writeConfigs(t, map[string]string{
 			"base.json":           `{"rulez": {}}`,
 			"CohereSettings.json": `{"extends": "./base.json"}`,
@@ -371,8 +396,10 @@ func TestABrokenChainRefusesTheWholeLoad(t *testing.T) {
 // silently. `format` has one that does (formatoptions applies each file's block over the one it
 // extends), so a base may carry it. Both still load from the project's own file.
 func TestABaseMayCarryOnlyKeysWhoseReadersFollowTheChain(t *testing.T) {
+	t.Parallel()
 	for key, followed := range map[string]bool{"settings": false, "format": true} {
 		t.Run(key, func(t *testing.T) {
+			t.Parallel()
 			inBase := writeConfigs(t, map[string]string{
 				"base.json":           `{"` + key + `": {}, "rules": {}}`,
 				"CohereSettings.json": `{"extends": "./base.json"}`,
@@ -396,12 +423,15 @@ func TestABaseMayCarryOnlyKeysWhoseReadersFollowTheChain(t *testing.T) {
 // changing an inherited ruling there needs a stated reason too (#25benkk). api's
 // `["**/*.ts", "**/*.tsx"]` block turned off thirteen rulings the Nexus tier holds at error, and with
 // only top-level entries checked it would have loaded with no reason and printed nothing.
+// Not parallel: it swaps the package's setFiles for a stand-in tier set through withOurTierForTest
+// (withSetFiles), which every test that reads a set would see.
 func TestAWholeTreeOverrideDepartsLikeATopLevelRule(t *testing.T) {
 	withOurTierForTest(t)
 	base := `{"extends": "cohere:system-inc/test", "rules": {"no-const-assign": "error", "no-var": "error"}}`
 	wholeTree := `"overrides": [{"files": ["**/*.ts", "**/*.tsx"], "rules": {"no-const-assign": "off", "no-var": "error"}}]`
 
 	t.Run("without a reason it is refused", func(t *testing.T) {
+		t.Parallel()
 		directory := writeConfigs(t, map[string]string{
 			"base.json":           base,
 			"CohereSettings.json": `{"extends": "./base.json", ` + wholeTree + `}`,
@@ -410,6 +440,7 @@ func TestAWholeTreeOverrideDepartsLikeATopLevelRule(t *testing.T) {
 	})
 
 	t.Run("with a reason it loads and the departure prints", func(t *testing.T) {
+		t.Parallel()
 		directory := writeConfigs(t, map[string]string{
 			"base.json": base,
 			"CohereSettings.json": `{"extends": "./base.json",
@@ -426,6 +457,7 @@ func TestAWholeTreeOverrideDepartsLikeATopLevelRule(t *testing.T) {
 	})
 
 	t.Run("a reason for a restated rule is stale and refused", func(t *testing.T) {
+		t.Parallel()
 		directory := writeConfigs(t, map[string]string{
 			"base.json": base,
 			"CohereSettings.json": `{"extends": "./base.json",
@@ -438,6 +470,7 @@ func TestAWholeTreeOverrideDepartsLikeATopLevelRule(t *testing.T) {
 	// business and need no reason, or every generated-code or test-file block would have to explain itself.
 	for _, files := range []string{`["**/generated/**/*.{ts,tsx}"]`, `["**/*.test.ts"]`, `["source/**/*.ts"]`, `["modules/**"]`} {
 		t.Run("a scoped override needs no reason: "+files, func(t *testing.T) {
+			t.Parallel()
 			directory := writeConfigs(t, map[string]string{
 				"base.json": base,
 				"CohereSettings.json": `{"extends": "./base.json",
@@ -453,6 +486,7 @@ func TestAWholeTreeOverrideDepartsLikeATopLevelRule(t *testing.T) {
 // The shape test decides whole-tree from the pattern alone. Both directions, because a test of only
 // the matches passes a predicate that answers yes to everything.
 func TestWholeTreePatternsAreDecidedByShape(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		patterns []string
 		want     bool
@@ -478,6 +512,8 @@ func TestWholeTreePatternsAreDecidedByShape(t *testing.T) {
 // not unconfigure the other (#hprjh4s). The Nexus tier holds the twin at error; api wrote the core key
 // off. The two still share a ruling, because the resolver lets the qualified key configure the core
 // rule when no key names it exactly, so a reason is required; but the twin keeps its own key.
+// Not parallel: it swaps the package's setFiles for a stand-in tier set through withOurTierForTest
+// (withSetFiles), which every test that reads a set would see.
 func TestATwinRuleKeepsItsOwnKeyWhenAProjectWritesTheOther(t *testing.T) {
 	registered := []string{"no-invalid-this", "@typescript-eslint/no-invalid-this"}
 	directory := writeConfigs(t, map[string]string{
@@ -513,6 +549,7 @@ func TestATwinRuleKeepsItsOwnKeyWhenAProjectWritesTheOther(t *testing.T) {
 // Without registered names only the same key is the same ruling, so two spellings are two entries and
 // neither is removed.
 func TestWithoutTheRegistryOnlyTheSameKeyIsTheSameRuling(t *testing.T) {
+	t.Parallel()
 	directory := writeConfigs(t, map[string]string{
 		"base.json":           `{"rules": {"nexus/consistency-no-enum": "error"}}`,
 		"CohereSettings.json": `{"extends": "./base.json", "rules": {"consistency-no-enum": "off"}, "reasons": {"consistency-no-enum": "a second spelling, off"}}`,
@@ -528,6 +565,7 @@ func TestWithoutTheRegistryOnlyTheSameKeyIsTheSameRuling(t *testing.T) {
 // author meant to leave out. The control is the same block with a reason, which loads and carries the
 // reason and the file that wrote it, so the refusal is about the unknown key and nothing else.
 func TestAnOverrideKeyTheLoaderDoesNotReadIsRefused(t *testing.T) {
+	t.Parallel()
 	directory := writeConfigs(t, map[string]string{
 		"excluded.json": `{"overrides": [{"files": ["**/*.ts"], "excludedFiles": ["**/keep.ts"], "rules": {"no-var": "off"}}]}`,
 		"reasoned.json": `{"overrides": [{"files": ["**/generated/*.ts"], "reason": "  until the generator is fixed ", "rules": {"no-var": "off"}}]}`,

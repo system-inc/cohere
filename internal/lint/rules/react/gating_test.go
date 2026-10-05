@@ -90,6 +90,7 @@ func TestGatingFiresOnUpstreamCorpus(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, Gating, gatingFile, testCase.sourceText), testCase.wantIds...)
 		})
@@ -112,6 +113,7 @@ func TestGatingStaysSilentOnUpstreamCorpus(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, Gating, gatingFile, testCase.sourceText))
 		})
 	}
@@ -238,6 +240,7 @@ func TestGatingFiresOnCasesUpstreamDoesNotShip(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, Gating, gatingFile, testCase.sourceText), testCase.wantIds...)
 		})
@@ -381,6 +384,7 @@ func TestGatingStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, Gating, gatingFile, testCase.sourceText))
 		})
 	}
@@ -424,6 +428,7 @@ func TestGatingReportsTheWholeDirectiveIncludingTheSemicolon(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, Gating, gatingFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
@@ -588,6 +593,7 @@ func TestGatingTranscriptionsStillHoldTheirDirectives(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			for _, want := range testCase.contains {
 				if !strings.Contains(testCase.body, want) {
 					t.Fatalf("body no longer contains %q:\n%s", want, testCase.body)

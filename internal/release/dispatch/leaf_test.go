@@ -83,6 +83,8 @@ var allowedRuleImportPrefixes = []string{
 // vendored upstream: the simpler rule would have rejected an import that costs nothing, which is
 // how a guard stops being trusted and starts being worked around.
 func TestRulePackagesStayLeaves(t *testing.T) {
+	t.Parallel()
+
 	/*
 	 * A rule package is one that REGISTERS rules, not merely one that lives under `rules/`.
 	 *

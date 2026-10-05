@@ -103,6 +103,7 @@ func TestJsxNoCommentTextnodesFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, JsxNoCommentTextnodes, jsxNoCommentTextnodesFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -227,6 +228,7 @@ func TestJsxNoCommentTextnodesStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, JsxNoCommentTextnodes, jsxNoCommentTextnodesFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -250,6 +252,7 @@ func TestJsxNoCommentTextnodesHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/Suffix.js",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, JsxNoCommentTextnodes, fileName, source)
 			rule_testing.ExpectFindings(t, result, "putCommentInBraces")
 		})
@@ -298,6 +301,7 @@ func TestJsxNoCommentTextnodesLineAnchoring(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, JsxNoCommentTextnodes, jsxNoCommentTextnodesFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -315,12 +319,14 @@ func TestJsxNoCommentTextnodesReportsOncePerTextNode(t *testing.T) {
 	t.Parallel()
 
 	t.Run("two comment lines in one text node report once", func(t *testing.T) {
+		t.Parallel()
 		source := "const a = <div>\n  // one\n  // two\n</div>;\n"
 		result := rule_testing.Run(t, JsxNoCommentTextnodes, jsxNoCommentTextnodesFile, source)
 		rule_testing.ExpectFindings(t, result, "putCommentInBraces")
 	})
 
 	t.Run("the same two lines split by a container report twice", func(t *testing.T) {
+		t.Parallel()
 		source := "const a = <div>\n  // one\n  {x}\n  // two\n</div>;\n"
 		result := rule_testing.Run(t, JsxNoCommentTextnodes, jsxNoCommentTextnodesFile, source)
 		rule_testing.ExpectFindings(t, result, "putCommentInBraces", "putCommentInBraces")
@@ -354,6 +360,7 @@ func TestJsxNoCommentTextnodesIgnoresStringLiterals(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, JsxNoCommentTextnodes, jsxNoCommentTextnodesFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -371,12 +378,14 @@ func TestJsxNoCommentTextnodesReadsRawSource(t *testing.T) {
 	t.Parallel()
 
 	t.Run("entity-escaped slashes are clean", func(t *testing.T) {
+		t.Parallel()
 		source := "const a = <pre>&#x2F;&#x2F; TODO</pre>;\n"
 		result := rule_testing.Run(t, JsxNoCommentTextnodes, jsxNoCommentTextnodesFile, source)
 		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("literal slashes in the same element report", func(t *testing.T) {
+		t.Parallel()
 		source := "const a = <pre>// TODO</pre>;\n"
 		result := rule_testing.Run(t, JsxNoCommentTextnodes, jsxNoCommentTextnodesFile, source)
 		rule_testing.ExpectFindings(t, result, "putCommentInBraces")
@@ -412,6 +421,7 @@ func TestJsxNoCommentTextnodesSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, JsxNoCommentTextnodes, jsxNoCommentTextnodesFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))

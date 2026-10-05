@@ -136,6 +136,7 @@ func TestNoWillUpdateSetStateFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoWillUpdateSetState, willUpdateSetStateFile,
 				testCase.sourceText, NoWillUpdateSetStateOptions{Mode: testCase.option})
 			rule_testing.ExpectFindings(t, result, "noSetStateInComponentWillUpdate")
@@ -242,6 +243,7 @@ func TestNoWillUpdateSetStateStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoWillUpdateSetState, willUpdateSetStateFile,
 				testCase.sourceText, NoWillUpdateSetStateOptions{Mode: testCase.option})
 			rule_testing.ExpectClean(t, result)
@@ -283,6 +285,7 @@ func TestNoWillUpdateSetStateReportsAtTheCallee(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoWillUpdateSetState, willUpdateSetStateFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))

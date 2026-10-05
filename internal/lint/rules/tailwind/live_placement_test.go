@@ -128,6 +128,7 @@ func livePlacementSystem(t *testing.T, entryPoint string) DesignSystemResult {
 // tables described the corpus, which is the thing the migration removes. The number to watch is that
 // it is still zero now that the answer comes from each repository's own stylesheet.
 func TestUnknownClassesPlacesEveryCorpusClass(t *testing.T) {
+	t.Parallel()
 	literals := livePlacementLiterals(t)
 
 	asked, unknown := 0, 0
@@ -203,6 +204,7 @@ func TestUnknownClassesPlacesEveryCorpusClass(t *testing.T) {
 // statics, and this rule reported it neither before nor after. It is a static collapse, which the
 // rule's own doc comment places out of scope alongside the single-class rewrites.
 func TestCanonicalClassesPlacementIsAccountedFor(t *testing.T) {
+	t.Parallel()
 	literals := livePlacementLiterals(t)
 
 	placed, asked, findings := 0, 0, 0
@@ -347,6 +349,7 @@ func TestCanonicalClassesPlacementIsAccountedFor(t *testing.T) {
 // Zero findings is the right answer on this corpus and it is asserted beside the population for the
 // reason the file comment gives: on its own it is satisfiable by a rule that resolved nothing.
 func TestConflictingClassesPlacementIsAccountedFor(t *testing.T) {
+	t.Parallel()
 	literals := livePlacementLiterals(t)
 
 	asked, resolved, findings := 0, 0, 0
@@ -439,6 +442,7 @@ func livePlacementTopKeys(counts map[string]int, limit int) []string {
 // from a snapshot of one repository and were structurally blind to roots either repository added
 // afterwards, while the computed path reads each repository's own design system.
 func TestConflictingClassesPerRepositoryPlacement(t *testing.T) {
+	t.Parallel()
 	literals := livePlacementLiterals(t)
 
 	type placement struct{ asked, resolved, findings int }
@@ -527,6 +531,7 @@ func TestConflictingClassesPerRepositoryPlacement(t *testing.T) {
 // test rather than needing to be added to it. The count is asserted non-zero because a theme that
 // resolved nothing would pass every comparison below without measuring anything.
 func TestRepositoryColorTokensReadAsColors(t *testing.T) {
+	t.Parallel()
 	var checkedRepositories, checkedTokens int
 
 	for entryPoint := range livePlacementLiterals(t) {

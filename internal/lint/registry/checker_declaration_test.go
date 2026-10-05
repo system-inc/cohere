@@ -31,6 +31,7 @@ import (
 // fixture-pair guard. This reads each rule's source for a `ctx.TypeChecker` reference and requires
 // the declaration to match.
 func TestRulesDeclareTheirCheckerUse(t *testing.T) {
+	t.Parallel()
 	declarations := checkerDeclarationsOnDisk(t)
 	if len(declarations) == 0 {
 		// A sweep with nothing to check passes for the wrong reason, which is the defect it guards.
@@ -233,6 +234,7 @@ func fileReadsTypeChecker(parsed *ast.File) bool {
 // that a real shift does. When it fails, the fix is not to widen the band: it is to read both
 // comments and decide whether what they conclude still follows.
 func TestCheckerDeclarationShareStillSupportsTheConclusion(t *testing.T) {
+	t.Parallel()
 	// The share at which the conclusion was measured, and the range over which it still holds.
 	// Below the floor, the acquisition is skipped on nearly every file and the blanket claim these
 	// comments replaced would be honest again. Above the ceiling, it is skipped so seldom that the

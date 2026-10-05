@@ -22,6 +22,7 @@ import (
 //	"flex\titems-center"    silent           (a tab separates as well as a space)
 
 func TestNoUnnecessaryWhitespaceReportsPadding(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -85,6 +86,7 @@ func TestNoUnnecessaryWhitespaceReportsPadding(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnnecessaryWhitespace, testCase.fileName, testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -94,6 +96,7 @@ func TestNoUnnecessaryWhitespaceReportsPadding(t *testing.T) {
 // The clean half. The template cases here are the ones a naive trim breaks, because the whitespace
 // next to a hole looks like padding and is actually the separator.
 func TestNoUnnecessaryWhitespaceStaysSilent(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -159,6 +162,7 @@ func TestNoUnnecessaryWhitespaceStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnnecessaryWhitespace, testCase.fileName, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -171,6 +175,7 @@ func TestNoUnnecessaryWhitespaceStaysSilent(t *testing.T) {
 // obviously correct repair (trim it) is wrong. Each expectation is what upstream's `--fix` actually
 // produced.
 func TestNoUnnecessaryWhitespaceFixMatchesUpstream(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name   string
 		source string
@@ -217,6 +222,7 @@ func TestNoUnnecessaryWhitespaceFixMatchesUpstream(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", testCase.source)
 			rule_testing.ExpectFixedSource(t, result, testCase.want)
 		})
@@ -230,6 +236,7 @@ func TestNoUnnecessaryWhitespaceFixMatchesUpstream(t *testing.T) {
 // `enforce-consistent-class-order` edit in the same pass (class_tokens.go). A rewrite of the whole
 // literal produces the same text and claims every byte, and the engine then refuses one of the two.
 func TestWhitespaceFixClaimsNoClassByte(t *testing.T) {
+	t.Parallel()
 	source := `const element = <div className="  flex   items-center  gap-2 " />;`
 	result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {
@@ -272,6 +279,7 @@ func TestWhitespaceFixClaimsNoClassByte(t *testing.T) {
 //
 // So the naive rewrite is computed here and required to differ from what the rule proposes.
 func TestWhitespaceFixNeverFusesClassesAcrossAHole(t *testing.T) {
+	t.Parallel()
 	// A segment sitting between two holes, with padding that a plain trim would remove entirely.
 	segment := ClassSegment{
 		Text:         "  flex  ",

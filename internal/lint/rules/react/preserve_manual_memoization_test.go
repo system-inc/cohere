@@ -425,6 +425,7 @@ return <div>{value}</div>;
 		{"correct", strings.Replace(source, "},[]);", "},[field.value]);", 1), 0},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runPreserveManualMemoization(t, testCase.name+".tsx", testCase.source)
 			if len(result.Diagnostics) != testCase.findings {
 				t.Fatalf("findings=%v, want %d", result.Diagnostics, testCase.findings)
@@ -458,6 +459,7 @@ return <div>{value}</div>;
 			fmt.Sprintf(body, "use\x5cu004Demo")},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if strings.Contains(testCase.source, "useMemo") {
 				t.Fatalf("fixture spells the name plainly, so it cannot exercise the escape path")
 			}
@@ -575,6 +577,7 @@ func TestPreserveManualMemoizationStaysSilent(t *testing.T) {
 		"primitiveCalls":        preserveManualMemoizationClean9,
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			result := runPreserveManualMemoization(t, name+".tsx", source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -876,6 +879,7 @@ function Component(props) {
 `},
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			result := runPreserveManualMemoization(t, name+".tsx", testCase.source)
 			if testCase.fires {
 				if len(result.Diagnostics) == 0 {
@@ -1063,6 +1067,7 @@ export function ZzReassignedComponent(properties: P) { const onPick = useReassig
 		},
 	} {
 		t.Run(row.name, func(t *testing.T) {
+			t.Parallel()
 			result := runPreserveManualMemoization(t, "overlap.tsx", row.source)
 			if row.reported {
 				if len(result.Diagnostics) == 0 {

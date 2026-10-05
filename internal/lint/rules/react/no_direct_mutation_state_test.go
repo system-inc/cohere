@@ -184,6 +184,7 @@ func TestNoDirectMutationStateFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDirectMutationState, directMutationStateFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantSpans))
@@ -290,6 +291,7 @@ func TestNoDirectMutationStateStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoDirectMutationState, directMutationStateFile, testCase.sourceText))
 		})
@@ -483,6 +485,7 @@ class Outer extends React.Component {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDirectMutationState, directMutationStateFile, testCase.source)
 
 			if len(testCase.wantSpans) == 0 {

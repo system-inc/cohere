@@ -16,6 +16,7 @@ import (
 // These are permanent fixtures rather than the throwaway probe that found it, because a defect that
 // produced silence once will produce silence again.
 func TestParenthesizedClassExpressionsAreRead(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name    string
 		source  string
@@ -61,6 +62,7 @@ func TestParenthesizedClassExpressionsAreRead(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := testCase.subject(t, testCase.source)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("parentheses hid the finding in %s", testCase.source)
@@ -76,6 +78,7 @@ func TestParenthesizedClassExpressionsAreRead(t *testing.T) {
 // rules read a string's contents, which parentheses cannot change, so stripping is safe for them
 // specifically. This pins that it stays a read and never becomes a rewrite.
 func TestParenthesesDoNotCauseFalseFindings(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name    string
 		source  string
@@ -106,6 +109,7 @@ func TestParenthesesDoNotCauseFalseFindings(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, testCase.subject(t, testCase.source))
 		})
 	}

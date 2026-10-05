@@ -54,6 +54,7 @@ func TestNoStringRefsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
 				NoStringRefsOptions{
 					NoTemplateLiterals: testCase.noTemplateLiterals,
@@ -87,6 +88,7 @@ func TestNoStringRefsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoStringRefs, stringRefsFile,
 				testCase.sourceText, NoStringRefsOptions{
 					NoTemplateLiterals: testCase.noTemplateLiterals,
@@ -134,6 +136,7 @@ func TestNoStringRefsDiscriminationsUpstreamDoesNotCover(t *testing.T) {
 
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoStringRefs, stringRefsFile, testCase.sourceText),
 				testCase.findings...)
@@ -192,6 +195,7 @@ func TestNoStringRefsDiscriminationsUpstreamDoesNotCover(t *testing.T) {
 
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoStringRefs, stringRefsFile, testCase.sourceText))
 		})
 	}
@@ -269,6 +273,7 @@ func TestNoStringRefsSpellingsOfTheRefsRead(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
 				NoStringRefsOptions{CheckThisRefs: true})
 			if len(testCase.findings) == 0 {
@@ -446,6 +451,7 @@ func TestNoStringRefsEnclosingComponentIsAScopeWalk(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
 				NoStringRefsOptions{CheckThisRefs: true})
 			if testCase.reports {
@@ -482,6 +488,7 @@ func TestNoStringRefsHasNoFileGate(t *testing.T) {
 		"/repository/source/Hello.js",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunWithOptions(t, NoStringRefs, fileName, sourceText,
 					NoStringRefsOptions{CheckThisRefs: true}),
@@ -516,6 +523,7 @@ func TestDecodeNoStringRefsOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeNoStringRefsOptions([]byte(testCase.raw))
 			if err != nil {
 				t.Fatalf("decoding %q: %v", testCase.raw, err)
@@ -610,6 +618,7 @@ func TestNoStringRefsPointsAtTheRightNode(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
 				NoStringRefsOptions{CheckThisRefs: true})
 			if len(result.Diagnostics) != len(testCase.reported) {

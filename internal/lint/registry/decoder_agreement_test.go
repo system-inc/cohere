@@ -28,6 +28,9 @@ import (
 // must also move rule.OptionsAsReads, unless it is named in optionsReadUnreachableOnProbe. Measured
 // when this landed: 172 of 172 reach it. The counter is global, which is why this test is not
 // parallel: a parallel test calling OptionsAs at the same moment would make a rule look reached.
+// Not parallel: it reads the process-wide counter rule.OptionsAsReads before and after each rule's run to
+// tell whether the run reached its options, so a parallel test calling OptionsAs at the same moment would
+// make an unreached rule look reached.
 func TestEveryDecoderHandsItsRuleTheTypeTheRuleReads(t *testing.T) {
 	exercised := 0
 	refused := 0
@@ -44,6 +47,8 @@ func TestEveryDecoderHandsItsRuleTheTypeTheRuleReads(t *testing.T) {
 		exercised++
 		subject := registration.Rule
 		readsBefore := rule.OptionsAsReads.Load()
+		// Not parallel: its parent reads rule.OptionsAsReads right after this subtest returns, so the run
+		// must have finished by then.
 		t.Run(subject.Name, func(t *testing.T) {
 			defer func() {
 				recovered := recover()
@@ -130,6 +135,8 @@ var optionsReachControl = rule.Rule{
 // The reach counter can fail: a rule reading its options only in a class listener does not move it
 // on the probe source, and does on a class. Without this the reach assertion above could be passing
 // because the counter moves on every run.
+// Not parallel: it asserts the process-wide counter rule.OptionsAsReads does not move across a run, which
+// a parallel test calling OptionsAs would break.
 func TestTheOptionsReachCounterSeesARuleThatNeverReadsItsOptions(t *testing.T) {
 	before := rule.OptionsAsReads.Load()
 	rule_testing.RunWithOptions(t, optionsReachControl, "/repository/source/Probe.tsx", "export const value = 1;\n", optionsReachControlOptions{})

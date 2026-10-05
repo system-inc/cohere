@@ -101,6 +101,7 @@ func TestNoDerivingStateInEffectsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoDerivingStateInEffects(t, testCase.source)
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
@@ -222,6 +223,7 @@ func TestNoDerivingStateInEffectsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runNoDerivingStateInEffects(t, testCase.source))
 		})
 	}
@@ -323,6 +325,7 @@ func TestNoDerivingStateInEffectsMeasuredCases(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoDerivingStateInEffects(t, testCase.source)
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
@@ -377,6 +380,7 @@ func TestNoDerivingStateInEffectsPointsAtTheSetterCall(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoDerivingStateInEffects(t, testCase.source)
 			if len(result.Diagnostics) != len(testCase.wantText) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.wantText), len(result.Diagnostics))

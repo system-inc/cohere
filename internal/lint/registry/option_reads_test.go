@@ -272,6 +272,7 @@ func selectedField(info *types.Info, expression ast.Expr) *types.Var {
 
 // TestEveryOptionFieldARuleDecodesIsRead is the guard over the rules tree.
 func TestEveryOptionFieldARuleDecodesIsRead(t *testing.T) {
+	t.Parallel()
 	rulesRoot, err := filepath.Abs("../rules")
 	if err != nil {
 		t.Fatal(err)
@@ -304,6 +305,7 @@ func TestEveryOptionFieldARuleDecodesIsRead(t *testing.T) {
 // TestTheOptionReadGuardSeesAnUnreadField runs the same walk over a planted package, so a clean result
 // above is a measurement rather than a matcher that never matches.
 func TestTheOptionReadGuardSeesAnUnreadField(t *testing.T) {
+	t.Parallel()
 	plantedRoot, err := filepath.Abs("testdata/optionreads")
 	if err != nil {
 		t.Fatal(err)

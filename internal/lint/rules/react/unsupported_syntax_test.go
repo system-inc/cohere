@@ -407,6 +407,7 @@ function Component(props: Props) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, testCase.sourceText),
 				testCase.wantIds...)
@@ -763,6 +764,7 @@ func TestUnsupportedSyntaxStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, testCase.sourceText))
 		})
@@ -873,6 +875,7 @@ func TestUnsupportedSyntaxPointsAtTheRightNode(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))

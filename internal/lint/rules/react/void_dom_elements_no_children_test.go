@@ -44,6 +44,7 @@ func TestVoidDomElementsNoChildrenFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "voidDomElementsNoChildren")
 		})
@@ -79,6 +80,7 @@ func TestVoidDomElementsNoChildrenStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -110,6 +112,7 @@ func TestVoidDomElementsNoChildrenPointsAtTheElementName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "voidDomElementsNoChildren")
 			if len(result.Diagnostics) != 1 {
@@ -146,6 +149,7 @@ func TestVoidDomElementsNoChildrenNamesTheElementInTheMessage(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -172,6 +176,7 @@ func TestVoidDomElementsNoChildrenCoversEveryVoidElement(t *testing.T) {
 
 	for _, elementName := range voidElements {
 		t.Run(elementName, func(t *testing.T) {
+			t.Parallel()
 			sourceText := "<" + elementName + " children='Foo' />;"
 			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, sourceText)
 			rule_testing.ExpectFindings(t, result, "voidDomElementsNoChildren")
@@ -202,6 +207,7 @@ func TestVoidDomElementsNoChildrenIsCaseSensitive(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -243,6 +249,7 @@ func TestVoidDomElementsNoChildrenDeclinesSpreads(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -276,6 +283,7 @@ func TestVoidDomElementsNoChildrenReadsOnlyStaticIdentifierKeys(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -312,12 +320,14 @@ func TestVoidDomElementsNoChildrenTreatsAnyChildAsContent(t *testing.T) {
 	}
 	for _, testCase := range reports {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "voidDomElementsNoChildren")
 		})
 	}
 
 	t.Run("a closing tag with nothing between it and the opening tag", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, "<br></br>;")
 		rule_testing.ExpectClean(t, result)
 	})
@@ -348,6 +358,7 @@ func TestVoidDomElementsNoChildrenDeclinesNonIdentifierTags(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -374,6 +385,7 @@ func TestVoidDomElementsNoChildrenAcceptsEveryCalleeSpellingUpstreamDoes(t *test
 	}
 	for _, testCase := range reports {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "voidDomElementsNoChildren")
 		})
@@ -382,6 +394,7 @@ func TestVoidDomElementsNoChildrenAcceptsEveryCalleeSpellingUpstreamDoes(t *test
 	// `document.createElement` builds a DOM node rather than a React element, and it is the one
 	// call sharing the property name. Upstream excludes it by name in both member arms.
 	t.Run("document.createElement is excluded by name", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, "document.createElement('br', {}, 'Foo');")
 		rule_testing.ExpectClean(t, result)
 	})
@@ -425,6 +438,7 @@ func TestVoidDomElementsNoChildrenMatchesUpstreamOnParenthesizedCallees(t *testi
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -456,6 +470,7 @@ func TestVoidDomElementsNoChildrenCountsArgumentsBeforeReadingThem(t *testing.T)
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -483,6 +498,7 @@ func TestVoidDomElementsNoChildrenReportsOncePerElement(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "voidDomElementsNoChildren")
 		})

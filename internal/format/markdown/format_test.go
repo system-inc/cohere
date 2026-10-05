@@ -7,6 +7,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/oracletest"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -78,11 +79,10 @@ var formatVariants = func() []formatoptions.Options {
 func compareFormat(t *testing.T, inputs []string) int {
 	t.Helper()
 	failures := 0
+	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
+	golden := oracletest.Open(t, t.Name())
 	for variantIndex, options := range formatVariants {
-		engine, err := prettier.New(options)
-		if err != nil {
-			t.Fatal(err)
-		}
+		engine := golden.Engine(options)
 		for _, input := range inputs {
 			expected, err := engine.Format("fixture.md", input)
 			if err != nil {
@@ -115,10 +115,8 @@ func TestFormatFixturesMatchOracle(t *testing.T) {
 // compared against the oracle's for another must differ.
 func TestFormatOracleCanFail(t *testing.T) {
 	t.Parallel()
-	engine, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		t.Fatal(err)
-	}
+	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
+	engine := oracletest.Open(t, t.Name()).Engine(formatoptions.Default())
 	expected, err := engine.Format("fixture.md", "* a")
 	if err != nil {
 		t.Fatal(err)
@@ -156,6 +154,8 @@ func TestExhaustiveDelimitersMatchOracle(t *testing.T) {
 	}
 	extend("", 0)
 
+	// The live oracle, not a golden (see oracletest): an opt-in measuring sweep of some 19,500 inputs that
+	// no default run reaches, so recording it would check in its answers for nothing a default run reads.
 	engine, err := prettier.New(formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)

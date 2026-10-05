@@ -68,6 +68,7 @@ func TestGlobalsFires(t *testing.T) {
 
 	for _, testCase := range globalsFiresCases() {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, Globals, "Subject.tsx", testCase.source)
 			expected := make([]string, testCase.count)
 			for index := range expected {
@@ -87,6 +88,7 @@ func TestGlobalsStaysSilent(t *testing.T) {
 
 	for _, testCase := range globalsSilentCases() {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, Globals, "Subject.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -321,6 +323,7 @@ func TestGlobalsSpans(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, Globals, "Subject.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
@@ -424,6 +427,7 @@ func TestGlobalsBoundary(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, Globals, "Subject.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})

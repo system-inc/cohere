@@ -107,6 +107,7 @@ func TestNoUnsafeFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoUnsafe, unsafeFile, testCase.sourceText,
 				NoUnsafeOptions{CheckAliases: testCase.checkAliases})
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -204,6 +205,7 @@ func TestNoUnsafeStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoUnsafe, unsafeFile, testCase.sourceText,
 				NoUnsafeOptions{CheckAliases: testCase.checkAliases})
 			rule_testing.ExpectClean(t, result)
@@ -270,6 +272,7 @@ func TestNoUnsafeReportsAtTheKey(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnsafe, unsafeFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))

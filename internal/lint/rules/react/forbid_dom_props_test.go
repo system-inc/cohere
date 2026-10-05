@@ -164,6 +164,7 @@ func TestForbidDomPropsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := forbidDomPropsOptions(t, testCase.rawOptions)
 			result := rule_testing.RunWithOptions(t, ForbidDomProps, forbidDomPropsFile, testCase.sourceText, options)
 			wantIds := make([]string, testCase.wantCount)
@@ -266,6 +267,7 @@ func TestForbidDomPropsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := forbidDomPropsOptions(t, testCase.rawOptions)
 			result := rule_testing.RunWithOptions(t, ForbidDomProps, forbidDomPropsFile, testCase.sourceText, options)
 			rule_testing.ExpectClean(t, result)
@@ -326,6 +328,7 @@ func TestForbidDomPropsMessageText(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ForbidDomProps, forbidDomPropsFile, `<div className="foo" />`, forbidDomPropsOptions(t, testCase.rawOptions))
 			rule_testing.ExpectFindings(t, result, "propIsForbidden")
 			if got := result.Diagnostics[0].Message.Description; got != testCase.want {
@@ -354,6 +357,7 @@ func TestForbidDomPropsHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/ForbidDomProps.jsx",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ForbidDomProps, fileName, source, forbidDomPropsOptions(t, `{"forbid":["className"]}`))
 			rule_testing.ExpectFindings(t, result, "propIsForbidden")
 		})
@@ -369,6 +373,7 @@ func TestDecodeForbidDomPropsOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("an empty body forbids nothing", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeForbidDomPropsOptions(nil)
 		if err != nil {
 			t.Fatalf("decoding an empty body: %v", err)
@@ -383,6 +388,7 @@ func TestDecodeForbidDomPropsOptions(t *testing.T) {
 	})
 
 	t.Run("the string arm", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeForbidDomPropsOptions([]byte(`{"forbid":["id","style"]}`))
 		if err != nil {
 			t.Fatalf("decoding the string arm: %v", err)
@@ -399,6 +405,7 @@ func TestDecodeForbidDomPropsOptions(t *testing.T) {
 	})
 
 	t.Run("an absent disallowedFor means every tag", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeForbidDomPropsOptions([]byte(`{"forbid":[{"propName":"className"}]}`))
 		if err != nil {
 			t.Fatalf("decoding an absent disallowedFor: %v", err)
@@ -413,6 +420,7 @@ func TestDecodeForbidDomPropsOptions(t *testing.T) {
 	})
 
 	t.Run("an empty disallowedFor means no tag", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeForbidDomPropsOptions([]byte(`{"forbid":[{"propName":"className","disallowedFor":[]}]}`))
 		if err != nil {
 			t.Fatalf("decoding an empty disallowedFor: %v", err)
@@ -427,6 +435,7 @@ func TestDecodeForbidDomPropsOptions(t *testing.T) {
 	})
 
 	t.Run("a named disallowedFor matches only those tags", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeForbidDomPropsOptions([]byte(`{"forbid":[{"propName":"className","disallowedFor":["div","span"]}]}`))
 		if err != nil {
 			t.Fatalf("decoding a named disallowedFor: %v", err)

@@ -11,6 +11,8 @@ import (
 
 // To a pipe or a file, a step and a note print nothing; a failure always prints (#ytqqv8v).
 func TestProgressOffATerminalSaysOnlyFailures(t *testing.T) {
+	t.Parallel()
+
 	var out bytes.Buffer
 	progress := NewProgress(&out, false, false)
 	progress.Step("cohere: building from commit %s", "abc")
@@ -27,6 +29,8 @@ func TestProgressOffATerminalSaysOnlyFailures(t *testing.T) {
 
 // On a terminal a step is one dim line that the next step rewrites and Clear removes, so the report
 // that follows starts on a clean row; a failure clears it first; a long step is kept to one row.
+//
+// Not parallel: it sets and clears NO_COLOR with t.Setenv, which a parallel test may not call.
 func TestProgressOnATerminalIsOneLineThatClears(t *testing.T) {
 	t.Setenv("NO_COLOR", "")
 	os.Unsetenv("NO_COLOR")
@@ -64,6 +68,8 @@ func TestProgressOnATerminalIsOneLineThatClears(t *testing.T) {
 
 // With --verbose every step and note prints in full, a line each, as it always did.
 func TestProgressVerboseSaysEverything(t *testing.T) {
+	t.Parallel()
+
 	var out bytes.Buffer
 	progress := NewProgress(&out, true, true)
 	progress.Step("cohere: building from commit %s", "abc")
@@ -79,6 +85,8 @@ func TestProgressVerboseSaysEverything(t *testing.T) {
 // a terminal. --verbose still names the build. The fixture's cohere prints one line, standing in for the
 // footer.
 func TestALaunchedRunPrintsOnlyCoheresOwnOutputOffATerminal(t *testing.T) {
+	t.Parallel()
+
 	fixture := newCommittedFixture(t)
 	launcher := filepath.Join(t.TempDir(), "cohere-dispatch")
 	if output, err := exec.Command("go", "build", "-o", launcher, "../../../command/cohere-dispatch").CombinedOutput(); err != nil {
@@ -117,6 +125,8 @@ func TestALaunchedRunPrintsOnlyCoheresOwnOutputOffATerminal(t *testing.T) {
 
 // What a prune removed is in the prune log and, under --verbose, on screen; a default run says nothing of
 // it. The cache here has binaries the prune removes, so the silence is not a prune that found nothing.
+//
+// Not parallel: it swaps the package variable Report, which every build and prune writes through.
 func TestAPruneIsSilentUnlessVerbose(t *testing.T) {
 	for _, verbose := range []bool{false, true} {
 		paths, _ := seedPruneCache(t)
@@ -142,6 +152,9 @@ func TestAPruneIsSilentUnlessVerbose(t *testing.T) {
 // SwiftPM's own lines are kept off a default run, stream under --verbose, and are quoted by a build that
 // fails. The swift on the path here prints what SwiftPM prints and, asked where it put the product, names
 // a directory holding one.
+//
+// Not parallel: it swaps the package variable Report, which every build writes through, and puts a fake
+// swift first on PATH with t.Setenv.
 func TestSwiftPMSpeaksOnlyUnderVerboseOrOnFailure(t *testing.T) {
 	bin := t.TempDir()
 	product := t.TempDir()

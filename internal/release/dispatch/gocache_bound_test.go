@@ -11,6 +11,9 @@ import (
 // The default cache is the one the caller's own `go` commands use, as the go command names it, and it is
 // trimmed to its own cap and claimed at most once per interval (#3sgjy0h). Positive control: an entry over
 // the cap and unused for a day is removed, from the directory `GOCACHE` names.
+//
+// Not parallel: it swaps the package variable defaultGoCacheCap, which every build's cache bound reads, and
+// sets GOCACHE with t.Setenv.
 func TestTheDefaultGoCacheIsTheCallersAndIsTrimmed(t *testing.T) {
 	previous := defaultGoCacheCap
 	defaultGoCacheCap = 1 << 20

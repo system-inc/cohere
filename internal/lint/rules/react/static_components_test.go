@@ -142,6 +142,7 @@ func TestStaticComponentsFires(t *testing.T) {
 `},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", testCase.source)
 			rule_testing.ExpectFindings(t, result, "staticComponents")
 		})
@@ -297,6 +298,7 @@ function Outer() {
 `},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})

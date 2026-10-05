@@ -55,6 +55,7 @@ var scratchFileExemptions = []string{"internal/astprobe"}
 // the exempted shipped package. The control is 343 real test files found by the same walk, so a
 // clean result here is a measurement rather than a search that examined nothing.
 func TestNoScratchFilesRemain(t *testing.T) {
+	t.Parallel()
 	// Skipped unless asked for, and that is a deliberate weakening rather than an oversight.
 	//
 	// The first version ran always, and within a minute of being written it went red on two live

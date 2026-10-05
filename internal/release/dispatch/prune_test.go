@@ -18,6 +18,8 @@ import (
 var pruneNow = time.Date(2026, time.October, 2, 12, 0, 0, 0, time.UTC)
 
 func TestPruneRemovesExactlyWhatNoRunCanReach(t *testing.T) {
+	t.Parallel()
+
 	paths, ages := seedPruneCache(t)
 
 	plan, err := PlanPrune(paths, []string{"cohere-" + platformTag() + "-keepme0000000000"}, "", pruneNow)
@@ -57,6 +59,8 @@ func TestPruneRemovesExactlyWhatNoRunCanReach(t *testing.T) {
 }
 
 func TestApplyPruneRemovesOnlyThePlanAndLeavesFrozenACandidate(t *testing.T) {
+	t.Parallel()
+
 	paths, ages := seedPruneCache(t)
 	plan, err := PlanPrune(paths, nil, "", pruneNow)
 	if err != nil {
@@ -93,6 +97,8 @@ func TestApplyPruneRemovesOnlyThePlanAndLeavesFrozenACandidate(t *testing.T) {
 }
 
 func TestApplyPruneRefusesANameThatIsAPath(t *testing.T) {
+	t.Parallel()
+
 	paths, _ := seedPruneCache(t)
 	outside := filepath.Join(paths.CacheDirectory, "outside")
 	writeFile(t, outside, "not in the binary cache\n")
@@ -110,6 +116,8 @@ func TestApplyPruneRefusesANameThatIsAPath(t *testing.T) {
 // and anything used within the hour stay, the rest go. Ages are real (relative to now) rather than to
 // pruneNow, because ApplyPrune asks the clock again at the moment of removal.
 func TestPruneRemovesStaleExtractionsAndKeepsWhatABuildCanReach(t *testing.T) {
+	t.Parallel()
+
 	paths, _ := seedPruneCache(t)
 	now := time.Now()
 	directory := func(parent string, name string, age time.Duration) string {
@@ -178,6 +186,8 @@ func TestPruneRemovesStaleExtractionsAndKeepsWhatABuildCanReach(t *testing.T) {
 // A build that touches an extraction between the plan and its removal keeps it. The plan is made, the
 // extraction is marked used the way ensureCompiler marks it, and the apply must leave it.
 func TestApplyPruneKeepsAnExtractionTouchedSinceThePlan(t *testing.T) {
+	t.Parallel()
+
 	paths, _ := seedPruneCache(t)
 	now := time.Now()
 	current := filepath.Join(paths.CompilerDirectory(), "current")
@@ -211,6 +221,8 @@ func TestApplyPruneKeepsAnExtractionTouchedSinceThePlan(t *testing.T) {
 // build. Without the mark, a pin extracted yesterday is stale to the prune while a build compiles
 // against it.
 func TestEnsureCompilerMarksAReusedExtractionInUse(t *testing.T) {
+	t.Parallel()
+
 	paths := Paths{ModuleDirectory: t.TempDir(), CacheDirectory: t.TempDir()}
 	commit := "8d550c837c90bd1805b047b7eeccc2baac2d5e7a"
 	extraction := filepath.Join(paths.CompilerDirectory(), commit)
@@ -237,6 +249,8 @@ func TestEnsureCompilerMarksAReusedExtractionInUse(t *testing.T) {
 }
 
 func TestApplyPruneRefusesADirectoryNameThatIsAPath(t *testing.T) {
+	t.Parallel()
+
 	paths, _ := seedPruneCache(t)
 	outside := filepath.Join(paths.CacheDirectory, "keep")
 	writeFile(t, filepath.Join(outside, "file"), "not in the compiler cache\n")
@@ -251,6 +265,8 @@ func TestApplyPruneRefusesADirectoryNameThatIsAPath(t *testing.T) {
 }
 
 func TestAPruneThatRemovesNothingSaysHowManyItLookedAt(t *testing.T) {
+	t.Parallel()
+
 	paths := Paths{ModuleDirectory: t.TempDir(), CacheDirectory: t.TempDir()}
 	if err := os.MkdirAll(paths.BinaryDirectory(), 0o755); err != nil {
 		t.Fatal(err)

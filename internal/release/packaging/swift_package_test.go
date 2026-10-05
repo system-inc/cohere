@@ -213,6 +213,8 @@ func TestSwiftContractRefusesAMismatchedPair(t *testing.T) {
 // modified tree as clean; the release turns that cache off. The first build also proves the stamp: it
 // reaches the binary, it does not count as a modification, and it is gone afterwards.
 func TestSwiftEngineBuildReadsTheTreeAsItIsNow(t *testing.T) {
+	t.Parallel()
+
 	if runtime.GOOS != "darwin" {
 		t.Skip("NOT MEASURED: the Swift engine is only built on macOS")
 	}

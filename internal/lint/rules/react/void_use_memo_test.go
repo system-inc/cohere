@@ -244,6 +244,7 @@ func TestVoidUseMemoFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VoidUseMemo, "component.tsx", testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.want...)
 		})
@@ -499,6 +500,7 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VoidUseMemo, "component.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -559,6 +561,7 @@ func TestVoidUseMemoSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VoidUseMemo, "component.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))

@@ -27,6 +27,7 @@ func TestNoObjectTypeAsDefaultPropStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -81,6 +82,7 @@ func TestNoObjectTypeAsDefaultPropFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
 				t.Fatalf("want %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
@@ -171,6 +173,7 @@ func TestNoObjectTypeAsDefaultPropMatchesTheInstalledRuleOnInputsTheCorpusDoesNo
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoObjectTypeAsDefaultProp,
 				noObjectTypeAsDefaultPropFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
@@ -249,6 +252,7 @@ func TestNoObjectTypeAsDefaultPropHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/Suffix.ts",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoObjectTypeAsDefaultProp, fileName, sourceText)
 			rule_testing.ExpectFindings(t, result, "forbiddenTypeDefaultParam")
 		})
@@ -336,6 +340,7 @@ func TestNoObjectTypeAsDefaultPropRendersRealKeyNamesWhereUpstreamSaysUndefined(
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoObjectTypeAsDefaultProp,
 				noObjectTypeAsDefaultPropFile, testCase.sourceText)
 

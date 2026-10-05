@@ -59,6 +59,7 @@ func TestNoDidUpdateSetStateFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
 				testCase.sourceText, NoDidUpdateSetStateOptions{Mode: testCase.option})
 			rule_testing.ExpectFindings(t, result, "noSetStateInComponentDidUpdate")
@@ -186,6 +187,7 @@ func TestNoDidUpdateSetStateStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
 				testCase.sourceText, NoDidUpdateSetStateOptions{Mode: testCase.option})
 			rule_testing.ExpectClean(t, result)
@@ -268,6 +270,7 @@ func TestNoDidUpdateSetStateFiresOnShapesUpstreamDoesNotWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
 				testCase.sourceText, NoDidUpdateSetStateOptions{Mode: testCase.option})
 			rule_testing.ExpectFindings(t, result, "noSetStateInComponentDidUpdate")
@@ -286,6 +289,7 @@ func TestNoDidUpdateSetStateOptionChangesTheAnswer(t *testing.T) {
 	nestedCallback := "\nclass Hello extends React.Component {\n  componentDidUpdate() {\n    someClass.on(function() {\n      this.setState({ data: 123 });\n    });\n  }\n}\n"
 
 	t.Run("silent by default", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
 			nestedCallback, NoDidUpdateSetStateOptions{Mode: ""})
 		rule_testing.ExpectClean(t, result)
@@ -295,6 +299,7 @@ func TestNoDidUpdateSetStateOptionChangesTheAnswer(t *testing.T) {
 	// `meta.schema` does not list, and upstream's own corpus passes it, so it is accepted here and
 	// means exactly the default.
 	t.Run("silent under the explicit allowed spelling", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
 			nestedCallback, NoDidUpdateSetStateOptions{Mode: "allowed"})
 		rule_testing.ExpectClean(t, result)
@@ -303,6 +308,7 @@ func TestNoDidUpdateSetStateOptionChangesTheAnswer(t *testing.T) {
 	// The same shape one level deeper, through an accessor rather than a method. This is the pair
 	// that pins the accessor's function scope being counted; see the clean case above.
 	t.Run("a callback inside a getter reports under disallow-in-func", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
 			"\nclass Hello extends React.Component {\n  get componentDidUpdate() {\n    someClass.on(function() {\n      this.setState({ data: 123 });\n    });\n    return 1;\n  }\n}\n",
 			NoDidUpdateSetStateOptions{Mode: "disallow-in-func"})
@@ -310,6 +316,7 @@ func TestNoDidUpdateSetStateOptionChangesTheAnswer(t *testing.T) {
 	})
 
 	t.Run("reports under disallow-in-func", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
 			nestedCallback, NoDidUpdateSetStateOptions{Mode: "disallow-in-func"})
 		rule_testing.ExpectFindings(t, result, "noSetStateInComponentDidUpdate")
@@ -320,6 +327,7 @@ func TestNoDidUpdateSetStateOptionChangesTheAnswer(t *testing.T) {
 	// has to decide; we do, and falling back to the permissive reading is the choice that cannot
 	// start reporting on a typo.
 	t.Run("an unrecognized mode reads as the default", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
 			nestedCallback, NoDidUpdateSetStateOptions{Mode: "disallowInFunc"})
 		rule_testing.ExpectClean(t, result)
@@ -330,6 +338,7 @@ func TestNoDidUpdateSetStateOptionChangesTheAnswer(t *testing.T) {
 	// alongside the zero value when nothing is configured, and a rule reading the error instead of
 	// the value would invert this.
 	t.Run("no options at all reads as the default", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.Run(t, NoDidUpdateSetState, didUpdateSetStateFile, nestedCallback)
 		rule_testing.ExpectClean(t, result)
 	})
@@ -368,6 +377,7 @@ func TestNoDidUpdateSetStatePointsAtTheCallee(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
 				testCase.sourceText, NoDidUpdateSetStateOptions{Mode: ""})
 			rule_testing.ExpectFindings(t, result, "noSetStateInComponentDidUpdate")

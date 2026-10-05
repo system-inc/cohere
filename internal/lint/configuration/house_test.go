@@ -19,6 +19,8 @@ func withHouseSetsForTest(t *testing.T) {
 	})
 }
 
+// Not parallel: it swaps the package's setFiles for stand-in sets through withHouseSetsForTest
+// (withSetFiles), which every test that reads a set would see.
 func TestZeroConfigAppliesEachPerFileSetOnlyWhereItFits(t *testing.T) {
 	withHouseSetsForTest(t)
 	root := t.TempDir()
@@ -85,6 +87,8 @@ func TestZeroConfigAppliesEachPerFileSetOnlyWhereItFits(t *testing.T) {
 
 // The control for the per-file evidence: with no file importing react, no file gets it, whatever else is
 // true of the project, and the first line says so.
+// Not parallel: it swaps the package's setFiles for stand-in sets through withHouseSetsForTest
+// (withSetFiles), which every test that reads a set would see.
 func TestZeroConfigWithNoReactFileAppliesNoReactRule(t *testing.T) {
 	withHouseSetsForTest(t)
 	root := t.TempDir()
@@ -101,6 +105,8 @@ func TestZeroConfigWithNoReactFileAppliesNoReactRule(t *testing.T) {
 }
 
 // Tailwind is project-wide: with the stylesheet found, every file gets it.
+// Not parallel: it swaps the package's setFiles for stand-in sets through withHouseSetsForTest
+// (withSetFiles), which every test that reads a set would see.
 func TestZeroConfigAppliesTailwindEverywhereWhenTheStylesheetIsTailwinds(t *testing.T) {
 	withHouseSetsForTest(t)
 	root := t.TempDir()
@@ -118,6 +124,8 @@ func TestZeroConfigAppliesTailwindEverywhereWhenTheStylesheetIsTailwinds(t *test
 
 // An outsider's own file goes on top of the detected sets: its off needs no reason, its options replace
 // the set's, and a rule it writes that a set also writes is its choice rather than a collision.
+// Not parallel: it swaps the package's setFiles for stand-in sets through withHouseSetsForTest
+// (withSetFiles), which every test that reads a set would see.
 func TestZeroConfigPutsTheProjectsOwnFileOnTop(t *testing.T) {
 	withHouseSetsForTest(t)
 	directory := writeConfigs(t, map[string]string{
@@ -147,6 +155,8 @@ func TestZeroConfigPutsTheProjectsOwnFileOnTop(t *testing.T) {
 	}
 }
 
+// Not parallel: it swaps the package's setFiles for stand-in sets through withHouseSetsForTest
+// (withSetFiles), which every test that reads a set would see.
 func TestAChainThatNamesASetIsNotZeroConfig(t *testing.T) {
 	withHouseSetsForTest(t)
 	directory := writeConfigs(t, map[string]string{
@@ -163,6 +173,8 @@ func TestAChainThatNamesASetIsNotZeroConfig(t *testing.T) {
 
 // A set's override is a shape, not a path in this project, so a project with no generated file is not a
 // broken config; the project's own override is still held to reaching a file.
+// Not parallel: it swaps the package's setFiles for stand-in sets through withHouseSetsForTest
+// (withSetFiles), which every test that reads a set would see.
 func TestSelectorValidationSkipsTheSetsOwnOverrides(t *testing.T) {
 	withHouseSetsForTest(t)
 	directory := writeConfigs(t, map[string]string{

@@ -16,6 +16,8 @@ import (
 //
 //	COHERE_COST_LIST=/path/to/list go test ./internal/prettier/ -run TestCost -v
 func TestCost(t *testing.T) {
+	t.Parallel()
+
 	listPath := os.Getenv("COHERE_COST_LIST")
 	if listPath == "" {
 		t.Skip("set COHERE_COST_LIST")

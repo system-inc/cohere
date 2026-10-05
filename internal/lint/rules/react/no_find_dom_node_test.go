@@ -98,6 +98,7 @@ func TestNoFindDOMNodeFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText), "noFindDOMNode")
 		})
@@ -161,6 +162,7 @@ func TestNoFindDOMNodeStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText))
 		})
@@ -220,6 +222,7 @@ func TestNoFindDOMNodeFiresOnCasesUpstreamDoesNotShip(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText), "noFindDOMNode")
 		})
@@ -266,6 +269,7 @@ func TestNoFindDOMNodeStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText))
 		})
@@ -300,6 +304,7 @@ func TestNoFindDOMNodeReportsTheNameNode(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "noFindDOMNode")
 			if len(result.Diagnostics) != 1 {

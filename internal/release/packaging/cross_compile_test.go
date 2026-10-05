@@ -56,10 +56,11 @@ func TestEveryReleaseTargetCompiles(t *testing.T) {
 	moduleDirectory := filepath.Join("..", "..", "..")
 
 	for _, target := range Targets {
+		// Not parallel: in type-check mode, the default, these run one after another, because a type-check
+		// holds about 900 MB and six at once is not worth five seconds. In build mode each one calls
+		// t.Parallel below, after the type-check branch has returned.
 		t.Run(target.String(), func(t *testing.T) {
 			if mode != "build" {
-				// One after another: a type-check holds about 900 MB, and six at once is not worth five
-				// seconds.
 				if problems := typeCheckTarget(moduleDirectory, target); len(problems) > 0 {
 					t.Fatalf("cohere does not type-check for %s, so a release would fail there:\n%s", target, strings.Join(problems, "\n"))
 				}

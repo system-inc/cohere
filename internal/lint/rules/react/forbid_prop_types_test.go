@@ -594,6 +594,7 @@ func TestForbidPropTypesFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runForbidPropTypes(t, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
 		})
@@ -1077,6 +1078,7 @@ func TestForbidPropTypesStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runForbidPropTypes(t, testCase.sourceText, testCase.options)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -1100,6 +1102,7 @@ func TestForbidPropTypesRequiresTheTypedHarnessForIndirection(t *testing.T) {
 		"C.propTypes = { a: PropTypes.any };\n"
 
 	t.Run("the indirect form needs the checker", func(t *testing.T) {
+		t.Parallel()
 		typed := rule_testing.RunTyped(t, ForbidPropTypes, forbidPropTypesFile, indirect)
 		rule_testing.ExpectFindings(t, typed, "forbiddenPropType")
 
@@ -1108,6 +1111,7 @@ func TestForbidPropTypesRequiresTheTypedHarnessForIndirection(t *testing.T) {
 	})
 
 	t.Run("the direct form does not", func(t *testing.T) {
+		t.Parallel()
 		untyped := rule_testing.Run(t, ForbidPropTypes, forbidPropTypesFile, direct)
 		rule_testing.ExpectFindings(t, untyped, "forbiddenPropType")
 	})
@@ -1183,6 +1187,7 @@ func TestForbidPropTypesDeclarationShapes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runForbidPropTypes(t, testCase.sourceText, nil)
 			rule_testing.ExpectFindings(t, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
 		})
@@ -1226,6 +1231,7 @@ func TestForbidPropTypesValueShapes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := "class C extends React.Component { render() { return null; } }\n" +
 				"C.propTypes = { a: " + testCase.value + " };\n"
 			result := runForbidPropTypes(t, source, nil)
@@ -1265,6 +1271,7 @@ func TestForbidPropTypesForbidList(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := "class C extends React.Component { render() { return null; } }\n" +
 				"C.propTypes = { a: " + testCase.value + " };\n"
 			result := runForbidPropTypes(t, source, testCase.options)
@@ -1296,6 +1303,7 @@ func TestForbidPropTypesContextOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := "class C extends React.Component { static " + testCase.declaration +
 				" = { a: PropTypes.any }; render() { return null; } }\n"
 			result := runForbidPropTypes(t, source, testCase.options)
@@ -1348,6 +1356,7 @@ func TestForbidPropTypesShapeReceiver(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runForbidPropTypes(t, testCase.sourceText, nil)
 			rule_testing.ExpectFindings(t, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
 		})
@@ -1406,6 +1415,7 @@ func TestForbidPropTypesForeignPackageGuard(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runForbidPropTypes(t, testCase.sourceText, nil)
 			rule_testing.ExpectFindings(t, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
 		})
@@ -1496,6 +1506,7 @@ func TestForbidPropTypesSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runForbidPropTypes(t, testCase.sourceText, nil)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
@@ -1529,6 +1540,7 @@ func TestForbidPropTypesMessageText(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := "X.propTypes = { a: " + testCase.value + " };\n"
 			result := runForbidPropTypes(t, source, nil)
 			rule_testing.ExpectFindings(t, result, "forbiddenPropType")
@@ -1549,6 +1561,7 @@ func TestDecodeForbidPropTypesOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("no options means the default list", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeForbidPropTypesOptions(nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -1563,6 +1576,7 @@ func TestDecodeForbidPropTypesOptions(t *testing.T) {
 	})
 
 	t.Run("an empty object means the default list", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeForbidPropTypesOptions([]byte(`{}`))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -1573,6 +1587,7 @@ func TestDecodeForbidPropTypesOptions(t *testing.T) {
 	})
 
 	t.Run("an explicitly empty list forbids nothing", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeForbidPropTypesOptions([]byte(`{"forbid":[]}`))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -1587,6 +1602,7 @@ func TestDecodeForbidPropTypesOptions(t *testing.T) {
 	})
 
 	t.Run("a custom list replaces the defaults", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeForbidPropTypesOptions([]byte(`{"forbid":["string"]}`))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -1598,6 +1614,7 @@ func TestDecodeForbidPropTypesOptions(t *testing.T) {
 	})
 
 	t.Run("the two context flags decode", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeForbidPropTypesOptions([]byte(`{"checkContextTypes":true,"checkChildContextTypes":true}`))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -1623,6 +1640,7 @@ func TestForbidPropTypesAssignmentOperators(t *testing.T) {
 
 	for _, operator := range []string{"=", "||=", "??=", "+="} {
 		t.Run(operator, func(t *testing.T) {
+			t.Parallel()
 			source := "class C extends React.Component { render() { return null; } }\n" +
 				"C.propTypes " + operator + " { a: PropTypes.any };\n"
 			result := runForbidPropTypes(t, source, nil)
@@ -1631,6 +1649,7 @@ func TestForbidPropTypesAssignmentOperators(t *testing.T) {
 	}
 
 	t.Run("a comparison is not an assignment", func(t *testing.T) {
+		t.Parallel()
 		// The control that keeps the operator test from being vacuous: without it, any binary
 		// expression whose left side is a `.propTypes` access would be read as a declaration.
 		source := "class C extends React.Component { render() { return null; } }\n" +
@@ -1689,6 +1708,7 @@ func TestForbidPropTypesGetterTakesTheLastReturn(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := "declare const x: boolean;\n" +
 				"class C extends React.Component {\n" +
 				"  static get propTypes() {\n    " + testCase.body + "\n  }\n" +
@@ -1764,6 +1784,7 @@ func TestForbidPropTypesRecordedPackageNameReachesTheIdentifierArm(t *testing.T)
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := testCase.imports +
 				"class C extends React.Component { static propTypes = { a: " + testCase.value +
 				" }; render() { return null; } }\n"
@@ -1820,6 +1841,7 @@ func TestForbidPropTypesObjectLiteralArmDoesNotFollowIdentifiers(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runForbidPropTypes(t, testCase.sourceText, nil)
 			rule_testing.ExpectFindings(t, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
 		})

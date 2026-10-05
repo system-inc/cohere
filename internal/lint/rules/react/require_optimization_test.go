@@ -55,6 +55,7 @@ func TestRequireOptimizationFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runRequireOptimization(t, testCase.sourceText, testCase.rawOptions)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -94,6 +95,7 @@ func TestRequireOptimizationStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runRequireOptimization(t, testCase.sourceText, testCase.rawOptions))
 		})
 	}
@@ -151,6 +153,7 @@ func TestRequireOptimizationObjectArmReproducesUpstreamsAccident(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runRequireOptimization(t, testCase.sourceText, ""), testCase.wantIds...)
 		})
 	}
@@ -233,6 +236,7 @@ func TestRequireOptimizationMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) 
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runRequireOptimization(t, testCase.sourceText, ""), testCase.wantIds...)
 		})
 	}
@@ -266,6 +270,7 @@ func TestRequireOptimizationDecoratorArms(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runRequireOptimization(t, testCase.sourceText, testCase.rawOptions), testCase.wantIds...)
 		})
 	}
@@ -358,6 +363,7 @@ func TestRequireOptimizationSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runRequireOptimization(t, testCase.sourceText, "")
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
@@ -418,6 +424,7 @@ func TestRequireOptimizationDecodesItsOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeRequireOptimizationOptions([]byte(testCase.raw))
 			if err != nil {
 				t.Fatalf("decoding %q: %v", testCase.raw, err)
@@ -512,6 +519,7 @@ func TestRequireOptimizationHasNoFileGate(t *testing.T) {
 		"/repository/source/RequireOptimization.ts",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, RequireOptimization, fileName, source,
 				RequireOptimizationOptions{})
 			rule_testing.ExpectFindings(t, result, "noShouldComponentUpdate")
@@ -548,6 +556,7 @@ func TestRequireOptimizationSurvivesShapesThatWouldPanic(t *testing.T) {
 
 	for index, sourceText := range sources {
 		t.Run(string(rune('a'+index)), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runRequireOptimization(t, sourceText, ""))
 		})
 	}
@@ -574,6 +583,7 @@ func TestRequireOptimizationObjectArmReportsWithoutAFunction(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runRequireOptimization(t, testCase.sourceText, ""),
 				"noShouldComponentUpdate")
 		})
@@ -607,6 +617,7 @@ func TestRequireOptimizationCreateReactClassSpellings(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runRequireOptimization(t, testCase.sourceText, ""), testCase.wantIds...)
 		})
 	}

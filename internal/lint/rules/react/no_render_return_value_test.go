@@ -74,6 +74,7 @@ func TestNoRenderReturnValueFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "noRenderReturnValue")
 		})
@@ -139,6 +140,7 @@ func TestNoRenderReturnValueStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -192,6 +194,7 @@ func TestNoRenderReturnValueReachesAnywhereInsideAnArrowExpressionBody(t *testin
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "noRenderReturnValue")
 		})
@@ -222,6 +225,7 @@ func TestNoRenderReturnValueSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "noRenderReturnValue")
 			if len(result.Diagnostics) != 1 {

@@ -54,6 +54,7 @@ func TestNoNamespaceFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -94,6 +95,7 @@ func TestNoNamespaceStaysSilent(t *testing.T) {
 	}
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -136,6 +138,7 @@ func TestNoNamespaceCreateElementBoundary(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -162,6 +165,7 @@ func TestNoNamespaceReadsBothElementForms(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -186,6 +190,7 @@ func TestNoNamespaceDoesNotPanicOnDottedTagNames(t *testing.T) {
 		"<a.b></a.b>;",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -209,6 +214,7 @@ func TestNoNamespaceSpanAndMessage(t *testing.T) {
 	t.Parallel()
 
 	t.Run("a self closing element reports on the element", func(t *testing.T) {
+		t.Parallel()
 		const sourceText = "const a = <ns:x />;"
 		result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, sourceText)
 		rule_testing.ExpectFindings(t, result, "noNamespace")
@@ -219,6 +225,7 @@ func TestNoNamespaceSpanAndMessage(t *testing.T) {
 	})
 
 	t.Run("an element with a closing tag reports on the opening element alone", func(t *testing.T) {
+		t.Parallel()
 		const sourceText = "const a = <ns:x></ns:x>;"
 		result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, sourceText)
 		rule_testing.ExpectFindings(t, result, "noNamespace")
@@ -229,6 +236,7 @@ func TestNoNamespaceSpanAndMessage(t *testing.T) {
 	})
 
 	t.Run("a call reports on the whole call expression", func(t *testing.T) {
+		t.Parallel()
 		const sourceText = "const a = React.createElement(\"ns:x\");"
 		result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, sourceText)
 		rule_testing.ExpectFindings(t, result, "noNamespace")
@@ -239,6 +247,7 @@ func TestNoNamespaceSpanAndMessage(t *testing.T) {
 	})
 
 	t.Run("the message identifies the rule and explains the defect", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, "<ns:x />;")
 		rule_testing.ExpectFindings(t, result, "noNamespace")
 		if result.Diagnostics[0].Message.Id != "noNamespace" {
@@ -279,6 +288,7 @@ func TestNoNamespaceHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/Namespace.tsx",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoNamespace, fileName, sourceText)
 			rule_testing.ExpectFindings(t, result, "noNamespace")
 		})
@@ -299,6 +309,7 @@ func TestNoNamespaceHasNoFileSuffixGateUntyped(t *testing.T) {
 		"/repository/source/Namespace.jsx",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoNamespace, fileName, sourceText)
 			rule_testing.ExpectFindings(t, result, "noNamespace")
 		})
@@ -371,6 +382,7 @@ func TestNoNamespaceDoesNotPanicOnNonLiteralArguments(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// Surviving the walk IS the assertion. The verdicts for shapes that have one are
 			// pinned in the boundary tables above.
 			rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, testCase.sourceText)

@@ -30,6 +30,7 @@ var scratchPackageSuffixes = []string{"iso", "probe"}
 // `iso` or `probe`, and if one ever legitimately does, adding it to an exemption here is a decision
 // somebody makes on purpose rather than a guard quietly widening.
 func TestNoScratchPackagesRemain(t *testing.T) {
+	t.Parallel()
 	entries, err := filepath.Glob("../rules/*")
 	if err != nil {
 		t.Fatalf("globbing rule packages: %v", err)

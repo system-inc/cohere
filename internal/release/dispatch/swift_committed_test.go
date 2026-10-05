@@ -15,6 +15,8 @@ import (
 
 const testToolchain = "swiftlang-6.4.0.34.1"
 
+// Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in, and two
+// fixtures at once would build with each other's.
 func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(t *testing.T) {
 	fixture := newSwiftFixture(t)
 
@@ -71,6 +73,8 @@ func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(t *testing
 	}
 }
 
+// Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in, and two
+// fixtures at once would build with each other's.
 func TestAnOlderCommitGetsItsOwnEngineWhileTheCheckoutIsCleanAtANewerOne(t *testing.T) {
 	// The case no provenance check can catch. A member commits, the checkout is clean at the new
 	// commit, and a gate still running the cohere built from the previous one asks for its engine. A
@@ -90,6 +94,8 @@ func TestAnOlderCommitGetsItsOwnEngineWhileTheCheckoutIsCleanAtANewerOne(t *test
 	}
 }
 
+// Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in, and two
+// fixtures at once would build with each other's.
 func TestADirtySwiftWorktreeIsRefusedNotForced(t *testing.T) {
 	fixture := newSwiftFixture(t)
 	if _, _, err := resolveCommittedSwiftEngine(fixture.paths, fixture.head(t), testToolchain, 2); err != nil {
@@ -110,6 +116,8 @@ func TestADirtySwiftWorktreeIsRefusedNotForced(t *testing.T) {
 	}
 }
 
+// Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in, and two
+// fixtures at once would build with each other's.
 func TestACommittedSwiftEngineReportingAModifiedTreeIsNotCached(t *testing.T) {
 	fixture := newSwiftFixture(t)
 	fixture.reportModified = true

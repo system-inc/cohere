@@ -38,6 +38,8 @@ import (
 //
 // It reads the overlay GOFLAGS names, if any (guardOverlay), never the one `go test -overlay` names.
 func TestRulesClaimShapesOnlyWhereTheScanAllowsIt(t *testing.T) {
+	t.Parallel()
+
 	scan := scanTypeReach(t, guardOverlay(t))
 	if len(scan.claims) == 0 && len(scan.mayReadImportedBodies) == 0 {
 		t.Fatal("the scan found no rules at all, so this test proved nothing")
@@ -100,6 +102,8 @@ var shapeReaders = map[string]bool{"rule.ExportNameIn": true, "rule.ImportBindin
 // take a node from another file and descend into its body, which is the read the scan exists to see, so
 // the trust in shapeReaders rests on this.
 func TestShapeReadersHandBackNoSyntax(t *testing.T) {
+	t.Parallel()
+
 	root, err := filepath.Abs("../../..")
 	if err != nil {
 		t.Fatal(err)

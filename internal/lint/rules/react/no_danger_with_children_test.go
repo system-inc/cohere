@@ -58,6 +58,7 @@ func TestNoDangerWithChildrenFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
 		})
@@ -101,6 +102,7 @@ func TestNoDangerWithChildrenStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -144,6 +146,7 @@ func TestNoDangerWithChildrenPointsAtTheWholeElement(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
 			finding := result.Diagnostics[0]
@@ -193,24 +196,28 @@ func TestNoDangerWithChildrenMatchesUpstreamsNarrowerCalleeTest(t *testing.T) {
 	danger := "{ dangerouslySetInnerHTML: { __html: \"HTML\" } }"
 
 	t.Run("a bare createElement call is silent, where the shelf helper would accept it", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
 			"createElement(\"div\", "+danger+", \"Children\");")
 		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("a computed member is silent, where the shelf helper would accept it", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
 			"React[\"createElement\"](\"div\", "+danger+", \"Children\");")
 		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("document.createElement reports, where the shelf helper would reject it", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
 			"document.createElement(\"div\", "+danger+", \"Children\");")
 		rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
 	})
 
 	t.Run("any other object is accepted, since the receiver is never checked", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
 			"Preact.createElement(\"div\", "+danger+", \"Children\");")
 		rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
@@ -268,6 +275,7 @@ func TestNoDangerWithChildrenReadsKeysThatNeedNoEvaluation(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
 			if testCase.wantFinding {
 				rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
@@ -329,6 +337,7 @@ func TestNoDangerWithChildrenDeclinesCallsTooShortToCarryProps(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})

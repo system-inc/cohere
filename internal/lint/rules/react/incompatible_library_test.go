@@ -63,6 +63,10 @@ func upstreamIncompatibleLibraryProvider() map[string]map[string]incompatibleLib
 // These are the complete set of `IncompatibleLibrary` error fixtures the conformance corpus ships.
 // The dispatch for this port said four; three is what is present, and the fourth
 // (`error.invalid-known-incompatible-aliasing-function`) exists only under oxc's compiler fixtures.
+// Not parallel: it swaps the package variable incompatibleLibraryTable through
+// withSeededIncompatibleLibraryTable, which the incompatible-library rule reads on every run, so a
+// parallel test running that rule would race the swap and read the seeded table instead of the shipped
+// one.
 func TestIncompatibleLibraryFiresOnUpstreamFixtures(t *testing.T) {
 	withSeededIncompatibleLibraryTable(t, upstreamIncompatibleLibraryProvider())
 
@@ -84,6 +88,7 @@ func TestIncompatibleLibraryFiresOnUpstreamFixtures(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, IncompatibleLibrary, incompatibleLibraryFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, "incompatibleLibrary")
 		})
@@ -101,6 +106,7 @@ func TestIncompatibleLibraryFiresOnUpstreamFixtures(t *testing.T) {
 // Each of these three was measured against React 7.1.1 through the ESLint Linter interface before
 // being written here, rather than derived from reading the table.
 func TestIncompatibleLibraryFiresOnTheRealDefaultTable(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		source string
@@ -112,6 +118,7 @@ func TestIncompatibleLibraryFiresOnTheRealDefaultTable(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, IncompatibleLibrary, incompatibleLibraryFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, "incompatibleLibrary")
 		})
@@ -129,6 +136,7 @@ func TestIncompatibleLibraryFiresOnTheRealDefaultTable(t *testing.T) {
 // The leading newline is upstream's own, and `rule_testing.Run` does not trim, so this is byte-identical
 // to the Rust literal.
 func TestIncompatibleLibraryFiresOnTheOxcCorpus(t *testing.T) {
+	t.Parallel()
 	source := "\nimport {useReactTable} from '@tanstack/react-table';\nfunction Component({columns, data}) {\n  const table = useReactTable({columns, data});\n  return <div>{table.getRowModel().rows.length}</div>;\n}\n"
 	result := rule_testing.Run(t, IncompatibleLibrary, incompatibleLibraryFile, source)
 	rule_testing.ExpectFindings(t, result, "incompatibleLibrary")
@@ -142,6 +150,7 @@ func TestIncompatibleLibraryFiresOnTheOxcCorpus(t *testing.T) {
 // local name would go silent here, and keying the call site by the imported name would go silent
 // too. Only splitting the two answers both, and nothing in the imported corpus can see it.
 func TestIncompatibleLibraryReadsThroughAnAlias(t *testing.T) {
+	t.Parallel()
 	source := "import {useReactTable as renamed} from '@tanstack/react-table';\n\nfunction Component() {\n  const table = renamed();\n  return <div>{table}</div>;\n}\n"
 	result := rule_testing.Run(t, IncompatibleLibrary, incompatibleLibraryFile, source)
 	rule_testing.ExpectFindings(t, result, "incompatibleLibrary")
@@ -158,6 +167,7 @@ func TestIncompatibleLibraryReadsThroughAnAlias(t *testing.T) {
 // same split as the alias case above but at a different node. Written because the single upstream
 // nested fixture does not rename, so nothing imported exercises this.
 func TestIncompatibleLibraryFiresOnARenamedDestructure(t *testing.T) {
+	t.Parallel()
 	source := "import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const {watch: w} = useForm();\n  return <div>{w()}</div>;\n}\n"
 	result := rule_testing.Run(t, IncompatibleLibrary, incompatibleLibraryFile, source)
 	rule_testing.ExpectFindings(t, result, "incompatibleLibrary")
@@ -178,6 +188,7 @@ func TestIncompatibleLibraryFiresOnARenamedDestructure(t *testing.T) {
 // The chained form is the same judgment with no intervening binding, and upstream's span there is
 // the whole inner call `useForm()`.
 func TestIncompatibleLibraryFiresOnAMemberAccess(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		source string
@@ -188,6 +199,7 @@ func TestIncompatibleLibraryFiresOnAMemberAccess(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, IncompatibleLibrary, incompatibleLibraryFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, "incompatibleLibrary")
 			found := result.Diagnostics[0]
@@ -204,6 +216,7 @@ func TestIncompatibleLibraryFiresOnAMemberAccess(t *testing.T) {
 // rather than the name. This port matches syntactically and is silent, which is the narrowness
 // stated at the rule. Asserted with the reason at the line rather than omitted.
 func TestIncompatibleLibraryDeclinesAReassignedResult(t *testing.T) {
+	t.Parallel()
 	source := "import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const a = useForm();\n  const b = a;\n  return <div>{b.watch()}</div>;\n}\n"
 	result := rule_testing.Run(t, IncompatibleLibrary, incompatibleLibraryFile, source)
 	rule_testing.ExpectClean(t, result)
@@ -216,6 +229,7 @@ func TestIncompatibleLibraryDeclinesAReassignedResult(t *testing.T) {
 // narrowed to components alone and every imported fixture would stay green, since all three of them
 // use a function named `Component`.
 func TestIncompatibleLibraryFiresInsideACustomHook(t *testing.T) {
+	t.Parallel()
 	source := "import {useReactTable} from '@tanstack/react-table';\n\nfunction useThing() {\n  return useReactTable();\n}\n"
 	result := rule_testing.Run(t, IncompatibleLibrary, incompatibleLibraryFile, source)
 	rule_testing.ExpectFindings(t, result, "incompatibleLibrary")
@@ -230,6 +244,7 @@ func TestIncompatibleLibraryFiresInsideACustomHook(t *testing.T) {
 // The second case is the load-bearing one. A rule that deduplicated by message text rather than by
 // enclosing function would pass the repeated-call case and report twice here.
 func TestIncompatibleLibraryReportsOncePerFunction(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		source string
@@ -240,6 +255,7 @@ func TestIncompatibleLibraryReportsOncePerFunction(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, IncompatibleLibrary, incompatibleLibraryFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, "incompatibleLibrary")
 			found := result.Diagnostics[0]
@@ -256,6 +272,7 @@ func TestIncompatibleLibraryReportsOncePerFunction(t *testing.T) {
 // file. Written because the one-per-function bookkeeping could be implemented as a single file-wide
 // flag, which would pass every case above while silencing the second component here.
 func TestIncompatibleLibraryReportsPerComponent(t *testing.T) {
+	t.Parallel()
 	source := "import {useReactTable} from '@tanstack/react-table';\n\nfunction First() {\n  const a = useReactTable();\n  return <div>{a}</div>;\n}\n\nfunction Second() {\n  const b = useReactTable();\n  return <div>{b}</div>;\n}\n"
 	result := rule_testing.Run(t, IncompatibleLibrary, incompatibleLibraryFile, source)
 	rule_testing.ExpectFindings(t, result, "incompatibleLibrary", "incompatibleLibrary")
@@ -263,6 +280,7 @@ func TestIncompatibleLibraryReportsPerComponent(t *testing.T) {
 
 // TestIncompatibleLibraryStaysSilent covers everything the rule must decline.
 func TestIncompatibleLibraryStaysSilent(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		source string
@@ -320,6 +338,7 @@ func TestIncompatibleLibraryStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, IncompatibleLibrary, incompatibleLibraryFile, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -351,6 +370,7 @@ func TestIncompatibleLibraryStaysSilent(t *testing.T) {
 // sharpest: the parenthesized form carries a specifier that WOULD match the table. Each is asserted
 // clean here, and each would panic rather than fail if the guard were removed.
 func TestIncompatibleLibrarySurvivesAMalformedModuleSpecifier(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		source string
@@ -362,6 +382,7 @@ func TestIncompatibleLibrarySurvivesAMalformedModuleSpecifier(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, IncompatibleLibrary, incompatibleLibraryFile, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -374,6 +395,7 @@ func TestIncompatibleLibrarySurvivesAMalformedModuleSpecifier(t *testing.T) {
 // REPORTS. Written because a guard narrowed to `ast.IsStringLiteral` would pass every case above
 // while going silent here, and nothing in the imported corpus writes a template.
 func TestIncompatibleLibraryAcceptsATemplateSpecifier(t *testing.T) {
+	t.Parallel()
 	source := "import {useReactTable} from `@tanstack/react-table`;\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n"
 	result := rule_testing.Run(t, IncompatibleLibrary, incompatibleLibraryFile, source)
 	rule_testing.ExpectFindings(t, result, "incompatibleLibrary")
@@ -387,6 +409,7 @@ func TestIncompatibleLibraryAcceptsATemplateSpecifier(t *testing.T) {
 // to build. Asserted as clean with the reason at the line rather than deleted: a case removed from a
 // corpus is a divergence no later reader can find.
 func TestIncompatibleLibraryDeclinesTheNamespaceForm(t *testing.T) {
+	t.Parallel()
 	source := "import * as table from '@tanstack/react-table';\n\nfunction Component() {\n  const t = table.useReactTable();\n  return <div>{t}</div>;\n}\n"
 	result := rule_testing.Run(t, IncompatibleLibrary, incompatibleLibraryFile, source)
 	rule_testing.ExpectClean(t, result)
@@ -402,6 +425,7 @@ func TestIncompatibleLibraryDeclinesTheNamespaceForm(t *testing.T) {
 // The expectation is a literal typed here rather than anything the rule computes, so it cannot move
 // with the rule.
 func TestIncompatibleLibraryReportsOnTheCallee(t *testing.T) {
+	t.Parallel()
 	source := "import {useReactTable} from '@tanstack/react-table';\n\nfunction Component() {\n  const table = useReactTable({columns: 1});\n  return <div>{table}</div>;\n}\n"
 	result := rule_testing.Run(t, IncompatibleLibrary, incompatibleLibraryFile, source)
 	if len(result.Diagnostics) != 1 {
@@ -424,6 +448,7 @@ func TestIncompatibleLibraryReportsOnTheCallee(t *testing.T) {
 // The two cases carry DIFFERENT entry text, which is what makes this able to see a rule that always
 // appends the same message.
 func TestIncompatibleLibraryMessageCarriesTheEntryText(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		source string
@@ -434,6 +459,7 @@ func TestIncompatibleLibraryMessageCarriesTheEntryText(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, IncompatibleLibrary, incompatibleLibraryFile, testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
@@ -461,6 +487,7 @@ func TestIncompatibleLibraryMessageCarriesTheEntryText(t *testing.T) {
 // The last two rows are the exactness of the module comparison, which is the axis this table differs
 // from `configuration.go`'s `isKnownReactModule` on.
 func TestDefaultIncompatibleLibraryTableMatchesUpstream(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		module   string
 		member   string

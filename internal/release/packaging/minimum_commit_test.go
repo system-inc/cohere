@@ -1,6 +1,7 @@
 package release
 
 import (
+	"fmt"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -11,12 +12,21 @@ import (
 func gitIn(t *testing.T, directory string, arguments ...string) string {
 	t.Helper()
 
+	output, err := gitRun(directory, arguments...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return output
+}
+
+// gitRun is gitIn for a fixture built outside any one test, which has no *testing.T to fail.
+func gitRun(directory string, arguments ...string) (string, error) {
 	command := exec.Command("git", append([]string{"-C", directory, "-c", "user.name=test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false"}, arguments...)...)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		t.Fatalf("git %s: %v\n%s", strings.Join(arguments, " "), err, output)
+		return "", fmt.Errorf("git %s: %w\n%s", strings.Join(arguments, " "), err, output)
 	}
-	return strings.TrimSpace(string(output))
+	return strings.TrimSpace(string(output)), nil
 }
 
 // repositoryWithSideCommit returns a repository checked out at its first commit, the hash of that

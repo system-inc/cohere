@@ -24,6 +24,7 @@ func withSetFiles(t *testing.T, files map[string]string) {
 }
 
 func TestEverySetCohereCarriesLoads(t *testing.T) {
+	t.Parallel()
 	names := SetNames()
 	if len(names) < 3 {
 		t.Fatalf("cohere carries %d sets (%v); the embedded tree did not load", len(names), names)
@@ -40,6 +41,8 @@ func TestEverySetCohereCarriesLoads(t *testing.T) {
 	}
 }
 
+// Not parallel: it swaps the package's setFiles for its own sets through withSetFiles, which every test
+// that reads a set would see.
 func TestASetIsReadFromTheBinaryAndNamedAsASet(t *testing.T) {
 	withSetFiles(t, map[string]string{
 		"typescript": `{"rules": {"no-var": "error"}}`,
@@ -63,6 +66,7 @@ func TestASetIsReadFromTheBinaryAndNamedAsASet(t *testing.T) {
 }
 
 func TestAListReadsASharedBaseOnceAsTheOutermostLayer(t *testing.T) {
+	t.Parallel()
 	directory := writeConfigs(t, map[string]string{
 		"base.json":           `{"rules": {"no-var": "error"}}`,
 		"react.json":          `{"extends": "./base.json", "rules": {"react/no-danger": "error"}}`,
@@ -90,6 +94,7 @@ func TestAListReadsASharedBaseOnceAsTheOutermostLayer(t *testing.T) {
 }
 
 func TestARuleTwoUnrelatedLayersConfigureIsRefused(t *testing.T) {
+	t.Parallel()
 	// Baseline first: the same composition, each rule in one set, loads. Without it the refusal
 	// below could be coming from anything about the shape.
 	disjoint := writeConfigs(t, map[string]string{
@@ -127,6 +132,7 @@ func TestARuleTwoUnrelatedLayersConfigureIsRefused(t *testing.T) {
 }
 
 func TestAnUnknownSetIsRefusedNamingTheSetsThereAre(t *testing.T) {
+	t.Parallel()
 	directory := writeConfigs(t, map[string]string{"CohereSettings.json": `{"extends": "cohere:typescirpt"}`})
 	refusedWith(t, filepath.Join(directory, "CohereSettings.json"), "the sets are cohere:")
 	_, err := Load(filepath.Join(directory, "CohereSettings.json"))
@@ -135,6 +141,8 @@ func TestAnUnknownSetIsRefusedNamingTheSetsThereAre(t *testing.T) {
 	}
 }
 
+// Not parallel: it swaps the package's setFiles for its own sets through withSetFiles, which every test
+// that reads a set would see.
 func TestASetMayExtendOnlySets(t *testing.T) {
 	withSetFiles(t, map[string]string{
 		"typescript": `{"rules": {"no-var": "error"}}`,
@@ -145,6 +153,7 @@ func TestASetMayExtendOnlySets(t *testing.T) {
 }
 
 func TestExtendsTakesOneSourceOrAListOfThem(t *testing.T) {
+	t.Parallel()
 	for _, extends := range []string{`""`, `[]`} {
 		directory := writeConfigs(t, map[string]string{"CohereSettings.json": `{"extends": ` + extends + `, "rules": {"no-var": "error"}}`})
 		loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))

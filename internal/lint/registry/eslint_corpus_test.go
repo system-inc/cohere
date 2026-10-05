@@ -268,6 +268,8 @@ func TestCohereAgreesWithESLintsCoreCorpus(t *testing.T) {
 
 	var mutex sync.Mutex
 	found := map[string]map[string]string{}
+	// Not parallel: this group holds its parallel per-rule subtests until they finish, so the test can
+	// read found after it returns.
 	t.Run("rules", func(t *testing.T) {
 		for _, name := range coreRules {
 			rows, hasRows := corpus[name]

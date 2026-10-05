@@ -18,6 +18,7 @@ import (
 // upstream added or reworded a diagnostic, and the correct response is to go read the emission site
 // and add it, not to let the fixture fall out of whichever rule's denominator it belonged to.
 func TestEveryDiagnosticIsAttributed(t *testing.T) {
+	t.Parallel()
 	fixtures := load(t)
 
 	unattributed := map[string]int{}
@@ -63,6 +64,7 @@ func TestEveryDiagnosticIsAttributed(t *testing.T) {
 // sufficient one, and the only thing that makes those twenty safe is that each was read at its
 // emission site.
 func TestAttributionReproducesTheGoldensOwnHeadings(t *testing.T) {
+	t.Parallel()
 	fixtures := load(t)
 
 	checked, mismatches := 0, 0
@@ -101,6 +103,7 @@ func TestAttributionReproducesTheGoldensOwnHeadings(t *testing.T) {
 // a fixture silently belonging to no rule — which reads as "no rule covers this" rather than as a
 // defect.
 func TestEveryCategoryMapsToARule(t *testing.T) {
+	t.Parallel()
 	for _, category := range categoryByMessage {
 		if _, found := RuleForCategory(category); !found {
 			t.Errorf("category %q has no rule name; ruleByCategory is missing an entry from getRuleForCategory", category)
@@ -148,6 +151,7 @@ func TestEveryCategoryMapsToARule(t *testing.T) {
 // The brief was right about config (4), set-state-in-render (13), unsupported-syntax (1), and
 // use-memo (7).
 func TestAttributionIsAMeasurementNotAGuess(t *testing.T) {
+	t.Parallel()
 	fixtures := load(t)
 
 	fixturesPerRule := map[string]int{}
@@ -231,6 +235,7 @@ func TestAttributionIsAMeasurementNotAGuess(t *testing.T) {
 // upstream later adds an error-named fixture for one of them, this fails and someone goes and
 // scores it, instead of the rule staying permanently in a decline bucket nobody revisits.
 func TestRulesShippedInVerifyWithNoErrorNamedFixture(t *testing.T) {
+	t.Parallel()
 	fixtures := load(t)
 
 	covered := map[string]bool{}

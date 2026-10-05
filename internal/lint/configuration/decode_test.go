@@ -22,6 +22,7 @@ type tuningOptions struct {
 // misconfigured guard and completely indistinguishable from a rule with nothing to report. A
 // liveness harness reporting `fixtures=54 live=53 dead=1` was the only thing that ever noticed.
 func TestRequiredOptionsFailLoudlyWhenAbsent(t *testing.T) {
+	t.Parallel()
 	registry := OptionsRegistry{
 		"guard": {Decode: DecodeInto[guardOptions](), Required: true},
 	}
@@ -46,6 +47,7 @@ func TestRequiredOptionsFailLoudlyWhenAbsent(t *testing.T) {
 // TestTuningOptionsFallBackToDefaults covers the other half. A rule whose options only adjust it
 // must run on its own defaults rather than fail, or every unconfigured tunable becomes a hard error.
 func TestTuningOptionsFallBackToDefaults(t *testing.T) {
+	t.Parallel()
 	registry := OptionsRegistry{
 		"tunable": {Decode: DecodeInto[tuningOptions]()},
 	}
@@ -61,6 +63,7 @@ func TestTuningOptionsFallBackToDefaults(t *testing.T) {
 
 // TestARuleWithNoDecoderGetsNil keeps the common case cheap: most rules take no options at all.
 func TestARuleWithNoDecoderGetsNil(t *testing.T) {
+	t.Parallel()
 	decoded, err := OptionsRegistry{}.Decode("plain", nil)
 	if err != nil {
 		t.Fatalf("a rule with no decoder errored on a bare severity: %v", err)
@@ -74,6 +77,7 @@ func TestARuleWithNoDecoderGetsNil(t *testing.T) {
 // `{"ignored":true}`, and the key name was the defect stated as a fixture: an option written for a
 // rule that reads none was accepted and had no effect.
 func TestARuleWithNoDecoderRefusesAnOption(t *testing.T) {
+	t.Parallel()
 	_, err := OptionsRegistry{}.Decode("plain", []json.RawMessage{json.RawMessage(`{"ignored":true}`)})
 	if err == nil {
 		t.Fatal("an option given to a rule that takes none was accepted and would never be read")
@@ -94,6 +98,7 @@ func TestARuleWithNoDecoderRefusesAnOption(t *testing.T) {
  * the list it was sliced from, which is the boundary PortingARule.md section 7c is about.
  */
 func TestASecondElementOnASingleElementRuleIsRefused(t *testing.T) {
+	t.Parallel()
 	registry := OptionsRegistry{"tunable": {Decode: DecodeInto[tuningOptions]()}}
 
 	_, err := registry.Decode("tunable", []json.RawMessage{
@@ -124,6 +129,7 @@ func TestASecondElementOnASingleElementRuleIsRefused(t *testing.T) {
 // array, in the order written. And nothing at all for a bare severity, so the rule's own defaults
 // apply.
 func TestAListRuleReceivesEveryElement(t *testing.T) {
+	t.Parallel()
 	var received []string
 	registry := OptionsRegistry{"listed": {DecodeList: func(raw json.RawMessage) (any, error) {
 		received = append(received, string(raw))
@@ -155,6 +161,7 @@ func TestAListRuleReceivesEveryElement(t *testing.T) {
 // TestMalformedOptionsAreAnError guards against a rule silently receiving a zero struct because its
 // JSON did not parse.
 func TestMalformedOptionsAreAnError(t *testing.T) {
+	t.Parallel()
 	registry := OptionsRegistry{"guard": {Decode: DecodeInto[guardOptions](), Required: true}}
 
 	if _, err := registry.Decode("guard", []json.RawMessage{json.RawMessage(`{"libraryDirectory": 42}`)}); err == nil {
@@ -168,6 +175,7 @@ func TestMalformedOptionsAreAnError(t *testing.T) {
 // facts. Reporting them as one describes a brand-new rule as though it had been deliberately
 // excluded, which is a lie about who decided what.
 func TestUnconfiguredIsNotScopedOff(t *testing.T) {
+	t.Parallel()
 	configuration := &Config{
 		Rules: map[string]RuleSetting{
 			"configured-on":  {Severity: SeverityError},
@@ -194,6 +202,7 @@ func TestUnconfiguredIsNotScopedOff(t *testing.T) {
 
 // TestTheLiveGuardRuleGetsItsOptions is the specific rule that was inert, against the real configuration.
 func TestTheLiveGuardRuleGetsItsOptions(t *testing.T) {
+	t.Parallel()
 	loaded, err := Load(liveConfigPath)
 	if err != nil {
 		t.Skipf("the live config is not present: %v", err)

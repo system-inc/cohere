@@ -37,6 +37,7 @@ func registeredRuleNames() []string {
 // boundary, so a name that lies about its plugin still reaches a user and still fails a config
 // lookup. The guard outlived the instrument that motivated it.
 func TestRegisteredNamesMatchTheirUpstreamSpelling(t *testing.T) {
+	t.Parallel()
 	registered := registeredRuleNames()
 	if len(registered) == 0 {
 		t.Fatal("registry.All() returned no rules, so this test checked nothing")

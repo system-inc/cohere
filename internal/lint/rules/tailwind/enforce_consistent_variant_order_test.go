@@ -44,6 +44,7 @@ func runVariantOrderFixture(t *testing.T, fileName string, source string) rule_t
 // Every source here was run through upstream on the ahra tree and reported, with the replacement
 // this rule prints matching upstream's character for character.
 func TestEnforceConsistentVariantOrderReports(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name   string
 		source string
@@ -96,6 +97,7 @@ func TestEnforceConsistentVariantOrderReports(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runVariantOrderFixture(t, "Component.tsx", testCase.source), "variantOrder")
 		})
 	}
@@ -107,6 +109,7 @@ func TestEnforceConsistentVariantOrderReports(t *testing.T) {
 // the registry's full `Compare` reported both. Upstream's `compareVariantOrder` answers 0 when both
 // variants sort below the global flag, so two element-scoped variants are accepted in either order.
 func TestEnforceConsistentVariantOrderStaysSilent(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name   string
 		source string
@@ -158,6 +161,7 @@ func TestEnforceConsistentVariantOrderStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runVariantOrderFixture(t, "Component.tsx", testCase.source))
 		})
 	}
@@ -168,6 +172,7 @@ func TestEnforceConsistentVariantOrderStaysSilent(t *testing.T) {
 // The replacement is the whole content of the finding: a reader told only that the order is wrong
 // has to work out the permutation themselves, and the permutation is what the rule computed.
 func TestEnforceConsistentVariantOrderNamesBothSpellings(t *testing.T) {
+	t.Parallel()
 	result := runVariantOrderFixture(t, "Component.tsx", `const element = <div className="dark:md:flex" />;`)
 	rule_testing.ExpectFindings(t, result, "variantOrder")
 

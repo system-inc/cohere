@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -20,32 +21,102 @@ type compilerFixture struct {
 	Later string
 }
 
-// moduleWithCompiler builds a module pinning a two-commit compiler at its first commit, and a committed
-// `.gitmodules` naming the fork. The checkout's own origin is whatever it was cloned from, a local path,
-// so nothing that reads the remote can produce the fork's name by accident.
+// compilerTemplate is the one module-with-compiler the package builds, the first time a test asks for one.
+// Building it takes eleven git commands, about 8s under load, and every test here wants the same module, so
+// it is built once and each test reads it or a copy of it. TestMain removes it.
+var compilerTemplate struct {
+	once    sync.Once
+	root    string
+	fixture compilerFixture
+	err     error
+}
+
+// TestMain removes the compiler template once every test is done with it.
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if compilerTemplate.root != "" {
+		os.RemoveAll(compilerTemplate.root)
+	}
+	os.Exit(code)
+}
+
+// sharedModuleWithCompiler is the template itself, for a test that only reads it. A test that changes
+// anything in the module or its compiler takes its own copy with moduleWithCompiler.
+func sharedModuleWithCompiler(t *testing.T) compilerFixture {
+	t.Helper()
+
+	compilerTemplate.once.Do(func() {
+		compilerTemplate.root, compilerTemplate.err = os.MkdirTemp("", "cohere-compiler-pin-")
+		if compilerTemplate.err == nil {
+			compilerTemplate.fixture, compilerTemplate.err = buildModuleWithCompiler(compilerTemplate.root)
+		}
+	})
+	if compilerTemplate.err != nil {
+		t.Fatalf("building the compiler fixture: %v", compilerTemplate.err)
+	}
+	return compilerTemplate.fixture
+}
+
+// moduleWithCompiler is a copy of the template the test owns, so it can move, patch or remove the
+// compiler without another test seeing it. Both repositories are copied whole, .git directories and all,
+// and the compiler's origin still names the template's compiler, a local path, as a fresh clone's does.
 func moduleWithCompiler(t *testing.T) compilerFixture {
 	t.Helper()
 
-	compiler := t.TempDir()
-	gitIn(t, compiler, "init", "--quiet")
-	writeFile(t, filepath.Join(compiler, "checker.go"), "package checker\n")
-	gitIn(t, compiler, "add", "checker.go")
-	gitIn(t, compiler, "commit", "--quiet", "-m", "first")
-	recorded := gitIn(t, compiler, "rev-parse", "HEAD")
-	writeFile(t, filepath.Join(compiler, "checker.go"), "package checker\n\n// later\n")
-	gitIn(t, compiler, "commit", "--quiet", "-am", "later")
-	later := gitIn(t, compiler, "rev-parse", "HEAD")
+	template := sharedModuleWithCompiler(t)
+	module := filepath.Join(t.TempDir(), "module")
+	if err := os.CopyFS(module, os.DirFS(template.Module)); err != nil {
+		t.Fatalf("copying the compiler fixture: %v", err)
+	}
+	return compilerFixture{Module: module, Recorded: template.Recorded, Later: template.Later}
+}
 
-	module := t.TempDir()
-	gitIn(t, module, "init", "--quiet")
-	gitIn(t, module, "clone", "--quiet", compiler, "TypeScript")
-	gitIn(t, filepath.Join(module, "TypeScript"), "checkout", "--quiet", recorded)
-	writeFile(t, filepath.Join(module, ".gitmodules"),
+// buildModuleWithCompiler builds, under root, a module pinning a two-commit compiler at its first commit,
+// and a committed `.gitmodules` naming the fork. The checkout's own origin is whatever it was cloned from,
+// a local path, so nothing that reads the remote can produce the fork's name by accident.
+func buildModuleWithCompiler(root string) (compilerFixture, error) {
+	// The first failure stops every step after it, and is what the builder returns.
+	var failed error
+	git := func(directory string, arguments ...string) string {
+		if failed != nil {
+			return ""
+		}
+		output, err := gitRun(directory, arguments...)
+		failed = err
+		return output
+	}
+	write := func(path string, contents string) {
+		if failed == nil {
+			failed = os.WriteFile(path, []byte(contents), 0o644)
+		}
+	}
+
+	compiler := filepath.Join(root, "compiler")
+	module := filepath.Join(root, "module")
+	for _, directory := range []string{compiler, module} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			return compilerFixture{}, err
+		}
+	}
+
+	git(compiler, "init", "--quiet")
+	write(filepath.Join(compiler, "checker.go"), "package checker\n")
+	git(compiler, "add", "checker.go")
+	git(compiler, "commit", "--quiet", "-m", "first")
+	recorded := git(compiler, "rev-parse", "HEAD")
+	write(filepath.Join(compiler, "checker.go"), "package checker\n\n// later\n")
+	git(compiler, "commit", "--quiet", "-am", "later")
+	later := git(compiler, "rev-parse", "HEAD")
+
+	git(module, "init", "--quiet")
+	git(module, "clone", "--quiet", compiler, "TypeScript")
+	git(filepath.Join(module, "TypeScript"), "checkout", "--quiet", recorded)
+	write(filepath.Join(module, ".gitmodules"),
 		"[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/kirkouimet/TypeScript.git\n")
-	gitIn(t, module, "-c", "advice.addEmbeddedRepo=false", "add", ".gitmodules", "TypeScript")
-	gitIn(t, module, "commit", "--quiet", "-m", "pin the compiler")
+	git(module, "-c", "advice.addEmbeddedRepo=false", "add", ".gitmodules", "TypeScript")
+	git(module, "commit", "--quiet", "-m", "pin the compiler")
 
-	return compilerFixture{Module: module, Recorded: recorded, Later: later}
+	return compilerFixture{Module: module, Recorded: recorded, Later: later}, failed
 }
 
 // TestCompilerPinIsTheCommitsGitlink is the positive half. Without it, a check that refused everything
@@ -53,7 +124,7 @@ func moduleWithCompiler(t *testing.T) compilerFixture {
 func TestCompilerPinIsTheCommitsGitlink(t *testing.T) {
 	t.Parallel()
 
-	fixture := moduleWithCompiler(t)
+	fixture := sharedModuleWithCompiler(t)
 
 	pin, err := readCompilerPin(fixture.Module)
 	if err != nil {
@@ -71,7 +142,7 @@ func TestCompilerPinIsTheCommitsGitlink(t *testing.T) {
 func TestCompilerPinAcceptsARelativeModuleDirectory(t *testing.T) {
 	t.Parallel()
 
-	fixture := moduleWithCompiler(t)
+	fixture := sharedModuleWithCompiler(t)
 	workingDirectory, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)

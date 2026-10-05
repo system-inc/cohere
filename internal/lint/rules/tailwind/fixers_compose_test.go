@@ -27,6 +27,7 @@ import (
 // Mutation check, run when this was written: putting `no-unnecessary-whitespace` back to rewriting
 // its whole segment turns this red with overlap refusals against `no-duplicate-classes`.
 func TestTailwindFixersComposeInOnePass(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name, source, want string
 	}{
@@ -60,6 +61,7 @@ func TestTailwindFixersComposeInOnePass(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := edit.FixText("/Component.tsx", testCase.source, proposeFromTailwindFixers(t), edit.DefaultMaxPasses)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)

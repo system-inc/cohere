@@ -8,6 +8,8 @@ import "testing"
 // the probe that preceded this engine keyed package.json off its extension and rewrote npm's array
 // formatting on every run, which was the single disagreement in a 1,556-file corpus.
 func TestParserForMatchesPrettierInference(t *testing.T) {
+	t.Parallel()
+
 	expected := map[string]string{
 		"a.ts": "typescript", "a.tsx": "typescript",
 		"a.js": "babel", "a.jsx": "babel", "a.mjs": "babel", "a.cjs": "babel",
@@ -31,6 +33,8 @@ func TestParserForMatchesPrettierInference(t *testing.T) {
 // TestPackageJsonIsNotKeyedByExtension is the regression that the corpus caught. A nested
 // package.json must still get json-stringify, and a differently-named .json must not.
 func TestPackageJsonIsNotKeyedByExtension(t *testing.T) {
+	t.Parallel()
+
 	if parser, _ := parserFor("/a/b/package.json"); parser != "json-stringify" {
 		t.Errorf("nested package.json got %q, want json-stringify", parser)
 	}
@@ -43,6 +47,8 @@ func TestPackageJsonIsNotKeyedByExtension(t *testing.T) {
 // yes to everything would be indistinguishable from one that works, and an engine that silently
 // skips an unhandled type reports a tree as formatted when it never looked at it.
 func TestUnhandledTypesAreRefused(t *testing.T) {
+	t.Parallel()
+
 	for _, fileName := range []string{"a.rb", "a.go", "a.py", "a.txt", "Makefile", "a"} {
 		if parser, handled := parserFor(fileName); handled {
 			t.Errorf("%s: handled with parser %q, want refused", fileName, parser)

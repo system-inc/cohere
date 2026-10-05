@@ -57,6 +57,7 @@ func TestSelfClosingCompStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, SelfClosingComp, selfClosingCompFile, testCase.sourceText, testCase.options)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -89,6 +90,7 @@ func TestSelfClosingCompFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, SelfClosingComp, selfClosingCompFile, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, "notSelfClosing")
 			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
@@ -170,6 +172,7 @@ func TestSelfClosingCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, SelfClosingComp, selfClosingCompFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != testCase.wantFindings {
@@ -212,6 +215,7 @@ func TestSelfClosingCompDoesNotPanicOnJsxText(t *testing.T) {
 	}
 	for _, sourceText := range sources {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			// Reaching the next line at all is the assertion.
 			rule_testing.RunWithOptions(t, SelfClosingComp, selfClosingCompFile, sourceText,
 				DefaultSelfClosingCompOptions())
@@ -251,6 +255,7 @@ func TestDecodeSelfClosingCompOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeSelfClosingCompOptions([]byte(testCase.raw))
 			if testCase.wantErr {
 				if err == nil {
@@ -286,6 +291,7 @@ func TestSelfClosingCompNilOptionsFallsBackToBothHalvesOn(t *testing.T) {
 
 	for _, sourceText := range []string{"var a = <div></div>;", "var a = <Foo></Foo>;"} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, SelfClosingComp, selfClosingCompFile, sourceText, nil)
 			rule_testing.ExpectFindings(t, result, "notSelfClosing")
 		})
@@ -319,6 +325,7 @@ func TestSelfClosingCompHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/Suffix.js",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, SelfClosingComp, fileName, sourceText,
 				DefaultSelfClosingCompOptions())
 			rule_testing.ExpectFindings(t, result, "notSelfClosing")

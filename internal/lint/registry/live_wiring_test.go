@@ -23,6 +23,7 @@ const liveConfigPath = "/Users/kirkouimet/Projects/ahra/CohereSettings.json"
 // This is the mechanical version: every registered rule must be a name the live config can resolve,
 // or be listed below as deliberately not enabled.
 func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
+	t.Parallel()
 	if _, err := os.Stat(liveConfigPath); err != nil {
 		t.Skipf("the live config is not present at %s", liveConfigPath)
 	}

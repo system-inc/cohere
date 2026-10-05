@@ -41,6 +41,7 @@ func TestNoAccessStateInSetstateStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -66,6 +67,7 @@ func TestNoAccessStateInSetstateFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
 		})
@@ -101,6 +103,7 @@ func TestNoAccessStateInSetstateSpans(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
@@ -210,6 +213,7 @@ func TestNoAccessStateInSetstateShapesUpstreamDoesNotWrite(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 				testCase.sourceText)
 			if len(testCase.messageIds) == 0 {
@@ -259,6 +263,7 @@ func TestNoAccessStateInSetstateScopeIdentity(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 				testCase.sourceText)
 			if len(testCase.messageIds) == 0 {
@@ -349,6 +354,7 @@ func TestNoAccessStateInSetstateIdentifierPosition(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 				testCase.sourceText)
 			if len(testCase.messageIds) == 0 {
@@ -384,6 +390,7 @@ func TestNoAccessStateInSetstateBinaryExpressionClimb(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 				testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "useCallback")
@@ -471,6 +478,7 @@ func TestNoAccessStateInSetstateMethodRoute(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 				testCase.sourceText)
 			if testCase.findings == 0 {
@@ -515,6 +523,7 @@ func TestNoAccessStateInSetstateObjectPatternGates(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 				testCase.sourceText)
 			if len(testCase.messageIds) == 0 {

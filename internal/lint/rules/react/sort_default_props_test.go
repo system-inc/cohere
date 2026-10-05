@@ -60,6 +60,7 @@ func TestSortDefaultPropsStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
 				testCase.sourceText, sortDefaultPropsDecode(t, testCase.rawOptions))
 			rule_testing.ExpectClean(t, result)
@@ -90,6 +91,7 @@ func TestSortDefaultPropsFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
 				testCase.sourceText, sortDefaultPropsDecode(t, testCase.rawOptions))
 			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
@@ -151,6 +153,7 @@ func TestSortDefaultPropsRawKeyTextComparison(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
 				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
 			if testCase.findings == 0 {
@@ -193,6 +196,7 @@ func TestSortDefaultPropsSpreadRestartsTheRun(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
 				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
 			if testCase.findings == 0 {
@@ -245,6 +249,7 @@ func TestSortDefaultPropsAccumulatorDoesNotAdvanceOnAFinding(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
 				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
 			ids := make([]string, testCase.findings)
@@ -326,6 +331,7 @@ func TestSortDefaultPropsWhichObjectsAreReached(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
 				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
 			if testCase.findings == 0 {
@@ -392,6 +398,7 @@ func TestDecodeSortDefaultPropsOptions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeSortDefaultPropsOptions([]byte(testCase.raw))
 			if err != nil {
 				t.Fatalf("decode returned %v", err)
@@ -465,6 +472,7 @@ func TestSortDefaultPropsLeadingTriviaIsNotPartOfTheKey(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
 				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
 			rule_testing.ExpectClean(t, result)
@@ -502,6 +510,7 @@ func TestSortDefaultPropsGetDefaultPropsSpelling(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
 				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
 			if testCase.findings == 0 {

@@ -103,6 +103,7 @@ func TestJsxNoConstructedContextValuesFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -242,6 +243,7 @@ func TestJsxNoConstructedContextValuesStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
@@ -367,6 +369,7 @@ func TestJsxNoConstructedContextValuesProviderShapes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -402,6 +405,7 @@ func TestJsxNoConstructedContextValuesValueAttributeShapes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -465,6 +469,7 @@ func TestJsxNoConstructedContextValuesConstructionKinds(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := "declare const c: any;\ndeclare const x: any;\ndeclare const a: any;\n" +
 				"declare const b: any;\ndeclare const rest: any;\ndeclare const Foo: any;\n" +
 				"declare function makeIt(): any;\n" +
@@ -501,6 +506,7 @@ func TestJsxNoConstructedContextValuesIdentifierFollowing(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := "declare function makeIt(): any;\n" +
 				"function Component() {\n  " + testCase.body +
 				"\n  return <Ctx.Provider value={v} />;\n}\n"
@@ -646,6 +652,7 @@ func TestJsxNoConstructedContextValuesEnclosingComponent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -724,6 +731,7 @@ func TestJsxNoConstructedContextValuesSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
@@ -753,6 +761,7 @@ func TestJsxNoConstructedContextValuesMessageText(t *testing.T) {
 	t.Parallel()
 
 	t.Run("the default message names the construction line", func(t *testing.T) {
+		t.Parallel()
 		source := "function Component() {\n  return <Ctx.Provider value={{a: 1}} />;\n}\n"
 		result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
 			jsxNoConstructedContextValuesFile, source)
@@ -767,6 +776,7 @@ func TestJsxNoConstructedContextValuesMessageText(t *testing.T) {
 	})
 
 	t.Run("the identifier message names both lines and the variable", func(t *testing.T) {
+		t.Parallel()
 		source := "function Component() {\n  const v = {a: 1};\n  return <Ctx.Provider value={v} />;\n}\n"
 		result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
 			jsxNoConstructedContextValuesFile, source)
@@ -781,6 +791,7 @@ func TestJsxNoConstructedContextValuesMessageText(t *testing.T) {
 	})
 
 	t.Run("a function construction asks for useCallback", func(t *testing.T) {
+		t.Parallel()
 		source := "function Component() {\n  function v() {}\n  return <Ctx.Provider value={v} />;\n}\n"
 		result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
 			jsxNoConstructedContextValuesFile, source)
@@ -795,6 +806,7 @@ func TestJsxNoConstructedContextValuesMessageText(t *testing.T) {
 	})
 
 	t.Run("an inline function asks for useCallback with no variable name", func(t *testing.T) {
+		t.Parallel()
 		// This is the fourth message id, which upstream's own corpus never exercises.
 		source := "function Component() {\n  return <Ctx.Provider value={() => {}} />;\n}\n"
 		result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
@@ -893,6 +905,7 @@ func TestJsxNoConstructedContextValuesTakesTheLastDeclaration(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := "function Component() {\n" + testCase.body +
 				"\n  return <Ctx.Provider value={v} />;\n}\n"
 			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,

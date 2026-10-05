@@ -17,6 +17,7 @@ const liveConfigPath = "/Users/kirkouimet/Projects/ahra/CohereSettings.json"
 // A test that models a config can drift from the configuration. This one reads the bytes that are actually
 // gating the codebase, so a change there shows up here rather than at the next full run.
 func TestAgainstTheLiveConfig(t *testing.T) {
+	t.Parallel()
 	if _, err := os.Stat(liveConfigPath); err != nil {
 		t.Skipf("the live config is not present at %s", liveConfigPath)
 	}
@@ -120,6 +121,7 @@ func TestAgainstTheLiveConfig(t *testing.T) {
 // The test therefore asserts membership exactly and reports severity rather than requiring it to
 // match, so the difference is visible instead of blocking or being smoothed away.
 func TestBothPathsAgreeOnEveryPluginDefault(t *testing.T) {
+	t.Parallel()
 	if _, err := os.Stat(liveConfigPath); err != nil {
 		t.Skipf("the live config is not present at %s", liveConfigPath)
 	}
@@ -265,6 +267,7 @@ func ruleNamesInContents(contents []byte) (map[string]RuleSetting, error) {
 // mutated copy on disk would either touch the artifact it guards or drift from it; `ruleNamesInContents`
 // exists so this one does neither.
 func TestTheGuardCatchesARemovedLine(t *testing.T) {
+	t.Parallel()
 	if _, err := os.Stat(liveConfigPath); err != nil {
 		t.Skipf("the live config is not present at %s", liveConfigPath)
 	}

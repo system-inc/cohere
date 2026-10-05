@@ -15,6 +15,8 @@ import (
 // is there: the printers, the options they resolve, the typescript-go parser they parse with, and the
 // pass loop, and that no lint rule is.
 func TestFormatterInputsCoverWhatCanChangeTheOutput(t *testing.T) {
+	t.Parallel()
+
 	workingDirectory, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -55,6 +57,8 @@ func TestFormatterInputsCoverWhatCanChangeTheOutput(t *testing.T) {
 }
 
 func TestFormatterIdentityMovesWithEveryInputAndNotWithOrder(t *testing.T) {
+	t.Parallel()
+
 	inputs := []formatterInput{
 		{Name: "github.com/system-inc/cohere/internal/format/native/native.go", Sum: strings.Repeat("a", 64)},
 		{Name: "github.com/microsoft/TypeScript/tsc/internal/parser/parser.go", Sum: strings.Repeat("b", 64)},

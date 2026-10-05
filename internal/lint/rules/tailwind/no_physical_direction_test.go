@@ -9,6 +9,7 @@ import (
 const physicalDirectionFile = "/repository/source/components/Thing.tsx"
 
 func TestNoPhysicalDirectionFires(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -60,6 +61,7 @@ func TestNoPhysicalDirectionFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoPhysicalDirection, physicalDirectionFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
@@ -71,6 +73,7 @@ func TestNoPhysicalDirectionFires(t *testing.T) {
 }
 
 func TestNoPhysicalDirectionStaysSilent(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		fileName   string
@@ -117,6 +120,7 @@ func TestNoPhysicalDirectionStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoPhysicalDirection, testCase.fileName, testCase.sourceText))
 		})

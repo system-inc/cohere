@@ -27,6 +27,9 @@ import (
 // at a path that does not exist, because loadBundles read a constant. A test that only checked
 // BundleDirectory's return value would have passed against the broken engine too, since the constant
 // was never the thing being consulted. So this goes through New and demands a real failure.
+//
+// Not parallel: it points ForkPathVariable at a missing fork with t.Setenv, which a parallel test may not
+// call.
 func TestOverrideReachesTheLoader(t *testing.T) {
 	t.Setenv(ForkPathVariable, "/nonexistent/elsewhere")
 
@@ -44,6 +47,9 @@ func TestOverrideReachesTheLoader(t *testing.T) {
 // pins the default, and what the default is has changed: with no variable set the bundles come from
 // the binary, not from any path. That is the property the whole vendoring unit exists to produce, so
 // asserting Origin is asserting the point rather than an implementation detail.
+//
+// Not parallel: it clears ForkPathVariable with t.Setenv to pin the no-override default, which a parallel
+// test may not call.
 func TestOverrideIsTheOnlyKnobThatMoves(t *testing.T) {
 	t.Setenv(ForkPathVariable, "")
 
@@ -65,6 +71,9 @@ func TestOverrideIsTheOnlyKnobThatMoves(t *testing.T) {
 // the package printed `ok` while measuring nothing. This asserts the opposite condition directly:
 // point the override at a path that does not exist, unset it, and the engine still builds. If this
 // fails, the binary is depending on a checkout again and the skip would come back with it.
+//
+// Not parallel: it clears ForkPathVariable with t.Setenv to pin the no-override default, which a parallel
+// test may not call.
 func TestEmbeddedBundlesNeedNoFork(t *testing.T) {
 	t.Setenv(ForkPathVariable, "")
 
@@ -80,6 +89,9 @@ func TestEmbeddedBundlesNeedNoFork(t *testing.T) {
 // error, but it cannot catch the other direction: a name added to BundleFiles and not to the
 // directive compiles fine and fails when someone formats that language. This is the guard for that,
 // and it is why the loader checks a map it was just handed.
+//
+// Not parallel: it clears ForkPathVariable with t.Setenv so the embed is what loads, which a parallel test
+// may not call.
 func TestEmbedMatchesBundleFiles(t *testing.T) {
 	t.Setenv(ForkPathVariable, "")
 
@@ -112,6 +124,8 @@ func TestEmbedMatchesBundleFiles(t *testing.T) {
 // It lives here rather than in `release` because `prettier` imports nothing internal, so this
 // direction is the one that cannot create a cycle.
 func TestReleaseResolvesThroughTheEngine(t *testing.T) {
+	t.Parallel()
+
 	if ForkPathVariable != "COHERE_PRETTIER_FORK" {
 		t.Fatalf("the variable is %q; release's exported alias and any CI that sets it both assume the old spelling", ForkPathVariable)
 	}

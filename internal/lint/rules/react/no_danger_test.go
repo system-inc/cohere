@@ -74,6 +74,7 @@ func TestNoDangerFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runNoDanger(t, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -96,6 +97,7 @@ func TestNoDangerStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runNoDanger(t, testCase.sourceText, testCase.options)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -130,6 +132,7 @@ func TestNoDangerElementNameBoundary(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoDanger(t, testCase.sourceText, "")
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -162,6 +165,7 @@ func TestNoDangerAttributeNameBoundary(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoDanger(t, testCase.sourceText, "")
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -220,6 +224,7 @@ func TestNoDangerCustomComponentNames(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoDanger(t, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -236,6 +241,7 @@ func TestNoDangerDecodesOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("absent options give the documented default", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoDangerOptions(nil)
 		if err != nil {
 			t.Fatalf("decoding nil: %v", err)
@@ -250,6 +256,7 @@ func TestNoDangerDecodesOptions(t *testing.T) {
 	})
 
 	t.Run("the wire name is customComponentNames", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoDangerOptions(json.RawMessage(`{"customComponentNames":["A","B*"]}`))
 		if err != nil {
 			t.Fatalf("decoding: %v", err)
@@ -261,6 +268,7 @@ func TestNoDangerDecodesOptions(t *testing.T) {
 	})
 
 	t.Run("an unknown key is accepted and ignored, matching a schema without additionalProperties false", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoDangerOptions(json.RawMessage(`{"somethingElse":1}`))
 		if err != nil {
 			t.Fatalf("decoding: %v", err)
@@ -271,6 +279,7 @@ func TestNoDangerDecodesOptions(t *testing.T) {
 	})
 
 	t.Run("the rule falls back to the default when handed nil rather than the struct", func(t *testing.T) {
+		t.Parallel()
 		// This bypasses the decoder entirely, which is the one path every other fixture misses.
 		//
 		// The COMPONENT is the case that measures anything, and a first version of this used a
@@ -299,6 +308,7 @@ func TestNoDangerSpanAndMessage(t *testing.T) {
 	t.Parallel()
 
 	t.Run("the finding points at the attribute, not the element", func(t *testing.T) {
+		t.Parallel()
 		const sourceText = "const a = <div dangerouslySetInnerHTML={{__html:''}} />;"
 		const want = "dangerouslySetInnerHTML={{__html:''}}"
 		result := runNoDanger(t, sourceText, "")
@@ -310,6 +320,7 @@ func TestNoDangerSpanAndMessage(t *testing.T) {
 	})
 
 	t.Run("a bare attribute spans just the name", func(t *testing.T) {
+		t.Parallel()
 		const sourceText = "const a = <div dangerouslySetInnerHTML />;"
 		result := runNoDanger(t, sourceText, "")
 		rule_testing.ExpectFindings(t, result, "dangerousProp")
@@ -320,6 +331,7 @@ func TestNoDangerSpanAndMessage(t *testing.T) {
 	})
 
 	t.Run("the message names the property and explains the defect", func(t *testing.T) {
+		t.Parallel()
 		result := runNoDanger(t, "<div dangerouslySetInnerHTML={{__html:''}} />;", "")
 		rule_testing.ExpectFindings(t, result, "dangerousProp")
 		got := result.Diagnostics[0].Message.Description
@@ -354,6 +366,7 @@ func TestNoDangerDoesNotPanicOnUnusualTagNames(t *testing.T) {
 		"<a.b></a.b>;",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			// The verdict is not the point; surviving the render is. Both verdicts are pinned in
 			// the boundary tables above for the shapes that have one.
 			runNoDanger(t, sourceText, `{"customComponentNames":["*"]}`)
@@ -379,6 +392,7 @@ func TestNoDangerHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/Danger.jsx",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeNoDangerOptions(nil)
 			if err != nil {
 				t.Fatalf("decoding: %v", err)

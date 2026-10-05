@@ -29,6 +29,8 @@ import (
 // run in process and on every core rather than as a command. A file that does not parse fails too, since
 // gofmt stops the release on it as surely.
 func TestEveryGoFileCohereOwnsIsGofmtClean(t *testing.T) {
+	t.Parallel()
+
 	module, err := FindModuleDirectory()
 	if err != nil {
 		t.Fatal(err)

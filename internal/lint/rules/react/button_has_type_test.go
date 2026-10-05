@@ -102,6 +102,7 @@ func TestButtonHasTypeFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runButtonHasType(t, testCase.sourceText, testCase.rawOptions)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
@@ -164,6 +165,7 @@ func TestButtonHasTypeStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runButtonHasType(t, testCase.sourceText, testCase.rawOptions))
 		})
 	}
@@ -222,6 +224,7 @@ func TestButtonHasTypePragmaIsFixedAtReact(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runButtonHasType(t, testCase.sourceText, ""))
 		})
 	}
@@ -273,6 +276,7 @@ func TestButtonHasTypeReadsStaticValuesUpstreamsWay(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runButtonHasType(t, testCase.sourceText, "")
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if testCase.wantValue == "" {
@@ -345,6 +349,7 @@ func TestButtonHasTypeRecursesThroughTernaries(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runButtonHasType(t, testCase.sourceText, ""), testCase.wantIds...)
 		})
 	}
@@ -422,6 +427,7 @@ func TestButtonHasTypeSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runButtonHasType(t, testCase.sourceText, "")
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
@@ -513,6 +519,7 @@ func TestButtonHasTypeMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runButtonHasType(t, testCase.sourceText, ""), testCase.wantIds...)
 		})
 	}
@@ -544,6 +551,7 @@ func TestButtonHasTypeDecodesItsOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeButtonHasTypeOptions([]byte(testCase.raw))
 			if err != nil {
 				t.Fatalf("decoding %q: %v", testCase.raw, err)
@@ -627,6 +635,7 @@ func TestButtonHasTypeSeparatesInvalidFromForbidden(t *testing.T) {
 		{"reset off leaves submit alone", "const a = <button type=\"submit\"/>;\n", `{"reset":false}`, nil},
 	} {
 		t.Run(row.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runButtonHasType(t, row.sourceText, row.rawOptions), row.wantIds...)
 		})
 	}
@@ -673,6 +682,7 @@ func TestButtonHasTypeHasNoFileGate(t *testing.T) {
 		"/repository/source/ButtonHasType.ts",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, ButtonHasType, fileName, source,
 				DefaultButtonHasTypeOptions())
 			rule_testing.ExpectFindings(t, result, "missingType")
@@ -703,6 +713,7 @@ func TestButtonHasTypeSurvivesShapesThatWouldPanic(t *testing.T) {
 
 	for index, sourceText := range sources {
 		t.Run(string(rune('a'+index)), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runButtonHasType(t, sourceText, ""))
 		})
 	}
@@ -799,6 +810,7 @@ func TestButtonHasTypeTrustsAProvenType(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runButtonHasType(t, testCase.sourceText, ""))
 		})
 	}
@@ -826,6 +838,7 @@ func TestButtonHasTypeTrustsAProvenType(t *testing.T) {
 	}
 	for _, testCase := range reporting {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runButtonHasType(t, testCase.sourceText, testCase.rawOptions), "complexType")
 		})
 	}

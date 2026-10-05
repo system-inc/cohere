@@ -43,6 +43,7 @@ func TestNoUnescapedEntitiesStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnescapedEntities, "component.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -158,6 +159,7 @@ func TestNoUnescapedEntitiesFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(
 				t, NoUnescapedEntities, "component.tsx", testCase.source, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -414,6 +416,7 @@ func TestNoUnescapedEntitiesDeclinesTheForbidEntriesUpstreamCannotUse(t *testing
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := decodeNoUnescapedEntitiesOptionsForTest(t, testCase.options)
 			rule_testing.ExpectClean(t,
 				rule_testing.RunWithOptions(t, NoUnescapedEntities, "component.tsx", testCase.source, options))
@@ -467,6 +470,7 @@ func TestNoUnescapedEntitiesIgnoresTextThatIsNotJsxText(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoUnescapedEntities, "component.tsx", testCase.source))
 		})

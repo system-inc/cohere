@@ -11,6 +11,8 @@ import (
 // green. Every test here asserts that some specific change to the inputs moves the digest.
 
 func TestHashChangesWhenFileContentsChange(t *testing.T) {
+	t.Parallel()
+
 	// The case a filename-based hash misses entirely: a rule edited in place keeps its name.
 	directory := t.TempDir()
 	path := filepath.Join(directory, "rule.go")
@@ -34,6 +36,8 @@ func TestHashChangesWhenFileContentsChange(t *testing.T) {
 }
 
 func TestHashChangesWhenContentsChangeWithoutChangingLength(t *testing.T) {
+	t.Parallel()
+
 	// This is the test that proves the digest reads the bytes rather than a summary of them.
 	//
 	// It exists because the obvious version of the previous test does not. Each file is framed in
@@ -56,6 +60,8 @@ func TestHashChangesWhenContentsChangeWithoutChangingLength(t *testing.T) {
 }
 
 func TestHashChangesWithEachInput(t *testing.T) {
+	t.Parallel()
+
 	// Each field is a thing that changes what the binary does. Missing any one of them is a
 	// separate way for the cache to lie, so each gets its own assertion rather than one combined
 	// check that could pass on the strength of the others.
@@ -83,6 +89,8 @@ func TestHashChangesWithEachInput(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			changed := base
 			test.modify(&changed)
 
@@ -94,6 +102,8 @@ func TestHashChangesWithEachInput(t *testing.T) {
 }
 
 func TestHashIsStableAcrossRuns(t *testing.T) {
+	t.Parallel()
+
 	// An unstable hash misses the cache forever, rebuilding on every invocation. That is the
 	// opposite failure from staleness and just as much a defect.
 	directory := t.TempDir()
@@ -116,6 +126,8 @@ func TestHashIsStableAcrossRuns(t *testing.T) {
 }
 
 func TestHashIgnoresSourceFileOrder(t *testing.T) {
+	t.Parallel()
+
 	// The toolchain is free to list packages in whatever order it likes, and an order-sensitive
 	// hash would miss the cache for reasons that have nothing to do with the code.
 	directory := t.TempDir()
@@ -133,6 +145,8 @@ func TestHashIgnoresSourceFileOrder(t *testing.T) {
 }
 
 func TestHashDistinguishesFilesWithSharedContent(t *testing.T) {
+	t.Parallel()
+
 	// Two files whose contents are identical must not be interchangeable with one file: the digest
 	// frames each entry with its name and length so that concatenation cannot collide.
 	directory := t.TempDir()
@@ -150,6 +164,8 @@ func TestHashDistinguishesFilesWithSharedContent(t *testing.T) {
 }
 
 func TestComputeFailsOnUnreadableInput(t *testing.T) {
+	t.Parallel()
+
 	// Hashing around a file that was listed but cannot be read produces a stable digest for a tree
 	// we could not actually see, which is staleness wearing a different hat.
 	inputs := Inputs{SourceFiles: []string{filepath.Join(t.TempDir(), "absent.go")}}
@@ -160,6 +176,8 @@ func TestComputeFailsOnUnreadableInput(t *testing.T) {
 }
 
 func TestCollectInputsRejectsAnEmptyFileSet(t *testing.T) {
+	t.Parallel()
+
 	// An empty input set hashes to a perfectly stable digest for a tree containing nothing, and
 	// every later run hits that entry. A run that measured nothing must not look like a run that
 	// found nothing.

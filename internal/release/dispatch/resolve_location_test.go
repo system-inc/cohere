@@ -18,6 +18,8 @@ import (
 // A path built relative to the working directory, which is the easy mistake when a file sits "beside"
 // a binary, would put it in whatever tree the caller was standing in. That would make the help text
 // false while every other launcher test kept passing.
+//
+// Not parallel: it moves into a stand-in project with t.Chdir, which a parallel test may not call.
 func TestTheDevelopmentHashLandsInCoheresOwnCache(t *testing.T) {
 	module := t.TempDir()
 	project := t.TempDir()

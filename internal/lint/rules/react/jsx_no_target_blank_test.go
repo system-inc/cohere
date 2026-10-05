@@ -199,6 +199,7 @@ func TestJsxNoTargetBlankFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := decodeTargetBlankOptionsForTest(t, testCase.rawOptions)
 			result := rule_testing.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
 				testCase.sourceText, options)
@@ -347,6 +348,7 @@ func TestJsxNoTargetBlankStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := decodeTargetBlankOptionsForTest(t, testCase.rawOptions)
 			result := rule_testing.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
 				testCase.sourceText, options)
@@ -398,6 +400,7 @@ func TestJsxNoTargetBlankSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := decodeTargetBlankOptionsForTest(t, testCase.rawOptions)
 			result := rule_testing.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
 				testCase.sourceText, options)
@@ -449,6 +452,7 @@ func TestDecodeJsxNoTargetBlankOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeJsxNoTargetBlankOptions([]byte(testCase.raw))
 			if err != nil {
 				t.Fatalf("decoding %q: %v", testCase.raw, err)
@@ -499,6 +503,7 @@ func TestJsxNoTargetBlankHasNoFileGate(t *testing.T) {
 		"/repository/source/Probe.js",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, JsxNoTargetBlank, fileName, source, nil)
 			rule_testing.ExpectFindings(t, result, "noTargetBlankWithoutNoreferrer")
 		})

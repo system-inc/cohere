@@ -45,6 +45,7 @@ func TestNoRedundantShouldComponentUpdateFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 			// The name is interpolated into the message, so an id assertion cannot see it and a
@@ -69,6 +70,7 @@ func TestNoRedundantShouldComponentUpdateStaysSilent(t *testing.T) {
 	}
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -130,6 +132,7 @@ func TestNoRedundantShouldComponentUpdateBaseClassBoundary(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -166,6 +169,7 @@ func TestNoRedundantShouldComponentUpdateMemberShapes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -198,6 +202,7 @@ func TestNoRedundantShouldComponentUpdateNameDerivation(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "noShouldCompUpdate")
 			wantPrefix := testCase.wantName + " extends PureComponent and also writes shouldComponentUpdate."
@@ -218,6 +223,7 @@ func TestNoRedundantShouldComponentUpdateSpan(t *testing.T) {
 	t.Parallel()
 
 	t.Run("a declaration reports on the whole class", func(t *testing.T) {
+		t.Parallel()
 		const sourceText = "class Foo extends PureComponent { shouldComponentUpdate() {} }"
 		result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, sourceText)
 		rule_testing.ExpectFindings(t, result, "noShouldCompUpdate")
@@ -228,6 +234,7 @@ func TestNoRedundantShouldComponentUpdateSpan(t *testing.T) {
 	})
 
 	t.Run("a class expression reports on the expression, not the declaration", func(t *testing.T) {
+		t.Parallel()
 		const sourceText = "var Foo = class extends PureComponent { shouldComponentUpdate() {} };"
 		const want = "class extends PureComponent { shouldComponentUpdate() {} }"
 		result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, sourceText)
@@ -258,6 +265,7 @@ func TestNoRedundantShouldComponentUpdateHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/Pure.jsx",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, fileName, sourceText)
 			rule_testing.ExpectFindings(t, result, "noShouldCompUpdate")
 		})
@@ -294,6 +302,7 @@ func TestNoRedundantShouldComponentUpdateDoesNotPanicOnComputedMembers(t *testin
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})

@@ -692,6 +692,7 @@ func TestRulesOfHooksStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, RulesOfHooks, "component.jsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -1293,6 +1294,7 @@ func TestRulesOfHooksFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, RulesOfHooks, "component.jsx", testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.ids...)
 		})
@@ -1367,6 +1369,7 @@ func TestRulesOfHooksSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, RulesOfHooks, "component.jsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected exactly one finding, got %d: %v", len(result.Diagnostics), result.MessageIds())
@@ -1534,6 +1537,7 @@ func TestRulesOfHooksBeyondTheCorpus(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, RulesOfHooks, "component.jsx", testCase.source)
 			if len(testCase.ids) == 0 {
 				rule_testing.ExpectClean(t, result)

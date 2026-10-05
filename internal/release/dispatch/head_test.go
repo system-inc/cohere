@@ -12,6 +12,8 @@ import (
 // in one of the layouts a checkout takes and compares the two, because a wrong commit here builds and
 // runs the wrong rules while looking like the right ones.
 func TestReadHeadAgreesWithGitInEveryLayout(t *testing.T) {
+	t.Parallel()
+
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is needed to build the fixtures and to compare against")
 	}
@@ -84,6 +86,8 @@ func TestReadHeadAgreesWithGitInEveryLayout(t *testing.T) {
 }
 
 func TestReadHeadRefusesWhatIsNotACommit(t *testing.T) {
+	t.Parallel()
+
 	repository := t.TempDir()
 	writeFile(t, filepath.Join(repository, ".git", "HEAD"), "ref: refs/heads/main\n")
 	writeFile(t, filepath.Join(repository, ".git", "refs", "heads", "main"), "abc123\n")
@@ -106,6 +110,8 @@ func TestReadHeadRefusesWhatIsNotACommit(t *testing.T) {
 // After the first run at a commit, the Swift engine's inputs are read from what that run kept, and git
 // is not asked again: the module directory here stops being a repository at all, and the answer holds.
 func TestSwiftEngineInputsAreAskedOncePerCommit(t *testing.T) {
+	t.Parallel()
+
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is needed for the first answer")
 	}
@@ -164,6 +170,8 @@ func TestSwiftEngineInputsAreAskedOncePerCommit(t *testing.T) {
 // snapshot has no `.git`, so a version that asked the submodule's origin instead would read nothing here
 // and fail every case that expects a name.
 func TestTheCompilerRepositoryIsReadFromTheCommittedGitmodules(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		gitmodules string
@@ -179,6 +187,8 @@ func TestTheCompilerRepositoryIsReadFromTheCommittedGitmodules(t *testing.T) {
 		{"a url that names no repository", "[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/\n", ""},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			snapshot := t.TempDir()
 			writeFile(t, filepath.Join(snapshot, ".gitmodules"), testCase.gitmodules)
 			if got := committedCompilerUpstream(snapshot); got != testCase.want {

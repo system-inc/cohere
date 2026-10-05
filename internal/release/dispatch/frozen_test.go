@@ -13,6 +13,8 @@ import (
 // asserts some form of "it refuses to be silent."
 
 func TestResolveFrozenRefusesWhenTheCacheIsEmpty(t *testing.T) {
+	t.Parallel()
+
 	// "Frozen with nothing to freeze" is a missing binary, and a missing binary is loud here like
 	// everywhere else. Returning a path that does not exist, or an empty one, would hand the caller
 	// something to exec that fails later and further from the cause.
@@ -31,6 +33,8 @@ func TestResolveFrozenRefusesWhenTheCacheIsEmpty(t *testing.T) {
 }
 
 func TestResolveFrozenRefusesWhenTheCacheIsMissing(t *testing.T) {
+	t.Parallel()
+
 	// A cache directory that was never created is a different failure from an empty one — it means
 	// no build has ever run here — and it must be just as loud rather than treated as "no results".
 	paths := Paths{ModuleDirectory: t.TempDir(), CacheDirectory: filepath.Join(t.TempDir(), "absent")}
@@ -41,6 +45,8 @@ func TestResolveFrozenRefusesWhenTheCacheIsMissing(t *testing.T) {
 }
 
 func TestResolveFrozenNamesWhatItSelected(t *testing.T) {
+	t.Parallel()
+
 	// The caller prints the hash and the build time, and it can only do that if this reports them.
 	// A frozen run that could not say which binary it ran would be indistinguishable from an
 	// ordinary one, which is the whole thing being guarded against.
@@ -63,6 +69,8 @@ func TestResolveFrozenNamesWhatItSelected(t *testing.T) {
 }
 
 func TestResolveFrozenPicksTheNewestBinary(t *testing.T) {
+	t.Parallel()
+
 	// The most recent successful build is the closest thing to the rules on disk the cache can
 	// offer. Picking any other one would be arbitrarily staler for no reason a reader could predict.
 	paths := newCacheWithBinaries(t, map[string]string{
@@ -87,6 +95,8 @@ func TestResolveFrozenPicksTheNewestBinary(t *testing.T) {
 }
 
 func TestResolveFrozenIgnoresNonExecutableEntries(t *testing.T) {
+	t.Parallel()
+
 	// The sidecar recording the development build's hash sits in the same directory and is not
 	// something to exec. Selecting it would produce an exec failure whose message is about file
 	// formats rather than about the cache.

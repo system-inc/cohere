@@ -89,6 +89,9 @@ const liveWalkMeasuredBuildCost = 1660 * time.Microsecond
 // its own comment said it happened once. Every finding stayed correct and every test stayed green.
 // So the claim is a counter read across a real walk of a real repository, which is the only form of
 // it that cannot decay into a sentence someone believes.
+// Not parallel: it resets the package designSystemCache and asserts the process-wide
+// tailwindengine.BuildsSoFar moved by exactly one across the walk, which any parallel test building a
+// design system or evicting the cache's one slot would inflate.
 func TestDesignSystemIsBuiltOnceUnderTheRealWalk(t *testing.T) {
 	if _, err := os.Stat(liveWalkRepository); err != nil {
 		t.Skipf("no corpus repository at %s, so there is no real walk to measure", liveWalkRepository)
@@ -144,6 +147,7 @@ func TestDesignSystemIsBuiltOnceUnderTheRealWalk(t *testing.T) {
 // guarding. Counting the list against the package's own registrations turns it into a failure that
 // names the missing rule.
 func TestLiveWalkCoversEveryRegisteredTailwindRule(t *testing.T) {
+	t.Parallel()
 	covered := make(map[string]bool)
 	for _, subject := range liveWalkRules() {
 		covered[subject.Name] = true

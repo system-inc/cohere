@@ -171,6 +171,7 @@ func TestSetStateInEffectFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runSetStateInEffect(t, testCase.source)
 			want := []string{setStateInEffect}
 			if testCase.name == "twoEffectsReportTwice" {
@@ -278,6 +279,7 @@ func TestSetStateInEffectStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runSetStateInEffect(t, testCase.source))
 		})
 	}
@@ -335,6 +337,7 @@ func TestSetStateInEffectPointsAtTheSetterCall(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runSetStateInEffect(t, testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
@@ -518,6 +521,7 @@ func TestSetStateInEffectSeesThroughManualMemoization(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runSetStateInEffect(t, testCase.source), setStateInEffect)
 		})
 	}

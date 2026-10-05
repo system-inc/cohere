@@ -105,6 +105,7 @@ func TestJsxNoScriptUrlFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := jsxNoScriptUrlOptions(t, testCase.rawOptions)
 			result := rule_testing.RunWithOptions(t, JsxNoScriptUrl, jsxNoScriptUrlFile, testCase.sourceText, options)
 			wantIds := make([]string, testCase.wantCount)
@@ -175,6 +176,7 @@ func TestJsxNoScriptUrlStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := jsxNoScriptUrlOptions(t, testCase.rawOptions)
 			result := rule_testing.RunWithOptions(t, JsxNoScriptUrl, jsxNoScriptUrlFile, testCase.sourceText, options)
 			rule_testing.ExpectClean(t, result)
@@ -251,6 +253,7 @@ func TestJsxNoScriptUrlHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/JsxNoScriptUrl.jsx",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, JsxNoScriptUrl, fileName, source, jsxNoScriptUrlOptions(t, ``))
 			rule_testing.ExpectFindings(t, result, "noScriptURL")
 		})
@@ -267,6 +270,7 @@ func TestDecodeJsxNoScriptUrlOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("an empty body keeps the built-in pair", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeJsxNoScriptUrlOptions(nil)
 		if err != nil {
 			t.Fatalf("decoding an empty body: %v", err)
@@ -285,6 +289,7 @@ func TestDecodeJsxNoScriptUrlOptions(t *testing.T) {
 	})
 
 	t.Run("the array arm alone", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeJsxNoScriptUrlOptions([]byte(`[[{"name":"Foo","props":["to","href"]}]]`))
 		if err != nil {
 			t.Fatalf("decoding the array arm: %v", err)
@@ -299,6 +304,7 @@ func TestDecodeJsxNoScriptUrlOptions(t *testing.T) {
 	})
 
 	t.Run("the object arm alone, at its default", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeJsxNoScriptUrlOptions([]byte(`[{"includeFromSettings":false}]`))
 		if err != nil {
 			t.Fatalf("decoding the object arm: %v", err)
@@ -309,6 +315,7 @@ func TestDecodeJsxNoScriptUrlOptions(t *testing.T) {
 	})
 
 	t.Run("both arms in order", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeJsxNoScriptUrlOptions([]byte(`[[{"name":"Bar","props":["link"]}],{"includeFromSettings":false}]`))
 		if err != nil {
 			t.Fatalf("decoding both arms: %v", err)
@@ -320,6 +327,7 @@ func TestDecodeJsxNoScriptUrlOptions(t *testing.T) {
 	})
 
 	t.Run("an empty array slot is not the object arm", func(t *testing.T) {
+		t.Parallel()
 		// `[[], {...}]` is upstream's own spelling in two corpus cases. An empty JSON array is the
 		// array arm, so the object must still be read from the second position: the refusal of
 		// `true` there is what proves it was read at all.
@@ -332,6 +340,7 @@ func TestDecodeJsxNoScriptUrlOptions(t *testing.T) {
 	})
 
 	t.Run("shapes the config layer does not deliver, or upstream refuses, are refused", func(t *testing.T) {
+		t.Parallel()
 		for _, raw := range []string{
 			// The wrapper this decoder used to read.
 			`{"positional":[[{"name":"Foo","props":["to"]}]]}`,

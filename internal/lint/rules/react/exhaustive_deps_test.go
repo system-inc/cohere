@@ -224,6 +224,7 @@ func TestExhaustiveDepsFires(t *testing.T) {
 
 	for index, testCase := range cases {
 		t.Run(exhaustiveDepsCaseName(index, testCase.sourceText), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText),
 				testCase.wantIds...)
@@ -392,6 +393,7 @@ func TestExhaustiveDepsStaysSilent(t *testing.T) {
 
 	for index, sourceText := range cases {
 		t.Run(exhaustiveDepsCaseName(index, sourceText), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, sourceText))
 		})
@@ -435,6 +437,7 @@ func TestExhaustiveDepsScopeIsStated(t *testing.T) {
 
 	for index, testCase := range cases {
 		t.Run(exhaustiveDepsCaseName(index, testCase.sourceText), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
 			for _, diagnostic := range result.Diagnostics {
 				if diagnostic.Message.Id == "exhaustiveDepsRefCleanup" ||
@@ -545,6 +548,7 @@ func TestExhaustiveDepsAdditionalHooks(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := rule.DecodeOptionsInto[ExhaustiveDepsOptions]()(
 				json.RawMessage(testCase.optionsJson))
 			if err != nil {
@@ -615,6 +619,7 @@ func TestExhaustiveDepsSuggestsTheCorrectedArray(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want exactly one finding to read the advice from, got %d",
@@ -696,6 +701,7 @@ func TestExhaustiveDepsConstructionRecursesThroughBranches(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
 			if testCase.reports {
 				rule_testing.ExpectFindings(t, result, "exhaustiveDepsConstruction")
@@ -733,6 +739,7 @@ func TestExhaustiveDepsPointsAtTheRightNode(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("no finding to read a span from")
@@ -811,6 +818,7 @@ func TestExhaustiveDepsNonEffectRebuildsTheArray(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 1 {
 				t.Fatalf("want one finding carrying one suggestion, got %d findings",

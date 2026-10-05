@@ -71,6 +71,7 @@ func runCanonicalFixtureWithOptions(
 }
 
 func TestEnforceCanonicalClassesReportsCollapses(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -166,6 +167,7 @@ func TestEnforceCanonicalClassesReportsCollapses(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runCanonicalFixture(t, testCase.fileName, testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -175,6 +177,7 @@ func TestEnforceCanonicalClassesReportsCollapses(t *testing.T) {
 // The clean half. The near-misses are the load-bearing ones: each differs from a real collapse in
 // exactly one of the three preconditions, and relaxing any of them reports correct code.
 func TestEnforceCanonicalClassesStaysSilent(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -239,6 +242,7 @@ func TestEnforceCanonicalClassesStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runCanonicalFixture(t, testCase.fileName, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -250,6 +254,7 @@ func TestEnforceCanonicalClassesStaysSilent(t *testing.T) {
 // A finding that says only "these collapse" leaves the reader to work out into what, which for
 // `w-8 h-8` is `size-8` and is not guessable from the class names.
 func TestCanonicalMessageNamesTheShorterSpelling(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		source string
 		want   string
@@ -264,6 +269,7 @@ func TestCanonicalMessageNamesTheShorterSpelling(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.want, func(t *testing.T) {
+			t.Parallel()
 			result := runCanonicalFixture(t, "Component.tsx", testCase.source)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("expected a finding, got none")
@@ -282,6 +288,7 @@ func TestCanonicalMessageNamesTheShorterSpelling(t *testing.T) {
 // resulting order is `enforce-consistent-class-order`'s concern and a rewrite that also reordered
 // would fight it.
 func TestCanonicalProposesNoFix(t *testing.T) {
+	t.Parallel()
 	result := runCanonicalFixture(t, "Component.tsx",
 		`const element = <div className="px-4 py-4" />;`)
 
@@ -301,6 +308,7 @@ func TestCanonicalProposesNoFix(t *testing.T) {
 // correct code. A rule that fires on correct code is one somebody turns off, so the preconditions
 // are the rule rather than a detail of it.
 func TestPreconditionsAreCheckedNotAssumed(t *testing.T) {
+	t.Parallel()
 	correctCode := []struct {
 		name   string
 		source string
@@ -338,6 +346,7 @@ func TestPreconditionsAreCheckedNotAssumed(t *testing.T) {
 // what lost `border-x` in the first place. `bg-linear-to-b` is the case that shows the difference on
 // real code — the walk read it as root `bg` with value `linear-to-b`, and `bg-linear` is a root.
 func TestLongestRootWinsInCollapse(t *testing.T) {
+	t.Parallel()
 	system := unknownFixtureLiveSystem(t)
 
 	parts, canParse := splitCandidateIn("border-l", system)
@@ -384,6 +393,7 @@ func TestLongestRootWinsInCollapse(t *testing.T) {
 // Measured before the fix: 88 of the corpus's classes split differently, 84 of them because the
 // modifier was dropped.
 func TestSplitValueCarriesEverythingAfterTheRoot(t *testing.T) {
+	t.Parallel()
 	system := unknownFixtureLiveSystem(t)
 
 	testCases := []struct {
@@ -445,6 +455,7 @@ func TestSplitValueCarriesEverythingAfterTheRoot(t *testing.T) {
 // So the parts carry both forms. Measured on the corpus: 16 classes decode to something different
 // from what was written, every one an arbitrary value carrying `_` or the `(--x)` shorthand.
 func TestRebuiltClassIsWritable(t *testing.T) {
+	t.Parallel()
 	system := unknownFixtureLiveSystem(t)
 
 	for _, className := range []string{
@@ -477,6 +488,7 @@ func TestRebuiltClassIsWritable(t *testing.T) {
 // machine that lacks the package. That was not hypothetical for the class-order fixtures and this
 // file uses the same helper shape.
 func TestCanonicalFixturesActuallyRan(t *testing.T) {
+	t.Parallel()
 	packageRoot := unknownFixturePackageRoot()
 	if packageRoot == "" {
 		t.Fatalf(
@@ -497,6 +509,7 @@ func TestCanonicalFixturesActuallyRan(t *testing.T) {
 // A rule declaring no options at all made oxlint refuse the whole plugin with "does not accept
 // options", which failed as a silent zero-finding run rather than a crash.
 func TestIgnoredClassesAreExempt(t *testing.T) {
+	t.Parallel()
 	options := EnforceCanonicalClassesOptions{Ignore: []string{`^px-4$`}}
 
 	result := runCanonicalFixtureWithOptions(t, "Component.tsx",

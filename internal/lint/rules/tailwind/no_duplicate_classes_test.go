@@ -11,6 +11,7 @@ import (
 // The violation half. Each case is a class written twice, on one of the three surfaces the
 // configuration names.
 func TestNoDuplicateClassesReportsRepeats(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -88,6 +89,7 @@ func TestNoDuplicateClassesReportsRepeats(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDuplicateClasses, testCase.fileName, testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -100,6 +102,7 @@ func TestNoDuplicateClassesReportsRepeats(t *testing.T) {
 // defect it misses is the expensive one: a rule that fires on correct code gets disabled, and a
 // disabled rule enforces nothing.
 func TestNoDuplicateClassesStaysSilent(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -172,6 +175,7 @@ func TestNoDuplicateClassesStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDuplicateClasses, testCase.fileName, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -189,6 +193,7 @@ func TestNoDuplicateClassesStaysSilent(t *testing.T) {
 // long separator is `no-unnecessary-whitespace`'s, so on its own this rule leaves it, and the two
 // close the gap together in one pass (TestTailwindFixersComposeInOnePass).
 func TestNoDuplicateClassesFixIsCorrect(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name   string
 		source string
@@ -223,6 +228,7 @@ func TestNoDuplicateClassesFixIsCorrect(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", testCase.source)
 			rule_testing.ExpectFixedSource(t, result, testCase.want)
 		})
@@ -235,6 +241,7 @@ func TestNoDuplicateClassesFixIsCorrect(t *testing.T) {
 // The visible fragments genuinely repeat, so the finding is real. Rewriting from those fragments
 // would silently delete the interpolation, which is a fix that changes what the code means.
 func TestTemplateHoleIsReportedButNotFixed(t *testing.T) {
+	t.Parallel()
 	// A template literal is not read as a class literal at all today, so the guard is asserted
 	// directly against the reporting path rather than through the parser.
 	literal := ClassLiteral{
@@ -266,6 +273,7 @@ func TestTemplateHoleIsReportedButNotFixed(t *testing.T) {
 // So a deliberately narrowed reader runs against the same sources and is required to lose findings
 // that the real rule catches. A guard that has never returned a positive has not been shown to work.
 func TestAttributeOnlyReadingLosesFindings(t *testing.T) {
+	t.Parallel()
 	sourcesOnlyNonAttributeSurfacesCatch := []string{
 		`const merged = mergeClassNames('px-4 py-2 px-4');`,
 		`const buttonClassName = 'rounded-md rounded-md';`,
@@ -324,6 +332,7 @@ func TestAttributeOnlyReadingLosesFindings(t *testing.T) {
 // in silence. Each fixed case is quoted from what the plugin wrote for the same input. A glued
 // fragment such as `px-` is half a class the hole completes, and is never compared.
 func TestNoDuplicateClassesReadsTemplateRuns(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		name, source, want string
 	}{
@@ -344,6 +353,7 @@ func TestNoDuplicateClassesReadsTemplateRuns(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", testCase.source)
 			rule_testing.ExpectFixedSource(t, result, testCase.want)
 		})
@@ -356,6 +366,7 @@ func TestNoDuplicateClassesReadsTemplateRuns(t *testing.T) {
 // its own and leaves `flex ${size} flex` as written, so a fix would be the one rewrite of a class
 // string the plugin never makes. The finding is what keeps it from sitting there silently.
 func TestNoDuplicateClassesReportsARepeatAcrossAHoleWithoutAFix(t *testing.T) {
+	t.Parallel()
 	result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", "const merged = mergeClassNames(`flex ${size} flex`);")
 	rule_testing.ExpectFindings(t, result, "duplicateClass")
 	if len(result.Diagnostics[0].Fixes) != 0 {
@@ -365,6 +376,7 @@ func TestNoDuplicateClassesReportsARepeatAcrossAHoleWithoutAFix(t *testing.T) {
 
 // The template runs that hold no repeat, including glued fragments that look like one.
 func TestNoDuplicateClassesTemplateRunsStaySilent(t *testing.T) {
+	t.Parallel()
 	for _, source := range []string{
 		"const merged = mergeClassNames(`flex ${size} block`);",
 		"const merged = mergeClassNames(`px-${a} px-${b}`);",

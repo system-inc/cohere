@@ -8,48 +8,96 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/dop251/goja"
+	"github.com/system-inc/cohere/internal/format/oracletest"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
 // The tree oracle: the embedded markdown bundle's own parser, run by goja, the exact code the format
 // oracle runs. Every node of the Go tree must carry the same type, the same fields with the same values
 // (null distinct from absent), and the same positions, offsets converted from UTF-16 to bytes.
+//
+// The fixtures' trees are recorded (see oracletest) as the JSON text upstream's parser serializes, so no
+// JavaScript runs for them and the runtime is built only when they are recorded again. The corpus reads
+// files off disk, so its oracle stays live, with no golden.
 
 type treeOracle struct {
+	golden  *oracletest.Golden
+	once    sync.Once
 	runtime *goja.Runtime
+	err     error
 }
 
+// newTreeOracle answers from the test's golden.
 func newTreeOracle(t *testing.T) *treeOracle {
 	t.Helper()
+	return &treeOracle{golden: oracletest.Open(t, t.Name())}
+}
+
+// newLiveTreeOracle answers from the bundle's parser on every call.
+func newLiveTreeOracle(t *testing.T) *treeOracle {
+	t.Helper()
+	oracle := &treeOracle{}
+	oracle.once.Do(oracle.load)
+	if oracle.err != nil {
+		t.Fatal(oracle.err)
+	}
+	return oracle
+}
+
+func (oracle *treeOracle) load() {
 	bundles, err := prettier.Bundles()
 	if err != nil {
-		t.Fatal(err)
+		oracle.err = err
+		return
 	}
 	runtime := goja.New()
 	for _, name := range []string{"standalone.js", "plugins/markdown.js"} {
 		if _, err := runtime.RunString(string(bundles.Files[name])); err != nil {
-			t.Fatalf("evaluating %s: %v", name, err)
+			oracle.err = fmt.Errorf("evaluating %s: %w", name, err)
+			return
 		}
 	}
-	return &treeOracle{runtime: runtime}
+	oracle.runtime = runtime
 }
 
 // parse returns upstream's tree as generic JSON, with `data` (hast hints for HTML output) dropped.
 func (oracle *treeOracle) parse(text string) (any, error) {
-	oracle.runtime.Set("__text", text)
-	value, err := oracle.runtime.RunString(`JSON.stringify(prettierPlugins.markdown.parsers.markdown.parse(__text),
-		(key, value) => key === "data" ? undefined : value)`)
+	var serialized string
+	var err error
+	if oracle.golden == nil {
+		serialized, err = oracle.serialize(text)
+	} else {
+		serialized, err = oracle.golden.Answer(oracletest.Key("tree", text), func() (string, error) {
+			oracle.once.Do(oracle.load)
+			if oracle.err != nil {
+				return "", oracle.err
+			}
+			return oracle.serialize(text)
+		})
+	}
 	if err != nil {
 		return nil, err
 	}
 	var tree any
-	if err := json.Unmarshal([]byte(value.String()), &tree); err != nil {
+	if err := json.Unmarshal([]byte(serialized), &tree); err != nil {
 		return nil, err
 	}
 	return tree, nil
+}
+
+// serialize is upstream's tree for text, as the JSON text the bundle's parser and JSON.stringify give.
+func (oracle *treeOracle) serialize(text string) (string, error) {
+	oracle.runtime.Set("__text", text)
+	value, err := oracle.runtime.RunString(`JSON.stringify(prettierPlugins.markdown.parsers.markdown.parse(__text),
+		(key, value) => key === "data" ? undefined : value)`)
+	if err != nil {
+		return "", err
+	}
+	return value.String(), nil
 }
 
 // convertOffsets rewrites every position offset in upstream's tree from UTF-16 units to bytes.
@@ -314,7 +362,8 @@ func TestCorpusTreesMatchUpstream(t *testing.T) {
 	if root == "" {
 		t.Skip("set COHERE_MARKDOWN_CORPUS to a directory to compare every .md file under it")
 	}
-	oracle := newTreeOracle(t)
+	// The live oracle, not a golden: the corpus is whatever markdown is on disk.
+	oracle := newLiveTreeOracle(t)
 	total, failures := 0, 0
 	byDifference := map[string]int{}
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {

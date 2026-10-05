@@ -109,6 +109,7 @@ func TestNoMultiCompStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile, testCase.sourceText, testCase.options)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -244,6 +245,7 @@ func TestNoMultiCompFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -392,6 +394,7 @@ func TestNoMultiCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *test
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile, testCase.sourceText,
 				NoMultiCompOptions{IgnoreStateless: testCase.ignoreStateless})
 			if len(result.Diagnostics) != testCase.wantFindings {
@@ -457,6 +460,7 @@ func TestNoMultiCompAnchorsOnTheComponentNotTheDeclaration(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile, testCase.sourceText,
 				DefaultNoMultiCompOptions())
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -513,6 +517,7 @@ func TestNoMultiCompHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/Suffix.ts",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMultiComp, fileName, sourceText,
 				DefaultNoMultiCompOptions())
 			rule_testing.ExpectFindings(t, result, "onlyOneComponent")
@@ -544,6 +549,7 @@ func TestDecodeNoMultiCompOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeNoMultiCompOptions([]byte(testCase.raw))
 			if testCase.wantErr {
 				if err == nil {
@@ -664,6 +670,7 @@ func TestNoMultiCompCurriedFunctionsAreNotComponents(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile,
 				testCase.sourceText, DefaultNoMultiCompOptions())
 			rule_testing.ExpectClean(t, result)

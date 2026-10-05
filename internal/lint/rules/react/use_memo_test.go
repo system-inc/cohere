@@ -357,6 +357,7 @@ func TestUseMemoFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, UseMemo, useMemoFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.ids...)
 			if len(result.Diagnostics) == 0 {
@@ -531,6 +532,7 @@ func TestUseMemoStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, UseMemo, useMemoFile, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -591,6 +593,7 @@ func TestUseMemoMessages(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.id, func(t *testing.T) {
+			t.Parallel()
 			if testCase.message.Id != testCase.id {
 				t.Errorf("id is %q, want %q", testCase.message.Id, testCase.id)
 			}

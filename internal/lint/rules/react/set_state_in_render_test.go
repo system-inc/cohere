@@ -198,6 +198,7 @@ func TestSetStateInRenderFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := testCase.source
 			if testCase.prependImport {
 				source = reactImport + source
@@ -288,6 +289,7 @@ func TestSetStateInRenderStaysSilentOnTheCorpusAsWritten(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runSetStateFixture(t, testCase.source))
 		})
 	}
@@ -480,6 +482,7 @@ func TestSetStateInRenderStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runSetStateFixture(t, testCase.source))
 		})
 	}
@@ -552,6 +555,7 @@ func TestSetStateInRenderReportsInsideUseMemo(t *testing.T) {
 	t.Parallel()
 
 	t.Run("an unconditional call inside a useMemo callback", func(t *testing.T) {
+		t.Parallel()
 		result := runSetStateFixture(t, "import {useState, useMemo} from 'react';\n"+
 			"function Component() {\n"+
 			"  const [x, setX] = useState(0);\n"+
@@ -562,6 +566,7 @@ func TestSetStateInRenderReportsInsideUseMemo(t *testing.T) {
 	})
 
 	t.Run("a conditional call inside a useMemo callback still reports", func(t *testing.T) {
+		t.Parallel()
 		result := runSetStateFixture(t, "import {useState, useMemo} from 'react';\n"+
 			"function Component(props: {c: boolean}) {\n"+
 			"  const [x, setX] = useState(0);\n"+
@@ -730,6 +735,7 @@ func TestFixturesMatchTheVendoredCorpusByte(t *testing.T) {
 	directory := filepath.Join("conformance", "testdata", "fixtures")
 	for _, testCase := range cases {
 		t.Run(testCase.fileName, func(t *testing.T) {
+			t.Parallel()
 			vendored, err := os.ReadFile(filepath.Join(directory, testCase.fileName))
 			if err != nil {
 				t.Fatalf("reading the vendored fixture: %v", err)
@@ -824,6 +830,7 @@ func TestSetStateInRenderFindsASetterDeclaredInsideAUseMemo(t *testing.T) {
 	t.Parallel()
 
 	t.Run("declared and called inside a useMemo callback", func(t *testing.T) {
+		t.Parallel()
 		result := runSetStateFixture(t, "import {useState, useMemo} from 'react';\n"+
 			"function Component() {\n"+
 			"  const y = useMemo(() => { const [a, setA] = useState(1); setA(2); return a; }, []);\n"+
@@ -833,6 +840,7 @@ func TestSetStateInRenderFindsASetterDeclaredInsideAUseMemo(t *testing.T) {
 	})
 
 	t.Run("conditional inside a useMemo callback still reports", func(t *testing.T) {
+		t.Parallel()
 		result := runSetStateFixture(t, "import {useState, useMemo} from 'react';\n"+
 			"function Component(props: {c: boolean}) {\n"+
 			"  const y = useMemo(() => { const [a, setA] = useState(1); if (props.c) { setA(2); } return a; }, []);\n"+
@@ -842,6 +850,7 @@ func TestSetStateInRenderFindsASetterDeclaredInsideAUseMemo(t *testing.T) {
 	})
 
 	t.Run("the same body inside a useCallback is clean", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, runSetStateFixture(t, "import {useState, useCallback} from 'react';\n"+
 			"function Component() {\n"+
 			"  const f = useCallback(() => { const [a, setA] = useState(1); setA(2); }, []);\n"+
@@ -850,6 +859,7 @@ func TestSetStateInRenderFindsASetterDeclaredInsideAUseMemo(t *testing.T) {
 	})
 
 	t.Run("a plain nested arrow declaring its own setter is clean", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, runSetStateFixture(t, reactImport+
 			"function Component() {\n"+
 			"  const f = () => { const [a, setA] = useState(0); setA(1); };\n"+

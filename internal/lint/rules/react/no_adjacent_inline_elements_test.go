@@ -43,6 +43,7 @@ func TestNoAdjacentInlineElementsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "inlineElement")
 		})
@@ -80,6 +81,7 @@ func TestNoAdjacentInlineElementsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -98,6 +100,7 @@ func TestNoAdjacentInlineElementsHasNoFileSuffixGate(t *testing.T) {
 
 	for _, suffix := range []string{".tsx", ".ts"} {
 		t.Run(suffix, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(
 				t,
 				NoAdjacentInlineElements,
@@ -141,6 +144,7 @@ func TestNoAdjacentInlineElementsIgnoresWhitespaceInJsx(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -177,6 +181,7 @@ func TestNoAdjacentInlineElementsWhitespaceMattersInCreateElement(t *testing.T) 
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -218,6 +223,7 @@ func TestNoAdjacentInlineElementsDoesNotCrashWhereUpstreamDoes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -247,6 +253,7 @@ func TestNoAdjacentInlineElementsReportsOncePerContainer(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "inlineElement")
 		})
@@ -282,6 +289,7 @@ func TestNoAdjacentInlineElementsNameMatching(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -318,6 +326,7 @@ func TestNoAdjacentInlineElementsCreateElementShapes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -347,6 +356,7 @@ func TestNoAdjacentInlineElementsAnchorsOnTheContainer(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "inlineElement")

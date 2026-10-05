@@ -62,6 +62,7 @@ func TestNoThisInSfcStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText))
 		})
 	}
@@ -92,6 +93,7 @@ func TestNoThisInSfcFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText), "noThisInSfc")
 		})
@@ -143,6 +145,7 @@ func TestNoThisInSfcPointsAtTheKeywordAlone(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
@@ -233,6 +236,7 @@ func TestNoThisInSfcParentheses(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(t, result, "noThisInSfc")
@@ -285,6 +289,7 @@ func TestNoThisInSfcComponentBoundary(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(t, result, "noThisInSfc")
@@ -346,6 +351,7 @@ func TestNoThisInSfcNesting(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(t, result, "noThisInSfc")
@@ -384,6 +390,7 @@ func TestNoThisInSfcClassComponentAncestor(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(t, result, "noThisInSfc")
@@ -421,6 +428,7 @@ func TestNoThisInSfcEs5FactoryNameIsStrict(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(t, result, "noThisInSfc")
@@ -455,6 +463,7 @@ func TestNoThisInSfcAccessorSplit(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoThisInSfc, thisInSfcFile, testCase.sourceText)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(t, result, "noThisInSfc")

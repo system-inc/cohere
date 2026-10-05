@@ -27,6 +27,8 @@ import (
 // helper whose name matches something the shared utility layer already exports, because that is a
 // second implementation of a decision that already has a home.
 func TestRulePackagesDoNotShadowSharedUtilities(t *testing.T) {
+	t.Parallel()
+
 	shared := exportedUtilityNames(t)
 	if len(shared) == 0 {
 		// A census with nothing to compare against passes for the wrong reason, which is the same
@@ -58,6 +60,8 @@ func TestRulePackagesDoNotShadowSharedUtilities(t *testing.T) {
 // rule count, and it grows silently every time a porter needs something the shelf does not have
 // yet. Printed with `-v` so the figure in a task body can be re-derived rather than remembered.
 func TestRulePackageHelperCensus(t *testing.T) {
+	t.Parallel()
+
 	files, err := filepath.Glob("../../lint/rules/*/*.go")
 	if err != nil {
 		t.Fatalf("globbing rule files: %v", err)
@@ -274,6 +278,8 @@ var wrappedAccessors = []wrappedAccessor{
 // the comment where an author naturally writes one: the first exemption this guard demanded was
 // written above the line, and requiring it trailing would have made the guard shape the prose.
 func TestRulePackagesDoNotReachPastWrappedAccessors(t *testing.T) {
+	t.Parallel()
+
 	files, err := filepath.Glob("../../lint/rules/*/*.go")
 	if err != nil {
 		t.Fatalf("globbing rule files: %v", err)

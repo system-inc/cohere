@@ -24,6 +24,7 @@ import (
 //	'a ' + 'b'               silent
 
 func TestNoConcatenatedClassesReportsGluedFragments(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -80,6 +81,7 @@ func TestNoConcatenatedClassesReportsGluedFragments(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoConcatenatedClasses, testCase.fileName, testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -92,6 +94,7 @@ func TestNoConcatenatedClassesReportsGluedFragments(t *testing.T) {
 // reported every interpolated literal would produce 141 false positives on a tree that is actually
 // correct. Every case here is a shape that appears in real code and must stay silent.
 func TestNoConcatenatedClassesStaysSilent(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -186,6 +189,7 @@ func TestNoConcatenatedClassesStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoConcatenatedClasses, testCase.fileName, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -198,6 +202,7 @@ func TestNoConcatenatedClassesStaysSilent(t *testing.T) {
 // classes and three holes, that tells the reader nothing about which seam to fix. Naming the
 // fragment is the difference between an actionable finding and one that gets suppressed.
 func TestNoConcatenatedClassesNamesTheFragment(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name         string
 		source       string
@@ -222,6 +227,7 @@ func TestNoConcatenatedClassesNamesTheFragment(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoConcatenatedClasses, "Component.tsx", testCase.source)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("expected a finding, got none")
@@ -241,6 +247,7 @@ func TestNoConcatenatedClassesNamesTheFragment(t *testing.T) {
 // change what the markup renders. Asserting the absence keeps a later well-meaning change from
 // adding one without arguing for it.
 func TestNoConcatenatedClassesProposesNoFix(t *testing.T) {
+	t.Parallel()
 	result := rule_testing.Run(t, NoConcatenatedClasses, "Component.tsx",
 		"const element = <div className={`px-${size}`} />;")
 
@@ -265,6 +272,7 @@ func TestNoConcatenatedClassesProposesNoFix(t *testing.T) {
 // So the narrowed reading runs against the silent fixtures and is required to disagree. A rule whose
 // discrimination has never been exercised has been shown to detect, never to discriminate.
 func TestBoundaryReadingIsWhitespaceAware(t *testing.T) {
+	t.Parallel()
 	// Sources with an interpolation that must stay silent. A report-any-interpolation rule flags
 	// every one of these.
 	silentButInterpolated := []string{

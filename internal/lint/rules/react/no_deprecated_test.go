@@ -176,6 +176,7 @@ func TestNoDeprecatedFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDeprecated, noDeprecatedFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.descriptions) {
 				t.Fatalf("want %d findings, got %d: %v", len(testCase.descriptions),
@@ -275,6 +276,7 @@ func TestNoDeprecatedStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDeprecated, noDeprecatedFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -328,6 +330,7 @@ func TestNoDeprecatedSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDeprecated, noDeprecatedFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("want %d findings, got %d", len(testCase.want), len(result.Diagnostics))
@@ -363,6 +366,7 @@ func TestNoDeprecatedHasNoFileGate(t *testing.T) {
 		"/repository/source/Probe.jsx",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDeprecated, fileName, source)
 			rule_testing.ExpectFindings(t, result, "deprecated")
 		})

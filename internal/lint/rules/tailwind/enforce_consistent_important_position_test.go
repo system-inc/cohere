@@ -22,6 +22,7 @@ func runImportantPositionFixture(t *testing.T, source string) rule_testing.Resul
 
 // TestEnforceConsistentImportantPositionReports covers what upstream reports.
 func TestEnforceConsistentImportantPositionReports(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name   string
 		source string
@@ -72,6 +73,7 @@ func TestEnforceConsistentImportantPositionReports(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runImportantPositionFixture(t, testCase.source), "importantPosition")
 		})
 	}
@@ -79,6 +81,7 @@ func TestEnforceConsistentImportantPositionReports(t *testing.T) {
 
 // TestEnforceConsistentImportantPositionStaysSilent covers what upstream leaves alone.
 func TestEnforceConsistentImportantPositionStaysSilent(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name   string
 		source string
@@ -121,6 +124,7 @@ func TestEnforceConsistentImportantPositionStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runImportantPositionFixture(t, testCase.source))
 		})
 	}
@@ -131,6 +135,7 @@ func TestEnforceConsistentImportantPositionStaysSilent(t *testing.T) {
 // The option exists because a repository mid-migration wants to name its target rather than have
 // one read off its node_modules. Under `legacy` every expectation above inverts.
 func TestEnforceConsistentImportantPositionLegacy(t *testing.T) {
+	t.Parallel()
 	legacy := EnforceConsistentImportantPositionOptions{Position: importantPositionLegacy}
 
 	reported := rule_testing.RunWithOptions(t, EnforceConsistentImportantPosition, "Component.tsx",
@@ -144,6 +149,7 @@ func TestEnforceConsistentImportantPositionLegacy(t *testing.T) {
 
 // TestEnforceConsistentImportantPositionNamesBothSpellings pins the message content.
 func TestEnforceConsistentImportantPositionNamesBothSpellings(t *testing.T) {
+	t.Parallel()
 	result := runImportantPositionFixture(t, `const element = <div className="hover:!flex" />;`)
 	rule_testing.ExpectFindings(t, result, "importantPosition")
 

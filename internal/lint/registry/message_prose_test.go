@@ -33,6 +33,7 @@ import (
 // token test can tell the package from the verb. That one was found by reading the diff, and a
 // rename whose new name is an ordinary word still needs that reading.
 func TestMessagesDoNotNameInternalPackages(t *testing.T) {
+	t.Parallel()
 	packageNames := underscoredInternalPackageNames(t)
 	if len(packageNames) == 0 {
 		// An empty set matches nothing, and a guard with nothing to match passes for the wrong

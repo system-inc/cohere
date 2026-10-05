@@ -10,6 +10,7 @@ import (
 // The valid selector beside the miss is load-bearing: a validator that checks the files array as a
 // single OR would see modules/** match and let the stale generated-code selector remain silent.
 func TestZeroMatchOverrideSelectorIsRefused(t *testing.T) {
+	t.Parallel()
 	configuration := &Config{
 		Root: "/repo",
 		Overrides: []Override{{
@@ -37,6 +38,7 @@ func TestZeroMatchOverrideSelectorIsRefused(t *testing.T) {
 // TestEveryMatchingSelectorPasses is the other direction. Without it a validator that rejects every
 // override would satisfy the failure case above while making all real configurations unusable.
 func TestEveryMatchingSelectorPasses(t *testing.T) {
+	t.Parallel()
 	configuration := &Config{
 		Root: "/repo",
 		Overrides: []Override{
@@ -60,6 +62,7 @@ func TestEveryMatchingSelectorPasses(t *testing.T) {
 // population. An override cannot affect a file excluded before override resolution, so matching one
 // must not make the selector look alive.
 func TestASelectorReachingOnlyIgnoredFilesIsRefused(t *testing.T) {
+	t.Parallel()
 	configuration := &Config{
 		Root:           "/repo",
 		IgnorePatterns: []string{"generated/**"},
@@ -83,6 +86,7 @@ func TestASelectorReachingOnlyIgnoredFilesIsRefused(t *testing.T) {
 // TestAnOverrideWithoutSelectorsIsRefused covers the zero-length form of the same defect. There is
 // no pattern to misspell, but the block can never apply and previously disappeared just as quietly.
 func TestAnOverrideWithoutSelectorsIsRefused(t *testing.T) {
+	t.Parallel()
 	configuration := &Config{Overrides: []Override{{}}}
 
 	err := configuration.ValidateSelectors([]string{"index.ts"})

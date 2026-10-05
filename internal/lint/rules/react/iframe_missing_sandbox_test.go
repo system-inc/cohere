@@ -53,6 +53,7 @@ func TestIframeMissingSandboxFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -108,6 +109,7 @@ func TestIframeMissingSandboxStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -132,6 +134,7 @@ func TestIframeMissingSandboxHasNoFileSuffixGate(t *testing.T) {
 
 	for _, suffix := range []string{".tsx", ".ts"} {
 		t.Run(suffix, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(
 				t,
 				IframeMissingSandbox,
@@ -169,6 +172,7 @@ func TestIframeMissingSandboxAnchorsOnTheOpeningTag(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// RunTyped writes strings.TrimSpace(source)+"\n" to disk, so a span sliced from the Go
 			// literal is off by however much leading whitespace the literal carries. These carry
 			// none, and the transform is applied anyway so the slice is against the bytes the
@@ -247,6 +251,7 @@ func TestIframeMissingSandboxSeparatesPresentFromReadable(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -292,6 +297,7 @@ func TestIframeMissingSandboxSplitsOnSpacesOnly(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -354,6 +360,7 @@ func TestIframeMissingSandboxReadsOnlyIdentifierKeys(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -394,6 +401,7 @@ func TestIframeMissingSandboxMatchesUpstreamCreateElementResolution(t *testing.T
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -506,6 +514,7 @@ func TestIframeMissingSandboxIsSilentOnThePairOnlyOnACrossOriginFrame(t *testing
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
 			if !testCase.reports {
 				rule_testing.ExpectClean(t, result)

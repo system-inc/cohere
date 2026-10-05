@@ -10,6 +10,7 @@ import (
 // TestVersionRangeAdmitsExactlyWhatNpmWould pins each form against the versions on either side of its
 // edges. Every row names a version that a nearby wrong reading would decide the other way.
 func TestVersionRangeAdmitsExactlyWhatNpmWould(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		versionRange string
 		admitted     []string
@@ -49,6 +50,7 @@ func TestVersionRangeAdmitsExactlyWhatNpmWould(t *testing.T) {
 // TestVersionPrecedenceIsSemverOrder holds the comparison to semver.org's own example list, in both
 // directions, so a comparison that only ever answered "less" or "equal" fails.
 func TestVersionPrecedenceIsSemverOrder(t *testing.T) {
+	t.Parallel()
 	ordered := []string{"1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-alpha.beta", "1.0.0-beta", "1.0.0-beta.2", "1.0.0-beta.11", "1.0.0-rc.1", "1.0.0", "1.0.1", "1.1.0", "2.0.0"}
 	for index := 0; index+1 < len(ordered); index++ {
 		lower, _ := parseSemanticVersion(ordered[index])
@@ -63,6 +65,7 @@ func TestVersionPrecedenceIsSemverOrder(t *testing.T) {
 }
 
 func TestVersionRangeRefusesWhatItCannotReadExactly(t *testing.T) {
+	t.Parallel()
 	for _, text := range []string{"", "  ", "1.x", "*", "1.0", "1.0.0 - 2.0.0", "01.0.0", "^1.0", "||", "^1.0.0 ||", "1.0.0-", "latest"} {
 		if _, err := ParseVersionRange(text); err == nil {
 			t.Errorf("%q should be refused", text)
@@ -82,6 +85,7 @@ func writeSettingsFiles(t *testing.T, files map[string]string) string {
 }
 
 func TestOnlyTheProjectsOwnFilePinsCohere(t *testing.T) {
+	t.Parallel()
 	// The baseline: the project's own pin is read.
 	loaded, err := Load(writeSettingsFiles(t, map[string]string{"CohereSettings.json": `{"cohere": "^1.0.0"}`}))
 	if err != nil {
@@ -113,6 +117,8 @@ func TestOnlyTheProjectsOwnFilePinsCohere(t *testing.T) {
 	}
 }
 
+// Not parallel: it swaps the package's releaseVersion function to stand in for published releases, which
+// every test loading a config that pins cohere would see.
 func TestAPublishedReleaseOutsideThePinRefusesNamingBothVersions(t *testing.T) {
 	original := releaseVersion
 	t.Cleanup(func() { releaseVersion = original })

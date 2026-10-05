@@ -1,11 +1,26 @@
 package prettier
 
 import (
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/format/formatoptions"
 )
+
+// TestMain clears ForkPathVariable once for the package, so every engine a test builds loads the embedded
+// bundles whatever the developer's shell exports. Clearing it per test with t.Setenv would hold every test
+// that builds an engine serial, since a test that calls t.Setenv cannot run in parallel. The tests in
+// forkpath_test.go that set the variable do so with t.Setenv, serially, and go test finishes every serial
+// test, restoring what it set, before any parallel test runs.
+func TestMain(m *testing.M) {
+	if err := os.Unsetenv(ForkPathVariable); err != nil {
+		fmt.Fprintf(os.Stderr, "clearing %s: %v\n", ForkPathVariable, err)
+		os.Exit(1)
+	}
+	os.Exit(m.Run())
+}
 
 // newTestEngine builds an engine, and no longer skips when a fork is absent.
 //
@@ -30,9 +45,11 @@ import (
 // one. `go test` suppresses a passing package's output regardless of source, so the only thing that
 // changes a plain run is the package not passing -- which forecloses every message-shaped fix and
 // left vendoring as the only real one.
+//
+// The engine loads the embedded bundles because TestMain clears ForkPathVariable for the whole package,
+// so a fork a developer's shell points at cannot stand in for them.
 func newTestEngine(t *testing.T) *Engine {
 	t.Helper()
-	t.Setenv(ForkPathVariable, "")
 	engine, err := New(formatoptions.Default())
 	if err != nil {
 		t.Fatalf("building the engine from the embedded bundles: %v", err)
@@ -43,6 +60,8 @@ func newTestEngine(t *testing.T) *Engine {
 // TestFormatsCrampedSource is the known-dirty control. A formatter that has never changed anything
 // has not been shown to run at all.
 func TestFormatsCrampedSource(t *testing.T) {
+	t.Parallel()
+
 	engine := newTestEngine(t)
 	formatted, err := engine.Format("probe.ts", "const   x=1\n")
 	if err != nil {
@@ -56,6 +75,8 @@ func TestFormatsCrampedSource(t *testing.T) {
 // TestLeavesFormattedSourceAlone is the other half of the control. A formatter that rewrites
 // everything is as useless as one that rewrites nothing.
 func TestLeavesFormattedSourceAlone(t *testing.T) {
+	t.Parallel()
+
 	engine := newTestEngine(t)
 	source := "const x = 1;\n"
 	formatted, err := engine.Format("clean.ts", source)
@@ -73,6 +94,8 @@ func TestLeavesFormattedSourceAlone(t *testing.T) {
 // result without pumping the job queue writes the literal text "[object Promise]" into the file.
 // That is what the first working version produced.
 func TestPromiseIsDrained(t *testing.T) {
+	t.Parallel()
+
 	engine := newTestEngine(t)
 	formatted, err := engine.Format("probe.ts", "const x=1\n")
 	if err != nil {
@@ -87,6 +110,8 @@ func TestPromiseIsDrained(t *testing.T) {
 // are the exact thing a reimplementation loses silently, and the reason we run the fork rather than
 // stock Prettier.
 func TestForkCustomizationsSurvive(t *testing.T) {
+	t.Parallel()
+
 	engine := newTestEngine(t)
 	source := "function probe(a) {\n" +
 		"    if(a) {\n        a = 1;\n    }\n" +
@@ -113,6 +138,8 @@ func TestForkCustomizationsSurvive(t *testing.T) {
 // throwing, which inverted CommonMark's flanking calculation and turned "approximately 25K" into
 // strikethrough. The fix lives in the fork's build; this proves the bundles being loaded carry it.
 func TestMarkdownTildeIsNotDoubled(t *testing.T) {
+	t.Parallel()
+
 	engine := newTestEngine(t)
 	source := "Sizes: `Seed` (~25K tokens), `Warm` (~75K tokens).\n"
 	formatted, err := engine.Format("probe.md", source)
@@ -126,6 +153,8 @@ func TestMarkdownTildeIsNotDoubled(t *testing.T) {
 
 // TestUnhandledTypeIsAnError proves the engine refuses rather than silently passing a file through.
 func TestUnhandledTypeIsAnError(t *testing.T) {
+	t.Parallel()
+
 	engine := newTestEngine(t)
 	if _, err := engine.Format("probe.rb", "puts 1\n"); err == nil {
 		t.Fatal("formatting a .rb file succeeded, want an error")
@@ -138,6 +167,8 @@ func TestUnhandledTypeIsAnError(t *testing.T) {
 // TestSyntaxErrorSurfaces confirms a malformed file produces an error whose text the pipeline's
 // matcher recognizes as a parse failure rather than a formatter crash.
 func TestSyntaxErrorSurfaces(t *testing.T) {
+	t.Parallel()
+
 	engine := newTestEngine(t)
 	_, err := engine.Format("broken.ts", "const x = {{{ broken\n")
 	if err == nil {
@@ -152,6 +183,8 @@ func TestSyntaxErrorSurfaces(t *testing.T) {
 // depends on it: `<T,>` on a single-parameter generic arrow is required in .tsx and dropped in .ts, and
 // Prettier tells the two apart by the path, not by the parser. Without a filepath both keep the comma.
 func TestFilepathReachesPrettier(t *testing.T) {
+	t.Parallel()
+
 	engine := newTestEngine(t)
 	source := "const identity = <T,>(value: T) => value;\n"
 	for fileName, want := range map[string]string{

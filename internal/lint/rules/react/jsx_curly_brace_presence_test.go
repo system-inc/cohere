@@ -691,6 +691,7 @@ func TestJsxCurlyBracePresenceRepairsSource(t *testing.T) {
 		},
 	} {
 		t.Run(strconv.Itoa(index), func(t *testing.T) {
+			t.Parallel()
 			result := jsxCurlyBracePresenceRun(t, testCase.source, testCase.options)
 			rule_testing.ExpectFixedSource(t, result, testCase.want)
 		})

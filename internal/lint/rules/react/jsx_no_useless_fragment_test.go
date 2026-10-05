@@ -75,6 +75,7 @@ func TestJsxNoUselessFragmentFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runJsxNoUselessFragment(t, testCase.sourceText, testCase.rawOptions)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			want := testCase.wantFixed
@@ -135,6 +136,7 @@ func TestJsxNoUselessFragmentStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runJsxNoUselessFragment(t, testCase.sourceText, testCase.rawOptions))
 		})
 	}
@@ -244,6 +246,7 @@ func TestJsxNoUselessFragmentDeclinesToDropAttributes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runJsxNoUselessFragment(t, testCase.sourceText, "")
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			// The finding stands and the source is untouched. Both halves matter: a rule that went
@@ -306,6 +309,7 @@ func TestJsxNoUselessFragmentFixKeepsTypeScript(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runJsxNoUselessFragment(t, testCase.sourceText, "")
 			if got := applyJsxNoUselessFragmentFixes(t, result); got != testCase.wantFixed {
 				t.Errorf("the repair produced %q, want %q", got, testCase.wantFixed)
@@ -352,6 +356,7 @@ func TestJsxNoUselessFragmentSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runJsxNoUselessFragment(t, testCase.sourceText, "")
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
@@ -480,6 +485,7 @@ func TestJsxNoUselessFragmentMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T)
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runJsxNoUselessFragment(t, testCase.sourceText, ""), testCase.wantIds...)
 		})
 	}
@@ -503,6 +509,7 @@ func TestJsxNoUselessFragmentDecodesItsOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeJsxNoUselessFragmentOptions([]byte(testCase.raw))
 			if err != nil {
 				t.Fatalf("decoding %q: %v", testCase.raw, err)
@@ -594,6 +601,7 @@ func TestJsxNoUselessFragmentSurvivesShapesThatWouldPanic(t *testing.T) {
 
 	for index, sourceText := range sources {
 		t.Run(string(rune('a'+index)), func(t *testing.T) {
+			t.Parallel()
 			runJsxNoUselessFragment(t, sourceText, "")
 		})
 	}
@@ -694,6 +702,7 @@ func TestJsxNoUselessFragmentReadsBothFragmentSpellings(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runJsxNoUselessFragment(t, testCase.sourceText, ""), testCase.wantIds...)
 		})
 	}

@@ -488,6 +488,7 @@ func TestNoArrowFunctionLifecycleFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
@@ -775,6 +776,7 @@ func TestNoArrowFunctionLifecycleStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -803,6 +805,7 @@ func TestNoArrowFunctionLifecycleStaticSplit(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(t, result, "lifecycle")
@@ -847,6 +850,7 @@ func TestNoArrowFunctionLifecycleDeclinesUnrenderableParameters(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "lifecycle")
 
@@ -874,6 +878,7 @@ func TestNoArrowFunctionLifecycleKeepsTheHeadWhole(t *testing.T) {
 	t.Parallel()
 
 	t.Run("a comment before the arrow declines", func(t *testing.T) {
+		t.Parallel()
 		for _, sourceText := range []string{
 			"class H extends React.Component {\n  render = /* c */ () => {\n    return <div />;\n  };\n}\n",
 			"class H extends React.Component {\n  render /* c */ = () => {\n    return <div />;\n  };\n}\n",
@@ -905,6 +910,7 @@ func TestNoArrowFunctionLifecycleKeepsTheHeadWhole(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "lifecycle")
 			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
@@ -973,6 +979,7 @@ func TestNoArrowFunctionLifecycleAnchor(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "lifecycle")
 
@@ -996,6 +1003,7 @@ func TestNoArrowFunctionLifecycleHasNoFileSuffixGate(t *testing.T) {
 
 	for _, suffix := range []string{".tsx", ".ts"} {
 		t.Run(suffix, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoArrowFunctionLifecycle, "/repository/source/SuffixProbe"+suffix, source)
 			rule_testing.ExpectFindings(t, result, "lifecycle")
 		})

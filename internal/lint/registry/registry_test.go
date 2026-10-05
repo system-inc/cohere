@@ -25,6 +25,7 @@ import (
 // the process that will run it. It also catches the failure mode self-registration introduces,
 // where a rule package nothing imports contributes nothing and does not fail to compile.
 func TestEveryRuleIsRegistered(t *testing.T) {
+	t.Parallel()
 	declared := declaredRules(t)
 	registered := registeredRuleNames()
 
@@ -156,6 +157,7 @@ func isRuleLiteral(expression ast.Expr) bool {
 
 // The registry must not contain duplicates: a rule listed twice reports every finding twice.
 func TestNoDuplicateRules(t *testing.T) {
+	t.Parallel()
 	seen := make(map[string]bool)
 	for _, subject := range All() {
 		if seen[subject.Name] {
@@ -168,6 +170,7 @@ func TestNoDuplicateRules(t *testing.T) {
 // Count must reflect what All actually returns, since the coverage line reports it and a coverage
 // line that overstates what ran is the failure this tool exists to prevent.
 func TestCountMatchesAll(t *testing.T) {
+	t.Parallel()
 	if Count() != len(All()) {
 		t.Errorf("Count() = %d but All() returned %d rules", Count(), len(All()))
 	}

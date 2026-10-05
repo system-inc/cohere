@@ -156,6 +156,7 @@ func TestJsxKeyFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := decodeJsxKeyOptionsForTest(t, testCase.rawOptions)
 			result := rule_testing.RunWithOptions(t, JsxKey, jsxKeyFile, testCase.sourceText, options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -278,6 +279,7 @@ func TestJsxKeyStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := decodeJsxKeyOptionsForTest(t, testCase.rawOptions)
 			result := rule_testing.RunWithOptions(t, JsxKey, jsxKeyFile, testCase.sourceText, options)
 			rule_testing.ExpectClean(t, result)
@@ -357,6 +359,7 @@ func TestJsxKeySpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := decodeJsxKeyOptionsForTest(t, testCase.rawOptions)
 			result := rule_testing.RunWithOptions(t, JsxKey, jsxKeyFile, testCase.sourceText, options)
 			if len(result.Diagnostics) != len(testCase.want) {
@@ -451,6 +454,7 @@ func TestJsxKeyHasNoFileGate(t *testing.T) {
 		"/repository/source/Probe.js",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, JsxKey, fileName, source, nil)
 			rule_testing.ExpectFindings(t, result, "missingArrayKey")
 		})

@@ -11,6 +11,7 @@ import (
 // took, and each handle names a registered rule. An entry no rule renders is wording nobody reads, and
 // a handle on an unregistered rule renders into nothing.
 func TestEveryHouseMessageIsRenderedByARegisteredRule(t *testing.T) {
+	t.Parallel()
 	registered := map[string]bool{}
 	for _, registration := range All() {
 		registered[registration.Name] = true

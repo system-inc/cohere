@@ -13,6 +13,8 @@ import (
 // This formats the same JSX both ways and requires different bytes, the specific difference being
 // where `>` goes.
 func TestBracketSameLineReachesTheEngine(t *testing.T) {
+	t.Parallel()
+
 	source := "const element = <Component firstAttribute=\"a long value here\" secondAttribute=\"another long value\" third=\"x\">child</Component>;\n"
 
 	format := func(sameLine bool) string {

@@ -68,6 +68,7 @@ func TestNoUnusedClassComponentMethodsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoUnusedClassComponentMethods(t, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
@@ -131,6 +132,7 @@ func TestNoUnusedClassComponentMethodsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runNoUnusedClassComponentMethods(t, testCase.sourceText))
 		})
 	}
@@ -189,6 +191,7 @@ func TestNoUnusedClassComponentMethodsDefinitionVersusUse(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runNoUnusedClassComponentMethods(t, testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -217,6 +220,7 @@ func TestNoUnusedClassComponentMethodsStaticIsInvisible(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runNoUnusedClassComponentMethods(t, testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -260,6 +264,7 @@ func TestNoUnusedClassComponentMethodsKeyShapes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runNoUnusedClassComponentMethods(t, testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -331,6 +336,7 @@ func TestNoUnusedClassComponentMethodsLifecycleSets(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runNoUnusedClassComponentMethods(t, testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -358,6 +364,7 @@ func TestNoUnusedClassComponentMethodsDestructuringCountsAsUse(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runNoUnusedClassComponentMethods(t, testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -387,6 +394,7 @@ func TestNoUnusedClassComponentMethodsSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoUnusedClassComponentMethods(t, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
@@ -434,6 +442,7 @@ func TestNoUnusedClassComponentMethodsComponentGate(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runNoUnusedClassComponentMethods(t, testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -504,6 +513,7 @@ func TestNoUnusedClassComponentMethodsHasNoFileGate(t *testing.T) {
 		"/repository/source/NoUnusedClassComponentMethods.ts",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUnusedClassComponentMethods, fileName, source),
 				"unusedWithClass")
 		})
@@ -530,6 +540,7 @@ func TestNoUnusedClassComponentMethodsSurvivesShapesThatWouldPanic(t *testing.T)
 
 	for index, sourceText := range sources {
 		t.Run(string(rune('a'+index)), func(t *testing.T) {
+			t.Parallel()
 			runNoUnusedClassComponentMethods(t, sourceText)
 		})
 	}

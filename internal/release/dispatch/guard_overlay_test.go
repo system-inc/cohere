@@ -142,6 +142,8 @@ func writeOverlay(t *testing.T, target string, contents string) string {
 
 // The creating-getter guard reads an overlay GOFLAGS names: a GetLocals call that exists only in the
 // overlay is caught, and the working tree, which has none, is not what was read.
+//
+// Not parallel: it names its overlay in GOFLAGS with t.Setenv, which a parallel test may not call.
 func TestTheCreatingGetterGuardReadsTheGoFlagsOverlay(t *testing.T) {
 	root, err := filepath.Abs("../../..")
 	if err != nil {
@@ -166,6 +168,8 @@ func TestTheCreatingGetterGuardReadsTheGoFlagsOverlay(t *testing.T) {
 
 // The TypeReach guard reads an overlay GOFLAGS names: a Shapes claim added only in the overlay, to a rule
 // the scan already finds reading imported bodies, is caught.
+//
+// Not parallel: it names its overlay in GOFLAGS with t.Setenv, which a parallel test may not call.
 func TestTheTypeReachGuardReadsTheGoFlagsOverlay(t *testing.T) {
 	root, err := filepath.Abs("../../..")
 	if err != nil {
@@ -256,6 +260,8 @@ func plantShapesClaim(source []byte) ([]byte, error) {
 // The plant works on every rule there is, read back the way the scan reads a claim, so the probe above
 // cannot miss on whichever rule it happens to pick.
 func TestAShapesClaimPlantsIntoEveryRuleFile(t *testing.T) {
+	t.Parallel()
+
 	root, err := filepath.Abs("../../..")
 	if err != nil {
 		t.Fatal(err)
@@ -303,6 +309,8 @@ func TestAShapesClaimPlantsIntoEveryRuleFile(t *testing.T) {
 
 // The command line `go test -overlay` is refused, since it cannot reach the guard, and GOFLAGS is not.
 func TestAnOverlayFlagGoFlagsDoesNotCarryIsRefused(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		arguments string
 		goFlags   string

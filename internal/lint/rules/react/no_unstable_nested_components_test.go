@@ -649,6 +649,7 @@ func TestNoUnstableNestedComponentsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := DefaultNoUnstableNestedComponentsOptions()
 			if testCase.options != nil {
 				options = *testCase.options
@@ -1383,6 +1384,7 @@ func TestNoUnstableNestedComponentsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := DefaultNoUnstableNestedComponentsOptions()
 			if testCase.options != nil {
 				options = *testCase.options
@@ -1494,6 +1496,7 @@ func TestNoUnstableNestedComponentsSpansAndMessages(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
 				"Component.tsx", testCase.source, DefaultNoUnstableNestedComponentsOptions())
 			rule_testing.ExpectFindings(t, result, "unstableNestedComponent")
@@ -1781,6 +1784,7 @@ func TestNoUnstableNestedComponentsHookNamePattern(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.calleeName, func(t *testing.T) {
+			t.Parallel()
 			source := `function ParentComponent() {
   const X = ` + testCase.calleeName + `(() => {
     return () => <div />;
@@ -1869,6 +1873,7 @@ func TestNoUnstableNestedComponentsAttributeValueKinds(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
 				"Component.tsx", testCase.source, DefaultNoUnstableNestedComponentsOptions())
 			rule_testing.ExpectFindings(t, result, "unstableNestedComponent")
@@ -1947,6 +1952,7 @@ func TestNoUnstableNestedComponentsInsideClassComponents(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoUnstableNestedComponents,
 				"Component.tsx", testCase.source, DefaultNoUnstableNestedComponentsOptions())
 			rule_testing.ExpectFindings(t, result, "unstableNestedComponent")

@@ -96,6 +96,7 @@ func TestStaticPropertyPlacementStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
 				staticPropertyPlacementFile, testCase.sourceText,
 				staticPropertyPlacementDecode(t, testCase.rawOptions))
@@ -131,6 +132,7 @@ func TestStaticPropertyPlacementFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
 				staticPropertyPlacementFile, testCase.sourceText,
 				staticPropertyPlacementDecode(t, testCase.rawOptions))
@@ -214,6 +216,7 @@ func TestStaticPropertyPlacementPositionMatrix(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
 				staticPropertyPlacementFile, testCase.sourceText,
 				staticPropertyPlacementDecode(t, testCase.rawOptions))
@@ -281,6 +284,7 @@ func TestStaticPropertyPlacementAssignmentReceiver(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
 				staticPropertyPlacementFile, testCase.sourceText,
 				staticPropertyPlacementDecode(t, `["static public field"]`))
@@ -334,6 +338,7 @@ func TestStaticPropertyPlacementMessageText(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
 				staticPropertyPlacementFile, testCase.sourceText,
 				staticPropertyPlacementDecode(t, testCase.rawOptions))
@@ -383,6 +388,7 @@ func TestStaticPropertyPlacementSpans(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
 				staticPropertyPlacementFile, testCase.sourceText,
 				staticPropertyPlacementDecode(t, testCase.rawOptions))
@@ -438,6 +444,7 @@ func TestDecodeStaticPropertyPlacementOptions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeStaticPropertyPlacementOptions([]byte(testCase.raw))
 			if err != nil {
 				t.Fatalf("decode returned %v", err)
@@ -544,6 +551,7 @@ func TestStaticPropertyPlacementFlowAliases(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
 				staticPropertyPlacementFile, testCase.sourceText,
 				staticPropertyPlacementDecode(t, `["property assignment"]`))

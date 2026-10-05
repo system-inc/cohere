@@ -9,6 +9,7 @@ import (
 // report once tested the reverse, so a bare key against a prefixed registry name read as resolving
 // while the resolver left the rule unconfigured (#7ya3xwe follow-up, 2026-10-02).
 func TestKeyReachesRuleRunsOneWay(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		key, ruleName string
 		want          bool
@@ -42,6 +43,7 @@ func TestKeyReachesRuleRunsOneWay(t *testing.T) {
 // KeyReachesRule compares by position to avoid building a string, and must answer exactly as the formula
 // it replaced, `key == ruleName || strings.HasSuffix(key, "/"+ruleName)`, over every short key and name.
 func TestKeyReachesRuleMatchesTheFormulaItReplaced(t *testing.T) {
+	t.Parallel()
 	alphabet := []string{"", "a", "b", "/"}
 	var words []string
 	var grow func(prefix string, depth int)

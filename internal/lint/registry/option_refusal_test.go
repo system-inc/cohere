@@ -43,6 +43,7 @@ var optionListModes = []string{`"always"`, `"as-needed"`, `"never"`, `"functions
 
 // TestEveryDecoderRefusesAnUnknownTopLevelKey probes the object every decoder reads first.
 func TestEveryDecoderRefusesAnUnknownTopLevelKey(t *testing.T) {
+	t.Parallel()
 	probed, lenient, skipped := 0, 0, []string{}
 	for _, registration := range rule.Registered() {
 		name := registration.Rule.Name
@@ -144,12 +145,14 @@ var nestedOptionCases = []nestedOptionCase{
 }
 
 func TestEveryNestedOptionObjectRefusesAnUnknownKey(t *testing.T) {
+	t.Parallel()
 	registrations := map[string]rule.Registration{}
 	for _, registration := range rule.Registered() {
 		registrations[registration.Rule.Name] = registration
 	}
 	for _, testCase := range nestedOptionCases {
 		t.Run(testCase.rule+" "+testCase.refusal, func(t *testing.T) {
+			t.Parallel()
 			registration, registered := registrations[testCase.rule]
 			if !registered {
 				t.Fatalf("%s is not registered under that name", testCase.rule)

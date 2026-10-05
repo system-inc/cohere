@@ -121,6 +121,7 @@ func runUnknownFixtureWithOptions(
 }
 
 func TestNoUnknownClassesReportsTypos(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -199,6 +200,7 @@ func TestNoUnknownClassesReportsTypos(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runUnknownFixture(t, testCase.fileName, testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -210,6 +212,7 @@ func TestNoUnknownClassesReportsTypos(t *testing.T) {
 // Answering existence from the property tables produced 12 findings on valid classes across the real
 // corpus. These are those shapes, pinned so the rule cannot regress into asking the wrong question.
 func TestNoUnknownClassesStaysSilent(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -299,6 +302,7 @@ func TestNoUnknownClassesStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runUnknownFixture(t, testCase.fileName, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -310,6 +314,7 @@ func TestNoUnknownClassesStaysSilent(t *testing.T) {
 // Any project with hand-written CSS has class names Tailwind does not define. On the ahra tree those
 // are the five `ahralia-splash*` classes, and they are the entire real-world finding count.
 func TestUnknownIgnoreExemptsProjectClasses(t *testing.T) {
+	t.Parallel()
 	options := NoUnknownClassesOptions{Ignore: []string{`^ahralia-`}}
 
 	exempted := runUnknownFixtureWithOptions(t, "Component.tsx",
@@ -344,6 +349,7 @@ func TestUnknownIgnoreExemptsProjectClasses(t *testing.T) {
 // So the shortcut is implemented here and required to be wrong about classes the real rule gets
 // right.
 func TestExistenceIsNotReadFromPropertyTables(t *testing.T) {
+	t.Parallel()
 	system := unknownFixtureLiveSystem(t)
 
 	// Classes that are real and absent from the property tables.
@@ -389,6 +395,7 @@ func TestExistenceIsNotReadFromPropertyTables(t *testing.T) {
 // The complement is asserted beside it, since a rule that reports everything would pass the first
 // half alone.
 func TestKnownRootWithUnknownValueIsReported(t *testing.T) {
+	t.Parallel()
 	system := unknownFixtureLiveSystem(t)
 
 	if classExistsIn("text-huge", system) {
@@ -418,6 +425,7 @@ func TestKnownRootWithUnknownValueIsReported(t *testing.T) {
 // `flex` and `px-4` are asserted known on both. Without them the disagreement count would be
 // satisfiable by a rule that had simply stopped answering.
 func TestExistenceComesFromTheRepositoryRatherThanATable(t *testing.T) {
+	t.Parallel()
 	ahra := unknownFixtureLiveSystem(t)
 	independent := independentLiveSystem(t)
 
@@ -512,6 +520,7 @@ func TestExistenceComesFromTheRepositoryRatherThanATable(t *testing.T) {
 // to measure the leak said to delete it and assert the corrected behaviour instead, so this is that
 // assertion.
 func TestRepositoryNamesAreNoLongerVouchedForByTheFramework(t *testing.T) {
+	t.Parallel()
 	ahra := unknownFixtureLiveSystem(t)
 	independent := independentLiveSystem(t)
 
@@ -568,6 +577,7 @@ func TestRepositoryNamesAreNoLongerVouchedForByTheFramework(t *testing.T) {
 // still report, in the same program. A design system that built but resolved nothing would fail the
 // first; a rule that had stopped answering would fail the second.
 func TestUnknownClassFixturesActuallyRan(t *testing.T) {
+	t.Parallel()
 	packageRoot := unknownFixturePackageRoot()
 	if packageRoot == "" {
 		t.Fatalf(
@@ -678,6 +688,7 @@ func independentLiveSystem(t *testing.T) *tailwindengine.LoadedDesignSystem {
 // Read from the design system rather than listed, so a repository adding an `@utility` block joins
 // this test rather than needing to be added to it.
 func TestRepositoryUtilityRootsAreNeverReported(t *testing.T) {
+	t.Parallel()
 	system := unknownFixtureLiveSystem(t)
 	if system == nil {
 		t.Skip("no design system loaded")

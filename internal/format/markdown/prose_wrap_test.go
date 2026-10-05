@@ -3,11 +3,13 @@ package markdown
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/dop251/goja"
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/oracletest"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -16,25 +18,50 @@ import (
 // these fixtures run the same bundles in their own runtime with proseWrap "always" and "never", against
 // the port with the same setting.
 
-// proseWrapOracle formats markdown with the embedded bundles and a proseWrap of its own.
-type proseWrapOracle struct{ runtime *goja.Runtime }
+// proseWrapOracle formats markdown with the embedded bundles and a proseWrap of its own. Its answers are
+// recorded (see oracletest), so the runtime is built only when they are recorded again.
+type proseWrapOracle struct {
+	golden  *oracletest.Golden
+	once    sync.Once
+	runtime *goja.Runtime
+	err     error
+}
 
 func newProseWrapOracle(t *testing.T) *proseWrapOracle {
 	t.Helper()
+	return &proseWrapOracle{golden: oracletest.Open(t, t.Name())}
+}
+
+func (oracle *proseWrapOracle) load() {
 	bundles, err := prettier.Bundles()
 	if err != nil {
-		t.Fatal(err)
+		oracle.err = err
+		return
 	}
 	runtime := goja.New()
 	for _, name := range prettier.BundleFiles {
 		if _, err := runtime.RunString(string(bundles.Files[name])); err != nil {
-			t.Fatalf("evaluating %s: %v", name, err)
+			oracle.err = fmt.Errorf("evaluating %s: %w", name, err)
+			return
 		}
 	}
-	return &proseWrapOracle{runtime: runtime}
+	oracle.runtime = runtime
 }
 
+// format is the recorded answer for text, keyed by everything formatLive passes the bundles: the text, the
+// file path, the parser, the options and the proseWrap.
 func (oracle *proseWrapOracle) format(text string, options formatoptions.Options, proseWrap string) (string, error) {
+	key := oracletest.Key("proseWrap", text, "fixture.md", "markdown", fmt.Sprintf("%+v", options), proseWrap)
+	return oracle.golden.Answer(key, func() (string, error) {
+		oracle.once.Do(oracle.load)
+		if oracle.err != nil {
+			return "", oracle.err
+		}
+		return oracle.formatLive(text, options, proseWrap)
+	})
+}
+
+func (oracle *proseWrapOracle) formatLive(text string, options formatoptions.Options, proseWrap string) (string, error) {
 	oracle.runtime.Set("__source", text)
 	oracle.runtime.Set("__proseWrap", proseWrap)
 	oracle.runtime.Set("__printWidth", options.PrintWidth)

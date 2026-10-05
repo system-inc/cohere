@@ -74,6 +74,7 @@ func TestForbidElementsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(
 				t,
 				ForbidElements,
@@ -116,6 +117,7 @@ func TestForbidElementsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(
 				t,
 				ForbidElements,
@@ -141,6 +143,7 @@ func TestForbidElementsHasNoFileSuffixGate(t *testing.T) {
 
 	for _, suffix := range []string{".tsx", ".ts"} {
 		t.Run(suffix, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(
 				t,
 				ForbidElements,
@@ -177,6 +180,7 @@ func TestForbidElementsAnchorsOnTheName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// RunTyped writes strings.TrimSpace(source)+"\n" to disk, so the expectation is
 			// transformed the same way rather than sliced from the untransformed literal.
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
@@ -205,6 +209,7 @@ func TestForbidElementsLaterEntriesWin(t *testing.T) {
 	t.Parallel()
 
 	t.Run("the last of two notes is the one reported", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTypedWithOptions(
 			t, ForbidElements, forbidElementsFile, `<button />`,
 			forbidElementsOptions(t, `{"forbid":[{"element":"button","message":"use <Button> instead"},{"element":"button","message":"use <Button2> instead"}]}`),
@@ -219,6 +224,7 @@ func TestForbidElementsLaterEntriesWin(t *testing.T) {
 	// A string entry after an object entry ERASES the note, which is the direction a port storing
 	// the first match would get backwards.
 	t.Run("a bare string after an object drops the note", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTypedWithOptions(
 			t, ForbidElements, forbidElementsFile, `<button />`,
 			forbidElementsOptions(t, `{"forbid":[{"element":"button","message":"m"},"button"]}`),
@@ -227,6 +233,7 @@ func TestForbidElementsLaterEntriesWin(t *testing.T) {
 	})
 
 	t.Run("an object after a bare string adds the note", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTypedWithOptions(
 			t, ForbidElements, forbidElementsFile, `<button />`,
 			forbidElementsOptions(t, `{"forbid":["button",{"element":"button","message":"m"}]}`),
@@ -290,6 +297,7 @@ func TestForbidElementsArgumentShapes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(
 				t, ForbidElements, forbidElementsFile, testCase.sourceText,
 				forbidElementsOptions(t, testCase.rawOptions),
@@ -326,6 +334,7 @@ func TestForbidElementsCreateElementResolution(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(
 				t, ForbidElements, forbidElementsFile, testCase.sourceText,
 				forbidElementsOptions(t, `{"forbid":["button"]}`),
@@ -371,6 +380,7 @@ func TestDecodeForbidElementsOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("an empty body yields an empty list rather than an error", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeForbidElementsOptions(nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -385,6 +395,7 @@ func TestDecodeForbidElementsOptions(t *testing.T) {
 	})
 
 	t.Run("both arms of the union decode", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeForbidElementsOptions([]byte(`{"forbid":["a",{"element":"b","message":"m"}]}`))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -402,6 +413,7 @@ func TestDecodeForbidElementsOptions(t *testing.T) {
 	})
 
 	t.Run("order is preserved, which is what makes the last entry win", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeForbidElementsOptions([]byte(`{"forbid":["x","y","z"]}`))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -414,6 +426,7 @@ func TestDecodeForbidElementsOptions(t *testing.T) {
 	})
 
 	t.Run("a malformed body errors rather than silently emptying the list", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeForbidElementsOptions([]byte(`{"forbid":`)); err == nil {
 			t.Error("want an error for a truncated body")
 		}

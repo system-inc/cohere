@@ -45,6 +45,7 @@ func TestNoChildrenPropFires(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
 		})
@@ -106,6 +107,7 @@ func TestNoChildrenPropStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText))
 		})
 	}
@@ -140,6 +142,7 @@ func TestNoChildrenPropPointsAtTheName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoChildrenProp, childrenPropFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
@@ -208,6 +211,7 @@ func TestNoChildrenPropCoversEveryPropertyKind(t *testing.T) {
 	}
 	for _, sourceText := range reports {
 		t.Run("reports "+sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
 		})
@@ -230,6 +234,7 @@ func TestNoChildrenPropCoversEveryPropertyKind(t *testing.T) {
 	}
 	for _, sourceText := range silent {
 		t.Run("silent on "+sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText))
 		})
 	}
@@ -280,6 +285,7 @@ func TestNoChildrenPropReadsTheCalleeTheWayTheShelfDoes(t *testing.T) {
 	}
 	for _, sourceText := range reports {
 		t.Run("reports "+sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
 		})
@@ -291,6 +297,7 @@ func TestNoChildrenPropReadsTheCalleeTheWayTheShelfDoes(t *testing.T) {
 	}
 	for _, sourceText := range silent {
 		t.Run("silent on "+sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText))
 		})
 	}
@@ -356,6 +363,7 @@ func TestNoChildrenPropSurvivesDegenerateInput(t *testing.T) {
 		`<div {...{children: 1}} />;`,
 	} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			defer func() {
 				if recovered := recover(); recovered != nil {
 					t.Fatalf("panicked rather than reporting: %v", recovered)

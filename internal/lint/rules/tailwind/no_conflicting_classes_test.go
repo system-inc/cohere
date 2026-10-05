@@ -83,6 +83,7 @@ func runConflictFixtureWithOptions(
 //	flex items-center         silent
 
 func TestNoConflictingClassesReportsSymmetrically(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -139,6 +140,7 @@ func TestNoConflictingClassesReportsSymmetrically(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runConflictFixture(t, testCase.fileName, testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -150,6 +152,7 @@ func TestNoConflictingClassesReportsSymmetrically(t *testing.T) {
 // Each of these is a case a reasonable port reports and upstream does not, so getting them wrong
 // means firing on correct code, which is how a rule gets turned off.
 func TestNoConflictingClassesStaysSilent(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -246,6 +249,7 @@ func TestNoConflictingClassesStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runConflictFixture(t, testCase.fileName, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -263,6 +267,7 @@ func TestNoConflictingClassesStaysSilent(t *testing.T) {
 // This was caught by `@system_cohere_lint_fix`'s research pass rather than by reading the source,
 // where the `autofix` flag reads as an instruction.
 func TestConflictingClassesProposeSuggestionsNotFixes(t *testing.T) {
+	t.Parallel()
 	result := runConflictFixture(t, "Component.tsx",
 		`const element = <div className="flex block" />;`)
 
@@ -287,6 +292,7 @@ func TestConflictingClassesProposeSuggestionsNotFixes(t *testing.T) {
 // That is the same shortcut, in a different guise, that silently stopped `border-x` being reported
 // during the migration.
 func TestPropertyLookupUsesTheLongestRoot(t *testing.T) {
+	t.Parallel()
 	designSystem := DesignSystemResult{System: unknownFixtureLiveSystem(t)}
 
 	// The real lookup.
@@ -340,6 +346,7 @@ func TestPropertyLookupUsesTheLongestRoot(t *testing.T) {
 // coming from a table: `synthetic-static` sets `display` and `opacity`, and no generated table in
 // this repository contains the name.
 func TestRepositoryUtilitiesAreCompiledRatherThanLookedUp(t *testing.T) {
+	t.Parallel()
 	packageRoot := unknownFixturePackageRoot()
 	if packageRoot == "" {
 		t.Skip("no installed tailwindcss on this machine")
@@ -416,6 +423,7 @@ func TestRepositoryUtilitiesAreCompiledRatherThanLookedUp(t *testing.T) {
 //
 // Pinned on the CURRENT behaviour so closing it upstream breaks this test deliberately.
 func TestStaticRepositoryUtilitiesStillReadFromTheFrameworkTables(t *testing.T) {
+	t.Parallel()
 	independent := DesignSystemResult{System: independentLiveSystem(t)}
 
 	if _, canResolve := resolveClassFactsIn("synthetic-static", independent); canResolve {
@@ -438,6 +446,7 @@ func TestStaticRepositoryUtilitiesStillReadFromTheFrameworkTables(t *testing.T) 
 // package whose every case skipped, so a mistake in where the walk starts looks identical to a
 // machine that lacks the package.
 func TestConflictFixturesActuallyRan(t *testing.T) {
+	t.Parallel()
 	packageRoot := unknownFixturePackageRoot()
 	if packageRoot == "" {
 		t.Fatalf(
@@ -458,6 +467,7 @@ func TestConflictFixturesActuallyRan(t *testing.T) {
 // Two classes conflict only in the same state. Comparing bare names reports `flex hover:block`,
 // which is correct code, and a rule that fires on correct code is one somebody turns off.
 func TestVariantsAreComparedNotStripped(t *testing.T) {
+	t.Parallel()
 	sameVariant := runConflictFixture(t, "Component.tsx",
 		`const element = <div className="hover:flex hover:block" />;`)
 	if len(sameVariant.Diagnostics) == 0 {
@@ -492,6 +502,7 @@ func TestVariantsAreComparedNotStripped(t *testing.T) {
 // repository writes a nested `@utility` block and a test that could not construct the case would be
 // asserting its absence.
 func TestSelectorShapeCannotProduceAWrongFinding(t *testing.T) {
+	t.Parallel()
 	packageRoot := unknownFixturePackageRoot()
 	if packageRoot == "" {
 		t.Skip("no installed tailwindcss on this machine")

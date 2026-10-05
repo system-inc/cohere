@@ -20,6 +20,7 @@ import (
 // backtick and the interpolation opener included, so a fix written against the untrimmed range
 // deletes both and leaves a file that does not parse.
 func TestClassSegmentRangesCoverExactlyTheirText(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name         string
 		source       string
@@ -52,6 +53,7 @@ func TestClassSegmentRangesCoverExactlyTheirText(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			segments, source := segmentsOf(t, testCase.source)
 
 			if len(segments) != len(testCase.wantSegments) {
@@ -84,6 +86,7 @@ func TestClassSegmentRangesCoverExactlyTheirText(t *testing.T) {
 // separator between the substituted value and the neighbouring class. Getting these backwards fuses
 // two class names into one that does not exist.
 func TestClassSegmentHoleFlags(t *testing.T) {
+	t.Parallel()
 	segments, _ := segmentsOf(t, "const element = <div className={`a ${x} b ${y} c`} />;")
 
 	if len(segments) != 3 {
@@ -113,6 +116,7 @@ func TestClassSegmentHoleFlags(t *testing.T) {
 // question and returns nothing when every seam is well spaced. Reusing it here would have skipped
 // exactly the templates that are otherwise well written.
 func TestClassSegmentsReadTemplatesWithNoBoundaryDefects(t *testing.T) {
+	t.Parallel()
 	segments, _ := segmentsOf(t, "const element = <div className={`flex  ${x}  gap-2`} />;")
 
 	if len(segments) == 0 {

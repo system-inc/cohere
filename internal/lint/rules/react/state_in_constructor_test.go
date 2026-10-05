@@ -136,6 +136,7 @@ func TestStateInConstructorFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runStateInConstructor(t, testCase.mode, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -326,6 +327,7 @@ func TestStateInConstructorStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runStateInConstructor(t, testCase.mode, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -390,6 +392,7 @@ class Foo extends React.Component {
 		"/repository/source/Suffix.js",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, StateInConstructor, fileName, source)
 			rule_testing.ExpectFindings(t, result, "stateInitConstructor")
 		})
@@ -438,6 +441,7 @@ func TestStateInConstructorKeyShapes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := "\nclass Foo extends React.Component {\n  " + testCase.member +
 				"\n  render() { return null; }\n}\n"
 			result := runStateInConstructor(t, StateInConstructorAlways, source)
@@ -483,6 +487,7 @@ func TestStateInConstructorNeverTargets(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := "\nclass Foo extends React.Component {\n" +
 				"  constructor(props) {\n    super(props);\n    " + testCase.statement +
 				"\n  }\n  render() { return null; }\n}\n"
@@ -521,6 +526,7 @@ func TestStateInConstructorNearestClassDecides(t *testing.T) {
 	t.Parallel()
 
 	t.Run("plain class inside a component, Always", func(t *testing.T) {
+		t.Parallel()
 		source := `
 class Foo extends React.Component {
   render() {
@@ -534,6 +540,7 @@ class Foo extends React.Component {
 	})
 
 	t.Run("plain class inside a component constructor, Never", func(t *testing.T) {
+		t.Parallel()
 		// Silent because the NEAREST class is Inner, and Inner is not a component. This is the
 		// component gate declining, not the constructor walk: see TestStateInConstructorWalkCrosses
 		// a class boundary for the proof that the walk itself goes straight through.
@@ -551,6 +558,7 @@ class Foo extends React.Component {
 	})
 
 	t.Run("component class inside a component reports on its own", func(t *testing.T) {
+		t.Parallel()
 		source := `
 class Foo extends React.Component {
   render() {
@@ -611,6 +619,7 @@ func TestStateInConstructorComponentGate(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := "\nclass Foo" + testCase.heritage +
 				" {\n  state = { bar: 0 };\n  render() { return null; }\n}\n"
 			result := runStateInConstructor(t, StateInConstructorAlways, source)
@@ -628,6 +637,7 @@ func TestStateInConstructorClassExpression(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Always", func(t *testing.T) {
+		t.Parallel()
 		source := `
 const Foo = class extends React.Component {
   state = { bar: 0 };
@@ -639,6 +649,7 @@ const Foo = class extends React.Component {
 	})
 
 	t.Run("Never", func(t *testing.T) {
+		t.Parallel()
 		source := `
 const Foo = class extends React.Component {
   constructor(props) { super(props); this.state = {}; }
@@ -694,6 +705,7 @@ func TestStateInConstructorSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runStateInConstructor(t, testCase.mode, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
@@ -745,6 +757,7 @@ func TestDecodeStateInConstructorOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("no options at all means Always", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeStateInConstructorOptions(nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -755,6 +768,7 @@ func TestDecodeStateInConstructorOptions(t *testing.T) {
 	})
 
 	t.Run("an empty object means Always", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeStateInConstructorOptions([]byte(`{}`))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -765,6 +779,7 @@ func TestDecodeStateInConstructorOptions(t *testing.T) {
 	})
 
 	t.Run("an explicit Never is kept", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeStateInConstructorOptions([]byte(`{"mode":"Never"}`))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -775,12 +790,14 @@ func TestDecodeStateInConstructorOptions(t *testing.T) {
 	})
 
 	t.Run("an unknown mode is refused", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeStateInConstructorOptions([]byte(`{"mode":"sometimes"}`)); err == nil {
 			t.Error("wanted an error naming the unknown mode")
 		}
 	})
 
 	t.Run("upstream's own spelling is refused rather than silently ignored", func(t *testing.T) {
+		t.Parallel()
 		// Guarding the migration: someone copying ESLint's config would write the kebab spelling,
 		// and silently reading that as Always would enforce the opposite of what they asked for.
 		if _, err := DecodeStateInConstructorOptions([]byte(`{"mode":"never"}`)); err == nil {
@@ -857,6 +874,7 @@ class Outer extends React.Component {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runStateInConstructor(t, StateInConstructorNever, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -895,6 +913,7 @@ func TestStateInConstructorNeverRequiresAnAssignment(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := "\nclass Foo extends React.Component {\n" +
 				"  constructor(props) {\n    super(props);\n    " + testCase.statement +
 				"\n  }\n  render() { return null; }\n}\n"

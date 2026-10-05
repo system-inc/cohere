@@ -46,6 +46,7 @@ func TestJsxFragmentsStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile, testCase.sourceText, testCase.options)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -75,6 +76,7 @@ func TestJsxFragmentsFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
 		})
@@ -107,6 +109,7 @@ func TestJsxFragmentsTypeArgumentsAreReportedAndNotRewritten(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile,
 				testCase.sourceText, JsxFragmentsOptions{Mode: JsxFragmentsSyntax})
 			rule_testing.ExpectFindings(t, result, "preferFragment")
@@ -157,6 +160,7 @@ func TestJsxFragmentsSpans(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {
@@ -238,6 +242,7 @@ func TestDecodeJsxFragmentsOptions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeJsxFragmentsOptions([]byte(testCase.raw))
 			if err != nil {
 				t.Fatalf("decode returned %v", err)
@@ -368,6 +373,7 @@ func TestJsxFragmentsShapesUpstreamDoesNotWrite(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile,
 				testCase.sourceText, testCase.options)
 			if len(testCase.messageIds) == 0 {
@@ -472,6 +478,7 @@ func TestJsxFragmentsSurvivorShapes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile,
 				testCase.sourceText, JsxFragmentsOptions{Mode: JsxFragmentsSyntax})
 			if len(testCase.messageIds) == 0 {
@@ -511,6 +518,7 @@ func TestJsxFragmentsNonReactSources(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile,
 				testCase.sourceText, JsxFragmentsOptions{Mode: JsxFragmentsSyntax})
 			rule_testing.ExpectClean(t, result)

@@ -257,6 +257,7 @@ func unmarshalsItself(named *types.Named) bool {
 
 // TestEveryOptionDecodeIsStrictAndEveryOptionFieldDeclaresItsKey is the guard over the rules tree.
 func TestEveryOptionDecodeIsStrictAndEveryOptionFieldDeclaresItsKey(t *testing.T) {
+	t.Parallel()
 	rulesRoot, err := filepath.Abs("../rules")
 	if err != nil {
 		t.Fatal(err)
@@ -300,6 +301,7 @@ func TestEveryOptionDecodeIsStrictAndEveryOptionFieldDeclaresItsKey(t *testing.T
 // TestTheOptionDecodingGuardSeesALooseDecodeAndAnUntaggedField runs the same walk over a planted
 // package, so a clean result above is a measurement rather than a matcher that never matches.
 func TestTheOptionDecodingGuardSeesALooseDecodeAndAnUntaggedField(t *testing.T) {
+	t.Parallel()
 	plantedRoot, err := filepath.Abs("testdata/optiondecoding")
 	if err != nil {
 		t.Fatal(err)

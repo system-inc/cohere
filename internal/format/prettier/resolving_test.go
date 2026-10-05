@@ -23,6 +23,8 @@ func writeFile(t *testing.T, path string, contents string) {
 // The JSX is long enough to break, so bracketSameLine decides where `>` lands. If Resolving applied one
 // config to both, the two outputs would put it in the same place.
 func TestResolvingFormatsEachFileWithItsOwnConfig(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	apart := filepath.Join(root, "apart")
 	together := filepath.Join(root, "together")
@@ -63,6 +65,8 @@ func TestResolvingFormatsEachFileWithItsOwnConfig(t *testing.T) {
 
 // TestResolvingRefusesAtConstructionNotMidRun pins why the first resolution is eager.
 func TestResolvingRefusesAtConstructionNotMidRun(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "prettier.config.js"), "module.exports = {}")
 	if _, err := NewResolving(root); err == nil {

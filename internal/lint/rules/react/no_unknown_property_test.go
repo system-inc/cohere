@@ -141,6 +141,7 @@ func TestNoUnknownPropertyFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := noUnknownPropertyOptions(t, testCase.rawOptions)
 			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -321,6 +322,7 @@ func TestNoUnknownPropertyStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := noUnknownPropertyOptions(t, testCase.rawOptions)
 			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, options)
 			rule_testing.ExpectClean(t, result)
@@ -353,6 +355,7 @@ func TestNoUnknownPropertyRepairs(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(t, ``))
 			rule_testing.ExpectFindings(t, result, "unknownPropWithStandardName")
 			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
@@ -381,6 +384,7 @@ func TestNoUnknownPropertyDoesNotRepairWhatItCannotName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(t, testCase.rawOptions))
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
@@ -431,6 +435,7 @@ func TestNoUnknownPropertyMessageText(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(t, testCase.rawOptions))
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
@@ -463,6 +468,7 @@ func TestNoUnknownPropertyAnchor(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(t, ``))
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
@@ -485,14 +491,17 @@ func TestNoUnknownPropertyIgnoreOption(t *testing.T) {
 	t.Parallel()
 
 	t.Run("the written spelling exempts", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div class="x" />`, noUnknownPropertyOptions(t, `{"ignore":["class"]}`))
 		rule_testing.ExpectClean(t, result)
 	})
 	t.Run("the canonical spelling does not exempt the written one", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div class="x" />`, noUnknownPropertyOptions(t, `{"ignore":["className"]}`))
 		rule_testing.ExpectFindings(t, result, "unknownPropWithStandardName")
 	})
 	t.Run("an unrelated entry exempts nothing", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div class="x" />`, noUnknownPropertyOptions(t, `{"ignore":["other"]}`))
 		rule_testing.ExpectFindings(t, result, "unknownPropWithStandardName")
 	})
@@ -506,18 +515,22 @@ func TestNoUnknownPropertyRequireDataLowercase(t *testing.T) {
 	t.Parallel()
 
 	t.Run("off by default", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div data-Foo="x" />`, noUnknownPropertyOptions(t, ``))
 		rule_testing.ExpectClean(t, result)
 	})
 	t.Run("explicitly false", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div data-Foo="x" />`, noUnknownPropertyOptions(t, `{"requireDataLowercase":false}`))
 		rule_testing.ExpectClean(t, result)
 	})
 	t.Run("on reports", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div data-Foo="x" />`, noUnknownPropertyOptions(t, `{"requireDataLowercase":true}`))
 		rule_testing.ExpectFindings(t, result, "dataLowercaseRequired")
 	})
 	t.Run("on leaves a lowercase data attribute alone", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div data-foo="x" />`, noUnknownPropertyOptions(t, `{"requireDataLowercase":true}`))
 		rule_testing.ExpectClean(t, result)
 	})
@@ -541,6 +554,7 @@ func TestNoUnknownPropertyHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/NoUnknownProperty.js",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoUnknownProperty, fileName, source, noUnknownPropertyOptions(t, ``))
 			rule_testing.ExpectFindings(t, result, "unknownPropWithStandardName")
 		})
@@ -552,6 +566,7 @@ func TestDecodeNoUnknownPropertyOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("an empty body carries upstream's defaults", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoUnknownPropertyOptions(nil)
 		if err != nil {
 			t.Fatalf("decoding an empty body: %v", err)
@@ -569,6 +584,7 @@ func TestDecodeNoUnknownPropertyOptions(t *testing.T) {
 	})
 
 	t.Run("both keys decode", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoUnknownPropertyOptions([]byte(`{"ignore":["a","b"],"requireDataLowercase":true}`))
 		if err != nil {
 			t.Fatalf("decoding both keys: %v", err)

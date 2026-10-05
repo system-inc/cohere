@@ -23,6 +23,7 @@ import (
 //	flex items-center         silent
 
 func TestNoDeprecatedClassesReportsRenames(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -112,6 +113,7 @@ func TestNoDeprecatedClassesReportsRenames(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDeprecatedClasses, testCase.fileName, testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -119,6 +121,7 @@ func TestNoDeprecatedClassesReportsRenames(t *testing.T) {
 }
 
 func TestNoDeprecatedClassesStaysSilent(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -171,6 +174,7 @@ func TestNoDeprecatedClassesStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDeprecatedClasses, testCase.fileName, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -184,6 +188,7 @@ func TestNoDeprecatedClassesStaysSilent(t *testing.T) {
 // has to put the prefix back, so a port that got the reassembly wrong would produce a class that
 // renders differently rather than one that fails to compile.
 func TestNoDeprecatedClassesFixMatchesUpstream(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		source   string
@@ -236,6 +241,7 @@ func TestNoDeprecatedClassesFixMatchesUpstream(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDeprecatedClasses, "Component.tsx", testCase.source)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("expected a finding, got none")
@@ -257,6 +263,7 @@ func TestNoDeprecatedClassesFixMatchesUpstream(t *testing.T) {
 // `bg-black/50` and requires knowing which color the author meant. A fix here would have to invent
 // one.
 func TestRemovedUtilitiesProposeNoFix(t *testing.T) {
+	t.Parallel()
 	result := rule_testing.Run(t, NoDeprecatedClasses, "Component.tsx",
 		`const element = <div className="bg-opacity-50" />;`)
 
@@ -274,6 +281,7 @@ func TestRemovedUtilitiesProposeNoFix(t *testing.T) {
 // passes every bare fixture and silently misses every prefixed one, which in real markup is most of
 // them. This asserts the real rule catches what that shortcut drops.
 func TestMatchingTheRawClassNameLosesFindings(t *testing.T) {
+	t.Parallel()
 	// Variant-prefixed only. `flex-shrink-0!` is deliberately absent: its `!` is swallowed by the
 	// `(.*)` capture, so the raw match happens to hit it and it would not demonstrate the defect.
 	// It would also produce a wrong replacement (`shrink-0!` via the capture rather than via
@@ -309,6 +317,8 @@ func TestMatchingTheRawClassNameLosesFindings(t *testing.T) {
 //
 // A 4.1 rename is not a defect for someone on 4.0, and reporting it would be noise on correct code.
 // The gate is exercised by pinning the version rather than by installing another Tailwind.
+// Not parallel: it swaps the package variable tailwindVersionForDeprecations, which NoDeprecatedClasses
+// reads on every run, and restores it with a defer.
 func TestVersionGateHoldsDeprecationsBack(t *testing.T) {
 	original := tailwindVersionForDeprecations
 	defer func() { tailwindVersionForDeprecations = original }()
@@ -343,6 +353,7 @@ func TestVersionGateHoldsDeprecationsBack(t *testing.T) {
 // Asserting the dissection directly means a future change to the patterns cannot quietly start
 // relying on the capture to carry punctuation.
 func TestImportanceIsStrippedBeforeMatching(t *testing.T) {
+	t.Parallel()
 	variants, base, important := dissectClass("sm:hover:flex-grow-2!")
 
 	if variants != "sm:hover:" {

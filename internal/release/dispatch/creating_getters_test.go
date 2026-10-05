@@ -24,6 +24,8 @@ var creatingGetters = map[string]bool{"GetLocals": true, "GetMembers": true, "Ge
 
 // No rule code calls a compiler getter that creates what it returns.
 func TestRulesCallNoCompilerGetterThatWrites(t *testing.T) {
+	t.Parallel()
+
 	for _, call := range creatingGetterCalls(t, guardOverlay(t)) {
 		t.Errorf("%s, which creates the table when it is missing and so writes to a node or symbol other "+
 			"workers read; read it without creating it (node.Locals(), symbol.Members, symbol.Exports)", call)
@@ -87,6 +89,8 @@ func creatingGetterCalls(t *testing.T, overlay map[string][]byte) []string {
 
 // The scan sees a creating getter where one is called: planted into no-shadow, it is named.
 func TestTheCreatingGetterScanSeesAPlantedCall(t *testing.T) {
+	t.Parallel()
+
 	root, err := filepath.Abs("../../..")
 	if err != nil {
 		t.Fatal(err)

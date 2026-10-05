@@ -182,6 +182,10 @@ func designSystemWalk(t *testing.T, root string, subject rule.Rule) *program.Gra
 // files because its scan was redone per file, while its own comment claimed it happened once. That
 // failure has no symptom other than time: every finding is correct, every test passes, and the run
 // is twenty-five times slower. So the claim is a counter here rather than a sentence.
+// Not parallel: it resets the package designSystemCache and asserts the process-wide
+// tailwindengine.BuildsSoFar moved by exactly one, so a parallel test building a design system or walking
+// another program (which evicts the cache's one slot) would add builds and hand later files a different
+// pointer.
 func TestDesignSystemIsBuiltOncePerProgram(t *testing.T) {
 	resetDesignSystemCacheForTest()
 
@@ -244,6 +248,9 @@ func TestDesignSystemIsBuiltOncePerProgram(t *testing.T) {
 // Mutating the key to nothing — deleting the `designSystemCache.program == ctx.Program` comparison
 // so any cached result is returned — makes this test fail on the entry-point assertion below, which
 // is what makes the key load-bearing rather than decorative.
+// Not parallel: it resets the package designSystemCache, the one slot every Tailwind rule's design system
+// is cached in, and then asserts on what that slot holds, so it walks its two programs in turn with no
+// other test's program taking the slot between them.
 func TestDesignSystemCacheKeyIsTheProgram(t *testing.T) {
 	resetDesignSystemCacheForTest()
 
@@ -283,6 +290,9 @@ func TestDesignSystemCacheKeyIsTheProgram(t *testing.T) {
 // The test above proves a second program does not read the first's data. This proves it actually
 // gets one of its own, which a cache that returned an error on every miss would also pass the first
 // test while failing every rule.
+// Not parallel: it resets the package designSystemCache and asserts the process-wide
+// tailwindengine.BuildsSoFar moved by exactly two, which any parallel test building a design system would
+// inflate.
 func TestDesignSystemBuildsAgainForASecondProgram(t *testing.T) {
 	resetDesignSystemCacheForTest()
 
@@ -308,6 +318,8 @@ func TestDesignSystemBuildsAgainForASecondProgram(t *testing.T) {
 // zero-valued design system. The distinction is the whole reason cohere exists: a rule reporting no
 // findings because the CSS could not be read is indistinguishable from a clean tree, and it is the
 // one failure mode a linter must not have.
+// Not parallel: it resets the package designSystemCache, the one slot every Tailwind rule's design system
+// is cached in, and then asserts on what that slot holds.
 func TestDesignSystemDeclinesRatherThanReportingClean(t *testing.T) {
 	resetDesignSystemCacheForTest()
 
@@ -349,6 +361,9 @@ func TestDesignSystemDeclinesRatherThanReportingClean(t *testing.T) {
 // A repository with no Tailwind would otherwise re-run entry-point discovery on every file, which
 // is the per-file cost this component exists to refuse, in the case where there is not even a
 // design system to show for it.
+// Not parallel: it resets the package designSystemCache and asserts every file got the same cached error
+// value, and a parallel test walking another program would evict the cache's one slot between files and
+// force a fresh error.
 func TestDesignSystemFailedBuildIsCachedToo(t *testing.T) {
 	resetDesignSystemCacheForTest()
 
@@ -385,6 +400,8 @@ func TestDesignSystemFailedBuildIsCachedToo(t *testing.T) {
 //
 // This is the control for the whole suite. Every test above would pass against a design system that
 // built nothing at all, which is the shape of a harness that has never returned a positive.
+// Not parallel: it resets the package designSystemCache, the one slot every Tailwind rule's design system
+// is cached in, and then asserts on what that slot holds.
 func TestDesignSystemComposesTheRepositorysOwnContributions(t *testing.T) {
 	resetDesignSystemCacheForTest()
 
@@ -472,6 +489,7 @@ func TestDesignSystemComposesTheRepositorysOwnContributions(t *testing.T) {
 // exactly where the framework put it. Both corpus repositories do precisely that. Only a name the
 // framework never registered appends a position.
 func TestDesignSystemCustomVariantsRegisterWithoutMovingFrameworkOnes(t *testing.T) {
+	t.Parallel()
 	resolve := designSystemFixtureResolver(map[string]string{
 		"tailwindcss": designSystemFrameworkStylesheet,
 	})
@@ -534,6 +552,7 @@ func TestDesignSystemCustomVariantsRegisterWithoutMovingFrameworkOnes(t *testing
 // names make disagreement essentially certain, and ten loads make a single lucky ordering not
 // enough to pass.
 func TestDesignSystemVariantRegistrationOrderIsDeterministic(t *testing.T) {
+	t.Parallel()
 	names := []string{
 		"zulu", "yankee", "xray", "whiskey", "victor", "uniform",
 		"tango", "sierra", "romeo", "quebec", "papa", "oscar",
@@ -603,6 +622,7 @@ func TestDesignSystemVariantRegistrationOrderIsDeterministic(t *testing.T) {
 // theme that is quietly short, and every rule reading it reports confidently against tokens the
 // repository does not have.
 func TestDesignSystemRefusesRatherThanHalfBuilding(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		stylesheet string
@@ -636,6 +656,7 @@ func TestDesignSystemRefusesRatherThanHalfBuilding(t *testing.T) {
 
 	for _, aCase := range cases {
 		t.Run(aCase.name, func(t *testing.T) {
+			t.Parallel()
 			entryPoint := designSystemWriteStylesheet(t, aCase.stylesheet)
 			system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 				EntryPoint: entryPoint,
@@ -660,6 +681,9 @@ func TestDesignSystemRefusesRatherThanHalfBuilding(t *testing.T) {
 // `internal/program/walk.go` runs up to 16 workers striding over files with one mutex only for the
 // final merge, so the cache is reached concurrently by construction. This is the assertion that
 // holds under `-race`; without it the mutex is a claim rather than a tested property.
+// Not parallel: it resets the package designSystemCache and asserts the process-wide
+// tailwindengine.BuildsSoFar moved by exactly one across its 64 goroutines, which any parallel test
+// building a design system would inflate.
 func TestDesignSystemIsSafeUnderTheParallelWalk(t *testing.T) {
 	resetDesignSystemCacheForTest()
 
@@ -703,6 +727,7 @@ func TestDesignSystemIsSafeUnderTheParallelWalk(t *testing.T) {
 // absolute. What is asserted is only that the measurement happened at all, since a timing test that
 // measured nothing and a fast one look identical in a green line.
 func TestDesignSystemLoadCost(t *testing.T) {
+	t.Parallel()
 	resolve := designSystemFixtureResolver(map[string]string{
 		"tailwindcss": designSystemFrameworkStylesheet,
 	})

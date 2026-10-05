@@ -22,6 +22,7 @@ func TestNoSetStateStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoSetState, noSetStateFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -43,6 +44,7 @@ func TestNoSetStateFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoSetState, noSetStateFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -106,6 +108,7 @@ func TestNoSetStateMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testi
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoSetState, noSetStateFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantFindings {
 				t.Errorf("installed build reports %d findings, this rule reports %d",
@@ -152,6 +155,7 @@ func TestNoSetStateAnchorsOnTheCalleeNotTheCall(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoSetState, noSetStateFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
@@ -200,6 +204,7 @@ func TestNoSetStateHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/Suffix.js",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoSetState, fileName, sourceText)
 			rule_testing.ExpectFindings(t, result, "noSetState")
 		})

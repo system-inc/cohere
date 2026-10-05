@@ -76,6 +76,7 @@ func TestPreferStatelessFunctionFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runPreferStatelessFunction(t, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -139,6 +140,7 @@ func TestPreferStatelessFunctionStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runPreferStatelessFunction(t, testCase.sourceText, testCase.options)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -175,6 +177,7 @@ func TestPreferStatelessFunctionOnlyClassesAndFactoriesReport(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runPreferStatelessFunction(t, testCase.sourceText, "")
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -206,6 +209,7 @@ func TestPreferStatelessFunctionMemberBoundary(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runPreferStatelessFunction(t, testCase.sourceText, "")
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -236,6 +240,7 @@ func TestPreferStatelessFunctionThisBoundary(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runPreferStatelessFunction(t, testCase.sourceText, "")
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -262,6 +267,7 @@ func TestPreferStatelessFunctionChildContextTypes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runPreferStatelessFunction(t, testCase.sourceText, "")
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -292,6 +298,7 @@ func TestPreferStatelessFunctionReturnBoundary(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runPreferStatelessFunction(t, testCase.sourceText, "")
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -309,6 +316,7 @@ func TestPreferStatelessFunctionDecodesOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("absent options give the documented default", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodePreferStatelessFunctionOptions(nil)
 		if err != nil {
 			t.Fatalf("decoding nil: %v", err)
@@ -319,6 +327,7 @@ func TestPreferStatelessFunctionDecodesOptions(t *testing.T) {
 	})
 
 	t.Run("the wire name is ignorePureComponents", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodePreferStatelessFunctionOptions(json.RawMessage(`{"ignorePureComponents":true}`))
 		if err != nil {
 			t.Fatalf("decoding: %v", err)
@@ -329,12 +338,14 @@ func TestPreferStatelessFunctionDecodesOptions(t *testing.T) {
 	})
 
 	t.Run("the option is what separates these, not the rule", func(t *testing.T) {
+		t.Parallel()
 		const sourceText = "class Foo extends React.PureComponent { render() { return <div>{this.props.foo}</div>; } }"
 		rule_testing.ExpectFindings(t, runPreferStatelessFunction(t, sourceText, ""), "componentShouldBePure")
 		rule_testing.ExpectClean(t, runPreferStatelessFunction(t, sourceText, `{"ignorePureComponents":true}`))
 	})
 
 	t.Run("ignorePureComponents does not exempt a plain Component", func(t *testing.T) {
+		t.Parallel()
 		// The distinguishing case for the option's predicate. react.IsEs6ComponentClass accepts
 		// Component and PureComponent alike and is the RIGHT predicate for the outer gate and the
 		// WRONG one here; routing the option through it would exempt every class component.
@@ -343,6 +354,7 @@ func TestPreferStatelessFunctionDecodesOptions(t *testing.T) {
 	})
 
 	t.Run("the rule falls back to the default when handed nil rather than the struct", func(t *testing.T) {
+		t.Parallel()
 		// Bypasses the decoder entirely, which is the path every other fixture misses. A
 		// PureComponent is the case that measures anything: it reports under the real default and
 		// would be clean under a wrong fallback of ignorePureComponents true.
@@ -361,6 +373,7 @@ func TestPreferStatelessFunctionSpan(t *testing.T) {
 	t.Parallel()
 
 	t.Run("a class declaration reports on the whole class", func(t *testing.T) {
+		t.Parallel()
 		const sourceText = "class Foo extends React.Component { render() { return <div/>; } }"
 		result := runPreferStatelessFunction(t, sourceText, "")
 		rule_testing.ExpectFindings(t, result, "componentShouldBePure")
@@ -371,6 +384,7 @@ func TestPreferStatelessFunctionSpan(t *testing.T) {
 	})
 
 	t.Run("a factory reports on the call, not the declaration", func(t *testing.T) {
+		t.Parallel()
 		const sourceText = "var Foo = createReactClass({ render: function() { return <div/>; } });"
 		const want = "createReactClass({ render: function() { return <div/>; } })"
 		result := runPreferStatelessFunction(t, sourceText, "")
@@ -382,6 +396,7 @@ func TestPreferStatelessFunctionSpan(t *testing.T) {
 	})
 
 	t.Run("the message identifies the rule and explains the defect", func(t *testing.T) {
+		t.Parallel()
 		result := runPreferStatelessFunction(t, "class Foo extends React.Component { render() { return <div/>; } }", "")
 		rule_testing.ExpectFindings(t, result, "componentShouldBePure")
 		if result.Diagnostics[0].Message.Id != "componentShouldBePure" {
@@ -416,6 +431,7 @@ func TestPreferStatelessFunctionHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/Pure.jsx",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodePreferStatelessFunctionOptions(nil)
 			if err != nil {
 				t.Fatalf("decoding: %v", err)

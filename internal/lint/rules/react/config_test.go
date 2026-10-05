@@ -78,6 +78,9 @@ func upstreamTestProvider() map[string]map[string]typeConfigKind {
 // this rule does not build. This test asserts what this port actually does. The two it declines are
 // recorded in TestConfigDeclinesTheUseSiteFixtures below with the reason, rather than deleted,
 // because a deleted case is a divergence nobody can find later.
+// Not parallel: it swaps the package variable moduleTypeProvider through withSeededProvider, which the
+// config rule reads on every run, so a parallel test running that rule would race the swap and could read
+// the seeded table.
 func TestConfigFiresOnUpstreamFixtures(t *testing.T) {
 	withSeededProvider(t, upstreamTestProvider())
 
@@ -96,6 +99,7 @@ func TestConfigFiresOnUpstreamFixtures(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, Config, configFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, "invalidTypeConfiguration")
 		})
@@ -109,6 +113,9 @@ func TestConfigFiresOnUpstreamFixtures(t *testing.T) {
 // them green. Upstream's own fixture for this direction is
 // `error.invalid-type-provider-nonhook-name-typed-as-hook`, whose source imports
 // `notAhookTypedAsHook` and reports at its use site; the import-anchored form is written here.
+// Not parallel: it swaps the package variable moduleTypeProvider through withSeededProvider, which the
+// config rule reads on every run, so a parallel test running that rule would race the swap and could read
+// the seeded table.
 func TestConfigFiresOnNonHookNameTypedAsHook(t *testing.T) {
 	withSeededProvider(t, upstreamTestProvider())
 	source := "import {notAhookTypedAsHook} from 'ReactCompilerTest';\n\nfunction Component() {\n  return <div>{notAhookTypedAsHook()}</div>;\n}\n"
@@ -123,6 +130,9 @@ func TestConfigFiresOnNonHookNameTypedAsHook(t *testing.T) {
 // still reports even though the local name is. No upstream fixture writes an alias, so both are
 // written from reading React's `getGlobalDeclaration`: reading `Name()` instead of the imported
 // name would flip both verdicts, and nothing in the imported corpus could see it.
+// Not parallel: it swaps the package variable moduleTypeProvider through withSeededProvider, which the
+// config rule reads on every run, so a parallel test running that rule would race the swap and could read
+// the seeded table.
 func TestConfigReadsThroughAnAlias(t *testing.T) {
 	withSeededProvider(t, upstreamTestProvider())
 	cases := []struct {
@@ -134,6 +144,7 @@ func TestConfigReadsThroughAnAlias(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, Config, configFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, "invalidTypeConfiguration")
 		})
@@ -141,6 +152,9 @@ func TestConfigReadsThroughAnAlias(t *testing.T) {
 }
 
 // TestConfigStaysSilent covers everything the rule must decline.
+// Not parallel: it swaps the package variable moduleTypeProvider through withSeededProvider, which the
+// config rule reads on every run, so a parallel test running that rule would race the swap and could read
+// the seeded table.
 func TestConfigStaysSilent(t *testing.T) {
 	withSeededProvider(t, upstreamTestProvider())
 
@@ -190,6 +204,7 @@ func TestConfigStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, Config, configFile, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -210,6 +225,9 @@ func TestConfigStaysSilent(t *testing.T) {
 // rather than a namespace import — probed rather than assumed. It is silent here because
 // `ReactCompilerTest`'s table declares no `default` property, so the default arm finds nothing to
 // compare, which is the same reason `defaultNotInTable` above is silent.
+// Not parallel: it swaps the package variable moduleTypeProvider through withSeededProvider, which the
+// config rule reads on every run, so a parallel test running that rule would race the swap and could read
+// the seeded table.
 func TestConfigDeclinesTheUseSiteFixtures(t *testing.T) {
 	withSeededProvider(t, upstreamTestProvider())
 
@@ -225,6 +243,7 @@ func TestConfigDeclinesTheUseSiteFixtures(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, Config, configFile, testCase.source)
 			// The dotted-member fixture reports nothing because its module declares no `default`.
 			// The JSX fixture DOES report here, on its named import, which is a superset of what
@@ -249,6 +268,7 @@ func TestConfigDeclinesTheUseSiteFixtures(t *testing.T) {
 // configuration, and this shows it declines a well-formed one. Together they separate "declines
 // correctly" from "wired and inert", which a zero on its own cannot do.
 func TestConfigIsSilentOnTheRealDefaultTable(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		source string
@@ -259,6 +279,7 @@ func TestConfigIsSilentOnTheRealDefaultTable(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, Config, configFile, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -271,6 +292,9 @@ func TestConfigIsSilentOnTheRealDefaultTable(t *testing.T) {
 // statement, or at the module specifier, passes every case above while being wrong. The span is
 // sliced out of the source and compared against a literal typed here rather than against anything
 // the rule computes, so the assertion cannot move with the rule.
+// Not parallel: it swaps the package variable moduleTypeProvider through withSeededProvider, which the
+// config rule reads on every run, so a parallel test running that rule would race the swap and could read
+// the seeded table.
 func TestConfigReportsOnTheImportSpecifier(t *testing.T) {
 	withSeededProvider(t, upstreamTestProvider())
 	source := "import {useHookNotTypedAsHook} from 'ReactCompilerTest';\n"
@@ -290,6 +314,9 @@ func TestConfigReportsOnTheImportSpecifier(t *testing.T) {
 // The default arm points at the local binding identifier, which is the only node carrying a name in
 // that shape. Separate from the specifier test above because the two arms compute their span from
 // different nodes, and a mutation swapping one for the other would leave the other green.
+// Not parallel: it swaps the package variable moduleTypeProvider through withSeededProvider, which the
+// config rule reads on every run, so a parallel test running that rule would race the swap and could read
+// the seeded table.
 func TestConfigReportsOnTheDefaultBinding(t *testing.T) {
 	withSeededProvider(t, upstreamTestProvider())
 	source := "import foo from 'useDefaultExportNotTypedAsHook';\n"
@@ -310,6 +337,9 @@ func TestConfigReportsOnTheDefaultBinding(t *testing.T) {
 // and nothing a format verb could corrupt. The assertion is still worth its lines: it compares
 // against a literal typed here rather than against `messageInvalidTypeConfiguration`, so a mutation
 // rewriting the constant moves the rule and the test in opposite directions instead of together.
+// Not parallel: it swaps the package variable moduleTypeProvider through withSeededProvider, which the
+// config rule reads on every run, so a parallel test running that rule would race the swap and could read
+// the seeded table.
 func TestConfigMessageText(t *testing.T) {
 	withSeededProvider(t, upstreamTestProvider())
 	source := "import {useHookNotTypedAsHook} from 'ReactCompilerTest';\n"
@@ -334,6 +364,7 @@ func TestConfigMessageText(t *testing.T) {
 // upstream. That last row is the axis that splits `react.IsLikelyComponentName` across trees, and
 // it is pinned here so this rule cannot drift onto the Unicode side of it.
 func TestIsHookNameMatchesUpstream(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		want bool
@@ -363,6 +394,7 @@ func TestIsHookNameMatchesUpstream(t *testing.T) {
 // version comparing exactly would validate `React` against the provider and could report where
 // upstream is silent.
 func TestIsKnownReactModuleIsCaseInsensitive(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		want bool

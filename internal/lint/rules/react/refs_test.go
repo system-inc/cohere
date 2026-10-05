@@ -263,6 +263,7 @@ func TestRefsMatchesTheImportedCorpus(t *testing.T) {
 	}
 	for _, fixture := range refsCorpus {
 		t.Run(fixture.Name, func(t *testing.T) {
+			t.Parallel()
 			result := runRefsFixture(t, fixture)
 			// Routed through the harness rather than compared by hand: `ExpectFindings` asserts the
 			// ids AND the count in the order the rule produced them, which is the same assertion
@@ -361,6 +362,7 @@ func TestRefsStaysSilent(t *testing.T) {
 
 	for _, testCase := range refsCleanCases {
 		t.Run(testCase.Name, func(t *testing.T) {
+			t.Parallel()
 			result := runRefsFixture(t, refsFixture{Name: testCase.Name, Source: testCase.Source})
 			if len(result.Diagnostics) != 0 {
 				t.Logf("this case exists because: %s", testCase.Why)
@@ -402,6 +404,7 @@ func TestRefsPointsAtTheAccess(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.Name, func(t *testing.T) {
+			t.Parallel()
 			source := refsImport + testCase.Source
 			result := runRefsFixture(t, refsFixture{Name: testCase.Name, Source: testCase.Source})
 			if len(result.Diagnostics) == 0 {
@@ -624,6 +627,7 @@ func TestRefsJoinsTaintAtABranchMerge(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.Name, func(t *testing.T) {
+			t.Parallel()
 			result := runRefsFixture(t, refsFixture{Name: testCase.Name, Source: testCase.Source})
 			if len(result.Diagnostics) != 1 {
 				ids := []string{}

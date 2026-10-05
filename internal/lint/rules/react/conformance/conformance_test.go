@@ -46,6 +46,7 @@ func load(t *testing.T) []Fixture {
 // more findings and reads as success. A total-only assertion would let the two populations trade
 // against each other silently, which is the shape of defect this whole file guards.
 func TestCorpusIsTheSizeItClaimsToBe(t *testing.T) {
+	t.Parallel()
 	fixtures := load(t)
 
 	errorNamed, clean := 0, 0
@@ -111,6 +112,7 @@ func TestCorpusIsTheSizeItClaimsToBe(t *testing.T) {
 // would, since an empty expectation compared against an empty result is a pass, and 325 of those is
 // a perfect score over a corpus nobody read.
 func TestEveryFixtureHasAParsedExpectation(t *testing.T) {
+	t.Parallel()
 	fixtures := load(t)
 
 	withDeclaredCount, withLocation, totalErrors := 0, 0, 0
@@ -172,6 +174,7 @@ func TestEveryFixtureHasAParsedExpectation(t *testing.T) {
 // measurements of the same quantity that were not derived from each other: if the parser drops an
 // `Error:` line or invents one, the sum stops matching the headers and says so.
 func TestDeclaredCountMatchesParsedErrors(t *testing.T) {
+	t.Parallel()
 	fixtures := load(t)
 
 	declaredTotal, parsedTotal := 0, 0
@@ -203,6 +206,7 @@ func TestDeclaredCountMatchesParsedErrors(t *testing.T) {
 // narrower one would hand 15 Flow-syntax files to a TypeScript parser and read the parse failures
 // as rule failures.
 func TestFlowFixtureCountIsUpstreamsOwnTest(t *testing.T) {
+	t.Parallel()
 	fixtures := load(t)
 
 	flowCount := 0
@@ -228,6 +232,7 @@ func TestFlowFixtureCountIsUpstreamsOwnTest(t *testing.T) {
 // changes what a fixture expects, and a runner that skips it reports "not applicable" for a case it
 // silently got wrong.
 func TestEveryPragmaInTheCorpusIsModelled(t *testing.T) {
+	t.Parallel()
 	fixtures := load(t)
 
 	seen := map[string]int{}
@@ -256,6 +261,7 @@ func TestEveryPragmaInTheCorpusIsModelled(t *testing.T) {
 // CheckPragmas that always returned nil would do. So this hands it a directive that is in neither
 // map and requires an error, which is the only way to tell a working guard from an absent one.
 func TestUnknownPragmaIsRefusedNotSkipped(t *testing.T) {
+	t.Parallel()
 	pragmas := ParsePragmas("// @validateRefAccessDuringRender @enableSomethingNobodyModelled")
 
 	err := CheckPragmas("error.hypothetical.js", pragmas)
@@ -281,6 +287,7 @@ func TestUnknownPragmaIsRefusedNotSkipped(t *testing.T) {
 // computed under a model already known to be incomplete. Marking a single fixture and carrying on
 // would produce exactly the scoreboard this package exists to prevent.
 func TestRunRefusesTheWholeCorpusOnOneUnknownPragma(t *testing.T) {
+	t.Parallel()
 	fixtures := []Fixture{
 		{Name: "error.fine.js", Pragmas: ParsePragmas("// @validateNoSetStateInRender")},
 		{Name: "error.bad.js", Pragmas: ParsePragmas("// @somethingUnmodelled")},
@@ -298,6 +305,7 @@ func TestRunRefusesTheWholeCorpusOnOneUnknownPragma(t *testing.T) {
 // upstream and would score three fixtures under a configuration upstream never applied when it
 // recorded their expectations.
 func TestPragmaParserReproducesUpstreamsSplit(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		firstLine string
 		want      []Pragma
@@ -342,6 +350,7 @@ func TestPragmaParserReproducesUpstreamsSplit(t *testing.T) {
 // One fixture, verified by eye against the file on disk, so the parser is anchored to something
 // outside its own output at least once.
 func TestExpectationParserReadsARealGolden(t *testing.T) {
+	t.Parallel()
 	fixtures := load(t)
 
 	var subject *Fixture
@@ -404,6 +413,7 @@ func (perfectImplementation) Analyze(fixture Fixture) (Result, error) {
 // test that says so, and it says so today rather than on the day a real rule lands and its first
 // correct result is scored as a failure.
 func TestRunnerCanDetectAPass(t *testing.T) {
+	t.Parallel()
 	fixtures := load(t)
 
 	score, err := Run(fixtures, perfectImplementation{}, Options{})
@@ -431,6 +441,7 @@ func TestRunnerCanDetectAPass(t *testing.T) {
 // one. This gives it a deliberately wrong answer and requires a failure, so that Passed and Failed
 // are both shown to be reachable.
 func TestRunnerCanDetectAFailure(t *testing.T) {
+	t.Parallel()
 	expectation := Expectation{
 		Errors: []ExpectedError{{Heading: "Error", Message: "Cannot reassign variables", Line: 3}},
 	}
@@ -479,6 +490,7 @@ func TestRunnerCanDetectAFailure(t *testing.T) {
 // Declined are what separate them, and `Score.Check` proves the buckets partition the corpus rather
 // than merely summing to something.
 func TestFirstHonestScoreIsZeroOfThreeHundredTwentyFive(t *testing.T) {
+	t.Parallel()
 	fixtures := load(t)
 
 	score, err := Run(fixtures, NothingImplemented{}, Options{})
@@ -510,6 +522,7 @@ func TestFirstHonestScoreIsZeroOfThreeHundredTwentyFive(t *testing.T) {
 // The failure mode being guarded is a suite that reports "290 / 290 declined" and reads like full
 // coverage. Excluding must move a fixture between columns, never out of the total.
 func TestFlowExclusionIsCountedNotDropped(t *testing.T) {
+	t.Parallel()
 	fixtures := load(t)
 
 	score, err := Run(fixtures, NothingImplemented{}, Options{SkipFlowFixtures: true})
@@ -543,6 +556,7 @@ func TestFlowExclusionIsCountedNotDropped(t *testing.T) {
 // golden, and against upstream by re-running `internal/lint/rules/react/tools/vendor_fixtures` and diffing, which is how
 // the current tree was verified byte-for-byte when it was written.
 func TestVendoredCorpusPairsAreComplete(t *testing.T) {
+	t.Parallel()
 	var inputs, expectations []string
 	err := filepath.WalkDir(fixtureRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -591,6 +605,7 @@ func TestVendoredCorpusPairsAreComplete(t *testing.T) {
 // once. CheckPragmas consults knownPragmas first, so an overlap would make the ignoredPragmas entry
 // and the evidence written next to it unreachable.
 func TestKnownAndIgnoredPragmasDoNotOverlap(t *testing.T) {
+	t.Parallel()
 	ignored := map[string]bool{}
 	for _, key := range IgnoredPragmaKeys() {
 		ignored[key] = true

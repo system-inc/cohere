@@ -134,6 +134,7 @@ func TestForbidForeignPropTypesFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(
 				t,
 				ForbidForeignPropTypes,
@@ -190,6 +191,7 @@ func TestForbidForeignPropTypesStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(
 				t,
 				ForbidForeignPropTypes,
@@ -218,6 +220,7 @@ func TestForbidForeignPropTypesHasNoFileSuffixGate(t *testing.T) {
 
 	for _, suffix := range []string{".tsx", ".ts", ".jsx", ".js"} {
 		t.Run(suffix, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(
 				t,
 				ForbidForeignPropTypes,
@@ -256,6 +259,7 @@ func TestForbidForeignPropTypesAnchorsOnTheProperty(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// The untyped harness does not trim, so the literal and the bytes on disk agree. The
 			// transform is applied anyway so the slice cannot drift if that ever changes.
 			onDisk := testCase.sourceText
@@ -299,6 +303,7 @@ func TestForbidForeignPropTypesExemptsOnlyAssignmentTargets(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ForbidForeignPropTypes, forbidForeignPropTypesFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -335,6 +340,7 @@ func TestForbidForeignPropTypesUnwrapsParentheses(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ForbidForeignPropTypes, forbidForeignPropTypesFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -376,6 +382,7 @@ func TestForbidForeignPropTypesReadsOnlyLiteralKeys(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ForbidForeignPropTypes, forbidForeignPropTypesFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -412,6 +419,7 @@ func TestForbidForeignPropTypesAllowInPropTypesReachesUpward(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(
 				t,
 				ForbidForeignPropTypes,

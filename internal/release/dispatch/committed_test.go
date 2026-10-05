@@ -16,6 +16,8 @@ import (
 // something about which tree the binary came from, measured by running it.
 
 func TestAnUncommittedEditDoesNotReachTheBuiltBinaryAndCommittingItDoes(t *testing.T) {
+	t.Parallel()
+
 	fixture := newCommittedFixture(t)
 
 	first, firstCommit, built, err := ResolveCommitted(fixture.paths, "./command/cohere")
@@ -85,6 +87,8 @@ func TestAnUncommittedEditDoesNotReachTheBuiltBinaryAndCommittingItDoes(t *testi
 }
 
 func TestCheckCommittedVersionReadsWhatARealBinaryPrints(t *testing.T) {
+	t.Parallel()
+
 	// The text comes from packaging itself rather than being typed here, so a change to how the
 	// commit line is printed breaks this test instead of every committed build.
 	commit := "508863131ed19b76776da9cd08862e4ef39d00b0"
@@ -112,6 +116,8 @@ func TestCheckCommittedVersionReadsWhatARealBinaryPrints(t *testing.T) {
 }
 
 func TestFrozenRunsOnlyCohereBinaries(t *testing.T) {
+	t.Parallel()
+
 	// Measured on 2026-10-02: the newest file in the real cache was `cohere-swift-current`, and the
 	// launcher itself sits there as `cohere-dispatch`. Both matched the old `cohere-` prefix.
 	cohere := platformBinaryPrefix() + "aaaaaaaaaaaaaaaa"
@@ -249,6 +255,8 @@ func run(t *testing.T, binary string, arguments ...string) string {
 // A launcher build compiles through the Go cache the caller's own `go` commands use, the one cache on the
 // machine, and keeps none of its own (#3kr3x59). The caller's cache here is the test's, empty before the
 // build, so its filling is the build's.
+//
+// Not parallel: it points GOCACHE at its own directory with t.Setenv, which a parallel test may not call.
 func TestALaunchedBuildUsesTheCallersGoCache(t *testing.T) {
 	fixture := newCommittedFixture(t)
 	shared := t.TempDir()

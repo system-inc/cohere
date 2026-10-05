@@ -14,6 +14,8 @@ import (
 // earlier evaluation of the same commit, so the rebuilt engine would call an edited tree clean. The stand-in
 // package's product prints the flag its manifest read, and the real build runs twice, clean then edited.
 func TestASwiftEngineRebuiltAfterAnEditSaysTheTreeWasModified(t *testing.T) {
+	t.Parallel()
+
 	if runtime.GOOS != "darwin" {
 		t.Skip("the Swift engine is built only on macOS")
 	}

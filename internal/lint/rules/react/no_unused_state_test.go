@@ -99,6 +99,7 @@ func TestNoUnusedStateStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -144,6 +145,7 @@ func TestNoUnusedStateFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
 		})
@@ -193,6 +195,7 @@ func TestNoUnusedStateGiveUpConditions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -234,6 +237,7 @@ func TestNoUnusedStateComputedLiteralIsARead(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -280,6 +284,7 @@ func TestNoUnusedStateDestructuringIsARead(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -323,6 +328,7 @@ func TestNoUnusedStateDoesNotPanicOnBindingPatterns(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// Reaching the end of this subtest is the assertion. A panic in the rule would fail the
 			// test rather than being swallowed, because the harness does not recover.
 			rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
@@ -385,6 +391,7 @@ func TestNoUnusedStateUpdaterAndLifecycleParameters(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -438,6 +445,7 @@ func TestNoUnusedStateLiteralKeyKinds(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -490,6 +498,7 @@ func TestNoUnusedStateTypeAssertionsAreUnwrapped(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "unusedStateField")
 		})
@@ -611,6 +620,7 @@ func TestNoUnusedStateWhichComponentsAreJudged(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -680,6 +690,7 @@ func TestNoUnusedStateLifecycleParameterGates(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -731,6 +742,7 @@ func TestNoUnusedStateDerivedStateAsAClassProperty(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -800,6 +812,7 @@ func TestNoUnusedStateClassPropertyGates(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -842,6 +855,7 @@ func TestNoUnusedStateReceiverMustBeThis(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
 				rule_testing.ExpectClean(t, result)

@@ -186,6 +186,7 @@ func TestJsxPropsNoSpreadMultiFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, testCase.sourceText),
 				testCase.findings...)
@@ -290,6 +291,7 @@ func TestJsxPropsNoSpreadMultiStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, testCase.sourceText))
 		})
@@ -346,6 +348,7 @@ func TestJsxPropsNoSpreadMultiReportsTheEarlierSpread(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("want %d findings, got %d", len(testCase.want), len(result.Diagnostics))

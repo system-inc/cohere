@@ -56,6 +56,7 @@ func TestBooleanPropNamingStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, BooleanPropNaming, booleanPropNamingFile, testCase.sourceText, testCase.options)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -174,6 +175,7 @@ func TestBooleanPropNamingFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, BooleanPropNaming, booleanPropNamingFile, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
 				t.Fatalf("want %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
@@ -252,6 +254,7 @@ func TestBooleanPropNamingMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, BooleanPropNaming, booleanPropNamingFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
@@ -335,6 +338,7 @@ func TestDecodeBooleanPropNamingOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeBooleanPropNamingOptions([]byte(testCase.raw))
 			if testCase.wantErr {
 				if err == nil {
@@ -448,6 +452,7 @@ func TestBooleanPropNamingAnchorsOnTheWholeProperty(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, BooleanPropNaming, booleanPropNamingFile,
 				testCase.sourceText, DefaultBooleanPropNamingOptions())
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -530,6 +535,7 @@ func TestBooleanPropNamingDoesNotPanicOnNameShapesThatCannotBeRead(t *testing.T)
 
 	for _, sourceText := range sources {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			// Reaching the next line without a panic is the assertion.
 			rule_testing.RunTypedWithOptions(t, BooleanPropNaming, booleanPropNamingFile,
 				sourceText, DefaultBooleanPropNamingOptions())

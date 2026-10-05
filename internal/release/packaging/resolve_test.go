@@ -14,6 +14,7 @@ import (
 // binary, returned a bare command name, and the failed spawn read as a clean tree. So these assert
 // on the error as hard as they assert on the success.
 
+// Not parallel: clearOverride empties COHERE_BINARY with t.Setenv, which a parallel test may not call.
 func TestResolveFailsLoudlyWhenNothingIsInstalled(t *testing.T) {
 	// The central case. An empty tree must be an error, never a bare name and never a guess.
 	clearOverride(t)
@@ -37,6 +38,7 @@ func TestResolveFailsLoudlyWhenNothingIsInstalled(t *testing.T) {
 	}
 }
 
+// Not parallel: clearOverride empties COHERE_BINARY with t.Setenv, which a parallel test may not call.
 func TestResolveFindsThePlatformPackage(t *testing.T) {
 	clearOverride(t)
 	root := t.TempDir()
@@ -51,6 +53,7 @@ func TestResolveFindsThePlatformPackage(t *testing.T) {
 	}
 }
 
+// Not parallel: clearOverride empties COHERE_BINARY with t.Setenv, which a parallel test may not call.
 func TestResolveWalksUpToAWorkspaceRoot(t *testing.T) {
 	// The monorepo case: the binary is hoisted to the workspace root, and cohere runs from a
 	// package several directories down. A resolver that only looks beside itself reports a missing
@@ -73,6 +76,7 @@ func TestResolveWalksUpToAWorkspaceRoot(t *testing.T) {
 	}
 }
 
+// Not parallel: clearOverride empties COHERE_BINARY with t.Setenv, which a parallel test may not call.
 func TestResolveReportsABinaryThatIsNotExecutable(t *testing.T) {
 	// A packaging step that drops the mode bit ships a file that is present and unrunnable. Left to
 	// exec, it surfaces as a permission error that reads like a broken machine. Reported here, it
@@ -96,6 +100,7 @@ func TestResolveReportsABinaryThatIsNotExecutable(t *testing.T) {
 	}
 }
 
+// Not parallel: it points COHERE_BINARY at its override with t.Setenv, which a parallel test may not call.
 func TestOverrideTakesPrecedence(t *testing.T) {
 	root := t.TempDir()
 	writePlatformBinary(t, root, 0o755)
@@ -113,6 +118,7 @@ func TestOverrideTakesPrecedence(t *testing.T) {
 	}
 }
 
+// Not parallel: it points COHERE_BINARY at its override with t.Setenv, which a parallel test may not call.
 func TestOverrideFailsLoudlyWhenItPointsAtNothing(t *testing.T) {
 	// A stale export in a shell profile. Falling back to the installed binary here would silently
 	// run something other than what was asked for, and the results would be read as the local
@@ -132,6 +138,7 @@ func TestOverrideFailsLoudlyWhenItPointsAtNothing(t *testing.T) {
 	}
 }
 
+// Not parallel: it points COHERE_BINARY at its override with t.Setenv, which a parallel test may not call.
 func TestOverrideRejectsADirectory(t *testing.T) {
 	// Pointing at the build output directory rather than the binary inside it. Without this the
 	// error arrives from exec as a format error, which reads like a corrupt download.
@@ -144,6 +151,8 @@ func TestOverrideRejectsADirectory(t *testing.T) {
 }
 
 func TestPlatformPackageNameTranslatesGoNamesToNpmNames(t *testing.T) {
+	t.Parallel()
+
 	// Go and npm disagree in two places: windows/win32 and amd64/x64. A package published under the
 	// Go spelling installs correctly and is never found, which on the machine is indistinguishable
 	// from a platform we never shipped. The keys here are Go's names, which is the contract.
@@ -164,6 +173,8 @@ func TestPlatformPackageNameTranslatesGoNamesToNpmNames(t *testing.T) {
 }
 
 func TestBinaryFileNameCarriesTheWindowsExtension(t *testing.T) {
+	t.Parallel()
+
 	// Without the extension the file does not execute on Windows at all.
 	if got := BinaryFileName("windows"); got != "cohere.exe" {
 		t.Errorf("windows binary named %s", got)

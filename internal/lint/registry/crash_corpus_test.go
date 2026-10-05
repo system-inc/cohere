@@ -93,6 +93,7 @@ const networkServiceStub = "export const networkService = {\n" +
 // panic loses one file rather than the run, and that boundary is what keeps a tree verifiable while
 // this guard finds the panics. Neither replaces the other.
 func TestNoRegisteredRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
+	t.Parallel()
 	rules := All()
 	if len(rules) == 0 {
 		// A sweep that finds nothing to check passes for the wrong reason, which is the same shape
@@ -122,6 +123,7 @@ func TestNoRegisteredRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 	for _, subject := range rules {
 		for index, source := range crashShapes {
 			t.Run(fmt.Sprintf("%s/shape-%d", subject.Name, index), func(t *testing.T) {
+				t.Parallel()
 				// A panic fails the test. The only assertion is that this returns at all: what each
 				// rule concludes about these shapes belongs in its own fixture pair, and asserting
 				// it here would make this guard fail for reasons that are not crashes.
@@ -147,6 +149,7 @@ func TestNoRegisteredRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 // the crashes the walk names rather than recovering on its own, and a run with several crashing
 // rules names every one.
 func TestNoRegisteredRuleCrashesOnTheCorpusWithTypes(t *testing.T) {
+	t.Parallel()
 	rules := All()
 	directory := t.TempDir()
 	files := map[string]string{"tsconfig.json": typedCorpusConfig}

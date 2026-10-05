@@ -106,6 +106,7 @@ func TestNoTyposFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoTypos(t, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -167,6 +168,7 @@ func TestNoTyposStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runNoTypos(t, testCase.sourceText))
 		})
 	}
@@ -288,6 +290,7 @@ func TestNoTyposImportBindingsGateThePropTypeArms(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runNoTypos(t, testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -340,6 +343,7 @@ func TestNoTyposReturningJsxDecidesTheMemberArm(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runNoTypos(t, testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -364,6 +368,7 @@ func TestNoTyposAcceptsEveryPropTypesModuleKey(t *testing.T) {
 	}
 	for _, name := range accepted {
 		t.Run("accepts "+name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runNoTypos(t,
 				preamble+"Foo.propTypes = { a: PropTypes."+name+" };\n"))
 		})
@@ -371,6 +376,7 @@ func TestNoTyposAcceptsEveryPropTypesModuleKey(t *testing.T) {
 
 	for _, name := range []string{"strng", "boolean", "Array", "func2"} {
 		t.Run("rejects "+name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runNoTypos(t,
 				preamble+"Foo.propTypes = { a: PropTypes."+name+" };\n"), "typoPropType")
 		})
@@ -409,6 +415,7 @@ func TestNoTyposRecursesThroughShapeAndOneOfType(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runNoTypos(t, testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -467,6 +474,7 @@ func TestNoTyposLifecycleArmsAreIndependent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runNoTypos(t, testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -520,6 +528,7 @@ func TestNoTyposSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoTypos(t, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
@@ -611,6 +620,7 @@ func TestNoTyposComponentGate(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runNoTypos(t, testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -662,6 +672,7 @@ func TestNoTyposHasNoFileGate(t *testing.T) {
 		"/repository/source/NoTypos.ts",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoTypos, fileName, source), "typoStaticClassProp")
 		})
 	}
@@ -689,6 +700,7 @@ func TestNoTyposSurvivesShapesThatWouldPanic(t *testing.T) {
 
 	for index, sourceText := range sources {
 		t.Run(string(rune('a'+index)), func(t *testing.T) {
+			t.Parallel()
 			runNoTypos(t, sourceText)
 		})
 	}
@@ -727,6 +739,7 @@ func TestNoTyposMemberArmAssignmentShapes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runNoTypos(t, testCase.sourceText), testCase.wantIds...)
 		})
 	}

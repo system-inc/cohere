@@ -67,6 +67,7 @@ func TestPreferEs6ClassFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runPreferEs6Class(t, testCase.mode, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -120,6 +121,7 @@ func TestPreferEs6ClassStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runPreferEs6Class(t, testCase.mode, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -170,6 +172,7 @@ func TestPreferEs6ClassHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/Suffix.js",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, PreferEs6Class, fileName, source)
 			rule_testing.ExpectFindings(t, result, "shouldUseES6Class")
 		})
@@ -217,6 +220,7 @@ func TestPreferEs6ClassFactoryNames(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runPreferEs6Class(t, PreferEs6ClassAlways, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -233,24 +237,28 @@ func TestPreferEs6ClassArgumentPosition(t *testing.T) {
 	t.Parallel()
 
 	t.Run("an object in second position still reports", func(t *testing.T) {
+		t.Parallel()
 		source := `var H = createReactClass(x, { render() { return null; } });`
 		result := runPreferEs6Class(t, PreferEs6ClassAlways, source)
 		rule_testing.ExpectFindings(t, result, "shouldUseES6Class")
 	})
 
 	t.Run("a nested object reports once, for the outer one", func(t *testing.T) {
+		t.Parallel()
 		source := `var H = createReactClass({ a: { b: 1 }, render() { return null; } });`
 		result := runPreferEs6Class(t, PreferEs6ClassAlways, source)
 		rule_testing.ExpectFindings(t, result, "shouldUseES6Class")
 	})
 
 	t.Run("a factory call assigned to nothing still reports", func(t *testing.T) {
+		t.Parallel()
 		source := `createReactClass({ render() { return null; } });`
 		result := runPreferEs6Class(t, PreferEs6ClassAlways, source)
 		rule_testing.ExpectFindings(t, result, "shouldUseES6Class")
 	})
 
 	t.Run("two components report twice", func(t *testing.T) {
+		t.Parallel()
 		source := "var A = createReactClass({ render() { return null; } });\n" +
 			"var B = createReactClass({ render() { return null; } });\n"
 		result := runPreferEs6Class(t, PreferEs6ClassAlways, source)
@@ -271,12 +279,14 @@ func TestPreferEs6ClassNeverAnchorsOnDeclarationsOnly(t *testing.T) {
 	t.Parallel()
 
 	t.Run("a class declaration reports", func(t *testing.T) {
+		t.Parallel()
 		source := "class Hello extends React.Component { render() { return null; } }\n"
 		result := runPreferEs6Class(t, PreferEs6ClassNever, source)
 		rule_testing.ExpectFindings(t, result, "shouldUseCreateClass")
 	})
 
 	t.Run("a class expression is silent", func(t *testing.T) {
+		t.Parallel()
 		source := "const Hello = class extends React.Component { render() { return null; } };\n"
 		result := runPreferEs6Class(t, PreferEs6ClassNever, source)
 		rule_testing.ExpectClean(t, result)
@@ -324,6 +334,7 @@ func TestPreferEs6ClassBaseNames(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := "class Hello " + testCase.heritage + " { render() { return null; } }\n"
 			result := runPreferEs6Class(t, PreferEs6ClassNever, source)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -356,6 +367,7 @@ func TestPreferEs6ClassIgnoresJsDocComponents(t *testing.T) {
 		"@extends Something.Else",
 	} {
 		t.Run(tag, func(t *testing.T) {
+			t.Parallel()
 			source := "/**\n * " + tag + "\n */\nclass Hello { render() { return null; } }\n"
 			result := runPreferEs6Class(t, PreferEs6ClassNever, source)
 			rule_testing.ExpectClean(t, result)
@@ -375,16 +387,20 @@ func TestPreferEs6ClassArmsAreDisjoint(t *testing.T) {
 	class := "class Hello extends React.Component { render() { return null; } }\n"
 
 	t.Run("Always is silent on an es6 class", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, runPreferEs6Class(t, PreferEs6ClassAlways, class))
 	})
 	t.Run("Never is silent on a factory call", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, runPreferEs6Class(t, PreferEs6ClassNever, factory))
 	})
 	t.Run("Always reports only the factory when both are present", func(t *testing.T) {
+		t.Parallel()
 		result := runPreferEs6Class(t, PreferEs6ClassAlways, factory+class)
 		rule_testing.ExpectFindings(t, result, "shouldUseES6Class")
 	})
 	t.Run("Never reports only the class when both are present", func(t *testing.T) {
+		t.Parallel()
 		result := runPreferEs6Class(t, PreferEs6ClassNever, factory+class)
 		rule_testing.ExpectFindings(t, result, "shouldUseCreateClass")
 	})
@@ -400,6 +416,7 @@ func TestPreferEs6ClassSpans(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Always underlines the object, not the call", func(t *testing.T) {
+		t.Parallel()
 		source := "var Hello = createReactClass({ render() { return null; } });\n"
 		result := runPreferEs6Class(t, PreferEs6ClassAlways, source)
 		if len(result.Diagnostics) != 1 {
@@ -413,6 +430,7 @@ func TestPreferEs6ClassSpans(t *testing.T) {
 	})
 
 	t.Run("Never underlines the whole class declaration", func(t *testing.T) {
+		t.Parallel()
 		source := "class Hello extends React.Component { render() { return null; } }\n"
 		result := runPreferEs6Class(t, PreferEs6ClassNever, source)
 		if len(result.Diagnostics) != 1 {
@@ -455,6 +473,7 @@ func TestDecodePreferEs6ClassOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("no options at all means Always", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodePreferEs6ClassOptions(nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -465,6 +484,7 @@ func TestDecodePreferEs6ClassOptions(t *testing.T) {
 	})
 
 	t.Run("an empty object means Always", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodePreferEs6ClassOptions([]byte(`{}`))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -475,6 +495,7 @@ func TestDecodePreferEs6ClassOptions(t *testing.T) {
 	})
 
 	t.Run("an explicit Never is kept", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodePreferEs6ClassOptions([]byte(`{"mode":"Never"}`))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -485,12 +506,14 @@ func TestDecodePreferEs6ClassOptions(t *testing.T) {
 	})
 
 	t.Run("an unknown mode is refused", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodePreferEs6ClassOptions([]byte(`{"mode":"sometimes"}`)); err == nil {
 			t.Error("wanted an error naming the unknown mode")
 		}
 	})
 
 	t.Run("upstream's own spelling is refused rather than silently ignored", func(t *testing.T) {
+		t.Parallel()
 		// Guarding the migration: someone copying ESLint's config would write the lowercase
 		// spelling, and reading that as Always would enforce the opposite of what they asked for.
 		if _, err := DecodePreferEs6ClassOptions([]byte(`{"mode":"never"}`)); err == nil {

@@ -126,6 +126,7 @@ func TestStylePropObjectFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := stylePropObjectOptions(t, testCase.rawOptions)
 			result := rule_testing.RunTypedWithOptions(t, StylePropObject, stylePropObjectFile, testCase.sourceText, options)
 			wantIds := make([]string, testCase.wantCount)
@@ -287,6 +288,7 @@ func TestStylePropObjectStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := stylePropObjectOptions(t, testCase.rawOptions)
 			result := rule_testing.RunTypedWithOptions(t, StylePropObject, stylePropObjectFile, testCase.sourceText, options)
 			rule_testing.ExpectClean(t, result)
@@ -317,6 +319,7 @@ func TestStylePropObjectAnchors(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, StylePropObject, stylePropObjectFile, testCase.sourceText, stylePropObjectOptions(t, ``))
 			rule_testing.ExpectFindings(t, result, "stylePropNotObject")
 
@@ -366,6 +369,7 @@ func TestStylePropObjectHasNoFileSuffixGate(t *testing.T) {
 
 	for _, suffix := range []string{".tsx", ".ts"} {
 		t.Run(suffix, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, StylePropObject, "/repository/source/SuffixProbe"+suffix, source, stylePropObjectOptions(t, ``))
 			rule_testing.ExpectFindings(t, result, "stylePropNotObject")
 		})
@@ -426,6 +430,7 @@ func TestStylePropObjectIsNonNullLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, StylePropObject, stylePropObjectFile, testCase.sourceText, stylePropObjectOptions(t, ``))
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(t, result, "stylePropNotObject")
@@ -441,6 +446,7 @@ func TestDecodeStylePropObjectOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("an empty body allows nothing", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeStylePropObjectOptions(nil)
 		if err != nil {
 			t.Fatalf("decoding an empty body: %v", err)
@@ -455,6 +461,7 @@ func TestDecodeStylePropObjectOptions(t *testing.T) {
 	})
 
 	t.Run("a named allow list", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeStylePropObjectOptions([]byte(`{"allow":["MyComponent","Other"]}`))
 		if err != nil {
 			t.Fatalf("decoding a named allow list: %v", err)

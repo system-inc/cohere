@@ -157,6 +157,7 @@ func TestNoDidMountSetStateFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, testCase.sourceText,
 				NoDidMountSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
 			rule_testing.ExpectFindings(t, result, "noDidMountSetState")
@@ -291,6 +292,7 @@ func TestNoDidMountSetStateStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, testCase.sourceText,
 				NoDidMountSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
 			rule_testing.ExpectClean(t, result)
@@ -708,6 +710,7 @@ class Hello extends React.Component {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoDidMountSetState, testCase.fileName, testCase.sourceText,
 				NoDidMountSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
 			if len(testCase.findings) == 0 {

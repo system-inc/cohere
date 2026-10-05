@@ -62,6 +62,7 @@ func TestPurityFiresOnTheVendoredCorpus(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runPurityFixture(t, testCase.source)
 			rule_testing.ExpectFindings(t, result,
 				messagePurityImpureCallId, messagePurityImpureCallId, messagePurityImpureCallId)
@@ -89,6 +90,7 @@ func TestPurityFixturesMatchTheVendoredCorpusByte(t *testing.T) {
 	directory := filepath.Join("conformance", "testdata", "fixtures")
 	for _, testCase := range cases {
 		t.Run(testCase.fileName, func(t *testing.T) {
+			t.Parallel()
 			vendored, err := os.ReadFile(filepath.Join(directory, testCase.fileName))
 			if err != nil {
 				t.Fatalf("reading the vendored fixture: %v", err)
@@ -335,6 +337,7 @@ func TestPurityFiresOnMeasuredInputs(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runPurityFixture(t, testCase.source)
 			want := make([]string, testCase.want)
 			for index := range want {
@@ -518,6 +521,7 @@ func TestPurityStaysSilentOnMeasuredInputs(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runPurityFixture(t, testCase.source))
 		})
 	}
@@ -640,6 +644,7 @@ func TestPurityPointsAtTheCall(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runPurityFixture(t, testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))

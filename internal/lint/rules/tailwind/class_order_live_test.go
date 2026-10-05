@@ -281,6 +281,7 @@ func classOrderLiveReversed(classes []string) []string {
 // machine it was captured on. A checkout holding one of the two repositories measures half the corpus
 // and must still be able to prove the property on that half.
 func TestClassOrderLiveMatchesTheEngineOverTheCorpus(t *testing.T) {
+	t.Parallel()
 	lists := classOrderLiveLoadCorpus(t)
 	systems := classOrderLiveSystems(t, lists)
 	measurement := classOrderLiveMeasure(t, lists, systems)
@@ -357,6 +358,7 @@ func TestClassOrderLiveMatchesTheEngineOverTheCorpus(t *testing.T) {
 // The pairs are asserted rather than merely counted so that a corpus that lost its stacked-variant
 // cases could not turn this suite green by having nothing left to disagree about.
 func TestClassOrderLiveStackedVariantsSortByMaskNotByDepth(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name     string
 		input    []string
@@ -393,6 +395,7 @@ func TestClassOrderLiveStackedVariantsSortByMaskNotByDepth(t *testing.T) {
 	designSystem := classOrderLiveRepositorySystem(t)
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			unranked, placeable := partitionUnranked(testCase.input, designSystem)
 			keys, unplaceable, resolved := classOrderKeys(placeable, designSystem.System, designSystem.Table)
 			if !resolved {
@@ -416,6 +419,7 @@ func TestClassOrderLiveStackedVariantsSortByMaskNotByDepth(t *testing.T) {
 // So this asserts the rule places a class no framework table contains. Without it, a swap that
 // silently kept reading the old tables would show green on the whole suite above.
 func TestClassOrderLiveReadsTheRepositoryRatherThanATable(t *testing.T) {
+	t.Parallel()
 	designSystem := classOrderLiveRepositorySystem(t)
 
 	// `markdown-content` is declared by this repository's own `app/_theme/styles/utilities.css` and
@@ -471,6 +475,7 @@ func classOrderLiveRepositorySystem(t *testing.T) DesignSystemResult {
 // the classes that resolved would reorder correct code on the strength of a lookup that failed, and
 // the author would be asked to make a change the engine does not agree with.
 func TestClassOrderLiveDeclinesRatherThanPartiallySorting(t *testing.T) {
+	t.Parallel()
 	designSystem := classOrderLiveRepositorySystem(t)
 
 	_, unplaceable, resolved := classOrderKeys(
@@ -491,6 +496,7 @@ func TestClassOrderLiveDeclinesRatherThanPartiallySorting(t *testing.T) {
 // not. The same variant takes a different index depending on what else the list contains, so a key
 // computed for one list is meaningless in another.
 func TestClassOrderLiveVariantIndicesAreRanksWithinTheList(t *testing.T) {
+	t.Parallel()
 	designSystem := classOrderLiveRepositorySystem(t)
 
 	maskOf := func(classes []string, target string) string {
@@ -533,6 +539,7 @@ func TestClassOrderLiveVariantIndicesAreRanksWithinTheList(t *testing.T) {
 // `ahra` declares no `dark` colour, which this asserts rather than assumes: the test is about nulls
 // and must not quietly turn into a test about two ranked classes.
 func TestClassOrderLiveUnrankedLeadInSourceOrder(t *testing.T) {
+	t.Parallel()
 	designSystem := classOrderLiveRepositorySystem(t)
 
 	for _, nullClass := range []string{"peer", "group", "text-dark", "dark:bg-dark-2", "ahralia-splash"} {
@@ -585,6 +592,7 @@ func TestClassOrderLiveUnrankedLeadInSourceOrder(t *testing.T) {
 // place. It is pinned here so that a future change which fixes it, or which widens it, shows up as a
 // failure in a test that names the cause instead of as a silent shift in a count.
 func TestClassOrderLiveDeclinesOnlyTheKnownBoundary(t *testing.T) {
+	t.Parallel()
 	lists := classOrderLiveLoadCorpus(t)
 	systems := classOrderLiveSystems(t, lists)
 
@@ -634,6 +642,7 @@ func TestClassOrderLiveDeclinesOnlyTheKnownBoundary(t *testing.T) {
 // `--shadow--0`. `hover:content--0-4` reads as `@utility content--*` with value `0-4`, needing a
 // `--color-content-0-4` the theme does not have, and as nothing else.
 func TestClassOrderRanksByTheReadingThatCompiles(t *testing.T) {
+	t.Parallel()
 	designSystem := classOrderLiveRepositorySystem(t)
 
 	for _, testCase := range []struct {
@@ -662,6 +671,7 @@ func TestClassOrderRanksByTheReadingThatCompiles(t *testing.T) {
 // sat on Structure sites with no-unknown-classes reporting nothing. The live ones are the controls,
 // and `shadow--0` is the one only a second reading reaches.
 func TestClassExistenceAsksTheEvaluatorForRepositoryRoots(t *testing.T) {
+	t.Parallel()
 	designSystem := classOrderLiveRepositorySystem(t)
 
 	for _, dead := range []string{"content--0-4", "hover:content--0-4", "background--2/50"} {

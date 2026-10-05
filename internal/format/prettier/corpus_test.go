@@ -20,6 +20,8 @@ import (
 //
 //	COHERE_CORPUS_LIST=/path/to/list COHERE_CORPUS_OUT=/path/to/dir go test ./internal/prettier/ -run TestCorpus -v
 func TestCorpus(t *testing.T) {
+	t.Parallel()
+
 	listPath := os.Getenv("COHERE_CORPUS_LIST")
 	outDirectory := os.Getenv("COHERE_CORPUS_OUT")
 	if listPath == "" || outDirectory == "" {

@@ -35,6 +35,8 @@ import (
 // rule.Program, and every call site then names ctx.Program. And a declaration in a comment is not a
 // declaration: only a ProgramReads key in a composite literal counts.
 func TestRulesDeclareExactlyWhatTheyReadOfTheProgram(t *testing.T) {
+	t.Parallel()
+
 	ruleFiles := ruleSourceFiles(t)
 	if len(ruleFiles) == 0 {
 		// A check that found nothing to check passes for the wrong reason, which is the same shape
@@ -84,6 +86,8 @@ func TestRulesDeclareExactlyWhatTheyReadOfTheProgram(t *testing.T) {
 // Each source is a shape this guard could misjudge, written to a file and read the way the guard
 // reads the tree, so the guard is shown able to fail rather than only shown passing.
 func TestReadProgramFactsSeesCodeNotComments(t *testing.T) {
+	t.Parallel()
+
 	helpers := map[string]programRead{"type_checking.IsPromiseLike": readsCompilerOptions | readsDefaultLibrary}
 	testCases := []struct {
 		name   string
@@ -134,6 +138,8 @@ var Probe = rule.Rule{Run: func(ctx rule.Context, options any) rule.Listeners { 
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			path := filepath.Join(t.TempDir(), "probe.go")
 			if err := os.WriteFile(path, []byte(testCase.source), 0o644); err != nil {
 				t.Fatal(err)

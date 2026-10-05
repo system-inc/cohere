@@ -11,6 +11,8 @@ import (
 // A formatter whose second pass differs from its first would report writes forever, and the count
 // would be honest while the tree never converged.
 func TestFormatIsIdempotent(t *testing.T) {
+	t.Parallel()
+
 	listPath := os.Getenv("COHERE_IDEM_LIST")
 	if listPath == "" {
 		t.Skip("set COHERE_IDEM_LIST")

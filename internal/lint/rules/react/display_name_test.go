@@ -87,6 +87,7 @@ func TestDisplayNameStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile, testCase.sourceText, testCase.options)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -134,6 +135,7 @@ func TestDisplayNameFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -169,6 +171,7 @@ func TestDisplayNameSettingsGatedCasesUnderDefaultSettings(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != testCase.wantFindings {
@@ -228,6 +231,7 @@ func TestDisplayNameSettingsGatedCasesThisPortCannotExpress(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != testCase.wantFindings {
@@ -360,6 +364,7 @@ func TestDisplayNameMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *test
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile,
 				testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -406,6 +411,7 @@ func TestDisplayNameMergedDeclarationsAreAllOffered(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile,
 				testCase.sourceText, DefaultDisplayNameOptions())
 			rule_testing.ExpectClean(t, result)
@@ -457,6 +463,7 @@ func TestDecodeDisplayNameOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeDisplayNameOptions([]byte(testCase.raw))
 			if testCase.wantErr {
 				if err == nil {
@@ -541,6 +548,7 @@ func TestDisplayNameAnchorsOnTheComponent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {

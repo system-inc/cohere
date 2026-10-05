@@ -227,6 +227,7 @@ func TestErrorBoundariesFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ErrorBoundaries, "component.tsx", testCase.source)
 			expected := make([]string, testCase.count)
 			for index := range expected {
@@ -452,6 +453,7 @@ func TestErrorBoundariesStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ErrorBoundaries, "component.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})

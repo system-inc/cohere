@@ -73,6 +73,7 @@ func TestCheckedRequiresFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runCheckedRequires(t, testCase.sourceText, testCase.rawOptions)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -122,6 +123,7 @@ func TestCheckedRequiresStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runCheckedRequires(t, testCase.sourceText, testCase.rawOptions))
 		})
 	}
@@ -267,6 +269,7 @@ func TestCheckedRequiresResolvesEveryPragmaShape(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runCheckedRequires(t, testCase.sourceText, "")
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -391,6 +394,7 @@ func TestCheckedRequiresMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runCheckedRequires(t, testCase.sourceText, "")
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -445,6 +449,7 @@ func TestCheckedRequiresReportsOnTheWholeElement(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runCheckedRequires(t, testCase.sourceText, "")
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
@@ -519,6 +524,7 @@ func TestCheckedRequiresDecodesItsOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeCheckedRequiresOnChangeOrReadOnlyOptions([]byte(testCase.raw))
 			if err != nil {
 				t.Fatalf("decoding %q: %v", testCase.raw, err)
@@ -618,6 +624,7 @@ func TestCheckedRequiresHasNoFileGate(t *testing.T) {
 		"/repository/source/CheckedRequires.ts",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, CheckedRequiresOnChangeOrReadOnly,
 				fileName, source, CheckedRequiresOnChangeOrReadOnlyOptions{})
 			rule_testing.ExpectFindings(t, result, "missingProperty")
@@ -652,6 +659,7 @@ func TestCheckedRequiresSurvivesShapesThatWouldPanic(t *testing.T) {
 
 	for index, sourceText := range sources {
 		t.Run(string(rune('a'+index)), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runCheckedRequires(t, sourceText, ""))
 		})
 	}

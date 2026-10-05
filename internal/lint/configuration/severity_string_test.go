@@ -7,6 +7,7 @@ import "testing"
 // without a String method prints '\x00' — illegible in exactly the output a reader consults to
 // find out whether their config is being honored.
 func TestSeverityRendersAsTheConfigSpellsIt(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		severity Severity
 		expected string

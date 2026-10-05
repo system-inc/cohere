@@ -234,6 +234,7 @@ export function Component() {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "unstableDependencyMsg")
@@ -535,6 +536,7 @@ export function Component(properties: { n: number }) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
@@ -658,6 +660,7 @@ export function makeComponent() {
 	}
 	for _, testCase := range silent {
 		t.Run("silent "+testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
@@ -684,6 +687,7 @@ export function Component(properties: { show: boolean }) {
 	}
 	for _, testCase := range reporting {
 		t.Run("reports "+testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "withIdentifierMsg")

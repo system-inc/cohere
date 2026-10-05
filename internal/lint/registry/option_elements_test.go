@@ -56,6 +56,7 @@ var optionElementRules = []string{
 
 // TestEveryMultiElementRuleReadsItsWholeOptionList pins the arity each of those rules declares.
 func TestEveryMultiElementRuleReadsItsWholeOptionList(t *testing.T) {
+	t.Parallel()
 	registrations := map[string]rule.Registration{}
 	for _, registration := range rule.Registered() {
 		registrations[registration.Rule.Name] = registration

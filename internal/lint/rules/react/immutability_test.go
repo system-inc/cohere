@@ -284,6 +284,7 @@ function Component(props) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, Immutability, "component.tsx", testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.messages...)
 		})
@@ -497,6 +498,7 @@ function Component(props) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, Immutability, "component.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -561,6 +563,7 @@ func TestImmutabilitySpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, Immutability, "component.tsx", testCase.source)
 			if len(result.Diagnostics) != len(testCase.expected) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.expected), len(result.Diagnostics))
@@ -628,6 +631,7 @@ func TestImmutabilityReasonSelectsTheMessage(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, Immutability, "component.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
@@ -689,6 +693,7 @@ func TestImmutabilityJoinIsNotAnOrdering(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if got := immutabilityMergeKinds(testCase.a, testCase.b); got != testCase.expected {
 				t.Errorf("expected %v, got %v", testCase.expected, got)
 			}

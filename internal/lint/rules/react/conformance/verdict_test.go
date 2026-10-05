@@ -36,6 +36,7 @@ func (d declineEverything) Analyze(Fixture) (Result, error) {
 // parser. Of the 94, eleven have been run against the real rule and every one landed in `stated
 // divergence`; the remaining 83 are unscored. Every fixture has a named reason, counted here.
 func TestAggregatedScoreAgainstReactsOwnFixtures(t *testing.T) {
+	t.Parallel()
 	fixtures := load(t)
 
 	report, err := Aggregate(fixtures, declineEverything{reason: "scored without a rule engine; see the note on this test"})
@@ -113,6 +114,7 @@ func TestAggregatedScoreAgainstReactsOwnFixtures(t *testing.T) {
 // corpus, and cohere implements none of them; that is the honest reason the parity number is small,
 // and it is a different reason from "our rules are wrong".
 func TestNoRuleShippedIsTheCorpusRatherThanTheRules(t *testing.T) {
+	t.Parallel()
 	fixtures := load(t)
 
 	perRule := map[string]int{}
@@ -174,6 +176,7 @@ func TestNoRuleShippedIsTheCorpusRatherThanTheRules(t *testing.T) {
 // rather than by writing the constant into a map. A category that cannot be produced here is not a
 // category and should be deleted rather than shipped as a label.
 func TestEveryCategoryIsReachable(t *testing.T) {
+	t.Parallel()
 	globalsFixture := Fixture{
 		Name:   "reachability.globals.js",
 		Source: "function Component() { someGlobal = true; }",
@@ -270,6 +273,7 @@ func TestEveryCategoryIsReachable(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.Name, func(t *testing.T) {
+			t.Parallel()
 			got := Classify(testCase.Fixture, testCase.Result, testCase.Err)
 			if got.Verdict != testCase.Want {
 				t.Errorf("classified as %q, want %q (reason: %s)", got.Verdict, testCase.Want, got.Reason)
@@ -288,6 +292,8 @@ func TestEveryCategoryIsReachable(t *testing.T) {
 // do not currently intersect. An empty category is exactly the thing `TestEveryCategoryIsReachable`
 // exists to distrust, so the wiring is proven directly by putting an entry in and taking it out
 // again, rather than by asserting the constant exists.
+// Not parallel: it adds entries to the package statedDivergences map, which Classify reads for every fixture,
+// so a parallel test classifying at the same moment would race it and could see the entry.
 func TestStatedDivergenceCategoryCanHoldAnEntry(t *testing.T) {
 	const name = "reachability.divergence.js"
 
@@ -340,6 +346,7 @@ func TestStatedDivergenceCategoryCanHoldAnEntry(t *testing.T) {
 // type-aware rule can claim it. This proves that restriction is live, by handing the same silent
 // result to a syntax-only rule's fixture and requiring a failure.
 func TestUnresolvableTypesIsNotAnExcuseForSyntaxRules(t *testing.T) {
+	t.Parallel()
 	// `globals` is syntax-only and is not in TypeAwareRules.
 	verdict := Classify(Fixture{
 		Name:   "reachability.globals-no-import.js",
@@ -363,6 +370,7 @@ func TestUnresolvableTypesIsNotAnExcuseForSyntaxRules(t *testing.T) {
 // an error in the direction that looks more rigorous, which is the direction least likely to be
 // questioned.
 func TestReactImportDetectionDoesNotOverMatch(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		Source string
 		Want   bool
@@ -388,6 +396,7 @@ func TestReactImportDetectionDoesNotOverMatch(t *testing.T) {
 // 13 resolved, 33% of hook-using fixtures missing the import). React's own corpus is worse on this
 // axis, not better, so a stub matters more here than the brief assumed.
 func TestCorpusTypeResolutionIsMeasured(t *testing.T) {
+	t.Parallel()
 	fixtures := load(t)
 
 	// Counted per population rather than over the corpus as a whole, because the two differ sharply
@@ -452,6 +461,7 @@ func TestCorpusTypeResolutionIsMeasured(t *testing.T) {
 
 // TestReportCheckCatchesANonPartition proves the arithmetic guard fires.
 func TestReportCheckCatchesANonPartition(t *testing.T) {
+	t.Parallel()
 	report := Report{
 		Considered: 2,
 		Counts:     map[Verdict]int{VerdictPassed: 1},

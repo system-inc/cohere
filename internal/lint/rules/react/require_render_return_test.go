@@ -131,6 +131,7 @@ func TestRequireRenderReturnFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, RequireRenderReturn, requireRenderReturnFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -237,6 +238,7 @@ func TestRequireRenderReturnStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, RequireRenderReturn, requireRenderReturnFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -312,6 +314,7 @@ func TestRequireRenderReturnSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, RequireRenderReturn, requireRenderReturnFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
@@ -387,6 +390,7 @@ func TestRequireRenderReturnHasNoFileGate(t *testing.T) {
 		"/repository/source/Probe.js",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, RequireRenderReturn, fileName, sourceText)
 			rule_testing.ExpectFindings(t, result, "noRenderReturn")
 		})

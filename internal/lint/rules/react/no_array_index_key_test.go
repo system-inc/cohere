@@ -153,6 +153,7 @@ func TestNoArrayIndexKeyFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -233,6 +234,7 @@ func TestNoArrayIndexKeyStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -317,6 +319,7 @@ func TestNoArrayIndexKeyIteratorMethods(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -362,6 +365,7 @@ func TestNoArrayIndexKeyCalleeShapes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -390,6 +394,7 @@ func TestNoArrayIndexKeyParameterShapes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -444,6 +449,7 @@ func TestNoArrayIndexKeyKeyExpressionShapes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			attribute := "key"
 			if testCase.key != "" {
 				attribute = "key=" + testCase.key
@@ -498,6 +504,7 @@ func TestNoArrayIndexKeyStackBehaviour(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -542,6 +549,7 @@ func TestNoArrayIndexKeyReactChildren(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -618,6 +626,7 @@ func TestNoArrayIndexKeyCreateElement(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -658,6 +667,7 @@ func TestNoArrayIndexKeySpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))

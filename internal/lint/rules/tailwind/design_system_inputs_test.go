@@ -21,6 +21,7 @@ import (
 // change which stylesheet is the entry. The entry imports `extra.css`, which only the engine reads,
 // and which must be recorded present.
 func TestDesignSystemReadsAreRunCacheInputs(t *testing.T) {
+	t.Parallel()
 	packageRoot := classOrderFixturePackageRoot()
 	if packageRoot == "" {
 		t.Skip("no installed tailwindcss on this machine, so there is no design system to load")

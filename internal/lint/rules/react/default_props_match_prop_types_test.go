@@ -76,6 +76,7 @@ func TestDefaultPropsMatchPropTypesStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, DefaultPropsMatchPropTypes, defaultPropsMatchPropTypesFile, testCase.sourceText, testCase.options)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -176,6 +177,7 @@ func TestDefaultPropsMatchPropTypesFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, DefaultPropsMatchPropTypes, defaultPropsMatchPropTypesFile, testCase.sourceText, testCase.options)
 
 			// The ids first, through the harness helper. `TestEveryRuleShipsAFixturePair` looks for
@@ -235,6 +237,7 @@ func TestDefaultPropsMatchPropTypesCasesThisPortCannotExpress(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, DefaultPropsMatchPropTypes,
 				defaultPropsMatchPropTypesFile, testCase.sourceText,
 				DefaultDefaultPropsMatchPropTypesOptions())
@@ -308,6 +311,7 @@ func TestDefaultPropsMatchPropTypesMatchesTheInstalledRuleOnInputsTheCorpusDoesN
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, DefaultPropsMatchPropTypes,
 				defaultPropsMatchPropTypesFile, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {

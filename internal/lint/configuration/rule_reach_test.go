@@ -9,6 +9,7 @@ import (
 // The pairs are the ones the doc on sameRuling names: a prefixed key that is one ruling with its bare
 // spelling, and a core rule beside its typescript-eslint twin, which share a ruling while being two rules.
 func TestRuleReachAnswersAsTheScanAndAsksEachKeyOnce(t *testing.T) {
+	t.Parallel()
 	registered := []string{"x", "no-invalid-this", "@typescript-eslint/no-invalid-this", "eqeqeq", "nexus/other"}
 	scan := func(key string) map[string]bool {
 		reached := map[string]bool{}

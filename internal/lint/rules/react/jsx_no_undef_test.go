@@ -81,6 +81,7 @@ func TestJsxNoUndefFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, JsxNoUndef, jsxNoUndefFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
@@ -141,6 +142,7 @@ func TestJsxNoUndefStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, JsxNoUndef, jsxNoUndefFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -190,6 +192,7 @@ func TestJsxNoUndefPointsAtTheReferencedIdentifier(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, JsxNoUndef, jsxNoUndefFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "jsxIdentifierNotDefined")
 

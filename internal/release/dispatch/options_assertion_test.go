@@ -25,6 +25,8 @@ import (
 // beside a rule.Context, which is Run's shape, or when it is named `options` and typed `any`, which
 // is the shape of a helper that resolves settings for its rule.
 func TestRulesReadOptionsThroughOptionsAs(t *testing.T) {
+	t.Parallel()
+
 	ruleFiles := ruleSourceFiles(t)
 	if len(ruleFiles) == 0 {
 		t.Fatal("found no rule source files, so this test proved nothing")
@@ -56,6 +58,8 @@ func TestRulesReadOptionsThroughOptionsAs(t *testing.T) {
 // Each source is written to a file and read the way the guard reads the tree, so the guard is shown
 // able to fail rather than only shown passing.
 func TestReadOptionsFactsSeesBareAssertions(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name        string
 		source      string
@@ -125,6 +129,8 @@ func probe(node any) bool { _, ok := node.(string); return ok }`,
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			path := filepath.Join(t.TempDir(), "probe.go")
 			if err := os.WriteFile(path, []byte(testCase.source), 0o644); err != nil {
 				t.Fatal(err)
