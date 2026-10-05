@@ -23,11 +23,11 @@ var sharedReaderRules = []rule.Rule{
 
 // sharedReaderWalkSource plants a finding for every one of those rules, on all three surfaces and in
 // the value positions the reader enters, so each rule reads nodes another rule already read.
-const sharedReaderWalkSource = `declare function mergeClassNames(...values: unknown[]): string;
+const sharedReaderWalkSource = `declare function cn(...values: unknown[]): string;
 declare const size: string;
 declare const open: boolean;
-export const buttonClassName = open ? 'items-center flex' : 'flex-shrink-0';
-export const merged = mergeClassNames('px-4 py-2 px-4', ` + "`px-${size}`" + `, open && 'ps-4 pe-4');
+export const className = open ? 'items-center flex' : 'flex-shrink-0';
+export const merged = cn('px-4 py-2 px-4', ` + "`px-${size}`" + `, open && 'ps-4 pe-4');
 export const elements = [
 	<div className="px-4 py-4" />,
 	<div className="flex block" />,

@@ -146,8 +146,8 @@ func DecodeJsxNoTargetBlankOptions(raw []byte) (any, error) {
 //
 // `linkComponentsUtil` starts from `['a']` and `['form']` and concatenates
 // `settings.linkComponents` / `settings.formComponents`, each of which may be a bare name or a
-// `{name, linkAttribute}` pair naming a different attribute to read. Our `internal/config` has no
-// settings surface, established in `no_string_refs.go` with a control grep, so neither list can be
+// `{name, linkAttribute}` pair naming a different attribute to read. cohere reads neither
+// (the loader refuses both namespaces by name), so neither list can be
 // extended here by any route.
 //
 // The faithful reading is the unconfigured answer rather than a guess at what a project might

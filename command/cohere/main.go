@@ -1353,8 +1353,12 @@ func configureLint(graph *program.Graph, location projectLocation) (*configurati
 	if err := lintConfig.ValidateSelectors(projectFileNames); err != nil {
 		return nil, fmt.Errorf("validating the lint config: %w", err)
 	}
+	base := optionsBase(lintConfig, location.Root)
+	if err := registry.CheckSettings(base); err != nil {
+		return nil, fmt.Errorf("validating the lint config: %w", err)
+	}
 	graph.LintConfig = lintConfig
-	graph.RuleOptions = registry.OptionsAt(optionsBase(lintConfig, location.Root))
+	graph.RuleOptions = registry.OptionsAt(base)
 	graph.RegisteredRuleNames = registry.Names()
 	graph.Readiness = requestedReadiness()
 	return lintConfig, nil
@@ -1364,6 +1368,7 @@ func optionsBase(lintConfig *configuration.Config, projectRoot string) rule.Opti
 	base := rule.OptionsBase{ProjectRoot: projectRoot}
 	if lintConfig != nil {
 		base.ConfigDirectory = lintConfig.Root
+		base.Settings = lintConfig.Settings
 	}
 	return base
 }

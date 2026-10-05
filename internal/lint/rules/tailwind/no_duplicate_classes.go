@@ -28,9 +28,7 @@ func messageDuplicateClass(className string) rule.Message {
 // from one with nothing to say.
 type NoDuplicateClassesOptions struct {
 	TailwindLocationOptions
-	Attributes []string `json:"attributes"`
-	Callees    []string `json:"callees"`
-	Variables  []string `json:"variables"`
+	TailwindClassLiteralOptions
 }
 
 // NoDuplicateClasses reports a class name written twice in the same string.
@@ -69,15 +67,7 @@ var NoDuplicateClasses = rule.Rule{
 
 		settings := DefaultClassLiteralSettings()
 		if configured, isConfigured := rule.OptionsAs[NoDuplicateClassesOptions](options); isConfigured {
-			if len(configured.Attributes) > 0 {
-				settings.AttributeNames = configured.Attributes
-			}
-			if len(configured.Callees) > 0 {
-				settings.CalleeNames = configured.Callees
-			}
-			if len(configured.Variables) > 0 {
-				settings.VariablePatterns = configured.Variables
-			}
+			settings = configured.ClassLiteralSettings()
 		}
 
 		reader := ClassLiteralReaderFor(ctx.FileCache, settings)

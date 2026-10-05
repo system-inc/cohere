@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -105,6 +106,19 @@ func HouseSources(path string) ([]string, error) {
 		sources = append(sources, own...)
 	}
 	return append(sources, TailwindSetName, NextSetName, ReactSetName, TypeScriptSetName), nil
+}
+
+// OwnSettingsOf returns the `settings` the project's own file at path writes, which zero config's
+// detection reads before LoadHouse runs, or nil when there is no file or it writes none.
+func OwnSettingsOf(path string) (map[string]json.RawMessage, error) {
+	if _, err := os.Stat(path); err != nil {
+		return nil, nil
+	}
+	layers, err := readConfigLayers(path, nil)
+	if err != nil {
+		return nil, err
+	}
+	return layers[len(layers)-1].raw.Settings, nil
 }
 
 // LoadHouse loads the zero-config configuration for the project whose settings would live at path,

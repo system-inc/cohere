@@ -127,6 +127,12 @@ type Config struct {
 	// and a range there would decide for all of them which release they run.
 	CohereVersion *VersionRange
 
+	// Settings is the project's own `settings`, keyed by plugin namespace, each value as written. Only
+	// the project's own file may write it, for the reason only it may pin a release: a value in a set
+	// would decide for every project extending it. Which namespaces a run reads, and which keys under
+	// each, is the rule packages' to say (rule.RegisterSettings), checked before any rule decodes.
+	Settings map[string]json.RawMessage
+
 	// ruleWriters is the source that turned each rule key on or set it: the file or set that wrote it at
 	// top level, the one that declared the plugin for a plugin default, or the one whose override names it.
 	ruleWriters map[string]string
@@ -344,8 +350,9 @@ func RulesFromPlugins(plugins []string, named map[string]RuleSetting) map[string
 //   - `ignorePatterns` and `overrides` concatenate, the base's first, so a later block still wins.
 //     Every pattern resolves against Root: a house pattern is a shape like `**/*.test.ts`, not a path.
 //   - A base may carry `format`: its reader (internal/format/formatoptions) follows the chain, applying
-//     each file's block over the one it extends. A base may not carry `settings`, because its reader
-//     does not follow the chain and a value there would be ignored silently.
+//     each file's block over the one it extends. A base may not carry `settings`: they are read from
+//     the project's own file only, as ESLint reads them from the project's config, so a value there
+//     would be ignored silently.
 //   - A rule set differently from the file it extends must be named under `departures` with a reason,
 //     and a `departures` entry that departs from nothing is refused, so the list cannot rot.
 //   - A rule a file turns off at top level says why under `reasons`, unless the off departs from an
@@ -412,7 +419,7 @@ func loadLayers(layers []configLayer, root string, registeredNames []string) (*C
 		}
 		if isBase && layer.present["settings"] {
 			return nil, fmt.Errorf("lint config %s declares \"settings\", and it is extended by %s: "+
-				"the reader of \"settings\" does not follow `extends`, so the value would be ignored "+
+				"settings are read from the project's own file only, so the value would be ignored "+
 				"silently. Keep \"settings\" in the project's own file",
 				layer.path, layers[len(layers)-1].path)
 		}
@@ -580,6 +587,10 @@ func loadLayers(layers []configLayer, root string, registeredNames []string) (*C
 				loaded.ruleWriters[name] = override.File
 			}
 		}
+	}
+
+	if own := layers[len(layers)-1]; own.present["settings"] {
+		loaded.Settings = own.raw.Settings
 	}
 
 	if own := layers[len(layers)-1]; own.present["cohere"] {
@@ -955,6 +966,7 @@ type rawConfig struct {
 	IgnorePatterns []string                   `json:"ignorePatterns"`
 	Overrides      []rawOverride              `json:"overrides"`
 	Cohere         string                     `json:"cohere"`
+	Settings       map[string]json.RawMessage `json:"settings"`
 }
 
 // parsedTopLevelKeys are the keys `rawConfig` decodes and the loader acts on.
@@ -967,6 +979,7 @@ var parsedTopLevelKeys = map[string]bool{
 	"ignorePatterns": true,
 	"overrides":      true,
 	"cohere":         true,
+	"settings":       true,
 }
 
 // ignoredTopLevelKeys are the keys the loader deliberately does not act on, each with the reason.
@@ -990,16 +1003,6 @@ var ignoredTopLevelKeys = map[string]string{
 
 	"output": "how a run prints, read by the command (command/cohere/output_settings.go) from the file cohere " +
 		"reads first. It decides nothing a rule does, so the linter leaves it alone on purpose.",
-
-	"settings": "per-plugin configuration for the JavaScript plugins above, and it is the entry " +
-		"most worth re-reading. `settings.better-tailwindcss.entryPoint` names this repository's " +
-		"root stylesheet, and the Tailwind rules' `FindEntryPoint` does not read it -- it probes a hardcoded " +
-		"candidate list whose first entry is that same path. All three repositories we lint hit " +
-		"that first candidate, so the divergence is latent rather than live: there is no known " +
-		"case of it producing a wrong answer, and a project whose stylesheet is elsewhere gets a " +
-		"loud decline rather than a wrong reading. Ignored on that basis, and the shape is worth " +
-		"naming -- right on the population we write, wrong on the mechanism, invisible to a corpus " +
-		"differential.",
 }
 
 // checkTopLevelKeys refuses a config carrying a key the loader does not implement.

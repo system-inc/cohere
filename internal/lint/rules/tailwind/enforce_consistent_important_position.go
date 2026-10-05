@@ -27,10 +27,8 @@ func messageImportantPosition(written string, corrected string) rule.Message {
 // node_modules.
 type EnforceConsistentImportantPositionOptions struct {
 	TailwindLocationOptions
-	Attributes []string `json:"attributes"`
-	Callees    []string `json:"callees"`
-	Variables  []string `json:"variables"`
-	Position   string   `json:"position"`
+	TailwindClassLiteralOptions
+	Position string `json:"position"`
 }
 
 // EnforceConsistentImportantPosition reports an important marker on the wrong side of a utility.
@@ -85,15 +83,7 @@ var EnforceConsistentImportantPosition = rule.Rule{
 		settings := DefaultClassLiteralSettings()
 		position := importantPositionRecommended
 		if configured, isConfigured := rule.OptionsAs[EnforceConsistentImportantPositionOptions](options); isConfigured {
-			if len(configured.Attributes) > 0 {
-				settings.AttributeNames = configured.Attributes
-			}
-			if len(configured.Callees) > 0 {
-				settings.CalleeNames = configured.Callees
-			}
-			if len(configured.Variables) > 0 {
-				settings.VariablePatterns = configured.Variables
-			}
+			settings = configured.ClassLiteralSettings()
 			if configured.Position == importantPositionLegacy {
 				position = importantPositionLegacy
 			}

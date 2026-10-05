@@ -147,13 +147,13 @@ func TestEnforceCanonicalClassesReportsCollapses(t *testing.T) {
 		{
 			name:     "on a callee surface",
 			fileName: "Component.tsx",
-			source:   `const merged = mergeClassNames('px-4 py-4');`,
+			source:   `const merged = cn('px-4 py-4');`,
 			wantIds:  []string{"canonicalCollapse"},
 		},
 		{
 			name:     "on a variable surface",
 			fileName: "Styles.ts",
-			source:   `const buttonClassName = 'w-8 h-8';`,
+			source:   `const className = 'w-8 h-8';`,
 			wantIds:  []string{"canonicalCollapse"},
 		},
 		{

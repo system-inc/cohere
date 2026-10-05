@@ -59,7 +59,7 @@ func (r *ClassLiteralReader) ClassTemplatesIn(node *ast.Node) []ClassTemplate {
 			return nil
 		}
 		name := attribute.Name()
-		if name == nil || !r.attributeNames[name.Text()] {
+		if name == nil || !r.attributes.matches(name.Text()) {
 			return nil
 		}
 		return templatesFrom(templateExpressionOf(attribute.Initializer), ClassLiteralOriginAttribute)
@@ -69,7 +69,7 @@ func (r *ClassLiteralReader) ClassTemplatesIn(node *ast.Node) []ClassTemplate {
 		if call == nil || call.Expression == nil || call.Arguments == nil {
 			return nil
 		}
-		if call.Expression.Kind != ast.KindIdentifier || !r.calleeNames[call.Expression.Text()] {
+		if !r.readsCallee(call.Expression) {
 			return nil
 		}
 		var templates []ClassTemplate
@@ -87,12 +87,10 @@ func (r *ClassLiteralReader) ClassTemplatesIn(node *ast.Node) []ClassTemplate {
 		if name == nil || name.Kind != ast.KindIdentifier {
 			return nil
 		}
-		for _, pattern := range r.variablePatterns {
-			if pattern.MatchString(name.Text()) {
-				return templatesFrom(templateExpressionOf(declaration.Initializer), ClassLiteralOriginVariable)
-			}
+		if !r.variables.matches(name.Text()) {
+			return nil
 		}
-		return nil
+		return templatesFrom(templateExpressionOf(declaration.Initializer), ClassLiteralOriginVariable)
 	}
 
 	return nil

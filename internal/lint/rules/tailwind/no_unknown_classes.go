@@ -20,9 +20,7 @@ func messageUnknownClass(className string) rule.Message {
 // classes that are real but come from somewhere Tailwind cannot see.
 type NoUnknownClassesOptions struct {
 	TailwindLocationOptions
-	Attributes []string `json:"attributes"`
-	Callees    []string `json:"callees"`
-	Variables  []string `json:"variables"`
+	TailwindClassLiteralOptions
 	// Ignore lists regular expressions for classes to leave alone. Required in practice rather than
 	// optional: a project with any hand-written CSS has class names Tailwind does not define, and
 	// without exempting them the rule reports correct code.
@@ -92,8 +90,7 @@ var NoUnknownClasses = rule.Rule{
 			}
 			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
 			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
-			if reason := designSystemSkipReason(designSystem.Err); reason != "" {
-				ctx.Skip(reason)
+			if skipWithoutTailwind(ctx, designSystem.Err) {
 				return nil
 			}
 			return declineListeners(ctx, "no-unknown-classes", designSystem)
@@ -102,15 +99,7 @@ var NoUnknownClasses = rule.Rule{
 		settings := DefaultClassLiteralSettings()
 		var ignore []string
 		if isConfigured {
-			if len(configured.Attributes) > 0 {
-				settings.AttributeNames = configured.Attributes
-			}
-			if len(configured.Callees) > 0 {
-				settings.CalleeNames = configured.Callees
-			}
-			if len(configured.Variables) > 0 {
-				settings.VariablePatterns = configured.Variables
-			}
+			settings = configured.ClassLiteralSettings()
 			ignore = configured.Ignore
 		}
 

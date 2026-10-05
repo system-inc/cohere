@@ -73,10 +73,9 @@ const (
 // # The React version gate is upstream's and is not reachable here, so its default branch is all
 //
 // oxc reads `settings.react.version` and drops the `UNSAFE_` spelling when the configured version
-// predates 16.3, where the prefix was introduced. Our `internal/config` has no settings surface at
-// all: `Config` carries `Rules` and `Overrides` and nothing else, checked with a control grep that
-// found `rules` in the same command that found no `settings`. So no version can reach a rule here,
-// and oxc's own default, `is_none_or(supports_unsafe_lifecycle_prefix)`, answers true. Both names
+// predates 16.3, where the prefix was introduced. cohere reads no React settings: the loader reads
+// `settings` for better-tailwindcss only and refuses `settings.react` by name. So no version can
+// reach a rule here, and oxc's own default, `is_none_or(supports_unsafe_lifecycle_prefix)`, answers true. Both names
 // are therefore unconditional in this port.
 //
 // Stating the measurement rather than the reasoning, because this is the shape of divergence claim

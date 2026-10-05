@@ -48,7 +48,7 @@ func TestNoPhysicalDirectionFires(t *testing.T) {
 		// Reached through a JSX attribute, a call argument, and a bare array entry. The last is the
 		// shape all three tree findings actually take, and the one a class-surface reader misses.
 		{"a jsx attribute", "export const c = <div className=\"flex ml-4\" />;\n", 1},
-		{"a call argument", "export const c = mergeClassNames('flex ml-4');\n", 1},
+		{"a call argument", "export const c = cn('flex ml-4');\n", 1},
 		{"a bare array entry", "export const theme = [\n    'flex items-center',\n    'fixed left-[50%]',\n];\n", 1},
 		// Template literals: the static head and the piece after an interpolation. A rule reading
 		// only the head would pass the first and miss the second.

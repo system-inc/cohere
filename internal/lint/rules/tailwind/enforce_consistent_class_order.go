@@ -23,9 +23,7 @@ func messageInconsistentClassOrder(ordered string) rule.Message {
 // EnforceConsistentClassOrderOptions lets a project name the surfaces that carry class strings.
 type EnforceConsistentClassOrderOptions struct {
 	TailwindLocationOptions
-	Attributes []string `json:"attributes"`
-	Callees    []string `json:"callees"`
-	Variables  []string `json:"variables"`
+	TailwindClassLiteralOptions
 	// Order is upstream's `order`: `official` (the default) is Tailwind's own order, `strict` is that
 	// order regrouped by variant (strictClassOrder), and `asc` and `desc` sort the classes as plain
 	// strings.
@@ -197,8 +195,7 @@ var EnforceConsistentClassOrder = rule.Rule{
 			}
 			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
 			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
-			if reason := designSystemSkipReason(designSystem.Err); reason != "" {
-				ctx.Skip(reason)
+			if skipWithoutTailwind(ctx, designSystem.Err) {
 				return nil
 			}
 			return declineListeners(ctx, "enforce-consistent-class-order", designSystem)
@@ -208,15 +205,7 @@ var EnforceConsistentClassOrder = rule.Rule{
 		ordering := defaultClassOrderOptions()
 		if isConfigured {
 			ordering = classOrderOptionsFrom(configured)
-			if len(configured.Attributes) > 0 {
-				settings.AttributeNames = configured.Attributes
-			}
-			if len(configured.Callees) > 0 {
-				settings.CalleeNames = configured.Callees
-			}
-			if len(configured.Variables) > 0 {
-				settings.VariablePatterns = configured.Variables
-			}
+			settings = configured.ClassLiteralSettings()
 		}
 
 		reader := ClassLiteralReaderFor(ctx.FileCache, settings)

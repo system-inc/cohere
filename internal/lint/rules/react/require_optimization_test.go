@@ -594,7 +594,7 @@ func TestRequireOptimizationObjectArmReportsWithoutAFunction(t *testing.T) {
 //
 // The shelf's `react.IsEs5ComponentCall` accepts `createClass` and `React.createClass` as well, and
 // upstream's `require-optimization` accepts NEITHER: its `createClass` pragma defaults to
-// `createReactClass` and there is no settings surface here to change it. A mutant dropping the gate
+// `createReactClass` and cohere reads no React settings to change it. A mutant dropping the gate
 // entirely survived the rest of this suite, because nothing in the corpus writes a call to anything
 // other than `createReactClass`. Every verdict below was measured on the installed build.
 func TestRequireOptimizationCreateReactClassSpellings(t *testing.T) {

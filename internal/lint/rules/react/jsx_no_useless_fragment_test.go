@@ -610,7 +610,7 @@ func TestJsxNoUselessFragmentSurvivesShapesThatWouldPanic(t *testing.T) {
 // TestJsxNoUselessFragmentPragmaIsFixedAtReact records the corpus case a settings surface would change.
 //
 // Upstream reads BOTH pragmas from settings: `settings.react.pragma` for the namespace and
-// `settings.react.fragment` for the name. `internal/config` has neither, so both are the fixed
+// `settings.react.fragment` for the name. cohere reads no React settings, so both are the fixed
 // `React` and `Fragment` here, and a project renaming either gets a false NEGATIVE.
 //
 // The case is upstream's own invalid-7, held out of the imported table because it is not

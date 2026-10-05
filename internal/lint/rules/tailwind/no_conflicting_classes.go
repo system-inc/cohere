@@ -30,9 +30,7 @@ func propertyWord(properties []string) string {
 // NoConflictingClassesOptions lets a project name the surfaces that carry class strings.
 type NoConflictingClassesOptions struct {
 	TailwindLocationOptions
-	Attributes []string `json:"attributes"`
-	Callees    []string `json:"callees"`
-	Variables  []string `json:"variables"`
+	TailwindClassLiteralOptions
 }
 
 // NoConflictingClasses reports two classes in one literal that set the same CSS property.
@@ -96,8 +94,7 @@ var NoConflictingClasses = rule.Rule{
 			}
 			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
 			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
-			if reason := designSystemSkipReason(designSystem.Err); reason != "" {
-				ctx.Skip(reason)
+			if skipWithoutTailwind(ctx, designSystem.Err) {
 				return nil
 			}
 			return declineListeners(ctx, "no-conflicting-classes", designSystem)
@@ -105,15 +102,7 @@ var NoConflictingClasses = rule.Rule{
 
 		settings := DefaultClassLiteralSettings()
 		if isConfigured {
-			if len(configured.Attributes) > 0 {
-				settings.AttributeNames = configured.Attributes
-			}
-			if len(configured.Callees) > 0 {
-				settings.CalleeNames = configured.Callees
-			}
-			if len(configured.Variables) > 0 {
-				settings.VariablePatterns = configured.Variables
-			}
+			settings = configured.ClassLiteralSettings()
 		}
 
 		reader := ClassLiteralReaderFor(ctx.FileCache, settings)

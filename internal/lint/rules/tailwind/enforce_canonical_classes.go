@@ -24,9 +24,7 @@ func messageCanonicalCollapse(inputs []string, output string) rule.Message {
 // exempt classes it does not want rewritten.
 type EnforceCanonicalClassesOptions struct {
 	TailwindLocationOptions
-	Attributes []string `json:"attributes"`
-	Callees    []string `json:"callees"`
-	Variables  []string `json:"variables"`
+	TailwindClassLiteralOptions
 	// Ignore lists regular expressions for classes to leave alone, matching the option upstream
 	// takes. The oxlint configuration supplies one, and a rule that declared no options at all made
 	// oxlint refuse the whole plugin with "does not accept options", which failed as a silent
@@ -116,8 +114,7 @@ var EnforceCanonicalClasses = rule.Rule{
 			}
 			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
 			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
-			if reason := designSystemSkipReason(designSystem.Err); reason != "" {
-				ctx.Skip(reason)
+			if skipWithoutTailwind(ctx, designSystem.Err) {
 				return nil
 			}
 			return declineListeners(ctx, "enforce-canonical-classes", designSystem)
@@ -134,15 +131,7 @@ var EnforceCanonicalClasses = rule.Rule{
 			if configured.Logical != nil {
 				collapse.logical = *configured.Logical
 			}
-			if len(configured.Attributes) > 0 {
-				settings.AttributeNames = configured.Attributes
-			}
-			if len(configured.Callees) > 0 {
-				settings.CalleeNames = configured.Callees
-			}
-			if len(configured.Variables) > 0 {
-				settings.VariablePatterns = configured.Variables
-			}
+			settings = configured.ClassLiteralSettings()
 			ignore = configured.Ignore
 		}
 

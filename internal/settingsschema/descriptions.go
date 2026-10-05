@@ -51,8 +51,11 @@ var topLevelDescriptions = map[string]string{
 		"types, lint) first in the footer's parentheses, as --phases does. Read only from the file cohere reads " +
 		"first, and a key outside this block's is refused.",
 
-	"settings": "Per-plugin settings carried for the JavaScript tools that still read this file. Allowed only " +
-		"in the file cohere reads first, never in a file another extends, and nothing in cohere reads it.",
+	"settings": "Per-plugin settings, read for better-tailwindcss: its rules read settings[\"better-tailwindcss\"] " +
+		"(or \"eslint-plugin-better-tailwindcss\") between their defaults and their own options, as upstream does, " +
+		"so entryPoint, attributes, callees and variables written here reach every Tailwind rule. A key no rule " +
+		"reads, or a namespace for another plugin, is refused by name. Allowed only in the file cohere reads " +
+		"first, never in a file another extends.",
 
 	FormatKey: "The formatter's options and the house ignore list. With no block anywhere in the chain, cohere " +
 		"formats with the house block " + formatoptions.NexusTierSetName + " carries. Outside our tiers, the most " +

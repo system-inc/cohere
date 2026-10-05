@@ -130,7 +130,7 @@ var NoUnusedClassComponentMethods = rule.Rule{
 // noUnusedClassComponentMethodsIsEs5Specification reports whether an object is a component body.
 //
 // Upstream's `isES5Component` looks at the object's PARENT call, requiring the callee to be the
-// createClass pragma. With no settings surface here that pragma is `createReactClass`, and the
+// createClass pragma. With no React settings read here that pragma is `createReactClass`, and the
 // namespaced `React.createClass` fails upstream's property test for the same reason. Written inline
 // rather than through the shelf's `react.IsEs5ComponentCall`, which accepts `createClass` and the
 // namespaced spelling and would report on objects upstream ignores.

@@ -41,26 +41,33 @@ func TestNoDuplicateClassesReportsRepeats(t *testing.T) {
 			// literals.
 			name:     "callee argument",
 			fileName: "Component.tsx",
-			source:   `const merged = mergeClassNames('px-4 py-2 px-4');`,
+			source:   `const merged = cn('px-4 py-2 px-4');`,
 			wantIds:  []string{"duplicateClass"},
 		},
 		{
 			name:     "callee with several arguments",
 			fileName: "Component.tsx",
-			source:   `const merged = mergeClassNames('flex flex', 'gap-2 gap-2');`,
+			source:   `const merged = cn('flex flex', 'gap-2 gap-2');`,
 			wantIds:  []string{"duplicateClass", "duplicateClass"},
 		},
 		{
 			// The third surface, 125 literals on the real tree.
 			name:     "variable by name",
 			fileName: "Styles.ts",
-			source:   `const buttonClassName = 'rounded-md rounded-md';`,
+			source:   `const className = 'rounded-md rounded-md';`,
+			wantIds:  []string{"duplicateClass"},
+		},
+		{
+			// Upstream's getESCalleeName names a member call by its last property, so `theme.cn` is `cn`.
+			name:     "method named like a callee",
+			fileName: "Component.tsx",
+			source:   `const value = theme.cn('flex flex');`,
 			wantIds:  []string{"duplicateClass"},
 		},
 		{
 			name:     "plural variable name",
 			fileName: "Styles.ts",
-			source:   `const buttonClassNames = 'p-2 p-2';`,
+			source:   `const classNames = 'p-2 p-2';`,
 			wantIds:  []string{"duplicateClass"},
 		},
 		{
@@ -159,10 +166,11 @@ func TestNoDuplicateClassesStaysSilent(t *testing.T) {
 			source:   `const description = 'flex flex';`,
 		},
 		{
-			// A method on an object is not the configured callee, even though the name matches.
-			name:     "method with a matching name",
+			// A member call is named by its last property and pathed by the whole chain, and neither
+			// `join` nor `cn.join` is a callee, though the chain starts with one.
+			name:     "method on an object named like a callee",
 			fileName: "Component.tsx",
-			source:   `const value = theme.mergeClassNames('flex flex');`,
+			source:   `const value = cn.join('flex flex');`,
 		},
 		{
 			// A dynamic class is `no-concatenated-classes`'s finding, and the visible fragments here
@@ -275,15 +283,15 @@ func TestTemplateHoleIsReportedButNotFixed(t *testing.T) {
 func TestAttributeOnlyReadingLosesFindings(t *testing.T) {
 	t.Parallel()
 	sourcesOnlyNonAttributeSurfacesCatch := []string{
-		`const merged = mergeClassNames('px-4 py-2 px-4');`,
-		`const buttonClassName = 'rounded-md rounded-md';`,
+		`const merged = cn('px-4 py-2 px-4');`,
+		`const className = 'rounded-md rounded-md';`,
 	}
 
 	attributeOnly := NewClassLiteralReader(ClassLiteralSettings{
-		AttributeNames: DefaultClassLiteralSettings().AttributeNames,
+		AttributePatterns: DefaultClassLiteralSettings().AttributePatterns,
 		// Deliberately empty: this is the mistake being reproduced.
-		CalleeNames:      nil,
-		VariablePatterns: nil,
+		CalleeNamePatterns: nil,
+		VariablePatterns:   nil,
 	})
 
 	lost := 0
@@ -338,13 +346,13 @@ func TestNoDuplicateClassesReadsTemplateRuns(t *testing.T) {
 	}{
 		{
 			name:   "a repeat before a hole",
-			source: "const merged = mergeClassNames(`flex flex ${size}`);",
-			want:   "const merged = mergeClassNames(`flex ${size}`);",
+			source: "const merged = cn(`flex flex ${size}`);",
+			want:   "const merged = cn(`flex ${size}`);",
 		},
 		{
 			name:   "a repeat in a run that ends glued to a hole",
-			source: "const merged = mergeClassNames(`items-center flex flex px-${size} block`);",
-			want:   "const merged = mergeClassNames(`items-center flex px-${size} block`);",
+			source: "const merged = cn(`items-center flex flex px-${size} block`);",
+			want:   "const merged = cn(`items-center flex px-${size} block`);",
 		},
 		{
 			name:   "a repeat after a hole",
@@ -367,7 +375,7 @@ func TestNoDuplicateClassesReadsTemplateRuns(t *testing.T) {
 // string the plugin never makes. The finding is what keeps it from sitting there silently.
 func TestNoDuplicateClassesReportsARepeatAcrossAHoleWithoutAFix(t *testing.T) {
 	t.Parallel()
-	result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", "const merged = mergeClassNames(`flex ${size} flex`);")
+	result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", "const merged = cn(`flex ${size} flex`);")
 	rule_testing.ExpectFindings(t, result, "duplicateClass")
 	if len(result.Diagnostics[0].Fixes) != 0 {
 		t.Fatalf("a repeat across a hole must not be fixed, got %+v", result.Diagnostics[0].Fixes)
@@ -378,9 +386,9 @@ func TestNoDuplicateClassesReportsARepeatAcrossAHoleWithoutAFix(t *testing.T) {
 func TestNoDuplicateClassesTemplateRunsStaySilent(t *testing.T) {
 	t.Parallel()
 	for _, source := range []string{
-		"const merged = mergeClassNames(`flex ${size} block`);",
-		"const merged = mergeClassNames(`px-${a} px-${b}`);",
-		"const merged = mergeClassNames(`flex px-${a} flex-${b} block`);",
+		"const merged = cn(`flex ${size} block`);",
+		"const merged = cn(`px-${a} px-${b}`);",
+		"const merged = cn(`flex px-${a} flex-${b} block`);",
 	} {
 		rule_testing.ExpectClean(t, rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", source))
 	}

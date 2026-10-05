@@ -1703,7 +1703,16 @@
             "description": "Each rule's severity, or [severity, ...options] for a rule that takes options. Inside our tiers (a chain extending a cohere:system-inc set), a rule this file sets differently from the file it extends must be named under departures with the reason, and a rule it turns off otherwise says why under reasons. Outside them, turning a rule off needs no reason, and coverage counts each unreasoned off by rule."
         },
         "settings": {
-            "description": "Per-plugin settings carried for the JavaScript tools that still read this file. Allowed only in the file cohere reads first, never in a file another extends, and nothing in cohere reads it.",
+            "additionalProperties": false,
+            "description": "Per-plugin settings, read for better-tailwindcss: its rules read settings[\"better-tailwindcss\"] (or \"eslint-plugin-better-tailwindcss\") between their defaults and their own options, as upstream does, so entryPoint, attributes, callees and variables written here reach every Tailwind rule. A key no rule reads, or a namespace for another plugin, is refused by name. Allowed only in the file cohere reads first, never in a file another extends.",
+            "properties": {
+                "better-tailwindcss": {
+                    "type": "object"
+                },
+                "eslint-plugin-better-tailwindcss": {
+                    "type": "object"
+                }
+            },
             "type": "object"
         }
     },

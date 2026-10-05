@@ -47,7 +47,7 @@ func TestReactIsDetectedFromImportsAndJsxNotFromPackageJson(t *testing.T) {
 		"source/Reactive.ts":       "import { reactive } from './reactive-store';\nexport const store = reactive;\n",
 		"source/reactive-store.ts": "export const reactive = 1;\n",
 	})
-	detection := Detect(graph.ProjectFiles(), root, graph.Program.Host().FS())
+	detection := Detect(graph.ProjectFiles(), root, graph.Program.Host().FS(), nil, "")
 
 	want := map[string]bool{"source/Imports.tsx": true, "source/Dom.ts": true, "source/JsxOnly.tsx": true}
 	for _, file := range graph.ProjectFiles() {
@@ -76,7 +76,7 @@ func TestNextIsDetectedFromImportsAndItsOwnFilesOnlyInANextProgram(t *testing.T)
 		"node_modules/next/package.json": `{"name": "next", "types": "index.d.ts"}`,
 	}
 	root, graph := buildProject(t, files)
-	detection := Detect(graph.ProjectFiles(), root, graph.Program.Host().FS())
+	detection := Detect(graph.ProjectFiles(), root, graph.Program.Host().FS(), nil, "")
 	want := map[string]bool{"app/layout.tsx": true, "app/page.tsx": true, "app/api/health/route.ts": true, "middleware.ts": true, "source/Link.tsx": true}
 	for _, file := range graph.ProjectFiles() {
 		relative, _ := filepath.Rel(root, file.FileName())
@@ -92,7 +92,7 @@ func TestNextIsDetectedFromImportsAndItsOwnFilesOnlyInANextProgram(t *testing.T)
 	delete(files, "app/layout.tsx")
 	delete(files, "source/Link.tsx")
 	root, graph = buildProject(t, files)
-	if detection := Detect(graph.ProjectFiles(), root, graph.Program.Host().FS()); len(detection.NextFiles) != 0 {
+	if detection := Detect(graph.ProjectFiles(), root, graph.Program.Host().FS(), nil, ""); len(detection.NextFiles) != 0 {
 		t.Errorf("an app/ directory with no import of next applied cohere:next: %v", detection.NextFiles)
 	}
 }
@@ -103,7 +103,7 @@ func TestTailwindIsDetectedFromTheStylesheetAndSkippedByNameWithoutOne(t *testin
 		"index.ts":        "export const x = 1;\n",
 		"app/globals.css": "@import \"tailwindcss\";\n",
 	})
-	detection := Detect(graph.ProjectFiles(), root, graph.Program.Host().FS())
+	detection := Detect(graph.ProjectFiles(), root, graph.Program.Host().FS(), nil, "")
 	if detection.TailwindEntryPoint != filepath.Join(root, "app", "globals.css") {
 		t.Errorf("entry %q, want app/globals.css", detection.TailwindEntryPoint)
 	}
@@ -112,13 +112,13 @@ func TestTailwindIsDetectedFromTheStylesheetAndSkippedByNameWithoutOne(t *testin
 		"index.ts":        "export const x = 1;\n",
 		"app/globals.css": "body { margin: 0; }\n",
 	})
-	detection = Detect(graph.ProjectFiles(), root, graph.Program.Host().FS())
+	detection = Detect(graph.ProjectFiles(), root, graph.Program.Host().FS(), nil, "")
 	if detection.TailwindEntryPoint != "" || !strings.Contains(detection.TailwindSkipped, "app/globals.css does not import tailwindcss") {
 		t.Errorf("a plain stylesheet applied tailwind: %+v", detection)
 	}
 
 	root, graph = buildProject(t, map[string]string{"index.ts": "export const x = 1;\n"})
-	detection = Detect(graph.ProjectFiles(), root, graph.Program.Host().FS())
+	detection = Detect(graph.ProjectFiles(), root, graph.Program.Host().FS(), nil, "")
 	if detection.TailwindEntryPoint != "" || !strings.Contains(detection.TailwindSkipped, "no Tailwind stylesheet") {
 		t.Errorf("no stylesheet must skip tailwind by name: %+v", detection)
 	}

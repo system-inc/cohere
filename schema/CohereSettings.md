@@ -181,10 +181,10 @@ Each rule's severity, or [severity, ...options] for a rule that takes options. I
 
 ### `settings`
 
-Per-plugin settings carried for the JavaScript tools that still read this file. Allowed only in the file cohere reads first, never in a file another extends, and nothing in cohere reads it.
+Per-plugin settings, read for better-tailwindcss: its rules read settings["better-tailwindcss"] (or "eslint-plugin-better-tailwindcss") between their defaults and their own options, as upstream does, so entryPoint, attributes, callees and variables written here reach every Tailwind rule. A key no rule reads, or a namespace for another plugin, is refused by name. Allowed only in the file cohere reads first, never in a file another extends.
 
 ```json
-{ "settings": { "react": { "version": "19.0" } } }
+{ "settings": { "better-tailwindcss": { "entryPoint": "./app/theme.css", "callees": ["cn", "clsx"] } } }
 ```
 
 ## Severities

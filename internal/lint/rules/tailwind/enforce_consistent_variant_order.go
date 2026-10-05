@@ -26,9 +26,7 @@ func messageVariantOrder(written string, sorted string) rule.Message {
 // EnforceConsistentVariantOrderOptions lets a project name the surfaces that carry class strings.
 type EnforceConsistentVariantOrderOptions struct {
 	TailwindLocationOptions
-	Attributes []string `json:"attributes"`
-	Callees    []string `json:"callees"`
-	Variables  []string `json:"variables"`
+	TailwindClassLiteralOptions
 }
 
 // EnforceConsistentVariantOrder reports stacked variants written in an order Tailwind would not.
@@ -98,8 +96,7 @@ var EnforceConsistentVariantOrder = rule.Rule{
 			}
 			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
 			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
-			if reason := designSystemSkipReason(designSystem.Err); reason != "" {
-				ctx.Skip(reason)
+			if skipWithoutTailwind(ctx, designSystem.Err) {
 				return nil
 			}
 			return declineListeners(ctx, "enforce-consistent-variant-order", designSystem)
@@ -107,15 +104,7 @@ var EnforceConsistentVariantOrder = rule.Rule{
 
 		settings := DefaultClassLiteralSettings()
 		if isConfigured {
-			if len(configured.Attributes) > 0 {
-				settings.AttributeNames = configured.Attributes
-			}
-			if len(configured.Callees) > 0 {
-				settings.CalleeNames = configured.Callees
-			}
-			if len(configured.Variables) > 0 {
-				settings.VariablePatterns = configured.Variables
-			}
+			settings = configured.ClassLiteralSettings()
 		}
 
 		reader := ClassLiteralReaderFor(ctx.FileCache, settings)

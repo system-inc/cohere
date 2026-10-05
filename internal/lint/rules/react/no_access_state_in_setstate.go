@@ -64,8 +64,8 @@ var messageUseSetStateCallback = rule.Message{
 //
 // A class extending a React base, or an object literal handed to the factory. The factory spelling
 // is `createReactClass` alone. `React.createClass` is silent unless `settings.react.createClass` is
-// configured to it, which upstream's own test harness does not do, and cohere has no settings
-// surface at all. Measured: `React.createClass` is silent on the installed build and
+// configured to it, which upstream's own test harness does not do, and cohere reads no React
+// settings. Measured: `React.createClass` is silent on the installed build and
 // `createReactClass` reports on byte-identical bodies. Six of upstream's nine failing cases are
 // written in the `React.createClass` spelling and are therefore dead against the version this
 // repository runs; they are recorded below in the reachable spelling, with every verdict replayed.

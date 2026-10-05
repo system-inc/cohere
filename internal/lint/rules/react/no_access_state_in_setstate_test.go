@@ -19,7 +19,7 @@ import (
 // nineteen reproduce their upstream verdict exactly. Without the rewrite, six of the nine failing
 // cases would have been imported as evidence of behaviour the running rule does not have.
 //
-// cohere has no settings surface, so `createReactClass` is the only reachable spelling here too,
+// cohere reads no React settings, so `createReactClass` is the only reachable spelling here too,
 // which is why the substitution is also the right shape for this port rather than only for the
 // measurement.
 const noAccessStateInSetstateFile = "/repository/source/NoAccessStateInSetstate.tsx"

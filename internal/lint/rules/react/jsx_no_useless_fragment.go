@@ -206,8 +206,8 @@ func jsxNoUselessFragmentReport(ctx rule.Context, node *ast.Node, message rule.M
 // jsxNoUselessFragmentIsFragmentName matches `<Fragment>` and `<React.Fragment>`.
 //
 // Upstream's `jsxUtil.isFragment` compares against the fragment pragma, which is `Fragment` unless
-// `settings.react.fragment` changes it, and against the react pragma for the namespaced form. There
-// is no settings surface here, so both are fixed. A different namespace does not count, which is
+// `settings.react.fragment` changes it, and against the react pragma for the namespaced form. cohere
+// reads no React settings, so both are fixed. A different namespace does not count, which is
 // the same discrimination `React.PureComponent` makes elsewhere in this package.
 func jsxNoUselessFragmentIsFragmentName(tagName *ast.Node) bool {
 	if tagName == nil {
