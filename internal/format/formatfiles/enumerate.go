@@ -23,8 +23,8 @@ import (
 // coverage line cannot tell them apart unless the enumeration says so.
 //
 // So every number here is a subtraction someone can check: Walked minus the ignore counts minus
-// Unhandled should equal len(Files), and DeclinedExtensions names what the engine refused rather
-// than leaving it to be inferred from a smaller total.
+// Unhandled minus SymbolicLinks should equal len(Files), and DeclinedExtensions names what the engine
+// refused rather than leaving it to be inferred from a smaller total.
 type Enumeration struct {
 	// Root is the directory that was walked. A count means nothing without the root it was taken
 	// against, which is how a corpus silently measures half a tree.
@@ -38,6 +38,12 @@ type Enumeration struct {
 
 	// Unhandled is how many surviving files the engine does not format.
 	Unhandled int
+
+	// SymbolicLinks is how many surviving entries were symbolic links, which the walk never follows or
+	// reads, as Prettier 3 skips them when it expands a directory and as git stores a link rather than
+	// its target. A link to a directory looked like a file named for it: pnpm's node_modules/zone.js was
+	// offered to the formatter as a .js file and the run failed reading a directory.
+	SymbolicLinks int
 
 	// NestedRepositories are directories the walk refused to descend into because they are their
 	// own git repository. Named rather than counted, because "we skipped a repo" is a fact someone
@@ -231,6 +237,9 @@ func Enumerate(root string, handles func(fileName string) bool) (Enumeration, er
 			return nil
 		}
 
+		// A symbolic link is never a directory to filepath.Walk, which does not follow it, so a link to a
+		// directory arrives here as a file. Whatever it points at, it is skipped, after the ignore layers
+		// have had their say about its name.
 		enumeration.Walked++
 
 		if ignored, _ := scope.Ignored(relative, false); ignored {
@@ -242,6 +251,11 @@ func Enumerate(root string, handles func(fileName string) bool) (Enumeration, er
 				enumeration.IgnoredByLayer[layer.name]++
 				return nil
 			}
+		}
+
+		if info.Mode()&os.ModeSymlink != 0 {
+			enumeration.SymbolicLinks++
+			return nil
 		}
 
 		if !handles(path) {

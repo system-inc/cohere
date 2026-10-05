@@ -61,6 +61,9 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	layerTwoClause := regexp.MustCompile(`; \d+ of \d+ files replayed from cache( \(type-aware rules ran again on \d+ of them, shape-keyed on \d+\))?( \(design-system rules ran again on \d+ of them\))?`)
 	// A cold run is a `--no-cache` run, which says so in a line no cached run prints.
 	cacheOffLine := regexp.MustCompile(`(?m)^  cache: off, by --no-cache.*\n`)
+	// A cached run says how many shapes it keyed on content (#5txm9gg); a cold run keys none, so the line is
+	// the invocation's, not the tree's.
+	contentKeyedLine := regexp.MustCompile(`(?m)^  cache: \d+ files?'s? shapes? (is|are) keyed on content.*\n?`)
 	// The total line's shape depends on timing as well as its numbers: the types phase's check runs alongside
 	// the fix walk, so whether the phases overlap is a property of this invocation, never of the tree.
 	totalLine := regexp.MustCompile(`(?m)^  total .*\n`)
@@ -68,6 +71,7 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// cache answered for, which a warm run and a cold one differ in by design.
 	footerLine := regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) .*\n?`)
 	normalized := func(output string) string {
+		output = contentKeyedLine.ReplaceAllString(output, "")
 		return typesClause.ReplaceAllString(footerLine.ReplaceAllString(totalLine.ReplaceAllString(cacheOffLine.ReplaceAllString(layerTwoClause.ReplaceAllString(durations.ReplaceAllString(output, "T"), ""), ""), ""), ""), "")
 	}
 	keepLines := func(output string, drop ...string) string {
@@ -93,7 +97,7 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// and is required separately below so a replay that lost it fails.
 	provenance := regexp.MustCompile(`^(fix|format scope|nested repositories) \(from the cached run at \d\d:\d\d:\d\d\): `)
 	replayBody := func(replay string) string {
-		lines := strings.Split(keepLines(replay, "cached: ", "phases: replayed ", "  this run: ", "  memory: ", "✓ 💎 ", "✗ ☠️ "), "\n")
+		lines := strings.Split(keepLines(contentKeyedLine.ReplaceAllString(replay, ""), "cached: ", "phases: replayed ", "  this run: ", "  memory: ", "✓ 💎 ", "✗ ☠️ "), "\n")
 		for index, line := range lines {
 			lines[index] = provenance.ReplaceAllString(line, "$1: ")
 		}

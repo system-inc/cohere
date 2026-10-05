@@ -144,6 +144,10 @@ type pipelineReport struct {
 	// cacheOff is `--no-cache`, said on every such run so a cold number cannot pass for a warm one.
 	cacheOff bool
 
+	// contentKeyedShapes is how many files' shapes this run keyed on their content, for want of a recorded
+	// declaration signature. See program.Graph.Signatures.
+	contentKeyedShapes int
+
 	// rootNote says which project was checked when that is not the directory the run started in.
 	// Empty otherwise. See projectLocation.rootNote.
 	rootNote string
@@ -395,6 +399,16 @@ func (r *pipelineReport) Write(out io.Writer) {
 	}
 	if r.cacheOff {
 		fmt.Fprintln(out, "  cache: off, by --no-cache: nothing was read from or written to this project's cache table or its incremental build info")
+	}
+	// Said, because keying a shape on content is a choice with a cost: an edit to one of these files re-runs
+	// its importers' shape-keyed rules. The alternative, a declaration emit up front, has no ceiling (#5txm9gg).
+	if r.contentKeyedShapes > 0 {
+		subject := "files' shapes are"
+		if r.contentKeyedShapes == 1 {
+			subject = "file's shape is"
+		}
+		fmt.Fprintf(out, "  cache: %d %s keyed on content, with no recorded declaration signature (computing one up front has no ceiling), so an edit to one re-runs its importers' shape-keyed rules\n",
+			r.contentKeyedShapes, subject)
 	}
 
 	// File scope is its own dimension and the phase lines cannot express it. A run narrowed to one

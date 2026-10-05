@@ -51,6 +51,11 @@ func shapeWalk(t *testing.T, root string, rules []rule.Rule, previous *program.L
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
+	// A first walk has its signatures computed, as a project with build info does, so the tests below are
+	// about shapes rather than about a first run's content-keyed fallback.
+	if previousShapes == nil {
+		previousShapes = program.RecordedRealSignatures(graph)
+	}
 	shapes, _ := graph.Signatures(context.Background(), previousShapes)
 	graph.Shapes = shapes
 	reuse := program.NewFindingsReuse(program.HashRuleSet([]string{"fixture"}), previous)

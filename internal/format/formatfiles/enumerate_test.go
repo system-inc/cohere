@@ -92,13 +92,58 @@ func TestEnumerateNamesWhatItDeclined(t *testing.T) {
 		}
 	}
 	// The subtraction has to reconcile, or a file went missing between the walk and the result.
-	accounted := len(enumeration.Files) + enumeration.Unhandled
+	accounted := len(enumeration.Files) + enumeration.Unhandled + enumeration.SymbolicLinks
 	for _, removed := range enumeration.IgnoredByLayer {
 		accounted += removed
 	}
 	if accounted != enumeration.Walked {
 		t.Errorf("walked %d but accounted for %d, so files went missing silently",
 			enumeration.Walked, accounted)
+	}
+}
+
+// TestEnumerateSkipsSymbolicLinks: a link is counted and never offered or read, whatever it points at.
+// A link to a directory named like a source file is the case that broke a run: pnpm's
+// node_modules/zone.js, a link to a package directory, was offered as a .js file and failed reading a
+// directory (TanStack Query's examples/angular/basic, found by @system_cohere_types).
+func TestEnumerateSkipsSymbolicLinks(t *testing.T) {
+	t.Parallel()
+	root := writeTree(t, map[string]string{
+		"a.ts":                   "export const a = 1;\n",
+		"packages/zone/index.js": "export const zone = 1;\n",
+		"vendor/real.ts":         "export const real = 1;\n",
+	})
+	for link, target := range map[string]string{
+		"zone.js":     filepath.Join(root, "packages", "zone"),
+		"alias.ts":    filepath.Join(root, "vendor", "real.ts"),
+		"dangling.ts": filepath.Join(root, "missing.ts"),
+	} {
+		if err := os.Symlink(target, filepath.Join(root, link)); err != nil {
+			t.Skipf("this filesystem cannot make symbolic links: %v", err)
+		}
+	}
+
+	enumeration, err := Enumerate(root, handlesEveryLanguage)
+	if err != nil {
+		t.Fatalf("a tree holding symbolic links failed to enumerate: %v", err)
+	}
+	if enumeration.SymbolicLinks != 3 {
+		t.Errorf("SymbolicLinks = %d, want 3", enumeration.SymbolicLinks)
+	}
+	for _, file := range enumeration.Files {
+		if base := filepath.Base(file); base == "zone.js" || base == "alias.ts" || base == "dangling.ts" {
+			t.Errorf("offered the link %s", file)
+		}
+	}
+	if len(enumeration.Files) != 3 {
+		t.Errorf("offered %v, want the three real files", enumeration.Files)
+	}
+	accounted := len(enumeration.Files) + enumeration.Unhandled + enumeration.SymbolicLinks
+	for _, removed := range enumeration.IgnoredByLayer {
+		accounted += removed
+	}
+	if accounted != enumeration.Walked {
+		t.Errorf("walked %d but accounted for %d", enumeration.Walked, accounted)
 	}
 }
 
