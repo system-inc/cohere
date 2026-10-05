@@ -2,6 +2,7 @@ package typescript
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -522,11 +523,8 @@ func TestBanTsCommentDefaultsBindWithNoConfiguration(t *testing.T) {
 // TestDecodeBanTsCommentOptionsReadsEveryShape exercises the decoder directly.
 //
 // Four of the five keys accept a boolean, the string `allow-with-description`, or an object holding
-// a pattern, which is upstream's hand-written Deserialize and which no struct tag can express. The
-// rows that matter most are the last three: an unrecognized value, an unparseable pattern, and an
-// absent key all have to keep the DEFAULT rather than silently disabling the directive, because
-// upstream refuses such a configuration at load time and there is no error channel here that would
-// reach a user.
+// a pattern, which is upstream's hand-written Deserialize and which no struct tag can express. An
+// absent key keeps the default; an unrecognized value and an unparseable pattern are refused, below.
 func TestDecodeBanTsCommentOptionsReadsEveryShape(t *testing.T) {
 	t.Parallel()
 
@@ -558,7 +556,7 @@ func TestDecodeBanTsCommentOptionsReadsEveryShape(t *testing.T) {
 					t.Fatalf("expected description-format, got %+v", options.TsNoCheck)
 				}
 				if options.TsNoCheck.DescriptionFormat == nil ||
-					options.TsNoCheck.DescriptionFormat.String() != "^: TS\\d+$" {
+					options.TsNoCheck.DescriptionFormat.Source() != "^: TS\\d+$" {
 					t.Fatalf("pattern did not survive the decode: %+v", options.TsNoCheck)
 				}
 			}},
@@ -572,16 +570,11 @@ func TestDecodeBanTsCommentOptionsReadsEveryShape(t *testing.T) {
 				t.Fatalf("an empty object should leave every default, got %+v", options)
 			}
 		}},
-		{"{\"ts-ignore\":\"nonsense\"}", func(t *testing.T, options BanTsCommentOptions) {
-			if options.TsIgnore != defaults.TsIgnore {
-				t.Fatalf("an unrecognized value should keep the default, got %+v", options.TsIgnore)
-			}
-		}},
-		{"{\"ts-ignore\":{\"descriptionFormat\":\"^(unclosed\"}}",
+		// A pattern only JavaScript compiles: Go's regexp has no lookahead, and ESLint accepts it.
+		{"{\"ts-ignore\":{\"descriptionFormat\":\"^(?=: TS)\"}}",
 			func(t *testing.T, options BanTsCommentOptions) {
-				if options.TsIgnore != defaults.TsIgnore {
-					t.Fatalf("an unparseable pattern should keep the default, got %+v",
-						options.TsIgnore)
+				if options.TsIgnore.DescriptionFormat == nil || options.TsIgnore.DescriptionFormat.Source() != "^(?=: TS)" {
+					t.Fatalf("a lookahead pattern did not survive the decode: %+v", options.TsIgnore)
 				}
 			}},
 	}
@@ -597,6 +590,33 @@ func TestDecodeBanTsCommentOptionsReadsEveryShape(t *testing.T) {
 				t.Fatalf("decoder returned %T rather than BanTsCommentOptions", decoded)
 			}
 			testCase.check(t, options)
+		})
+	}
+}
+
+// TestDecodeBanTsCommentOptionsRefusesWhatUpstreamRefuses pins the refusals that replaced the decoder's
+// fallback to the default (ruled on #pd2chkx): each value here fails typescript-eslint's schema or its
+// `new RegExp`, so ESLint refuses the config, and so does cohere, naming the key.
+func TestDecodeBanTsCommentOptionsRefusesWhatUpstreamRefuses(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		configuration string
+		want          string
+	}{
+		{`{"ts-ignore":"nonsense"}`, `ts-ignore: expected true, false, "allow-with-description"`},
+		{`{"ts-check":"Allow-with-description"}`, `ts-check: expected true, false, "allow-with-description"`},
+		{`{"ts-nocheck":3}`, `ts-nocheck: expected true, false, "allow-with-description"`},
+		{`{"ts-expect-error":[]}`, `ts-expect-error: expected true, false, "allow-with-description"`},
+		{`{"ts-ignore":{"descriptionFormat":"^(unclosed"}}`, `ts-ignore: descriptionFormat "^(unclosed" is not a pattern JavaScript can compile`},
+	}
+	for index, testCase := range cases {
+		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
+			_, err := DecodeBanTsCommentOptions([]byte(testCase.configuration))
+			if err == nil || !strings.Contains(err.Error(), testCase.want) {
+				t.Fatalf("decoding %s: error %v, want one containing %q", testCase.configuration, err, testCase.want)
+			}
 		})
 	}
 }
