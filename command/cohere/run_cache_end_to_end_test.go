@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +21,7 @@ import (
 func TestMain(m *testing.M) {
 	// In-process, the tests read the verbose account, as the binary tests do through verboseArguments.
 	activeOutput = outputSettings{Mode: outputVerbose}
+	pinGoEnvironment()
 	home, err := os.MkdirTemp("", "cohere-test-home-")
 	if err != nil {
 		panic(err)
@@ -437,4 +440,25 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			t.Fatalf("the run after the discard did not write a table the next run could replay:\n%s", again)
 		}
 	})
+}
+
+// pinGoEnvironment sets the go command's caches and settings in the environment as the caller has them, before
+// TestMain moves HOME. The go command finds its build cache, its module cache and its settings file under
+// HOME, so every test that built this command under the fake home compiled the whole module cold and lost
+// the house's -trimpath: about a minute per package run, the most of command/cohere's wall (#nxgt2ca). A
+// variable the caller already set is left as it is.
+func pinGoEnvironment() {
+	output, err := exec.Command("go", "env", "-json", "GOCACHE", "GOMODCACHE", "GOPATH", "GOFLAGS").Output()
+	if err != nil {
+		panic(fmt.Sprintf("reading the go environment: %v", err))
+	}
+	var settings map[string]string
+	if err := json.Unmarshal(output, &settings); err != nil {
+		panic(fmt.Sprintf("reading the go environment: %v", err))
+	}
+	for name, value := range settings {
+		if _, set := os.LookupEnv(name); !set && value != "" {
+			os.Setenv(name, value)
+		}
+	}
 }
