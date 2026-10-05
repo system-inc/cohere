@@ -190,14 +190,14 @@ func readRuns(path string) ([]benchresults.Run, error) {
 			return nil, fmt.Errorf("%s:%d: quiet is %q, want quiet or loaded", path, line, fields[9])
 		}
 		numbers := map[int]float64{}
-		for _, index := range []int{1, 2, 3, 5, 7, 8, 10} {
+		for _, index := range []int{1, 2, 3, 4, 5, 7, 8, 10} {
 			if numbers[index], err = strconv.ParseFloat(fields[index], 64); err != nil {
 				return nil, fmt.Errorf("%s:%d: field %d: %w", path, line, index+1, err)
 			}
 		}
 		runs = append(runs, benchresults.Run{
 			Mode: mode, Round: int(numbers[1]), VerdictSeconds: numbers[2], SettledSeconds: numbers[3],
-			LoadBefore: numbers[7], LoadAfter: numbers[8], Quiet: fields[9] == "quiet",
+			EngineSeconds: numbers[4], LoadBefore: numbers[7], LoadAfter: numbers[8], Quiet: fields[9] == "quiet",
 			Findings: int(numbers[5]), Cache: fields[6], Exit: int(numbers[10]),
 		})
 	}

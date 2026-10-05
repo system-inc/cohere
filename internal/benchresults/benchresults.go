@@ -90,10 +90,13 @@ type Run struct {
 	VerdictSeconds float64 `json:"verdictSeconds"`
 	// SettledSeconds is until every process the run started has exited, its cache write included.
 	SettledSeconds float64 `json:"settledSeconds"`
-	LoadBefore     float64 `json:"loadBefore"`
-	LoadAfter      float64 `json:"loadAfter"`
+	// EngineSeconds is the engine's own wall clock, from its --json summary.
+	EngineSeconds float64 `json:"engineSeconds"`
+	LoadBefore    float64 `json:"loadBefore"`
+	LoadAfter     float64 `json:"loadAfter"`
 	// Quiet is true when the load was at or under the ceiling both before and after the run.
-	Quiet    bool   `json:"quiet"`
+	Quiet bool `json:"quiet"`
+	// Findings and Cache are what the run reported about itself (RunOutput).
 	Findings int    `json:"findings"`
 	Cache    string `json:"cache"`
 	Exit     int    `json:"exit"`
@@ -144,8 +147,9 @@ func Summarize(runs []Run) map[Mode]ModeSummary {
 
 // Validate refuses a record that is not the honest account of its own runs: a run called quiet whose loads
 // were over the ceiling, or the reverse; a quiet summary that is not what the quiet runs give, including
-// one on a mode with no quiet run; a mode with a run count other than the rounds. A dirty engine is
-// refused too, since no commit reproduces its numbers.
+// one on a mode with no quiet run; a mode with a run count other than the rounds; a run whose cache use
+// its mode cannot have, which means the run was not what its mode says, or the instrument read nothing.
+// A dirty engine is refused too, since no commit reproduces its numbers.
 func Validate(record Record) error {
 	if record.Schema != SchemaVersion {
 		return fmt.Errorf("schema %d, want %d", record.Schema, SchemaVersion)
@@ -171,6 +175,12 @@ func Validate(record Record) error {
 			return fmt.Errorf("%s round %d settled at %gs before or without its verdict at %gs", run.Mode, run.Round,
 				run.SettledSeconds, run.VerdictSeconds)
 		}
+		if run.EngineSeconds <= 0 {
+			return fmt.Errorf("%s round %d has no engine seconds, so its output was not read", run.Mode, run.Round)
+		}
+		if err := cacheFitsMode(run); err != nil {
+			return fmt.Errorf("%s round %d: %w", run.Mode, run.Round, err)
+		}
 	}
 	for _, mode := range Modes {
 		if counts[mode] != record.Rounds {
@@ -190,6 +200,25 @@ func Validate(record Record) error {
 	}
 	if string(got) != string(want) {
 		return fmt.Errorf("the mode summaries are not what the runs give:\n  recorded %s\n  the runs %s", got, want)
+	}
+	return nil
+}
+
+// cacheFitsMode refuses a cache use the run's mode cannot have: Cold runs with --no-cache, so its cache is
+// off; Warm replays an unchanged tree, so it is a whole replay or every file replayed; Edit changed one
+// file, so some files and not all of them were replayed.
+func cacheFitsMode(run Run) error {
+	replayed, inScope := 0, 0
+	partial := false
+	if _, err := fmt.Sscanf(run.Cache, "files %d/%d", &replayed, &inScope); err == nil {
+		partial = replayed > 0 && replayed < inScope
+	}
+	switch {
+	case run.Mode == ModeCold && run.Cache == "off":
+	case run.Mode == ModeWarm && (run.Cache == "replay" || (replayed > 0 && replayed == inScope)):
+	case run.Mode == ModeEdit && partial:
+	default:
+		return fmt.Errorf("its cache read %q, which a %s run cannot have", run.Cache, run.Mode)
 	}
 	return nil
 }

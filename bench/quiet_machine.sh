@@ -5,12 +5,19 @@
 # It measures a copy of the project pinned to its commits, never the project itself, with one cohere
 # engine for every run. pinned.zsh, which it shares with rivals.sh, says how and why.
 #
-# The command measured is plain `cohere`, the one a developer runs, so a warm run gets the caches a
-# developer's run would. That command may write, so the copy's files are hashed before the first run and
-# after the last one, and a benchmark that changed a byte of them refuses to report.
+# The command measured is `cohere --json`: the one a developer runs, so a warm run gets the caches a
+# developer's run would, printing its versioned contract instead of the footer. The footer is for people and
+# free to change, and when it became one line, everything this benchmark read from it read nothing
+# (#zrgrk14), so each run's engine seconds, findings and cache use are read from its --json summary by
+# internal/benchresults/tools/runoutput, which is tested against real output. That command may write, so
+# the copy's files are hashed before the first run and after the last one, and a benchmark that changed a
+# byte of them refuses to report.
 #
 # One round, interleaved, so a load that drifts lands on every mode alike:
-#   prime   `cohere`, not measured, so the cache describes the tree as it stands
+#   prime   `cohere`, not measured, so the cache describes the tree as it stands: run again until one
+#           replays, up to three times, since a first run after a new engine or the cold run can leave
+#           a cache the next run does not replay whole (measured 2026-10-05: prime and warm both checked
+#           all 3,976 files, and the run after replayed)
 #   warm    `cohere` again on the unchanged tree: the replay
 #   edit    one line added to one function body, `cohere`, then the file's original bytes put back
 #   cold    `cohere --no-cache`: every phase from source, nothing read or written
@@ -87,6 +94,9 @@ logs=$copy/.cache/quiet-machine-$(date +%Y%m%d-%H%M%S)
 mkdir -p $logs
 runs_table=$logs/runs.tsv
 pin_engine $logs
+run_output_reader=$logs/runoutput
+(cd ${0:A:h:h} && go build -o $run_output_reader ./internal/benchresults/tools/runoutput) ||
+  fail "could not build the run output reader"
 
 print "# quiet-machine benchmark, $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 print_pinned_header
@@ -96,24 +106,7 @@ print
 # run_cohere runs the pinned engine in the copy; see run_timed.
 run_cohere() {
   local log=$1; shift
-  run_timed $log $engine "$@"
-}
-
-# engine_total is the engine's own time for the run, in seconds: its `total` line, or on a replay its
-# `this run` line.
-engine_total() {
-  grep -oE '^  (total|this run:) [0-9.]+m?s' $1 | awk '{ value = $NF; if (value ~ /ms$/) { sub(/ms$/, "", value); value /= 1000 } else sub(/s$/, "", value); printf "%.3f", value }'
-}
-# finding_count is every finding line the run printed, whichever phase found it.
-finding_count() { grep -cE '^/.+:[0-9]+:[0-9]+ - ' $1 }
-# cache_use says what the run took from the cache: `replay` for a whole run replayed, `files N/M` for N of
-# M files' findings replayed, `off` under --no-cache, and `none` when it computed everything anyway.
-cache_use() {
-  if grep -q '^phases: replayed the run' $1; then print replay
-  elif grep -q '^  cache: off' $1; then print off
-  else
-    grep -oE '[0-9]+ of [0-9]+ files replayed from cache' $1 | awk '{ print "files " $1 "/" $3; found = 1 } END { if (!found) print "none" }'
-  fi
+  run_timed $log $engine --json "$@"
 }
 
 measure() {
@@ -125,8 +118,13 @@ measure() {
   local after=$(load)
   local quiet=loaded
   under_ceiling $before && under_ceiling $after && quiet=quiet
+  # The run's engine seconds, findings and cache use, from its --json summary. A log the reader cannot
+  # read stops the benchmark rather than recording a column it could not fill.
+  local output engine_seconds findings cache
+  output=$($run_output_reader $log) || fail "could not read the run's output, see $log"
+  IFS=$'\t' read -r engine_seconds findings cache <<< $output
   printf '%s\t%d\t%.3f\t%.3f\t%s\t%s\t%s\t%s\t%s\t%s\t%d\n' $mode $round $verdict_seconds $settled_seconds \
-    "$(engine_total $log)" "$(finding_count $log)" "$(cache_use $log)" $before $after $quiet $exit_code |
+    $engine_seconds $findings "$cache" $before $after $quiet $exit_code |
     tee -a $runs_table
 }
 
@@ -136,7 +134,10 @@ original_hash=$(shasum -a 256 < $edit_original)
 
 printf 'mode\tround\tverdict_s\tsettled_s\tengine_s\tfindings\tcache\tload_before\tload_after\tquiet\texit\n'
 for round in $(seq 1 $runs); do
-  run_cohere $logs/prime-$round.log
+  for prime in 1 2 3; do
+    run_cohere $logs/prime-$round-$prime.log
+    [[ $($run_output_reader $logs/prime-$round-$prime.log | cut -f3) == replay ]] && break
+  done
 
   measure warm $round
 
