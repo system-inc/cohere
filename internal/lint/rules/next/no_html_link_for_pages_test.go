@@ -399,10 +399,10 @@ func TestNoHtmlLinkForPagesReadsTheAnchorAsUpstreamDoes(t *testing.T) {
 		// is not `_blank`.
 		{`<a href>x</a>`, nil},
 		{`<a href="/about" target>x</a>`, []string{"/about/"}},
-		// Divergence, not this rule's: ESLint's parser decodes HTML entities in a JSX attribute string
-		// and reports `/about/` here, while jsx.StringAttributeValue hands every rule the text as
-		// written. Pinned so a decoding fix on the shelf shows up here as a changed row.
-		{`<a href="&#47;about">x</a>`, nil},
+		// ESLint's parser decodes HTML entities in a JSX attribute string, and so does
+		// jsx.StringAttributeValue, so an encoded slash is the route it spells (#51y9jh2).
+		{`<a href="&#47;about">x</a>`, []string{"/about/"}},
+		{`<a href="&#47;nothing">x</a>`, nil},
 	}, "pages/about.tsx")
 }
 
