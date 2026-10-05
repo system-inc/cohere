@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -671,8 +672,8 @@ func noInvalidThisJSDocBlockBefore(ctx rule.Context, node *ast.Node) string {
 // gap belong to `1` rather than to the callback in `z(/* @this */ 1, function () {})`.
 func noInvalidThisCommentsImmediatelyBefore(ctx rule.Context, node *ast.Node) []comments.Comment {
 	tokenStart := rule.TokenRange(ctx.SourceFile, node).Pos()
-	text := ctx.SourceFile.Text()
-	if tokenStart > len(text) {
+	sourceText := ctx.SourceFile.Text()
+	if tokenStart > len(sourceText) {
 		return nil
 	}
 
@@ -684,7 +685,7 @@ func noInvalidThisCommentsImmediatelyBefore(ctx rule.Context, node *ast.Node) []
 		if comment.Range.End() > cursor {
 			continue
 		}
-		if strings.TrimSpace(text[comment.Range.End():cursor]) != "" {
+		if text.TrimWhitespace(sourceText[comment.Range.End():cursor]) != "" {
 			break
 		}
 		found = append([]comments.Comment{comment}, found...)

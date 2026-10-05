@@ -243,6 +243,9 @@ func TestLocalizationNoUntranslatedValueDeclinesFilesThatAreNotLocaleData(t *tes
 		{"a Translations.ts type file", "translations/AccountTranslations.ts"},
 		{"a TranslationsType.ts type file", "translations/AccountTranslationsType.ts"},
 		{"an Interface.ts type file", "translations/AccountInterface.ts"},
+		// A helper the old exclusion list did not name: Structure kept its type brand here (#xt9hkse).
+		{"a TranslationTemplate.ts type brand", "translations/TranslationTemplate.ts"},
+		{"a lowercase helper whose name is no locale code", "translations/helpers.ts"},
 		// Outside a translations directory this is just an object literal that happens to hold
 		// English strings, which describes a great deal of ordinary code.
 		{"a file outside any translations directory", "source/es.ts"},
@@ -333,6 +336,42 @@ func TestLocalizationNoUntranslatedValueLeavesALocaleNamedFileOutsideASetQuiet(t
 		t.Run(relativePath, func(t *testing.T) {
 			t.Parallel()
 			rule_testing.ExpectClean(t, runOnTranslations(t, map[string]string{relativePath: copied}, relativePath))
+		})
+	}
+}
+
+// A helper in a set with no English table stays quiet: it is not locale data, so it misses no sibling.
+// This is the false missingEnglishSibling #xt9hkse removes, beside a control locale that reports.
+func TestLocalizationNoUntranslatedValueLeavesAHelperInASetQuiet(t *testing.T) {
+	t.Parallel()
+
+	const copied = "export default {\n    Greeting: 'Hello there',\n};\n"
+	rule_testing.ExpectFindings(t, runOnTranslations(t, map[string]string{"translations/fr.ts": copied},
+		"translations/fr.ts"), "missingEnglishSibling")
+	for _, relativePath := range []string{"translations/TranslationTemplate.ts", "translations/index.ts", "translations/locales.ts"} {
+		t.Run(relativePath, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectClean(t, runOnTranslations(t, map[string]string{relativePath: copied}, relativePath))
+		})
+	}
+}
+
+// A locale code with a region or script subtag is a locale: zh-TW is in our sets, and pt-BR and
+// zh_Hant are the other spellings a set may use. Each compares against English, and each misses it.
+func TestLocalizationNoUntranslatedValueRecognizesRegionedLocales(t *testing.T) {
+	t.Parallel()
+
+	const copied = "export default {\n    Greeting: 'Hello there',\n};\n"
+	for _, localeCode := range []string{"zh-TW", "pt-BR", "zh_Hant", "ckb"} {
+		t.Run(localeCode, func(t *testing.T) {
+			t.Parallel()
+			subject := "translations/" + localeCode + ".ts"
+			rule_testing.ExpectFindings(t, runOnTranslations(t, map[string]string{
+				"translations/en.ts": englishTranslations,
+				subject:              copied,
+			}, subject), "identicalToSource")
+			rule_testing.ExpectFindings(t, runOnTranslations(t, map[string]string{subject: copied}, subject),
+				"missingEnglishSibling")
 		})
 	}
 }

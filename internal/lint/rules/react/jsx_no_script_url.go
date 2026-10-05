@@ -93,6 +93,7 @@ func DecodeJsxNoScriptUrlOptions(list []byte) (any, error) {
 	}
 
 	objectElement := elements[0]
+	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 	if bytes.HasPrefix(bytes.TrimSpace(elements[0]), []byte("[")) {
 		var legacy []jsxNoScriptUrlWireComponent
 		if err := jsxNoScriptUrlDecodeStrictly(elements[0], &legacy); err != nil {

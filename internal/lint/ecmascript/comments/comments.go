@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -327,9 +328,9 @@ func (c Comment) ContentLines() []string {
 
 	var lines []string
 	for _, line := range strings.Split(inner, "\n") {
-		line = strings.TrimSpace(line)
+		line = text.TrimWhitespace(line)
 		line = strings.TrimPrefix(line, "*")
-		line = strings.TrimSpace(line)
+		line = text.TrimWhitespace(line)
 		if line != "" {
 			lines = append(lines, line)
 		}

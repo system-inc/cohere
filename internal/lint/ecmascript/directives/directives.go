@@ -9,7 +9,12 @@
 // agreeing by construction rather than by a copied list.
 package directives
 
-import "strings"
+import (
+	"strings"
+	"unicode/utf8"
+
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
+)
 
 // Directive spellings cohere honors, with identical grammar.
 //
@@ -29,6 +34,12 @@ import "strings"
 //
 // The grammar does not vary by spelling, so nothing downstream of parsing knows which one it read.
 // That is the property that keeps this from becoming several code paths that drift.
+//
+// Whitespace in this grammar is JavaScript's, because ESLint's is: it trims with
+// `String.prototype.trim` and ends the directive word at `\s`. Go's `strings.TrimSpace` counts the
+// next-line character (U+0085) as space and the byte order mark (U+FEFF) as not, and JavaScript does
+// the reverse, so a Go trim read 15 of 19 comments holding one of them, a no-break space after the
+// word included, differently from ESLint (#z4nssqs, found by @system_adamic's stream P2).
 const (
 	// DirectiveCohere is the spelling new code should use.
 	DirectiveCohere = "cohere-disable"
@@ -83,7 +94,7 @@ type Disable struct {
 // Everything after the directive word is optional. No rules means blanket. No reason means the
 // author did not say why, which is recorded rather than rejected.
 func ParseDisable(commentText string) (Disable, bool) {
-	body := strings.TrimSpace(stripCommentMarkers(commentText))
+	body := text.TrimWhitespace(stripCommentMarkers(commentText))
 
 	rest, found := splitDirective(body)
 	if !found {
@@ -113,7 +124,7 @@ func ParseEnable(commentText string) (rules []string, found bool) {
 	if isLineComment(commentText) {
 		return nil, false
 	}
-	body := strings.TrimSpace(stripCommentMarkers(commentText))
+	body := text.TrimWhitespace(stripCommentMarkers(commentText))
 
 	for _, directive := range enableDirectives {
 		if !strings.HasPrefix(body, directive) {
@@ -121,7 +132,7 @@ func ParseEnable(commentText string) (rules []string, found bool) {
 		}
 		rest := body[len(directive):]
 		// Same anchoring rule as a disable: the directive has to be the whole word.
-		if rest != "" && !strings.HasPrefix(rest, " ") && !strings.HasPrefix(rest, "\t") {
+		if !endsWord(rest) {
 			continue
 		}
 		names, _ := splitReason(rest)
@@ -202,15 +213,20 @@ func splitScope(rest string) (scope Scope, remainder string, valid bool) {
 	return ScopeFile, "", false
 }
 
-// endsWord reports whether the scope word just read is a whole word: the comment ends, or a space
-// or tab follows.
+// endsWord reports whether the directive word just read is a whole word: the comment ends, or
+// JavaScript whitespace follows, as ESLint's `(?:\s|$)` after the word has it. A no-break space or a
+// byte order mark ends the word, and the next-line character does not.
 //
 // Every scope needs it, not only the bare form. ESLint 10.8.1 reads none of these as a directive,
 // measured: `eslint-disable-next-line, no-console`, `eslint-disable-next-lineno-console`, and
 // `eslint-disable-lines no-console`. Without the check the first named `no-console` and the last
 // named a rule `s no-console`, each suppressing what ESLint reports.
 func endsWord(rest string) bool {
-	return rest == "" || rest[0] == ' ' || rest[0] == '\t'
+	if rest == "" {
+		return true
+	}
+	first, _ := utf8.DecodeRuneInString(rest)
+	return text.IsWhitespace(first)
 }
 
 // splitReason separates the rule list from the ` -- reason` that may follow it.
@@ -219,9 +235,9 @@ func endsWord(rest string) bool {
 // name cannot contain `--`, so the first occurrence wins.
 func splitReason(rest string) (rules string, reason string) {
 	if index := strings.Index(rest, "--"); index >= 0 {
-		return strings.TrimSpace(rest[:index]), strings.TrimSpace(rest[index+2:])
+		return text.TrimWhitespace(rest[:index]), text.TrimWhitespace(rest[index+2:])
 	}
-	return strings.TrimSpace(rest), ""
+	return text.TrimWhitespace(rest), ""
 }
 
 // parseRuleNames splits a comma-separated rule list, dropping empties.
@@ -237,7 +253,7 @@ func parseRuleNames(list string) []string {
 	}
 	names := []string{}
 	for _, part := range strings.Split(list, ",") {
-		if trimmed := strings.TrimSpace(part); trimmed != "" {
+		if trimmed := text.TrimWhitespace(part); trimmed != "" {
 			names = append(names, trimmed)
 		}
 	}
@@ -267,20 +283,18 @@ func isLineComment(commentText string) bool {
 // wrapped reason parse as a reason rather than as a truncated one. JSX `{/* ... */}` arrives here
 // already unwrapped by the scanner, which returns the comment span rather than the braces.
 func stripCommentMarkers(commentText string) string {
-	text := commentText
-
-	if strings.HasPrefix(text, "//") {
-		return text[2:]
+	if strings.HasPrefix(commentText, "//") {
+		return commentText[2:]
 	}
 
-	text = strings.TrimSuffix(strings.TrimPrefix(text, "/*"), "*/")
-	if !strings.Contains(text, "\n") {
-		return text
+	inner := strings.TrimSuffix(strings.TrimPrefix(commentText, "/*"), "*/")
+	if !strings.Contains(inner, "\n") {
+		return inner
 	}
 
-	lines := strings.Split(text, "\n")
+	lines := strings.Split(inner, "\n")
 	for index, line := range lines {
-		lines[index] = strings.TrimPrefix(strings.TrimSpace(line), "*")
+		lines[index] = strings.TrimPrefix(text.TrimWhitespace(line), "*")
 	}
 	return strings.Join(lines, " ")
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -261,14 +262,14 @@ func arrowFunctionFix(ctx rule.Context, node *ast.Node) (rule.Fix, bool) {
 		return rule.Fix{}, false
 	}
 
-	text := sourceFile.Text()
+	sourceText := sourceFile.Text()
 	signatureStart := rule.TokenRange(sourceFile, node).Pos()
 	asyncKeyword := ""
 	if modifiers := node.Modifiers(); modifiers != nil {
 		for _, modifier := range modifiers.Nodes {
 			if modifier.Kind == ast.KindAsyncKeyword {
 				asyncKeyword = "async "
-				signatureStart = scanner.SkipTrivia(text, modifier.End())
+				signatureStart = scanner.SkipTrivia(sourceText, modifier.End())
 			}
 		}
 	}
@@ -279,18 +280,18 @@ func arrowFunctionFix(ctx rule.Context, node *ast.Node) (rule.Fix, bool) {
 	if arrow.TypeParameters != nil {
 		// The list's end already includes a trailing comma, so `<T,>` lands here on the `>` too;
 		// the `.tsx` fix vector is what pins that.
-		closingAngle := scanner.SkipTrivia(text, arrow.TypeParameters.End())
-		if closingAngle >= arrowTokenStart || text[closingAngle] != '>' {
+		closingAngle := scanner.SkipTrivia(sourceText, arrow.TypeParameters.End())
+		if closingAngle >= arrowTokenStart || sourceText[closingAngle] != '>' {
 			return rule.Fix{}, false
 		}
-		generics = strings.TrimSpace(text[signatureStart : closingAngle+1])
+		generics = text.TrimWhitespace(sourceText[signatureStart : closingAngle+1])
 		parametersStart = closingAngle + 1
 	}
 	if parametersStart > arrowTokenStart {
 		return rule.Fix{}, false
 	}
 
-	signature := strings.TrimSpace(text[parametersStart:arrowTokenStart])
+	signature := text.TrimWhitespace(sourceText[parametersStart:arrowTokenStart])
 	if !strings.HasPrefix(signature, "(") {
 		signature = "(" + signature + ")"
 	}
@@ -299,13 +300,13 @@ func arrowFunctionFix(ctx rule.Context, node *ast.Node) (rule.Fix, bool) {
 	replacementBody := ""
 	if body.Kind == ast.KindBlock {
 		bodyRange := rule.TokenRange(sourceFile, body)
-		replacementBody = text[bodyRange.Pos():bodyRange.End()]
+		replacementBody = sourceText[bodyRange.Pos():bodyRange.End()]
 	} else {
 		for body.Kind == ast.KindParenthesizedExpression {
 			body = body.AsParenthesizedExpression().Expression
 		}
 		bodyRange := rule.TokenRange(sourceFile, body)
-		replacementBody = "{ return " + text[bodyRange.Pos():bodyRange.End()] + "; }"
+		replacementBody = "{ return " + sourceText[bodyRange.Pos():bodyRange.End()] + "; }"
 	}
 
 	replacement := asyncKeyword + "function" + generics + signature + " " + replacementBody

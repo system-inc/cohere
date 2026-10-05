@@ -1,11 +1,13 @@
 package nexus
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/types/sourcename"
 	"github.com/system-inc/cohere/policy"
@@ -191,7 +193,7 @@ func reportUntranslated(
 			return
 		}
 
-		if strings.TrimSpace(value) == "" && strings.TrimSpace(englishValue) != "" {
+		if text.TrimWhitespace(value) == "" && text.TrimWhitespace(englishValue) != "" {
 			ctx.ReportNode(valueNode, messageMissingTranslation(key, localeCode))
 			return
 		}
@@ -387,17 +389,23 @@ func unwrapTypeAssertions(expression *ast.Node) *ast.Node {
 	return nil
 }
 
+// localeCodeStem is a translation file's name without its extension: a two- or three-letter language
+// code, then any region or script subtags (`zh-TW`, `pt-BR`, `zh_Hant`).
+//
+// Recognizing locale data by its own name, rather than by excluding names that are not, is what keeps a
+// helper that happens to sit in a translations directory out of the rule (#xt9hkse). The exclusion list
+// this replaced named index.ts, locales.ts and the *Translations, *TranslationsType and *Interface type
+// files, and a file it did not name was read as a locale: Structure's translations/TranslationTemplate.ts,
+// a type brand, drew missingEnglishSibling once a missing sibling reported. None of the old exclusions
+// can match this pattern. Measured against all 35 locales in the four consumers' sets, it keeps every one.
+var localeCodeStem = regexp.MustCompile(`^[a-z]{2,3}(?:[-_][A-Za-z0-9]+)*$`)
+
 // translationFileInformation decides whether a file is locale data this rule should read, returning
 // its locale code and the directory its en.ts sits in.
 //
-// Every exclusion here is load-bearing, and each one is a file that would otherwise be compared
-// against itself or against nothing:
-//
-//   - en.ts is the basis of the comparison, so every value in it is identical to English by
-//     definition and the rule would report the entire file.
-//   - index.ts and locales.ts are wiring rather than translations.
-//   - *Translations.ts, *TranslationsType.ts, and *Interface.ts are type declarations that happen to
-//     live in the same directory.
+// A locale file is one whose stem is a locale code, other than en: en.ts is the basis of the
+// comparison, so every value in it is identical to English by definition and the rule would report
+// the entire file.
 //
 // The directory match is on a whole path segment. Matching a bare substring would pull in a
 // directory named "translations-archive" and, worse, would silently start linting whatever a future
@@ -416,13 +424,8 @@ func translationFileInformation(sourceFile *ast.SourceFile) (string, string, boo
 	directory := fileName[:lastSlash]
 	baseName := fileName[lastSlash+1:]
 
-	switch sourcename.TreatedAs(baseName) {
-	case "en.ts", "index.ts", "locales.ts":
-		return "", "", false
-	}
-	if strings.HasSuffix(sourcename.TreatedAs(baseName), "Translations.ts") ||
-		strings.HasSuffix(sourcename.TreatedAs(baseName), "TranslationsType.ts") ||
-		strings.HasSuffix(sourcename.TreatedAs(baseName), "Interface.ts") {
+	localeCode := strings.TrimSuffix(sourcename.TreatedAs(baseName), ".ts")
+	if localeCode == "en" || !localeCodeStem.MatchString(localeCode) {
 		return "", "", false
 	}
 
@@ -434,7 +437,7 @@ func translationFileInformation(sourceFile *ast.SourceFile) (string, string, boo
 		return "", "", false
 	}
 
-	return strings.TrimSuffix(sourcename.TreatedAs(baseName), ".ts"), directory, true
+	return localeCode, directory, true
 }
 
 // englishSibling finds a translation file's English table: en with the file's own extension first,

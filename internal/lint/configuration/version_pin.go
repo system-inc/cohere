@@ -68,12 +68,14 @@ type semanticVersion struct {
 // `>=`, a caret, a tilde, space-separated comparators that must all hold, and `||` between
 // alternatives. Wildcards (`1.x`, `*`) and hyphen ranges are refused by name rather than guessed at.
 func ParseVersionRange(text string) (VersionRange, error) {
+	// Go whitespace: the "cohere" pin in cohere's own settings, which no JavaScript tool reads.
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
 		return VersionRange{}, fmt.Errorf("the \"cohere\" range is empty: write the releases this project accepts, like \"^1.0.0\"")
 	}
 	parsed := VersionRange{Text: trimmed}
 	for _, alternative := range strings.Split(trimmed, "||") {
+		// Go whitespace: the "cohere" pin in cohere's own settings, which no JavaScript tool reads.
 		fields := strings.Fields(alternative)
 		if len(fields) == 0 {
 			return VersionRange{}, fmt.Errorf("the \"cohere\" range %q has an empty alternative around `||`", trimmed)

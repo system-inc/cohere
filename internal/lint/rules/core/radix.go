@@ -48,6 +48,7 @@ func DecodeRadixOptions(raw []byte) (any, error) {
 		}
 	}
 	return RadixMode(""), fmt.Errorf("radix takes \"always\" or \"as-needed\", got %s",
+		// Go whitespace: raw JSON bytes of the rule's options, echoed in cohere's own error message.
 		strings.TrimSpace(string(raw)))
 }
 

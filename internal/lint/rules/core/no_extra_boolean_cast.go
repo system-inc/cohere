@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -328,12 +329,12 @@ func (reporter booleanCastReporter) realParent(node *ast.Node) *ast.Node {
 }
 
 // replacementText renders the unwrapped expression, parenthesised when precedence demands it.
-func (reporter booleanCastReporter) replacementText(replacement *ast.Node, target *ast.Node, text string) string {
-	result := text
+func (reporter booleanCastReporter) replacementText(replacement *ast.Node, target *ast.Node, expressionText string) string {
+	result := expressionText
 	if reporter.needsParentheses(replacement, target) {
-		trimmed := strings.TrimSpace(text)
+		trimmed := text.TrimWhitespace(expressionText)
 		if !(strings.HasPrefix(trimmed, "(") && strings.HasSuffix(trimmed, ")")) {
-			result = "(" + text + ")"
+			result = "(" + expressionText + ")"
 		}
 	}
 	return reporter.padForTokenBoundary(target, result)

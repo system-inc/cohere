@@ -82,43 +82,6 @@ type addedContent struct {
 	contents string
 }
 
-// StatSnapshot holds the identity of every file the run cache's check statted, by path. A run the check could
-// not replay has just statted every input it recorded, and the content pack validates against those stats
-// rather than taking each again: about 18ms of a graph phase's 32ms of serving on ahra, at 12 workers (#kdee854).
-//
-// It is sound because nothing the run reads can be newer than its clock. The run-cache clock starts before the
-// check (startRunCacheClock), so a file changed after its stat here has a modification or change time past the
-// run's readSince, and RecordRunCache refuses to record that run: the next run reads the file afresh. Every
-// other cache keys on the bytes the pack actually served, so served bytes older than the disk are recorded as
-// exactly that. The run reports the tree as it stood at the check, and nothing replays it past a later change.
-type StatSnapshot struct {
-	identities sync.Map
-}
-
-// NewStatSnapshot returns an empty snapshot for a check to fill.
-func NewStatSnapshot() *StatSnapshot {
-	return &StatSnapshot{}
-}
-
-// note keeps a file's identity from a stat already taken, when this platform can read one from it.
-func (s *StatSnapshot) note(path string, information os.FileInfo) {
-	if identity, ok := identityFromInfo(information); ok {
-		s.identities.Store(path, identity)
-	}
-}
-
-// identityOf is the identity noted for path, if the check statted it.
-func (s *StatSnapshot) identityOf(path string) (fileIdentity, bool) {
-	if s == nil {
-		return fileIdentity{}, false
-	}
-	identity, found := s.identities.Load(path)
-	if !found {
-		return fileIdentity{}, false
-	}
-	return identity.(fileIdentity), true
-}
-
 // ContentPack serves file bytes recorded by earlier runs and collects what this run read from disk, for
 // Save to keep. Safe for the program loader's concurrent reads.
 type ContentPack struct {

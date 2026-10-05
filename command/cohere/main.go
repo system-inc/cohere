@@ -542,6 +542,7 @@ func run() error {
 			SingleThreaded:   *singleThreaded,
 			Inputs:           runCacheInputs,
 			ContentPack:      contentPack,
+			CheckedStats:     runCacheCheckStats,
 			Timing:           graphTiming,
 			Yielded:          yield.yieldedFiles(),
 			Listings:         discoveredListings,
@@ -573,7 +574,8 @@ func run() error {
 
 		// The build saw every file the compiler read. The lint config is read by the command, not the
 		// compiler, so it is named here, with every file it extends: a base edited alone changes what runs.
-		declareRunCacheInputs(append(configuration.SourcesOnDisk(lintConfigSources(location.LintConfigFileName)), location.ConfigFileName)...)
+		declareLintConfigInputs(location.LintConfigFileName)
+		declareRunCacheInputs(location.ConfigFileName)
 	}
 
 	var projectFiles []*ast.SourceFile

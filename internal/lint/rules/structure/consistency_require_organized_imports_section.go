@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -192,7 +193,7 @@ func trailingCommentFor(sourceText string, fileComments []comments.Comment,
 		if strings.ContainsAny(between, "\n\r") {
 			continue
 		}
-		if strings.TrimSpace(between) != "" {
+		if text.TrimWhitespace(between) != "" {
 			continue
 		}
 		return comment.Text, true
