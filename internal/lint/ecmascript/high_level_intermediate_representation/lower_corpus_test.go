@@ -294,22 +294,24 @@ func TestLowerRealCodebase(t *testing.T) {
 // Nondeterminism here would be invisible in every other test and fatal to a golden-file suite
 // downstream. The usual source is map iteration order leaking into block or identifier numbering,
 // which this package avoids by allocating ids from counters rather than from map walks.
+//
+// The sample is read from the pinned corpus, whose files never change. It used to be a named file in the
+// live tree, style/ColorConverter.ts, which moved away and left the test skipping on every machine (#sycrdr6).
+// It is the first pinned file that lowers to something, so the comparison is never over nothing.
 func TestLowerRealCodebaseIsDeterministic(t *testing.T) {
 	t.Parallel()
 
-	skipWithoutCorpus(t)
+	paths, contents := pinnedCorpusFiles(t, 100)
 
-	path := filepath.Join(corpusRoot(t), "style", "ColorConverter.ts")
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		t.Skipf("the sample file is not present: %v", err)
-	}
-
-	printOnce := func() string {
+	printOnce := func(path string) string {
+		kind := core.ScriptKindTS
+		if strings.HasSuffix(path, ".tsx") {
+			kind = core.ScriptKindTSX
+		}
 		source := parser.ParseSourceFile(ast.SourceFileParseOptions{
-			FileName: path,
-			Path:     tspath.Path("/ColorConverter.ts"),
-		}, string(contents), core.ScriptKindTS)
+			FileName: "/" + path,
+			Path:     tspath.Path("/" + path),
+		}, contents[path], kind)
 
 		var out strings.Builder
 		forEachFunctionLike(source.AsNode(), func(node *ast.Node) {
@@ -320,14 +322,22 @@ func TestLowerRealCodebaseIsDeterministic(t *testing.T) {
 		return out.String()
 	}
 
-	first := printOnce()
-	second := printOnce()
+	sample := ""
+	for _, path := range paths {
+		if printOnce(path) != "" {
+			sample = path
+			break
+		}
+	}
+	if sample == "" {
+		t.Fatalf("none of the %d pinned files lowers to anything, so there is no sample to compare", len(paths))
+	}
+	first := printOnce(sample)
+	second := printOnce(sample)
 	if first != second {
 		t.Error("lowering the same file twice produced different output; something depends on map order")
 	}
-	if len(first) == 0 {
-		t.Error("lowering the sample file produced nothing")
-	}
+	t.Logf("lowered %s twice, %d bytes each", sample, len(first))
 }
 
 // forEachFunctionLike calls visit for every function-like node in the tree, outermost first.
