@@ -256,7 +256,7 @@ func printBinaryishExpressions(path *Path, options *Options, print PrintFunc, is
 			return fillDoc.Parts
 		}
 
-		if concatenated, isConcat := printed.(doc.Concat); isConcat {
+		if concatenated, isArray := doc.Parts(printed); isArray {
 			return concatenated
 		}
 		return []Doc{printed}

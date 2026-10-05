@@ -20,7 +20,7 @@ func flattenFill(docs []doc.Doc) doc.Doc {
 	var rec func(docArray []doc.Doc)
 	rec = func(docArray []doc.Doc) {
 		for _, document := range docArray {
-			if array, isArray := document.(doc.Concat); isArray {
+			if array, isArray := doc.Parts(document); isArray {
 				rec(array)
 				continue
 			}

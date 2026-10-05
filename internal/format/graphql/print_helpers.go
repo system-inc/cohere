@@ -23,7 +23,7 @@ func ifBreak(breakContents doc.Doc, flatContents doc.Doc) doc.Doc {
 
 // join is upstream's join, which returns an array; a Concat here, so a caller can spread it.
 func join(separator doc.Doc, parts []doc.Doc) doc.Concat {
-	return doc.Join(separator, parts).(doc.Concat)
+	return doc.Join(separator, parts)
 }
 
 var (

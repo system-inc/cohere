@@ -300,11 +300,6 @@ func fits(next command, rest []command, remainingWidth int, hasLineSuffix bool, 
 				remainingWidth -= StringWidth(string(document))
 			}
 
-		case Concat:
-			for index := len(document) - 1; index >= 0; index-- {
-				commands = append(commands, command{mode: current.mode, doc: document[index]})
-			}
-
 		case *Fill:
 			for index := len(document.Parts) - 1; index >= 0; index-- {
 				commands = append(commands, command{mode: current.mode, doc: document.Parts[index]})
@@ -375,6 +370,13 @@ func fits(next command, rest []command, remainingWidth int, hasLineSuffix bool, 
 			}
 
 		case breakParentDoc:
+
+		default:
+			if parts, isArray := Parts(document); isArray {
+				for index := len(parts) - 1; index >= 0; index-- {
+					commands = append(commands, command{mode: current.mode, doc: parts[index]})
+				}
+			}
 		}
 	}
 	return false
@@ -413,11 +415,6 @@ func Print(document Doc, options Options) string {
 				if len(commands) > 0 {
 					position += StringWidth(string(document))
 				}
-			}
-
-		case Concat:
-			for index := len(document) - 1; index >= 0; index-- {
-				commands = append(commands, command{indent: current.indent, mode: current.mode, doc: document[index]})
 			}
 
 		case *Indent:
@@ -528,7 +525,13 @@ func Print(document Doc, options Options) string {
 		case breakParentDoc:
 
 		default:
-			panic(fmt.Sprintf("invalid doc %T", current.doc))
+			parts, isArray := Parts(document)
+			if !isArray {
+				panic(fmt.Sprintf("invalid doc %T", current.doc))
+			}
+			for index := len(parts) - 1; index >= 0; index-- {
+				commands = append(commands, command{indent: current.indent, mode: current.mode, doc: parts[index]})
+			}
 		}
 
 		// Flush deferred line suffixes at the end, in case no newline follows them.

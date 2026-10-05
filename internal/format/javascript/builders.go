@@ -100,15 +100,20 @@ func concat(parts ...any) Doc {
 // are reset once the doc is laid out and reused by the next format (#fyw36kf). Made one at a time they
 // were concat's 3.9M slices, and 1.7M groups and indents, a pass on ahra. A released doc reads as
 // poisonedDoc under cohere_poison, so a doc read after its file was printed shows in the output.
+//
+// An array doc from here is a *doc.Sequence: a Concat is a slice, and putting one in a Doc allocates a cell
+// for its header every time, 3.6M of them a pass on ahra; a pointer from the arena costs nothing.
 type docMemory struct {
-	parts   arena.Slab[doc.Doc]
-	groups  arena.Arena[doc.Group]
-	indents arena.Arena[doc.Indent]
+	parts     arena.Slab[doc.Doc]
+	sequences arena.Arena[doc.Sequence]
+	groups    arena.Arena[doc.Group]
+	indents   arena.Arena[doc.Indent]
 }
 
 var docMemories = sync.Pool{New: func() any {
 	memory := &docMemory{}
 	memory.parts.Poison = poisonedDoc
+	memory.sequences.Poison = doc.Sequence{Parts: []Doc{poisonedDoc}}
 	memory.groups.Poison = doc.Group{Contents: poisonedDoc}
 	memory.indents.Poison = doc.Indent{Contents: poisonedDoc}
 	return memory
@@ -122,6 +127,7 @@ func acquireDocMemory() *docMemory { return docMemories.Get().(*docMemory) }
 // release resets the memory and returns it to the pool. Every doc it handed out is gone.
 func (memory *docMemory) release() {
 	memory.parts.Reset()
+	memory.sequences.Reset()
 	memory.groups.Reset()
 	memory.indents.Reset()
 	docMemories.Put(memory)
@@ -136,18 +142,28 @@ func docMemoryOf(path *Path) *docMemory {
 	return formatSettings.docs
 }
 
-// concatIn is concat with its parts from the format's docMemory, when the path's print has one. The other
-// half of concat's cost, boxing the slice into a Doc, stays.
+// concatIn is concat from the format's docMemory, when the path's print has one: its parts from the slab
+// and the doc a *doc.Sequence from the arena, so it allocates nothing.
 func concatIn(path *Path, parts ...any) Doc {
 	memory := docMemoryOf(path)
 	if memory == nil {
 		return concat(parts...)
 	}
-	result := doc.Concat(memory.parts.Make(len(parts))[:len(parts)])
+	result := memory.parts.Make(len(parts))[:len(parts)]
 	for index, part := range parts {
 		result[index] = toDoc(part)
 	}
-	return result
+	return memory.sequences.New(doc.Sequence{Parts: result})
+}
+
+// sequenceIn is parts as an array doc: a *doc.Sequence from the format's docMemory when the path's print has
+// one, or a Concat.
+func sequenceIn(path *Path, parts []Doc) Doc {
+	memory := docMemoryOf(path)
+	if memory == nil {
+		return doc.Concat(parts)
+	}
+	return memory.sequences.New(doc.Sequence{Parts: parts})
 }
 
 // partsIn is a []Doc of length count for a concatenation the caller fills, from the format's docMemory when

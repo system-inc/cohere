@@ -46,7 +46,7 @@ func printTypeScriptMappedType(path *Path, options *Options, print PrintFunc) Do
 	if len(danglingComments) > 0 {
 		lastComment := danglingComments[len(danglingComments)-1]
 		// upstream's printDanglingComments without indent returns join(hardline, parts), an array.
-		parts, _ := printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}).(doc.Concat)
+		parts, _ := doc.Parts(printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}))
 		if len(parts) > 0 {
 			for _, part := range parts[:len(parts)-1] {
 				danglingCommentsDoc = append(danglingCommentsDoc, part)

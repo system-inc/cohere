@@ -146,7 +146,10 @@ func (generator *specGenerator) node() *spec {
 }
 
 // buildSpec constructs the Go doc for a spec.
-func buildSpec(root *spec) Doc {
+func buildSpec(root *spec) Doc { return buildSpecAs(root, false) }
+
+// buildSpecAs is buildSpec, building each concat as a *Sequence of its parts when asSequences is set.
+func buildSpecAs(root *spec, asSequences bool) Doc {
 	ids := map[string]*GroupID{}
 	groups := map[int]*Group{}
 	id := func(name string) *GroupID {
@@ -181,6 +184,9 @@ func buildSpec(root *spec) Doc {
 		case "hardlineWithoutBreakParent":
 			return HardlineWithoutBreakParent
 		case "concat":
+			if asSequences {
+				return &Sequence{Parts: children(node)}
+			}
 			return Concat(children(node))
 		case "indent":
 			return NewIndent(build(node.Children[0]))

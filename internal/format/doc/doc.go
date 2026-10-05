@@ -45,6 +45,25 @@ type Text string
 // Concat is a sequence, Prettier's array doc.
 type Concat []Doc
 
+// Sequence is Prettier's array doc behind a pointer, so it is a Doc without the allocation that putting
+// a slice in an interface costs. A printer that cuts its docs from a format's memory builds these, and
+// every walk treats one exactly as the Concat of its parts, uncached by identity as a Concat is
+// (#fyw36kf).
+type Sequence struct{ Parts []Doc }
+
+// Parts is the parts of Prettier's array doc, a Concat or a *Sequence, and whether document is one.
+// Nothing else asks a doc whether it is an array: a test fails on a type switch or assertion naming
+// either type outside this function, so no walk can know one and miss the other.
+func Parts(document Doc) ([]Doc, bool) {
+	switch typed := document.(type) {
+	case Concat:
+		return typed, true
+	case *Sequence:
+		return typed.Parts, true
+	}
+	return nil, false
+}
+
 // Indent increases indentation by one level for its contents.
 type Indent struct{ Contents Doc }
 
@@ -133,6 +152,7 @@ type breakParentDoc struct{}
 
 func (Text) isDoc()                  {}
 func (Concat) isDoc()                {}
+func (*Sequence) isDoc()             {}
 func (*Indent) isDoc()               {}
 func (*Align) isDoc()                {}
 func (trimDoc) isDoc()               {}
@@ -237,8 +257,9 @@ func NewLabel(label string, contents Doc) Doc {
 	return &Label{Label: label, Contents: contents}
 }
 
-// Join is upstream's join(): separator between each part.
-func Join(separator Doc, parts []Doc) Doc {
+// Join is upstream's join(): separator between each part. Upstream's is an array a caller may spread,
+// so this is a Concat, typed as one.
+func Join(separator Doc, parts []Doc) Concat {
 	result := make(Concat, 0, 2*len(parts))
 	for index, part := range parts {
 		if index > 0 {

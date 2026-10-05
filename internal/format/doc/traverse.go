@@ -14,7 +14,8 @@ import (
  *   - mapDoc caches by identity, so a subtree shared by two parents (a conditional group's states share
  *     their parts) maps to one shared result. Go docs that are slices (Concat) have no identity and are
  *     mapped afresh each time, which is safe because every node that can carry identity inside them
- *     (a group, an indent) is a pointer and is cached.
+ *     (a group, an indent) is a pointer and is cached. A *Sequence is mapped afresh too, exactly as the
+ *     Concat of its parts would be.
  *   - cleanDoc concatenates adjacent strings and flattens arrays one level, after its children are
  *     already clean, the way upstream's mapDoc order makes it.
  */
@@ -41,10 +42,6 @@ func TraverseDoc(root Doc, onEnter func(Doc) bool, onExit func(Doc), shouldTrave
 		}
 
 		switch document := current.(type) {
-		case Concat:
-			for index := len(document) - 1; index >= 0; index-- {
-				stack = append(stack, document[index])
-			}
 		case *Fill:
 			for index := len(document.Parts) - 1; index >= 0; index-- {
 				stack = append(stack, document.Parts[index])
@@ -71,7 +68,13 @@ func TraverseDoc(root Doc, onEnter func(Doc) bool, onExit func(Doc), shouldTrave
 			stack = append(stack, document.Contents)
 		case Text, trimDoc, lineSuffixBoundaryDoc, *Line, breakParentDoc, nil:
 		default:
-			panic(fmt.Sprintf("invalid doc %T", current))
+			parts, isArray := Parts(current)
+			if !isArray {
+				panic(fmt.Sprintf("invalid doc %T", current))
+			}
+			for index := len(parts) - 1; index >= 0; index-- {
+				stack = append(stack, parts[index])
+			}
 		}
 	}
 }
@@ -160,14 +163,15 @@ func isPointerDoc(document Doc) bool {
 // rebuilt every time. The printer writes break marks onto groups in place, but a mark follows from the
 // group's contents alone, so a group the mapped doc shares with its source is marked as a copy would be.
 func mapOne(document Doc, rec func(Doc) Doc, fn func(Doc) Doc) Doc {
-	switch typed := document.(type) {
-	case Concat:
-		parts := mapParts(typed, rec)
-		if sameParts(parts, typed) {
-			// The doc itself, not typed: putting a slice back in an interface allocates.
+	if original, isArray := Parts(document); isArray {
+		parts := mapParts(original, rec)
+		if sameParts(parts, original) {
+			// The doc itself: putting a slice back in an interface allocates.
 			return fn(document)
 		}
 		return fn(Concat(parts))
+	}
+	switch typed := document.(type) {
 	case *Fill:
 		parts := mapParts(typed.Parts, rec)
 		if sameParts(parts, typed.Parts) {
@@ -263,13 +267,13 @@ func sameParts(left []Doc, right []Doc) bool {
 	return len(left) == len(right) && (len(left) == 0 || &left[0] == &right[0])
 }
 
-// sameDoc is whether two docs are the same doc: the same node, the same text, or for a concat, which Go
-// cannot compare, the same parts.
+// sameDoc is whether two docs are the same doc: the same node, the same text, or for an array, which Go
+// cannot compare as a Concat, the same parts.
 func sameDoc(left Doc, right Doc) bool {
-	leftParts, leftIsConcat := left.(Concat)
-	rightParts, rightIsConcat := right.(Concat)
-	if leftIsConcat || rightIsConcat {
-		return leftIsConcat && rightIsConcat && (leftParts == nil) == (rightParts == nil) && sameParts(leftParts, rightParts)
+	leftParts, leftIsArray := Parts(left)
+	rightParts, rightIsArray := Parts(right)
+	if leftIsArray || rightIsArray {
+		return leftIsArray && rightIsArray && (leftParts == nil) == (rightParts == nil) && sameParts(leftParts, rightParts)
 	}
 	return left == right
 }
@@ -313,7 +317,7 @@ func (cleaner *docCleaner) clean(document Doc) Doc {
 		}
 	}
 	var result Doc
-	if parts, isConcat := document.(Concat); isConcat {
+	if parts, isArray := Parts(document); isArray {
 		result = cleaner.cleanConcat(document, parts)
 	} else {
 		result = mapOne(document, cleaner.rec, cleanDocFn)
@@ -329,7 +333,7 @@ func (cleaner *docCleaner) clean(document Doc) Doc {
 
 // cleanConcat is mapOne and cleanDocFn for a concat. Each child's own walk leaves buffer as it found it,
 // so the concat's children are buffer[start:] once they are all cleaned.
-func (cleaner *docCleaner) cleanConcat(document Doc, parts Concat) Doc {
+func (cleaner *docCleaner) cleanConcat(document Doc, parts []Doc) Doc {
 	start := len(cleaner.buffer)
 	changed := false
 	for _, part := range parts {
@@ -352,6 +356,13 @@ func (cleaner *docCleaner) cleanConcat(document Doc, parts Concat) Doc {
 }
 
 func cleanDocFn(document Doc) Doc {
+	if parts, isArray := Parts(document); isArray {
+		if isCleanConcat(parts) {
+			// The doc itself: putting a slice back in an interface allocates.
+			return document
+		}
+		return cleanParts(parts)
+	}
 	switch typed := document.(type) {
 	case *Fill:
 		allEmpty := true
@@ -395,12 +406,6 @@ func cleanDocFn(document Doc) Doc {
 		if isFalsy(typed.FlatContents) && isFalsy(typed.BreakContents) {
 			return Text("")
 		}
-	case Concat:
-		if isCleanConcat(typed) {
-			// The doc itself, not typed: putting a slice back in an interface allocates.
-			return document
-		}
-		return cleanParts(typed)
 	}
 	return document
 }
@@ -410,7 +415,7 @@ func cleanDocFn(document Doc) Doc {
 func cleanParts(parts []Doc) Doc {
 	size := 0
 	for _, part := range parts {
-		if nested, isConcat := part.(Concat); isConcat && len(nested) > 0 {
+		if nested, isArray := Parts(part); isArray && len(nested) > 0 {
 			size += len(nested)
 		} else {
 			size++
@@ -421,8 +426,8 @@ func cleanParts(parts []Doc) Doc {
 		if isFalsy(part) {
 			continue
 		}
-		current, rest := part, Concat(nil)
-		if nested, isConcat := part.(Concat); isConcat {
+		current, rest := part, []Doc(nil)
+		if nested, isArray := Parts(part); isArray {
 			if len(nested) == 0 {
 				// `[first, ...rest] = []` makes first undefined, which upstream then pushes.
 				cleaned = append(cleaned, nil)
@@ -453,7 +458,7 @@ func cleanParts(parts []Doc) Doc {
 // isCleanConcat is whether cleanDocFn would rebuild parts equal to themselves: two or more, none falsy,
 // none a concat to flatten, and no two texts side by side to join. Then the concat is returned as it is
 // rather than copied (#r89mksm).
-func isCleanConcat(parts Concat) bool {
+func isCleanConcat(parts []Doc) bool {
 	if len(parts) < 2 {
 		return false
 	}
@@ -462,7 +467,7 @@ func isCleanConcat(parts Concat) bool {
 		if isFalsy(part) {
 			return false
 		}
-		if _, isConcat := part.(Concat); isConcat {
+		if _, isArray := Parts(part); isArray {
 			return false
 		}
 		_, isText := part.(Text)
@@ -563,6 +568,9 @@ func stripTrailingHardlineFromParts(parts []Doc) []Doc {
 }
 
 func stripTrailingHardlineFromDoc(document Doc) Doc {
+	if parts, isArray := Parts(document); isArray {
+		return Concat(stripTrailingHardlineFromParts(parts))
+	}
 	switch typed := document.(type) {
 	case *Indent:
 		return &Indent{Contents: stripTrailingHardlineFromDoc(typed.Contents)}
@@ -586,8 +594,6 @@ func stripTrailingHardlineFromDoc(document Doc) Doc {
 		}
 	case *Fill:
 		return &Fill{Parts: stripTrailingHardlineFromParts(typed.Parts)}
-	case Concat:
-		return Concat(stripTrailingHardlineFromParts(typed))
 	case Text:
 		// trim-newlines' trimNewlinesEnd: trailing \r and \n only.
 		return Text(strings.TrimRight(string(typed), "\r\n"))
