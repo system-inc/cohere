@@ -250,7 +250,7 @@ func formatNestedFiles(transform edit.Transform, fileNames []string) []nestedOut
 					outcomes[index] = nestedOutcome{err: err}
 					continue
 				}
-				formatted, err := transform(fileNames[index], string(contents))
+				formatted, err := transform(fileNames[index], string(contents), nil)
 				switch {
 				case errors.Is(err, edit.ErrSkipped):
 					outcomes[index] = nestedOutcome{unchecked: strings.TrimPrefix(err.Error(), edit.ErrSkipped.Error()+": ")}

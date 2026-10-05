@@ -35,13 +35,13 @@ func isPreviousLineEmptyBefore(node Node, options *Options) bool {
 
 // stripComments is upstream's stripComments: the original text with every comment blanked to spaces,
 // computed once per format. Upstream caches it in a WeakMap keyed on the comments array; the Go keeps
-// it on settings.
+// it on settings, as the parse's postprocess made it when it ran one, since that stripped the same text of
+// the same comments.
 func stripComments(options *Options) string {
-	if !settingsOf(options).hasStrippedText {
-		settingsOf(options).strippedText = estree.StripComments(options.OriginalText, options.Comments)
-		settingsOf(options).hasStrippedText = true
+	if settingsOf(options).strippedText == nil {
+		settingsOf(options).strippedText = estree.NewStrippedText(options.OriginalText, options.Comments)
 	}
-	return settingsOf(options).strippedText
+	return settingsOf(options).strippedText.Text()
 }
 
 // getShebang is upstream's getShebang.

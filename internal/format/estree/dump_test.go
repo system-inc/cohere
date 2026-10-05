@@ -148,7 +148,7 @@ func TestConvertAgreesWithPrettier(t *testing.T) {
 // dumpFile converts one file and renders it the way the oracle script does, through JSON, so both sides
 // compare as the same Go values.
 func dumpFile(path string, text string) (map[string]any, error) {
-	program, comments, err := ParseTypeScript(path, text, nil)
+	program, comments, _, err := ParseTypeScript(path, text, nil)
 	if err != nil {
 		return nil, err
 	}

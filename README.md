@@ -4,7 +4,9 @@ cohere type-checks, lints, fixes and formats a TypeScript codebase in one proces
 compiler builds the program once, and that one type graph is what TypeScript's own diagnostics and
 every lint rule read, the rules in one walk of each file. The fix engine and the formatter run in the
 same process. Fixes re-read each file from disk and re-lint it until they stop landing, so they never
-apply to a stale copy. The formatter parses each TypeScript file it formats with the same TypeScript
+apply to a stale copy. They land only in files the lint walk checked: a file the formatter reaches that the
+program does not hold, such as a bundle beside a tsconfig that does not include it, is formatted and never
+fixed. The formatter parses each TypeScript file it formats with the same TypeScript
 parser, and prints every file it formats with cohere's own printers. Keeping the rules on one graph in
 one walk is what lets a codebase carry hundreds of them without each one costing another pass over the
 code.
@@ -74,7 +76,9 @@ See [Output](#output) for what that line says, and for `--verbose` and `--json`.
 
 With no settings file, cohere applies the house stack, each set where the code shows it fits:
 
-- `cohere:typescript` on every file.
+- `cohere:typescript` on every file. It composes two sets a configuration can also name on its own:
+  `cohere:adamic`, the soundness set, whose rules hold types to the truth, and `cohere:style`, the taste
+  set.
 - `cohere:react` on each file that imports `react` or a `react-` package, or contains JSX.
 - `cohere:next` on each file that imports `next`, and, once anything does, on Next's own files: everything
   under `app/` and `pages/`, and `middleware`, `instrumentation` and `next.config`.

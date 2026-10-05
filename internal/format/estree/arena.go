@@ -16,6 +16,9 @@ import (
 type Arena struct {
 	nodes      arena.Arena[Node]
 	properties arena.Slab[property]
+
+	// count is how many nodes the arena has handed out since it was acquired.
+	count int
 }
 
 // poisonedNodeType is what a released node's type reads under cohere_poison: no parse produces it.
@@ -39,7 +42,17 @@ func (nodes *Arena) Release() {
 	}
 	nodes.nodes.Reset()
 	nodes.properties.Reset()
+	nodes.count = 0
 	arenas.Put(nodes)
+}
+
+// Len is how many nodes the arena has handed out since it was acquired: a file's tree, and any node the
+// postprocess made and dropped. Zero for a nil arena.
+func (nodes *Arena) Len() int {
+	if nodes == nil {
+		return 0
+	}
+	return nodes.count
 }
 
 // node is New, from the arena.
@@ -47,6 +60,7 @@ func (nodes *Arena) node(nodeType string, start int, end int, keysAndValues []an
 	if nodes == nil {
 		return New(nodeType, start, end, keysAndValues...)
 	}
+	nodes.count++
 	created := nodes.nodes.New(Node{nodeType: nodeType, Range: [2]int{start, end}, properties: nodes.properties.Make(len(keysAndValues) / 2)})
 	for index := 0; index+1 < len(keysAndValues); index += 2 {
 		created.Set(keysAndValues[index].(string), keysAndValues[index+1])

@@ -108,6 +108,11 @@ type Options[N Node[N]] struct {
 	// Comments is every comment in the file, upstream's options[commentsPropertyInOptions].
 	Comments []N
 
+	// NodeCount is about how many nodes the tree holds, when the language knows it cheaply, or zero. The
+	// print cache, one entry per node printed, starts with room for that many rather than growing by
+	// insertion, which was 124 + 79 MB of a cold run on ahra (#wcgw0n4). It never changes the output.
+	NodeCount int
+
 	// printedComments is upstream's options[Symbol.for("printedComments")]: comments printed by a
 	// printer directly or covered by a prettier-ignore, which ensureAllCommentsPrinted must not flag.
 	printedComments map[N]bool
@@ -150,7 +155,7 @@ func PrintAstToDoc[N Node[N]](ast N, comments []N, options *Options[N]) (doc.Doc
 		ast = options.Printer.Preprocess(ast, options)
 	}
 
-	cache := map[N]doc.Doc{}
+	cache := make(map[N]doc.Doc, options.NodeCount)
 	path := NewAstPath(ast)
 	path.Settings = options.Settings
 	embeds := map[N]doc.Doc{}

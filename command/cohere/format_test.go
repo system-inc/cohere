@@ -98,7 +98,7 @@ func TestAnUnhandledFileTypeIsSkippedWithItsReason(t *testing.T) {
 	for _, fileName := range []string{"Makefile", "notes.txt", "query.graphql", "script.sh"} {
 		t.Run(fileName, func(t *testing.T) {
 			t.Parallel()
-			_, err := transform(fileName, "anything at all\n")
+			_, err := transform(fileName, "anything at all\n", nil)
 			if !errors.Is(err, edit.ErrSkipped) {
 				t.Fatalf("expected a skip for %s, got %v", fileName, err)
 			}
@@ -115,8 +115,8 @@ func TestSkipReasonsGroupByExtension(t *testing.T) {
 	t.Parallel()
 	transform := formatTransform(prettierLike())
 
-	_, firstError := transform("docs/one.txt", "x\n")
-	_, secondError := transform("notes/two.txt", "y\n")
+	_, firstError := transform("docs/one.txt", "x\n", nil)
+	_, secondError := transform("notes/two.txt", "y\n", nil)
 	if firstError == nil || secondError == nil {
 		t.Fatalf("expected both files to skip, got %v and %v", firstError, secondError)
 	}
@@ -139,7 +139,7 @@ func TestHandledFileTypesAreNotSkipped(t *testing.T) {
 	for _, fileName := range []string{"a.ts", "b.tsx", "c.js", "d.jsx", "e.mjs", "f.md", "g.css", "h.json"} {
 		t.Run(fileName, func(t *testing.T) {
 			t.Parallel()
-			_, err := transform(fileName, "const a = 1;\n")
+			_, err := transform(fileName, "const a = 1;\n", nil)
 			if errors.Is(err, edit.ErrSkipped) {
 				t.Fatalf("%s was skipped but should be formatted: %v", fileName, err)
 			}
@@ -152,7 +152,7 @@ func TestHandledFileTypesAreNotSkipped(t *testing.T) {
 // a second complaint from the formatter adds noise rather than information.
 func TestAnUnparseableFileIsSkippedNotFailed(t *testing.T) {
 	t.Parallel()
-	_, err := formatTransform(parseFailingEngine())("broken.ts", "function alpha( {\n")
+	_, err := formatTransform(parseFailingEngine())("broken.ts", "function alpha( {\n", nil)
 
 	if !errors.Is(err, edit.ErrSkipped) {
 		t.Fatalf("an unparseable file should skip, not fail: %v", err)
@@ -173,12 +173,12 @@ func TestFormattingIsIdempotent(t *testing.T) {
 	transform := formatTransform(prettierLike())
 	source := "const   alpha    =   1;\nfunction beta(  ) {   return alpha   }\n"
 
-	first, err := transform("sample.ts", source)
+	first, err := transform("sample.ts", source, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	second, err := transform("sample.ts", first)
+	second, err := transform("sample.ts", first, nil)
 	if err != nil {
 		t.Fatalf("unexpected error on the second pass: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestFormattingIsIdempotent(t *testing.T) {
 // generating garbage.
 func TestFormattedOutputStillParses(t *testing.T) {
 	t.Parallel()
-	formatted, err := formatTransform(prettierLike())("sample.ts", "const   alpha  =  1;\nexport   { alpha };\n")
+	formatted, err := formatTransform(prettierLike())("sample.ts", "const   alpha  =  1;\nexport   { alpha };\n", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -248,7 +248,7 @@ func TestAFormatFailureIsNotDowngradedToASkip(t *testing.T) {
 		},
 	}
 
-	_, err := formatTransform(engine)("sample.ts", "const a = 1;\n")
+	_, err := formatTransform(engine)("sample.ts", "const a = 1;\n", nil)
 
 	if err == nil {
 		t.Fatalf("a failing formatter reported success")
@@ -269,14 +269,14 @@ func TestAnUnhandledFileIsNeverHandedToTheEngine(t *testing.T) {
 	engine := prettierLike()
 	transform := formatTransform(engine)
 
-	if _, err := transform("Makefile", "all:\n"); !errors.Is(err, edit.ErrSkipped) {
+	if _, err := transform("Makefile", "all:\n", nil); !errors.Is(err, edit.ErrSkipped) {
 		t.Fatalf("expected a skip, got %v", err)
 	}
 	if len(engine.askedFor) != 0 {
 		t.Fatalf("the engine was asked to format a file it does not handle: %v", engine.askedFor)
 	}
 
-	if _, err := transform("a.ts", "const a = 1;\n"); err != nil {
+	if _, err := transform("a.ts", "const a = 1;\n", nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(engine.askedFor) != 1 || engine.askedFor[0] != "a.ts" {
@@ -292,7 +292,7 @@ func TestAnUnhandledFileIsNeverHandedToTheEngine(t *testing.T) {
 // `11 not formatted (11 no formatter is configured)`.
 func TestAnUnrequestedFormatSkipsWithAReason(t *testing.T) {
 	t.Parallel()
-	_, err := formatTransform(nil)("a.ts", "const a = 1;\n")
+	_, err := formatTransform(nil)("a.ts", "const a = 1;\n", nil)
 
 	if !errors.Is(err, edit.ErrSkipped) {
 		t.Fatalf("a run that did not ask to format should skip, got %v", err)
@@ -448,14 +448,14 @@ func TestTheTransformFormatsARealNonIdempotentInputToItsFixpoint(t *testing.T) {
 		t.Fatal("one pass settled the Unifi chain, so this fixture no longer reproduces a non-idempotent input")
 	}
 
-	formatted, err := formatTransform(engine)("Report.ts", nonIdempotentUnifiChain)
+	formatted, err := formatTransform(engine)("Report.ts", nonIdempotentUnifiChain, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if formatted != twice {
 		t.Fatalf("the transform stopped short of the fixpoint:\n--- transform\n%s--- two passes\n%s", formatted, twice)
 	}
-	if again, _ := formatTransform(engine)("Report.ts", formatted); again != formatted {
+	if again, _ := formatTransform(engine)("Report.ts", formatted, nil); again != formatted {
 		t.Fatalf("the transform's own output is rewritten by the next run:\n%s", again)
 	}
 }
@@ -469,7 +469,7 @@ func TestTheFormatFixpointIsBoundedAndStopsWhenStable(t *testing.T) {
 		handled: []string{".ts"},
 		format:  func(_ string, text string) (string, error) { return text + "x", nil },
 	}
-	_, err := formatTransform(growing)("Drifting.ts", "const a = 1;\n")
+	_, err := formatTransform(growing)("Drifting.ts", "const a = 1;\n", nil)
 	if err == nil || errors.Is(err, edit.ErrSkipped) {
 		t.Fatalf("a file still changing at the bound was not a failure: %v", err)
 	}
@@ -491,12 +491,12 @@ func TestTheFormatFixpointIsBoundedAndStopsWhenStable(t *testing.T) {
 			}
 		},
 	}
-	if formatted, err := formatTransform(settling)("Settling.ts", "a\n"); err != nil || formatted != "c\n" {
+	if formatted, err := formatTransform(settling)("Settling.ts", "a\n", nil); err != nil || formatted != "c\n" {
 		t.Fatalf("a file that settles on the second pass came back %q, %v; want \"c\\n\"", formatted, err)
 	}
 
 	stable := prettierLike()
-	if _, err := formatTransform(stable)("Formatted.ts", "const a = 1;\n"); err != nil {
+	if _, err := formatTransform(stable)("Formatted.ts", "const a = 1;\n", nil); err != nil {
 		t.Fatal(err)
 	}
 	if len(stable.askedFor) != 1 {

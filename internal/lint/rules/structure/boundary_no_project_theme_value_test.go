@@ -69,6 +69,9 @@ func TestBoundaryNoProjectThemeValueStaysSilent(t *testing.T) {
 		{"the other defined variant", libraryFilePath, "export const a = <Button variant=\"Outline\" />;\n"},
 		{"a defined size", libraryFilePath, "export const a = <Button size=\"Small\" />;\n"},
 		{"a defined value on an alias", libraryFilePath, "export const a = <AnimatedButton variant=\"Ghost\" />;\n"},
+		// A defined value spelled with a character reference. ESLint's parser decodes a JSX attribute
+		// string, and the twin reads that decoded value, so this is Ghost to both (#5f61r5b).
+		{"a defined value spelled with a character reference", libraryFilePath, "export const a = <Button variant=\"Gh&#111;st\" />;\n"},
 		// The boundary itself. The same undefined value outside the library is a project extending
 		// the library, which is the system working. This fixture is the one that pins the gate, and
 		// it has to carry a value that would otherwise report.

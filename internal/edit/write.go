@@ -57,23 +57,30 @@ func TypeScriptParsable(fileName string) bool {
 }
 
 func Parses(fileName string, text string) (bool, string) {
+	parses, reason, _ := parsesWithTree(fileName, text)
+	return parses, reason
+}
+
+// parsesWithTree is Parses, also returning the tree it built: nil for a file the TypeScript parser does not
+// own, or one that does not parse. The fix engine hands it to the transform, which then parses nothing
+// again (Transform).
+func parsesWithTree(fileName string, text string) (bool, string, *ast.SourceFile) {
 	// A file the TypeScript parser does not own is not something this guard can judge. Reporting it
 	// as unparseable would refuse every css and markdown file in the tree with a TypeScript syntax
 	// error, which is a true diagnostic about the wrong question.
 	if !TypeScriptParsable(fileName) {
-		return true, ""
+		return true, "", nil
 	}
 
 	sourceFile := parseText(fileName, text)
 	if sourceFile == nil {
-		return false, "the parser produced nothing"
+		return false, "the parser produced nothing", nil
 	}
+	return verdictOf(sourceFile)
+}
 
-	diagnostics := sourceFile.Diagnostics()
-	if len(diagnostics) == 0 {
-		return true, ""
-	}
-
+// reasonOf is a refusal's reason, from the parse diagnostics of a file that does not parse.
+func reasonOf(diagnostics []*ast.Diagnostic) string {
 	// Localized rather than MessageText, which a parse diagnostic leaves empty: every refusal used to read
 	// "TS1135: " with the message missing (#v1ah2qq).
 	first := diagnostics[0]
@@ -81,7 +88,16 @@ func Parses(fileName string, text string) (bool, string) {
 	if len(diagnostics) > 1 {
 		reason = fmt.Sprintf("%s (and %d more)", reason, len(diagnostics)-1)
 	}
-	return false, reason
+	return reason
+}
+
+// verdictOf is parsesWithTree's answer for a tree in hand.
+func verdictOf(sourceFile *ast.SourceFile) (bool, string, *ast.SourceFile) {
+	diagnostics := sourceFile.Diagnostics()
+	if len(diagnostics) == 0 {
+		return true, "", sourceFile
+	}
+	return false, reasonOf(diagnostics), nil
 }
 
 // parseText parses source text under a rooted, normalized file name.
@@ -91,16 +107,6 @@ func Parses(fileName string, text string) (bool, string) {
 // and .ts disagree about whether a `<T>` is a type argument or an element, and parsing one as the
 // other invents syntax errors in a file that was fine.
 func parseText(fileName string, text string) *ast.SourceFile {
-	scriptKind := core.ScriptKindTS
-	switch {
-	case strings.HasSuffix(fileName, ".tsx"):
-		scriptKind = core.ScriptKindTSX
-	case strings.HasSuffix(fileName, ".jsx"):
-		scriptKind = core.ScriptKindJSX
-	case strings.HasSuffix(fileName, ".js"), strings.HasSuffix(fileName, ".mjs"), strings.HasSuffix(fileName, ".cjs"):
-		scriptKind = core.ScriptKindJS
-	}
-
 	rooted := fileName
 	if !tspath.IsRootedDiskPath(rooted) {
 		rooted = "/" + strings.TrimPrefix(rooted, "/")
@@ -110,7 +116,20 @@ func parseText(fileName string, text string) *ast.SourceFile {
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: rooted,
 		Path:     tspath.Path(rooted),
-	}, text, scriptKind)
+	}, text, guardScriptKind(fileName))
+}
+
+// guardScriptKind is the script kind the guard parses a file as, chosen by extension.
+func guardScriptKind(fileName string) core.ScriptKind {
+	switch {
+	case strings.HasSuffix(fileName, ".tsx"):
+		return core.ScriptKindTSX
+	case strings.HasSuffix(fileName, ".jsx"):
+		return core.ScriptKindJSX
+	case strings.HasSuffix(fileName, ".js"), strings.HasSuffix(fileName, ".mjs"), strings.HasSuffix(fileName, ".cjs"):
+		return core.ScriptKindJS
+	}
+	return core.ScriptKindTS
 }
 
 // WriteAtomically replaces a file's contents so that no reader ever observes a partial write.

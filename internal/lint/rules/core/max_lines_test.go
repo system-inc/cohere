@@ -1,6 +1,7 @@
 package core
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -131,5 +132,46 @@ func TestMaxLinesDecodesUpstreamsShapes(t *testing.T) {
 	}
 	if _, err := DecodeMaxLinesOptions([]byte("-1")); err == nil {
 		t.Error("a negative maximum was accepted")
+	}
+}
+
+// TestMaxLinesEachSplitsAsTheSliceSplitterDid pins maxLinesEach to the answers of the slice splitter
+// it replaced (#smshtp5): every line's start and end, without its break, for each line break and for
+// the edges a counter gets wrong, the empty text, a missing final break, a final break, and blank
+// lines in a row. The old splitter's offsets were checked against these rows before it was removed,
+// alongside 200,000 random texts.
+func TestMaxLinesEachSplitsAsTheSliceSplitterDid(t *testing.T) {
+	t.Parallel()
+	lineSeparator := string(rune(0x2028))
+	paragraphSeparator := string(rune(0x2029))
+	for _, testCase := range []struct {
+		name  string
+		text  string
+		lines [][2]int
+	}{
+		{"empty text is one empty line", "", [][2]int{{0, 0}}},
+		{"one line with no final break", "a", [][2]int{{0, 1}}},
+		{"a final line feed ends the line rather than starting another", "a\n", [][2]int{{0, 1}}},
+		{"a lone line feed is one empty line", "\n", [][2]int{{0, 0}}},
+		{"line feed", "a\nb", [][2]int{{0, 1}, {2, 3}}},
+		{"carriage return and line feed are one break", "a\r\nb", [][2]int{{0, 1}, {3, 4}}},
+		{"a final carriage return and line feed", "a\r\n", [][2]int{{0, 1}}},
+		{"a lone carriage return", "a\rb", [][2]int{{0, 1}, {2, 3}}},
+		{"line separator", "a" + lineSeparator + "b", [][2]int{{0, 1}, {4, 5}}},
+		{"paragraph separator", "a" + paragraphSeparator + "b", [][2]int{{0, 1}, {4, 5}}},
+		{"blank lines in a row", "a\n\n\nb", [][2]int{{0, 1}, {2, 2}, {3, 3}, {4, 5}}},
+		{"a blank line before a final break", "a\n\n", [][2]int{{0, 1}, {2, 2}}},
+		{"two breaks and nothing else", "\r\n\r\n", [][2]int{{0, 0}, {2, 2}}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			var lines [][2]int
+			for start, end := range maxLinesEach(testCase.text) {
+				lines = append(lines, [2]int{start, end})
+			}
+			if !slices.Equal(lines, testCase.lines) {
+				t.Errorf("%q splits into %v, want %v", testCase.text, lines, testCase.lines)
+			}
+		})
 	}
 }
