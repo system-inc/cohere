@@ -210,6 +210,9 @@ type runGaps struct {
 	ModifiedBuild bool `json:"modifiedBuild"`
 	// Unread is files the run could not check for any other reason, said as the run said it.
 	Unread string `json:"unread,omitempty"`
+	// AdamicIgnored is the Adamic `.a` files the program holds that git's ignore rules leave out of the
+	// format walk: checked, and never formatted (#6mhafvb).
+	AdamicIgnored int `json:"adamicIgnored,omitempty"`
 }
 
 // failed is whether the run found anything or lost a verdict to a crash, which is what the exit code says
