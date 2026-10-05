@@ -78,6 +78,10 @@ type Context struct {
 
 	// Report emits a finding. Prefer the helpers below, which spare a rule from restating how to
 	// turn a node into a range.
+	//
+	// Report and RecordNote are good only during Run and the listeners Run returns, for this file. The
+	// walk makes each rule's pair once per worker and points it at whichever file it is dispatching,
+	// so a rule that keeps them past its file reports into another file, or panics between files.
 	Report func(Diagnostic)
 
 	// FileCache holds work that is expensive per file and identical for every rule that wants it.

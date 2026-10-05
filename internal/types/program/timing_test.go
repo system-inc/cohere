@@ -155,10 +155,10 @@ func TestAMeteredCallIsBilledItsCPU(t *testing.T) {
 	t.Parallel()
 	meter, _ := startTestMeter(t)
 	timing := &RuleTiming{Name: "spins"}
-	wrapped := meter.listener(timing, func(node *ast.Node) { spinFor(t, 2*time.Millisecond) })
+	spins := func(node *ast.Node) { spinFor(t, 2*time.Millisecond) }
 
 	for range 5 {
-		wrapped(nil)
+		meter.call(timing, spins, nil)
 	}
 
 	if timing.NodesOffered != 5 {
@@ -175,11 +175,11 @@ func TestAWaitingCallCostsNothing(t *testing.T) {
 	t.Parallel()
 	meter, _ := startTestMeter(t)
 	timing := &RuleTiming{Name: "sleeps"}
-	wrapped := meter.listener(timing, func(node *ast.Node) { time.Sleep(5 * time.Millisecond) })
+	sleeps := func(node *ast.Node) { time.Sleep(5 * time.Millisecond) }
 
 	wallStart := time.Now()
 	for range 5 {
-		wrapped(nil)
+		meter.call(timing, sleeps, nil)
 	}
 	wall := time.Since(wallStart)
 
@@ -223,7 +223,7 @@ func TestSharedFillIsBilledToTheDerivationNotTheRuleThatAsked(t *testing.T) {
 	meter.watchFills(cache)
 	timing := &RuleTiming{Name: "asked-first"}
 
-	meter.listener(timing, func(node *ast.Node) {
+	meter.call(timing, func(node *ast.Node) {
 		spinFor(t, 2*time.Millisecond)
 		rule.Cached(cache, "comments.All", func() int {
 			spinFor(t, 3*time.Millisecond)
@@ -233,7 +233,7 @@ func TestSharedFillIsBilledToTheDerivationNotTheRuleThatAsked(t *testing.T) {
 			})
 			return 1
 		})
-	})(nil)
+	}, nil)
 
 	if !within(timing.ListenerCPU, 2*time.Millisecond) {
 		t.Fatalf("the rule that asked was billed %v for its own 2ms", timing.ListenerCPU)
@@ -261,7 +261,7 @@ func TestARuleThatPanicsStillBalancesItsFrames(t *testing.T) {
 		run()
 	}
 
-	recovering(func() { meter.listener(timing, func(node *ast.Node) { panic("planted") })(nil) })
+	recovering(func() { meter.call(timing, func(node *ast.Node) { panic("planted") }, nil) })
 	recovering(func() { meter.setup(timing, func() { panic("planted") }) })
 
 	if meter.depth != 0 {
@@ -280,7 +280,7 @@ func TestTheWorkersCPUIsAccountedFor(t *testing.T) {
 	}
 	timing := timings.forRule("spins")
 	spinFor(t, 2*time.Millisecond)
-	meter.listener(timing, func(node *ast.Node) { spinFor(t, 3*time.Millisecond) })(nil)
+	meter.call(timing, func(node *ast.Node) { spinFor(t, 3*time.Millisecond) }, nil)
 	meter.finish()
 
 	account := timings.Account
@@ -308,7 +308,7 @@ func TestTheMeterIsPassThroughWhenNotTiming(t *testing.T) {
 	meter.watchFills(cache)
 
 	called := 0
-	meter.listener(nil, func(node *ast.Node) { called++ })(nil)
+	meter.call(nil, func(node *ast.Node) { called++ }, nil)
 	meter.setup(nil, func() { called++ })
 	meter.finish()
 	if called != 2 {
