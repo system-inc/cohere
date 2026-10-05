@@ -852,7 +852,9 @@ func run() error {
 
 		// The Adamic `.a` files the program holds join the format scope now that there is a program to ask
 		// (#6mhafvb). The walk held every `.a` back, since one could as well be a static library, and the early
-		// pass never saw one. A held `.a` git ignores is checked and not formatted, and the run says so.
+		// pass never saw one. A held `.a` git ignores is checked and not formatted, and the run says so. A nested
+		// repository's drift check has no program to ask, so it reads none of a library's `.a` files: their
+		// drift is the library's own run to find, not this one's.
 		if formatter != nil {
 			held := adamicHeld(graph)
 			if graph == nil && len(scope.adamic) > 0 {
