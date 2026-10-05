@@ -267,10 +267,10 @@ func TestNoImplicitGlobalsStaysSilent(t *testing.T) {
 //
 // Upstream reports assignmentToReadonlyGlobal and redeclarationOfReadonlyGlobal for a name it knows
 // to be a read-only global. Both sources are eslint configuration surfaces rather than anything in
-// the tree: the globals config key, and the /*global foo:readonly*/ directive.
-// @typescript-eslint/no-redeclare declined upstream's builtinGlobals option here for the same
-// reason, probed: a local var Object SHADOWS rather than merges, so resolution answers the same for
-// a builtin as for any undeclared name.
+// the tree: the globals config key, and the /*global foo:readonly*/ directive. (Under
+// typescript-eslint's parser the TypeScript lib's types are read-only globals too, which is the
+// surface @typescript-eslint/no-redeclare's builtinGlobals reads since #e1zk9s0. This rule's two
+// messages were not revisited there.)
 //
 // The shape of the decline is an UPGRADE that does not happen, rather than a finding that goes
 // missing, and that distinction is worth stating because it is much the smaller gap. Measured

@@ -2,6 +2,10 @@ package typescript
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -10,23 +14,160 @@ import (
 // redeclareFile is where the fixtures pretend to live.
 const redeclareFile = "/repository/source/Redeclare.ts"
 
-// The corpus is typescript-eslint's own, copied rather than rewritten.
-//
-// Every case below is verbatim from
-// `typescript-eslint/packages/eslint-plugin/tests/rules/no-redeclare.test.ts`: 52 cases, 21 clean and
-// 31 reporting, carrying 35 findings between them. The strings were extracted through the TypeScript
-// compiler API rather than retyped and this file was generated from that extraction, because a
-// fixture a porter types encodes the same belief as the port and a tool that rewrites an escape on
-// the way in goes green while asserting the opposite of upstream.
-//
-// Sixteen of the 52 are omitted here and the omission is deliberate rather than an oversight. They
-// carry the `builtinGlobals` option, whose verdict comes from a surface we do not have. See the
-// rule's doc comment, and `TestNoRedeclareBuiltinGlobalsIsOutOfScope` below, which pins the
-// omission rather than leaving it as silence.
-//
-// The remaining 36 were each driven against the installed @typescript-eslint 8.67.0 rule through the
-// ESLint Linter API before being written here, so the verdict beside each one is measured rather
-// than read off the corpus. All 52 reproduced, including the 16 omitted.
+/*
+ * The corpus is typescript-eslint 8.71.0's own no-redeclare rows, all of them, plus edge rows, each with
+ * the verdict the installed rule gave on the same bytes under the same tsconfig;
+ * no_redeclare_corpus_data_test.go says how it was built. Each row runs over a real program, so the lib a
+ * builtin comes from is the program's, as it is for the installed rule under typed parsing.
+ */
+
+// noRedeclareTsconfig is the corpus tsconfig, with lib replaced for a row that names one.
+func noRedeclareTsconfig(t *testing.T, lib []string) string {
+	t.Helper()
+	if lib == nil {
+		return noRedeclareCorpusTsconfig
+	}
+	var configuration struct {
+		CompilerOptions map[string]any `json:"compilerOptions"`
+		Include         []string       `json:"include"`
+	}
+	if err := json.Unmarshal([]byte(noRedeclareCorpusTsconfig), &configuration); err != nil {
+		t.Fatal(err)
+	}
+	configuration.CompilerOptions["lib"] = lib
+	encoded, err := json.Marshal(configuration)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(encoded)
+}
+
+func TestNoRedeclareUpstreamCorpus(t *testing.T) {
+	t.Parallel()
+
+	valid, invalid, pinned := 0, 0, 0
+	for _, row := range noRedeclareCorpus {
+		if row.edge != "" {
+			continue
+		}
+		if len(row.pinned) > 0 {
+			pinned++
+		}
+		// Upstream's direction, not the recorded verdict's: a pinned row's verdict is taken with the
+		// inexpressible part out, which can turn an invalid row clean
+		if row.index < noRedeclareCorpusUpstreamValid {
+			valid++
+		} else {
+			invalid++
+		}
+	}
+	if valid != noRedeclareCorpusUpstreamValid || invalid != noRedeclareCorpusUpstreamInvalid || pinned != noRedeclareCorpusUpstreamPinned {
+		t.Fatalf("the corpus holds %d valid, %d invalid and %d pinned upstream rows, and upstream has %d, %d and %d",
+			valid, invalid, pinned, noRedeclareCorpusUpstreamValid, noRedeclareCorpusUpstreamInvalid, noRedeclareCorpusUpstreamPinned)
+	}
+
+	for _, row := range noRedeclareCorpus {
+		name := fmt.Sprintf("upstream-%d", row.index)
+		if row.edge != "" {
+			name = row.edge
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			options, err := DecodeNoRedeclareOptions([]byte(row.options))
+			if err != nil {
+				t.Fatalf("decoding %q: %v", row.options, err)
+			}
+			configuration := noRedeclareTsconfig(t, row.lib)
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(t, NoRedeclare, map[string]string{"file.ts": row.source}, "file.ts", options,
+				func(directory string) {
+					if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				})
+
+			diagnostics := result.Diagnostics
+			sort.SliceStable(diagnostics, func(first, second int) bool {
+				return diagnostics[first].Range.Pos() < diagnostics[second].Range.Pos()
+			})
+			reported := []noRedeclareCorpusFinding{}
+			for _, diagnostic := range diagnostics {
+				reported = append(reported, noRedeclareCorpusFinding{
+					id:   diagnostic.Message.Id,
+					text: row.source[diagnostic.Range.Pos():diagnostic.Range.End()],
+				})
+			}
+			if fmt.Sprint(reported) != fmt.Sprint(row.findings) {
+				t.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
+			}
+		})
+	}
+}
+
+// The three things cohere cannot express are pinned on the rows that carry them, by name, so a row
+// cannot lose its pin and quietly start asserting a verdict it was never recorded under, and a fourth
+// kind cannot appear without a reason being written for it.
+func TestNoRedeclareCorpusPinsWhatCohereCannotExpress(t *testing.T) {
+	t.Parallel()
+
+	reasons := map[string]bool{
+		// cohere carries no globals configuration, by the 1.0 contract (#bfxz13m item 4).
+		"globals configuration": true,
+		// Directive globals are declined, as in no-implicit-globals.
+		"global comment directive": true,
+		// There is no CommonJS function scope around a file.
+		"ecmaFeatures.globalReturn": true,
+	}
+	counts := map[string]int{}
+	for _, row := range noRedeclareCorpus {
+		for _, feature := range row.pinned {
+			if !reasons[feature] {
+				t.Errorf("row %d pins %q, which has no reason here", row.index, feature)
+			}
+			counts[feature]++
+		}
+	}
+	for feature := range reasons {
+		if counts[feature] == 0 {
+			t.Errorf("no row pins %q, so its reason above is stale", feature)
+		}
+	}
+}
+
+// Three scopes upstream never examines, kept as upstream parity (ruled on #e1zk9s0). Upstream finds its
+// scopes from eight listeners (the program, functions, arrow functions, blocks, `for`, `for in`,
+// `for of`, `switch`), each checking only the scope that node owns. A namespace body, a class static
+// block and a catch clause own a scope none of those nodes is the block of, so a duplicate there is
+// never looked at. Nothing is lost: TypeScript's checker reports a real redeclaration in each (TS2451
+// and its kin). Each case was recorded clean against the installed rule; the control shows the same
+// duplicate in an ordinary block still reports, so the silence is the scope and not a dead rule.
+func TestNoRedeclareScopesUpstreamNeverExamines(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		sourceText string
+	}{
+		// A namespace body is the scope of the TSModuleBlock, which no listener owns.
+		{"namespace body", "namespace N {\n  let a;\n  let a;\n}"},
+		// A static block's statements sit directly in the StaticBlock, which is not a BlockStatement.
+		{"class static block", "class C {\n  static {\n    let a;\n    let a;\n  }\n}"},
+		// A catch parameter binds in the catch clause's own scope, which no listener owns.
+		{"catch clause", "try {\n} catch ({ a, b: a }) {\n}"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, nil))
+		})
+	}
+
+	t.Run("control: an ordinary block reports", func(t *testing.T) {
+		t.Parallel()
+		rule_testing.ExpectFindings(t,
+			rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "{\n  let a;\n  let a;\n}", nil),
+			"redeclared")
+	})
+}
 
 // optionsJSON builds this rule's configuration the way the config layer delivers it, which is the
 // bare object rather than upstream's `[{...}]` tuple. Routing fixtures through the rule's own
@@ -43,121 +184,6 @@ func redeclareOptions(ignoreDeclarationMerge bool) any {
 		panic(err)
 	}
 	return decoded
-}
-
-// TestNoRedeclareFires covers every reporting case in the corpus that does not need the missing
-// surface, with the message ids upstream states per case.
-func TestNoRedeclareFires(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name       string
-		sourceText string
-		options    any
-		messageIds []string
-	}{
-		{"corpus case 21", "\nvar a = 3;\nvar a = 10;\n      ", nil, []string{"redeclared"}},
-		{"corpus case 22", "\nswitch (foo) {\n  case a:\n    var b = 3;\n  case b:\n    var b = 4;\n}\n      ", nil, []string{"redeclared"}},
-		{"corpus case 23", "\nvar a = 3;\nvar a = 10;\n      ", nil, []string{"redeclared"}},
-		{"corpus case 24", "\nvar a = {};\nvar a = [];\n      ", nil, []string{"redeclared"}},
-		{"corpus case 25", "\nvar a;\nfunction a() {}\n      ", nil, []string{"redeclared"}},
-		{"corpus case 26", "\nfunction a() {}\nfunction a() {}\n      ", nil, []string{"redeclared"}},
-		{"corpus case 27", "\nvar a = function () {};\nvar a = function () {};\n      ", nil, []string{"redeclared"}},
-		{"corpus case 28", "\nvar a = function () {};\nvar a = new Date();\n      ", nil, []string{"redeclared"}},
-		{"corpus case 29", "\nvar a = 3;\nvar a = 10;\nvar a = 15;\n      ", nil, []string{"redeclared", "redeclared"}},
-		{"corpus case 30", "\nvar a;\nvar a;\n      ", nil, []string{"redeclared"}},
-		{"corpus case 31", "\nexport var a;\nvar a;\n      ", nil, []string{"redeclared"}},
-		{"corpus case 39", "\ntype T = 1;\ntype T = 2;\n      ", nil, []string{"redeclared"}},
-		{"corpus case 41", "\ninterface A {}\ninterface A {}\n      ", redeclareOptions(false), []string{"redeclared"}},
-		{"corpus case 42", "\ninterface A {}\nclass A {}\n      ", redeclareOptions(false), []string{"redeclared"}},
-		{"corpus case 43", "\nclass A {}\nnamespace A {}\n      ", redeclareOptions(false), []string{"redeclared"}},
-		{"corpus case 44", "\ninterface A {}\nclass A {}\nnamespace A {}\n      ", redeclareOptions(false), []string{"redeclared", "redeclared"}},
-		{"corpus case 45", "\nclass A {}\nclass A {}\nnamespace A {}\n      ", redeclareOptions(true), []string{"redeclared"}},
-		{"corpus case 46", "\nfunction A() {}\nnamespace A {}\n      ", redeclareOptions(false), []string{"redeclared"}},
-		{"corpus case 47", "\nfunction A() {}\nfunction A() {}\nnamespace A {}\n      ", redeclareOptions(true), []string{"redeclared"}},
-		{"corpus case 48", "\nfunction A() {}\nclass A {}\n      ", redeclareOptions(false), []string{"redeclared"}},
-		{"corpus case 49", "\nenum A {}\nnamespace A {}\nenum A {}\n      ", redeclareOptions(true), []string{"redeclared"}},
-		{"corpus case 50", "\nfunction A() {}\nclass A {}\nnamespace A {}\n      ", redeclareOptions(false), []string{"redeclared", "redeclared"}},
-		{"corpus case 51", "\ntype something = string;\nconst something = 2;\n      ", nil, []string{"redeclared"}},
-	}
-
-	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
-		})
-	}
-}
-
-// TestNoRedeclareStaysSilent covers every clean case in the corpus that does not need the missing
-// surface. These are the false positives upstream already thought about, and they carry the whole
-// declaration-merge discrimination: an interface pair, a class beside an interface, a namespace
-// beside anything, overload signatures, and the same name bound in scopes that do not overlap.
-func TestNoRedeclareStaysSilent(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name       string
-		sourceText string
-		options    any
-	}{
-		{"corpus case 0", "\nvar a = 3;\nvar b = function () {\n  var a = 10;\n};\n    ", nil},
-		{"corpus case 1", "\nvar a = 3;\na = 10;\n    ", nil},
-		{"corpus case 2", "\nif (true) {\n  let b = 2;\n} else {\n  let b = 3;\n}\n      ", nil},
-		{"corpus case 11", "\nfunction foo({ bar }: { bar: string }) {\n  console.log(bar);\n}\n    ", nil},
-		{"corpus case 12", "\ntype AST<T extends ParserOptions> = TSESTree.Program &\n  (T['range'] extends true ? { range: [number, number] } : {}) &\n  (T['tokens'] extends true ? { tokens: TSESTree.Token[] } : {}) &\n  (T['comment'] extends true ? { comments: TSESTree.Comment[] } : {});\ninterface ParseAndGenerateServicesResult<T extends ParserOptions> {\n  ast: AST<T>;\n  services: ParserServices;\n}\n    ", nil},
-		{"corpus case 13", "\nfunction A<T>() {}\ninterface B<T> {}\ntype C<T> = Array<T>;\nclass D<T> {}\n    ", nil},
-		{"corpus case 14", "\nfunction a(): string;\nfunction a(): number;\nfunction a() {}\n    ", nil},
-		{"corpus case 15", "\ninterface A {}\ninterface A {}\n      ", redeclareOptions(true)},
-		{"corpus case 16", "\ninterface A {}\nclass A {}\n      ", redeclareOptions(true)},
-		{"corpus case 17", "\nclass A {}\nnamespace A {}\n      ", redeclareOptions(true)},
-		{"corpus case 18", "\ninterface A {}\nclass A {}\nnamespace A {}\n      ", redeclareOptions(true)},
-		{"corpus case 19", "\nenum A {}\nnamespace A {}\n      ", redeclareOptions(true)},
-		{"corpus case 20", "\nfunction A() {}\nnamespace A {}\n      ", redeclareOptions(true)},
-	}
-
-	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, testCase.options))
-		})
-	}
-}
-
-// TestNoRedeclareBuiltinGlobalsIsOutOfScope pins the sixteen omitted corpus cases as omitted, so the
-// gap is a recorded decision rather than fixtures that quietly do not exist.
-//
-// Upstream's `builtinGlobals` option reports a declaration that shadows a global. The measurement
-// behind declining it, run with a control: for `var Object = 1;` the checker's scope enumeration
-// returns ONLY the local declaration and the standard library's `Object` is not in scope at all,
-// which is byte-identical to what it answers for a name that is not a builtin. So there is nothing
-// to compare the local declaration against.
-//
-// The corpus itself shows the verdict is not a resolution question. `var Object = 0;` appears as a
-// CLEAN case and as a REPORTING case under the same `builtinGlobals: true`, separated only by
-// whether the file is a module, which is ESLint's environment model rather than anything a type
-// checker knows. The two assertions below are what our rule does with those inputs today, and both
-// are silence.
-func TestNoRedeclareBuiltinGlobalsIsOutOfScope(t *testing.T) {
-	t.Parallel()
-
-	// Upstream reports this in script mode with `builtinGlobals: true`, and is clean on it in module
-	// mode with the same option. We are silent on both, having no such option.
-	rule_testing.ExpectClean(t,
-		rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "var Object = 0;", nil))
-
-	// Upstream reports this against a name a comment directive introduced. We have no
-	// directive-globals surface, so it is silent for the same reason.
-	rule_testing.ExpectClean(t,
-		rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "/*global b:false*/ var b = 1;", nil))
-
-	// The control for both, and the reason the two silences above are a scoped decline rather than a
-	// dead rule: an ordinary redeclaration in the same file shape still reports.
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "var b = 1; var b = 2;", nil),
-		"redeclared")
 }
 
 // TestNoRedeclareRequiresTheTypedHarness asserts the rule declines rather than panics when the
@@ -179,8 +205,8 @@ func TestNoRedeclareRequiresTheTypedHarness(t *testing.T) {
 		rule_testing.Run(t, NoRedeclare, redeclareFile, "var a = 1; var a = 2;"))
 }
 
-// TestNoRedeclareDefaultsToIgnoringDeclarationMerge is the decoder test, and it exists because this
-// rule's one option defaults to TRUE.
+// TestNoRedeclareDefaultsToIgnoringDeclarationMerge is the decoder test, and it exists because both
+// of this rule's options default to TRUE.
 //
 // A rule written down as a bare "error" is handed nil options, and a generic decoder would yield a
 // zero-valued struct whose false `IgnoreDeclarationMerge` turns every merge exemption off. That does
@@ -193,8 +219,15 @@ func TestNoRedeclareDefaultsToIgnoringDeclarationMerge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DecodeNoRedeclareOptions(nil) errored: %v", err)
 	}
-	if got := decoded.(NoRedeclareOptions); !got.IgnoreDeclarationMerge {
-		t.Errorf("absent options: IgnoreDeclarationMerge = false, want true")
+	if got := decoded.(NoRedeclareOptions); !got.IgnoreDeclarationMerge || !got.BuiltinGlobals {
+		t.Errorf("absent options: %+v, want both true", got)
+	}
+	builtinsOff, err := DecodeNoRedeclareOptions(json.RawMessage(`{"builtinGlobals":false}`))
+	if err != nil {
+		t.Fatalf("DecodeNoRedeclareOptions errored: %v", err)
+	}
+	if got := builtinsOff.(NoRedeclareOptions); got.BuiltinGlobals || !got.IgnoreDeclarationMerge {
+		t.Errorf("builtinGlobals false: %+v, want it off and the merge exemption still on", got)
 	}
 
 	explicit, err := DecodeNoRedeclareOptions(json.RawMessage(`{"ignoreDeclarationMerge":false}`))

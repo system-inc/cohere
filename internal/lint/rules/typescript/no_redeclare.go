@@ -16,23 +16,36 @@ var messageNoRedeclare = rule.Message{
 		"`instanceof` in the file. Rename one of them, or delete the declaration that is dead.",
 }
 
-// NoRedeclareOptions tunes whether TypeScript's legitimate declaration merges are exempt.
+var messageNoRedeclareAsBuiltin = rule.Message{
+	Id: "redeclaredAsBuiltin",
+	Description: "This name is already declared by the standard library this program compiles against, " +
+		"and this file is a script, so its top-level declarations land in the same global scope " +
+		"the library's do. The declaration does not make a new name, it collides with the " +
+		"built-in one: a type merges into it or conflicts with it, and a value replaces it for " +
+		"every script on the page that reads the global. Rename it, or make the file a module " +
+		"with an import or export so its declarations stop being globals.",
+}
+
+// NoRedeclareOptions tunes whether a script may redeclare the standard library's globals, and
+// whether TypeScript's legitimate declaration merges are exempt.
 //
-// The wire field is a pointer because the default is TRUE. A plain bool cannot tell an absent key
-// from an explicit `false`, and a zero-valued struct would turn every merge exemption off, which
+// The wire fields are pointers because both defaults are TRUE. A plain bool cannot tell an absent
+// key from an explicit `false`, and a zero-valued struct would turn every merge exemption off, which
 // silently converts thirteen of upstream's clean cases into findings.
 type NoRedeclareOptions struct {
+	BuiltinGlobals         bool
 	IgnoreDeclarationMerge bool
 }
 
 // noRedeclareWire is the shape the config layer actually delivers, before defaults are applied.
 type noRedeclareWire struct {
+	BuiltinGlobals         *bool `json:"builtinGlobals"`
 	IgnoreDeclarationMerge *bool `json:"ignoreDeclarationMerge"`
 }
 
 // DefaultNoRedeclareOptions is the configuration upstream applies when the rule is written bare.
 func DefaultNoRedeclareOptions() NoRedeclareOptions {
-	return NoRedeclareOptions{IgnoreDeclarationMerge: true}
+	return NoRedeclareOptions{BuiltinGlobals: true, IgnoreDeclarationMerge: true}
 }
 
 // DecodeNoRedeclareOptions reads this rule's configuration from the config layer.
@@ -50,6 +63,9 @@ func DecodeNoRedeclareOptions(raw []byte) (any, error) {
 	var wire noRedeclareWire
 	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return options, err
+	}
+	if wire.BuiltinGlobals != nil {
+		options.BuiltinGlobals = *wire.BuiltinGlobals
 	}
 	if wire.IgnoreDeclarationMerge != nil {
 		options.IgnoreDeclarationMerge = *wire.IgnoreDeclarationMerge
@@ -69,6 +85,8 @@ func DecodeNoRedeclareOptions(raw []byte) (any, error) {
 //	invalid: type T = 1; type T = 2;
 //	invalid: type something = string; const something = 2;
 //	invalid: class A {} class A {} namespace A {}
+//	invalid: var Object = 0;                 in a script, redeclaredAsBuiltin
+//	valid:   var Object = 0; export {};      a module's top level is not the global scope
 //
 // A second declaration of a name does not add a binding, it replaces what the name reaches. In
 // plain JavaScript that is a typo with no diagnostic; in TypeScript it is worse, because the
@@ -151,21 +169,58 @@ func DecodeNoRedeclareOptions(raw []byte) (any, error) {
 // a() {}` is one implementation and two signatures rather than three declarations. Our parser gives
 // all three `KindFunctionDeclaration` and separates them by whether a body is present.
 //
-// # What this port does not do, measured rather than assumed
+// # A `var` binds into its function, not its block
 //
-// Upstream's `builtinGlobals` option reports a declaration that shadows a global, and this port has
-// no such option. That is not a gap in our checker. Probed with a control: a local `var Object`
-// SHADOWS rather than merges, so the scope enumeration returns only the local declaration and the
-// standard library's `Object` is not in scope at all, answering identically to a name that is not a
-// builtin. The option's verdict comes from ESLint's own environment model rather than from
-// resolution, and upstream's corpus shows it: `var Object = 0;` appears as a CLEAN case and as a
-// REPORTING case with the same option value, separated only by whether the file is a module. We
-// have no configured-globals surface for that question to read, so the option is absent rather than
-// stubbed. Sixteen of upstream's 52 cases carry it and are omitted from the fixtures, pinned by
-// `TestNoRedeclareBuiltinGlobalsIsOutOfScope` rather than left as silence.
+// A block-scoped declaration groups by its nearest locals container, and a `var` does not: it hoists
+// to the enclosing function, namespace, static block or file, which is where upstream's scope manager
+// puts it. So `var a; if (x) { var a; }` is one name declared twice, and a `var Object` inside a
+// top-level block of a script is a global. The key a `var` gets is the one a `let` written directly
+// in that function's body gets, so `var a; let a;` in one body still meets.
 //
-// The same reasoning covers upstream's `/*global b:false*/` case, which reports a declaration
-// against a name a comment directive introduced. We have no directive-globals surface either.
+// Some scopes upstream never looks inside: a namespace body, a class static block and a catch clause.
+// Its listeners find scopes by the node that owns them, and none of its eight is the owner of those,
+// so a duplicate there is clean to it and to this port. See upstreamVisitsScope.
+//
+// A destructured name is a declaration too: `var { a = 0, b: Object = 0 } = {};` declares `a` and
+// `Object`, and each reports at its own identifier. A parameter's pattern is not walked, since a
+// parameter belongs to the function's own scope, as above.
+//
+// # builtinGlobals: a script's top level redeclaring the standard library
+//
+// With `builtinGlobals` on, the default, upstream yields a "builtin" declaration first for any name
+// in the GLOBAL scope that ESLint knows as a read-only global, and then every declaration of the name
+// in the file after it. Two sources make one, and the replay measured both:
+//
+//   - ESLint's own ECMAScript globals for `ecmaVersion: "latest"`, which its Linter declares in every
+//     run whatever the parser: `NaN`, `parseInt`, `toString` and the rest of eslintLatestGlobals.
+//   - The TypeScript lib, which typescript-eslint's scope manager seeds the global scope with, as the
+//     parser derived it from the program's compiler options: every name a lib file declares as a TYPE
+//     (an interface, type alias, class, enum or namespace), so `type NodeListOf = 1;` under lib dom
+//     reports. A lib `declare var` alone is a value with no type and the lib generator leaves it out,
+//     which is why `var top = 0;` and `var self = 1;` are clean.
+//
+// Two things decide it, and both are read here rather than configured:
+//
+//   - The scope is the global scope only when the file is a script. A module's top level is its own
+//     scope, so the same declaration there is clean. Script means TypeScript's notion, no import or
+//     export (or every file under `moduleDetection: force`), the test `no-implicit-globals` uses. The
+//     ESLint twins parse every file as `sourceType: "module"`, where the option never fires; ruled on
+//     #e1zk9s0 as the twin's simplification, and a script in house code gets the faithful answer.
+//   - The lib half is the program's own lib, read as the global symbol of the name and whether any
+//     of its declarations is a type-kind declaration in a default library file. The checker merges
+//     the lib files first, and on a conflicting user declaration `mergeSymbol` keeps the lib's
+//     symbol, so the lib's declarations are still on the global when the user's is not.
+//
+// The arithmetic is upstream's yield order. The builtin is first, so EVERY surviving syntax
+// declaration reports, each as `redeclaredAsBuiltin`, rather than every one after the first. The
+// merge exemption still runs first: two interfaces augmenting a lib interface merge and nothing
+// reports, while a lone augmenting `interface Window {}` in a script reports, because upstream only
+// applies the exemption to more than one declaration.
+//
+// What stays out, pinned by name in the upstream replay rather than dropped: ESLint's `globals`
+// configuration and `/*global*/` comment directives (cohere carries no globals configuration, by the
+// 1.0 contract), and `ecmaFeatures.globalReturn`. Upstream's third message, `redeclaredBySyntax`, is
+// reachable only from a `/*global*/` directive, so it is not declared here.
 //
 // No fix. The repair is a rename or a deletion, and choosing which declaration is the dead one, and
 // what to call the survivor, is exactly what the rule cannot know.
@@ -174,7 +229,13 @@ var NoRedeclare = rule.Rule{
 
 	// See the doc above: the scope partition comes from the binder, which the program builds.
 	NeedsTypeChecker: true,
-	TypeReach:        rule.TypeReachShapes,
+	// Contents, not Shapes: builtinGlobals reads a global symbol's declarations, and the rule walks its
+	// own file's bodies, which is the pair TestRulesClaimShapesOnlyWhereTheScanAllowsIt refuses. The
+	// declarations it reads are the lib's, by kind and file only, but the scan cannot tell them from an
+	// imported one, and a refused claim costs re-runs where a wrong one costs a stale verdict.
+	//
+	// builtinGlobals asks whether a global's declarations live in a lib file.
+	ProgramReads: rule.ReadsDefaultLibrary,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoRedeclareOptions](options)
@@ -225,6 +286,9 @@ func reportRedeclarationsIn(ctx rule.Context, sourceFile *ast.Node, settings NoR
 		}
 		if name := redeclarableName(current); name != "" {
 			container := nearestScopeContainer(current)
+			if bindsIntoFunctionScope(current) {
+				container = varScopeContainer(current)
+			}
 			key := scopedName{container: container, name: name}
 			group, seen := groups[key]
 			if !seen {
@@ -241,18 +305,116 @@ func reportRedeclarationsIn(ctx rule.Context, sourceFile *ast.Node, settings NoR
 	}
 	walk(sourceFile)
 
+	// Only a script's top level is the global scope, so only its groups can meet a builtin.
+	file := sourceFile.AsSourceFile()
+	checksBuiltins := settings.BuiltinGlobals && !ast.IsExternalModule(file) && ctx.Program != nil
+
 	// Iterate the recorded order rather than the map. Go randomises map iteration, so reporting
 	// straight from it would emit findings in a different order on every run, and the harness
 	// asserts findings in order.
 	for _, key := range order {
-		for _, declaration := range redeclarationsToReport(groups[key].declarations, settings) {
+		if !upstreamVisitsScope(key.container) {
+			continue
+		}
+		declarations := survivingDeclarations(groups[key].declarations, settings)
+		message := messageNoRedeclare
+		if checksBuiltins && key.container == sourceFile && len(declarations) > 0 && isBuiltinGlobal(ctx, key.name) {
+			// The builtin is the first declaration, so every one in the file redeclares it.
+			message = messageNoRedeclareAsBuiltin
+		} else if len(declarations) < 2 {
+			continue
+		} else {
+			// The first declaration is the one being redeclared, so it is not itself a finding.
+			declarations = declarations[1:]
+		}
+		for _, declaration := range declarations {
 			name := declaration.Name()
 			if name == nil {
 				continue
 			}
-			ctx.ReportNode(name, messageNoRedeclare)
+			ctx.ReportNode(name, message)
 		}
 	}
+}
+
+// eslintLatestGlobals is ESLint 10.8.1's own ECMAScript globals at `ecmaVersion: "latest"` (es2026 in
+// conf/globals.js), which its Linter declares read-only in every global scope before any rule runs
+// (lib/languages/js/source-code/source-code.js:955 at 10.8.1, `getGlobalsForEcmaVersion`), on top of
+// whatever the parser's scope manager put there. They are why `var NaN = 1;` and
+// `function toString() {}` report in a script although the TypeScript lib gives neither a type.
+var eslintLatestGlobals = map[string]bool{
+	"AggregateError": true, "Array": true, "ArrayBuffer": true, "AsyncDisposableStack": true,
+	"Atomics": true, "BigInt": true, "BigInt64Array": true, "BigUint64Array": true, "Boolean": true,
+	"DataView": true, "Date": true, "DisposableStack": true, "Error": true, "EvalError": true,
+	"FinalizationRegistry": true, "Float16Array": true, "Float32Array": true, "Float64Array": true,
+	"Function": true, "Infinity": true, "Int16Array": true, "Int32Array": true, "Int8Array": true,
+	"Intl": true, "Iterator": true, "JSON": true, "Map": true, "Math": true, "NaN": true,
+	"Number": true, "Object": true, "Promise": true, "Proxy": true, "RangeError": true,
+	"ReferenceError": true, "Reflect": true, "RegExp": true, "Set": true, "SharedArrayBuffer": true,
+	"String": true, "SuppressedError": true, "Symbol": true, "SyntaxError": true, "Temporal": true,
+	"TypeError": true, "URIError": true, "Uint16Array": true, "Uint32Array": true, "Uint8Array": true,
+	"Uint8ClampedArray": true, "WeakMap": true, "WeakRef": true, "WeakSet": true, "constructor": true,
+	"decodeURI": true, "decodeURIComponent": true, "encodeURI": true, "encodeURIComponent": true,
+	"escape": true, "eval": true, "globalThis": true, "hasOwnProperty": true, "isFinite": true,
+	"isNaN": true, "isPrototypeOf": true, "parseFloat": true, "parseInt": true,
+	"propertyIsEnumerable": true, "toLocaleString": true, "toString": true, "undefined": true,
+	"unescape": true, "valueOf": true,
+}
+
+// isBuiltinGlobal reports whether an ESLint run under typescript-eslint's parser holds name as a
+// read-only global: ESLint's own ECMAScript globals, or a type the program's lib declares.
+func isBuiltinGlobal(ctx rule.Context, name string) bool {
+	return eslintLatestGlobals[name] || isLibraryTypeGlobal(ctx, name)
+}
+
+// upstreamVisitsScope reports whether upstream ever examines the scope a container stands for.
+//
+// It finds its scopes from eight listeners: the program, functions, arrow functions, blocks, `for`,
+// `for in`, `for of` and `switch`. A namespace body, a class static block and a catch clause own a
+// scope that none of those nodes is the block of, so upstream never walks their variables, and two
+// `var a` in one namespace, or two `let a` in one static block, are clean to it. Measured against
+// the installed rule, which the edge rows record.
+func upstreamVisitsScope(container *ast.Node) bool {
+	if container == nil {
+		return true
+	}
+	switch container.Kind {
+	case ast.KindModuleDeclaration, ast.KindClassStaticBlockDeclaration, ast.KindCatchClause:
+		return false
+	case ast.KindBlock:
+		return container.Parent == nil || container.Parent.Kind != ast.KindClassStaticBlockDeclaration
+	}
+	return true
+}
+
+// isLibraryTypeGlobal reports whether the program's standard library declares name as a type, which
+// is what typescript-eslint's scope manager seeds the global scope with.
+//
+// Read through the global symbol rather than a list of the lib files, which would be a read of other
+// files that no findings key covers. The checker merges lib files into the globals first, and when a
+// script's declaration conflicts with a lib one, `mergeSymbol` reports it and keeps the lib's symbol,
+// so a lib declaration is on the global whether the user's merged into it or not.
+//
+// The kinds are the ones the scope manager's lib generator keeps, the type variables: a
+// `declare var NaN` or a `declare function parseInt` alone is a value with no type and is not a
+// builtin to upstream, while `interface Object` beside `declare var Object` is.
+func isLibraryTypeGlobal(ctx rule.Context, name string) bool {
+	symbol := ctx.TypeChecker.GetGlobalSymbol(name, ast.SymbolFlagsAll, nil)
+	if symbol == nil {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		switch declaration.Kind {
+		case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration, ast.KindClassDeclaration,
+			ast.KindEnumDeclaration, ast.KindModuleDeclaration:
+		default:
+			continue
+		}
+		if file := ast.GetSourceFileOfNode(declaration); file != nil && ctx.Program.IsSourceFileDefaultLibrary(file.Path()) {
+			return true
+		}
+	}
+	return false
 }
 
 // scopedName identifies one name inside one scope.
@@ -261,9 +423,10 @@ type scopedName struct {
 	name      string
 }
 
-// redeclarationsToReport applies upstream's merge arithmetic to one group and returns the
-// declarations that should report, which is every one after the first that survives the exemptions.
-func redeclarationsToReport(declarations []*ast.Node, settings NoRedeclareOptions) []*ast.Node {
+// survivingDeclarations applies upstream's merge arithmetic to one group and returns the syntax
+// declarations upstream yields for it, in source order. With no builtin ahead of them every one after
+// the first reports; with one, every one does.
+func survivingDeclarations(declarations []*ast.Node, settings NoRedeclareOptions) []*ast.Node {
 	// Overload signatures are not declarations for this rule's purposes. Upstream filters its
 	// `TSDeclareFunction` nodes before counting, so a function with two signatures and one body is
 	// a single declaration rather than three.
@@ -274,30 +437,20 @@ func redeclarationsToReport(declarations []*ast.Node, settings NoRedeclareOption
 		}
 		considered = append(considered, declaration)
 	}
-	// A cost guard rather than a discrimination, and measured as one: neutralising it survives the
-	// whole corpus because every path below returns `slice[1:]`, which is already empty for a group
-	// of one, so no input can distinguish the two versions. Kept because it skips the merge
-	// arithmetic for the overwhelmingly common case of a name declared once, and the inverse
-	// mutation, widening it to swallow real groups, fails 38 lines, so the statement is reached and
-	// the fixtures do see it.
-	if len(considered) < 2 {
-		return nil
-	}
 
-	if settings.IgnoreDeclarationMerge {
+	// A discrimination since builtinGlobals, where it used to be only a cost guard. Upstream applies
+	// the exemption to more than one declaration only, so a lone `interface Window {}` in a script is
+	// yielded and reports against the lib's, where the merge sets would call one interface exempt.
+	if settings.IgnoreDeclarationMerge && len(considered) > 1 {
 		if exempt, primaries := mergeExemption(considered); exempt {
-			// Every declaration merges legitimately, so nothing reports.
-			if primaries == nil {
-				return nil
-			}
-			// More than one declaration of the merge set's primary kind, so those report and the
-			// legitimate merge partners beside them do not. The first primary is the one being
-			// redeclared, so it is not itself a finding.
-			return primaries[1:]
+			// Every declaration merges legitimately and nothing is yielded, or more than one
+			// declaration of the merge set's primary kind is, and the legitimate merge partners
+			// beside them are not.
+			return primaries
 		}
 	}
 
-	return considered[1:]
+	return considered
 }
 
 // mergeExemption reports whether a group is one of TypeScript's legitimate declaration merges, and
@@ -384,23 +537,70 @@ var mergeSets = []mergeSet{
 //
 // The kinds are the ones that can collide. A parameter and a class member are deliberately absent:
 // a parameter belongs to the function's own scope where upstream's scope manager puts it too, and a
-// member belongs to the class rather than to any scope this rule partitions. A binding pattern's
-// elements are absent for a different reason, and it is a divergence worth naming: upstream reports
-// `var { a = 0, b: Object = 0 } = {};` against an earlier `var a;`, so a destructured name IS a
-// declaration to it. Reproducing that needs the binding pattern walked into, which is reachable,
-// and it is left out here only because every corpus case exercising it also carries the
-// `builtinGlobals` option and could not be asserted either way.
+// member belongs to the class rather than to any scope this rule partitions. A binding element counts
+// when its pattern belongs to a variable declaration, since upstream reports `var { a = 0 } = {};`
+// against an earlier `var a;`, and not when it belongs to a parameter.
 func redeclarableName(node *ast.Node) string {
 	switch node.Kind {
 	case ast.KindClassDeclaration, ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration,
 		ast.KindEnumDeclaration, ast.KindModuleDeclaration, ast.KindFunctionDeclaration,
 		ast.KindVariableDeclaration:
-		name := node.Name()
-		if name != nil && ast.IsIdentifier(name) {
-			return name.Text()
+	case ast.KindBindingElement:
+		if bindingRoot(node).Kind != ast.KindVariableDeclaration {
+			return ""
 		}
+	default:
+		return ""
+	}
+	name := node.Name()
+	if name != nil && ast.IsIdentifier(name) {
+		return name.Text()
 	}
 	return ""
+}
+
+// bindingRoot walks up from a binding element through its patterns to the declaration that owns
+// them: a variable declaration or a parameter.
+func bindingRoot(node *ast.Node) *ast.Node {
+	current := node
+	for current.Parent != nil && (current.Kind == ast.KindBindingElement || ast.IsBindingPattern(current)) {
+		current = current.Parent
+	}
+	return current
+}
+
+// bindsIntoFunctionScope reports whether a declaration is a `var`, or a name destructured by one,
+// which hoists out of the blocks around it.
+//
+// The test is the declaration's own flags, read through its list and patterns: a `let`, `const` or
+// `using` is block-scoped, and so is a catch clause's variable, which TypeScript spells as a variable
+// declaration too.
+func bindsIntoFunctionScope(node *ast.Node) bool {
+	if node.Kind != ast.KindVariableDeclaration && node.Kind != ast.KindBindingElement {
+		return false
+	}
+	return !ast.IsBlockOrCatchScoped(node)
+}
+
+// varScopeContainer returns the scope a `var` binds into: the nearest function, static block,
+// namespace or file.
+//
+// The key is the one a block-scoped declaration written directly in that scope's body gets from
+// nearestScopeContainer, so the two kinds still meet: a function's body block rather than the
+// function, and a namespace itself, since its module block owns no locals.
+func varScopeContainer(node *ast.Node) *ast.Node {
+	for current := node.Parent; current != nil; current = current.Parent {
+		switch {
+		case current.Kind == ast.KindSourceFile, current.Kind == ast.KindModuleDeclaration:
+			return current
+		case ast.IsFunctionLike(current), current.Kind == ast.KindClassStaticBlockDeclaration:
+			if body := current.Body(); body != nil && ast.IsLocalsContainer(body) {
+				return body
+			}
+			return current
+		}
+	}
+	return nil
 }
 
 // isFunctionOverloadSignature reports whether a function declaration is a signature with no body.

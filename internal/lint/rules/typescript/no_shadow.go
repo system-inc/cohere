@@ -48,8 +48,9 @@ var messageNoEnumShadow = rule.Message{
 // 20, ignoreFunctionTypeParameterNameValueShadow 19, ignoreTypeValueShadow 8, allow 1.
 //
 // `builtinGlobals` is not merely unported, it is not portable here: all of its cases need a
-// configured `globals` map, and this configuration declares none. That is the same wall
-// `no-redeclare` stopped at. The other four axes are later passes and each is a real analysis.
+// configured `globals` map, and this configuration declares none. (`no-redeclare` reads the
+// TypeScript lib's globals instead since #e1zk9s0, which this rule's pass will weigh.) The other four
+// axes are later passes and each is a real analysis.
 //
 // # The scope graph is the binder's, not one this rule builds
 //

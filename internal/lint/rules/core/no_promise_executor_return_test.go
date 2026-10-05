@@ -268,7 +268,7 @@ func TestNoPromiseExecutorReturnSpans(t *testing.T) {
 // The directive-comment one is worth naming separately because it is the case that FAILED rather
 // than merely being unexpressible: this port reports it, because `Promise` there does resolve to the
 // standard library and nothing reads the comment. Reproducing upstream's silence needs a
-// configured-globals layer, which is the same absence `no-redeclare` stopped on for `builtinGlobals`.
+// configured-globals layer, which cohere does not carry.
 //
 // Both are facts about the harness rather than about the rule, so hiding them inside a relaxed
 // rule would turn them into facts about the rule. What IS asserted here is the part that does not

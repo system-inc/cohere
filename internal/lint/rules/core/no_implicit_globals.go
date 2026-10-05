@@ -93,9 +93,9 @@ func DecodeNoImplicitGlobalsOptions(raw []byte) (any, error) {
 // Upstream also reports `assignmentToReadonlyGlobal` and `redeclarationOfReadonlyGlobal`, which
 // require knowing that a name is a read-only global. Both of its sources are eslint configuration
 // surfaces rather than anything in the tree: the `globals` config key, and the `/*global foo:readonly*/`
-// comment directive. `@typescript-eslint/no-redeclare` declined upstream's `builtinGlobals` option
-// here for exactly this reason, with a probe showing a local `var Object` SHADOWS rather than merges,
-// so resolution answers identically for a builtin and for an ordinary name.
+// comment directive. Under typescript-eslint's parser the TypeScript lib's types are read-only globals
+// as well, which `@typescript-eslint/no-redeclare`'s `builtinGlobals` reads since #e1zk9s0; these two
+// messages were not revisited there.
 //
 // The decline is pinned by `TestNoImplicitGlobalsDeclinesReadonlyGlobals` rather than left as
 // silence, and it costs 3 of upstream's failing cases outright plus every case carrying a directive.
