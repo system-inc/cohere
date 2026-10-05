@@ -3,6 +3,7 @@ package react
 import (
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -857,7 +858,24 @@ func (s *unstableNestedState) parentStatelessComponentOf(node *ast.Node) *ast.No
 // feeds it: an object key read as `KindIdentifier` and a JSX attribute name read as
 // `KindIdentifier`. A computed key or a namespaced attribute never reaches here, because both are
 // declined by kind at the call site rather than being stringified.
+//
+// `Run` is called once per file, so compiling here compiled the same pattern once per file: 179K
+// objects on a cold ahra run. A matcher depends only on its pattern, so each is compiled once and
+// kept in propNamePatternMatchers. Keyed by the pattern rather than held in one variable, because a
+// run can lint under more than one configuration.
 func compilePropNamePattern(pattern string) func(string) bool {
+	if cached, found := propNamePatternMatchers.Load(pattern); found {
+		return cached.(func(string) bool)
+	}
+	matcher, _ := propNamePatternMatchers.LoadOrStore(pattern, buildPropNamePattern(pattern))
+	return matcher.(func(string) bool)
+}
+
+// propNamePatternMatchers holds compilePropNamePattern's matcher for each pattern seen.
+var propNamePatternMatchers sync.Map
+
+// buildPropNamePattern compiles one pattern, for compilePropNamePattern to keep.
+func buildPropNamePattern(pattern string) func(string) bool {
 	var builder strings.Builder
 	builder.WriteString("^")
 	for _, character := range pattern {
