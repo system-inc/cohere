@@ -401,9 +401,8 @@ func (c *RunCache) Check(key string) error {
 	return c.CheckNoting(key, nil)
 }
 
-// CheckNoting is Check, noting in snapshot the identity of every file it statted, so the content pack can
-// validate against stats this run already took rather than take each again (#kdee854). A nil snapshot notes
-// nothing.
+// CheckNoting is Check, noting in snapshot what it found at every path it statted, so the build and the content
+// pack can use stats this run already took rather than take each again (#kdee854). A nil snapshot notes nothing.
 func (c *RunCache) CheckNoting(key string, snapshot *StatSnapshot) error {
 	if c == nil {
 		return fmt.Errorf("%w: no cache", ErrRunCacheMiss)
@@ -432,7 +431,7 @@ func (c *RunCache) ChangedInput() error {
 	return c.changedInput(nil)
 }
 
-// changedInput is ChangedInput, noting each file's identity in snapshot when it is not nil.
+// changedInput is ChangedInput, noting what each stat found in snapshot when it is not nil.
 func (c *RunCache) changedInput(snapshot *StatSnapshot) error {
 	workers := min(runtime.NumCPU(), 8)
 	var mutex sync.Mutex
@@ -465,12 +464,12 @@ func (c *RunCache) changedInput(snapshot *StatSnapshot) error {
 	return mismatch
 }
 
-// stillMatches compares one input against the filesystem now, noting a file's identity in snapshot, matching or
+// stillMatches compares one input against the filesystem now, noting what the stat found in snapshot, matching or
 // not: the stat is current either way.
 func (input RunCacheInput) stillMatches(snapshot *StatSnapshot) error {
 	information, err := os.Stat(input.Path)
-	if err == nil && snapshot != nil && !information.IsDir() {
-		snapshot.note(input.Path, information)
+	if snapshot != nil {
+		snapshot.note(input.Path, information, err)
 	}
 	if !input.Exists {
 		if err == nil {
