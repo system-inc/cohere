@@ -48,7 +48,7 @@ func TestPostDominatorFrontiersMatchTheChainWalk(t *testing.T) {
 		}
 	}
 
-	compared := 0
+	handWrittenCompared, corpusCompared := 0, 0
 	// handWrittenFunctions counts the hand-written sources' function-like nodes at any depth, from the parse
 	// alone, so a hand-written function that stops lowering is missed against a count Lower did not make.
 	handWrittenFunctions := 0
@@ -61,7 +61,8 @@ func TestPostDominatorFrontiersMatchTheChainWalk(t *testing.T) {
 			FileName: "/" + name,
 			Path:     tspath.Path("/" + name),
 		}, code, kind)
-		if _, isHandWritten := handWritten[name]; isHandWritten {
+		_, isHandWritten := handWritten[name]
+		if isHandWritten {
 			handWrittenFunctions += functionLikeCount(source.AsNode())
 		}
 		forEachFunctionLike(source.AsNode(), func(node *ast.Node) {
@@ -70,7 +71,11 @@ func TestPostDominatorFrontiersMatchTheChainWalk(t *testing.T) {
 				if function == nil {
 					return
 				}
-				compared++
+				if isHandWritten {
+					handWrittenCompared++
+				} else {
+					corpusCompared++
+				}
 				r := &reactivity{function: function}
 				got := r.postDominatorFrontiers()
 				want := chainWalkFrontiers(function)
@@ -85,18 +90,19 @@ func TestPostDominatorFrontiersMatchTheChainWalk(t *testing.T) {
 			compare(Lower(node, nil))
 		})
 	}
-	// With the corpus, a count under 20 means the corpus parsed to almost nothing. Without it (its subtest
-	// skipped, naming the variable), the hand-written sources are all there is, and every function in them
-	// must compare. This required 20 on every machine, so it failed wherever the Structure checkout was
-	// absent, until #sycrdr6.
-	minimum := handWrittenFunctions
-	if paths != nil {
-		minimum = 20
+	// Two floors, counted apart so neither hides behind the other. Every hand-written function must compare,
+	// with or without the corpus: a total would let one that stops lowering hide behind the corpus's
+	// thousands. With the corpus, it must add at least 20 of its own, or it parsed to almost nothing. Without
+	// it, its subtest skipped naming the variable. This used to require 20 in total on every machine, so it
+	// failed wherever the Structure checkout was absent, until #sycrdr6.
+	if handWrittenCompared < handWrittenFunctions {
+		t.Fatalf("compared %d of the %d hand-written functions, so the rest stopped lowering", handWrittenCompared,
+			handWrittenFunctions)
 	}
-	if compared < minimum {
-		t.Fatalf("compared only %d functions, so this proved little", compared)
+	if paths != nil && corpusCompared < 20 {
+		t.Fatalf("compared only %d corpus functions, so the corpus proved little", corpusCompared)
 	}
-	t.Logf("compared %d functions", compared)
+	t.Logf("compared %d hand-written and %d corpus functions", handWrittenCompared, corpusCompared)
 }
 
 // functionLikeCount is how many function-like nodes a parsed source holds, at any depth.
