@@ -74,99 +74,99 @@ func runStrictIn(t *testing.T, fileName string, testCase strictCase) rule_testin
 // comment. Both are covered by their own tests below.
 func strictFiresCases() []strictCase {
 	return []strictCase{
-		{"\"use strict\"; foo();", StrictOptions{Mode: StrictNever}, []string{"never"}, ""},
-		{"function foo() { 'use strict'; return; }", StrictOptions{Mode: StrictNever}, []string{"never"}, ""},
-		{"var foo = function() { 'use strict'; return; };", StrictOptions{Mode: StrictNever}, []string{"never"}, ""},
-		{"function foo() { return function() { 'use strict'; return; }; }", StrictOptions{Mode: StrictNever}, []string{"never"}, ""},
-		{"'use strict'; function foo() { \"use strict\"; return; }", StrictOptions{Mode: StrictNever}, []string{"never", "never"}, ""},
-		{"foo();", StrictOptions{Mode: StrictGlobal}, []string{"global"}, ""},
-		{"/* license */\nfunction foo() {}\nfunction bar() {}\n/* end */", StrictOptions{Mode: StrictGlobal}, []string{"global"}, ""},
-		{"function foo() { 'use strict'; return; }", StrictOptions{Mode: StrictGlobal}, []string{"global", "global"}, ""},
-		{"var foo = function() { 'use strict'; return; }", StrictOptions{Mode: StrictGlobal}, []string{"global", "global"}, ""},
-		{"var foo = () => { 'use strict'; return () => 1; }", StrictOptions{Mode: StrictGlobal}, []string{"global", "global"}, ""},
-		{"'use strict'; function foo() { 'use strict'; return; }", StrictOptions{Mode: StrictGlobal}, []string{"global"}, ""},
-		{"'use strict'; var foo = function() { 'use strict'; return; };", StrictOptions{Mode: StrictGlobal}, []string{"global"}, ""},
-		{"'use strict'; 'use strict'; foo();", StrictOptions{Mode: StrictGlobal}, []string{"multiple"}, "'use strict';  foo();"},
-		{"'use strict'; foo();", StrictOptions{Mode: StrictFunction}, []string{"function"}, ""},
-		{"'use strict'; (function() { 'use strict'; return true; }());", StrictOptions{Mode: StrictFunction}, []string{"function"}, ""},
-		{"(function() { 'use strict'; function f() { 'use strict'; return } return true; }());", StrictOptions{Mode: StrictFunction}, []string{"unnecessary"}, "(function() { 'use strict'; function f() {  return } return true; }());"},
-		{"(function() { return true; }());", StrictOptions{Mode: StrictFunction}, []string{"function"}, ""},
-		{"(() => { return true; })();", StrictOptions{Mode: StrictFunction}, []string{"function"}, ""},
-		{"(() => true)();", StrictOptions{Mode: StrictFunction}, []string{"function"}, ""},
-		{"var foo = function() { foo(); 'use strict'; return; }; function bar() { foo(); 'use strict'; }", StrictOptions{Mode: StrictFunction}, []string{"function", "function"}, ""},
-		{"function foo() { 'use strict'; 'use strict'; return; }", StrictOptions{Mode: StrictFunction}, []string{"multiple"}, "function foo() { 'use strict';  return; }"},
-		{"var foo = function() { 'use strict'; 'use strict'; return; }", StrictOptions{Mode: StrictFunction}, []string{"multiple"}, "var foo = function() { 'use strict';  return; }"},
-		{"function foo() { return function() { 'use strict'; return; }; }", StrictOptions{Mode: StrictFunction}, []string{"function"}, ""},
-		{"var foo = function() { function bar() { 'use strict'; return; } return; }", StrictOptions{Mode: StrictFunction}, []string{"function"}, ""},
-		{"function foo() { 'use strict'; return; } var bar = function() { return; };", StrictOptions{Mode: StrictFunction}, []string{"function"}, ""},
-		{"var foo = function() { 'use strict'; return; }; function bar() { return; };", StrictOptions{Mode: StrictFunction}, []string{"function"}, ""},
-		{"function foo() { 'use strict'; return function() { 'use strict'; 'use strict'; return; }; }", StrictOptions{Mode: StrictFunction}, []string{"unnecessary", "multiple"}, "function foo() { 'use strict'; return function() {   return; }; }"},
-		{"var foo = function() { 'use strict'; function bar() { 'use strict'; 'use strict'; return; } }", StrictOptions{Mode: StrictFunction}, []string{"unnecessary", "multiple"}, "var foo = function() { 'use strict'; function bar() {   return; } }"},
-		{"var foo = () => { return; };", StrictOptions{Mode: StrictFunction}, []string{"function"}, ""},
-		{"class A { constructor() { \"use strict\"; } }", StrictOptions{Mode: StrictFunction}, []string{"unnecessaryInClasses"}, "class A { constructor() {  } }"},
-		{"class A { foo() { \"use strict\"; } }", StrictOptions{Mode: StrictFunction}, []string{"unnecessaryInClasses"}, "class A { foo() {  } }"},
-		{"class A { foo() { function bar() { \"use strict\"; } } }", StrictOptions{Mode: StrictFunction}, []string{"unnecessaryInClasses"}, "class A { foo() { function bar() {  } } }"},
-		{"class A { field = () => { \"use strict\"; } }", StrictOptions{Mode: StrictFunction}, []string{"unnecessaryInClasses"}, "class A { field = () => {  } }"},
-		{"class A { field = function() { \"use strict\"; } }", StrictOptions{Mode: StrictFunction}, []string{"unnecessaryInClasses"}, "class A { field = function() {  } }"},
-		{"'use strict'; function foo() { return; }", StrictOptions{Mode: StrictSafe}, []string{"function", "function"}, ""},
+		{"\"use strict\"; foo();", StrictNever, []string{"never"}, ""},
+		{"function foo() { 'use strict'; return; }", StrictNever, []string{"never"}, ""},
+		{"var foo = function() { 'use strict'; return; };", StrictNever, []string{"never"}, ""},
+		{"function foo() { return function() { 'use strict'; return; }; }", StrictNever, []string{"never"}, ""},
+		{"'use strict'; function foo() { \"use strict\"; return; }", StrictNever, []string{"never", "never"}, ""},
+		{"foo();", StrictGlobal, []string{"global"}, ""},
+		{"/* license */\nfunction foo() {}\nfunction bar() {}\n/* end */", StrictGlobal, []string{"global"}, ""},
+		{"function foo() { 'use strict'; return; }", StrictGlobal, []string{"global", "global"}, ""},
+		{"var foo = function() { 'use strict'; return; }", StrictGlobal, []string{"global", "global"}, ""},
+		{"var foo = () => { 'use strict'; return () => 1; }", StrictGlobal, []string{"global", "global"}, ""},
+		{"'use strict'; function foo() { 'use strict'; return; }", StrictGlobal, []string{"global"}, ""},
+		{"'use strict'; var foo = function() { 'use strict'; return; };", StrictGlobal, []string{"global"}, ""},
+		{"'use strict'; 'use strict'; foo();", StrictGlobal, []string{"multiple"}, "'use strict';  foo();"},
+		{"'use strict'; foo();", StrictFunction, []string{"function"}, ""},
+		{"'use strict'; (function() { 'use strict'; return true; }());", StrictFunction, []string{"function"}, ""},
+		{"(function() { 'use strict'; function f() { 'use strict'; return } return true; }());", StrictFunction, []string{"unnecessary"}, "(function() { 'use strict'; function f() {  return } return true; }());"},
+		{"(function() { return true; }());", StrictFunction, []string{"function"}, ""},
+		{"(() => { return true; })();", StrictFunction, []string{"function"}, ""},
+		{"(() => true)();", StrictFunction, []string{"function"}, ""},
+		{"var foo = function() { foo(); 'use strict'; return; }; function bar() { foo(); 'use strict'; }", StrictFunction, []string{"function", "function"}, ""},
+		{"function foo() { 'use strict'; 'use strict'; return; }", StrictFunction, []string{"multiple"}, "function foo() { 'use strict';  return; }"},
+		{"var foo = function() { 'use strict'; 'use strict'; return; }", StrictFunction, []string{"multiple"}, "var foo = function() { 'use strict';  return; }"},
+		{"function foo() { return function() { 'use strict'; return; }; }", StrictFunction, []string{"function"}, ""},
+		{"var foo = function() { function bar() { 'use strict'; return; } return; }", StrictFunction, []string{"function"}, ""},
+		{"function foo() { 'use strict'; return; } var bar = function() { return; };", StrictFunction, []string{"function"}, ""},
+		{"var foo = function() { 'use strict'; return; }; function bar() { return; };", StrictFunction, []string{"function"}, ""},
+		{"function foo() { 'use strict'; return function() { 'use strict'; 'use strict'; return; }; }", StrictFunction, []string{"unnecessary", "multiple"}, "function foo() { 'use strict'; return function() {   return; }; }"},
+		{"var foo = function() { 'use strict'; function bar() { 'use strict'; 'use strict'; return; } }", StrictFunction, []string{"unnecessary", "multiple"}, "var foo = function() { 'use strict'; function bar() {   return; } }"},
+		{"var foo = () => { return; };", StrictFunction, []string{"function"}, ""},
+		{"class A { constructor() { \"use strict\"; } }", StrictFunction, []string{"unnecessaryInClasses"}, "class A { constructor() {  } }"},
+		{"class A { foo() { \"use strict\"; } }", StrictFunction, []string{"unnecessaryInClasses"}, "class A { foo() {  } }"},
+		{"class A { foo() { function bar() { \"use strict\"; } } }", StrictFunction, []string{"unnecessaryInClasses"}, "class A { foo() { function bar() {  } } }"},
+		{"class A { field = () => { \"use strict\"; } }", StrictFunction, []string{"unnecessaryInClasses"}, "class A { field = () => {  } }"},
+		{"class A { field = function() { \"use strict\"; } }", StrictFunction, []string{"unnecessaryInClasses"}, "class A { field = function() {  } }"},
+		{"'use strict'; function foo() { return; }", StrictSafe, []string{"function", "function"}, ""},
 		{"'use strict'; function foo() { return; }", nil, []string{"function", "function"}, ""},
 		{"function foo() { return; }", nil, []string{"function"}, ""},
 		{"function foo(a = 0) { 'use strict' }", nil, []string{"nonSimpleParameterList"}, ""},
 		{"(function() { 'use strict'; function foo(a = 0) { 'use strict' } }())", nil, []string{"nonSimpleParameterList"}, ""},
-		{"function foo(a = 0) { 'use strict' }", StrictOptions{Mode: StrictNever}, []string{"nonSimpleParameterList"}, ""},
-		{"function foo(a = 0) { 'use strict' }", StrictOptions{Mode: StrictGlobal}, []string{"global", "nonSimpleParameterList"}, ""},
-		{"'use strict'; function foo(a = 0) { 'use strict' }", StrictOptions{Mode: StrictGlobal}, []string{"nonSimpleParameterList"}, ""},
-		{"function foo(a = 0) { 'use strict' }", StrictOptions{Mode: StrictFunction}, []string{"nonSimpleParameterList"}, ""},
-		{"(function() { 'use strict'; function foo(a = 0) { 'use strict' } }())", StrictOptions{Mode: StrictFunction}, []string{"nonSimpleParameterList"}, ""},
-		{"function foo(a = 0) { }", StrictOptions{Mode: StrictFunction}, []string{"wrap"}, ""},
-		{"(function() { function foo(a = 0) { } }())", StrictOptions{Mode: StrictFunction}, []string{"function"}, ""},
-		{"'use strict'; class C { static { function foo() { \n'use strict'; } } }", StrictOptions{Mode: StrictGlobal}, []string{"global"}, ""},
-		{"class C { static { function foo() { \n'use strict'; } } }", StrictOptions{Mode: StrictNever}, []string{"never"}, ""},
-		{"function foo() {'use strict'; class C { static { function foo() { \n'use strict'; } } } }", StrictOptions{Mode: StrictFunction}, []string{"unnecessary"}, "function foo() {'use strict'; class C { static { function foo() { \n } } } }"},
-		{"class C { static { function foo() { \n'use strict'; } } }", StrictOptions{Mode: StrictFunction}, []string{"unnecessaryInClasses"}, "class C { static { function foo() { \n } } }"},
-		{"class C { static { function foo() { \n'use strict';\n'use strict'; } } }", StrictOptions{Mode: StrictFunction}, []string{"unnecessaryInClasses", "multiple"}, "class C { static { function foo() { \n\n } } }"},
+		{"function foo(a = 0) { 'use strict' }", StrictNever, []string{"nonSimpleParameterList"}, ""},
+		{"function foo(a = 0) { 'use strict' }", StrictGlobal, []string{"global", "nonSimpleParameterList"}, ""},
+		{"'use strict'; function foo(a = 0) { 'use strict' }", StrictGlobal, []string{"nonSimpleParameterList"}, ""},
+		{"function foo(a = 0) { 'use strict' }", StrictFunction, []string{"nonSimpleParameterList"}, ""},
+		{"(function() { 'use strict'; function foo(a = 0) { 'use strict' } }())", StrictFunction, []string{"nonSimpleParameterList"}, ""},
+		{"function foo(a = 0) { }", StrictFunction, []string{"wrap"}, ""},
+		{"(function() { function foo(a = 0) { } }())", StrictFunction, []string{"function"}, ""},
+		{"'use strict'; class C { static { function foo() { \n'use strict'; } } }", StrictGlobal, []string{"global"}, ""},
+		{"class C { static { function foo() { \n'use strict'; } } }", StrictNever, []string{"never"}, ""},
+		{"function foo() {'use strict'; class C { static { function foo() { \n'use strict'; } } } }", StrictFunction, []string{"unnecessary"}, "function foo() {'use strict'; class C { static { function foo() { \n } } } }"},
+		{"class C { static { function foo() { \n'use strict'; } } }", StrictFunction, []string{"unnecessaryInClasses"}, "class C { static { function foo() { \n } } }"},
+		{"class C { static { function foo() { \n'use strict';\n'use strict'; } } }", StrictFunction, []string{"unnecessaryInClasses", "multiple"}, "class C { static { function foo() { \n\n } } }"},
 	}
 }
 
 func strictSilentCases() []strictCase {
 	return []strictCase{
-		{"foo();", StrictOptions{Mode: StrictNever}, nil, ""},
-		{"function foo() { return; }", StrictOptions{Mode: StrictNever}, nil, ""},
-		{"var foo = function() { return; };", StrictOptions{Mode: StrictNever}, nil, ""},
-		{"foo(); 'use strict';", StrictOptions{Mode: StrictNever}, nil, ""},
-		{"function foo() { bar(); 'use strict'; return; }", StrictOptions{Mode: StrictNever}, nil, ""},
-		{"var foo = function() { { 'use strict'; } return; };", StrictOptions{Mode: StrictNever}, nil, ""},
-		{"(function() { bar('use strict'); return; }());", StrictOptions{Mode: StrictNever}, nil, ""},
-		{"var fn = x => 1;", StrictOptions{Mode: StrictNever}, nil, ""},
-		{"var fn = x => { return; };", StrictOptions{Mode: StrictNever}, nil, ""},
-		{"// Intentionally empty", StrictOptions{Mode: StrictGlobal}, nil, ""},
-		{"\"use strict\"; foo();", StrictOptions{Mode: StrictGlobal}, nil, ""},
-		{"'use strict'; function foo() { return; }", StrictOptions{Mode: StrictGlobal}, nil, ""},
-		{"'use strict'; var foo = function() { return; };", StrictOptions{Mode: StrictGlobal}, nil, ""},
-		{"'use strict'; function foo() { bar(); 'use strict'; return; }", StrictOptions{Mode: StrictGlobal}, nil, ""},
-		{"'use strict'; var foo = function() { bar(); 'use strict'; return; };", StrictOptions{Mode: StrictGlobal}, nil, ""},
-		{"'use strict'; function foo() { return function() { bar(); 'use strict'; return; }; }", StrictOptions{Mode: StrictGlobal}, nil, ""},
-		{"'use strict'; var foo = () => { return () => { bar(); 'use strict'; return; }; }", StrictOptions{Mode: StrictGlobal}, nil, ""},
-		{"function foo() { 'use strict'; return; }", StrictOptions{Mode: StrictFunction}, nil, ""},
-		{"var foo = function() { 'use strict'; return; }", StrictOptions{Mode: StrictFunction}, nil, ""},
-		{"function foo() { 'use strict'; return; } var bar = function() { 'use strict'; bar(); };", StrictOptions{Mode: StrictFunction}, nil, ""},
-		{"var foo = function() { 'use strict'; function bar() { return; } bar(); };", StrictOptions{Mode: StrictFunction}, nil, ""},
-		{"var foo = () => { 'use strict'; var bar = () => 1; bar(); };", StrictOptions{Mode: StrictFunction}, nil, ""},
-		{"class A { constructor() { } }", StrictOptions{Mode: StrictFunction}, nil, ""},
-		{"class A { foo() { } }", StrictOptions{Mode: StrictFunction}, nil, ""},
-		{"class A { foo() { function bar() { } } }", StrictOptions{Mode: StrictFunction}, nil, ""},
-		{"(function() { 'use strict'; function foo(a = 0) { } }())", StrictOptions{Mode: StrictFunction}, nil, ""},
-		{"function foo() { 'use strict'; return; }", StrictOptions{Mode: StrictSafe}, nil, ""},
+		{"foo();", StrictNever, nil, ""},
+		{"function foo() { return; }", StrictNever, nil, ""},
+		{"var foo = function() { return; };", StrictNever, nil, ""},
+		{"foo(); 'use strict';", StrictNever, nil, ""},
+		{"function foo() { bar(); 'use strict'; return; }", StrictNever, nil, ""},
+		{"var foo = function() { { 'use strict'; } return; };", StrictNever, nil, ""},
+		{"(function() { bar('use strict'); return; }());", StrictNever, nil, ""},
+		{"var fn = x => 1;", StrictNever, nil, ""},
+		{"var fn = x => { return; };", StrictNever, nil, ""},
+		{"// Intentionally empty", StrictGlobal, nil, ""},
+		{"\"use strict\"; foo();", StrictGlobal, nil, ""},
+		{"'use strict'; function foo() { return; }", StrictGlobal, nil, ""},
+		{"'use strict'; var foo = function() { return; };", StrictGlobal, nil, ""},
+		{"'use strict'; function foo() { bar(); 'use strict'; return; }", StrictGlobal, nil, ""},
+		{"'use strict'; var foo = function() { bar(); 'use strict'; return; };", StrictGlobal, nil, ""},
+		{"'use strict'; function foo() { return function() { bar(); 'use strict'; return; }; }", StrictGlobal, nil, ""},
+		{"'use strict'; var foo = () => { return () => { bar(); 'use strict'; return; }; }", StrictGlobal, nil, ""},
+		{"function foo() { 'use strict'; return; }", StrictFunction, nil, ""},
+		{"var foo = function() { 'use strict'; return; }", StrictFunction, nil, ""},
+		{"function foo() { 'use strict'; return; } var bar = function() { 'use strict'; bar(); };", StrictFunction, nil, ""},
+		{"var foo = function() { 'use strict'; function bar() { return; } bar(); };", StrictFunction, nil, ""},
+		{"var foo = () => { 'use strict'; var bar = () => 1; bar(); };", StrictFunction, nil, ""},
+		{"class A { constructor() { } }", StrictFunction, nil, ""},
+		{"class A { foo() { } }", StrictFunction, nil, ""},
+		{"class A { foo() { function bar() { } } }", StrictFunction, nil, ""},
+		{"(function() { 'use strict'; function foo(a = 0) { } }())", StrictFunction, nil, ""},
+		{"function foo() { 'use strict'; return; }", StrictSafe, nil, ""},
 		{"function foo() { 'use strict'; return; }", nil, nil, ""},
-		{"'use strict'; class C { static { foo; } }", StrictOptions{Mode: StrictGlobal}, nil, ""},
-		{"'use strict'; class C { static { 'use strict'; } }", StrictOptions{Mode: StrictGlobal}, nil, ""},
-		{"'use strict'; class C { static { 'use strict'; 'use strict'; } }", StrictOptions{Mode: StrictGlobal}, nil, ""},
-		{"class C { static { foo; } }", StrictOptions{Mode: StrictFunction}, nil, ""},
-		{"class C { static { 'use strict'; } }", StrictOptions{Mode: StrictFunction}, nil, ""},
-		{"class C { static { 'use strict'; 'use strict'; } }", StrictOptions{Mode: StrictFunction}, nil, ""},
-		{"class C { static { foo; } }", StrictOptions{Mode: StrictNever}, nil, ""},
-		{"class C { static { 'use strict'; } }", StrictOptions{Mode: StrictNever}, nil, ""},
-		{"class C { static { 'use strict'; 'use strict'; } }", StrictOptions{Mode: StrictNever}, nil, ""},
+		{"'use strict'; class C { static { foo; } }", StrictGlobal, nil, ""},
+		{"'use strict'; class C { static { 'use strict'; } }", StrictGlobal, nil, ""},
+		{"'use strict'; class C { static { 'use strict'; 'use strict'; } }", StrictGlobal, nil, ""},
+		{"class C { static { foo; } }", StrictFunction, nil, ""},
+		{"class C { static { 'use strict'; } }", StrictFunction, nil, ""},
+		{"class C { static { 'use strict'; 'use strict'; } }", StrictFunction, nil, ""},
+		{"class C { static { foo; } }", StrictNever, nil, ""},
+		{"class C { static { 'use strict'; } }", StrictNever, nil, ""},
+		{"class C { static { 'use strict'; 'use strict'; } }", StrictNever, nil, ""},
 	}
 }
 
@@ -273,27 +273,26 @@ func TestStrictDeclinesToRepair(t *testing.T) {
 func TestStrictReadsTypeScriptParameterLists(t *testing.T) {
 	t.Parallel()
 
-	never := StrictOptions{Mode: StrictNever}
 	cases := []strictCase{
 		// An annotation and a return type leave the parameter simple, so the directive is merely
 		// redundant rather than a syntax error, and the repair deletes it.
-		{"function f(a: string): void { 'use strict'; }", never, []string{"implied"},
+		{"function f(a: string): void { 'use strict'; }", StrictNever, []string{"implied"},
 			"function f(a: string): void {  }"},
-		{"function f<T>(a: T): T { 'use strict'; return a; }", never, []string{"implied"},
+		{"function f<T>(a: T): T { 'use strict'; return a; }", StrictNever, []string{"implied"},
 			"function f<T>(a: T): T {  return a; }"},
 		// An optional marker likewise.
-		{"function f(a?: string) { 'use strict'; }", never, []string{"implied"},
+		{"function f(a?: string) { 'use strict'; }", StrictNever, []string{"implied"},
 			"function f(a?: string) {  }"},
 		// A method with an annotated parameter, reached through the class arm.
-		{"class A { foo(a: string): void { 'use strict'; } }", never, []string{"implied"},
+		{"class A { foo(a: string): void { 'use strict'; } }", StrictNever, []string{"implied"},
 			"class A { foo(a: string): void {  } }"},
 		// The three shapes that genuinely make the directive a syntax error, each carrying a type
 		// annotation as well so the annotation is not what decides it.
-		{"function f(a: string = 'x') { 'use strict'; }", never,
+		{"function f(a: string = 'x') { 'use strict'; }", StrictNever,
 			[]string{"nonSimpleParameterList"}, ""},
-		{"function f(...rest: string[]) { 'use strict'; }", never,
+		{"function f(...rest: string[]) { 'use strict'; }", StrictNever,
 			[]string{"nonSimpleParameterList"}, ""},
-		{"function f({a}: {a: number}) { 'use strict'; }", never,
+		{"function f({a}: {a: number}) { 'use strict'; }", StrictNever,
 			[]string{"nonSimpleParameterList"}, ""},
 	}
 	for _, testCase := range cases {
@@ -326,7 +325,7 @@ func TestStrictReadsATypeScriptFileAsImpliedStrict(t *testing.T) {
 			t.Parallel()
 			testCase := strictCase{sourceText: script}
 			if mode != "" {
-				testCase.options = StrictOptions{Mode: mode}
+				testCase.options = mode
 			}
 			rule_testing.ExpectClean(t, runStrictIn(t, strictTypeScriptFile, testCase))
 		})
@@ -337,11 +336,11 @@ func TestStrictReadsATypeScriptFileAsImpliedStrict(t *testing.T) {
 	// through the same reportAll as `never` and `module`.
 	cases := []strictCase{
 		{"'use strict';\nconst a: number = 1;", nil, []string{"implied"}, "\nconst a: number = 1;"},
-		{"'use strict';\nconst a: number = 1;", StrictOptions{Mode: StrictGlobal},
+		{"'use strict';\nconst a: number = 1;", StrictGlobal,
 			[]string{"implied"}, "\nconst a: number = 1;"},
-		{"'use strict'; 'use strict';\nconst a: number = 1;", StrictOptions{Mode: StrictGlobal},
+		{"'use strict'; 'use strict';\nconst a: number = 1;", StrictGlobal,
 			[]string{"implied", "implied"}, " \nconst a: number = 1;"},
-		{"function foo(): void { 'use strict'; 'use strict'; }", StrictOptions{Mode: StrictFunction},
+		{"function foo(): void { 'use strict'; 'use strict'; }", StrictFunction,
 			[]string{"implied", "implied"}, "function foo(): void {   }"},
 		// A module still wins, as upstream's Program listener has it: `module` is assigned after
 		// `implied`, so a TypeScript module says the more specific thing.
@@ -447,7 +446,7 @@ func TestStrictCollapsesEveryModeInAModule(t *testing.T) {
 		t.Run(string(mode), func(t *testing.T) {
 			t.Parallel()
 			result := runStrict(t, strictCase{sourceText: source,
-				options: StrictOptions{Mode: mode}})
+				options: mode})
 			rule_testing.ExpectFindings(t, result, "module")
 			rule_testing.ExpectFixedSource(t, result, " export const a = 1;")
 		})
@@ -498,27 +497,26 @@ func TestStrictHasNoImpliedMode(t *testing.T) {
 
 	// Upstream has no `implied` option either: `impliedStrict` is a parser feature, and here the
 	// file kind and the tsconfig stand in for it. An option spelling would be a second way to say
-	// the same thing that could disagree with the first.
-	for _, mode := range []string{"Safe", "Global", "Function", "Never", "Implied"} {
-		decoded, err := DecodeStrictOptions([]byte(`{"mode":"` + mode + `"}`))
-		if mode == "Implied" {
+	// the same thing that could disagree with the first. `module` is refused for the same reason:
+	// the file's own imports select it.
+	for _, mode := range []string{"safe", "global", "function", "never", "implied", "module"} {
+		_, err := DecodeStrictOptions([]byte(`"` + mode + `"`))
+		if mode == "implied" || mode == "module" {
 			if err == nil {
-				t.Errorf("mode %q decoded, but there is no implied mode to select", mode)
+				t.Errorf("mode %q decoded, but it is selected by the file, not the option", mode)
 			}
 			continue
 		}
 		if err != nil {
 			t.Errorf("mode %q should decode: %v", mode, err)
 		}
-		_ = decoded
 	}
 }
 
-// The decoder, which has no upstream counterpart.
+// The decoder takes upstream's option element exactly: one bare string from upstream's four.
 //
-// Upstream's option is a bare positional enum; ours is a named key in our own casing. Every arm of
-// the rule is selected by string equality, so an unrecognized spelling must fail rather than pick a
-// silent fifth behaviour of reporting nothing.
+// Every arm of the rule is selected by string equality, so an unrecognized spelling must fail rather
+// than pick a silent fifth behaviour of reporting nothing.
 func TestDecodeStrictOptions(t *testing.T) {
 	t.Parallel()
 
@@ -528,22 +526,45 @@ func TestDecodeStrictOptions(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if mode := decoded.(StrictOptions).Mode; mode != "" {
-			t.Errorf("mode came back %q, wanted the empty default", mode)
+		if mode := decoded.(StrictMode); mode != StrictSafe {
+			t.Errorf("mode came back %q, wanted upstream's default %q", mode, StrictSafe)
 		}
 	})
 
-	t.Run("upstream's lowercase spelling is rejected", func(t *testing.T) {
+	t.Run("upstream's bare string decodes to its mode", func(t *testing.T) {
+		t.Parallel()
+		decoded, err := DecodeStrictOptions([]byte(`"never"`))
+		if err != nil {
+			t.Fatalf("upstream's own `[\"error\", \"never\"]` was refused: %v", err)
+		}
+		if mode := decoded.(StrictMode); mode != StrictNever {
+			t.Errorf("mode came back %q, wanted %q", mode, StrictNever)
+		}
+	})
+
+	// The object form was this decoder's own invention and no ESLint version accepts it, so a config
+	// carrying it was never valid ESLint. Refusing it keeps one spelling for one setting.
+	t.Run("the object form is refused", func(t *testing.T) {
 		t.Parallel()
 		if _, err := DecodeStrictOptions([]byte(`{"mode":"never"}`)); err == nil {
-			t.Error("the lowercase spelling decoded; our modes are PascalCase")
+			t.Error(`{"mode":"never"} decoded; upstream's option is a bare string`)
+		}
+	})
+
+	// Upstream's enum is case-sensitive, so a PascalCase spelling is a typo rather than a synonym.
+	t.Run("another casing is rejected", func(t *testing.T) {
+		t.Parallel()
+		if _, err := DecodeStrictOptions([]byte(`"Never"`)); err == nil {
+			t.Error(`"Never" decoded; upstream spells it "never"`)
 		}
 	})
 
 	t.Run("an unknown mode is rejected", func(t *testing.T) {
 		t.Parallel()
-		if _, err := DecodeStrictOptions([]byte(`{"mode":"Sometimes"}`)); err == nil {
-			t.Error("an unrecognized mode decoded")
+		for _, raw := range []string{`"sometimes"`, `""`, `null`, `1`} {
+			if _, err := DecodeStrictOptions([]byte(raw)); err == nil {
+				t.Errorf("%s decoded", raw)
+			}
 		}
 	})
 }
@@ -568,18 +589,17 @@ func TestDecodeStrictOptions(t *testing.T) {
 func TestStrictStopsAtANonStrictDirective(t *testing.T) {
 	t.Parallel()
 
-	never := StrictOptions{Mode: StrictNever}
 	cases := []strictCase{
-		{"'use strict'; foo();", never, []string{"never"}, ""},
-		{"'use strict'; 'use asm'; foo();", never, []string{"never"}, ""},
+		{"'use strict'; foo();", StrictNever, []string{"never"}, ""},
+		{"'use strict'; 'use asm'; foo();", StrictNever, []string{"never"}, ""},
 		// The reproduced defect: silent because index 0 is a hole.
-		{"'use asm'; 'use strict'; foo();", never, nil, ""},
-		{"'a'; 'b'; 'use strict'; foo();", never, nil, ""},
+		{"'use asm'; 'use strict'; foo();", StrictNever, nil, ""},
+		{"'a'; 'b'; 'use strict'; foo();", StrictNever, nil, ""},
 		// A non-directive string does not open a prologue slot at all.
-		{"'use asm'; foo();", never, nil, ""},
+		{"'use asm'; foo();", StrictNever, nil, ""},
 		// The control: two real directives in a row are both reported, so the silence above is
 		// the hole rather than a rule that only ever reports one.
-		{"'use strict'; 'use strict'; foo();", never, []string{"never", "never"}, ""},
+		{"'use strict'; 'use strict'; foo();", StrictNever, []string{"never", "never"}, ""},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
@@ -613,12 +633,11 @@ func TestStrictStopsAtANonStrictDirective(t *testing.T) {
 func TestStrictSafeResolvesToFunctionForAScript(t *testing.T) {
 	t.Parallel()
 
-	safe := StrictOptions{Mode: StrictSafe}
 	// A script with a top-level function and no directive: Function mode reports, Global would
 	// have reported on the whole program instead, so the message id separates them.
 	rule_testing.ExpectFindings(t, runStrict(t, strictCase{
-		sourceText: "function foo() { return; }", options: safe}), "function")
+		sourceText: "function foo() { return; }", options: StrictSafe}), "function")
 	// And the CommonJS spelling resolves the same way here, which is the divergence itself.
 	rule_testing.ExpectFindings(t, runStrict(t, strictCase{
-		sourceText: "module.exports = function foo() { return; };", options: safe}), "function")
+		sourceText: "module.exports = function foo() { return; };", options: StrictSafe}), "function")
 }

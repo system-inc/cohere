@@ -252,8 +252,8 @@ func preferExponentiationOperatorFix(ctx rule.Context, node *ast.Node) (rule.Fix
 	if base == nil || exponent == nil {
 		return rule.Fix{}, false
 	}
-	baseText := preferExponentiationOperatorSourceText(ctx, base)
-	exponentText := preferExponentiationOperatorSourceText(ctx, exponent)
+	baseText := ctx.NodeText(base)
+	exponentText := ctx.NodeText(exponent)
 
 	if preferExponentiationOperatorBaseNeedsParentheses(base) {
 		baseText = "(" + baseText + ")"
@@ -291,12 +291,6 @@ func preferExponentiationOperatorFix(ctx rule.Context, node *ast.Node) (rule.Fix
 	}
 
 	return rule.ReplaceRange(core.NewTextRange(nodeRange.Pos(), node.End()), replacement), true
-}
-
-// preferExponentiationOperatorSourceText reads a node's own text without leading trivia.
-func preferExponentiationOperatorSourceText(ctx rule.Context, node *ast.Node) string {
-	span := rule.TokenRange(ctx.SourceFile, node)
-	return ctx.SourceFile.Text()[span.Pos():node.End()]
 }
 
 // preferExponentiationOperatorHasCommentInside answers whether a comment sits in a span.

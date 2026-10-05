@@ -40,14 +40,9 @@ func TestNoInvalidRegexpFires(t *testing.T) {
 		// is a syntax error there and a literal brace otherwise.
 		{"a pattern the u flag invalidates", "export const a = new RegExp('\\\\p{', 'u');\n"},
 
-		// The half of the option decision that a fixture can actually hold.
-		//
-		// Upstream takes `allowConstructorFlags`, and under `["a"]` this exact line is clean there.
-		// This port implements no option surface, so it must sit on upstream's default empty
-		// allow-list and report. That choice is invisible to every other case in this file, because
-		// they all exercise flags no allow-list would name; this one names the branch.
-		//
-		// If someone later adds the option and wires its default wrong, this is the case that fails.
+		// The default of `allowConstructorFlags`. Under `["a"]` this exact line is clean, and with
+		// nothing configured the allow-list is empty, so it must report. Every other case here
+		// exercises flags no allow-list would name; this one pins the unconfigured branch.
 		{"a flag only an allow-list could excuse", "export const a = new RegExp('.', 'a');\n"},
 	}
 	for _, testCase := range cases {
@@ -122,4 +117,83 @@ func TestNoInvalidRegexpAsksForTheGlobalAndLeavesVPatternsAlone(t *testing.T) {
 		"new RegExp('[');"), "invalidRegexp")
 	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoInvalidRegexp, noInvalidRegexpFile,
 		"new RegExp('.', 'vz');"), "invalidRegexp")
+}
+
+// allowConstructorFlags read the way upstream reads it: extra flags struck once each like the
+// language's, case-sensitive, joined across strings, and a language flag in the list changing nothing.
+// The rows are ESLint's own, so each one is a verdict upstream has already given.
+func TestNoInvalidRegexpHonorsAllowConstructorFlags(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		options    string
+		sourceText string
+		reports    bool
+	}{
+		{"an allowed flag alone", `{"allowConstructorFlags": ["a"]}`, "new RegExp('.', 'a');\n", false},
+		{"an allowed flag beside a valid one", `{"allowConstructorFlags": ["a"]}`, "new RegExp('.', 'ga');\n", false},
+		{"two allowed flags in any order", `{"allowConstructorFlags": ["a", "z"]}`, "new RegExp('.', 'zga');\n", false},
+		{"one string allowing two flags", `{"allowConstructorFlags": ["az"]}`, "new RegExp('.', 'za');\n", false},
+		{"an allowed flag with an unknown pattern", `{"allowConstructorFlags": ["a"]}`, "new RegExp(pattern, 'ga');\n", false},
+		{"an empty allow-list", `{"allowConstructorFlags": []}`, "new RegExp('.', 'a');\n", true},
+		{"an empty options object", `{}`, "new RegExp('.', 'a');\n", true},
+		{"a flag the list does not name", `{"allowConstructorFlags": ["a"]}`, "new RegExp('.', 'z');\n", true},
+		{"the other case of an allowed flag", `{"allowConstructorFlags": ["a"]}`, "RegExp('.', 'A');\n", true},
+		{"an allowed flag twice", `{"allowConstructorFlags": ["a"]}`, "new RegExp('.', 'aga');\n", true},
+		{"an allowed flag twice with a non-literal pattern", `{"allowConstructorFlags": ["a"]}`, "new RegExp(pattern, 'aa');\n", true},
+
+		// A language flag in the list is dropped rather than added a second time, so it is still
+		// struck once and a second copy is still a duplicate.
+		{"a language flag listed and doubled", `{"allowConstructorFlags": ["u"]}`, "new RegExp('.', 'uu');\n", true},
+
+		// An allowed flag carries no meaning into the pattern, so `\u{0}` is still read without `u`.
+		{"an allowed flag over a pattern only u accepts", `{"allowConstructorFlags": ["a"]}`, "new RegExp('\\\\u{0}*', 'a');\n", true},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			options, err := DecodeNoInvalidRegexpOptions([]byte(testCase.options))
+			if err != nil {
+				t.Fatalf("decoding %s: %v", testCase.options, err)
+			}
+			result := rule_testing.RunTypedWithOptions(t, NoInvalidRegexp, noInvalidRegexpFile, testCase.sourceText, options)
+			if testCase.reports {
+				rule_testing.ExpectFindings(t, result, "invalidRegexp")
+			} else {
+				rule_testing.ExpectClean(t, result)
+			}
+		})
+	}
+}
+
+// The decoder holds upstream's schema: an object with one array of unique strings and nothing else.
+func TestNoInvalidRegexpDecodesOnlyUpstreamsSchema(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		raw     string
+		refused bool
+	}{
+		{"an empty object", `{}`, false},
+		{"an empty list", `{"allowConstructorFlags": []}`, false},
+		{"a list of flags", `{"allowConstructorFlags": ["a", "z"]}`, false},
+		{"an unknown key", `{"allowConstructorFlag": ["a"]}`, true},
+		{"a key in the wrong case", `{"AllowConstructorFlags": ["a"]}`, true},
+		{"an item that is not a string", `{"allowConstructorFlags": [1]}`, true},
+		{"a repeated item", `{"allowConstructorFlags": ["a", "a"]}`, true},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := DecodeNoInvalidRegexpOptions([]byte(testCase.raw))
+			if testCase.refused && err == nil {
+				t.Errorf("%s decoded, and upstream's schema refuses it", testCase.raw)
+			}
+			if !testCase.refused && err != nil {
+				t.Errorf("%s was refused, and upstream's schema accepts it: %v", testCase.raw, err)
+			}
+		})
+	}
 }

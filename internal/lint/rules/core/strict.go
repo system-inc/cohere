@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -10,6 +11,9 @@ import (
 )
 
 // StrictMode selects which spelling of strict mode the rule asks for.
+//
+// The values are upstream's own spellings, because the option is upstream's bare string and the
+// decoder reads it straight into this type. A config written for ESLint reads the same here.
 type StrictMode string
 
 const (
@@ -18,49 +22,48 @@ const (
 	// Upstream resolves it to Global for a CommonJS file or one allowing a top-level return, and to
 	// Function otherwise. In this tree it resolves to Function for every script, because nothing
 	// here is parsed as CommonJS.
-	StrictSafe StrictMode = "Safe"
+	StrictSafe StrictMode = "safe"
 
 	// StrictGlobal wants exactly one directive at the top of the file and none inside a function.
-	StrictGlobal StrictMode = "Global"
+	StrictGlobal StrictMode = "global"
 
 	// StrictFunction wants a directive at the top of each top-level function and none at the file
 	// level. This is the only mode that tracks nesting, because a directive is redundant inside a
 	// function whose parent is already strict.
-	StrictFunction StrictMode = "Function"
+	StrictFunction StrictMode = "function"
 
 	// StrictNever wants no directive anywhere.
-	StrictNever StrictMode = "Never"
+	StrictNever StrictMode = "never"
 )
 
-// StrictOptions configures the rule.
+// DecodeStrictOptions reads this rule's one option element, upstream's bare mode string.
 //
-// Upstream's option is a bare positional enum rather than an object, so it is carried under a named
-// key here and spelled in our casing. The four values and what each selects are unchanged.
-type StrictOptions struct {
-	// Mode is which spelling to ask for. Absent means Safe, which is upstream's default.
-	Mode StrictMode `json:"mode"`
-}
-
-// DecodeStrictOptions reads this rule's configuration from the config layer.
+// Upstream's schema is `[{ enum: ["never", "global", "function", "safe"] }]`, so `["error", "never"]`
+// is the whole configuration and the element is a string, never an object. An earlier decoder here
+// read it from a `{"mode": ...}` object no ESLint version accepts, which refused upstream's own form
+// and stopped a run on a config copied from a real repository. The object is refused now, with the
+// error naming the shape that works.
 //
 // Hand-rolled so an unrecognized mode fails loudly. Every arm here is selected by string equality,
-// so `rule.DecodeOptionsInto` leaving an unknown string in the field would pick a silent fifth
-// behaviour of reporting nothing at all.
+// so an unknown string left in the mode would pick a silent fifth behaviour of reporting nothing at
+// all. No element at all is upstream's default, Safe.
 func DecodeStrictOptions(raw []byte) (any, error) {
-	options := StrictOptions{}
 	if len(raw) == 0 {
-		return options, nil
+		return StrictSafe, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	var mode StrictMode
+	if err := json.Unmarshal(raw, &mode); err != nil {
+		return StrictSafe, fmt.Errorf(
+			"strict: the option is a bare string, one of \"never\", \"global\", \"function\" or "+
+				"\"safe\", got %s", raw)
 	}
-	switch options.Mode {
-	case "", StrictSafe, StrictGlobal, StrictFunction, StrictNever:
+	switch mode {
+	case StrictSafe, StrictGlobal, StrictFunction, StrictNever:
 	default:
-		return options, fmt.Errorf(
-			"strict: unknown mode %q, wanted one of Safe, Global, Function, Never", options.Mode)
+		return StrictSafe, fmt.Errorf(
+			"strict: unknown mode %q, wanted one of \"never\", \"global\", \"function\" or \"safe\"", mode)
 	}
-	return options, nil
+	return mode, nil
 }
 
 // The messages. Upstream carries ten ids for what reads like one judgment, and the split is not
@@ -204,13 +207,13 @@ var Strict = rule.Rule{
 	// follow the tsconfig.
 	ProgramReads: rule.ReadsCompilerOptions,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings := StrictOptions{}
-		if decoded, configured := rule.OptionsAs[StrictOptions](options); configured {
-			settings = decoded
+		mode := StrictSafe
+		if decoded, configured := rule.OptionsAs[StrictMode](options); configured {
+			mode = decoded
 		}
 		return rule.Listeners{
 			ast.KindSourceFile: func(file *ast.Node) {
-				checkStrict(ctx, file, settings)
+				checkStrict(ctx, file, mode)
 			},
 		}
 	},
@@ -227,13 +230,9 @@ type strictWalker struct {
 }
 
 // checkStrict resolves the mode for this file and walks it.
-func checkStrict(ctx rule.Context, file *ast.Node, settings StrictOptions) {
+func checkStrict(ctx rule.Context, file *ast.Node, mode StrictMode) {
 	source := file.AsSourceFile()
 
-	mode := settings.Mode
-	if mode == "" {
-		mode = StrictSafe
-	}
 	if type_checking.CompilerImpliesStrict(ctx, source) {
 		mode = strictModeImplied
 	} else if mode == StrictSafe {
@@ -287,12 +286,12 @@ func checkStrict(ctx rule.Context, file *ast.Node, settings StrictOptions) {
 
 // strictModeModule is the mode a module collapses to. Not one of the configurable four, which is
 // why it is a package constant rather than a StrictMode the decoder accepts.
-const strictModeModule StrictMode = "Module"
+const strictModeModule StrictMode = "module"
 
 // strictModeImplied is the mode a TypeScript file collapses to when the compiler makes it strict. Like
 // strictModeModule it is selected by the file rather than configured, which is upstream's shape too:
 // `impliedStrict` is a parser feature, and `implied` is not one of the option's four values.
-const strictModeImplied StrictMode = "Implied"
+const strictModeImplied StrictMode = "implied"
 
 // fileLevelMessage is what a directive at the top of the file means under the current mode.
 func (w strictWalker) fileLevelMessage() rule.Message {

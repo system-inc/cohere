@@ -101,11 +101,16 @@ func init() {
 			Rule:   NoGlobalAssign,
 			Decode: rule.DecodeOptionsInto[NoGlobalAssignOptions](),
 		},
-		rule.Registration{Rule: NoInvalidRegexp},
-		rule.Registration{Rule: NoMisleadingCharacterClass},
+		rule.Registration{
+			Rule:   NoInvalidRegexp,
+			Decode: DecodeNoInvalidRegexpOptions,
+		},
+		rule.Registration{
+			Rule:   NoMisleadingCharacterClass,
+			Decode: rule.DecodeOptionsInto[NoMisleadingCharacterClassOptions](),
+		},
 		rule.Registration{Rule: NoNonoctalDecimalEscape},
 		rule.Registration{Rule: NoRegexSpaces},
-		rule.Registration{Rule: NoSelfAssign},
 		rule.Registration{Rule: NoSetterReturn},
 		rule.Registration{
 			Rule:   NoShadowRestrictedNames,
@@ -143,6 +148,9 @@ func init() {
 			Rule:   UseIsNaN,
 			Decode: rule.DecodeOptionsInto[UseIsNaNOptions](),
 		},
-		rule.Registration{Rule: ValidTypeof},
+		rule.Registration{
+			Rule:   ValidTypeof,
+			Decode: rule.DecodeOptionsInto[ValidTypeofOptions](),
+		},
 	)
 }

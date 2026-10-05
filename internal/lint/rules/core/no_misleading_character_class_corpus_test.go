@@ -15,11 +15,12 @@ import (
  * finding's id, text and byte offset written here as ESLint answered.
  *
  * The corpus rows are the registry's corpus file, verbatim, less the rows ESLint runs under configured
- * globals, the rows that set allowEscape, an option this port does not take, and the rows the
- * registry's known-gaps list holds for this rule, which that list keeps exactly. The edge rows were
- * written for this port: a RegExp reached through an alias or globalThis and a local one that is not
- * it, a pattern held in a name or built by concatenation, a regex bound to a constant, regex literals
- * handed over with and without flags, and flags that are constant, written, or unknowable.
+ * globals, the rows that set allowEscape, which TestNoMisleadingCharacterClassAllowEscape runs both ways
+ * round, and the rows the registry's known-gaps list holds for this rule, which that list keeps exactly.
+ * The edge rows were written for this port: a RegExp reached through an alias or globalThis and a local
+ * one that is not it, a pattern held in a name or built by concatenation, a regex bound to a constant,
+ * regex literals handed over with and without flags, and flags that are constant, written, or
+ * unknowable.
  */
 func TestNoMisleadingCharacterClassAgreesWithESLint(t *testing.T) {
 	t.Parallel()
@@ -188,6 +189,9 @@ func TestNoMisleadingCharacterClassAgreesWithESLint(t *testing.T) {
 		{"corpus", "\n\n            // unescaped <CR> <LF> counts as a single character\n            new RegExp(`[\n\\\\u200D.]`)\n\n            ", []string{"zwj \n\\\\u200D.@91"}},
 		{"corpus", "var r = /[[👶🏻]]/v", []string{"emojiModifier 👶🏻@11"}},
 		{"corpus", "new RegExp(/^[👍]$/v, '')", []string{"surrogatePairWithoutUFlag 👍@14"}},
+		{"corpus", "var r = /[\\uD83D\\uDC4D-\\uffff]/", []string{"surrogatePairWithoutUFlag \\uD83D\\uDC4D@10"}},
+		{"corpus", "var r = /[👨‍👩‍👦]/", []string{"surrogatePairWithoutUFlag 👨@10", "zwj 👨‍@10", "surrogatePairWithoutUFlag 👩@17", "zwj 👩‍@17", "surrogatePairWithoutUFlag 👦@24"}},
+		{"corpus", "var r = new RegExp(\"[👨‍👩‍👦]\", \"\")", []string{"surrogatePairWithoutUFlag 👨@21", "zwj 👨‍@21", "surrogatePairWithoutUFlag 👩@28", "zwj 👩‍@28", "surrogatePairWithoutUFlag 👦@35"}},
 		{"edge", "const R = RegExp; new R(\"[👍]\");", []string{"surrogatePairWithoutUFlag 👍@26"}},
 		{"edge", "globalThis.RegExp(\"[👍]\");", []string{"surrogatePairWithoutUFlag 👍@20"}},
 		{"edge", "let RegExp; new RegExp(\"[👍]\");", []string{}},
