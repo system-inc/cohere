@@ -39,7 +39,7 @@ func TestParenthesizedClassExpressionsAreRead(t *testing.T) {
 		},
 		{
 			name:   "duplicate inside a parenthesized call argument",
-			source: `const merged = mergeClassNames(('flex flex'));`,
+			source: `const merged = cn(('flex flex'));`,
 			subject: func(t *testing.T, source string) rule_testing.Result {
 				return rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", source)
 			},

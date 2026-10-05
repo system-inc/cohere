@@ -17,54 +17,22 @@ import (
 // rules that vanished rather than as a quieter run.
 func init() {
 	rule.Register(
-		rule.Registration{
-			Rule:   EnforceConsistentClassOrder,
-			Decode: rule.DecodeOptionsInto[EnforceConsistentClassOrderOptions](),
-		},
-		rule.Registration{
-			Rule:   EnforceConsistentVariantOrder,
-			Decode: rule.DecodeOptionsInto[EnforceConsistentVariantOrderOptions](),
-		},
-		rule.Registration{
-			Rule:   EnforceConsistentImportantPosition,
-			Decode: rule.DecodeOptionsInto[EnforceConsistentImportantPositionOptions](),
-		},
-		rule.Registration{
-			Rule:   EnforceConsistentVariableSyntax,
-			Decode: rule.DecodeOptionsInto[EnforceConsistentVariableSyntaxOptions](),
-		},
-		rule.Registration{
-			Rule:   EnforceShorthandClasses,
-			Decode: rule.DecodeOptionsInto[EnforceShorthandClassesOptions](),
-		},
-		rule.Registration{
-			Rule:   EnforceCanonicalClasses,
-			Decode: rule.DecodeOptionsInto[EnforceCanonicalClassesOptions](),
-		},
-		rule.Registration{
-			Rule:   NoConcatenatedClasses,
-			Decode: rule.DecodeOptionsInto[NoConcatenatedClassesOptions](),
-		},
-		rule.Registration{
-			Rule:   NoConflictingClasses,
-			Decode: rule.DecodeOptionsInto[NoConflictingClassesOptions](),
-		},
-		rule.Registration{
-			Rule:   NoDeprecatedClasses,
-			Decode: rule.DecodeOptionsInto[NoDeprecatedClassesOptions](),
-		},
-		rule.Registration{
-			Rule:   NoDuplicateClasses,
-			Decode: rule.DecodeOptionsInto[NoDuplicateClassesOptions](),
-		},
-		rule.Registration{
-			Rule:   NoUnknownClasses,
-			Decode: rule.DecodeOptionsInto[NoUnknownClassesOptions](),
-		},
-		rule.Registration{
-			Rule:   NoUnnecessaryWhitespace,
-			Decode: rule.DecodeOptionsInto[NoUnnecessaryWhitespaceOptions](),
-		},
+		tailwindRegistration[EnforceConsistentClassOrderOptions](EnforceConsistentClassOrder),
+		tailwindRegistration[EnforceConsistentVariantOrderOptions](EnforceConsistentVariantOrder),
+		tailwindRegistration[EnforceConsistentImportantPositionOptions](EnforceConsistentImportantPosition),
+		tailwindRegistration[EnforceConsistentVariableSyntaxOptions](EnforceConsistentVariableSyntax),
+		tailwindRegistration[EnforceShorthandClassesOptions](EnforceShorthandClasses),
+		tailwindRegistration[EnforceCanonicalClassesOptions](EnforceCanonicalClasses),
+		tailwindRegistration[NoConcatenatedClassesOptions](NoConcatenatedClasses),
+		tailwindRegistration[NoConflictingClassesOptions](NoConflictingClasses),
+		tailwindRegistration[NoDeprecatedClassesOptions](NoDeprecatedClasses),
+		tailwindRegistration[NoDuplicateClassesOptions](NoDuplicateClasses),
+		tailwindRegistration[NoUnknownClassesOptions](NoUnknownClasses),
+		tailwindRegistration[NoUnnecessaryWhitespaceOptions](NoUnnecessaryWhitespace),
 		rule.Registration{Rule: NoPhysicalDirection},
 	)
+	rule.RegisterSettings(rule.SettingsRegistration{
+		Namespaces: tailwindSettingsNamespaces,
+		Split:      splitTailwindSettings,
+	})
 }

@@ -510,8 +510,8 @@ func requireOptimizationScanPastTrivia(sourceFile *ast.SourceFile, from int) int
 //	notCreateReactClass({})    SILENT, both agree
 //
 // The cause is upstream's `createClass` pragma, which defaults to `createReactClass` and is only
-// `createClass` when a project configures `settings.react.createClass`. We have no settings surface,
-// so the default is the only reachable value and the shelf's leniency is a divergence rather than a
+// `createClass` when a project configures `settings.react.createClass`. cohere reads no React
+// settings, so the default is the only reachable value and the shelf's leniency is a divergence rather than a
 // convenience. The shelf's own doc comment says a rule whose upstream reads its callee differently
 // should read it inline here, and this is that rule.
 //

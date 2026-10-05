@@ -2,13 +2,18 @@ package main
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 )
 
 // Adamic readiness through the caches (#drbrp8c): every number a cached run prints is the number a `--no-cache`
-// run prints over the same tree. A replayed file that was never measured, or one replayed as ready when its
+// run prints over the same tree. Readiness is measured only under --adamic-readiness (#9tgm3dq), so every run
+// here asks for it, and the last two tests change the flag between runs. A replayed file that was never measured, or one replayed as ready when its
 // imports moved, would read as Adamic-ready with nothing behind it, the cache's one failure that looks like a
 // success. Each test runs the cold truth on the tree the cached run saw and compares the segments whole.
+
+// readinessFlag asks a run to measure readiness.
+const readinessFlag = "--adamic-readiness"
 
 // readinessPattern is the footer's readiness segment, measured or not.
 var readinessPattern = regexp.MustCompile(`\d+% Adamic-ready \([^)]*\)|Adamic readiness not measured: [^\n•]*`)
@@ -39,7 +44,7 @@ func readinessFixture(t *testing.T) *runCacheFixture {
 // coldReadiness is the readiness a `--no-cache` run reads over the tree as it is now.
 func (fixture *runCacheFixture) coldReadiness() string {
 	fixture.t.Helper()
-	output, _ := fixture.run(false)
+	output, _ := fixture.run(false, readinessFlag)
 	return readinessIn(fixture.t, output)
 }
 
@@ -47,8 +52,8 @@ func (fixture *runCacheFixture) coldReadiness() string {
 func TestAReplayedRunReadsTheReadinessACheckedOneDoes(t *testing.T) {
 	t.Parallel()
 	fixture := readinessFixture(t)
-	fixture.establishHit()
-	replayed, _ := fixture.run(true)
+	fixture.establishHit(readinessFlag)
+	replayed, _ := fixture.run(true, readinessFlag)
 	if !isRunCacheReplay(replayed) {
 		t.Fatalf("an unchanged tree did not replay:\n%s", replayed)
 	}
@@ -66,9 +71,9 @@ func TestAReplayedRunReadsTheReadinessACheckedOneDoes(t *testing.T) {
 func TestReadinessFromTheFindingsCacheIsTheCheckedReadiness(t *testing.T) {
 	t.Parallel()
 	fixture := readinessFixture(t)
-	fixture.establishHit()
+	fixture.establishHit(readinessFlag)
 	fixture.write("source/a.ts", "export const a: number = 2;\n")
-	warm, _ := fixture.run(true)
+	warm, _ := fixture.run(true, readinessFlag)
 	if isRunCacheReplay(warm) {
 		t.Fatalf("an edited tree replayed the whole run:\n%s", warm)
 	}
@@ -89,13 +94,13 @@ func TestASuppressedAdamicFindingKeepsItsFileUnreadyWarm(t *testing.T) {
 	fixture.commit("suppressed")
 	cold := fixture.coldReadiness()
 
-	fixture.establishHit()
-	replayed, _ := fixture.run(true)
+	fixture.establishHit(readinessFlag)
+	replayed, _ := fixture.run(true, readinessFlag)
 	if got := readinessIn(t, replayed); got != cold {
 		t.Errorf("replayed readiness %q, cold %q", got, cold)
 	}
 	fixture.write("source/a.ts", "export const a: number = 3;\n")
-	warm, _ := fixture.run(true)
+	warm, _ := fixture.run(true, readinessFlag)
 	if got, coldNow := readinessIn(t, warm), fixture.coldReadiness(); got != coldNow {
 		t.Errorf("readiness from the findings cache %q, cold %q", got, coldNow)
 	}
@@ -115,13 +120,13 @@ func TestASuppressedAdamicFindingKeepsItsFileUnreadyWarm(t *testing.T) {
 func TestAnImportsShapeChangeIsMeasuredAgainWarm(t *testing.T) {
 	t.Parallel()
 	fixture := readinessFixture(t)
-	fixture.establishHit()
+	fixture.establishHit(readinessFlag)
 	before := fixture.coldReadiness()
 
 	// `any` without the keyword, so no-explicit-any stays quiet and types.ts stays as ready as it was: only
 	// use.ts can move.
 	fixture.write("source/types.ts", "export type Value = ReturnType<typeof JSON.parse>;\n")
-	warm, _ := fixture.run(true)
+	warm, _ := fixture.run(true, readinessFlag)
 	if isRunCacheReplay(warm) {
 		t.Fatalf("an edited tree replayed the whole run:\n%s", warm)
 	}
@@ -131,5 +136,49 @@ func TestAnImportsShapeChangeIsMeasuredAgainWarm(t *testing.T) {
 	}
 	if cold == before {
 		t.Errorf("readiness reads %q before and after use.ts's import became any, so the fixture does not move it", cold)
+	}
+}
+
+// (e) A run that asks after runs that did not measures: the whole-run cache keys on the flag, so it never replays
+// a summary recorded without readiness, and the findings cache misses on every entry recorded without it rather
+// than replaying those files as unmeasured.
+func TestARunThatAsksForReadinessAfterOnesThatDidNotMeasuresIt(t *testing.T) {
+	t.Parallel()
+	fixture := readinessFixture(t)
+	fixture.establishHit()
+	asked, _ := fixture.run(true, readinessFlag)
+	if isRunCacheReplay(asked) {
+		t.Fatalf("a run that asked for readiness replayed a run that did not:\n%s", asked)
+	}
+	cold := fixture.coldReadiness()
+	if got := readinessIn(t, asked); got != cold {
+		t.Errorf("readiness after unasked runs %q, cold %q", got, cold)
+	}
+
+	// Through the findings cache alone: an edit misses the whole run, and every other file's entry was recorded
+	// by an unasked run.
+	fixture.establishHit()
+	fixture.write("source/a.ts", "export const a: number = 4;\n")
+	warm, _ := fixture.run(true, readinessFlag)
+	if isRunCacheReplay(warm) {
+		t.Fatalf("an edited tree replayed the whole run:\n%s", warm)
+	}
+	if got, coldNow := readinessIn(t, warm), fixture.coldReadiness(); got != coldNow {
+		t.Errorf("readiness from entries recorded unasked %q, cold %q", got, coldNow)
+	}
+}
+
+// (f) A run that does not ask, after runs that did, prints no readiness, though the whole-run cache holds a
+// summary that has it.
+func TestARunThatDoesNotAskPrintsNoReadinessAfterOnesThatDid(t *testing.T) {
+	t.Parallel()
+	fixture := readinessFixture(t)
+	fixture.establishHit(readinessFlag)
+	unasked, _ := fixture.run(true)
+	if segment := readinessPattern.FindString(unasked); segment != "" {
+		t.Errorf("a run that did not ask printed readiness %q:\n%s", segment, unasked)
+	}
+	if strings.Contains(unasked, "Adamic") {
+		t.Errorf("a run that did not ask names Adamic:\n%s", unasked)
 	}
 }

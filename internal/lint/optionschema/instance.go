@@ -54,7 +54,7 @@ var Extensions = []Extension{
 		Element: 1,
 		Key:     "elements",
 		Reason: "upstream reads its element descriptors from settings[\"boundaries/elements\"] beside the rule, " +
-			"and cohere's config carries no per-plugin settings, so they are written in the rule's own options",
+			"and cohere carries no boundaries settings, so they are written in the rule's own options",
 	},
 }
 

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -25,8 +26,8 @@ func TestAnEarlyFormatResultIsDiscardedWhenTheFileChangesBeforeTheBuild(t *testi
 			if err := os.WriteFile(fileName, []byte("export const a = 1;\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			unchanged := func(_ string, text string) (string, error) { return text, nil }
-			speculation := speculateFormatOn([]string{fileName}, unchanged, 1, 1)
+			unchanged := func(_ string, text string, _ *ast.SourceFile) (string, error) { return text, nil }
+			speculation := speculateFormatOn([]string{fileName}, unchanged, 1, 1, nil)
 			speculation.wait()
 			if _, attempted := speculation.attempts[fileName]; !attempted {
 				t.Fatal("the speculation attempted nothing, so nothing below is about keeping it")
@@ -77,7 +78,7 @@ func TestANarrowedSpeculationRunsOnFewerWorkersAndStillReachesEveryFile(t *testi
 	release := make(chan struct{})
 	var isNarrowed atomic.Bool
 	var runningAfter, mostAfter atomic.Int32
-	holding := func(_ string, text string) (string, error) {
+	holding := func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		if !isNarrowed.Load() {
 			started <- struct{}{}
 			<-release
@@ -91,7 +92,7 @@ func TestANarrowedSpeculationRunsOnFewerWorkersAndStillReachesEveryFile(t *testi
 		return text, nil
 	}
 
-	speculation := speculateFormatOn(candidates, holding, 1, workers)
+	speculation := speculateFormatOn(candidates, holding, 1, workers, nil)
 	for range workers {
 		<-started
 	}

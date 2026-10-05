@@ -88,7 +88,7 @@ func runWithEngine(t *testing.T, binary string, engine string, directory string,
 	if !isExit {
 		t.Fatalf("running cohere: %v\n%s", err, output)
 	}
-	return string(output), exited.ExitCode()
+	return string(output), childExitCode(t, exited)
 }
 
 // buildCohere returns this command's binary, built on the first call. A build failure is fatal rather
@@ -136,7 +136,7 @@ func runCohereWithEnvironment(t *testing.T, binary string, directory string, env
 	if !isExit {
 		t.Fatalf("running cohere: %v\n%s", err, output)
 	}
-	return string(output), exitError.ExitCode()
+	return string(output), childExitCode(t, exitError)
 }
 
 // TestCohereRunsFromAnywhere holds the behaviors of the command a caller sees from a shell:

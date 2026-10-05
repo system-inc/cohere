@@ -18,8 +18,8 @@ import (
 
 // sharedReaderSource puts a class string on every surface and in every value position the reader
 // enters, plus a `tw` attribute that only a reader configured for it should see.
-const sharedReaderSource = "const buttonClassName = (open ? 'flex flex' : 'hidden') as const;\n" +
-	"const merged = mergeClassNames('p-2', open && 'gap-2', ['m-1', size ?? 'm-2'], `px-${size} py-1`);\n" +
+const sharedReaderSource = "const className = (open ? 'flex flex' : 'hidden') as const;\n" +
+	"const merged = cn('p-2', open && 'gap-2', ['m-1', size ?? 'm-2'], `px-${size} py-1`);\n" +
 	"const element = <div tw=\"text-left text-left\" className={`flex ${open ? ' rotate-90 ' : ''}`} />;\n" +
 	"const other = <span className=\"items-center\" title=\"not classes\" />;\n" +
 	"const notClasses = 'flex flex';\n"
@@ -27,7 +27,7 @@ const sharedReaderSource = "const buttonClassName = (open ? 'flex flex' : 'hidde
 func TestClassLiteralReaderIsSharedPerSettingsPerFile(t *testing.T) {
 	t.Parallel()
 	twSettings := DefaultClassLiteralSettings()
-	twSettings.AttributeNames = []string{"tw"}
+	twSettings.AttributePatterns = []string{"tw"}
 
 	cache := rule.NewFileCache()
 	first := ClassLiteralReaderFor(cache, DefaultClassLiteralSettings())
@@ -43,9 +43,9 @@ func TestClassLiteralReaderIsSharedPerSettingsPerFile(t *testing.T) {
 	}
 
 	// Names that run together the same way are still different settings.
-	joined := ClassLiteralSettings{AttributeNames: []string{"ab"}}
-	split := ClassLiteralSettings{AttributeNames: []string{"a", "b"}}
-	moved := ClassLiteralSettings{AttributeNames: []string{"a"}, CalleeNames: []string{"b"}}
+	joined := ClassLiteralSettings{AttributePatterns: []string{"ab"}}
+	split := ClassLiteralSettings{AttributePatterns: []string{"a", "b"}}
+	moved := ClassLiteralSettings{AttributePatterns: []string{"a"}, CalleeNamePatterns: []string{"b"}}
 	if joined.key() == split.key() || split.key() == moved.key() || joined.key() == moved.key() {
 		t.Fatalf("distinct settings share a key: %q %q %q", joined.key(), split.key(), moved.key())
 	}
@@ -55,7 +55,7 @@ func TestClassLiteralReaderIsSharedPerSettingsPerFile(t *testing.T) {
 	if nextFile == first {
 		t.Fatal("two files shared a memo, so a node pointer from one could answer for the other")
 	}
-	if len(nextFile.variablePatterns) == 0 || nextFile.variablePatterns[0] != first.variablePatterns[0] {
+	if nextFile.variables == nil || nextFile.variables != first.variables {
 		t.Fatal("the variable patterns were compiled again for a second file")
 	}
 }
@@ -71,7 +71,7 @@ func TestSharedReadingAgreesWithAFreshOne(t *testing.T) {
 	}
 
 	twSettings := DefaultClassLiteralSettings()
-	twSettings.AttributeNames = []string{"tw"}
+	twSettings.AttributePatterns = []string{"tw"}
 
 	// Both readers share one file's cache, as two rules configured differently would.
 	cache := rule.NewFileCache()
@@ -87,7 +87,7 @@ func TestSharedReadingAgreesWithAFreshOne(t *testing.T) {
 				shared := bound.classValuesIn(node)
 				if expected := fresh.classValuesIn(node); !reflect.DeepEqual(shared, expected) {
 					t.Fatalf("settings %q: a shared reading of %s differs from a fresh one:\n  shared: %+v\n  fresh:  %+v",
-						settings.AttributeNames, node.Kind, shared, expected)
+						settings.AttributePatterns, node.Kind, shared, expected)
 				}
 			}
 			read += len(fresh.classValuesIn(node).literals)
@@ -101,7 +101,7 @@ func TestSharedReadingAgreesWithAFreshOne(t *testing.T) {
 		// Proof the comparison saw class strings and the memo was used, not a vacuous agreement.
 		if read == 0 || len(bound.values) == 0 {
 			t.Fatalf("settings %q: read %d literals and remembered %d nodes; the fixture reached nothing",
-				settings.AttributeNames, read, len(bound.values))
+				settings.AttributePatterns, read, len(bound.values))
 		}
 	}
 }

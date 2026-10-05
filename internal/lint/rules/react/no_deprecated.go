@@ -38,8 +38,8 @@ import (
 // force. Auto-detection from `node_modules/react` runs only when the configuration says
 // `version: "detect"` explicitly; absence does not trigger it.
 //
-// Our `internal/config` has no settings surface, which `no_string_refs.go` established with a
-// control grep, so no React version can reach a rule here by any route. The faithful reading is to
+// cohere reads no React settings (the loader refuses `settings.react`), so no React version can
+// reach a rule here by any route. The faithful reading is to
 // reproduce the answer upstream gives under this repository's configuration, and that answer is
 // that all 29 entries fire. Measured directly: one file writing all 29 deprecated spellings under
 // no settings produces 29 findings on the installed build.
@@ -668,7 +668,7 @@ func isDeprecatedEs5Component(node *ast.Node) bool {
 
 // createReactClassFactoryName is `getCreateClassFromContext`'s default and the only reachable value.
 //
-// `settings.react.createClass` would override it and our config has no settings surface, so this is
+// `settings.react.createClass` would override it and cohere reads no React settings, so this is
 // the answer for every file. Named rather than inlined because it appears in the doc comment above
 // as a measured divergence from the shelf helper, and a reader checking that claim should find one
 // spelling.

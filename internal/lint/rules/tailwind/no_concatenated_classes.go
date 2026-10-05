@@ -23,9 +23,8 @@ func messageConcatenatedClass(fragment string) rule.Message {
 
 // NoConcatenatedClassesOptions lets a project name the surfaces that carry class strings.
 type NoConcatenatedClassesOptions struct {
-	Attributes []string `json:"attributes"`
-	Callees    []string `json:"callees"`
-	Variables  []string `json:"variables"`
+	TailwindLocationOptions
+	TailwindClassLiteralOptions
 }
 
 // NoConcatenatedClasses reports a class fragment glued to an interpolated value.
@@ -67,15 +66,7 @@ var NoConcatenatedClasses = rule.Rule{
 
 		settings := DefaultClassLiteralSettings()
 		if configured, isConfigured := rule.OptionsAs[NoConcatenatedClassesOptions](options); isConfigured {
-			if len(configured.Attributes) > 0 {
-				settings.AttributeNames = configured.Attributes
-			}
-			if len(configured.Callees) > 0 {
-				settings.CalleeNames = configured.Callees
-			}
-			if len(configured.Variables) > 0 {
-				settings.VariablePatterns = configured.Variables
-			}
+			settings = configured.ClassLiteralSettings()
 		}
 
 		reader := ClassLiteralReaderFor(ctx.FileCache, settings)

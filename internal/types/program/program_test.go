@@ -2,10 +2,12 @@ package program_test
 
 import (
 	"context"
+	"fmt"
 	"github.com/microsoft/TypeScript/tsc/shim/locale"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -509,6 +511,65 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(t *testing.T) {
 	}
 	if crashed[witness.Name] != 0 {
 		t.Errorf("the rule that never panicked is named as crashing")
+	}
+}
+
+// A rule's Program is a view the walk keeps in the rule's slot and points at each file in turn
+// (#9xfg09f), so it is good for its file only. A rule that keeps it past the file reads nothing through it:
+// every Program a rule kept is ended once the walk is over, and a read panics naming the rule. Reads made
+// during the file go through, which is the half that shows the view was live when the rule was given it.
+func TestAProgramARuleKeepsPastItsFileIsEnded(t *testing.T) {
+	t.Parallel()
+	directory := writeProject(t, map[string]string{
+		"tsconfig.json": minimalConfig,
+		"main.ts":       "const counted: number = 41 + 1;\n",
+		"other.ts":      "const other: number = 2;\n",
+	})
+
+	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if err != nil {
+		t.Fatalf("building: %v", err)
+	}
+
+	var keptLock sync.Mutex
+	var kept []rule.Program
+	keeper := rule.Rule{
+		Name:         "test-keeps-its-program",
+		ProgramReads: rule.ReadsCompilerOptions,
+		Run: func(ctx rule.Context, options any) rule.Listeners {
+			if ctx.Program.Options() == nil {
+				t.Error("the program view read no options during its own file")
+			}
+			keptLock.Lock()
+			kept = append(kept, ctx.Program)
+			keptLock.Unlock()
+			return rule.Listeners{
+				ast.KindVariableDeclaration: func(node *ast.Node) { ctx.Program.Options() },
+			}
+		},
+	}
+
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{keeper})
+	if err != nil {
+		t.Fatalf("walking: %v", err)
+	}
+	if len(result.Coverage.RulesCrashed) != 0 {
+		t.Fatalf("reading the program during its own file crashed the rule: %v", result.Coverage.RulesCrashed)
+	}
+	if len(kept) != 2 {
+		t.Fatalf("the rule kept %d programs, want one for each of the 2 files", len(kept))
+	}
+
+	for index, view := range kept {
+		func() {
+			defer func() {
+				message := fmt.Sprint(recover())
+				if !strings.Contains(message, "after the file it was given ended") || !strings.Contains(message, keeper.Name) {
+					t.Errorf("program %d, kept past its file, read without the ended refusal naming the rule: %s", index, message)
+				}
+			}()
+			view.Options()
+		}()
 	}
 }
 

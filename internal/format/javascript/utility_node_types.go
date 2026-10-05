@@ -1,5 +1,7 @@
 package javascript
 
+import "strings"
+
 // utilities/node-types.js, utilities/literal.js, utilities/get-raw.js and the small type predicates
 // built on them. Flow and Babel type names stay in the lists, as upstream has them, so a list reads
 // against its source even though only the TypeScript and ESTree names occur here.
@@ -126,14 +128,21 @@ func isNodeMatches(node Node, nameOrPaths []string) bool {
 	return false
 }
 
+// isNodeMatchesNameOrPath is upstream's isNodeMatchesNameOrPath. Upstream splits the path on "." and walks
+// the names from the last; this reads the same names from the end of the string, so no list is made: one
+// per call was 0.36M objects a cold run on ahra (#wcgw0n4). A name is first (upstream's index 0) when no dot
+// is left before it, and second (index 1) when exactly one name is.
 func isNodeMatchesNameOrPath(node Node, nameOrPath string) bool {
-	names := splitDots(nameOrPath)
-	for index := len(names) - 1; index >= 0; index-- {
-		name := names[index]
-		if index == 0 {
+	rest := nameOrPath
+	for {
+		dot := strings.LastIndexByte(rest, '.')
+		name := rest[dot+1:]
+		if dot == -1 {
 			return node.Is("Identifier") && node.String("name") == name
 		}
-		if index == 1 && node.Is("MetaProperty") && node.Child("property").Is("Identifier") &&
+		rest = rest[:dot]
+		isSecond := strings.IndexByte(rest, '.') == -1
+		if isSecond && node.Is("MetaProperty") && node.Child("property").Is("Identifier") &&
 			node.Child("property").String("name") == name {
 			node = node.Child("meta")
 			continue
@@ -145,19 +154,6 @@ func isNodeMatchesNameOrPath(node Node, nameOrPath string) bool {
 		}
 		return false
 	}
-	return false
-}
-
-func splitDots(text string) []string {
-	var parts []string
-	start := 0
-	for index := 0; index < len(text); index++ {
-		if text[index] == '.' {
-			parts = append(parts, text[start:index])
-			start = index + 1
-		}
-	}
-	return append(parts, text[start:])
 }
 
 // precedence is upstream's PRECEDENCE, utilities/get-precedence.js.

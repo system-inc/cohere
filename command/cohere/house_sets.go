@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/housesets"
+	"github.com/system-inc/cohere/internal/lint/rules/tailwind"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -24,7 +27,23 @@ func loadLintConfig(graph *program.Graph, location projectLocation) (*configurat
 	if !usesHouseSets(location) {
 		return configuration.LoadFor(location.LintConfigFileName, registeredRuleNames())
 	}
-	detection := housesets.Detect(graph.ProjectFiles(), location.Root, graph.Program.Host().FS())
+	settings, err := configuration.OwnSettingsOf(location.LintConfigFileName)
+	if err != nil {
+		return nil, err
+	}
+	settingsDirectory, err := filepath.Abs(filepath.Dir(location.LintConfigFileName))
+	if err != nil {
+		return nil, err
+	}
+	detection := housesets.Detect(graph.ProjectFiles(), location.Root, graph.Program.Host().FS(), settings, settingsDirectory)
+	// Settings for rules the house does not apply would be read by nothing, which is the silent drop
+	// reading them exists to end (#gj5nm6e). The run says so instead, with the way out.
+	if detection.TailwindEntryPoint == "" && tailwind.WritesSettings(settings) {
+		return nil, fmt.Errorf("%s writes settings[\"better-tailwindcss\"], and zero config does not apply %s: %s. "+
+			"Nothing would read those settings, so name its stylesheet in them as entryPoint, name %q in "+
+			"\"extends\", or remove them", location.LintConfigFileName, configuration.TailwindSetName,
+			strings.TrimSuffix(detection.TailwindSkipped, ", so its rules are skipped"), configuration.TailwindSetName)
+	}
 	return configuration.LoadHouse(location.LintConfigFileName, registeredRuleNames(), detection)
 }
 

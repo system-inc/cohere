@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
 )
 
@@ -33,7 +34,7 @@ func TestAStoppedSpeculationBeginsNoMoreFiles(t *testing.T) {
 
 	// A formatter that rewrites every third file, so the pass after the walk has real work as well as kept
 	// results to take.
-	format := func(fileName string, text string) (string, error) {
+	format := func(fileName string, text string, _ *ast.SourceFile) (string, error) {
 		if index := slices.Index(candidates, fileName); index%3 == 0 {
 			return strings.ToUpper(text), nil
 		}
@@ -43,13 +44,13 @@ func TestAStoppedSpeculationBeginsNoMoreFiles(t *testing.T) {
 	// while every worker is mid-file.
 	started := make(chan struct{}, len(candidates))
 	release := make(chan struct{})
-	holding := func(fileName string, text string) (string, error) {
+	holding := func(fileName string, text string, parsed *ast.SourceFile) (string, error) {
 		started <- struct{}{}
 		<-release
-		return format(fileName, text)
+		return format(fileName, text, parsed)
 	}
 
-	stopped := speculateFormat(candidates, holding, 1)
+	stopped := speculateFormat(candidates, holding, 1, nil)
 	for range workers {
 		<-started
 	}
@@ -74,7 +75,7 @@ func TestAStoppedSpeculationBeginsNoMoreFiles(t *testing.T) {
 		}
 	}
 
-	free := speculateFormat(candidates, format, 1)
+	free := speculateFormat(candidates, format, 1, nil)
 	free.wait()
 	if want := len(candidates) - (len(candidates)+2)/3; len(free.attempts) != want {
 		t.Fatalf("never stopped, the speculation kept %d of %d files, want the %d it leaves unchanged", len(free.attempts), len(candidates), want)

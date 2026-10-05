@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
 )
 
@@ -35,10 +36,10 @@ func (clock *formatClock) timing(inner edit.Transform) edit.Transform {
 	if inner == nil {
 		return nil
 	}
-	return func(fileName string, text string) (string, error) {
+	return func(fileName string, text string, parsed *ast.SourceFile) (string, error) {
 		clock.start()
 		defer clock.stop()
-		return inner(fileName, text)
+		return inner(fileName, text, parsed)
 	}
 }
 

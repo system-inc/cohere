@@ -11,6 +11,8 @@
 package rule
 
 import (
+	"crypto/sha256"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -322,6 +324,18 @@ type Rule struct {
 	// declaring less is refused at the read. A rule reading a helper's program methods declares what
 	// the helper reads.
 	ProgramReads ProgramRead
+
+	// ProgramFingerprint, on a rule that declares ReadsOtherFiles, is a hash of exactly the program-wide data the
+	// rule's verdict on one file depends on beyond that file: the theme interfaces it indexes, the import graph's
+	// edges, the one file it reads. With it, the findings cache replays the rule on a file whose bytes are
+	// unchanged while this hash is too (#kdee854). It is called once per run, with a Program viewed under the
+	// rule's own ProgramReads.
+	//
+	// It is a claim of completeness, and it decides soundness: anything the verdict reads outside the file and
+	// outside this hash replays a stale finding when it changes. So it is proven both ways for each rule, a
+	// planted change to the indexed data moving it and an edit elsewhere leaving it alone. A rule that declares
+	// ReadsOtherFiles without one is walked on every file, as before: the default is always the sound one.
+	ProgramFingerprint func(program Program) [sha256.Size]byte
 
 	// TypeReach declares what a type-aware rule can see of the files its file imports, and so what its
 	// cached findings are keyed on. Contents, the default, keys them on the bytes of every file in the

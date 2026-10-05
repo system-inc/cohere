@@ -53,8 +53,8 @@ func TestNoUnsafeFires(t *testing.T) {
 		//
 		// Each is clean upstream only because its tester block configures
 		// `settings.react.version = "16.2.0"`, which predates the `UNSAFE_` prefix, and each is
-		// byte-identical to a FAIL case above that differs only in carrying `"16.3.0"`. Our
-		// `internal/config` has no settings surface at all, so no React version can reach a rule here
+		// byte-identical to a FAIL case above that differs only in carrying `"16.3.0"`. cohere
+		// reads no React settings, so no React version can reach a rule here
 		// and oxc's own default branch, `is_none_or(supports_unsafe_lifecycle_prefix)`, is the only
 		// reachable one. Measured rather than reasoned about: with no version configured that exact
 		// source produces 3 findings on the release binary, and with `"version": "16.2.0"` configured

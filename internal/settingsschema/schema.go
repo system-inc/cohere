@@ -100,6 +100,9 @@ func document(ruleNames []string, nexusTier bool) (map[string]any, error) {
 
 // keyShape is the schema for one top-level key's value, read off the Go type the loader decodes it into.
 func keyShape(key configuration.TopLevelKey) (map[string]any, error) {
+	if key.Name == "settings" {
+		return settingsShape(), nil
+	}
 	if key.Field == nil {
 		shape, known := ignoredKeyShapes[key.Name]
 		if !known {
@@ -108,6 +111,22 @@ func keyShape(key configuration.TopLevelKey) (map[string]any, error) {
 		return shape(), nil
 	}
 	return typeShape(key.Name, key.Field)
+}
+
+// settingsShape is the namespaces a run reads settings for: better-tailwindcss, under either of the
+// names upstream reads (tailwindSettingsNamespaces in internal/lint/rules/tailwind). Which keys each
+// carries is checked by the run against the rules that read them (registry.CheckSettings), and a key
+// no rule reads is refused there, so the schema names the namespaces and leaves their keys open.
+func settingsShape() map[string]any {
+	namespace := map[string]any{"type": "object"}
+	return map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"properties": map[string]any{
+			"better-tailwindcss":               namespace,
+			"eslint-plugin-better-tailwindcss": namespace,
+		},
+	}
 }
 
 var stringSliceType = reflect.TypeOf([]string{})
@@ -147,7 +166,6 @@ var ignoredKeyShapes = map[string]func() map[string]any{
 	"jsPlugins": func() map[string]any {
 		return map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
 	},
-	"settings": func() map[string]any { return map[string]any{"type": "object"} },
 	"output": func() map[string]any {
 		return map[string]any{
 			"type":                 "object",

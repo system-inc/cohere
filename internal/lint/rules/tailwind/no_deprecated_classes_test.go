@@ -93,13 +93,13 @@ func TestNoDeprecatedClassesReportsRenames(t *testing.T) {
 		{
 			name:     "on a callee surface",
 			fileName: "Component.tsx",
-			source:   `const merged = mergeClassNames('flex-shrink-0');`,
+			source:   `const merged = cn('flex-shrink-0');`,
 			wantIds:  []string{"deprecatedClassReplaceable"},
 		},
 		{
 			name:     "on a variable surface",
 			fileName: "Styles.ts",
-			source:   `const buttonClassName = 'overflow-ellipsis';`,
+			source:   `const className = 'overflow-ellipsis';`,
 			wantIds:  []string{"deprecatedClassReplaceable"},
 		},
 		{

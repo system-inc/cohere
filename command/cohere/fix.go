@@ -12,8 +12,10 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -92,7 +94,11 @@ func applyProposedFixes(
 		speculation = early.speculation
 		speculation.narrow(speculationWorkers())
 	} else {
-		speculation = speculateFormat(formatCandidates, transform, maxPasses)
+		var programs programOffer
+		if graph != nil {
+			programs.offer(graph.Program)
+		}
+		speculation = speculateFormat(formatCandidates, transform, maxPasses, &programs)
 	}
 
 	var result program.Result
@@ -205,6 +211,12 @@ func applyProposedFixes(
 	}
 	sort.Strings(fileNames)
 
+	// linted is every file the walk ran the rules over, in the form the candidates are keyed by.
+	linted := make(map[string]bool, len(projectFiles))
+	for _, sourceFile := range projectFiles {
+		linted[filepath.Clean(sourceFile.FileName())] = true
+	}
+
 	// propose is what a file's fixpoint asks for proposals. The first pass reuses the proposals already
 	// collected; later passes re-lint the rewritten text. Reusing them for the first pass and only the
 	// first pass is what keeps offsets honest: a proposal is valid exactly against the text it was
@@ -221,7 +233,15 @@ func applyProposedFixes(
 		// the formatted text and applied them anyway: formatting one file in nexus rewrote it under
 		// nexus/consistency-no-multiline-arrow-function on a run that reported the repository's fixes as
 		// not applied.
-		fixesWithheld := writable.Everything && repositoryRoot != "" && unwritableRepository(repositoryRoot, fileName) != ""
+		//
+		// A format candidate the walk never linted is formatted and never fixed either, for the same reason:
+		// no rule ran over it, so no finding was reported for it, and a fix landing there is a repair nobody
+		// was told about. It was costly as well as wrong. angular/angular's deploy-docs-site action keeps a
+		// 2.8 MB esbuild bundle beside a tsconfig that does not include it; the format pass printed it, every
+		// later pass re-linted all 2.8 MB with every rule, and `--no-fix` reported prefer-template, strict and
+		// more as rewrites of a vendored file the lint phase never looked at (#xn1k1gz).
+		fixesWithheld := !linted[fileName] ||
+			writable.Everything && repositoryRoot != "" && unwritableRepository(repositoryRoot, fileName) != ""
 
 		return func(_ string, text string) ([]edit.Proposal, error) {
 			if !used {
@@ -242,14 +262,18 @@ func applyProposedFixes(
 	// same one: no proposal, and the bytes the walk read. The rest are formatted here, as before.
 	speculated := speculation.keepable(byFileName, graph)
 	attempts := formatInParallel(fileNames, byFileName, speculated, func(fileName string) (edit.FileResult, error) {
-		return process(fileName, propose(fileName, refuseToRelint), transform, maxPasses)
+		return watchedFile(os.Stderr, slowFixNotice, fileName, func() (edit.FileResult, error) {
+			return process(fileName, propose(fileName, refuseToRelint), transform, maxPasses)
+		})
 	})
 
 	results := make([]edit.FileResult, 0, len(fileNames))
 	for index, fileName := range fileNames {
 		fileResult, err := attempts[index].result, attempts[index].err
 		if !attempts[index].done {
-			fileResult, err = process(fileName, propose(fileName, serially), transform, maxPasses)
+			fileResult, err = watchedFile(os.Stderr, slowFixNotice, fileName, func() (edit.FileResult, error) {
+				return process(fileName, propose(fileName, serially), transform, maxPasses)
+			})
 		}
 		if err != nil {
 			// One file failing must not abandon the rest. The failure is reported rather than
@@ -273,6 +297,25 @@ func applyProposedFixes(
 	summary := edit.Summarize(results)
 	summary.Checked = !write
 	return summary, result, lineEndings, nil
+}
+
+// slowFixNotice is how long one file may spend in the fix phase before the run names it. A healthy file takes
+// milliseconds and the 2.8 MB bundle that found this takes about two seconds now; a file past this is a runaway
+// the run would otherwise sit in with nothing on screen, as angular/angular's deploy-docs-site bundle did for
+// 26 minutes and 19 GB (#xn1k1gz).
+const slowFixNotice = 30 * time.Second
+
+// watchedFile runs one file's fix and format, and names the file on out if it is still running after after.
+// The run goes on: the notice says which file to report, or to leave out, while it is still happening rather
+// than after a wait nobody can explain.
+func watchedFile(out io.Writer, after time.Duration, fileName string, process func() (edit.FileResult, error)) (edit.FileResult, error) {
+	notice := time.AfterFunc(after, func() {
+		fmt.Fprintf(out, "cohere: %s is still being fixed and formatted after %s, which no file should take. This is "+
+			"likely a bug in cohere, not in your code: please report it at %s with the output of `cohere --version` "+
+			"and the file.\n", fileName, after, reportBugsAt)
+	})
+	defer notice.Stop()
+	return process()
 }
 
 // errRelintRefused is what the parallel format pass's proposer answers when a file would need its
@@ -543,12 +586,24 @@ func proposalsForText(
 	 */
 	directives := suppression.Build(sourceFile.Text())
 
+	/*
+	 * One file cache for every rule re-linting this text, as the lint walk keeps one per file.
+	 *
+	 * Without it rule.Cached recomputes on every ask, and a derivation meant to be paid once per file is
+	 * paid wherever a rule asks: no-invalid-this asks for the file's comments at each function, so the
+	 * whole-file comment scan ran once per function. On a 2.8 MB esbuild bundle in angular/angular, which
+	 * the format pass printed and this path then re-linted, `--no-fix` took 26 minutes and 19 GB on one
+	 * core while each half of it finished in seconds (#xn1k1gz).
+	 */
+	fileCache := rule.NewFileCache()
+
 	var diagnostics []rule.Diagnostic
 	for _, subject := range applicable {
 		currentRule := subject
 		context := rule.Context{
 			SourceFile: sourceFile,
 			Program:    rule.ViewProgram(graph.Program, sourceFile, currentRule),
+			FileCache:  fileCache,
 			Report: func(diagnostic rule.Diagnostic) {
 				diagnostic.RuleName = currentRule.Name
 				if diagnostic.SourceFile == nil {
@@ -617,12 +672,18 @@ type formatSpeculation struct {
 // after the walk, which writes it. A file the walk then proposes a fix for, or whose bytes are not
 // the ones the walk read, is discarded too (keepable), so what is kept is exactly what formatInParallel would
 // have computed, and everything else is computed as it always was.
-func speculateFormat(candidates []string, transform edit.Transform, maxPasses int) *formatSpeculation {
-	return speculateFormatOn(candidates, transform, maxPasses, speculationWorkers())
+//
+// A TypeScript file is formatted from the program's own tree where the program has one of exactly the bytes read,
+// already bound, rather than parsed twice more, once by the fix engine's guard and once by the printer (#dk2502g).
+// programs is where the program arrives once it is built, or nil. Every other file goes first, so the program
+// has the time to be built while they are formatted, and a TypeScript file reached before then is parsed, as
+// before: nothing waits for the program.
+func speculateFormat(candidates []string, transform edit.Transform, maxPasses int, programs *programOffer) *formatSpeculation {
+	return speculateFormatOn(candidates, transform, maxPasses, speculationWorkers(), programs)
 }
 
 // speculateFormatOn is speculateFormat on a given number of workers.
-func speculateFormatOn(candidates []string, transform edit.Transform, maxPasses int, workers int) *formatSpeculation {
+func speculateFormatOn(candidates []string, transform edit.Transform, maxPasses int, workers int, programs *programOffer) *formatSpeculation {
 	speculation := &formatSpeculation{done: make(chan struct{}), attempts: map[string]formatAttempt{}, read: map[string]string{},
 		stopped: make(chan struct{})}
 	speculation.limit.Store(int32(workers))
@@ -632,7 +693,14 @@ func speculateFormatOn(candidates []string, transform edit.Transform, maxPasses 
 	}
 	next := make(chan string, len(candidates))
 	for _, fileName := range candidates {
-		next <- fileName
+		if !edit.TypeScriptParsable(fileName) {
+			next <- fileName
+		}
+	}
+	for _, fileName := range candidates {
+		if edit.TypeScriptParsable(fileName) {
+			next <- fileName
+		}
 	}
 	close(next)
 	var mutex sync.Mutex
@@ -662,7 +730,7 @@ func speculateFormatOn(candidates []string, transform edit.Transform, maxPasses 
 					}
 					return refuseToRelint("", "")
 				}
-				result, err := edit.CheckFile(fileName, unproposed, transform, maxPasses)
+				result, err := edit.CheckFileSeeded(fileName, programs.boundTreeOf(fileName), unproposed, transform, maxPasses)
 				// Only an unchanged result is final this early. A changed one is left to the path after the
 				// walk, which writes it, or re-lints it where its type has rules: a markdown, css or json file
 				// the printer changed comes back changed rather than refused, and keeping it would report a
@@ -682,6 +750,43 @@ func speculateFormatOn(candidates []string, transform edit.Transform, maxPasses 
 		close(speculation.done)
 	}()
 	return speculation
+}
+
+// programOffer is where a speculation finds the program once it is built. Its zero value has none, and so does
+// a nil one.
+type programOffer struct {
+	program atomic.Pointer[compiler.Program]
+}
+
+// offer hands the speculation the program, once it is built.
+func (programs *programOffer) offer(program *compiler.Program) {
+	if programs != nil && program != nil {
+		programs.program.Store(program)
+	}
+}
+
+// boundTreeOf is the program's tree of fileName if the program is in and has bound that file, or nil.
+//
+// Bound, because the binder writes node flags the formatter's converter reads (binder.go sets
+// NodeFlagsThisNodeOrAnySubNodesHasError and NodeFlagsExportContext on nodes, and estree reads Let, Const,
+// Using and Reparsed off the same word), and the checkers bind on their own goroutines while this pass runs.
+// isBound is an atomic stored once the binder is done with the file, so a file that reads bound here has had
+// every flag written before any is read. A file not yet bound is not waited for: it is parsed, as before.
+//
+// The tree is not yet known to be of the bytes the speculation reads; edit.CheckFileSeeded compares them.
+func (programs *programOffer) boundTreeOf(fileName string) *ast.SourceFile {
+	if programs == nil {
+		return nil
+	}
+	program := programs.program.Load()
+	if program == nil {
+		return nil
+	}
+	sourceFile := program.GetSourceFile(fileName)
+	if sourceFile == nil || !sourceFile.IsBound() {
+		return nil
+	}
+	return sourceFile
 }
 
 // speculationWorkers is how many files speculateFormat formats at once: a quarter of the cores, and none

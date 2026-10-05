@@ -100,6 +100,20 @@ func TestNoUnwantedPolyfillioReports(t *testing.T) {
 			want:   []string{messageNoUnwantedPolyfillioSecurity.Id},
 		},
 		{
+			// Entities in the URL. ESLint's parser decodes a JSX attribute string, so the installed
+			// plugin (16.3.1) reads the host and copyWithin in both and reports the duplicate
+			// (#5f61r5b). On polyfill-fastly.io rather than polyfill.io, whose security arm answers
+			// first here and would hide whether the feature list was decoded.
+			name:   "a host spelled with character references",
+			source: "export const A = () => <script src='https:&#47;&#47;polyfill-fastly.io/v3/polyfill.min.js?features=Array.prototype.copyWithin' />;",
+			want:   []string{messageNoUnwantedPolyfillioDuplicate.Id},
+		},
+		{
+			name:   "a feature spelled with a character reference",
+			source: "export const A = () => <script src='https://polyfill-fastly.io/v3/polyfill.min.js?features=Array.prototype.copy&#87;ithin' />;",
+			want:   []string{messageNoUnwantedPolyfillioDuplicate.Id},
+		},
+		{
 			// The lowercase intrinsic tag needs no import at all, which is the arm the corpus only
 			// covers incidentally.
 			name:   "intrinsic script needs no import",

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/formatfiles"
 )
@@ -19,7 +20,7 @@ import (
 // 3,407 files must not print like a run that formatted everything.
 func TestAScopedTransformFormatsOnlyWhatIsInScope(t *testing.T) {
 	t.Parallel()
-	inner := func(_ string, text string) (string, error) {
+	inner := func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		return strings.ToUpper(text), nil
 	}
 	scope := formatScope{
@@ -30,7 +31,7 @@ func TestAScopedTransformFormatsOnlyWhatIsInScope(t *testing.T) {
 
 	transform := scopedTransform(inner, scope)
 
-	formatted, err := transform("/repo/in.ts", "hello\n")
+	formatted, err := transform("/repo/in.ts", "hello\n", nil)
 	if err != nil {
 		t.Fatalf("a file in scope was not formatted: %v", err)
 	}
@@ -38,7 +39,7 @@ func TestAScopedTransformFormatsOnlyWhatIsInScope(t *testing.T) {
 		t.Fatalf("the inner transform did not run: %q", formatted)
 	}
 
-	_, err = transform("/repo/out.ts", "hello\n")
+	_, err = transform("/repo/out.ts", "hello\n", nil)
 	if !errors.Is(err, edit.ErrSkipped) {
 		t.Fatalf("a file outside scope should skip, got %v", err)
 	}
@@ -54,12 +55,12 @@ func TestAScopedTransformFormatsOnlyWhatIsInScope(t *testing.T) {
 // formatting it asks for.
 func TestAWholeTreeScopeDoesNotFilter(t *testing.T) {
 	t.Parallel()
-	transform := scopedTransform(func(_ string, text string) (string, error) {
+	transform := scopedTransform(func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		return text + "!", nil
 	}, wholeTreeScope())
 
 	for _, fileName := range []string{"/anywhere/a.ts", "/elsewhere/b.tsx", "/deep/c.md"} {
-		formatted, err := transform(fileName, "x")
+		formatted, err := transform(fileName, "x", nil)
 		if err != nil {
 			t.Fatalf("a whole-tree scope skipped %s: %v", fileName, err)
 		}
@@ -89,12 +90,12 @@ func TestScopingANilTransformStaysNil(t *testing.T) {
 // direction.
 func TestAnEmptyScopeSkipsEverythingAndSaysWhy(t *testing.T) {
 	t.Parallel()
-	transform := scopedTransform(func(_ string, text string) (string, error) {
+	transform := scopedTransform(func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		t.Fatalf("the inner transform ran under an empty scope")
 		return text, nil
 	}, formatScope{Description: "nothing (could not enumerate the tree: the walk failed)"})
 
-	_, err := transform("/repo/a.ts", "x")
+	_, err := transform("/repo/a.ts", "x", nil)
 	if !errors.Is(err, edit.ErrSkipped) {
 		t.Fatalf("expected a skip, got %v", err)
 	}
@@ -127,14 +128,14 @@ func TestScopeDescriptionsAreDistinct(t *testing.T) {
 // whole-tree scope an index that would exclude the file if anything looked at it.
 func TestAWholeTreeScopeBypassesTheFilterEntirely(t *testing.T) {
 	t.Parallel()
-	inner := func(_ string, text string) (string, error) { return text + "!", nil }
+	inner := func(_ string, text string, _ *ast.SourceFile) (string, error) { return text + "!", nil }
 
 	// Everything is set, and the index deliberately does not contain the file. If the returned
 	// transform consults the index at all, this skips.
 	scope := wholeTreeScope()
 	scope.index = map[string]struct{}{"/some/other/file.ts": {}}
 
-	formatted, err := scopedTransform(inner, scope)("/not/in/the/index.ts", "x")
+	formatted, err := scopedTransform(inner, scope)("/not/in/the/index.ts", "x", nil)
 	if err != nil {
 		t.Fatalf("a whole-tree scope consulted its index: %v", err)
 	}

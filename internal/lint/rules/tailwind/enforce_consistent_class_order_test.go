@@ -184,13 +184,13 @@ func TestEnforceConsistentClassOrderReportsMisordering(t *testing.T) {
 		{
 			name:     "on a callee surface",
 			fileName: "Component.tsx",
-			source:   `const merged = mergeClassNames('items-center flex');`,
+			source:   `const merged = cn('items-center flex');`,
 			wantIds:  []string{"inconsistentClassOrder"},
 		},
 		{
 			name:     "on a variable surface",
 			fileName: "Styles.ts",
-			source:   `const buttonClassName = 'items-center flex';`,
+			source:   `const className = 'items-center flex';`,
 			wantIds:  []string{"inconsistentClassOrder"},
 		},
 	}
@@ -383,7 +383,7 @@ func TestClassOrderReportsWithoutAFixItCannotPlace(t *testing.T) {
 	}{
 		{
 			name:   "an escape in the literal",
-			source: `const merged = mergeClassNames('items-center\u0020flex');`,
+			source: `const merged = cn('items-center\u0020flex');`,
 		},
 		{
 			name:   "a deprecated class that moves",
@@ -776,8 +776,8 @@ func TestClassOrderSortsTemplateRunsLikeThePlugin(t *testing.T) {
 		},
 		{
 			name:   "both runs, separators untouched",
-			source: "const merged = mergeClassNames(`items-center   flex ${x} gap-2   block`);",
-			want:   "const merged = mergeClassNames(`flex   items-center ${x} block   gap-2`);",
+			source: "const merged = cn(`items-center   flex ${x} gap-2   block`);",
+			want:   "const merged = cn(`flex   items-center ${x} block   gap-2`);",
 		},
 		{
 			name:   "a template in a conditional's branch",

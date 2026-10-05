@@ -2,6 +2,10 @@
 # The quiet-machine benchmark: how long `cohere` takes on a real project, cold, on an unchanged replay,
 # and after a one-file edit, measured so that the number means what it says.
 #
+# It runs at the priority it is started with, never niced as the house's test and build runs are
+# (cohere-dev test, #2qc6j8g): it measures, and a niced run's times say how busy the machine was rather
+# than how fast cohere is. Run it only in a quiet window, where nothing else is competing.
+#
 # It measures a copy of the project pinned to its commits, never the project itself, with one cohere
 # engine for every run. pinned.zsh, which it shares with rivals.sh, says how and why.
 #
@@ -23,6 +27,12 @@
 #   warm    `cohere` again on the unchanged tree: the replay
 #   edit    one line added to one function body, `cohere`, then the file's original bytes put back
 #   cold    `cohere --no-cache`: every phase from source, nothing read or written
+#   first   `cohere` in a fresh copy of the tree with no cache of any kind: what a developer's first run
+#           pays, cache writes and incremental build info included. Measured beside cold, because a first
+#           run doing more than cold is a cliff nothing else here would show: on 2026-10-04 a first run
+#           on www-ahra-ai took 8.6s against 0.8s cold (#0q6nmnt). Its runs go to first.tsv, apart from
+#           the runs table the record reads, and the summary flags a quiet median more than 25% over
+#           cold's
 # The edit is a comment line, inserted above a `return` statement, so the file's bytes and every
 # content hash cohere keys on change while its types and findings do not. A round whose edit run
 # reports a different finding count from its warm run says so, because then the edit did more than that.
@@ -59,8 +69,9 @@
 #                      numbers, refused when it disagrees with its own runs or the engine is dirty;
 #                      commit it with what `go run ./internal/docsdata/tools/generate` rewrites
 #
-# Exit status: 0 when every mode has a quiet number, 3 when some mode has none, 1 when it could not
-# measure at all, including a copy that changed under it or a cohere that changed between runs.
+# Exit status: 0 when every mode has a quiet number, 3 when some mode has none, 4 when every mode has one
+# and the first run's quiet median is more than 25% over cold's, 1 when it could not measure at all,
+# including a copy that changed under it or a cohere that changed between runs.
 set -u
 name=quiet_machine
 source ${0:A:h}/pinned.zsh
@@ -93,10 +104,34 @@ done
 prepare_copy
 [[ -f $copy/$edit ]] || fail "no file $edit in the copy to edit"
 
+# The first mode's template: the copy without its cache, made once per copy and cloned for each first run,
+# so a first run never sees what an earlier run of any mode left behind. Its tree is the copy's, or it is
+# refused, the same as the copy.
+#
+# Its ready marker is written here, never copied: written only once the template's tree matches the copy's,
+# so a copy that died part way is never taken for a finished one. And a TypeScript build info anywhere in it
+# (tsc's default puts one beside the tsconfig, outside .cache) would make a first run not first, so a
+# template holding one is refused rather than measured.
+template=$work/${copy:t}-first-template
+if [[ ! -f $template/bench-ready ]]; then
+  [[ -e $template ]] && fail "$template exists but was never finished; remove it and run again"
+  mkdir -p $template
+  rsync -a --exclude=/.cache --exclude=/bench-ready "$copy/" "$template/" || fail "copying the copy into $template"
+  [[ $(copy=$template tree_hash) == $expected_tree ]] ||
+    fail "the first runs' template at $template does not match the copy; remove it and run again"
+  print $expected_tree > $template/bench-ready
+fi
+[[ $(copy=$template tree_hash) == $(< $template/bench-ready) && $(< $template/bench-ready) == $expected_tree ]] ||
+  fail "the first runs' template at $template no longer matches the copy; remove it and run again"
+build_infos=(${(f)"$(cd $template && find . -name '*.tsbuildinfo' -not -path './.cache/*' -not -path '*/node_modules/*')"})
+(( ${#build_infos} == 0 )) ||
+  fail "the copy holds a TypeScript build info outside .cache (${build_infos[1]}), so a first run there would not be first"
+
 logs=$copy/.cache/quiet-machine-$(date +%Y%m%d-%H%M%S)
 mkdir -p $logs
 runs_table=$logs/runs.tsv
 pin_engine $logs
+first_table=$logs/first.tsv
 run_output_reader=$logs/runoutput
 (cd ${0:A:h:h} && go build -o $run_output_reader ./internal/benchresults/tools/runoutput) ||
   fail "could not build the run output reader"
@@ -114,6 +149,7 @@ run_cohere() {
 
 measure() {
   local mode=$1 round=$2; shift 2
+  local table=${measure_table:-$runs_table}
   wait_for_quiet
   local before=$(load)
   local log=$logs/$mode-$round.log
@@ -128,7 +164,7 @@ measure() {
   IFS=$'\t' read -r engine_seconds findings cache <<< $output
   printf '%s\t%d\t%.3f\t%.3f\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%d\n' $mode $round $verdict_seconds $settled_seconds \
     $engine_seconds $findings "$cache" $before $after $quiet $exit_code $primes |
-    tee -a $runs_table
+    tee -a $table
 }
 
 edit_original=$logs/edit-original
@@ -164,6 +200,16 @@ for round in $(seq 1 $runs); do
   [[ $(shasum -a 256 < $copy/$edit) == $original_hash ]] || fail "$edit did not go back to its original bytes"
 
   measure cold $round --no-cache
+
+  # A fresh clone of the template for each first run (copy-on-write where the volume allows it), measured
+  # there, then held to the copy's tree: a first run must write nothing but its cache.
+  first_copy=$logs/first-$round
+  cp -c -R $template $first_copy 2> /dev/null || cp -R $template $first_copy || fail "cloning $template"
+  # A first run has no primes, so its row says 0. The clone stays in the logs with its cache, for a slow
+  # first run to be read; on a volume without clones that is a full tree per round, under the logs.
+  copy=$first_copy measure_table=$first_table primes=0 measure first $round
+  [[ $(copy=$first_copy tree_hash) == $expected_tree ]] ||
+    fail "the first run in round $round changed the tree it ran in; see $first_copy"
 done
 
 [[ $(tree_hash) == $expected_tree ]] ||
@@ -200,6 +246,29 @@ for mode in cold warm edit; do
   (( ${#loaded_runs} > 0 )) &&
     printf '        loaded runs, not a quiet number: %s\n' "${(j:, :)loaded_runs}"
 done
+
+# The first mode, from its own table, and the one comparison it exists for (#0q6nmnt).
+first_quiet=($(awk -F'\t' '$10 == "quiet" { print $3 }' $first_table | sort -n))
+first_loaded=($(awk -F'\t' '$10 == "loaded" { print $3 }' $first_table | sort -n))
+cold_quiet=($(awk -F'\t' '$1 == "cold" && $10 == "quiet" { print $3 }' $runs_table | sort -n))
+if (( ${#first_quiet} > 0 )); then
+  first_median=$first_quiet[$(( (${#first_quiet} + 1) / 2 ))]
+  printf '  %-5s quiet best %s, median %s, worst %s (%d of %d runs quiet)\n' first \
+    $first_quiet[1] $first_median $first_quiet[-1] ${#first_quiet} $runs
+  if (( ${#cold_quiet} > 0 )); then
+    cold_median=$cold_quiet[$(( (${#cold_quiet} + 1) / 2 ))]
+    if awk -v first=$first_median -v cold=$cold_median 'BEGIN { exit !(first > cold * 1.25) }'; then
+      printf 'warning: the first run'"'"'s quiet median %s is more than 25%% over cold'"'"'s %s: a first run is doing work cold does not (#0q6nmnt); see first-*.log\n' \
+        $first_median $cold_median
+      (( outcome == 0 )) && outcome=4
+    fi
+  fi
+else
+  outcome=3
+  printf '  %-5s no quiet number: all %d runs started or ended above the load ceiling of %s\n' first $runs $ceiling
+fi
+(( ${#first_loaded} > 0 )) &&
+  printf '        loaded runs, not a quiet number: %s\n' "${(j:, :)first_loaded}"
 print "runs and logs: $logs"
 
 # The record is written from the same runs table the summary above printed, so the two cannot differ, and

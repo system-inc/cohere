@@ -120,13 +120,13 @@ func TestNoConflictingClassesReportsSymmetrically(t *testing.T) {
 		{
 			name:     "on a callee surface",
 			fileName: "Component.tsx",
-			source:   `const merged = mergeClassNames('flex block');`,
+			source:   `const merged = cn('flex block');`,
 			wantIds:  []string{"conflictingClasses", "conflictingClasses"},
 		},
 		{
 			name:     "on a variable surface",
 			fileName: "Styles.ts",
-			source:   `const buttonClassName = 'px-4 px-8';`,
+			source:   `const className = 'px-4 px-8';`,
 			wantIds:  []string{"conflictingClasses", "conflictingClasses"},
 		},
 		{

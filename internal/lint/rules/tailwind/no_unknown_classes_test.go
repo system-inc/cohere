@@ -187,13 +187,13 @@ func TestNoUnknownClassesReportsTypos(t *testing.T) {
 		{
 			name:     "on a callee surface",
 			fileName: "Component.tsx",
-			source:   `const merged = mergeClassNames('flx');`,
+			source:   `const merged = cn('flx');`,
 			wantIds:  []string{"unknownClass"},
 		},
 		{
 			name:     "on a variable surface",
 			fileName: "Styles.ts",
-			source:   `const buttonClassName = 'not-a-real-class-xyz';`,
+			source:   `const className = 'not-a-real-class-xyz';`,
 			wantIds:  []string{"unknownClass"},
 		},
 	}

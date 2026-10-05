@@ -11,12 +11,12 @@
 package tailwind
 
 import (
-	"regexp"
 	"strings"
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -51,32 +51,93 @@ const (
 	ClassLiteralOriginVariable ClassLiteralOrigin = "Variable"
 )
 
-// ClassLiteralSettings names the three surfaces where class strings are written.
+// ClassLiteralSettings names the three surfaces where class strings are written, each as upstream's
+// name patterns.
 //
 // All three matter, and that is not obvious. On the ahra tree the attribute surface holds 7,773
 // literals and the other two hold 2,192, so a rule that reads only JSX attributes silently covers
 // 78% of the class surface while reporting a clean tree for the rest. Every rule in this package
 // reads through this type for that reason.
+//
+// Every pattern is a JavaScript regular expression that must match the whole name, upstream's
+// matchesName (utils/utils.js at 4.7.0): its first match, and that match is the name. An attribute
+// pattern and name are both lowercased first, as getLiteralsByJSXAttribute does.
 type ClassLiteralSettings struct {
-	// AttributeNames are the JSX attributes that carry classes, typically `class` and `className`.
-	AttributeNames []string
-	// CalleeNames are functions whose string arguments are classes.
-	CalleeNames []string
+	// AttributePatterns match the JSX attributes that carry classes, `class` and `className` by default.
+	AttributePatterns []string
+	// CalleeNamePatterns match a call's name, the identifier or the property a member call ends in,
+	// and CalleePathPatterns match its dotted path, `twc.div` for `twc.div(...)`. A callee matching
+	// either is read, which is upstream's selector `name` and `path`.
+	CalleeNamePatterns []string
+	CalleePathPatterns []string
 	// VariablePatterns match variable names whose string initializers are classes.
 	VariablePatterns []string
 }
 
-// DefaultClassLiteralSettings mirrors what the oxlint configuration supplies today.
+// DefaultClassLiteralSettings is upstream 4.7.0's default selectors (options/default-options.js),
+// the half of them that read strings: the attribute, callee and variable selectors whose matchers
+// read strings, or that have none.
 //
-// Defaults rather than a required option, because a rule that declines every file when
-// unconfigured is indistinguishable from a rule with nothing to report. That failure kept
-// `boundary-no-project-import` inert for months.
+// The other half is not ported yet and is named here so no one reads this as complete (#gj5nm6e,
+// unit 6): object keys (`cn({ 'p-2': on })`, `classList`, `objstr`), object values at a path (cva and
+// tv `variants`, `compoundVariants`, `slots`, `base`, and clb), the strings a function returns
+// (twc and twx), and tagged templates (twc`...`). Nor is upstream's string matcher's walk ported
+// exactly: these rules read the strings in a value position of an argument, and upstream reads every
+// string nested under it.
+//
+// Defaults rather than a required option, because a rule that declines every file when unconfigured
+// is indistinguishable from a rule with nothing to report. A project writing its own `attributes`,
+// `callees` or `variables`, in a rule's options or in settings["better-tailwindcss"], replaces that
+// kind's defaults whole, as upstream's legacy selectors do. Our own repositories name
+// `mergeClassNames` and `createVariantClassNames` there.
 func DefaultClassLiteralSettings() ClassLiteralSettings {
 	return ClassLiteralSettings{
-		AttributeNames:   []string{"class", "className"},
-		CalleeNames:      []string{"mergeClassNames", "createVariantClassNames"},
-		VariablePatterns: []string{`.*[Cc]lassName$`, `.*[Cc]lassNames$`},
+		AttributePatterns: []string{
+			`^class(?:Name)?$`,
+			`^class:.*$`,
+			`(?:^\[class\]$)|(?:^\[ngClass\]$)`,
+			`(?:^\[class\..*\]$)`,
+			`^v-bind:class$`,
+			`^class:list$`,
+		},
+		CalleeNamePatterns: []string{
+			`^cc$`, `^clsx$`, `^cn$`, `^cnb$`, `^ctl$`, `^cva$`, `^cx$`, `^dcnb$`, `^tv$`, `^twJoin$`, `^twMerge$`,
+		},
+		CalleePathPatterns: []string{`^twc\.\w+`, `^twx\.\w+`},
+		VariablePatterns:   []string{`^classNames?$`, `^classes$`, `^styles?$`},
 	}
+}
+
+// TailwindClassLiteralOptions are upstream's legacy selector options, which every better-tailwindcss
+// rule accepts: `attributes`, `callees` and `variables`, each a list of name patterns.
+//
+// A kind that is written replaces that kind's defaults whole, an empty list included, which then reads
+// nothing of that kind; a kind not written keeps its defaults. That is upstream's createRule: a legacy
+// kind drops every default selector of the kind (`hasCalleeOverride` and its siblings). A legacy callee
+// is upstream's `{name, path}` with both set to the pattern, so it matches a call by either.
+//
+// Not ported yet: a legacy entry's matcher form, `[name, [{match}]]`, and `tags`, both unit 6 of
+// #gj5nm6e, refused until then.
+type TailwindClassLiteralOptions struct {
+	Attributes []string `json:"attributes"`
+	Callees    []string `json:"callees"`
+	Variables  []string `json:"variables"`
+}
+
+// ClassLiteralSettings is the defaults with every kind these options write put in place of its own.
+func (options TailwindClassLiteralOptions) ClassLiteralSettings() ClassLiteralSettings {
+	settings := DefaultClassLiteralSettings()
+	if options.Attributes != nil {
+		settings.AttributePatterns = options.Attributes
+	}
+	if options.Callees != nil {
+		settings.CalleeNamePatterns = options.Callees
+		settings.CalleePathPatterns = options.Callees
+	}
+	if options.Variables != nil {
+		settings.VariablePatterns = options.Variables
+	}
+	return settings
 }
 
 // ClassLiteralReader finds class-carrying strings in a file.
@@ -85,13 +146,68 @@ func DefaultClassLiteralSettings() ClassLiteralSettings {
 // and hands every rule reading a file with those settings the same reader, so a node is read once
 // however many rules listen to it. NewClassLiteralReader builds an unshared one, for a harness.
 type ClassLiteralReader struct {
-	attributeNames   map[string]bool
-	calleeNames      map[string]bool
-	variablePatterns []*regexp.Regexp
+	attributes  *namePatterns
+	calleeNames *namePatterns
+	calleePaths *namePatterns
+	variables   *namePatterns
 
 	// values holds what each node read as, for the one file this reader serves. Nil on a reader that
 	// is not bound to a file, which then reads every node afresh.
 	values map[*ast.Node]classValues
+}
+
+// namePatterns is one kind's patterns, compiled, with each name's answer remembered.
+//
+// The answers are a memo because names repeat and the patterns run on a backtracking engine: ahra's
+// attributes are almost all `className`, asked about on every JSX attribute in 3,978 files. The answer
+// is a pure function of the name, so the memo is shared by every worker reading with these settings.
+type namePatterns struct {
+	compiled  []*esregexp.RegExp
+	lowercase bool
+	answers   sync.Map
+}
+
+// newNamePatterns compiles patterns as JavaScript does. One that does not compile is skipped rather
+// than fatal: a rule that refuses to run because one pattern in a config file is malformed reports a
+// clean tree, which is the failure mode this whole tool exists to remove.
+func newNamePatterns(patterns []string, lowercase bool) *namePatterns {
+	compiledPatterns := &namePatterns{lowercase: lowercase}
+	for _, pattern := range patterns {
+		if lowercase {
+			pattern = strings.ToLower(pattern)
+		}
+		compiled, err := esregexp.Compile(pattern, "")
+		if err != nil {
+			continue
+		}
+		compiledPatterns.compiled = append(compiledPatterns.compiled, compiled)
+	}
+	return compiledPatterns
+}
+
+// matches reports whether any pattern matches the whole name, upstream's matchesName.
+func (patterns *namePatterns) matches(name string) bool {
+	if name == "" || len(patterns.compiled) == 0 {
+		return false
+	}
+	if patterns.lowercase {
+		name = strings.ToLower(name)
+	}
+	if answer, isAnswered := patterns.answers.Load(name); isAnswered {
+		return answer.(bool)
+	}
+	answer := false
+	for _, pattern := range patterns.compiled {
+		// The first match, and only if it is the name: `exec(name)[0] === name`. A pattern whose
+		// first match is shorter does not match, though a longer match exists, exactly as upstream.
+		match, err := pattern.Unwrap().FindStringMatch(name)
+		if err == nil && match != nil && match.RuneIndex == 0 && match.String() == name {
+			answer = true
+			break
+		}
+	}
+	patterns.answers.Store(name, answer)
+	return answer
 }
 
 // ClassLiteralReaderFor returns the reader for these settings in this file, shared through the file's
@@ -134,7 +250,7 @@ func compiledClassLiteralReader(key string, settings ClassLiteralSettings) *Clas
 // settings share a key only when they would read every node the same way.
 func (s ClassLiteralSettings) key() string {
 	var builder strings.Builder
-	for index, names := range [][]string{s.AttributeNames, s.CalleeNames, s.VariablePatterns} {
+	for index, names := range [][]string{s.AttributePatterns, s.CalleeNamePatterns, s.CalleePathPatterns, s.VariablePatterns} {
 		if index > 0 {
 			builder.WriteByte(1)
 		}
@@ -147,31 +263,13 @@ func (s ClassLiteralSettings) key() string {
 }
 
 // NewClassLiteralReader compiles the settings into a reader.
-//
-// An unparseable variable pattern is skipped rather than fatal. A rule that refuses to run because
-// one regular expression in a config file is malformed reports a clean tree, which is the failure
-// mode this whole tool exists to remove.
 func NewClassLiteralReader(settings ClassLiteralSettings) *ClassLiteralReader {
-	reader := &ClassLiteralReader{
-		attributeNames: map[string]bool{},
-		calleeNames:    map[string]bool{},
+	return &ClassLiteralReader{
+		attributes:  newNamePatterns(settings.AttributePatterns, true),
+		calleeNames: newNamePatterns(settings.CalleeNamePatterns, false),
+		calleePaths: newNamePatterns(settings.CalleePathPatterns, false),
+		variables:   newNamePatterns(settings.VariablePatterns, false),
 	}
-
-	for _, name := range settings.AttributeNames {
-		reader.attributeNames[name] = true
-	}
-	for _, name := range settings.CalleeNames {
-		reader.calleeNames[name] = true
-	}
-	for _, pattern := range settings.VariablePatterns {
-		compiled, err := regexp.Compile(pattern)
-		if err != nil {
-			continue
-		}
-		reader.variablePatterns = append(reader.variablePatterns, compiled)
-	}
-
-	return reader
 }
 
 // ListenerKinds are the node kinds a rule must subscribe to in order to see every class literal.
@@ -266,8 +364,10 @@ func (r *ClassLiteralReader) attributeValues(node *ast.Node) classValues {
 		return classValues{}
 	}
 
+	// A namespaced attribute reads as `namespace:name`, which is what upstream's getAttributeName
+	// builds and what Text gives a JsxNamespacedName.
 	name := attribute.Name()
-	if name == nil || !r.attributeNames[name.Text()] {
+	if name == nil || !r.attributes.matches(name.Text()) {
 		return classValues{}
 	}
 
@@ -280,13 +380,13 @@ func (r *ClassLiteralReader) calleeValues(node *ast.Node) classValues {
 		return classValues{}
 	}
 
-	// The callee's own text, so `mergeClassNames(...)` matches and `theme.mergeClassNames(...)`
-	// does not. Matching on the trailing identifier instead would let any object with a similarly
-	// named method silently opt in.
-	if call.Expression.Kind != ast.KindIdentifier {
+	// Upstream's getESCalleeName: a call is named by its identifier or the property a member call
+	// ends in, so `cn(...)` and `utils.cn(...)` are both `cn`, and its path is the dotted chain,
+	// `twc.div`. A callee with neither is never read.
+	if call.Arguments == nil {
 		return classValues{}
 	}
-	if !r.calleeNames[call.Expression.Text()] || call.Arguments == nil {
+	if !r.readsCallee(call.Expression) {
 		return classValues{}
 	}
 
@@ -308,18 +408,87 @@ func (r *ClassLiteralReader) variableValues(node *ast.Node) classValues {
 		return classValues{}
 	}
 
-	matches := false
-	for _, pattern := range r.variablePatterns {
-		if pattern.MatchString(name.Text()) {
-			matches = true
-			break
-		}
-	}
-	if !matches {
+	if !r.variables.matches(name.Text()) {
 		return classValues{}
 	}
 
 	return classValuesUnder(declaration.Initializer, ClassLiteralOriginVariable)
+}
+
+// readsCallee reports whether a call's callee is one of these settings', by name or by path. The path
+// is built only when the name did not match and a path pattern could, since it is a new string for every
+// member call in the file.
+func (r *ClassLiteralReader) readsCallee(callee *ast.Node) bool {
+	if r.calleeNames.matches(calleeName(callee)) {
+		return true
+	}
+	if len(r.calleePaths.compiled) == 0 {
+		return false
+	}
+	_, path := calleeNameAndPath(callee)
+	return r.calleePaths.matches(path)
+}
+
+// calleeName is calleeNameAndPath's name alone, which allocates nothing.
+func calleeName(callee *ast.Node) string {
+	switch callee.Kind {
+	case ast.KindIdentifier:
+		return callee.Text()
+	case ast.KindPropertyAccessExpression:
+		access := callee.AsPropertyAccessExpression()
+		if access.Expression == nil || access.Expression.Kind == ast.KindSuperKeyword {
+			return ""
+		}
+		if access.Name() != nil && access.Name().Kind == ast.KindIdentifier {
+			return access.Name().Text()
+		}
+	case ast.KindElementAccessExpression:
+		access := callee.AsElementAccessExpression()
+		if access.Expression == nil || access.Expression.Kind == ast.KindSuperKeyword {
+			return ""
+		}
+		if access.ArgumentExpression != nil && access.ArgumentExpression.Kind == ast.KindStringLiteral {
+			return access.ArgumentExpression.Text()
+		}
+	}
+	return ""
+}
+
+// calleeNameAndPath is upstream's getESCalleeName (parsers/es.js at 4.7.0) for both of its readings:
+// the name is an identifier's text or the last property of a member access, and the path is the whole
+// chain joined by dots, present only when every link in it has a name. `this.cn` has the name `cn` and
+// no path, and `super.cn` has neither. A computed access counts when its key is a plain string.
+func calleeNameAndPath(callee *ast.Node) (string, string) {
+	switch callee.Kind {
+	case ast.KindIdentifier:
+		return callee.Text(), callee.Text()
+
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		var object *ast.Node
+		property := ""
+		if callee.Kind == ast.KindPropertyAccessExpression {
+			access := callee.AsPropertyAccessExpression()
+			object = access.Expression
+			if access.Name() != nil && access.Name().Kind == ast.KindIdentifier {
+				property = access.Name().Text()
+			}
+		} else {
+			access := callee.AsElementAccessExpression()
+			object = access.Expression
+			if access.ArgumentExpression != nil && access.ArgumentExpression.Kind == ast.KindStringLiteral {
+				property = access.ArgumentExpression.Text()
+			}
+		}
+		if object == nil || object.Kind == ast.KindSuperKeyword || property == "" {
+			return "", ""
+		}
+		_, objectPath := calleeNameAndPath(object)
+		if objectPath == "" {
+			return property, ""
+		}
+		return property, objectPath + "." + property
+	}
+	return "", ""
 }
 
 // classValuesUnder collects every string and template with holes in a value position under an

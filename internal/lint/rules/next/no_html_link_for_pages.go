@@ -50,8 +50,8 @@ func noHtmlLinkForPagesMessage(hrefPath string) rule.Message {
 // directory (#cn8sthd). Ruled by @system_cohere_lint_sets on #d21war2: port @next's route model.
 //
 // The root is the project root. Upstream reads `settings.next.rootDir` and falls back to the working
-// directory; cohere carries no shared settings, so it is the root cohere checks, which is where every
-// consumer starts ESLint.
+// directory; cohere reads no Next settings (the loader refuses `settings.next`), so it is the root
+// cohere checks, which is where every consumer starts ESLint.
 //
 // # Declared reads, and why it is never cached
 //

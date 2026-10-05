@@ -72,12 +72,29 @@ go run ./command/cohere
 `cohere` cannot cohere itself — it is a Go program and its phases check TypeScript. This repo is
 gated by Go's own toolchain: `gofmt -l .`, `go vet ./...`, `go test ./...`, `go build ./...`.
 
-A whole-module test run goes through `go run ./command/cohere-dev test ./...`, which takes the
-machine's one slot for it and otherwise waits, naming whose run holds the slot (#3kr3x59). Several
-whole-module runs at once each build and run every test binary on every core, and measured at the
-house's load, three started together all timed out where one at a time finished. Inside a run nothing
-is held back: packages and `t.Parallel` tests run at full width. One package runs at once, through the
-wrapper or plain `go test`.
+Heavy Go work goes through `cohere-dev`, which takes a token from the machine's pool and runs with Go
+held to the token's share of the cores, niced (#qhg0ntb): `go run ./command/cohere-dev test ./...` for the
+landing gate, `test <package>` or `test --fast` while editing, `build` and `vet`, and `exec -- <command>`
+for anything else heavy, a bench or a cohere run. A run that finds every token held waits its turn in
+arrival order and names who holds them; `cohere-dev status` shows the pool and the line. Plain `go test`,
+`go build` and `go vet` run unbudgeted on every core, and a dozen of them at once held the machine at load
+110 to 180, made a 27s gate take 7 to 10 minutes, and failed tests on their deadlines. Inside a token's run
+nothing more is held back: its packages and `t.Parallel` tests use the whole share.
+
+Work lands on main through `go run ./command/cohere-dev land`, run in the worktree being landed, with
+its work committed (#fz6xejy). It takes the machine's one land lock in arrival order and holds it from
+merge to fast-forward: it merges current main in, gates the result (`go vet ./...` and the whole
+module's tests, through a pool token), and fast-forwards main to it, checkout and all. Nothing landed
+this way moves main during another's gate. A fast-forward of main by hand does, and when one happens
+mid-gate, land merges it and gates again. A merge that conflicts is undone and its files named. On a
+loaded morning a branch gated green eight times without landing, and every one of those gates compiled a
+merge that never existed again.
+
+The Go build cache is held under a cap, 40 GB unless `COHERE_DEV_CACHE_GB` says otherwise (#jc6ca7r).
+When a token's run ends, at most once every ten minutes for the machine, `cohere-dev` looks at the
+cache in the background, and when it is over the cap it takes every token, trims the least recently
+used entries to three quarters of the cap, and gives the tokens back. `cohere-dev status` shows the
+last look. Go alone keeps entries for five days, and the house refilled 200 GB in two and a half hours.
 
 A gate run never passes `-count=1`, and the wrapper refuses one for the whole module. Go's test cache
 skips every package whose inputs did not change, and after a one-file change `-count=1` cost 81% more

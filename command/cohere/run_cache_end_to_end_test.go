@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -45,6 +46,20 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// nodeCounts is the lint line's node account: what the walk visited, and what the cache covered by replay.
+var nodeCounts = regexp.MustCompile(`(\d+) nodes visited(?:, (\d+) more covered by replay)?`)
+
+// foldNodeCounts writes each lint line's node account as one total, the form a warm run and a cold run agree on:
+// the warm one walked fewer nodes and replayed the rest (#kdee854).
+func foldNodeCounts(output string) string {
+	return nodeCounts.ReplaceAllStringFunc(output, func(account string) string {
+		parts := nodeCounts.FindStringSubmatch(account)
+		visited, _ := strconv.Atoi(parts[1])
+		replayed, _ := strconv.Atoi(parts[2])
+		return fmt.Sprintf("%d nodes visited", visited+replayed)
+	})
+}
+
 // TestRunCacheEndToEnd is the run cache's proof against the real binary over a real git repository.
 //
 // For each input category: establish a hit, make the change, and require that the next run does not
@@ -63,7 +78,7 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// so it comes off before a comparison and is required or forbidden separately per scenario.
 	// The types phase's clause says how many files' semantic diagnostics were replayed; a cold run never has it.
 	typesClause := regexp.MustCompile(`; \d+ of \d+ files' semantic diagnostics replayed from cache`)
-	layerTwoClause := regexp.MustCompile(`; \d+ of \d+ files replayed from cache( \(type-aware rules ran again on \d+ of them, shape-keyed on \d+\))?( \(design-system rules ran again on \d+ of them\))?`)
+	layerTwoClause := regexp.MustCompile(`; \d+ of \d+ files replayed from cache( \(type-aware rules ran again on \d+ of them, shape-keyed on \d+\))?( \(design-system rules ran again on \d+ of them\))?( \(derived rules ran again on \d+ of them\))?`)
 	// A cold run is a `--no-cache` run, which says so in a line no cached run prints.
 	cacheOffLine := regexp.MustCompile(`(?m)^  cache: off, by --no-cache.*\n`)
 	// A cached run says how many shapes it keyed on content (#5txm9gg); a cold run keys none, so the line is
@@ -79,7 +94,7 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// cache answered for, which a warm run and a cold one differ in by design.
 	footerLine := regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) .*\n?`)
 	normalized := func(output string) string {
-		output = missLine.ReplaceAllString(contentKeyedLine.ReplaceAllString(output, ""), "")
+		output = foldNodeCounts(missLine.ReplaceAllString(contentKeyedLine.ReplaceAllString(output, ""), ""))
 		return typesClause.ReplaceAllString(footerLine.ReplaceAllString(totalLine.ReplaceAllString(cacheOffLine.ReplaceAllString(layerTwoClause.ReplaceAllString(durations.ReplaceAllString(output, "T"), ""), ""), ""), ""), "")
 	}
 	keepLines := func(output string, drop ...string) string {
@@ -454,14 +469,14 @@ func (fixture *runCacheFixture) run(cached bool, arguments ...string) (string, i
 	if !isExit {
 		fixture.t.Fatalf("running cohere: %v\n%s", err, output)
 	}
-	return string(output), exitError.ExitCode()
+	return string(output), childExitCode(fixture.t, exitError)
 }
 
-// establishHit runs twice and requires the second to replay the first.
-func (fixture *runCacheFixture) establishHit() {
+// establishHit runs twice with arguments and requires the second to replay the first.
+func (fixture *runCacheFixture) establishHit(arguments ...string) {
 	fixture.t.Helper()
-	fixture.run(true)
-	if output, _ := fixture.run(true); !isRunCacheReplay(output) {
+	fixture.run(true, arguments...)
+	if output, _ := fixture.run(true, arguments...); !isRunCacheReplay(output) {
 		fixture.t.Fatalf("an unchanged tree did not replay, so nothing below can show a change was noticed:\n%s", output)
 	}
 }

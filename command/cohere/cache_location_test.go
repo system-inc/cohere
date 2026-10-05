@@ -115,7 +115,7 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(t *testing.T) {
 		kept := []string{}
 		for _, line := range strings.Split(output, "\n") {
 			if strings.Contains(line, " - ") || strings.HasPrefix(line, "lint: ") || strings.HasPrefix(line, "types: ") {
-				kept = append(kept, replayedClause.ReplaceAllString(durations.ReplaceAllString(line, "T"), ""))
+				kept = append(kept, foldNodeCounts(replayedClause.ReplaceAllString(durations.ReplaceAllString(line, "T"), "")))
 			}
 		}
 		return strings.Join(kept, "\n")

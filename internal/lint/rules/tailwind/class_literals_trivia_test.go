@@ -20,19 +20,19 @@ func TestClassLiteralFixesKeepTheirQuotesAfterTrivia(t *testing.T) {
 	}{
 		{
 			name:   "literal on its own line",
-			source: "const merged = mergeClassNames(\n    'flex flex',\n);\n",
-			want:   "const merged = mergeClassNames(\n    'flex',\n);\n",
+			source: "const merged = cn(\n    'flex flex',\n);\n",
+			want:   "const merged = cn(\n    'flex',\n);\n",
 		},
 		{
 			name:   "literal after a comma",
-			source: "const merged = mergeClassNames('p-2', 'flex flex');\n",
-			want:   "const merged = mergeClassNames('p-2', 'flex');\n",
+			source: "const merged = cn('p-2', 'flex flex');\n",
+			want:   "const merged = cn('p-2', 'flex');\n",
 		},
 		{
 			// The control: no trivia before the literal, which was always right.
 			name:   "literal with no trivia before it",
-			source: "const merged = mergeClassNames('flex flex');\n",
-			want:   "const merged = mergeClassNames('flex');\n",
+			source: "const merged = cn('flex flex');\n",
+			want:   "const merged = cn('flex');\n",
 		},
 	}
 	for _, testCase := range testCases {

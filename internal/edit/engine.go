@@ -6,6 +6,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // DefaultMaxPasses bounds convergence.
@@ -105,6 +107,22 @@ type Propose func(fileName string, text string) ([]Proposal, error)
 // alone and every proposal in the pass is reported as refused, so the reader learns which file and
 // which rules to look at.
 func FixText(fileName string, text string, propose Propose, maxPasses int) (FileResult, error) {
+	result, _, err := fixText(fileName, text, nil, propose, maxPasses)
+	return result, err
+}
+
+// fixText is FixText, also returning the guard's tree of the text it settled on: the starting text's, or
+// the last accepted pass's. Nil where the guard built none (a file the TypeScript parser does not own), and
+// for a file whose passes ran out and were discarded.
+//
+// seed is a tree of text someone already parsed, or nil: the starting guard takes it rather than parsing where
+// it is the tree the guard would build (seedFor), and every later guard parses as always.
+//
+// One tree is held at a time. Keeping the starting tree through every pass, for the rare file that runs out
+// and reverts, held two whole trees and a third being built on a file with fixes, and a 2.8 MB bundle is a
+// file with fixes (#xn1k1gz). The formatter parses a reverted file again, as it did before it was handed
+// trees at all. Found by @system_cohere_lint_fix in review.
+func fixText(fileName string, text string, seed *ast.SourceFile, propose Propose, maxPasses int) (FileResult, *ast.SourceFile, error) {
 	if maxPasses <= 0 {
 		maxPasses = DefaultMaxPasses
 	}
@@ -115,8 +133,16 @@ func FixText(fileName string, text string, propose Propose, maxPasses int) (File
 	// broken is not this package's problem to report — the types phase does that, loudly — but it is
 	// this package's problem not to make worse, and "the result parses" is a guarantee that says
 	// nothing if the input did not.
-	if parses, reason := Parses(fileName, text); !parses {
-		return result, fmt.Errorf("%s does not parse before any fix is applied (%s)", fileName, reason)
+	var parses bool
+	var reason string
+	var currentTree *ast.SourceFile
+	if seedFor(fileName, text, seed) {
+		parses, reason, currentTree = verdictOf(seed)
+	} else {
+		parses, reason, currentTree = parsesWithTree(fileName, text)
+	}
+	if !parses {
+		return result, nil, fmt.Errorf("%s does not parse before any fix is applied (%s)", fileName, reason)
 	}
 
 	current := text
@@ -130,7 +156,7 @@ func FixText(fileName string, text string, propose Propose, maxPasses int) (File
 
 		proposals, err := propose(fileName, current)
 		if err != nil {
-			return result, fmt.Errorf("collecting fixes for %s on pass %d: %w", fileName, pass, err)
+			return result, nil, fmt.Errorf("collecting fixes for %s on pass %d: %w", fileName, pass, err)
 		}
 		lastProposals = proposals
 		if len(proposals) == 0 {
@@ -150,7 +176,11 @@ func FixText(fileName string, text string, propose Propose, maxPasses int) (File
 			break
 		}
 
-		if parses, reason := Parses(fileName, rewritten); !parses {
+		// Let go of the last pass's tree before building this one's. A pass refused below leaves the file
+		// with no tree, and the formatter parses it, as it did before it was handed one.
+		currentTree = nil
+		parses, reason, rewrittenTree := parsesWithTree(fileName, rewritten)
+		if !parses {
 			for _, proposal := range plan.Applied {
 				result.Rejected = append(result.Rejected, Rejection{
 					Proposal:         proposal,
@@ -165,6 +195,7 @@ func FixText(fileName string, text string, propose Propose, maxPasses int) (File
 		}
 
 		current = rewritten
+		currentTree = rewrittenTree
 		result.Applied = append(result.Applied, plan.Applied...)
 		result.Changed = true
 	}
@@ -191,11 +222,11 @@ func FixText(fileName string, text string, propose Propose, maxPasses int) (File
 		result.Applied = nil
 		result.Changed = false
 		result.Text = text
-		return result, nil
+		return result, nil, nil
 	}
 
 	result.Text = current
-	return result, nil
+	return result, currentTree, nil
 }
 
 // breaksParseAlone reports whether one fix, applied by itself to the text its pass started from, already
@@ -263,7 +294,13 @@ func FixFile(fileName string, propose Propose, maxPasses int) (FileResult, error
 //
 // Identified by @system_cohere_format, which read this package and found the failure mode before
 // anything was built against it.
-type Transform func(fileName string, text string) (string, error)
+//
+// parsed is a tree of text that the engine's own guard already built, or nil. A transform that parses with
+// typescript-go may take it rather than parse the same bytes again, which every formatted TypeScript file
+// did: 0.18 GB a cold ahra run (#dk2502g). It is the guard's tree, parsed with the guard's script kind (JS
+// for a .js file, where the formatter parses TSX), so a transform takes it only where it is the tree it
+// would build, and a wrapper passes it through untouched.
+type Transform func(fileName string, text string, parsed *ast.SourceFile) (string, error)
 
 // ErrSkipped is what a transform returns to decline a file rather than to fail on it.
 //
@@ -341,11 +378,19 @@ func FixAndTransformFile(fileName string, propose Propose, transform Transform, 
 // through the same function the writing run calls before it writes, so a file this reports as
 // unchanged is a file `--fix` would leave alone, and the two cannot drift apart.
 func CheckFile(fileName string, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
+	return CheckFileSeeded(fileName, nil, propose, transform, maxPasses)
+}
+
+// CheckFileSeeded is CheckFile given a tree of the file that someone already parsed, the program's, or nil.
+// The file is still read now, and the tree is taken only if it is of exactly the bytes read and is the tree
+// the guard would build (seedFor), so a tree of a stale copy, or of another script kind, is parsed past as if
+// it were not there. Taken, it is the starting guard's tree and the transform's (#dk2502g).
+func CheckFileSeeded(fileName string, seed *ast.SourceFile, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
 	text, err := readFile(fileName)
 	if err != nil {
 		return FileResult{FileName: fileName}, err
 	}
-	return FixAndTransformText(fileName, text, propose, transform, maxPasses)
+	return fixAndTransformText(fileName, text, seed, propose, transform, maxPasses)
 }
 
 // FixAndTransformText is FixAndTransformFile on text in hand, writing nothing: the fixpoint, then the
@@ -363,21 +408,29 @@ func CheckFile(fileName string, propose Propose, transform Transform, maxPasses 
 // FormatFixRoundLimit rounds. A file still changing after that is left exactly as it was found and
 // reported as not converged, naming the rules and the formatter, never written half-settled.
 func FixAndTransformText(fileName string, text string, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
-	result, err := FixText(fileName, text, propose, maxPasses)
+	return fixAndTransformText(fileName, text, nil, propose, transform, maxPasses)
+}
+
+// fixAndTransformText is FixAndTransformText with a seed for the starting guard (fixText).
+func fixAndTransformText(fileName string, text string, seed *ast.SourceFile, propose Propose, transform Transform,
+	maxPasses int) (FileResult, error) {
+	result, tree, err := fixText(fileName, text, seed, propose, maxPasses)
 	if err != nil || transform == nil {
 		return result, err
 	}
 	if !result.Converged {
 		// The fixes ran out of passes and were discarded, so the transform formats the text as found,
 		// once, as it always has. Re-linting what it printed would only meet the same arguing rules.
-		applyTransform(&result, fileName, transform)
+		applyTransform(&result, fileName, transform, tree)
 		return result, nil
 	}
 
 	for round := 1; ; round++ {
-		if !applyTransform(&result, fileName, transform) {
+		changed, printedTree := applyTransform(&result, fileName, transform, tree)
+		if !changed {
 			return result, nil
 		}
+		tree = printedTree
 
 		// Only a file the TypeScript parser reads has rules to ask. A markdown, css or json file the
 		// printer changed has nothing to re-lint, and handing it to the TypeScript parser crashed the
@@ -421,7 +474,7 @@ func FixAndTransformText(fileName string, text string, propose Propose, transfor
 			}
 			return propose(name, current)
 		}
-		next, err := FixText(fileName, result.Text, startingWith, maxPasses)
+		next, nextTree, err := fixText(fileName, result.Text, nil, startingWith, maxPasses)
 		if err != nil {
 			return result, err
 		}
@@ -441,6 +494,7 @@ func FixAndTransformText(fileName string, text string, propose Propose, transfor
 		if next.Changed {
 			result.Text = next.Text
 			result.Applied = append(result.Applied, next.Applied...)
+			tree = nextTree
 		}
 	}
 }
@@ -452,10 +506,17 @@ func FixAndTransformText(fileName string, text string, propose Propose, transfor
 const FormatFixRoundLimit = 3
 
 // applyTransform runs the transform once over result.Text and records what happened, reporting
-// whether it changed the text. A skip, a failure, a result that does not parse, and text already in
-// the transform's shape all leave the text as it was and report false.
-func applyTransform(result *FileResult, fileName string, transform Transform) bool {
-	transformed, transformError := transform(fileName, result.Text)
+// whether it changed the text, and the guard's tree of the text it printed. A skip, a failure, a result
+// that does not parse, and text already in the transform's shape all leave the text as it was and report
+// false.
+//
+// tree is the guard's tree of result.Text, or nil, and is offered to the transform only while it is still
+// that text's.
+func applyTransform(result *FileResult, fileName string, transform Transform, tree *ast.SourceFile) (bool, *ast.SourceFile) {
+	if tree != nil && tree.Text() != result.Text {
+		tree = nil
+	}
+	transformed, transformError := transform(fileName, result.Text, tree)
 	switch {
 	case errors.Is(transformError, ErrSkipped):
 		// The transform declined this file on purpose — a file type it does not handle, or one it
@@ -465,7 +526,7 @@ func applyTransform(result *FileResult, fileName string, transform Transform) bo
 		// as a run where four hundred files were already correctly formatted.
 		result.TransformSkipped = true
 		result.TransformSkipReason = skipReasonOf(transformError)
-		return false
+		return false, nil
 
 	case transformError != nil:
 		// A transform that failed says nothing about the fixes, which already converged and
@@ -475,27 +536,28 @@ func applyTransform(result *FileResult, fileName string, transform Transform) bo
 			Proposal: Proposal{RuleName: transformRuleName},
 			Reason:   fmt.Sprintf("%s (%s)", ReasonTransformFailed, transformError),
 		})
-		return false
+		return false, nil
 
 	case transformed == result.Text:
 		// Already in the shape the transform wants. Not an error and not a change.
-		return false
+		return false, nil
 	}
 
 	// The guard applies to the transform exactly as it applies to a fix pass. A whole-text
 	// rewrite has a wider blast radius than any single fix, so it earns the check more, not
 	// less.
-	if parses, reason := Parses(fileName, transformed); !parses {
+	parses, reason, printedTree := parsesWithTree(fileName, transformed)
+	if !parses {
 		result.Rejected = append(result.Rejected, Rejection{
 			Proposal: Proposal{RuleName: transformRuleName},
 			Reason:   fmt.Sprintf("%s (%s)", ReasonParseFailure, reason),
 		})
-		return false
+		return false, nil
 	}
 	result.Text = transformed
 	result.Transformed = true
 	result.Changed = true
-	return true
+	return true, printedTree
 }
 
 // Summary is what a whole fix run did, across every file.

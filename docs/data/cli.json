@@ -1,6 +1,10 @@
 {
     "flags": [
         {
+            "name": "adamic-readiness",
+            "usage": "say what share of the files are Adamic-ready, measured with cohere:adamic at the set's own options, in the footer and in --json"
+        },
+        {
             "name": "cache-dump",
             "usage": "print what the cache table for this project holds, and exit"
         },

@@ -90,7 +90,8 @@ func measureTests(t *testing.T, root string, pattern string, environment []strin
 func TestTheFastTierRefusesCountOnce(t *testing.T) {
 	t.Parallel()
 	for _, arguments := range [][]string{{"--fast", "-count=1"}, {"--fast", "-count", "1"}, {"--fast", "-v", "--count=1"}} {
-		if code := test(arguments); code != 2 {
+		// --full-priority, so the refusal is all this asks of run: nothing nices this test process.
+		if code := run("test", append([]string{fullPriorityFlag}, arguments...)); code != 2 {
 			t.Errorf("cohere-dev test %v exited %d, want 2, the refusal", arguments, code)
 		}
 	}

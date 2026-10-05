@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/formatfiles"
 	"github.com/system-inc/cohere/internal/release/packaging"
@@ -217,8 +218,8 @@ func (record *formatRecord) observe(inner edit.Transform, optionsFor func(fileNa
 	if record == nil || inner == nil || record.key == "" {
 		return inner
 	}
-	return func(fileName string, text string) (string, error) {
-		formatted, err := inner(fileName, text)
+	return func(fileName string, text string, parsed *ast.SourceFile) (string, error) {
+		formatted, err := inner(fileName, text, parsed)
 		if err != nil {
 			return formatted, err
 		}
