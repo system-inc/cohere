@@ -74,7 +74,9 @@ See [Output](#output) for what that line says, and for `--verbose` and `--json`.
 
 With no settings file, cohere applies the house stack, each set where the code shows it fits:
 
-- `cohere:typescript` on every file.
+- `cohere:typescript` on every file. It composes two sets a configuration can also name on its own:
+  `cohere:adamic`, the soundness set, whose rules hold types to the truth, and `cohere:style`, the taste
+  set.
 - `cohere:react` on each file that imports `react` or a `react-` package, or contains JSX.
 - `cohere:next` on each file that imports `next`, and, once anything does, on Next's own files: everything
   under `app/` and `pages/`, and `middleware`, `instrumentation` and `next.config`.

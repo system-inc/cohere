@@ -1552,9 +1552,9 @@
                 {
                     "examples": [
                         "cohere:adamic",
-                        "cohere:house",
                         "cohere:next",
                         "cohere:react",
+                        "cohere:style",
                         "cohere:system-inc/base",
                         "cohere:system-inc/structure",
                         "cohere:tailwind",
@@ -1567,9 +1567,9 @@
                     "items": {
                         "examples": [
                             "cohere:adamic",
-                            "cohere:house",
                             "cohere:next",
                             "cohere:react",
+                            "cohere:style",
                             "cohere:system-inc/base",
                             "cohere:system-inc/structure",
                             "cohere:tailwind",

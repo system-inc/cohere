@@ -77,7 +77,7 @@ For each rule this file sets differently from the file it extends, the reason wh
 
 What this file builds on: a path to another settings file, relative to this one, or a rule set cohere carries, named cohere:<name>, or a list of them applied in order. Their rules, overrides and ignore patterns apply first and this file's after, so a shared tier holds most of the configuration and a project states only what differs. A base two entries share is read once, outermost.
 
-The rule sets cohere carries: `cohere:adamic`, `cohere:house`, `cohere:next`, `cohere:react`, `cohere:system-inc/base`, `cohere:system-inc/structure`, `cohere:tailwind`, `cohere:typescript`.
+The rule sets cohere carries: `cohere:adamic`, `cohere:next`, `cohere:react`, `cohere:style`, `cohere:system-inc/base`, `cohere:system-inc/structure`, `cohere:tailwind`, `cohere:typescript`.
 
 ```json
 { "extends": ["cohere:typescript", "./NexusCohereSettings.json"] }
