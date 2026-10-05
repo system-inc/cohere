@@ -9,7 +9,7 @@
                 "column": 19,
                 "endLine": 1,
                 "endColumn": 21,
-                "messageId": "noEmptyObjectType",
+                "messageId": "noEmptyObject",
                 "message": "`{}` does not mean an empty object. It means any value that is not null or undefined, so a string and a number both satisfy it. That is almost never what the author intended, and the two readings are impossible to tell apart at a glance. Use `object` for any non-primitive, or `unknown` for genuinely any value.",
                 "suggestions": 2
             }
@@ -21,7 +21,8 @@
     },
     "assertedMessageIds": [
         "noEmptyInterface",
-        "noEmptyObjectType"
+        "noEmptyInterfaceWithSuper",
+        "noEmptyObject"
     ],
     "assertsSuggestion": true
 }

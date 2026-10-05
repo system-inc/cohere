@@ -1488,9 +1488,13 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-empty-object-type",
             "typeAware": false,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "noEmptyInterface",
-                "noEmptyObjectType"
+                "noEmptyInterfaceWithSuper",
+                "noEmptyObject"
             ],
             "fixKind": "suggestion",
             "sets": [

@@ -28,7 +28,6 @@ func init() {
 		},
 		rule.Registration{Rule: NoArrayDelete},
 		rule.Registration{Rule: NoDuplicateEnumValues},
-		rule.Registration{Rule: NoEmptyObjectType},
 		rule.Registration{
 			Rule:   NoExplicitAny,
 			Decode: rule.DecodeOptionsInto[NoExplicitAnyOptions](),
