@@ -10,6 +10,8 @@ package prettier
 import (
 	"path/filepath"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/types/sourcename"
 )
 
 // parserForExtension maps a file extension to the Prettier parser that handles it.
@@ -46,10 +48,13 @@ var parserForExtension = map[string]string{
 // The filename matters and not only its extension: Prettier's own file-info inference picks
 // json-stringify for package.json, and a formatter that used plain json there would rewrite npm's
 // formatting on every run.
+//
+// The extension is the one the name is treated as, so an Adamic `.a` file parses with typescript, as the
+// same file named `.ts` would (#6mhafvb).
 func parserFor(fileName string) (string, bool) {
 	if filepath.Base(fileName) == "package.json" {
 		return "json-stringify", true
 	}
-	parser, ok := parserForExtension[strings.ToLower(filepath.Ext(fileName))]
+	parser, ok := parserForExtension[strings.ToLower(filepath.Ext(sourcename.TreatedAs(fileName)))]
 	return parser, ok
 }

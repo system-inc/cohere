@@ -1,29 +1,29 @@
 package javascript
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/printing"
+	"github.com/system-inc/cohere/internal/types/sourcename"
 )
 
 // print/type-parameters.js.
-
-var typeScriptFileExtension = regexp.MustCompile(`\.ts$`)
 
 // Keep comma if the file extension not `.ts` and
 // has one type parameter that isn't extend with any types.
 // Because, otherwise formatted result will be invalid as tsx.
 //
-// shouldForceTrailingComma is upstream's shouldForceTrailingComma.
+// shouldForceTrailingComma is upstream's shouldForceTrailingComma. Upstream tests the path against
+// /\.ts$/; the name is read through sourcename.TreatedAs, so an Adamic `.a` file drops the comma as the
+// same file named `.ts` does (#6mhafvb).
 func shouldForceTrailingComma(path *Path, options *Options, paramsKey string) bool {
 	current := node(path)
 	return len(getFunctionParameters(current)) == 1 &&
 		strings.HasPrefix(current.Type(), "TS") &&
 		!current.List(paramsKey)[0].Truthy("constraint") &&
 		parentOf(path).Is("ArrowFunctionExpression") &&
-		!(settingsOf(options).FilePath != "" && typeScriptFileExtension.MatchString(settingsOf(options).FilePath))
+		!(settingsOf(options).FilePath != "" && strings.HasSuffix(sourcename.TreatedAs(settingsOf(options).FilePath), ".ts"))
 }
 
 /*
