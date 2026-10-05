@@ -7,6 +7,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/types/sourcename"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -31,6 +32,20 @@ func messageMissingTranslation(key string, locale string) rule.Message {
 		Description: localizationNoUntranslatedValueMissingTranslationText.Render(map[string]string{
 			"key":    key,
 			"locale": locale,
+		}),
+	}
+}
+
+// localizationNoUntranslatedValueAmbiguousEnglishSiblingText is the rule's `ambiguousEnglishSibling`
+// message, whose wording lives in `policy/messages/localization-no-untranslated-value.json`.
+var localizationNoUntranslatedValueAmbiguousEnglishSiblingText = policy.MessageOf("nexus/localization-no-untranslated-value", "ambiguousEnglishSibling")
+
+func messageAmbiguousEnglishSibling(first string, second string) rule.Message {
+	return rule.Message{
+		Id: "ambiguousEnglishSibling",
+		Description: localizationNoUntranslatedValueAmbiguousEnglishSiblingText.Render(map[string]string{
+			"first":  first,
+			"second": second,
 		}),
 	}
 }
@@ -73,6 +88,10 @@ func messageIdenticalToSource(key string, locale string, value string) rule.Mess
 // program and already parsed. Asking the program for it costs a map lookup, it cannot go stale
 // against the file being linted, and it does not hold parsed ASTs alive for the process lifetime.
 //
+// An Adamic translation set's English is en.a, and a set moving to Adamic file by file can hold either,
+// so the sibling is looked up with the file's own extension first, then the other; both present is
+// reported, since which is English would be a guess (#kwt1htp).
+//
 // A file whose en.ts is not in the program is declined rather than reported on. That is the
 // conservative direction on purpose: the alternative is reporting every key in a locale file as
 // untranslatable because the comparison basis was missing, which is a wall of findings that says
@@ -99,8 +118,15 @@ var LocalizationNoUntranslatedValue = rule.Rule{
 		if ctx.Program == nil {
 			return nil
 		}
-		englishSourceFile := ctx.Program.GetSourceFile(translationsDirectory + "/en.ts")
+		englishSourceFile, both := englishSibling(ctx.Program, translationsDirectory, ctx.SourceFile.FileName())
+		if both != nil {
+			fileStart := ctx.SourceFile.AsNode().Loc.WithEnd(ctx.SourceFile.AsNode().Loc.Pos())
+			ctx.ReportRange(fileStart, messageAmbiguousEnglishSibling(both[0], both[1]))
+			return nil
+		}
 		if englishSourceFile == nil {
+			// Declined silently, as the Nexus twin declines (#techtr1 makes a missing English sibling
+			// report in both engines, once the consumers are measured).
 			return nil
 		}
 		englishValues := map[string]string{}
@@ -362,8 +388,9 @@ func unwrapTypeAssertions(expression *ast.Node) *ast.Node {
 // directory named "translations-archive" and, worse, would silently start linting whatever a future
 // directory named that way holds.
 func translationFileInformation(sourceFile *ast.SourceFile) (string, string, bool) {
+	// An Adamic `.a` translation file is read as the `.ts` it is (#kwt1htp).
 	fileName := imports.NormalizedFileName(sourceFile)
-	if !strings.HasSuffix(fileName, ".ts") {
+	if !strings.HasSuffix(sourcename.TreatedAs(fileName), ".ts") {
 		return "", "", false
 	}
 
@@ -374,10 +401,13 @@ func translationFileInformation(sourceFile *ast.SourceFile) (string, string, boo
 	directory := fileName[:lastSlash]
 	baseName := fileName[lastSlash+1:]
 
-	if baseName == "en.ts" || baseName == "index.ts" || baseName == "locales.ts" ||
-		strings.HasSuffix(baseName, "Translations.ts") ||
-		strings.HasSuffix(baseName, "TranslationsType.ts") ||
-		strings.HasSuffix(baseName, "Interface.ts") {
+	switch sourcename.TreatedAs(baseName) {
+	case "en.ts", "index.ts", "locales.ts":
+		return "", "", false
+	}
+	if strings.HasSuffix(sourcename.TreatedAs(baseName), "Translations.ts") ||
+		strings.HasSuffix(sourcename.TreatedAs(baseName), "TranslationsType.ts") ||
+		strings.HasSuffix(sourcename.TreatedAs(baseName), "Interface.ts") {
 		return "", "", false
 	}
 
@@ -389,5 +419,31 @@ func translationFileInformation(sourceFile *ast.SourceFile) (string, string, boo
 		return "", "", false
 	}
 
-	return strings.TrimSuffix(baseName, ".ts"), directory, true
+	return strings.TrimSuffix(sourcename.TreatedAs(baseName), ".ts"), directory, true
+}
+
+// englishSibling finds a translation file's English table: en with the file's own extension first,
+// then the other one, since a set moving to Adamic file by file holds `.ts` and `.a` side by side
+// (#kwt1htp). When both en.ts and en.a are in the program, which is English is a guess, so both names
+// come back for the rule to report and the file is not compared at all. Neither found returns nil.
+func englishSibling(program rule.Program, directory string, fileName string) (*ast.SourceFile, []string) {
+	extensions := []string{".ts", sourcename.AdamicExtension}
+	if sourcename.IsAdamic(fileName) {
+		extensions = []string{sourcename.AdamicExtension, ".ts"}
+	}
+	var found *ast.SourceFile
+	var names []string
+	for _, extension := range extensions {
+		name := directory + "/en" + extension
+		if sourceFile := program.GetSourceFile(name); sourceFile != nil {
+			if found == nil {
+				found = sourceFile
+			}
+			names = append(names, name)
+		}
+	}
+	if len(names) > 1 {
+		return nil, names
+	}
+	return found, nil
 }
