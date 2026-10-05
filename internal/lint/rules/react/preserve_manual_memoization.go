@@ -114,8 +114,10 @@ var messagePreserveManualMemoizationDependencyMutable = rule.Message{
 //
 // The first dry run over ahra: 287 findings across 3,516 files in 7,603ms, 43.4% of all rule time,
 // when the rule lowered every outermost function in every file. Since the spelling gate
-// (`hir.MayNameManualMemoization`) it lowers only a function that can name a memo hook, and a
-// profile on 2026-10-03 put it near 620ms. What it pays per function it does lower is inherent: the
+// (`hir.MayNameManualMemoization`) it analyzes only a function that can name a memo hook, and a
+// profile on 2026-10-03 put it near 620ms. Since #rwsffzm it starts from a copy of the shared
+// lowering rather than lowering the function again, which on a cold ahra run took 665K objects and
+// 0.06 GB off. What it pays per function it does analyze is inherent: the
 // compiler's intermediate representation and eighteen pipeline passes over it -- mutable range
 // inference, scope assignment, alignment, merging, four prunes and a reactive rebuild -- because the
 // judgment being ported is "what survived compilation", and nothing cheaper can answer it.
@@ -186,11 +188,14 @@ var PreserveManualMemoization = rule.Rule{
 					if !hir.MayNameManualMemoization(functionNode, text[functionNode.Pos():functionNode.End()]) {
 						return
 					}
-					function := hir.Lower(functionNode, ctx.TypeChecker)
+					// A copy of the shared lowering rather than a lowering of its own. The pipeline
+					// rewrites the graph it is handed, so it cannot read the shared one, and a copy
+					// skips the control-flow build and single-assignment construction the other react
+					// rules have already paid for on this function (#rwsffzm).
+					function := hir.CloneFunction(hir.ForFunction(ctx, functionNode))
 					if function == nil {
 						return
 					}
-					hir.Construct(function)
 					for _, finding := range hir.AnalyzePreservedManualMemoization(function, ctx.TypeChecker) {
 						identifier := function.Identifier(finding.Identifier)
 						if identifier == nil || identifier.Node == nil {
