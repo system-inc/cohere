@@ -527,6 +527,7 @@ func run() error {
 			ContentPack:      contentPack,
 			Timing:           graphTiming,
 			Yielded:          yield.yieldedFiles(),
+			Listings:         discoveredListings,
 		})
 		if err != nil {
 			// A program that fails to build is a loud failure and never an empty result. An empty file list
