@@ -133,7 +133,7 @@ func readCommittedBuild(moduleDirectory string) (committedBuild, error) {
 
 // buildCommitted extracts the snapshot, builds it, and proves the result before it can be found.
 func buildCommitted(paths Paths, packagePath string, build committedBuild, binaryPath string) error {
-	for _, directory := range []string{paths.BinaryDirectory(), paths.GoCacheDirectory(), paths.SnapshotDirectory(), paths.CompilerDirectory()} {
+	for _, directory := range []string{paths.BinaryDirectory(), paths.SnapshotDirectory(), paths.CompilerDirectory()} {
 		if err := os.MkdirAll(directory, 0o755); err != nil {
 			return fmt.Errorf("creating %s: %w", directory, err)
 		}
@@ -225,7 +225,6 @@ func pruneAfterBuild(paths Paths, keep string, currentCompiler string) {
 	if applyErr != nil {
 		Report.Fail("cohere: the prune stopped part way: %v", applyErr)
 	}
-	boundGoCacheAfterBuild(paths)
 }
 
 // ensureCompiler returns an extraction of the compiler at compilerCommit, creating it once.
@@ -294,7 +293,7 @@ func goBuildSnapshot(paths Paths, snapshot string, packagePath string, build com
 		arguments = append(arguments, flag)
 	}
 	workspace := "GOWORK=" + filepath.Join(snapshot, "go.work")
-	formatter, err := FormatterIdentity(snapshot, build.GoVersion, []string{"GOCACHE=" + paths.GoCacheDirectory(), workspace})
+	formatter, err := FormatterIdentity(snapshot, build.GoVersion, []string{workspace})
 	if err != nil {
 		return err
 	}
@@ -312,11 +311,8 @@ func goBuildSnapshot(paths Paths, snapshot string, packagePath string, build com
 
 	command := exec.Command("go", arguments...)
 	command.Dir = snapshot
-	command.Env = append(os.Environ(),
-		"GOCACHE="+paths.GoCacheDirectory(),
-		workspace,
-		"CGO_ENABLED=0",
-	)
+	// The shared Go cache, as build() uses: see ReleaseBuildFlags.
+	command.Env = append(os.Environ(), workspace, "CGO_ENABLED=0")
 	command.Stderr = os.Stderr
 
 	if err := command.Run(); err != nil {

@@ -84,13 +84,8 @@ func TestALaunchedRunPrintsOnlyCoheresOwnOutputOffATerminal(t *testing.T) {
 	if output, err := exec.Command("go", "build", "-o", launcher, "../../../command/cohere-dispatch").CombinedOutput(); err != nil {
 		t.Fatalf("building the launcher: %v\n%s", err, output)
 	}
-	// The launcher keeps its cache in the checkout. Its Go cache is the toolchain's own, so the fixture
-	// does not compile the standard library cold, as newCommittedFixture does for its own paths.
-	cache := filepath.Join(fixture.superproject, ".cache", "cohere")
-	if err := os.MkdirAll(cache, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(strings.TrimSpace(goEnvironmentValue(t, "GOCACHE")), filepath.Join(cache, "gocache")); err != nil {
+	// The launcher keeps its cache in the checkout, and builds through the toolchain's own Go cache.
+	if err := os.MkdirAll(filepath.Join(fixture.superproject, ".cache", "cohere"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -98,8 +93,7 @@ func TestALaunchedRunPrintsOnlyCoheresOwnOutputOffATerminal(t *testing.T) {
 		t.Helper()
 		command := exec.Command(launcher, arguments...)
 		command.Dir = fixture.superproject
-		// The default cache the launcher bounds in the background is one of the test's own.
-		command.Env = append(os.Environ(), "COHERE_WAIT=1", "GOCACHE="+t.TempDir())
+		command.Env = append(os.Environ(), "COHERE_WAIT=1")
 		output, err := command.CombinedOutput()
 		if err != nil {
 			t.Fatalf("the launcher failed: %v\n%s", err, output)
@@ -126,8 +120,6 @@ func TestALaunchedRunPrintsOnlyCoheresOwnOutputOffATerminal(t *testing.T) {
 func TestAPruneIsSilentUnlessVerbose(t *testing.T) {
 	for _, verbose := range []bool{false, true} {
 		paths, _ := seedPruneCache(t)
-		writeFile(t, filepath.Join(paths.GoCacheDirectory(), "README"),
-			"This directory holds cached build artifacts from the Go build system.\n")
 		var out bytes.Buffer
 		previous := Report
 		Report = NewProgress(&out, verbose, false)

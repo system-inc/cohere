@@ -197,19 +197,20 @@ in your own checkout works too, and its `--version` reports the uncommitted chan
 The build flags are fixed at `-trimpath -ldflags="-s -w"`. They make the link marginally faster and
 the binary 29% smaller, and `-trimpath` is a build-input change rather than a link flag: turning it
 on invalidates the entire compile cache, measured at 33s on a warm 2.0 GB cache. Flipping it per run
-would pay that repeatedly, so it does not vary. `GOCACHE` is pinned inside `.cache/cohere/` so that
-other Go work neither shares it nor evicts it — Go's default cache trims entries unused for about
-five days, which would quietly turn a warm rebuild into a cold one.
+would pay that repeatedly, so it does not vary. The launcher builds through the same Go cache every
+`go build` and `go test` on the machine uses (#3kr3x59). The house sets `GOFLAGS=-trimpath`, so a
+member's test run compiles the packages the launcher's next build needs, and a private cache only
+stored them twice: it had reached 40 GB beside the default cache's 81 GB. The launcher still builds
+with cgo off, which compiles only the few packages that use cgo differently, measured at 46 MB.
 
-**Neither cache is bounded by Go, so the launcher bounds both.** Go trims by age alone, five days
+**Go does not bound the cache, so the launcher does.** Go trims by age alone, five days
 unused, and developing cohere filled the default cache far faster: on 2026-10-03 it regrew 223 GB in
 nine hours and filled the disk (#3sgjy0h), most of it `TestEveryReleaseTargetCompiles` building cohere
 for six platforms on every `go test ./...`, until `3dc6e70` made it type-check them instead.
 `internal/release/gocache` trims a cache of its least recently used entries once it is over a cap,
-down to three quarters of it. The launcher trims its own cache after each build, at 32 GB, and on any
-run at most every ten minutes starts a background copy of itself that trims the default cache, the one
-every plain `go build`, `go test` and `go vet` fills, at 48 GB. The run pays one stat for that and
-never waits on the walk. What either removed is logged to `.cache/cohere/prune.log`.
+down to three quarters of it. On any run, at most every ten minutes, the launcher starts a background
+copy of itself that trims the cache at 48 GB. The run pays one stat for that and never waits on the
+walk. What it removed is logged to `.cache/cohere/prune.log`.
 
 **No trim removes an entry used in the last 90 minutes**, so a burst can stand above the cap by what it
 wrote inside that window. Go marks an entry used at most once an hour, so within the hour, age cannot
