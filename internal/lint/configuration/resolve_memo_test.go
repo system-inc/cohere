@@ -52,8 +52,9 @@ func TestPathsMatchingTheSameOverridesShareOneResolution(t *testing.T) {
 // TestHouseVariantsNeverShareAResolution is the zero-config case @system_cohere_lint_sets named. A React
 // file and a Node file can match the same overrides and still resolve through different house variants,
 // so the memo lives per variant, after the dispatch, and the two never share an answer.
+//
+// Not parallel: withHouseSetsForTest swaps the package-level house sets for the length of the test.
 func TestHouseVariantsNeverShareAResolution(t *testing.T) {
-	// Not parallel: withHouseSetsForTest swaps the package-level house sets for the length of the test.
 	withHouseSetsForTest(t)
 	root := t.TempDir()
 	component := filepath.Join(root, "source", "Button.tsx")
