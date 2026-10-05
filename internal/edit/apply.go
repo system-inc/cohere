@@ -56,6 +56,11 @@ type Rejection struct {
 	// they compete with another rule's, and a reader seeing the same name on both sides is looking
 	// at that case rather than at a bug.
 	ConflictsWith string
+
+	// BreaksParseAlone is set on a parse failure's refusal when this fix, applied by itself to the text
+	// its pass started from, already does not parse. It names the fix that broke the file. When no fix of
+	// a refused pass breaks it alone, the pass's fixes broke it together, and none is marked.
+	BreaksParseAlone bool
 }
 
 // Reasons a proposal is rejected. Stated as constants because they are read by tests and printed

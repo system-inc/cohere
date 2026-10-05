@@ -37,7 +37,12 @@ type Coverage struct {
 	// NodesVisited is how many AST nodes the traversal touched, across every file.
 	NodesVisited int
 
-	// RulesRun is how many rules were dispatched.
+	// RulesRun is how many rules ran: were offered at least one file, here or in a replayed verdict.
+	//
+	// Counted from what was offered rather than from the rules the walk was handed, which are every
+	// registered rule. A config that turns most of them off left the footer saying "484 rules" when 118
+	// ran (#v1ah2qq), the very gap between configured and checked this struct exists to show. A rule
+	// offered files that it declined still ran: it looked and had nothing to listen for.
 	RulesRun int
 
 	// RulesOffered counts, per rule name, how many files the rule was actually handed. A rule that
@@ -141,6 +146,11 @@ type Coverage struct {
 	// is a decision waiting to be made rather than one already made. Reporting them as one number
 	// would describe a new rule as though someone had excluded it.
 	RulesUnconfigured map[string]int
+
+	// UnrunRuleReferences counts, by name, the rules disable and enable comments named that are real and
+	// that cohere doesn't run: an ESLint core rule it hasn't ported, or another plugin's rule. Such a
+	// directive silences nothing here, which is a note rather than a finding (#v1ah2qq).
+	UnrunRuleReferences map[string]int
 }
 
 // Result is the findings of one walk, and the coverage that produced them.
@@ -228,6 +238,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	filesIgnored := 0
 	scopedOff := map[string]int{}
 	unconfigured := map[string]int{}
+	unrunRuleReferences := map[string]int{}
 	configFailures := []error{}
 	fileCrashes := []FileCrash{}
 	ruleCrashesAll := []RuleCrash{}
@@ -592,6 +603,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			shapeKeyedRerun += localShapeKeyedRerun
 			designSystemRerun += localDesignSystemRerun
 			filesOnForeignCheckers += localForeign
+			for name, count := range dispatcher.unrunRuleReferences {
+				unrunRuleReferences[name] += count
+			}
 			mutex.Unlock()
 		}()
 	}
@@ -627,7 +641,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			FilesInProgram: len(g.Program.GetSourceFiles()),
 			FilesWalked:    len(files),
 			NodesVisited:   nodesVisited,
-			RulesRun:       len(rules),
+			RulesRun:       rulesOffered(offeredCounts),
 			RulesOffered:   offeredCounts,
 			RulesListening: listeningCounts,
 			RulesReporting: reportingCounts,
@@ -643,8 +657,21 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			FilesIgnored:      filesIgnored,
 			RulesScopedOff:    scopedOff,
 			RulesUnconfigured: unconfigured,
+
+			UnrunRuleReferences: unrunRuleReferences,
 		},
 	}, nil
+}
+
+// rulesOffered is how many rules were offered at least one file.
+func rulesOffered(offeredCounts map[string]int) int {
+	offered := 0
+	for _, count := range offeredCounts {
+		if count > 0 {
+			offered++
+		}
+	}
+	return offered
 }
 
 // ruleNameCatalog answers whether a rule name a suppression comment wrote exists anywhere cohere can
@@ -695,19 +722,36 @@ func (c *ruleNameCatalog) exists(name string) bool {
 	return false
 }
 
-// reportUnknownRuleReferences reports every rule name a disable or enable comment wrote that exists
-// nowhere, the way ESLint does: rule id the unknown name, anchored on the whole comment, message
-// beginning with ESLint's own sentence so the two engines read alike (measured on 10.8.1).
+// reportUnknownRuleReferences reports every rule name a disable or enable comment wrote that can only
+// be a mistake, the way ESLint does: rule id the unknown name, anchored on the whole comment, message
+// beginning with ESLint's own sentence so the two engines read alike (measured on 10.8.1). A name that is
+// a real rule cohere doesn't run is counted into unrun instead, for a --verbose note, and never reported.
+//
+// Ruled by @system_cohere (#v1ah2qq): a repository written for ESLint names plugin rules cohere has not
+// ported, 43 in trpc, 6 in excalidraw and 160 in TanStack/query, and reporting each as an error made the
+// first run on someone else's code a wall of findings about cohere rather than about the code. So:
+//   - a name cohere knows (a registered rule, a config key, or the twin spelling of one) is fine;
+//   - an unprefixed name ESLint ships is a core rule cohere doesn't run: unrun;
+//   - an unprefixed name ESLint does not ship is a typo, since ESLint's core is fully known: reported;
+//   - a name under one of our own plugins is a typo or a stale prefix, since cohere is their reference
+//     engine and runs every rule they have: reported, with the registered name when there is one;
+//   - a name under any other plugin is a rule cohere doesn't run: unrun. It is not told cohere's rule of
+//     the same bare name, which belongs to another plugin and may not be the same rule.
 //
 // Reported straight to the walk rather than through a rule's Report, so no directive can silence a
 // finding about a directive that silences nothing.
 func reportUnknownRuleReferences(sourceFile *ast.SourceFile, directives *suppression.Index,
-	catalog *ruleNameCatalog, report func(rule.Diagnostic)) {
+	catalog *ruleNameCatalog, report func(rule.Diagnostic), unrun map[string]int) {
 	if catalog == nil {
 		return
 	}
 	for _, reference := range directives.RuleReferences() {
 		if catalog.exists(reference.Name) {
+			continue
+		}
+		plugin := pluginOf(reference.Name)
+		if plugin == "" && rule.IsEslintCoreRule(reference.Name) || plugin != "" && !housePlugins[plugin] {
+			unrun[reference.Name]++
 			continue
 		}
 		description := fmt.Sprintf("Definition for rule '%s' was not found. A suppression naming it "+
@@ -837,6 +881,10 @@ type fileDispatcher struct {
 	// slots is this worker's slot for each rule it has met, by name.
 	slots map[string]*ruleSlot
 
+	// unrunRuleReferences counts, by name, the rules this worker's directives named that cohere doesn't
+	// run. See reportUnknownRuleReferences.
+	unrunRuleReferences map[string]int
+
 	// listeners is the merged dispatch table of the file being dispatched, indexed by kind. A kind may have
 	// listeners from several rules, so each holds a slice, and a slice index rather than a map key, since the
 	// walk reads it once per node: about 100ms of CPU across a cold ahra walk (#zqsdzbq). Kept across files:
@@ -878,6 +926,8 @@ func newFileDispatcher(graph *Graph, timings *Timings, catalog *ruleNameCatalog)
 		catalog:   catalog,
 		slots:     map[string]*ruleSlot{},
 		listeners: make([][]listenerCall, ast.KindCount),
+
+		unrunRuleReferences: map[string]int{},
 	}
 }
 
@@ -1022,7 +1072,7 @@ func (d *fileDispatcher) dispatchFile(
 	// through the same index. Scanning is proportional to the file rather than to the rule count, so
 	// a file with no directives costs one pass and then answers every query with an empty slice.
 	directives := suppression.Build(sourceFile.Text())
-	reportUnknownRuleReferences(sourceFile, directives, d.catalog, report)
+	reportUnknownRuleReferences(sourceFile, directives, d.catalog, report, d.unrunRuleReferences)
 
 	d.sourceFile, d.directives, d.report = sourceFile, directives, report
 	// However the dispatch ends, a panic included, so the next file starts from an empty table and no slot
@@ -1256,6 +1306,19 @@ func bareRuleName(name string) string {
 		return name[slash+1:]
 	}
 	return name
+}
+
+// housePlugins are the plugins that are ours, whose every rule cohere runs, so a name under one that
+// cohere doesn't know is a typo or a stale prefix rather than a rule it hasn't ported.
+var housePlugins = map[string]bool{"base": true, "nexus": true, "structure": true}
+
+// pluginOf is a rule name's plugin, everything before its last `/`, empty for a core rule:
+// `@typescript-eslint/no-x` is `@typescript-eslint`, `@next/next/no-x` is `@next/next`.
+func pluginOf(name string) string {
+	if slash := strings.LastIndexByte(name, '/'); slash >= 0 {
+		return name[:slash]
+	}
+	return ""
 }
 
 // tally reads what a file's directives actually did, after the walk.

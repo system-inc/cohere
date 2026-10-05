@@ -299,7 +299,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 		output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, WalkCost: "in 1s"})
 		requireLines(t, output,
 			"  1 files crashed",
-			"  crashed: /project/Broken.ts could not be linted, so nothing in it was checked: Node.Text on a kind it does not handle\n",
+			"  crashed: /project/Broken.ts: cohere crashed on this file (Node.Text on a kind it does not handle). This is a bug in cohere, not in your code: nothing in this file was checked.",
 		)
 	})
 
@@ -310,7 +310,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 		output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, WalkCost: "in 1s"})
 		requireLines(t, output,
 			"  0 files crashed · 1 rule crashes, each costing one rule one file",
-			"  crashed: rule prefer-arrow-callback could not finish /project/Broken.ts, so its verdict on that file is missing and the file's other rules ran: interface conversion\n",
+			"  crashed: /project/Broken.ts: cohere's rule prefer-arrow-callback crashed on this file (interface conversion). This is a bug in cohere, not in your code: the rule's verdict on this file is missing, and the file's other rules ran.",
 		)
 	})
 

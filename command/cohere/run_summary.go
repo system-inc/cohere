@@ -170,6 +170,9 @@ type runGaps struct {
 	// ProgramFiles is the program's size when the run was narrowed to fewer of its files, zero otherwise.
 	ProgramFiles int `json:"programFiles"`
 	CrashedFiles int `json:"crashedFiles"`
+	// RuleCrashes is each rule that crashed on a file, leaving its verdict there missing. Like a crashed
+	// file it fails the run: see runCrash.
+	RuleCrashes int `json:"ruleCrashes"`
 	// RulesSkippingEverything is the rules that declined every file they were offered.
 	RulesSkippingEverything int  `json:"rulesSkippingEverything"`
 	FormattingNotChecked    bool `json:"formattingNotChecked"`
@@ -180,7 +183,9 @@ type runGaps struct {
 	Unread string `json:"unread,omitempty"`
 }
 
-// failed is whether the run found anything, which is what the exit code says too.
+// failed is whether the run found anything or lost a verdict to a crash, which is what the exit code says
+// too. A crash is cohere's bug, and a run that could not check a file never exits 0. See runCrash.
 func (summary runSummary) failed() bool {
-	return summary.TypeErrors > 0 || summary.Findings > 0 || summary.WouldChange > 0
+	return summary.TypeErrors > 0 || summary.Findings > 0 || summary.WouldChange > 0 ||
+		summary.Gaps.CrashedFiles > 0 || summary.Gaps.RuleCrashes > 0
 }

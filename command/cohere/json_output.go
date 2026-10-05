@@ -7,12 +7,14 @@ import (
 )
 
 // `--json` is the run for a program to read: newline-delimited JSON, one object per line, each with a
-// `kind`. A finding is one line, each file the run fixed or formatted is one line, and the summary is
-// the last line, so a reader can stream the findings and still know the run ended by seeing it.
+// `kind`. A finding is one line, each file the run fixed or formatted is one line, each crash is one
+// line, and the summary is the last line, so a reader can stream the findings and still know the run
+// ended by seeing it.
 //
 //	{"kind":"finding","path":"/repo/a.ts","line":3,"column":7,"severity":"error","rule":"nexus/...","messageId":"...","message":"..."}
 //	{"kind":"fixed","path":"/repo/b.ts","rules":["prefer-const"]}
 //	{"kind":"formatted","path":"/repo/c.ts"}
+//	{"kind":"crash","path":"/repo/d.ts","rule":"react-hooks/purity","cause":"..."}
 //	{"kind":"summary","schemaVersion":1,"verdict":"pass",...}
 //
 // It is the second view of runSummary, beside the footer, and the one a consumer such as Structure's

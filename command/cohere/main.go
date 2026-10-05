@@ -853,6 +853,9 @@ func run() error {
 		}
 		// True of the tree and actionable, so a replay keeps it, but it says which run produced it.
 		fmt.Fprintln(accountOutput(provenanceOutput(os.Stdout)), fixSummary)
+		for _, refusal := range fixSummary.Refusals() {
+			fmt.Fprintln(accountOutput(provenanceOutput(os.Stdout)), "  "+refusal)
+		}
 		// The files the fix phase rewrote, above the findings, in the views that list them.
 		if mutate {
 			activeSummary.Changed = changedFilesFrom(fixSummary.ChangedFiles, location.Root)
@@ -1225,7 +1228,8 @@ func run() error {
 	// only appeared on failure would reintroduce exactly that ambiguity for the successful case.
 	writeRunEnd(report, os.Stdout)
 
-	if findings > 0 {
+	// A crash fails the run as a finding does, though it is not one: see runCrash.
+	if findings > 0 || activeSummary.Gaps.CrashedFiles > 0 || activeSummary.Gaps.RuleCrashes > 0 {
 		finishRunCache(1)
 	}
 	return nil

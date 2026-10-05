@@ -8,6 +8,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/locale"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/replace"
@@ -73,8 +74,10 @@ func Parses(fileName string, text string) (bool, string) {
 		return true, ""
 	}
 
+	// Localized rather than MessageText, which a parse diagnostic leaves empty: every refusal used to read
+	// "TS1135: " with the message missing (#v1ah2qq).
 	first := diagnostics[0]
-	reason := fmt.Sprintf("TS%d: %s", first.Code(), first.MessageText())
+	reason := fmt.Sprintf("TS%d: %s", first.Code(), first.Localize(locale.Locale{}))
 	if len(diagnostics) > 1 {
 		reason = fmt.Sprintf("%s (and %d more)", reason, len(diagnostics)-1)
 	}

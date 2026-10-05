@@ -117,7 +117,7 @@ func TestOnlyAFileTheFormatterCouldNotReadIsUnchecked(t *testing.T) {
 			{FileName: "/a/notes.txt", Reason: ".txt is not a file type the formatter handles"},
 		},
 		FilesFailed:  []string{"/a/Unreadable.ts"},
-		FilesRefused: []string{"/a/Reprinted.ts"},
+		FilesRefused: []edit.RefusedFile{{FileName: "/a/Reprinted.ts", Rules: []string{"format"}}},
 	}
 	got := []string{}
 	for _, file := range formatOnlyUnchecked(summary, formatScope{}) {
