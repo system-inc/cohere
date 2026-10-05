@@ -53,43 +53,48 @@ var NoOptionalWidening = rule.Rule{
 			return nil
 		}
 		typeChecker := ctx.TypeChecker
-		return flow.Listeners(ctx, func(site flow.Site) {
+		walker := flow.WalkerFor(ctx)
+		// The judge, what it reads and what it reports are made once per file and set at each site, not a
+		// closure per site (#m6tyg79).
+		var exactAtTop bool
+		var missing *ast.Symbol
+		judge := func(pair flow.Pair) (bool, bool) {
+			if isClassInstance(pair.Target) {
+				return false, false
+			}
+			if pair.Target.Flags()&checker.TypeFlagsObject == 0 || pair.Source.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsAny) != 0 {
+				return false, true
+			}
+			// A tuple's optional element is a position its fixed length rules out: tsc refuses `[number]`
+			// as `[]`, so a value typed `[]` holds no element 0 (probe t6 on #drbrp8c). A function's optional
+			// members stay judged, since Object.assign can hand a function any of them (probe t5).
+			if flow.IsArrayLike(typeChecker, pair.Target) {
+				return false, true
+			}
+			if exactAtTop && len(pair.Path) == 0 {
+				return false, true
+			}
+			apparent := checker.Checker_getApparentType(typeChecker, pair.Source)
+			if apparent == nil || apparent.Flags()&(checker.TypeFlagsObject|checker.TypeFlagsIntersection) == 0 {
+				return false, true
+			}
+			for _, property := range checker.Checker_getPropertiesOfType(typeChecker, pair.Target) {
+				if property.Flags&ast.SymbolFlagsOptional == 0 {
+					continue
+				}
+				if checker.Checker_getPropertyOfType(typeChecker, apparent, property.Name) == nil {
+					missing = property
+					return true, false
+				}
+			}
+			return false, true
+		}
+		return walker.Listeners(func(site flow.Site) {
 			if site.Fresh {
 				return
 			}
-			exactAtTop := isConstLiteralAlias(typeChecker, site.Node)
-			var missing *ast.Symbol
-			found, wrong := flow.Walk(typeChecker, site, func(pair flow.Pair) (bool, bool) {
-				if isClassInstance(pair.Target) {
-					return false, false
-				}
-				if pair.Target.Flags()&checker.TypeFlagsObject == 0 || pair.Source.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsAny) != 0 {
-					return false, true
-				}
-				// A tuple's optional element is a position its fixed length rules out: tsc refuses `[number]`
-				// as `[]`, so a value typed `[]` holds no element 0 (probe t6 on #drbrp8c). A function's optional
-				// members stay judged, since Object.assign can hand a function any of them (probe t5).
-				if flow.IsArrayLike(typeChecker, pair.Target) {
-					return false, true
-				}
-				if exactAtTop && len(pair.Path) == 0 {
-					return false, true
-				}
-				apparent := checker.Checker_getApparentType(typeChecker, pair.Source)
-				if apparent == nil || apparent.Flags()&(checker.TypeFlagsObject|checker.TypeFlagsIntersection) == 0 {
-					return false, true
-				}
-				for _, property := range checker.Checker_getPropertiesOfType(typeChecker, pair.Target) {
-					if property.Flags&ast.SymbolFlagsOptional == 0 {
-						continue
-					}
-					if checker.Checker_getPropertyOfType(typeChecker, apparent, property.Name) == nil {
-						missing = property
-						return true, false
-					}
-				}
-				return false, true
-			})
+			exactAtTop, missing = isConstLiteralAlias(typeChecker, site.Node), nil
+			found, wrong := walker.Walk(site, judge)
 			if !wrong {
 				return
 			}

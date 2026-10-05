@@ -1,11 +1,13 @@
 package flow
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
 // StepKind is how the walk moved from a type into one of its parts.
@@ -44,6 +46,12 @@ type Pair struct {
 // Judge rules on one pair: wrong when the pair is the hole the rule exists for, and descend when the walk
 // should go on into its parts. A rule that owns a whole type (nominal-class owns a class instance) stops
 // the walk there, so two rules do not report one hole twice.
+//
+// A judge rules only where the target has an object part: a mutable slot exists only inside an array,
+// tuple, container or object, and a class instance and an optional property are object types. So a site
+// whose target has none (`const x: string = e`, a `number` argument) is never offered, which spares the
+// checker its source on the most common sites (#m6tyg79). A judge that would rule on such a target needs
+// that condition lifted in offer first.
 type Judge func(pair Pair) (wrong bool, descend bool)
 
 // maximumDepth bounds the walk. A recursive type meets its own pair first and stops on the visited set;
@@ -51,7 +59,8 @@ type Judge func(pair Pair) (wrong bool, descend bool)
 const maximumDepth = 8
 
 // Walk relates a site's source to its target part by part, the way tsc related them when it accepted the
-// site, and returns the first pair judge finds wrong.
+// site, and returns the first pair judge finds wrong. The pair it returns owns its Path; the Path a judge
+// sees is the walker's, valid while the judge looks at that pair.
 //
 // What it pairs:
 //
@@ -76,38 +85,131 @@ const maximumDepth = 8
 //
 // A fresh site is judged at its top only. Its parts are sites of their own, so descending would report
 // one hole twice.
-func Walk(typeChecker *checker.Checker, site Site, judge Judge) (Pair, bool) {
+func (w *Walker) Walk(site Site, judge Judge) (Pair, bool) {
 	top := Pair{Source: site.Source, Target: site.Target}
 	if site.Fresh {
 		wrong, _ := judge(top)
 		return top, wrong
 	}
-	walker := walker{typeChecker: typeChecker, judge: judge, visited: map[[2]*checker.Type]bool{}, newContainer: site.NewContainer}
-	return walker.relate(top, 0)
+	w.judge, w.newContainer = judge, site.NewContainer
+	w.visited, w.path = w.visited[:0], w.path[:0]
+	if len(w.visitedSet) > 0 {
+		clear(w.visitedSet)
+	}
+	found, wrong := w.relate(top, 0)
+	w.judge = nil
+	return found, wrong
 }
 
-type walker struct {
+// Walker relates the sites of one file, keeping what each walk would otherwise allocate for itself: the
+// pairs a walk has met, the path to the pair it is on, and which pairs are assignable. One serves every rule
+// that walks the file (WalkerFor), so the three rules also share what they ask the checker. Measured on a
+// cold ahra run, the per-walk maps, paths and pair lists, the per-site judges and each rule finding every
+// site again were most of the three rules' 3.85M objects (#m6tyg79).
+//
+// Not safe for concurrent use, and it does not need to be: a file's rules run one at a time on the goroutine
+// that owns the file, and a judge never starts a walk of its own.
+type Walker struct {
 	typeChecker *checker.Checker
-	judge       Judge
-	visited     map[[2]*checker.Type]bool
 
-	// newContainer is a site whose source container was just built: its own slots are read-only to the
-	// walk, since no other name can write into them. See Site.NewContainer.
+	// judge and newContainer are the walk in progress's. newContainer is a site whose source container was
+	// just built: its own slots are read-only to the walk, since no other name can write into them. See
+	// Site.NewContainer.
+	judge        Judge
 	newContainer bool
+
+	// visited is the pairs this walk has met, in a slice while it is short and in visitedSet as well past
+	// visitedListLimit: most walks meet a handful, and a map made for each walk was a quarter of the rules'
+	// objects.
+	visited    [][2]*checker.Type
+	visitedSet map[[2]*checker.Type]bool
+
+	// path is the steps from the site to the pair the walk is on. A pair's Path is a view of it.
+	path []Step
+
+	// assignable is the checker's answer for each pair asked, since the three rules ask the same pairs and
+	// the checker builds a relation key for every ask, answered before or not.
+	assignable map[[2]*checker.Type]bool
+
+	// sitesNode is the node whose sites are in sites: the first rule to reach a node finds them, and the
+	// others listening there read them. See Listeners.
+	sitesNode *ast.Node
+	sites     []Site
 }
 
-func (w walker) relate(pair Pair, depth int) (Pair, bool) {
+// visitedListLimit is how many pairs a walk keeps in its slice before it looks them up in a map.
+const visitedListLimit = 16
+
+// walkerKey is the walker's place in a file's cache.
+const walkerKey = "flow.Walker"
+
+// WalkerFor is the walker of ctx's file, made by the first rule that asks and shared by the rest. A
+// context with no file cache gets a walker of its own each time, which shares nothing and judges the same.
+// The walker is made empty and given the checker after, so the ask allocates no closure.
+func WalkerFor(ctx rule.Context) *Walker {
+	walker := rule.Cached(ctx.FileCache, walkerKey, func() *Walker { return &Walker{} })
+	if walker.typeChecker == nil {
+		walker.typeChecker = ctx.TypeChecker
+	}
+	return walker
+}
+
+// NewWalker is a walker over typeChecker that shares nothing yet.
+func NewWalker(typeChecker *checker.Checker) *Walker {
+	return &Walker{typeChecker: typeChecker}
+}
+
+// IsAssignable is the checker's isTypeAssignableTo, asked once per pair in the file.
+func (w *Walker) IsAssignable(source *checker.Type, target *checker.Type) bool {
+	key := [2]*checker.Type{source, target}
+	if answer, asked := w.assignable[key]; asked {
+		return answer
+	}
+	answer := checker.Checker_isTypeAssignableTo(w.typeChecker, source, target)
+	if w.assignable == nil {
+		w.assignable = map[[2]*checker.Type]bool{}
+	}
+	w.assignable[key] = answer
+	return answer
+}
+
+// meet records that the walk has met key, and says whether it had met it before.
+func (w *Walker) meet(key [2]*checker.Type) bool {
+	if len(w.visited) < visitedListLimit {
+		for _, met := range w.visited {
+			if met == key {
+				return true
+			}
+		}
+		w.visited = append(w.visited, key)
+		return false
+	}
+	if w.visitedSet == nil {
+		w.visitedSet = map[[2]*checker.Type]bool{}
+	}
+	if len(w.visitedSet) == 0 {
+		for _, met := range w.visited {
+			w.visitedSet[met] = true
+		}
+	}
+	if w.visitedSet[key] {
+		return true
+	}
+	w.visitedSet[key] = true
+	return false
+}
+
+func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 	if pair.Source == nil || pair.Target == nil || pair.Source == pair.Target || depth > maximumDepth {
 		return Pair{}, false
 	}
-	key := [2]*checker.Type{pair.Source, pair.Target}
-	if w.visited[key] {
+	if w.meet([2]*checker.Type{pair.Source, pair.Target}) {
 		return Pair{}, false
 	}
-	w.visited[key] = true
 
 	wrong, descend := w.judge(pair)
 	if wrong {
+		pair.Path = slices.Clone(pair.Path)
 		return pair, true
 	}
 	if !descend {
@@ -130,7 +232,7 @@ func (w walker) relate(pair Pair, depth int) (Pair, bool) {
 		var first Pair
 		failed := false
 		for _, member := range pair.Target.Types() {
-			if !checker.Checker_isTypeAssignableTo(w.typeChecker, pair.Source, member) {
+			if !w.IsAssignable(pair.Source, member) {
 				continue
 			}
 			found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path}, depth+1)
@@ -146,39 +248,39 @@ func (w walker) relate(pair Pair, depth int) (Pair, bool) {
 	return w.parts(pair, depth)
 }
 
-// parts pairs the parts of two types that are not unions.
-func (w walker) parts(pair Pair, depth int) (Pair, bool) {
+// into relates part, one step below pair, with the step on the path while the part is judged.
+func (w *Walker) into(pair Pair, part Pair, step Step, depth int) (Pair, bool) {
+	w.path = append(w.path[:len(pair.Path)], step)
+	part.Path = w.path
+	found, wrong := w.relate(part, depth+1)
+	w.path = w.path[:len(pair.Path)]
+	return found, wrong
+}
+
+// parts relates the parts of two types that are not unions, one at a time in the order they are listed,
+// and stops at the first that is wrong.
+func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 	source, target := pair.Source, pair.Target
 	// The slots of a container the site just built are no one else's, so writing through the wider type
 	// reaches only this value. Its parts' own slots keep their mutability.
 	ownSlotsShared := !(w.newContainer && len(pair.Path) == 0)
-	into := func(kind StepKind, name string, index int) []Step {
-		path := make([]Step, len(pair.Path), len(pair.Path)+1)
-		copy(path, pair.Path)
-		return append(path, Step{Kind: kind, Name: name, Index: index})
-	}
-	each := func(pairs []Pair) (Pair, bool) {
-		for _, part := range pairs {
-			if found, wrong := w.relate(part, depth+1); wrong {
-				return found, true
-			}
-		}
-		return Pair{}, false
-	}
 
 	if checker.Checker_isArrayType(w.typeChecker, target) {
 		targetElement := w.typeArgument(target, 0)
 		mutable := ownSlotsShared && !isNamed(target, "ReadonlyArray")
-		var pairs []Pair
 		switch {
 		case checker.Checker_isArrayType(w.typeChecker, source):
-			pairs = append(pairs, Pair{w.typeArgument(source, 0), targetElement, into(StepElement, "", -1), mutable})
+			return w.into(pair, Pair{Source: w.typeArgument(source, 0), Target: targetElement, Mutable: mutable},
+				Step{Kind: StepElement, Index: -1}, depth)
 		case checker.IsTupleType(source):
 			for _, element := range checker.Checker_getTypeArguments(w.typeChecker, source) {
-				pairs = append(pairs, Pair{element, targetElement, into(StepElement, "", -1), mutable})
+				if found, wrong := w.into(pair, Pair{Source: element, Target: targetElement, Mutable: mutable},
+					Step{Kind: StepElement, Index: -1}, depth); wrong {
+					return found, true
+				}
 			}
 		}
-		return each(pairs)
+		return Pair{}, false
 	}
 	if checker.IsTupleType(target) {
 		if !checker.IsTupleType(source) {
@@ -187,11 +289,13 @@ func (w walker) parts(pair Pair, depth int) (Pair, bool) {
 		mutable := ownSlotsShared && !target.TargetTupleType().IsReadonly()
 		sourceElements := checker.Checker_getTypeArguments(w.typeChecker, source)
 		targetElements := checker.Checker_getTypeArguments(w.typeChecker, target)
-		var pairs []Pair
 		for index := 0; index < len(sourceElements) && index < len(targetElements); index++ {
-			pairs = append(pairs, Pair{sourceElements[index], targetElements[index], into(StepElement, "", index), mutable})
+			if found, wrong := w.into(pair, Pair{Source: sourceElements[index], Target: targetElements[index], Mutable: mutable},
+				Step{Kind: StepElement, Index: index}, depth); wrong {
+				return found, true
+			}
 		}
-		return each(pairs)
+		return Pair{}, false
 	}
 	if container, readonly, isContainer := containerOf(target); isContainer {
 		sourceContainer, _, sourceIsContainer := containerOf(source)
@@ -200,25 +304,27 @@ func (w walker) parts(pair Pair, depth int) (Pair, bool) {
 		}
 		sourceArguments := checker.Checker_getTypeArguments(w.typeChecker, source)
 		targetArguments := checker.Checker_getTypeArguments(w.typeChecker, target)
-		var pairs []Pair
 		for index := 0; index < len(sourceArguments) && index < len(targetArguments); index++ {
-			pairs = append(pairs, Pair{sourceArguments[index], targetArguments[index], into(StepTypeArgument, container, index), ownSlotsShared && !readonly})
+			if found, wrong := w.into(pair, Pair{Source: sourceArguments[index], Target: targetArguments[index], Mutable: ownSlotsShared && !readonly},
+				Step{Kind: StepTypeArgument, Name: container, Index: index}, depth); wrong {
+				return found, true
+			}
 		}
-		return each(pairs)
+		return Pair{}, false
 	}
 	if target.Flags()&checker.TypeFlagsObject == 0 || source.Flags()&checker.TypeFlagsObject == 0 {
 		return Pair{}, false
 	}
 	targetSignatures := checker.Checker_getSignaturesOfType(w.typeChecker, target, checker.SignatureKindCall)
 	sourceSignatures := checker.Checker_getSignaturesOfType(w.typeChecker, source, checker.SignatureKindCall)
-	var pairs []Pair
 	if len(targetSignatures) == 1 && len(sourceSignatures) == 1 {
 		targetSignature, sourceSignature := targetSignatures[0], sourceSignatures[0]
-		pairs = append(pairs, Pair{
-			checker.Checker_getReturnTypeOfSignature(w.typeChecker, sourceSignature),
-			checker.Checker_getReturnTypeOfSignature(w.typeChecker, targetSignature),
-			into(StepReturn, "", -1), false,
-		})
+		if found, wrong := w.into(pair, Pair{
+			Source: checker.Checker_getReturnTypeOfSignature(w.typeChecker, sourceSignature),
+			Target: checker.Checker_getReturnTypeOfSignature(w.typeChecker, targetSignature),
+		}, Step{Kind: StepReturn, Index: -1}, depth); wrong {
+			return found, true
+		}
 		sourceParameters := checker.Signature_parameters(sourceSignature)
 		targetParameters := checker.Signature_parameters(targetSignature)
 		// Positional parameters pair by position, and the pairing stops at a rest parameter on either side,
@@ -227,11 +333,12 @@ func (w walker) parts(pair Pair, depth int) (Pair, bool) {
 			if isRestParameter(sourceParameters[index]) || isRestParameter(targetParameters[index]) {
 				break
 			}
-			pairs = append(pairs, Pair{
-				checker.Checker_getTypeOfSymbol(w.typeChecker, targetParameters[index]),
-				checker.Checker_getTypeOfSymbol(w.typeChecker, sourceParameters[index]),
-				into(StepParameter, sourceParameters[index].Name, index), false,
-			})
+			if found, wrong := w.into(pair, Pair{
+				Source: checker.Checker_getTypeOfSymbol(w.typeChecker, targetParameters[index]),
+				Target: checker.Checker_getTypeOfSymbol(w.typeChecker, sourceParameters[index]),
+			}, Step{Kind: StepParameter, Name: sourceParameters[index].Name, Index: index}, depth); wrong {
+				return found, true
+			}
 		}
 	}
 	for _, property := range checker.Checker_getPropertiesOfType(w.typeChecker, target) {
@@ -242,17 +349,18 @@ func (w walker) parts(pair Pair, depth int) (Pair, bool) {
 		if sourceProperty == nil {
 			continue
 		}
-		pairs = append(pairs, Pair{
-			checker.Checker_getTypeOfSymbol(w.typeChecker, sourceProperty),
-			checker.Checker_getTypeOfSymbol(w.typeChecker, property),
-			into(StepProperty, property.Name, -1),
-			ownSlotsShared && !checker.Checker_isReadonlySymbol(w.typeChecker, property),
-		})
+		if found, wrong := w.into(pair, Pair{
+			Source:  checker.Checker_getTypeOfSymbol(w.typeChecker, sourceProperty),
+			Target:  checker.Checker_getTypeOfSymbol(w.typeChecker, property),
+			Mutable: ownSlotsShared && !checker.Checker_isReadonlySymbol(w.typeChecker, property),
+		}, Step{Kind: StepProperty, Name: property.Name, Index: -1}, depth); wrong {
+			return found, true
+		}
 	}
-	return each(pairs)
+	return Pair{}, false
 }
 
-func (w walker) typeArgument(t *checker.Type, index int) *checker.Type {
+func (w *Walker) typeArgument(t *checker.Type, index int) *checker.Type {
 	arguments := checker.Checker_getTypeArguments(w.typeChecker, t)
 	if index >= len(arguments) {
 		return nil

@@ -1,13 +1,10 @@
 package tailwind
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -87,22 +84,5 @@ func TestClassOrderOptions(t *testing.T) {
 			}
 			rule_testing.ExpectFixedSource(t, result, `export const element = <img className="`+testCase.want+`" />;`+"\n")
 		})
-	}
-}
-
-// TestClassOrderStrictIsRefused pins the refusal that stands until `strict` is ported: a config
-// asking for it fails to load by name, rather than loading and ordering as `official`.
-func TestClassOrderStrictIsRefused(t *testing.T) {
-	t.Parallel()
-	var options EnforceConsistentClassOrderOptions
-	err := rule.UnmarshalOptions([]byte(`{"order": "strict"}`), &options)
-	if err == nil || !strings.Contains(err.Error(), "strict") {
-		t.Fatalf("order strict should be refused by name, got %v", err)
-	}
-	for _, accepted := range []string{"asc", "desc", "official"} {
-		encoded, _ := json.Marshal(map[string]string{"order": accepted})
-		if err := rule.UnmarshalOptions(encoded, &options); err != nil {
-			t.Errorf("order %q should load: %v", accepted, err)
-		}
 	}
 }

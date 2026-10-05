@@ -136,6 +136,9 @@ type Config struct {
 
 	// resolutionMemo is Resolve's results by match, created on first use. See resolutionMemo.
 	resolutionMemo atomic.Pointer[resolutionMemo]
+
+	// compiledGlobs is IgnorePatterns and each override's Files, compiled on first use. See Config.globs.
+	compiledGlobs atomic.Pointer[configGlobs]
 }
 
 // Departure is one rule a configuration sets differently from the file it extends, and why.

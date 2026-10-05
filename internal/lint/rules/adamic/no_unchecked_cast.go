@@ -29,7 +29,7 @@ const CheckedDowncastNote = "checked downcast"
  *
  * - `as const`, and a cast to the same type.
  * - An upcast: the source is assignable to the target. Nothing is claimed that tsc did not prove, and
- *   flow.Listeners offers it to invariant-mutable, nominal-class and no-optional-widening as a site.
+ *   flow.Walker offers it to invariant-mutable, nominal-class and no-optional-widening as a site.
  * - A checked downcast: the source is a union, the target keeps some of its members, and the runtime can
  *   tell every kept member from every dropped one, by a property whose unit literal differs between them,
  *   by typeof, or by instanceof. Adamic compiles it to a check that panics (adamic docs/0.1.md, decision

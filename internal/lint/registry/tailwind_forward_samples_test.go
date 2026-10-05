@@ -30,12 +30,6 @@ var tailwindAcceptedBefore = map[string][]string{
 	"better-tailwindcss/enforce-consistent-variable-syntax":    {"syntax"},
 }
 
-// tailwindRefusedValues are values of a ported option that stay refused until they are ported too, by
-// rule and key, as JSON.
-var tailwindRefusedValues = map[string]map[string]string{
-	"better-tailwindcss/enforce-consistent-class-order": {"order": `"strict"`},
-}
-
 // TestTailwindForwardSamplesLoadOncePorted runs every better-tailwindcss option list that upstream
 // 4.7.0's schema accepts (#pd2chkx's forward sweep, which found cohere refusing all of them) through
 // cohere's real decoders. A list whose every key is ported (or was accepted before) must load; a list
@@ -71,9 +65,8 @@ func TestTailwindForwardSamplesLoadOncePorted(t *testing.T) {
 		described := sample.Rule + " " + string(compactJSON(t, sample.Elements[0]))
 
 		ported := true
-		for key, value := range element {
-			refused, isRefused := tailwindRefusedValues[sample.Rule][key]
-			ported = ported && isTailwindPorted(sample.Rule, key) && !(isRefused && string(value) == refused)
+		for key := range element {
+			ported = ported && isTailwindPorted(sample.Rule, key)
 		}
 		_, decodeError := options.Decode(sample.Rule, sample.Elements)
 		switch {

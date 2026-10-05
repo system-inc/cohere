@@ -32,7 +32,7 @@ var invariantMutableText = policy.MessageOf("adamic/invariant-mutable", "mutable
  *
  * # How
  *
- * flow.Listeners finds every place a value goes into a typed slot, and flow.Walk pairs the value's parts
+ * The file's flow.Walker finds every place a value goes into a typed slot and pairs the value's parts
  * with the slot's. At every pair the target marks mutable, whatever the wider type can write there must be
  * something the original can read: the target's slot type must be assignable to the source's. tsc already
  * proved the other direction when it accepted the site, so together the slot is invariant. That catches a
@@ -62,18 +62,21 @@ var InvariantMutable = rule.Rule{
 			return nil
 		}
 		typeChecker := ctx.TypeChecker
-		return flow.Listeners(ctx, func(site flow.Site) {
-			found, wrong := flow.Walk(typeChecker, site, func(pair flow.Pair) (bool, bool) {
-				if isClassInstance(pair.Target) {
-					return false, false
-				}
-				if !pair.Mutable {
-					return false, true
-				}
-				// Writing through the wider type stores a target value where the original reads a source
-				// value, so every target value must be a source value too.
-				return !checker.Checker_isTypeAssignableTo(typeChecker, pair.Target, pair.Source), true
-			})
+		walker := flow.WalkerFor(ctx)
+		// Made once per file, not per site: a judge made per site was a closure per site (#m6tyg79).
+		judge := func(pair flow.Pair) (bool, bool) {
+			if isClassInstance(pair.Target) {
+				return false, false
+			}
+			if !pair.Mutable {
+				return false, true
+			}
+			// Writing through the wider type stores a target value where the original reads a source
+			// value, so every target value must be a source value too.
+			return !walker.IsAssignable(pair.Target, pair.Source), true
+		}
+		return walker.Listeners(func(site flow.Site) {
+			found, wrong := walker.Walk(site, judge)
 			if !wrong {
 				return
 			}
