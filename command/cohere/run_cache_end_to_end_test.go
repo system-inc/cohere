@@ -384,9 +384,9 @@ func TestRunCacheEndToEnd(t *testing.T) {
 // TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory is the derived class's proof through the
 // real binary, on the rule whose option chooses what it reads (#s9k38p3). @next/next/no-html-link-for-pages is
 // configured with pagesDir `custom`, and `pages/team.tsx` stands where the default would read it, so a run that
-// ignored the option would report the anchor from the start. An edit to another file replays the anchor's file
-// with its derived rule, and a page added under `custom` runs that rule again on every replayed file and
-// reports the anchor, whose own bytes never changed. Each run is held against a cold one.
+// ignored the option would report the anchor from the start. An edit to a file nothing imports replays the
+// anchor's file with its derived rule, and a page added under `custom` runs that rule again on every replayed
+// file and reports the anchor, whose own bytes never changed. Each run is held against a cold one.
 func TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory(t *testing.T) {
 	t.Parallel()
 	binary := buildCohere(t)
@@ -423,12 +423,14 @@ func TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory(t *tes
 		t.Fatalf("the anchor reports before any page under custom names it, so the option was not read:\n%s", output)
 	}
 
-	// An edit elsewhere: the anchor's file replays, its derived rule with it.
-	fixture.write("source/a.ts", "export const a: number = 2;\n")
+	// An edit elsewhere: the anchor's file replays, its derived rule with it. The edited file is one nothing
+	// imports, since other derived rules read types and rightly run again on an edited file's importers, which
+	// would count here though this rule replayed.
+	fixture.write("source/nested/b.ts", "import { a } from \"../a\";\nexport const b = a + 2;\n")
 	warm, warmExit := fixture.run(true, "--no-fix")
 	cold, coldExit := fixture.run(false, "--no-fix")
 	if isRunCacheReplay(warm) || !strings.Contains(lintLine.FindString(warm), "files replayed from cache") {
-		t.Fatalf("an edit to a.ts served nothing from the findings cache:\n%s", warm)
+		t.Fatalf("an edit to b.ts served nothing from the findings cache:\n%s", warm)
 	}
 	if strings.Contains(warm, "derived rules ran again") {
 		t.Errorf("an edit outside the routes ran the derived rule again on replayed files:\n%s", warm)
