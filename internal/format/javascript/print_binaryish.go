@@ -57,7 +57,7 @@ func printBinaryishExpression(path *Path, options *Options, print PrintFunc) Doc
 		// `UnaryExpression` adds parentheses and indention when argument has comment
 		parent.Is("UnaryExpression") && !hasAnyComment(current) ||
 		isMemberExpression(parent) && !parent.Bool("computed") {
-		return group(concatIn(path, indent(concatIn(path, softline, doc.Concat(parts))), softline))
+		return groupIn(path, concatIn(path, indentIn(path, concatIn(path, softline, doc.Concat(parts))), softline))
 	}
 
 	// Avoid indenting sub-expressions in some cases where the first sub-expression is already
@@ -90,7 +90,7 @@ func printBinaryishExpression(path *Path, options *Options, print PrintFunc) Doc
 	if shouldNotIndent ||
 		shouldInlineLogicalExpression(current) && !samePrecedenceSubExpression ||
 		!shouldInlineLogicalExpression(current) && shouldIndentIfInlining {
-		return group(doc.Concat(parts))
+		return groupIn(path, doc.Concat(parts))
 	}
 
 	if len(parts) == 0 {
@@ -144,15 +144,15 @@ func printBinaryishExpression(path *Path, options *Options, print PrintFunc) Doc
 	// level. The first item is guaranteed to be the first
 	// left-most expression.
 	chainParts = append(chainParts, headParts...)
-	chainParts = append(chainParts, indent(doc.Concat(rest)))
-	chain := groupWith(doc.Concat(chainParts), doc.GroupOptions{ID: groupID})
+	chainParts = append(chainParts, indentIn(path, doc.Concat(rest)))
+	chain := groupWithIn(path, doc.Concat(chainParts), doc.GroupOptions{ID: groupID})
 
 	if !hasJsx {
 		return chain
 	}
 
 	jsxPart := parts[len(parts)-1]
-	return group(concatIn(path, chain, indentIfBreak(jsxPart, groupID, false)))
+	return groupIn(path, concatIn(path, chain, indentIfBreak(jsxPart, groupID, false)))
 }
 
 // For binary expressions to be consistent, we need to group
@@ -168,7 +168,7 @@ func printBinaryishExpressions(path *Path, options *Options, print PrintFunc, is
 
 	// Simply print the node normally.
 	if !isBinaryish(current) {
-		return []Doc{group(print(nil, nil))}
+		return []Doc{groupIn(path, print(nil, nil))}
 	}
 
 	var parts []Doc
@@ -190,7 +190,7 @@ func printBinaryishExpressions(path *Path, options *Options, print PrintFunc, is
 			return printBinaryishExpressions(path, options, print, true /* isNested */, isInsideParenthesis)
 		}, "left")
 	} else {
-		parts = append(parts, group(print("left", nil)))
+		parts = append(parts, groupIn(path, print("left", nil)))
 	}
 
 	shouldInline := shouldInlineLogicalExpression(current)
@@ -210,7 +210,7 @@ func printBinaryishExpressions(path *Path, options *Options, print PrintFunc, is
 	if shouldInline {
 		var rightContent Doc
 		if hasLeadingOwnLineComment(originalText(options), rightNodeToCheckComments) {
-			rightContent = indent(concatIn(path, line, print("right", nil), emptyDoc))
+			rightContent = indentIn(path, concatIn(path, line, print("right", nil), emptyDoc))
 		} else {
 			rightContent = concatIn(path, " ", print("right", nil), emptyDoc)
 		}
@@ -237,7 +237,7 @@ func printBinaryishExpressions(path *Path, options *Options, print PrintFunc, is
 			current.Child("left").Type() != current.Type() &&
 			current.Child("right").Type() != current.Type()
 	if shouldGroup {
-		right = groupWith(right, doc.GroupOptions{ShouldBreak: shouldBreak})
+		right = groupWithIn(path, right, doc.GroupOptions{ShouldBreak: shouldBreak})
 	}
 
 	if lineBeforeOperator {

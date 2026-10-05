@@ -27,7 +27,7 @@ func printArray(path *Path, options *Options, print PrintFunc) Doc {
 	}
 	elements := current.List(elementsProperty)
 	if len(elements) == 0 {
-		parts = append(parts, group(concatIn(path, "[", printDanglingCommentsInList(path, options, nil), "]")))
+		parts = append(parts, groupIn(path, concatIn(path, "[", printDanglingCommentsInList(path, options, nil), "]")))
 	} else {
 		lastElem := elements[len(elements)-1]
 		canHaveTrailingComma := !lastElem.Is("RestElement")
@@ -95,15 +95,14 @@ func printArray(path *Path, options *Options, print PrintFunc) Doc {
 			)
 		}
 
-		parts = append(parts, groupWith(
-			concatIn(path, "[",
-				indent(concatIn(path, softline,
-					elementsDoc,
-					printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}),
-				)),
-				softline,
-				"]",
-			),
+		parts = append(parts, groupWithIn(path, concatIn(path, "[",
+			indentIn(path, concatIn(path, softline,
+				elementsDoc,
+				printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}),
+			)),
+			softline,
+			"]",
+		),
 			doc.GroupOptions{ShouldBreak: shouldBreak, ID: groupID},
 		))
 	}
@@ -173,7 +172,7 @@ func printArrayElements(path *Path, options *Options, print PrintFunc, elementsP
 	each(path, func(path *Path, _ int) {
 		current := node(path)
 		if current != nil {
-			parts = append(parts, group(print(nil, nil)))
+			parts = append(parts, groupIn(path, print(nil, nil)))
 		} else {
 			parts = append(parts, emptyDoc)
 		}

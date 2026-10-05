@@ -107,7 +107,7 @@ func printFunctionParameters(
 			// Removing lines in this case leads to broken or ugly output
 			panic(argExpansionBailout{})
 		}
-		return group(concatIn(path, doc.RemoveLines(typeParametersDoc),
+		return groupIn(path, concatIn(path, doc.RemoveLines(typeParametersDoc),
 			"(",
 			doc.RemoveLines(doc.Concat(printed)),
 			")",
@@ -150,7 +150,7 @@ func printFunctionParameters(
 	}
 	return concatIn(path, typeParametersDoc,
 		"(",
-		indent(append([]Doc{softline}, printed...)),
+		indentIn(path, append([]Doc{softline}, printed...)),
 		trailingComma,
 		softline,
 		")",

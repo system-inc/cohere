@@ -210,8 +210,8 @@ func printModuleSpecifiers(path *Path, options *Options, print PrintFunc) Doc {
 					spacingLine = line
 				}
 				parts = append(parts,
-					group(concatIn(path, "{",
-						indent(concatIn(path, spacingLine,
+					groupIn(path, concatIn(path, "{",
+						indentIn(path, concatIn(path, spacingLine,
 							join(concatIn(path, ",", line), groupedSpecifiers),
 						)),
 						printTrailingComma(options, ""),

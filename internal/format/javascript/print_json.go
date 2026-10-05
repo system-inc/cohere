@@ -60,12 +60,12 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 			}
 			return print(nil, nil)
 		}, "elements")
-		return concatIn(path, "[", indent(concatIn(path, hardline, join(concatIn(path, ",", hardline), printed))), hardline, "]")
+		return concatIn(path, "[", indentIn(path, concatIn(path, hardline, join(concatIn(path, ",", hardline), printed))), hardline, "]")
 	case "ObjectExpression":
 		if len(current.List("properties")) == 0 {
 			return doc.Text("{}")
 		}
-		return concatIn(path, "{", indent(concatIn(path, hardline, join(concatIn(path, ",", hardline), printAll(path, print, "properties")))), hardline, "}")
+		return concatIn(path, "{", indentIn(path, concatIn(path, hardline, join(concatIn(path, ",", hardline), printAll(path, print, "properties")))), hardline, "}")
 	case "ObjectProperty":
 		return concatIn(path, print("key", nil), ": ", print("value", nil))
 	case "UnaryExpression":

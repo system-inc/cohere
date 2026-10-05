@@ -28,21 +28,20 @@ func printUnionType(path *Path, options *Options, print PrintFunc, args *printAr
 	// | child1
 	// // comment
 	// | child2
-	var printed Doc = group(
-		mapPath(path, func(path *Path, _ int) Doc {
-			var bar Doc
-			if path.IsFirst() {
-				bar = ifBreak("| ", "")
-			} else {
-				bar = concatIn(path, line, "| ")
-			}
-			typeDoc := print(nil, nil)
-			if hasComment(node(path), commentLeading, nil) {
-				return concatIn(path, bar, align(2, printing.PrintComments(path, typeDoc, options, nil)))
-			}
+	var printed Doc = groupIn(path, mapPath(path, func(path *Path, _ int) Doc {
+		var bar Doc
+		if path.IsFirst() {
+			bar = ifBreak("| ", "")
+		} else {
+			bar = concatIn(path, line, "| ")
+		}
+		typeDoc := print(nil, nil)
+		if hasComment(node(path), commentLeading, nil) {
+			return concatIn(path, bar, align(2, printing.PrintComments(path, typeDoc, options, nil)))
+		}
 
-			return concatIn(path, bar, printing.PrintComments(path, align(2, typeDoc), options, nil))
-		}, "types"),
+		return concatIn(path, bar, printing.PrintComments(path, align(2, typeDoc), options, nil))
+	}, "types"),
 	)
 
 	if shouldUnionTypePrintOwnComments(path) {
@@ -50,11 +49,11 @@ func printUnionType(path *Path, options *Options, print PrintFunc, args *printAr
 	}
 
 	if needsParentheses(path, options) {
-		return group(concatIn(path, indent(concatIn(path, softline, printed)), softline))
+		return groupIn(path, concatIn(path, indentIn(path, concatIn(path, softline, printed)), softline))
 	}
 
 	if isMultipleTupleTypeElement(path) {
-		return group(concatIn(path, indent(concatIn(path, ifBreak(concatIn(path, "(", softline), ""), printed)),
+		return groupIn(path, concatIn(path, indentIn(path, concatIn(path, ifBreak(concatIn(path, "(", softline), ""), printed)),
 			softline,
 			ifBreak(")", ""),
 		))
@@ -66,7 +65,7 @@ func printUnionType(path *Path, options *Options, print PrintFunc, args *printAr
 		return printed
 	}
 
-	return group(indent(concatIn(path, softline, printed)))
+	return groupIn(path, indentIn(path, concatIn(path, softline, printed)))
 }
 
 // shouldIndentUnionType is upstream's shouldIndentUnionType. The Flow branches (a FunctionTypeParam's
@@ -89,41 +88,40 @@ func shouldIndentUnionType(path *Path) bool {
 // `IntersectionTypeAnnotation`.
 func printIntersectionType(path *Path, options *Options, print PrintFunc) Doc {
 	wasIndented := false
-	return group(
-		mapPath(path, func(path *Path, index int) Doc {
-			printed := print(nil, nil)
-			if path.IsFirst() {
-				return printed
-			}
+	return groupIn(path, mapPath(path, func(path *Path, index int) Doc {
+		printed := print(nil, nil)
+		if path.IsFirst() {
+			return printed
+		}
 
-			currentIsObjectType := isObjectType(node(path))
-			previousIsObjectType := isObjectType(previousOf(path))
+		currentIsObjectType := isObjectType(node(path))
+		previousIsObjectType := isObjectType(previousOf(path))
 
-			// If both are objects, don't indent
-			if previousIsObjectType && currentIsObjectType {
-				if wasIndented {
-					return concatIn(path, " & ", indent(printed))
-				}
-				return concatIn(path, " & ", printed)
-			}
-
-			if
-			// If no object is involved, go to the next line if it breaks
-			(!previousIsObjectType && !currentIsObjectType) ||
-				hasLeadingOwnLineComment(options.OriginalText, node(path)) {
-				// experimentalOperatorPosition is always "end", so upstream's "start" branch is dropped.
-				return indent(concatIn(path, " &", line, printed))
-			}
-
-			// If you go from object to non-object or vis-versa, then inline it
-			if index > 1 {
-				wasIndented = true
-			}
-
-			if index > 1 {
-				return concatIn(path, " & ", indent(printed))
+		// If both are objects, don't indent
+		if previousIsObjectType && currentIsObjectType {
+			if wasIndented {
+				return concatIn(path, " & ", indentIn(path, printed))
 			}
 			return concatIn(path, " & ", printed)
-		}, "types"),
+		}
+
+		if
+		// If no object is involved, go to the next line if it breaks
+		(!previousIsObjectType && !currentIsObjectType) ||
+			hasLeadingOwnLineComment(options.OriginalText, node(path)) {
+			// experimentalOperatorPosition is always "end", so upstream's "start" branch is dropped.
+			return indentIn(path, concatIn(path, " &", line, printed))
+		}
+
+		// If you go from object to non-object or vis-versa, then inline it
+		if index > 1 {
+			wasIndented = true
+		}
+
+		if index > 1 {
+			return concatIn(path, " & ", indentIn(path, printed))
+		}
+		return concatIn(path, " & ", printed)
+	}, "types"),
 	)
 }

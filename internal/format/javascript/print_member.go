@@ -52,7 +52,7 @@ func printMemberExpression(path *Path, options *Options, print PrintFunc) Doc {
 	if shouldInline {
 		lookup = lookupDoc
 	} else {
-		lookup = group(indent(concatIn(path, softline, lookupDoc)))
+		lookup = groupIn(path, indentIn(path, concatIn(path, softline, lookupDoc)))
 	}
 	return label(labelOf(objectDoc), concatIn(path, objectDoc,
 		lineSuffixBoundary,
@@ -74,5 +74,5 @@ func printMemberLookup(path *Path, options *Options, print PrintFunc) Doc {
 		return concatIn(path, optional, "[", property, "]")
 	}
 
-	return group(concatIn(path, optional, "[", indent(concatIn(path, softline, property)), softline, "]"))
+	return groupIn(path, concatIn(path, optional, "[", indentIn(path, concatIn(path, softline, property)), softline, "]"))
 }

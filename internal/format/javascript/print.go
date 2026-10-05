@@ -70,7 +70,7 @@ func printEstree(path *Path, options *Options, print PrintFunc, args any) Doc {
 			open, close = "(", ")"
 		}
 		if hasDecorators {
-			return concatIn(path, open, group(concatIn(path, decoratorsDoc, printed)), close)
+			return concatIn(path, open, groupIn(path, concatIn(path, decoratorsDoc, printed)), close)
 		}
 		return concatIn(path, open, printed, close)
 	})
@@ -81,7 +81,7 @@ func printCommentsForFunction(path *Path, options *Options, printed Doc) Doc {
 	current := node(path)
 	if (hasComment(current, commentLeading, nil) || hasComment(current, commentTrailing, nil)) &&
 		isIifeCalleeOrTaggedTemplateExpressionTag(path) {
-		return concatIn(path, indent(concatIn(path, softline, printing.PrintComments(path, printed, options, nil))), softline)
+		return concatIn(path, indentIn(path, concatIn(path, softline, printing.PrintComments(path, printed, options, nil))), softline)
 	}
 	return printed
 }
@@ -110,7 +110,7 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 		if shouldHug {
 			return concatIn(path, "(", print("expression", nil), ")")
 		}
-		return group(concatIn(path, "(", indent(concatIn(path, softline, print("expression", nil))), softline, ")"))
+		return groupIn(path, concatIn(path, "(", indentIn(path, concatIn(path, softline, print("expression", nil))), softline, ")"))
 	case "AssignmentExpression":
 		return printAssignmentExpression(path, options, print)
 	case "VariableDeclarator":
@@ -198,7 +198,7 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 		}
 		argumentDoc := print("argument", nil)
 		if hasAnyComment(current.Child("argument")) {
-			parts = append(parts, group(concatIn(path, "(", indent(concatIn(path, softline, argumentDoc)), softline, ")")))
+			parts = append(parts, groupIn(path, concatIn(path, "(", indentIn(path, concatIn(path, softline, argumentDoc)), softline, ")")))
 		} else {
 			parts = append(parts, argumentDoc)
 		}

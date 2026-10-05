@@ -96,26 +96,82 @@ func concat(parts ...any) Doc {
 	return result
 }
 
-// concatIn is concat with its parts from the format's slab (settings.docs), when the path's print has one:
-// a fresh slice per concatenation was half of concat's 8M allocations a pass on ahra (#fyw36kf). The
-// other half, boxing the slice into a Doc, stays.
-func concatIn(path *Path, parts ...any) Doc {
+// docMemory is where one format's docs come from: concat's parts, groups and indents, cut from chunks that
+// are reset once the doc is laid out and reused by the next format (#fyw36kf). Made one at a time they
+// were concat's 3.9M slices, and 1.7M groups and indents, a pass on ahra. A released doc reads as
+// poisonedDoc under cohere_poison, so a doc read after its file was printed shows in the output.
+type docMemory struct {
+	parts   arena.Slab[doc.Doc]
+	groups  arena.Arena[doc.Group]
+	indents arena.Arena[doc.Indent]
+}
+
+var docMemories = sync.Pool{New: func() any {
+	memory := &docMemory{}
+	memory.parts.Poison = poisonedDoc
+	memory.groups.Poison = doc.Group{Contents: poisonedDoc}
+	memory.indents.Poison = doc.Indent{Contents: poisonedDoc}
+	return memory
+}}
+
+var poisonedDoc Doc = doc.Text("CoherePoisonedDoc")
+
+// acquireDocMemory is a docMemory for one format, from the pool. Release it once the doc is laid out.
+func acquireDocMemory() *docMemory { return docMemories.Get().(*docMemory) }
+
+// release resets the memory and returns it to the pool. Every doc it handed out is gone.
+func (memory *docMemory) release() {
+	memory.parts.Reset()
+	memory.groups.Reset()
+	memory.indents.Reset()
+	docMemories.Put(memory)
+}
+
+// docMemoryOf is the path's print's docMemory, or nil for the heap.
+func docMemoryOf(path *Path) *docMemory {
 	formatSettings, _ := path.Settings.(*settings)
-	if formatSettings == nil || formatSettings.docs == nil {
+	if formatSettings == nil {
+		return nil
+	}
+	return formatSettings.docs
+}
+
+// concatIn is concat with its parts from the format's docMemory, when the path's print has one. The other
+// half of concat's cost, boxing the slice into a Doc, stays.
+func concatIn(path *Path, parts ...any) Doc {
+	memory := docMemoryOf(path)
+	if memory == nil {
 		return concat(parts...)
 	}
-	result := doc.Concat(formatSettings.docs.Make(len(parts))[:len(parts)])
+	result := doc.Concat(memory.parts.Make(len(parts))[:len(parts)])
 	for index, part := range parts {
 		result[index] = toDoc(part)
 	}
 	return result
 }
 
-// docSlabs hold the slabs concatIn takes parts from, between formats. A released part reads as
-// poisonedDoc under cohere_poison, so a doc read after its file was printed shows in the output.
-var docSlabs = sync.Pool{New: func() any { return &arena.Slab[doc.Doc]{Poison: poisonedDoc} }}
+// groupIn is group with the group from the format's docMemory.
+func groupIn(path *Path, contents any) Doc {
+	return groupWithIn(path, contents, doc.GroupOptions{})
+}
 
-var poisonedDoc Doc = doc.Text("CoherePoisonedDoc")
+// groupWithIn is groupWith with the group from the format's docMemory. It builds what doc.NewGroup does.
+func groupWithIn(path *Path, contents any, options doc.GroupOptions) Doc {
+	memory := docMemoryOf(path)
+	if memory == nil {
+		return groupWith(contents, options)
+	}
+	return memory.groups.New(doc.Group{ID: options.ID, Contents: toDoc(contents), Break: options.ShouldBreak, ExpandedStates: options.ExpandedStates})
+}
+
+// indentIn is indent with the indent from the format's docMemory. It builds what doc.NewIndent does.
+func indentIn(path *Path, contents any) Doc {
+	memory := docMemoryOf(path)
+	if memory == nil {
+		return indent(contents)
+	}
+	return memory.indents.New(doc.Indent{Contents: toDoc(contents)})
+}
 
 // docs converts a list of doc values, for the builders that take arrays.
 func docs(parts ...any) []Doc {

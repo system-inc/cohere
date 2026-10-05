@@ -11,7 +11,7 @@ func printClassMemberDecorators(path *Path, options *Options, print PrintFunc) D
 	if hasNewlineBetweenOrAfterDecorators(current, options) {
 		separator = hardline
 	}
-	return group(concatIn(path, join(line, printAll(path, print, "decorators")), separator))
+	return groupIn(path, concatIn(path, join(line, printAll(path, print, "decorators")), separator))
 }
 
 // printDecoratorsBeforeExport is upstream's printDecoratorsBeforeExport.
@@ -70,7 +70,7 @@ func printIgnored(path *Path, options *Options) Doc {
 		text = ";" + text
 	}
 	if current.Is("ClassExpression") && len(current.List("decorators")) > 0 {
-		return concatIn(path, indent(concatIn(path, softline, text)), softline)
+		return concatIn(path, indentIn(path, concatIn(path, softline, text)), softline)
 	}
 	return concatIn(path, text)
 }

@@ -129,19 +129,19 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 		if shouldPrintSoftlineInIndent {
 			softlineDoc = softline
 		}
-		signatures = indent(concatIn(path, softlineDoc, signaturesDoc))
+		signatures = indentIn(path, concatIn(path, softlineDoc, signaturesDoc))
 	}
 	var body Doc
 	if shouldPrintAsChain {
 		body = indentIfBreak(bodyDoc, chainGroupID, false)
 	} else {
-		body = group(bodyDoc)
+		body = groupIn(path, bodyDoc)
 	}
 	var trailing Doc = emptyDoc
 	if shouldPrintAsChain && isCallee {
 		trailing = ifBreakWithGroup(softline, "", chainGroupID)
 	}
-	return group(concatIn(path, groupWith(signatures, doc.GroupOptions{ShouldBreak: shouldBreakSignatures, ID: chainGroupID}),
+	return groupIn(path, concatIn(path, groupWithIn(path, signatures, doc.GroupOptions{ShouldBreak: shouldBreakSignatures, ID: chainGroupID}),
 		" =>",
 		body,
 		trailing,
@@ -166,10 +166,10 @@ func printArrowFunctionSignature(path *Path, options *Options, print PrintFunc, 
 			if doc.WillBreak(returnTypeDoc) {
 				panic(argExpansionBailout{})
 			}
-			returnTypeDoc = group(doc.RemoveLines(returnTypeDoc))
+			returnTypeDoc = groupIn(path, doc.RemoveLines(returnTypeDoc))
 		}
 		parts = append(parts,
-			group(concatIn(path, printFunctionParameters(
+			groupIn(path, concatIn(path, printFunctionParameters(
 				path,
 				options,
 				print,
@@ -223,11 +223,10 @@ func printArrowFunctionSignatures(
 	key := keyOf(path)
 	if (key != "callee" && isCallLikeExpression(parent)) ||
 		isBinaryish(parent) {
-		return groupWith(
-			concatIn(path, signatureDocs[0],
-				" =>",
-				indent(concatIn(path, line, join(concatIn(path, " =>", line), signatureDocs[1:]))),
-			),
+		return groupWithIn(path, concatIn(path, signatureDocs[0],
+			" =>",
+			indentIn(path, concatIn(path, line, join(concatIn(path, " =>", line), signatureDocs[1:]))),
+		),
 			doc.GroupOptions{ShouldBreak: shouldBreak},
 		)
 	}
@@ -235,10 +234,10 @@ func printArrowFunctionSignatures(
 	if (key == "callee" && isCallLikeExpression(parent)) ||
 		// isAssignmentRhs
 		args.assignmentLayout != "" {
-		return groupWith(join(concatIn(path, " =>", line), signatureDocs), doc.GroupOptions{ShouldBreak: shouldBreak})
+		return groupWithIn(path, join(concatIn(path, " =>", line), signatureDocs), doc.GroupOptions{ShouldBreak: shouldBreak})
 	}
 
-	return groupWith(indent(join(concatIn(path, " =>", line), signatureDocs)), doc.GroupOptions{ShouldBreak: shouldBreak})
+	return groupWithIn(path, indentIn(path, join(concatIn(path, " =>", line), signatureDocs)), doc.GroupOptions{ShouldBreak: shouldBreak})
 }
 
 // printArrowFunctionBody is upstream's printArrowFunctionBody. Upstream's options object { bodyDoc,
@@ -272,8 +271,8 @@ func printArrowFunctionBody(
 
 	if shouldPutBodyOnSameLine && shouldAddParensIfNotBreak(functionBody) {
 		return concatIn(path, " ",
-			group(concatIn(path, ifBreak("", "("),
-				indent(concatIn(path, softline, bodyDoc)),
+			groupIn(path, concatIn(path, ifBreak("", "("),
+				indentIn(path, concatIn(path, softline, bodyDoc)),
 				ifBreak("", ")"),
 				trailingComma,
 				trailingSpace,
@@ -285,5 +284,5 @@ func printArrowFunctionBody(
 	if shouldPutBodyOnSameLine {
 		return concatIn(path, " ", bodyDoc, bodyComments)
 	}
-	return concatIn(path, indent(concatIn(path, line, bodyDoc, bodyComments)), trailingComma, trailingSpace)
+	return concatIn(path, indentIn(path, concatIn(path, line, bodyDoc, bodyComments)), trailingComma, trailingSpace)
 }

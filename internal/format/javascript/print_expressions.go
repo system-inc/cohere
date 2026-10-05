@@ -17,10 +17,10 @@ func printReturnOrThrowArgument(path *Path, options *Options, print PrintFunc) D
 	current := node(path)
 	argumentDoc := print(nil, nil)
 	if returnArgumentHasLeadingComment(current, options) {
-		return concatIn(path, "(", indent(concatIn(path, hardline, argumentDoc)), hardline, ")")
+		return concatIn(path, "(", indentIn(path, concatIn(path, hardline, argumentDoc)), hardline, ")")
 	}
 	if isBinaryish(current) {
-		return group(concatIn(path, ifBreak("(", ""), indent(concatIn(path, softline, argumentDoc)), softline, ifBreak(")", "")))
+		return groupIn(path, concatIn(path, ifBreak("(", ""), indentIn(path, concatIn(path, softline, argumentDoc)), softline, ifBreak(")", "")))
 	}
 	return argumentDoc
 }
@@ -72,7 +72,7 @@ func printVariableDeclaration(path *Path, options *Options, print PrintFunc) Doc
 	if len(printed) == 1 && !hasAnyComment(declarations[0]) {
 		firstVariable = printed[0]
 	} else if len(printed) > 0 {
-		firstVariable = indent(printed[0])
+		firstVariable = indentIn(path, printed[0])
 	}
 
 	var first Doc = emptyDoc
@@ -91,10 +91,10 @@ func printVariableDeclaration(path *Path, options *Options, print PrintFunc) Doc
 	if !isForXStatementInitializer {
 		semicolon = printSemicolon(options)
 	}
-	return group(concatIn(path, printDeclareToken(path),
+	return groupIn(path, concatIn(path, printDeclareToken(path),
 		current.String("kind"),
 		first,
-		indent(concatIn(path, rest...)),
+		indentIn(path, concatIn(path, rest...)),
 		semicolon,
 	))
 }
@@ -118,16 +118,16 @@ func printSequenceExpression(path *Path, options *Options, print PrintFunc) Doc 
 			if path.IsFirst() {
 				parts = append(parts, print(nil, nil))
 			} else {
-				parts = append(parts, ",", indent(concatIn(path, line, print(nil, nil))))
+				parts = append(parts, ",", indentIn(path, concatIn(path, line, print(nil, nil))))
 			}
 		}, "expressions")
-		return group(concatIn(path, parts...))
+		return groupIn(path, concatIn(path, parts...))
 	}
 	parts := join(concatIn(path, ",", line), printAll(path, print, "expressions"))
 	if shouldIndentSequenceExpression(path, options) {
-		return group(ifBreak(concatIn(path, indent(concatIn(path, softline, parts)), softline), parts))
+		return groupIn(path, ifBreak(concatIn(path, indentIn(path, concatIn(path, softline, parts)), softline), parts))
 	}
-	return group(parts)
+	return groupIn(path, parts)
 }
 
 // printAwaitExpression is upstream's printAwaitExpression.
@@ -139,7 +139,7 @@ func printAwaitExpression(path *Path, options *Options, print PrintFunc) Doc {
 		parent := parentOf(path)
 		if isCallExpression(parent) && parent.Child("callee") == current ||
 			isMemberExpression(parent) && parent.Child("object") == current {
-			parts = []any{indent(concatIn(path, append([]any{softline}, parts...)...)), softline}
+			parts = []any{indentIn(path, concatIn(path, append([]any{softline}, parts...)...)), softline}
 			// avoid printing `await (await` on one line
 			parentAwaitOrBlock, _ := path.FindAncestor(func(node Node) bool {
 				return node.Is("AwaitExpression", "BlockStatement")
@@ -148,7 +148,7 @@ func printAwaitExpression(path *Path, options *Options, print PrintFunc) Doc {
 				!startsWithNoLookaheadToken(parentAwaitOrBlock.Child("argument"), func(leftmost Node) bool {
 					return leftmost == current
 				}) {
-				return group(concatIn(path, parts...))
+				return groupIn(path, concatIn(path, parts...))
 			}
 		}
 	}

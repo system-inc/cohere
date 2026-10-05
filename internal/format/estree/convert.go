@@ -165,6 +165,12 @@ func (converter *Converter) createNodeWithRange(nodeType string, nodeRange [2]in
 	return converter.nodes.node(nodeType, nodeRange[0], nodeRange[1], keysAndValues)
 }
 
+// noNodes is an empty node list made a property value once. A []*Node{} given to createNode is boxed
+// into its value on every node that has one, which was 1.5M of the conversion's allocations on ahra for
+// identifiers' decorators alone (#fyw36kf). Sharing one is safe: nothing can be stored in an empty list,
+// and appending to it moves the result to new memory.
+var noNodes any = []*Node{}
+
 // fixParentLocation is upstream's fixParentLocation.
 func fixParentLocation(result *Node, childRange [2]int) {
 	if childRange[0] < result.Range[0] {
@@ -543,11 +549,11 @@ func (converter *Converter) fixExports(node *ast.Node, result *Node) *Node {
 		exportKind = "type"
 	}
 	return converter.createNodeWithRange("ExportNamedDeclaration", [2]int{converter.getStart(exportKeyword), result.Range[1]},
-		"attributes", []*Node{},
+		"attributes", noNodes,
 		"declaration", result,
 		"exportKind", exportKind,
 		"source", nil,
-		"specifiers", []*Node{})
+		"specifiers", noNodes)
 }
 
 // getNamespaceModifiers is upstream's getNamespaceModifiers: nested namespaces use the topmost
@@ -594,7 +600,7 @@ var keywordTypeNames = map[ast.Kind]string{
 // identifier builds upstream's Identifier object literal.
 func (converter *Converter) identifierNode(nodeRange [2]int, name string) *Node {
 	return converter.createNodeWithRange("Identifier", nodeRange,
-		"decorators", []*Node{},
+		"decorators", noNodes,
 		"name", name,
 		"optional", false,
 		"typeAnnotation", nil)
@@ -788,7 +794,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 				patterns[index] = converter.convertPattern(element, nil)
 			}
 			return converter.createNode(node, "ArrayPattern",
-				"decorators", []*Node{},
+				"decorators", noNodes,
 				"elements", patterns,
 				"optional", false,
 				"typeAnnotation", nil)
@@ -804,7 +810,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 				patterns[index] = converter.convertPattern(property, nil)
 			}
 			return converter.createNode(node, "ObjectPattern",
-				"decorators", []*Node{},
+				"decorators", noNodes,
 				"optional", false,
 				"properties", patterns,
 				"typeAnnotation", nil)
@@ -834,7 +840,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 				"optional", false,
 				"shorthand", true,
 				"value", converter.createNode(node, "AssignmentPattern",
-					"decorators", []*Node{},
+					"decorators", noNodes,
 					"left", converter.convertPattern(node.Name(), nil),
 					"optional", false,
 					"right", converter.convertChild(shorthand.ObjectAssignmentInitializer, nil),
@@ -924,7 +930,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 			patterns[index] = converter.convertPattern(element, nil)
 		}
 		return converter.createNode(node, "ArrayPattern",
-			"decorators", []*Node{},
+			"decorators", noNodes,
 			"elements", patterns,
 			"optional", false,
 			"typeAnnotation", nil)
@@ -939,7 +945,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 			patterns[index] = converter.convertPattern(element, nil)
 		}
 		return converter.createNode(node, "ObjectPattern",
-			"decorators", []*Node{},
+			"decorators", noNodes,
 			"optional", false,
 			"properties", patterns,
 			"typeAnnotation", nil)
@@ -977,7 +983,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 			cookedValue = nil
 		}
 		return converter.createNode(node, "TemplateLiteral",
-			"expressions", []*Node{},
+			"expressions", noNodes,
 			"quasis", []*Node{converter.createNode(node, "TemplateElement",
 				"tail", true,
 				"value", &TemplateValue{Cooked: cookedValue, Raw: rawText})})
@@ -1028,7 +1034,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 		if converter.allowPattern {
 			return converter.createNode(node, "RestElement",
 				"argument", converter.convertPattern(node.Expression(), nil),
-				"decorators", []*Node{},
+				"decorators", noNodes,
 				"optional", false,
 				"typeAnnotation", nil,
 				"value", nil)
@@ -1296,7 +1302,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 	case ast.KindJsxSelfClosingElement:
 		element := node.AsJsxSelfClosingElement()
 		return converter.createNode(node, "JSXElement",
-			"children", []*Node{},
+			"children", noNodes,
 			"closingElement", nil,
 			"openingElement", converter.createNodeWithRange("JSXOpeningElement", converter.getRange(node),
 				"attributes", converter.convertChildren(element.Attributes.AsJsxAttributes().Properties.Nodes, nil),
@@ -1761,7 +1767,7 @@ func (converter *Converter) convertMethod(node *ast.Node, parent *ast.Node) *Nod
 		"expression", false,
 		"generator", asterisk,
 		"id", nil,
-		"params", []*Node{},
+		"params", noNodes,
 		"returnType", converter.returnType(node),
 		"typeParameters", converter.convertTypeParameters(node))
 	if typeParameters := method.Child("typeParameters"); typeParameters != nil {
@@ -1860,7 +1866,7 @@ func (converter *Converter) convertConstructor(node *ast.Node) *Node {
 	return converter.createNode(node, methodType,
 		"accessibility", getTSNodeAccessibility(node),
 		"computed", false,
-		"decorators", []*Node{},
+		"decorators", noNodes,
 		"key", constructorKey,
 		"kind", kind,
 		"optional", false,
@@ -1876,7 +1882,7 @@ func (converter *Converter) convertBindingElement(node *ast.Node, parent *ast.No
 		arrayItem := converter.convertChild(node.Name(), parent)
 		if element.Initializer != nil {
 			return converter.createNode(node, "AssignmentPattern",
-				"decorators", []*Node{},
+				"decorators", noNodes,
 				"left", arrayItem,
 				"optional", false,
 				"right", converter.convertChild(element.Initializer, nil),
@@ -1885,7 +1891,7 @@ func (converter *Converter) convertBindingElement(node *ast.Node, parent *ast.No
 		if element.DotDotDotToken != nil {
 			return converter.createNode(node, "RestElement",
 				"argument", arrayItem,
-				"decorators", []*Node{},
+				"decorators", noNodes,
 				"optional", false,
 				"typeAnnotation", nil,
 				"value", nil)
@@ -1901,7 +1907,7 @@ func (converter *Converter) convertBindingElement(node *ast.Node, parent *ast.No
 		}
 		result = converter.createNode(node, "RestElement",
 			"argument", converter.convertChild(argument, nil),
-			"decorators", []*Node{},
+			"decorators", noNodes,
 			"optional", false,
 			"typeAnnotation", nil,
 			"value", nil)
@@ -1921,7 +1927,7 @@ func (converter *Converter) convertBindingElement(node *ast.Node, parent *ast.No
 	}
 	if element.Initializer != nil {
 		result.Set("value", converter.createNodeWithRange("AssignmentPattern", [2]int{converter.getStart(node.Name()), element.Initializer.End()},
-			"decorators", []*Node{},
+			"decorators", noNodes,
 			"left", converter.convertChild(node.Name(), nil),
 			"optional", false,
 			"right", converter.convertChild(element.Initializer, nil),
@@ -1938,7 +1944,7 @@ func (converter *Converter) convertParameter(node *ast.Node, parent *ast.Node) *
 	case declaration.DotDotDotToken != nil:
 		parameter = converter.createNode(node, "RestElement",
 			"argument", converter.convertChild(node.Name(), nil),
-			"decorators", []*Node{},
+			"decorators", noNodes,
 			"optional", false,
 			"typeAnnotation", nil,
 			"value", nil)
@@ -1946,7 +1952,7 @@ func (converter *Converter) convertParameter(node *ast.Node, parent *ast.Node) *
 	case declaration.Initializer != nil:
 		parameter = converter.convertChild(node.Name(), nil)
 		result = converter.createNodeWithRange("AssignmentPattern", [2]int{converter.getStart(node.Name()), declaration.Initializer.End()},
-			"decorators", []*Node{},
+			"decorators", noNodes,
 			"left", parameter,
 			"optional", false,
 			"right", converter.convertChild(declaration.Initializer, nil),
@@ -1974,7 +1980,7 @@ func (converter *Converter) convertParameter(node *ast.Node, parent *ast.Node) *
 	if len(modifiers(node)) > 0 {
 		return converter.createNode(node, "TSParameterProperty",
 			"accessibility", getTSNodeAccessibility(node),
-			"decorators", []*Node{},
+			"decorators", noNodes,
 			"override", hasModifier(ast.KindOverrideKeyword, node),
 			"parameter", result,
 			"readonly", hasModifier(ast.KindReadonlyKeyword, node),
@@ -2219,7 +2225,7 @@ func (converter *Converter) convertBinary(node *ast.Node) *Node {
 	expressionType, operator := binaryExpressionType(operatorKind)
 	if converter.allowPattern && expressionType == "AssignmentExpression" {
 		return converter.createNode(node, "AssignmentPattern",
-			"decorators", []*Node{},
+			"decorators", noNodes,
 			"left", converter.convertPattern(binary.Left, node),
 			"optional", false,
 			"right", converter.convertChild(binary.Right, nil),

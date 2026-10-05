@@ -20,7 +20,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 	args := getCallArguments(current)
 
 	if len(args) == 0 {
-		return group(concatIn(path, "(", printDanglingCommentsInList(path, options, nil), ")"))
+		return groupIn(path, concatIn(path, "(", printDanglingCommentsInList(path, options, nil), ")"))
 	}
 
 	lastArgIndex := len(args) - 1
@@ -68,8 +68,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 	}
 
 	allArgsBrokenOut := func() Doc {
-		return groupWith(
-			concatIn(path, "(", indent(concatIn(path, spreadDocs(line, printedArguments)...)), trailingComma, line, ")"),
+		return groupWithIn(path, concatIn(path, "(", indentIn(path, concatIn(path, spreadDocs(line, printedArguments)...)), trailingComma, line, ")"),
 			doc.GroupOptions{ShouldBreak: true},
 		)
 	}
@@ -98,7 +97,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 		if doc.WillBreak(firstArg) {
 			return concatIn(path, breakParent,
 				conditionalGroup([]Doc{
-					concatIn(path, spreadDocs("(", groupWith(firstArg, doc.GroupOptions{ShouldBreak: true}), ", ", tailArgs, ")")...),
+					concatIn(path, spreadDocs("(", groupWithIn(path, firstArg, doc.GroupOptions{ShouldBreak: true}), ", ", tailArgs, ")")...),
 					allArgsBrokenOut(),
 				}, doc.GroupOptions{}),
 			)
@@ -106,7 +105,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 
 		return conditionalGroup([]Doc{
 			concatIn(path, spreadDocs("(", firstArg, ", ", tailArgs, ")")...),
-			concatIn(path, spreadDocs("(", groupWith(firstArg, doc.GroupOptions{ShouldBreak: true}), ", ", tailArgs, ")")...),
+			concatIn(path, spreadDocs("(", groupWithIn(path, firstArg, doc.GroupOptions{ShouldBreak: true}), ", ", tailArgs, ")")...),
 			allArgsBrokenOut(),
 		}, doc.GroupOptions{})
 	}
@@ -130,7 +129,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 		if doc.WillBreak(lastArg) {
 			return concatIn(path, breakParent,
 				conditionalGroup([]Doc{
-					concatIn(path, spreadDocs("(", headArgs, groupWith(lastArg, doc.GroupOptions{ShouldBreak: true}), ")")...),
+					concatIn(path, spreadDocs("(", headArgs, groupWithIn(path, lastArg, doc.GroupOptions{ShouldBreak: true}), ")")...),
 					allArgsBrokenOut(),
 				}, doc.GroupOptions{}),
 			)
@@ -138,13 +137,13 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 
 		return conditionalGroup([]Doc{
 			concatIn(path, spreadDocs("(", headArgs, lastArg, ")")...),
-			concatIn(path, spreadDocs("(", headArgs, groupWith(lastArg, doc.GroupOptions{ShouldBreak: true}), ")")...),
+			concatIn(path, spreadDocs("(", headArgs, groupWithIn(path, lastArg, doc.GroupOptions{ShouldBreak: true}), ")")...),
 			allArgsBrokenOut(),
 		}, doc.GroupOptions{})
 	}
 
 	contents := concatIn(path, "(",
-		indent(concatIn(path, spreadDocs(softline, printedArguments)...)),
+		indentIn(path, concatIn(path, spreadDocs(softline, printedArguments)...)),
 		trailingComma,
 		softline,
 		")",
@@ -162,7 +161,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 			break
 		}
 	}
-	return groupWith(contents, doc.GroupOptions{ShouldBreak: shouldBreak})
+	return groupWithIn(path, contents, doc.GroupOptions{ShouldBreak: shouldBreak})
 }
 
 // printCatchingArgExpansionBailout is upstream's

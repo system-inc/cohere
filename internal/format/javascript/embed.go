@@ -233,7 +233,7 @@ func printEmbedCss(textToDoc printing.TextToDoc, print PrintFunc, path *Path, op
 	if newDoc == nil {
 		return nil, errCouldNotInsertExpressions
 	}
-	return concatIn(path, "`", indent(concatIn(path, hardline, newDoc)), softline, "`"), nil
+	return concatIn(path, "`", indentIn(path, concatIn(path, hardline, newDoc)), softline, "`"), nil
 }
 
 var errCouldNotInsertExpressions = errors.New("Couldn't insert all the expressions")
@@ -446,7 +446,7 @@ func printEmbedGraphQL(textToDoc printing.TextToDoc, print PrintFunc, path *Path
 		}
 	}
 
-	return concatIn(path, "`", indent(concatIn(path, hardline, join(hardline, parts))), hardline, "`"), nil
+	return concatIn(path, "`", indentIn(path, concatIn(path, hardline, join(hardline, parts))), hardline, "`"), nil
 }
 
 // commentAtLineEnd is upstream's /#[^\n\r]*$/ over one line.

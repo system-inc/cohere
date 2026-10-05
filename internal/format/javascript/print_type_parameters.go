@@ -111,8 +111,8 @@ func printTypeParameters(path *Path, options *Options, print PrintFunc, paramsKe
 		trailingComma = printTrailingComma(options, "")
 	}
 
-	return group(concatIn(path, "<",
-		indent(concatIn(path, softline, join(concatIn(path, ",", line), printAll(path, print, paramsKey)))),
+	return groupIn(path, concatIn(path, "<",
+		indentIn(path, concatIn(path, softline, join(concatIn(path, ",", line), printAll(path, print, paramsKey)))),
 		trailingComma,
 		softline,
 		">",
@@ -175,7 +175,7 @@ func printTypeParameter(path *Path, options *Options, print PrintFunc) Doc {
 		groupID := newGroupID("constraint")
 		parts = append(parts,
 			" extends",
-			groupWith(indent(line), doc.GroupOptions{ID: groupID}),
+			groupWithIn(path, indentIn(path, line), doc.GroupOptions{ID: groupID}),
 			lineSuffixBoundary,
 			indentIfBreak(print("constraint", nil), groupID, false),
 		)
@@ -185,11 +185,11 @@ func printTypeParameter(path *Path, options *Options, print PrintFunc) Doc {
 		groupID := newGroupID("default")
 		parts = append(parts,
 			" =",
-			groupWith(indent(line), doc.GroupOptions{ID: groupID}),
+			groupWithIn(path, indentIn(path, line), doc.GroupOptions{ID: groupID}),
 			lineSuffixBoundary,
 			indentIfBreak(print("default", nil), groupID, false),
 		)
 	}
 
-	return group(concatIn(path, parts...))
+	return groupIn(path, concatIn(path, parts...))
 }

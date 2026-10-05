@@ -23,7 +23,7 @@ func printBlock(path *Path, options *Options, print PrintFunc) Doc {
 	}
 	parts = append(parts, "{")
 	if bodyDoc != nil {
-		parts = append(parts, indent(concatIn(path, hardline, bodyDoc)), hardline)
+		parts = append(parts, indentIn(path, concatIn(path, hardline, bodyDoc)), hardline)
 	} else {
 		parentParent := grandparentOf(path)
 		if !(parent.Is("ArrowFunctionExpression", "FunctionExpression", "FunctionDeclaration", "ComponentDeclaration",

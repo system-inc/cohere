@@ -56,7 +56,7 @@ func printTypeScriptMappedType(path *Path, options *Options, print PrintFunc) Do
 				hasNewline(options.OriginalText, locEnd(lastComment)) {
 				separator = hardline
 			}
-			danglingCommentsDoc = append(danglingCommentsDoc, group(concatIn(path, parts[len(parts)-1], separator)))
+			danglingCommentsDoc = append(danglingCommentsDoc, groupIn(path, concatIn(path, parts[len(parts)-1], separator)))
 		}
 	}
 
@@ -94,8 +94,8 @@ func printTypeScriptMappedType(path *Path, options *Options, print PrintFunc) Do
 	indented = append(indented, danglingCommentsDoc...)
 	indented = append(indented,
 		readonly,
-		group(concatIn(path, "[",
-			indent(concatIn(path, softline,
+		groupIn(path, concatIn(path, "[",
+			indentIn(path, concatIn(path, softline,
 				print("key", nil),
 				" in ",
 				print("constraint", nil),
@@ -110,12 +110,11 @@ func printTypeScriptMappedType(path *Path, options *Options, print PrintFunc) Do
 		semicolon,
 	)
 
-	return groupWith(
-		concatIn(path, "{",
-			indent(concatIn(path, indented...)),
-			bracketLine,
-			"}",
-		),
+	return groupWithIn(path, concatIn(path, "{",
+		indentIn(path, concatIn(path, indented...)),
+		bracketLine,
+		"}",
+	),
 		doc.GroupOptions{ShouldBreak: shouldBreak},
 	)
 }
