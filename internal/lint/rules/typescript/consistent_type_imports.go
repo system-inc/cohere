@@ -266,10 +266,9 @@ func reportImportTypeAnnotations(ctx rule.Context, sourceFile *ast.SourceFile) {
 // Nothing about references is consulted here. The setting says the keyword is unwanted wherever it
 // appears, so a type-only import of a name used only as a type still reports.
 func reportTypeKeywordsToRemove(ctx rule.Context, sourceFile *ast.SourceFile) {
-	for _, statement := range sourceFile.Statements.Nodes {
-		if statement.Kind != ast.KindImportDeclaration {
-			continue
-		}
+	// Every import declaration, including those inside an ambient module body, the way upstream
+	// visits ImportDeclaration wherever it sits.
+	for _, statement := range imports.Declarations(sourceFile) {
 		clause := statement.AsImportDeclaration().ImportClause
 		if clause == nil {
 			continue
@@ -305,10 +304,8 @@ func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile, 
 	var metadataRoots map[*ast.Node]bool
 	var jsxValueNames map[string]bool
 
-	for _, statement := range sourceFile.Statements.Nodes {
-		if statement.Kind != ast.KindImportDeclaration {
-			continue
-		}
+	// Every import declaration, including those inside an ambient module body (#7g5r6vt).
+	for _, statement := range imports.Declarations(sourceFile) {
 		declaration := statement.AsImportDeclaration()
 		clause := declaration.ImportClause
 		if clause == nil {
