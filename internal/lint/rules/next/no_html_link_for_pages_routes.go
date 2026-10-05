@@ -1,6 +1,7 @@
 package next
 
 import (
+	"crypto/sha256"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -44,11 +45,11 @@ type noHtmlLinkForPagesRouteModel struct {
 // noHtmlLinkForPagesRouteModels holds the models built for one program, so each is built once per
 // run rather than once per file.
 //
-// The rule declares ReadsOtherFiles and is therefore never put in the findings cache, so a page added
-// between runs cannot replay a stale verdict. Within a run the directories are read once, the way
-// upstream's process-wide existsSync and readdirSync caches read them once per ESLint process. Keyed
-// on the program's identity, so the next run's program starts a fresh set rather than reading this
-// one's, the same shape as the Tailwind design system's cache.
+// Within a run the directories are read once, the way upstream's process-wide existsSync and
+// readdirSync caches read them once per ESLint process, and the fingerprint the findings cache keys
+// the rule on is read off the same model, so a page added between runs moves it and cannot replay a
+// stale verdict. Keyed on the program's identity, so the next run's program starts a fresh set rather
+// than reading this one's, the same shape as the Tailwind design system's cache.
 var noHtmlLinkForPagesRouteModels struct {
 	sync.Mutex
 	program rule.ProgramIdentity
@@ -73,6 +74,34 @@ func noHtmlLinkForPagesRouteModelFor(program rule.Program, root string, settings
 	model := buildNoHtmlLinkForPagesRouteModel(program.FS(), root, settings)
 	noHtmlLinkForPagesRouteModels.models[key] = model
 	return model
+}
+
+// noHtmlLinkForPagesFingerprint is the rule's program fingerprint under one setting of its option, which
+// chooses the pages directories: whether a pages or app directory was found, and every route the model
+// holds, as compiled, in the order a file's anchors are tested against them (#s9k38p3).
+//
+// A file's record reads its own bytes and these two, nothing else. The routes decide its findings: an
+// anchor reports once for each route it matches, and the message names only the href, so duplicates are
+// kept, since a route found two ways reports twice. Whether a directory was found decides its coverage,
+// which the cache replays with the findings: with none the rule attaches no listener, and with an empty
+// one it listens and reports nothing. Two things the model is built from are left out because no record
+// can tell them apart. A route that does not compile is dropped before any anchor sees it. The root
+// reaches a record only through the routes, and is in the findings key besides. A page's contents are
+// never read, so an edit inside one leaves the fingerprint alone.
+func noHtmlLinkForPagesFingerprint(program rule.Program, options any) [sha256.Size]byte {
+	settings, _ := rule.OptionsAs[NoHtmlLinkForPagesOptions](options)
+	model := noHtmlLinkForPagesRouteModelFor(program, program.GetCurrentDirectory(), settings)
+	hash := sha256.New()
+	if model.found {
+		hash.Write([]byte{1})
+	}
+	for _, route := range model.routes {
+		hash.Write([]byte(route.Source()))
+		hash.Write([]byte{0})
+	}
+	var fingerprint [sha256.Size]byte
+	copy(fingerprint[:], hash.Sum(nil))
+	return fingerprint
 }
 
 // noHtmlLinkForPagesSettingsKey spells an option setting as a cache key that no other setting shares.

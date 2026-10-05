@@ -15,7 +15,7 @@ func correctnessRequireBlockingStandardStreamsFingerprintOf(t *testing.T, files 
 	var fingerprint [sha256.Size]byte
 	probe := CorrectnessRequireBlockingStandardStreams
 	probe.Run = func(ctx rule.Context, options any) rule.Listeners {
-		fingerprint = CorrectnessRequireBlockingStandardStreams.ProgramFingerprint(ctx.Program)
+		fingerprint = CorrectnessRequireBlockingStandardStreams.ProgramFingerprint(ctx.Program, options)
 		return nil
 	}
 	rule_testing.RunTypedFiles(t, probe, files, subject)

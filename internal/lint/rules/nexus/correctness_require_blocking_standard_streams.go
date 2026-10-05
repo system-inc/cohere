@@ -226,8 +226,9 @@ func correctnessRequireBlockingStandardStreamsIndexFor(program rule.Program) *co
 // files a file's imports reach are its closure, whose bytes and resolutions its type fingerprint holds;
 // and whether one of them can reach the streams is decided by its own imports, inside that closure. So
 // the imported set is the whole of it: an edit that makes a file imported or unimported moves this, and
-// an edit that does neither leaves it, and the findings replay.
-func correctnessRequireBlockingStandardStreamsFingerprint(program rule.Program) [sha256.Size]byte {
+// an edit that does neither leaves it, and the findings replay. The rule takes no options, so none reach
+// it.
+func correctnessRequireBlockingStandardStreamsFingerprint(program rule.Program, _ any) [sha256.Size]byte {
 	index := correctnessRequireBlockingStandardStreamsIndexFor(program)
 	var imported []string
 	for path := range index.imported {

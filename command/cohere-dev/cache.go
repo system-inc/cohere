@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -29,7 +30,10 @@ import (
 // the cap does it take every token in the pool, so no build that goes through cohere-dev is running, and
 // trim the least recently used entries down to three quarters of the cap, sparing only the last
 // cacheTrimSpare, which covers a build outside the pool that just wrote. Then it gives the tokens back.
-// The pool narrows while it waits for each token in turn, and the trim itself takes seconds.
+// It waits for the pool to be empty holding nothing, and takes every token in one step only then, so it
+// never keeps a token idle while another runs: taken one at a time with a wait for each, it held half the
+// pool idle for minutes behind a land gate (2026-10-05 15:55). The trim itself takes seconds. A pool that
+// is never empty for cacheTrimPatience is left alone, and the next look tries again.
 
 // cacheCapVariable sets the Go build cache's cap, in gigabytes, a fraction allowed.
 const cacheCapVariable = "COHERE_DEV_CACHE_GB"
@@ -44,6 +48,12 @@ const cacheTrimInterval = 10 * time.Minute
 // cacheTrimSpare is how recently written an entry may be and never be trimmed, while the pool is held:
 // what a build outside the pool has just written and may be about to read.
 const cacheTrimSpare = 10 * time.Minute
+
+// cacheTrimPatience is how long the trim waits for an empty pool before it leaves this look to the next.
+const cacheTrimPatience = 5 * time.Minute
+
+// cacheTrimPoll is how often the trim looks for an empty pool while it waits.
+const cacheTrimPoll = 250 * time.Millisecond
 
 // trimCacheVerb runs cohere-dev as the background trim. It is what startCacheTrim starts.
 const trimCacheVerb = "trim-cache"
@@ -146,7 +156,12 @@ func trimCache() int {
 		return 2
 	}
 	release, err := holdThePool(directory, shape.tokens, fmt.Sprintf("trimming the Go build cache, %s over the %s cap",
-		gigabytes(measured.Before), gigabytes(capBytes)))
+		gigabytes(measured.Before), gigabytes(capBytes)), cacheTrimPatience)
+	if errors.Is(err, errPoolNeverEmpty) {
+		recordCacheLook(directory, fmt.Sprintf("%s over the %s cap, not trimmed: the pool was never empty for %s, "+
+			"and the next look tries again", gigabytes(measured.Before), gigabytes(capBytes), cacheTrimPatience))
+		return 0
+	}
 	if err != nil {
 		recordCacheLook(directory, "holding the pool to trim: "+err.Error())
 		return 1
@@ -164,13 +179,45 @@ func trimCache() int {
 	return 0
 }
 
-// holdThePool takes every token, waiting for each in turn, and returns what gives them back. Its holder
-// line says why, so a run waiting behind it knows.
-func holdThePool(directory string, tokens int, why string) (func(), error) {
+// errPoolNeverEmpty is holdThePool's answer when every look found a token in use.
+var errPoolNeverEmpty = errors.New("the pool was never empty")
+
+// holdThePool takes every token in one step, once none is in use, and returns what gives them back. While
+// any token is in use it holds none, so it never keeps a token idle while another runs; it looks again every
+// cacheTrimPoll, for up to patience. Its holder lines say why, so a run waiting behind it knows.
+func holdThePool(directory string, tokens int, why string, patience time.Duration) (func(), error) {
+	deadline := time.Now().Add(patience)
+	for {
+		held, err := takeEveryToken(directory, tokens)
+		if err != nil {
+			return nil, err
+		}
+		if held != nil {
+			line := fmt.Sprintf("pid %d since %s: %s", os.Getpid(), time.Now().Format("15:04:05"), why)
+			for token := 1; token <= tokens; token++ {
+				os.WriteFile(holderPath(directory, token), []byte(line+"\n"), 0o644)
+			}
+			return func() {
+				for index, lock := range held {
+					os.Remove(holderPath(directory, index+1))
+					unlockFile(lock)
+					lock.Close()
+				}
+			}, nil
+		}
+		if time.Now().After(deadline) {
+			return nil, errPoolNeverEmpty
+		}
+		time.Sleep(cacheTrimPoll)
+	}
+}
+
+// takeEveryToken takes every token, or none: a token found in use gives back the ones already taken at once,
+// and it returns nil.
+func takeEveryToken(directory string, tokens int) ([]*os.File, error) {
 	held := []*os.File{}
-	giveBack := func() {
-		for index, lock := range held {
-			os.Remove(holderPath(directory, index+1))
+	letGo := func() {
+		for _, lock := range held {
 			unlockFile(lock)
 			lock.Close()
 		}
@@ -178,19 +225,18 @@ func holdThePool(directory string, tokens int, why string) (func(), error) {
 	for token := 1; token <= tokens; token++ {
 		lock, err := os.OpenFile(lockPath(directory, token), os.O_CREATE|os.O_RDWR, 0o644)
 		if err != nil {
-			giveBack()
+			letGo()
 			return nil, err
 		}
-		if err := lockFileWaiting(lock); err != nil {
+		taken, err := tryLockFile(lock)
+		if err != nil || !taken {
 			lock.Close()
-			giveBack()
+			letGo()
 			return nil, err
 		}
 		held = append(held, lock)
-		line := fmt.Sprintf("pid %d since %s: %s", os.Getpid(), time.Now().Format("15:04:05"), why)
-		os.WriteFile(holderPath(directory, token), []byte(line+"\n"), 0o644)
 	}
-	return giveBack, nil
+	return held, nil
 }
 
 // goCacheDirectory is the cache a plain go command here uses: GOCACHE when it is set, Go's default

@@ -212,7 +212,8 @@ func mergeMain(worktree string, mainCommit string) error {
 
 // gate runs the landing gate on the worktree through a pool token: go vet and the whole module's tests.
 func gate(worktree string, commit string) int {
-	return withToken("land gate on "+shortCommit(commit)+" in "+worktree, func(environment []string) int {
+	return withToken("land gate on "+shortCommit(commit)+" in "+worktree, func(budget []string) int {
+		environment := gateEnvironment(budget)
 		vet := exec.Command("go", "vet", "./...")
 		vet.Dir, vet.Env = worktree, environment
 		vet.Stdout, vet.Stderr = os.Stdout, os.Stderr
@@ -234,6 +235,28 @@ func gate(worktree string, commit string) int {
 		}
 		return 0
 	})
+}
+
+// gateEnvironment is the budget's environment with GOFLAGS reduced to the pool's own -p, so every landing
+// is gated the same way, whatever its caller's shell has set. A caller's -trimpath failed tests that find
+// their fixtures from their own source path, and the gate read that as the landing's fault (2026-10-05).
+func gateEnvironment(budget []string) []string {
+	environment := make([]string, 0, len(budget))
+	for _, variable := range budget {
+		value, isFlags := strings.CutPrefix(variable, "GOFLAGS=")
+		if !isFlags {
+			environment = append(environment, variable)
+			continue
+		}
+		kept := []string{}
+		for _, flag := range strings.Fields(value) {
+			if strings.HasPrefix(flag, "-p=") {
+				kept = append(kept, flag)
+			}
+		}
+		environment = append(environment, "GOFLAGS="+strings.Join(kept, " "))
+	}
+	return environment
 }
 
 func exitCodeOf(err error) int {
