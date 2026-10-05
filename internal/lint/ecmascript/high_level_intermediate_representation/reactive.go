@@ -135,6 +135,8 @@
 package high_level_intermediate_representation
 
 import (
+	"slices"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 )
@@ -878,62 +880,97 @@ func (r *reactivity) terminalTestIsReactive(terminal Terminal) bool {
 // Upstream's `postDominatorFrontier`, over the tree `postdominator.go` already builds. For a target
 // T: collect the blocks T post-dominates, then take every predecessor of any of those that is not
 // itself post-dominated by T. Those are the blocks where control chose whether T would run.
+//
+// The tree maps a block to its IMMEDIATE post-dominator, so it is inverted into children once, and the
+// blocks T post-dominates are T's subtree, marked in a slice by each block's position in
+// `Function.Blocks` and cleared after. It used to be one map per target sized to the whole function,
+// filled by walking every block's chain up to the root, plus another map for the frontier's duplicates:
+// quadratic allocation in the block count, and with the collector off every byte of it a fresh page.
+// That was about a quarter of preserve-manual-memoization's CPU on ahra, 736 to 536ms (#hekjpw3). The
+// answer is the same, order included, and TestPostDominatorFrontiersMatchTheChainWalk holds the old
+// walk beside it.
 func (r *reactivity) postDominatorFrontiers() map[BlockId][]BlockId {
 	tree := computePostDominance(r.function)
-	frontiers := make(map[BlockId][]BlockId, len(r.function.Blocks))
+	blocks := r.function.Blocks
+	frontiers := make(map[BlockId][]BlockId, len(blocks))
 
-	for _, block := range r.function.Blocks {
-		postDominated := r.blocksPostDominatedBy(tree, block.Id)
+	position := make(map[BlockId]int, len(blocks))
+	for index, block := range blocks {
+		position[block.Id] = index
+	}
+	children := make(map[BlockId][]BlockId, len(tree.immediate))
+	for child, parent := range tree.immediate {
+		if parent != child {
+			children[parent] = append(children[parent], child)
+		}
+	}
 
-		seen := map[BlockId]bool{}
+	inSubtree := make([]bool, len(blocks))
+	seen := make([]bool, len(blocks))
+	var marked, stack []BlockId
+	for _, block := range blocks {
+		// The target's subtree, the target included. Bounded by the tree's size for the reason the
+		// chain walk was: this reads data a caller could have restructured into a cycle, and a linter
+		// must not hang on it.
+		stack = append(stack[:0], block.Id)
+		for steps := 0; len(stack) > 0 && steps <= len(tree.immediate)+1; steps++ {
+			current := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if index, inFunction := position[current]; inFunction {
+				if inSubtree[index] {
+					continue
+				}
+				inSubtree[index] = true
+				marked = append(marked, current)
+			}
+			stack = append(stack, children[current]...)
+		}
+
+		// A block is post-dominated by the target when it is in the subtree and is not the target.
+		postDominated := func(id BlockId) bool {
+			index, inFunction := position[id]
+			return inFunction && inSubtree[index] && id != block.Id
+		}
+
 		var frontier []BlockId
-		// Iterating Function.Blocks rather than the postDominated map keeps the frontier's order
-		// deterministic: Blocks is a slice in reverse postorder and the map is not ordered at all.
-		for _, candidate := range r.function.Blocks {
-			if !postDominated[candidate.Id] && candidate.Id != block.Id {
+		// Iterating Function.Blocks keeps the frontier's order deterministic: Blocks is a slice in
+		// reverse postorder.
+		for index, candidate := range blocks {
+			if !inSubtree[index] {
 				continue
 			}
 			for _, predecessorId := range candidate.Predecessors {
-				if postDominated[predecessorId] || seen[predecessorId] {
+				if postDominated(predecessorId) {
 					continue
 				}
-				seen[predecessorId] = true
+				// A predecessor outside Function.Blocks has no slot, and is told apart from the
+				// frontier's earlier entries by reading them.
+				if predecessorIndex, inFunction := position[predecessorId]; inFunction {
+					if seen[predecessorIndex] {
+						continue
+					}
+					seen[predecessorIndex] = true
+				} else if slices.Contains(frontier, predecessorId) {
+					continue
+				}
 				frontier = append(frontier, predecessorId)
 			}
 		}
 		if len(frontier) > 0 {
 			frontiers[block.Id] = frontier
 		}
-	}
-	return frontiers
-}
 
-// blocksPostDominatedBy returns the blocks that target post-dominates, walking the tree downward.
-//
-// The tree maps a block to its IMMEDIATE post-dominator, so this inverts it once per target. A
-// block is post-dominated by the target when the chain of immediate post-dominators from it reaches
-// the target.
-func (r *reactivity) blocksPostDominatedBy(tree *postDominanceTree, target BlockId) map[BlockId]bool {
-	postDominated := make(map[BlockId]bool, len(r.function.Blocks))
-	for _, block := range r.function.Blocks {
-		current := block.Id
-		// Bounded by the block count: the chain is a tree path and cannot revisit, but this walks
-		// data a caller could have restructured, and a linter must not hang on it.
-		for step := 0; step <= len(r.function.Blocks); step++ {
-			if current == target {
-				if block.Id != target {
-					postDominated[block.Id] = true
-				}
-				break
+		for _, id := range marked {
+			inSubtree[position[id]] = false
+		}
+		marked = marked[:0]
+		for _, id := range frontier {
+			if index, inFunction := position[id]; inFunction {
+				seen[index] = false
 			}
-			next, ok := tree.immediate[current]
-			if !ok || next == current {
-				break
-			}
-			current = next
 		}
 	}
-	return postDominated
+	return frontiers
 }
 
 // applyToPlaces writes the settled reactive set onto every place, and recurses into nested
