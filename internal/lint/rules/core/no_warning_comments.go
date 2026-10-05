@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -93,7 +94,7 @@ func DecodeNoWarningCommentsOptions(raw []byte) (any, error) {
 		return options, err
 	}
 	for index, decoration := range options.Decoration {
-		if len([]rune(decoration)) != 1 || strings.TrimSpace(decoration) == "" {
+		if len([]rune(decoration)) != 1 || text.TrimWhitespace(decoration) == "" {
 			return options, fmt.Errorf(
 				"no-warning-comments: decoration %d is %q, wanted exactly one non-whitespace "+
 					"character", index, decoration)
@@ -298,7 +299,7 @@ func noWarningCommentsIsSelfDirective(value string) bool {
 	if !noWarningCommentsSelfDirective.MatchString(value) {
 		return false
 	}
-	trimmed := strings.TrimSpace(value)
+	trimmed := text.TrimWhitespace(value)
 	for _, prefix := range noWarningCommentsDirectivePrefixes {
 		if trimmed == prefix {
 			return true
@@ -395,7 +396,7 @@ func noWarningCommentsIsWordCharacter(character byte) bool {
 func noWarningCommentsQuote(value string) string {
 	var quoted strings.Builder
 	truncated := false
-	for _, word := range strings.Fields(value) {
+	for _, word := range text.WhitespaceFields(value) {
 		candidate := word
 		if quoted.Len() > 0 {
 			candidate = quoted.String() + " " + word

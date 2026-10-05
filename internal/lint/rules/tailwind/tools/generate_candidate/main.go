@@ -62,6 +62,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "read committed fixture: %v\n", err)
 			os.Exit(1)
 		}
+		// Go whitespace: the tool's own fixture file against its own output, a trailing newline at most.
 		if !bytes.Equal(bytes.TrimSpace(committed), bytes.TrimSpace(generated)) {
 			fmt.Fprintf(os.Stderr, "%s is out of date; rerun without -check\n", *output)
 			os.Exit(1)

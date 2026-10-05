@@ -323,6 +323,9 @@ func printGraphTiming(out io.Writer, timing *program.GraphTiming, buildDuration 
 	if timing.PackServed+timing.PackRead > 0 {
 		pack = fmt.Sprintf("the content pack served %d of the reads and %d were read from disk", timing.PackServed, timing.PackRead)
 	}
+	if timing.CheckedAnswers > 0 {
+		pack += fmt.Sprintf("; %d existence checks and stats, config's and program's, were answered from the run cache's check rather than by the disk", timing.CheckedAnswers)
+	}
 	fmt.Fprintf(out, "  program, summed over the compiler's parallel loaders: %d files loaded (each a read and a parse) in %s; "+
 		"disk %s over %s; %s\n",
 		timing.SourceFileLoads, formatMilliseconds(timing.SourceFileSummed),

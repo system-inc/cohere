@@ -1,12 +1,11 @@
 package core
 
 import (
-	"strings"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/tokens"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -186,16 +185,16 @@ func allReported(bindings []*ast.Node, reportedUnused map[*ast.Node]bool) bool {
 // its lines, the lines go, newline included; otherwise just the node's own text.
 func removeNodeWithTrailingNewline(sourceFile *ast.SourceFile, node *ast.Node) rule.Fix {
 	nodeRange := rule.TokenRange(sourceFile, node)
-	text := sourceFile.Text()
+	sourceText := sourceFile.Text()
 	lineStarts := scanner.GetECMALineStarts(sourceFile)
 	startLine := scanner.ComputeLineOfPosition(lineStarts, nodeRange.Pos())
 	endLine := scanner.ComputeLineOfPosition(lineStarts, nodeRange.End())
 	lineRangeStart := int(lineStarts[startLine])
-	lineRangeEnd := len(text)
+	lineRangeEnd := len(sourceText)
 	if endLine+1 < len(lineStarts) {
 		lineRangeEnd = int(lineStarts[endLine+1])
 	}
-	if text[nodeRange.Pos():nodeRange.End()] == strings.TrimSpace(text[lineRangeStart:lineRangeEnd]) {
+	if sourceText[nodeRange.Pos():nodeRange.End()] == text.TrimWhitespace(sourceText[lineRangeStart:lineRangeEnd]) {
 		return rule.RemoveRange(core.NewTextRange(lineRangeStart, lineRangeEnd))
 	}
 	return rule.RemoveRange(nodeRange)

@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/tokens"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -304,7 +305,7 @@ func (fixer *consistentTypeImportsFixer) toTypeImportDeclaration(
 			if !found || comma.Kind != ast.KindCommaToken {
 				return false
 			}
-			defaultText := strings.TrimSpace(fixer.text[defaultStart:comma.Start])
+			defaultText := text.TrimWhitespace(fixer.text[defaultStart:comma.Start])
 			fixer.insertBefore(fixer.start, "import type "+defaultText+" from "+fixer.sourceText()+";\n")
 			fixer.removeRange(defaultStart, fixer.nextTokenOrComment(comma.End))
 		}

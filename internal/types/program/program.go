@@ -231,6 +231,11 @@ type Options struct {
 	// ownership in the command.
 	Yielded map[string]struct{}
 
+	// CheckedStats, when set, answers the build's existence checks and stats from what the run cache's check found
+	// at each path it statted this run, rather than asking the disk again. Beneath the input recorder, so a run
+	// cache still records every path the build asked about. Nil asks the disk. See StatSnapshot.
+	CheckedStats *StatSnapshot
+
 	// Listings, when set, serve the build's directory listings from ones already read, discovery's, rather
 	// than reading those directories again. Beneath the input recorder, so a run cache still records every
 	// listing the build asked for. Nil reads every listing from disk. See DirectoryListings.
@@ -449,7 +454,8 @@ func buildOnce(options Options) (*Graph, error) {
 	// The input recorder wraps the real disk innermost: beneath the memoizing layer, so it sees each path
 	// about once, and beneath the lib overlay, so the embedded libs never reach it.
 	//
-	// The content pack is beneath even that, so a file it serves is still a file the recorder saw read.
+	// The content pack is beneath even that, so a file it serves is still a file the recorder saw read, and so
+	// are the run cache's check's answers, so a path they answer is still a path the recorder saw asked about.
 	var disk vfs.FS = osvfs.FS()
 	if options.FileSystem != nil {
 		disk = options.FileSystem
@@ -459,6 +465,10 @@ func buildOnce(options Options) (*Graph, error) {
 	}
 	if options.ContentPack != nil {
 		disk = options.ContentPack.wrap(disk)
+	}
+	var checkedAnswers atomic.Int64
+	if options.CheckedStats != nil {
+		disk = &checkedStatsFS{FS: disk, snapshot: options.CheckedStats, answered: &checkedAnswers}
 	}
 	if options.Inputs != nil {
 		disk = &recordingFS{FS: disk, recorder: options.Inputs}
@@ -590,6 +600,7 @@ func buildOnce(options Options) (*Graph, error) {
 			// so they are read rather than added.
 			options.Timing.PackServed, options.Timing.PackRead, _ = options.ContentPack.Counts()
 		}
+		options.Timing.CheckedAnswers += checkedAnswers.Load()
 	}
 	if builtProgram == nil {
 		return nil, fmt.Errorf("building a program from %s produced nothing", configFileName)

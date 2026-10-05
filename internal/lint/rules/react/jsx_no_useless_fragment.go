@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -310,8 +311,7 @@ func jsxNoUselessFragmentIsPaddingSpaces(child *ast.Node) bool {
 	if child.Kind != ast.KindJsxText {
 		return false
 	}
-	text := child.AsJsxText().Text
-	return strings.TrimSpace(text) == "" && strings.Contains(text, "\n")
+	return text.TrimWhitespace(child.AsJsxText().Text) == "" && strings.Contains(child.AsJsxText().Text, "\n")
 }
 
 // jsxNoUselessFragmentNonPaddingChildren drops the whitespace React would strip.
@@ -583,7 +583,7 @@ func jsxNoUselessFragmentIsNonspaceTextOrCurly(child *ast.Node) bool {
 		return true
 	}
 	// The field rather than `Text()`, which panics on this kind; see IsPaddingSpaces above.
-	return child.Kind == ast.KindJsxText && strings.TrimSpace(child.AsJsxText().Text) != ""
+	return child.Kind == ast.KindJsxText && text.TrimWhitespace(child.AsJsxText().Text) != ""
 }
 
 // jsxNoUselessFragmentFix builds the replacement, or reports that none is safe.

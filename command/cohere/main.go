@@ -542,6 +542,7 @@ func run() error {
 			SingleThreaded:   *singleThreaded,
 			Inputs:           runCacheInputs,
 			ContentPack:      contentPack,
+			CheckedStats:     runCacheCheckStats,
 			Timing:           graphTiming,
 			Yielded:          yield.yieldedFiles(),
 			Listings:         discoveredListings,

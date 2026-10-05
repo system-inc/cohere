@@ -39,6 +39,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 func main() {
@@ -66,6 +68,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "read committed fixture: %v\n", err)
 			os.Exit(1)
 		}
+		// Go whitespace: this tool comparing its own committed fixture with its own output.
 		if !bytes.Equal(bytes.TrimSpace(committed), bytes.TrimSpace(generated)) {
 			fmt.Fprintf(os.Stderr, "%s is stale: the engine now orders variants differently. Re-run without -check and read the diff.\n", *output)
 			os.Exit(1)
@@ -255,7 +258,7 @@ func harvestClassLists(sourceRoot string, maximum int) ([][]string, error) {
 		}
 
 		for _, match := range classAttributePattern.FindAllSubmatch(contents, -1) {
-			classes := strings.Fields(string(match[1]))
+			classes := text.WhitespaceFields(string(match[1]))
 			// A single class has no order to get wrong, and a list that repeats a class is
 			// `no-duplicate-classes`'s finding rather than an ordering question. Both would pass
 			// any comparator and inflate the agreement count without testing it.
@@ -282,7 +285,7 @@ func harvestClassLists(sourceRoot string, maximum int) ([][]string, error) {
 
 	classLists := make([][]string, 0, len(keys))
 	for _, key := range keys {
-		classLists = append(classLists, strings.Fields(key))
+		classLists = append(classLists, text.WhitespaceFields(key))
 	}
 	return classLists, nil
 }

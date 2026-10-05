@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -430,7 +431,7 @@ func consistentTypeImportsJsxValueNames(ctx rule.Context, sourceFile *ast.Source
 	}
 
 	firstIdentifier := func(factory string) string {
-		return strings.TrimSpace(strings.SplitN(factory, ".", 2)[0])
+		return text.TrimWhitespace(strings.SplitN(factory, ".", 2)[0])
 	}
 	names := map[string]bool{"React": true}
 	if ctx.Program != nil {

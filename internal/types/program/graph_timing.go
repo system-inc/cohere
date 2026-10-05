@@ -59,6 +59,10 @@ type GraphTiming struct {
 	// pack served costs a copy, not an open, so the two must be told apart to read Reads' time.
 	PackServed int
 	PackRead   int
+
+	// CheckedAnswers is how many of the existence checks and stats above were answered from the run cache's
+	// check (Options.CheckedStats) rather than by the disk, across config and program alike.
+	CheckedAnswers int64
 }
 
 // DiskTiming is filesystem calls by kind, each a count and the time summed across every goroutine

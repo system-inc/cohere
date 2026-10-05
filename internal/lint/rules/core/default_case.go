@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -192,7 +193,7 @@ func defaultCaseCommentBody(comment *comments.Comment) string {
 	} else {
 		body = strings.TrimPrefix(body, "//")
 	}
-	return strings.TrimSpace(body)
+	return text.TrimWhitespace(body)
 }
 
 // DefaultDefaultCaseOptions is the unconfigured answer.

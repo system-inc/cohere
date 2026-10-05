@@ -134,6 +134,7 @@ func (selectors *dependencySelectors) UnmarshalJSON(raw []byte) error {
 // it. A selector key this port does not implement, `captured` or `file` or `parent`, would then load
 // clean and be ignored, which is a policy narrower than the one written with nothing saying so.
 func decodeOneOrMany[Item any](raw []byte, into *[]Item, shape string) error {
+	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) > 0 && trimmed[0] == '[' {
 		var many []json.RawMessage

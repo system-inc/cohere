@@ -292,6 +292,7 @@ func referenceAttribute(commentText string) (string, string, bool) {
 	}
 	inner := content[startIndex+len(referenceStart) : startIndex+endOffset]
 
+	// Go whitespace: oxc's split_whitespace and trim, Go's set, until #jjfa7qb ports typescript-eslint's regex.
 	for _, part := range strings.Fields(inner) {
 		if !strings.HasPrefix(part, "types=") &&
 			!strings.HasPrefix(part, "path=") &&
@@ -306,6 +307,7 @@ func referenceAttribute(commentText string) (string, string, bool) {
 		if len(attributeParts) != 2 {
 			return "", "", false
 		}
+		// Go whitespace: oxc's split_whitespace and trim, Go's set, until #jjfa7qb ports typescript-eslint's regex.
 		key := strings.Trim(strings.TrimSpace(attributeParts[0]), "\"")
 		value := strings.TrimRight(strings.Trim(attributeParts[1], "\""), "/")
 		return key, value, true

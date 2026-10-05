@@ -706,6 +706,7 @@ func acknowledgedKey(className string, outcome Outcome) string {
 func AcknowledgedIndex(acknowledged []AcknowledgedDivergence) map[string]AcknowledgedDivergence {
 	index := make(map[string]AcknowledgedDivergence, len(acknowledged))
 	for _, one := range acknowledged {
+		// Go whitespace: a reason written in cohere's own Go source, which no JavaScript tool reads.
 		if strings.TrimSpace(one.Reason) == "" {
 			panic("tailwind: acknowledged divergence for " + one.ClassName + " has no reason; an unreasoned acknowledgement is a suppression")
 		}
