@@ -97,7 +97,7 @@ type BundleSource struct {
 // changed mid-run -- which is exactly the case Disk mode exists to serve. Caching here would
 // optimize the mode that does not need it at the cost of correctness in the mode that does.
 func Bundles() (BundleSource, error) {
-	forkPath := strings.TrimSpace(os.Getenv(ForkPathVariable))
+	forkPath := strings.TrimSpace(os.Getenv(ForkPathVariable)) // Go whitespace: a path from the environment, which no JavaScript tool reads.
 	if forkPath == "" {
 		return embeddedBundles()
 	}
