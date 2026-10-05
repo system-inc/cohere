@@ -37,7 +37,7 @@ type Site struct {
 	NewContainer bool
 }
 
-// Listeners returns the listeners that find every site in a file and hand each to visit.
+// Listeners returns the listeners that find every site in the walker's file and hand each to visit.
 //
 // The sites:
 //
@@ -54,142 +54,190 @@ type Site struct {
 // A site whose source and target are the same type is never handed over: nothing below can differ, and
 // it is the overwhelmingly common case. JSX attributes are not sites yet, since JSX is no part of Adamic
 // 0.1; their contextual type is the same question and the obvious next listener.
-func Listeners(ctx rule.Context, visit func(Site)) rule.Listeners {
-	typeChecker := ctx.TypeChecker
-	if typeChecker == nil {
+//
+// Every rule listening shares the file's walker (WalkerFor), and every listener reaching a node is called
+// before the walk moves on, so the first rule there finds the node's sites and the others read them. Each
+// rule finding them again asked the checker for every source three times, and an object literal's type is
+// built anew on every ask (#m6tyg79). One listener serves every kind, so a rule costs a file one closure.
+func (w *Walker) Listeners(visit func(Site)) rule.Listeners {
+	if w.typeChecker == nil {
 		return nil
 	}
-	offer := func(expression *ast.Node, target *checker.Type) {
-		if expression == nil || target == nil {
-			return
+	listener := func(node *ast.Node) {
+		if w.sitesNode != node {
+			w.sites = w.sites[:0]
+			siteFinders[node.Kind](w, node)
+			w.sitesNode = node
 		}
-		source := typeChecker.GetTypeAtLocation(expression)
-		if source == nil || source == target {
-			return
+		for _, site := range w.sites {
+			visit(site)
 		}
-		visit(Site{Node: expression, Source: source, Target: target, Fresh: isFresh(expression),
-			NewContainer: isNewContainer(expression)})
 	}
-	annotated := func(typeNode *ast.Node, expression *ast.Node) {
-		if typeNode == nil || expression == nil {
+	listeners := make(rule.Listeners, len(siteFinders))
+	for kind := range siteFinders {
+		listeners[kind] = listener
+	}
+	return listeners
+}
+
+// siteFinders is, by node kind, what offers the sites at a node of that kind into the walker's sites.
+var siteFinders = map[ast.Kind]func(w *Walker, node *ast.Node){
+	ast.KindVariableDeclaration: func(w *Walker, node *ast.Node) {
+		declaration := node.AsVariableDeclaration()
+		w.annotated(declaration.Type, declaration.Initializer)
+	},
+	ast.KindPropertyDeclaration: func(w *Walker, node *ast.Node) {
+		declaration := node.AsPropertyDeclaration()
+		w.annotated(declaration.Type, declaration.Initializer)
+	},
+	ast.KindParameter: func(w *Walker, node *ast.Node) {
+		parameter := node.AsParameterDeclaration()
+		w.annotated(parameter.Type, parameter.Initializer)
+	},
+	ast.KindBinaryExpression: func(w *Walker, node *ast.Node) {
+		binary := node.AsBinaryExpression()
+		if binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken || binary.Left == nil {
 			return
 		}
-		offer(expression, checker.Checker_getTypeFromTypeNode(typeChecker, typeNode))
-	}
-	contextual := func(expression *ast.Node) {
-		offer(expression, checker.Checker_getContextualType(typeChecker, expression, checker.ContextFlagsNone))
-	}
-	returned := func(function *ast.Node, expression *ast.Node) {
-		if function == nil || function.Type() == nil {
+		left := ast.SkipParentheses(binary.Left)
+		// A literal on the left is a destructuring pattern, whose parts are bindings, not slots.
+		if left.Kind == ast.KindObjectLiteralExpression || left.Kind == ast.KindArrayLiteralExpression {
 			return
 		}
-		if ast.GetFunctionFlags(function)&(ast.FunctionFlagsAsync|ast.FunctionFlagsGenerator) != 0 {
+		w.offer(binary.Right, w.typeChecker.GetTypeAtLocation(binary.Left))
+	},
+	ast.KindCallExpression: (*Walker).arguments,
+	ast.KindNewExpression: func(w *Walker, node *ast.Node) {
+		if node.AsNewExpression().Arguments == nil {
 			return
 		}
-		offer(expression, checker.Checker_getReturnTypeFromAnnotation(typeChecker, function))
-	}
-	arguments := func(call *ast.Node) {
-		for index, argument := range call.Arguments() {
-			if argument.Kind == ast.KindSpreadElement {
+		w.arguments(node)
+	},
+	ast.KindReturnStatement: func(w *Walker, node *ast.Node) {
+		expression := node.AsReturnStatement().Expression
+		if expression == nil {
+			return
+		}
+		w.returned(type_checking.GetParentFunctionNode(node), expression)
+	},
+	ast.KindArrowFunction: func(w *Walker, node *ast.Node) {
+		body := node.AsArrowFunction().Body
+		if body == nil || ast.IsBlock(body) {
+			return
+		}
+		w.returned(node, body)
+	},
+	ast.KindPropertyAssignment: func(w *Walker, node *ast.Node) {
+		if IsDestructuringTarget(node.Parent) {
+			return
+		}
+		w.contextual(node.AsPropertyAssignment().Initializer)
+	},
+	ast.KindShorthandPropertyAssignment: func(w *Walker, node *ast.Node) {
+		if IsDestructuringTarget(node.Parent) || node.AsShorthandPropertyAssignment().ObjectAssignmentInitializer != nil {
+			return
+		}
+		name := node.Name()
+		if name == nil {
+			return
+		}
+		// The key and the value are one identifier: its contextual type is the property's slot and
+		// its type is the value put there, which no-unsafe-assignment reads the same way.
+		w.offer(name, checker.Checker_getContextualType(w.typeChecker, name, checker.ContextFlagsNone))
+	},
+	ast.KindArrayLiteralExpression: func(w *Walker, node *ast.Node) {
+		if IsDestructuringTarget(node) {
+			return
+		}
+		for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
+			if element.Kind == ast.KindSpreadElement || element.Kind == ast.KindOmittedExpression {
 				continue
 			}
-			offer(argument, checker.Checker_getContextualTypeForArgumentAtIndex(typeChecker, call, index))
+			w.contextual(element)
 		}
+	},
+	ast.KindAsExpression:            (*Walker).offerUpcast,
+	ast.KindTypeAssertionExpression: (*Walker).offerUpcast,
+}
+
+// offer adds the site of expression flowing into target, unless the two are one type or the target has no
+// object part, where no judge can rule (see Judge). The target is read first so such a site never asks the
+// checker for its source.
+func (w *Walker) offer(expression *ast.Node, target *checker.Type) {
+	if expression == nil || target == nil || !hasObjectPart(target) {
+		return
 	}
-	return rule.Listeners{
-		ast.KindVariableDeclaration: func(node *ast.Node) {
-			declaration := node.AsVariableDeclaration()
-			annotated(declaration.Type, declaration.Initializer)
-		},
-		ast.KindPropertyDeclaration: func(node *ast.Node) {
-			declaration := node.AsPropertyDeclaration()
-			annotated(declaration.Type, declaration.Initializer)
-		},
-		ast.KindParameter: func(node *ast.Node) {
-			parameter := node.AsParameterDeclaration()
-			annotated(parameter.Type, parameter.Initializer)
-		},
-		ast.KindBinaryExpression: func(node *ast.Node) {
-			binary := node.AsBinaryExpression()
-			if binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken || binary.Left == nil {
-				return
-			}
-			left := ast.SkipParentheses(binary.Left)
-			// A literal on the left is a destructuring pattern, whose parts are bindings, not slots.
-			if left.Kind == ast.KindObjectLiteralExpression || left.Kind == ast.KindArrayLiteralExpression {
-				return
-			}
-			offer(binary.Right, typeChecker.GetTypeAtLocation(binary.Left))
-		},
-		ast.KindCallExpression: arguments,
-		ast.KindNewExpression: func(node *ast.Node) {
-			if node.AsNewExpression().Arguments == nil {
-				return
-			}
-			arguments(node)
-		},
-		ast.KindReturnStatement: func(node *ast.Node) {
-			expression := node.AsReturnStatement().Expression
-			if expression == nil {
-				return
-			}
-			returned(type_checking.GetParentFunctionNode(node), expression)
-		},
-		ast.KindArrowFunction: func(node *ast.Node) {
-			body := node.AsArrowFunction().Body
-			if body == nil || ast.IsBlock(body) {
-				return
-			}
-			returned(node, body)
-		},
-		ast.KindPropertyAssignment: func(node *ast.Node) {
-			if IsDestructuringTarget(node.Parent) {
-				return
-			}
-			contextual(node.AsPropertyAssignment().Initializer)
-		},
-		ast.KindShorthandPropertyAssignment: func(node *ast.Node) {
-			if IsDestructuringTarget(node.Parent) || node.AsShorthandPropertyAssignment().ObjectAssignmentInitializer != nil {
-				return
-			}
-			name := node.Name()
-			if name == nil {
-				return
-			}
-			// The key and the value are one identifier: its contextual type is the property's slot and
-			// its type is the value put there, which no-unsafe-assignment reads the same way.
-			offer(name, checker.Checker_getContextualType(typeChecker, name, checker.ContextFlagsNone))
-		},
-		ast.KindArrayLiteralExpression: func(node *ast.Node) {
-			if IsDestructuringTarget(node) {
-				return
-			}
-			for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
-				if element.Kind == ast.KindSpreadElement || element.Kind == ast.KindOmittedExpression {
-					continue
-				}
-				contextual(element)
-			}
-		},
-		ast.KindAsExpression:            func(node *ast.Node) { offerUpcast(typeChecker, node, offer) },
-		ast.KindTypeAssertionExpression: func(node *ast.Node) { offerUpcast(typeChecker, node, offer) },
+	source := w.typeChecker.GetTypeAtLocation(expression)
+	if source == nil || source == target {
+		return
+	}
+	w.sites = append(w.sites, Site{Node: expression, Source: source, Target: target, Fresh: isFresh(expression),
+		NewContainer: isNewContainer(expression)})
+}
+
+func (w *Walker) annotated(typeNode *ast.Node, expression *ast.Node) {
+	if typeNode == nil || expression == nil {
+		return
+	}
+	w.offer(expression, checker.Checker_getTypeFromTypeNode(w.typeChecker, typeNode))
+}
+
+func (w *Walker) contextual(expression *ast.Node) {
+	w.offer(expression, checker.Checker_getContextualType(w.typeChecker, expression, checker.ContextFlagsNone))
+}
+
+func (w *Walker) returned(function *ast.Node, expression *ast.Node) {
+	if function == nil || function.Type() == nil {
+		return
+	}
+	if ast.GetFunctionFlags(function)&(ast.FunctionFlagsAsync|ast.FunctionFlagsGenerator) != 0 {
+		return
+	}
+	w.offer(expression, checker.Checker_getReturnTypeFromAnnotation(w.typeChecker, function))
+}
+
+func (w *Walker) arguments(call *ast.Node) {
+	for index, argument := range call.Arguments() {
+		if argument.Kind == ast.KindSpreadElement {
+			continue
+		}
+		w.offer(argument, checker.Checker_getContextualTypeForArgumentAtIndex(w.typeChecker, call, index))
 	}
 }
 
 // offerUpcast hands over a cast that only widens. A downcast is no flow at all, since the value is not
 // being put anywhere wider, and adamic/no-unchecked-cast judges it. `as const` names no slot.
-func offerUpcast(typeChecker *checker.Checker, node *ast.Node, offer func(*ast.Node, *checker.Type)) {
+func (w *Walker) offerUpcast(node *ast.Node) {
 	typeNode := node.Type()
 	if typeNode == nil || ast.IsConstTypeReference(typeNode) {
 		return
 	}
 	expression := node.Expression()
-	target := checker.Checker_getTypeFromTypeNode(typeChecker, typeNode)
-	source := typeChecker.GetTypeAtLocation(expression)
-	if target == nil || source == nil || !checker.Checker_isTypeAssignableTo(typeChecker, source, target) {
+	target := checker.Checker_getTypeFromTypeNode(w.typeChecker, typeNode)
+	if target == nil || !hasObjectPart(target) {
 		return
 	}
-	offer(expression, target)
+	source := w.typeChecker.GetTypeAtLocation(expression)
+	if source == nil || !w.IsAssignable(source, target) {
+		return
+	}
+	w.offer(expression, target)
+}
+
+// hasObjectPart is a type the walk can relate parts of: an object type, or a union with one among its
+// members. Union members are never unions themselves.
+func hasObjectPart(t *checker.Type) bool {
+	if t.Flags()&checker.TypeFlagsObject != 0 {
+		return true
+	}
+	if t.Flags()&checker.TypeFlagsUnion != 0 {
+		for _, member := range t.Types() {
+			if member.Flags()&checker.TypeFlagsObject != 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // isFresh is an expression whose value is made right here: an object or array literal, parenthesized or
