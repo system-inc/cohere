@@ -201,7 +201,17 @@ func reportUnreachableLoops(ctx rule.Context, sourceFile *ast.Node, settings NoU
 		return state
 	}
 
-	for _, root := range unreachableLoopRootsIn(sourceFile) {
+	// Only a root whose own code holds a loop this rule judges can report, so only those are built.
+	// On a cold ahra run that is 7.6% of roots and 30% of the blocks every root used to cost
+	// (#tmn9n27).
+	for _, summary := range codePathRoots(ctx, sourceFile) {
+		root := summary.Node
+		if !unreachableLoopRootHoldsJudgedLoop(summary, settings.Ignore) {
+			if CheckCodePathGates {
+				unreachableLoopCheckSkipped(root, settings.Ignore)
+			}
+			continue
+		}
 		control_flow_graph.Build(root, control_flow_graph.Hooks[struct{}]{
 			Statement: func(builder *control_flow_graph.Builder[struct{}], node *ast.Node) {
 				name, isLoop := unreachableLoopKindNames[node.Kind]
@@ -275,24 +285,25 @@ func reportUnreachableLoops(ctx rule.Context, sourceFile *ast.Node, settings NoU
 	}
 }
 
-// unreachableLoopRootsIn collects every code-path root in the file, the file itself included.
-//
-// One graph per root is what `controlflow` builds, and a loop is judged in the root it runs in.
-func unreachableLoopRootsIn(sourceFile *ast.Node) []*ast.Node {
-	roots := []*ast.Node{}
-	var collect func(node *ast.Node)
-	collect = func(node *ast.Node) {
-		if node == nil {
-			return
+// unreachableLoopRootHoldsJudgedLoop reports whether a root's own code holds a loop of a kind the
+// options leave to judge. A root holding none records no loop state, so it cannot report.
+func unreachableLoopRootHoldsJudgedLoop(root control_flow_graph.RootSummary, ignore []string) bool {
+	for _, kind := range root.Loops {
+		if !slices.Contains(ignore, unreachableLoopKindNames[kind]) {
+			return true
 		}
-		if control_flow_graph.IsRoot(node) {
-			roots = append(roots, node)
-		}
-		node.ForEachChild(func(child *ast.Node) bool {
-			collect(child)
-			return false
-		})
 	}
-	collect(sourceFile)
-	return roots
+	return false
+}
+
+// unreachableLoopCheckSkipped is the gate's check under CheckCodePathGates: a root skipped for
+// holding no judged loop must lay out none.
+func unreachableLoopCheckSkipped(root *ast.Node, ignore []string) {
+	control_flow_graph.Build(root, control_flow_graph.Hooks[struct{}]{
+		Statement: func(builder *control_flow_graph.Builder[struct{}], node *ast.Node) {
+			if name, isLoop := unreachableLoopKindNames[node.Kind]; isLoop && !slices.Contains(ignore, name) {
+				panic("no-unreachable-loop skipped a root whose graph holds a judged loop")
+			}
+		},
+	})
 }

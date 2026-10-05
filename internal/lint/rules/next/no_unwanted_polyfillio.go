@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -262,7 +263,9 @@ func stringAttributeWithNode(attributes *ast.Node, name string) (string, *ast.No
 		if attribute.Initializer == nil || attribute.Initializer.Kind != ast.KindStringLiteral {
 			return "", nil
 		}
-		return attribute.Initializer.Text(), property
+		// Decoded as ESLint's parser decodes it, so an entity in the URL reads as the character it
+		// names, as it does upstream.
+		return text.UnescapeStringLiteralText(attribute.Initializer.Text()), property
 	}
 
 	return "", nil

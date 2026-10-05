@@ -104,21 +104,17 @@ var NoUselessReturn = rule.Rule{
 				// One code path per root, as upstream runs one per function. A nested function's
 				// returns belong to the nested path: `try { return 5; } finally { function bar() {
 				// return; } }` reports the INNER return and not the outer one.
-				noUselessReturnCheckRoot(ctx, node)
-				var walk func(current *ast.Node)
-				walk = func(current *ast.Node) {
-					if current == nil {
-						return
+				//
+				// Only a root whose own code holds a bare `return;` can report, so only those are
+				// built. On a cold ahra run that is 4.4% of roots and 13% of the blocks every root
+				// used to cost (#tmn9n27).
+				for _, root := range codePathRoots(ctx, node) {
+					if root.BareReturn {
+						noUselessReturnCheckRoot(ctx, root.Node)
+					} else if CheckCodePathGates {
+						noUselessReturnCheckSkipped(root.Node)
 					}
-					if current != node && control_flow_graph.IsRoot(current) {
-						noUselessReturnCheckRoot(ctx, current)
-					}
-					current.ForEachChild(func(child *ast.Node) bool {
-						walk(child)
-						return false
-					})
 				}
-				walk(node)
 			},
 		}
 	},
@@ -166,6 +162,18 @@ func noUselessReturnCheckRoot(ctx rule.Context, root *ast.Node) {
 			ctx.ReportNode(candidate, messageNoUselessReturn)
 		}
 	}
+}
+
+// noUselessReturnCheckSkipped is the gate's check under CheckCodePathGates: a root skipped for
+// holding no bare return must lay out none.
+func noUselessReturnCheckSkipped(root *ast.Node) {
+	control_flow_graph.Build(root, control_flow_graph.Hooks[struct{}]{
+		Statement: func(builder *control_flow_graph.Builder[struct{}], node *ast.Node) {
+			if node.Kind == ast.KindReturnStatement && node.AsReturnStatement().Expression == nil {
+				panic("no-useless-return skipped a root whose graph holds a bare return")
+			}
+		},
+	})
 }
 
 // noUselessReturnSomethingRunsAfter answers whether any statement executes after the candidate.

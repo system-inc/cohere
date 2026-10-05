@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/module"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -133,7 +134,8 @@ var BoundaryNoProjectThemeValue = rule.Rule{
 				if attribute.Initializer == nil || attribute.Initializer.Kind != ast.KindStringLiteral {
 					return
 				}
-				value := attribute.Initializer.Text()
+				// Decoded as ESLint's parser decodes it, which is the value the ESLint twin reads.
+				value := text.UnescapeStringLiteralText(attribute.Initializer.Text())
 
 				componentName := jsxElementNameOf(node)
 				if componentName == "" {
