@@ -458,6 +458,19 @@ func run() error {
 	// exits, before the graph is built. Otherwise this starts recording. See run_cache.go.
 	runCacheInputs := beginRunCache(location)
 
+	// The formatter, built here rather than in the fix phase, so a bare run can start the format walk now,
+	// beside the graph build, instead of after it: the walk reads only the disk, and on ahra it was about
+	// 100ms between the graph and the fix phase on a cold run (#679s763). A formatter that cannot load is
+	// reported where it always was. See startFormatWalkAhead.
+	var formatter formatEngine
+	var formatterError error
+	if runFix {
+		formatter, formatterError = configuredFormatter(!*noFormat && (*explainFile == "" || *format || *formatAll))
+	}
+	if formatter != nil && len(flag.Args()) == 0 {
+		startFormatWalkAhead(formatter, writeRepositoryRoot(location.ArgumentBase, location.Root))
+	}
+
 	// Under --timing the build says what it was made of, not only how long it took (#cazsft3).
 	var graphTiming *program.GraphTiming
 	if *showTiming {
@@ -673,9 +686,8 @@ func run() error {
 		// A run formats by default (Kirk's ruling, 2026-10-04: "running cohere should type check lint fix
 		// format all in one call"), unless --no-format leaves it out or the run is --explain, which explains
 		// the rules on one file and writes nothing.
-		formatter, err := configuredFormatter(!*noFormat && (*explainFile == "" || *format || *formatAll))
-		if err != nil {
-			return err
+		if formatterError != nil {
+			return formatterError
 		}
 		activeSummary.Gaps.FormattingNotChecked = formatter == nil
 		var formatLeftOut string
@@ -755,7 +767,7 @@ func run() error {
 				scope = writeScope
 			}
 			declineRunCache("a formatter enumerated the tree")
-			enumeration, enumerateError := formatter.Enumerate(repositoryRoot)
+			enumeration, enumerateError := enumerateFormatTree(formatter, repositoryRoot)
 			if enumerateError != nil {
 				// A failed walk withholds formatting and says why, rather than falling back to a universe
 				// that would format the wrong set. Fixing still runs.

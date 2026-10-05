@@ -313,11 +313,47 @@ type formatUniverse struct {
 }
 
 func enumerateFormatUniverse(engine formatEngine, root string) (formatUniverse, error) {
-	rootEnumeration, err := engine.Enumerate(root)
+	rootEnumeration, err := enumerateFormatTree(engine, root)
 	if err != nil {
 		return formatUniverse{}, err
 	}
 	return formatUniverse{root: rootEnumeration, files: append([]string(nil), rootEnumeration.Files...)}, nil
+}
+
+// formatWalkAhead is the format walk begun before the graph build, for the fix phase to take.
+type formatWalkAhead struct {
+	engine      formatEngine
+	root        string
+	done        chan struct{}
+	enumeration formatfiles.Enumeration
+	err         error
+}
+
+// aheadFormatWalk is the walk startFormatWalkAhead began, nil once taken or when none was.
+var aheadFormatWalk *formatWalkAhead
+
+// startFormatWalkAhead begins engine's walk of root on its own goroutine and returns at once. The fix phase
+// takes the result through enumerateFormatTree. It is the same call the fix phase would make, on the same
+// engine and root, only earlier, so the enumeration is the one it would have made: the tree is not written
+// between the two, since nothing writes before the fix phase does.
+func startFormatWalkAhead(engine formatEngine, root string) {
+	ahead := &formatWalkAhead{engine: engine, root: root, done: make(chan struct{})}
+	go func() {
+		defer close(ahead.done)
+		ahead.enumeration, ahead.err = engine.Enumerate(root)
+	}()
+	aheadFormatWalk = ahead
+}
+
+// enumerateFormatTree is engine.Enumerate(root), taken from the walk begun ahead when that walk was of the same
+// engine and root. A walk begun ahead is taken once; any other call walks the tree itself.
+func enumerateFormatTree(engine formatEngine, root string) (formatfiles.Enumeration, error) {
+	if ahead := aheadFormatWalk; ahead != nil && ahead.engine == engine && ahead.root == root {
+		aheadFormatWalk = nil
+		<-ahead.done
+		return ahead.enumeration, ahead.err
+	}
+	return engine.Enumerate(root)
 }
 
 // declaredSubmodules reads the submodule paths a repository's `.gitmodules` declares. A repository with
