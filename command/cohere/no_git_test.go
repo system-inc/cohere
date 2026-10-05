@@ -33,15 +33,30 @@ func TestCohereRunsNoGit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	withoutGit := runNoGitSequence(t, binary, "PATH="+fakeGit)
-	if calls, err := os.ReadFile(gitLog); err == nil && len(calls) > 0 {
-		t.Fatalf("cohere ran git:\n%s", calls)
+	// The two sequences share nothing, each with its own project and home, so they run at once: one after
+	// the other they were the longest test in the package (#nxgt2ca).
+	var withoutGit, withGit []string
+	// Not parallel: this group holds its two parallel sequences until both finish, so the comparison below
+	// reads both.
+	t.Run("sequences", func(t *testing.T) {
+		t.Run("without git", func(t *testing.T) {
+			t.Parallel()
+			withoutGit = runNoGitSequence(t, binary, "PATH="+fakeGit)
+			if calls, err := os.ReadFile(gitLog); err == nil && len(calls) > 0 {
+				t.Fatalf("cohere ran git:\n%s", calls)
+			}
+		})
+		t.Run("with git", func(t *testing.T) {
+			t.Parallel()
+			if _, err := exec.LookPath("git"); err != nil {
+				t.Skip("no git on this machine to compare against; the no-git sequence still runs")
+			}
+			withGit = runNoGitSequence(t, binary, "PATH="+os.Getenv("PATH"))
+		})
+	})
+	if t.Failed() || withGit == nil {
+		return
 	}
-
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("no git on this machine to compare against; the no-git half above already ran")
-	}
-	withGit := runNoGitSequence(t, binary, "PATH="+os.Getenv("PATH"))
 	for index := range withoutGit {
 		if withoutGit[index] != withGit[index] {
 			t.Errorf("step %d differs with git on PATH:\n--- without git\n%s\n--- with git\n%s",
