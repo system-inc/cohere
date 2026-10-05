@@ -105,19 +105,7 @@ func TestNoShadowUpstreamCorpus(t *testing.T) {
 			if fmt.Sprint(reported) != fmt.Sprint(row.findings) {
 				t.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
 			}
-
-			// Through the harness's own assertion as well, which is what records an asserted case for
-			// the docs capture: without it rules.json never learns noShadowGlobal, which only these
-			// rows assert.
-			if len(reported) == 0 {
-				rule_testing.ExpectClean(t, result)
-				return
-			}
-			ids := make([]string, 0, len(reported))
-			for _, finding := range reported {
-				ids = append(ids, finding.id)
-			}
-			rule_testing.ExpectFindings(t, result, ids...)
+			rule_testing.RecordAssertedCase(t, result)
 		})
 	}
 }
