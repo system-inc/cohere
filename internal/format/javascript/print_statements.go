@@ -13,7 +13,7 @@ import (
 // printIfStatement is upstream's printIfStatement.
 func printIfStatement(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
-	opening := group(concatIn(path, // @system-inc: no space between `if` and `(`.
+	opening := groupIn(path, concatIn(path, // @system-inc: no space between `if` and `(`.
 		"if(",
 		printIfStatementCondition(path, options, print),
 		")",
@@ -40,7 +40,7 @@ func printIfStatement(path *Path, options *Options, print PrintFunc) Doc {
 		}
 		parts = append(parts, printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}), separator)
 	}
-	parts = append(parts, "else", group(printIfStatementAlternate(path, options, print)))
+	parts = append(parts, "else", groupIn(path, printIfStatementAlternate(path, options, print)))
 	return concatIn(path, parts...)
 }
 
@@ -57,7 +57,7 @@ func printForStatement(path *Path, options *Options, print PrintFunc) Doc {
 	}
 
 	if current.Child("init") == nil && current.Child("test") == nil && current.Child("update") == nil {
-		return concatIn(path, printedComments, group(concatIn(path /* @system-inc: no space */, "for(;;)", body)))
+		return concatIn(path, printedComments, groupIn(path, concatIn(path /* @system-inc: no space */, "for(;;)", body)))
 	}
 
 	var update Doc = emptyDoc
@@ -65,9 +65,9 @@ func printForStatement(path *Path, options *Options, print PrintFunc) Doc {
 		update = concatIn(path, line, print("update", nil))
 	}
 	return concatIn(path, printedComments,
-		group(concatIn(path, // @system-inc: no space between `for` and `(`.
+		groupIn(path, concatIn(path, // @system-inc: no space between `for` and `(`.
 			"for(",
-			group(concatIn(path, indent(concatIn(path, softline, print("init", nil), ";", line, print("test", nil), ";", update)),
+			groupIn(path, concatIn(path, indentIn(path, concatIn(path, softline, print("init", nil), ";", line, print("test", nil), ";", update)),
 				softline,
 			)),
 			")",
@@ -87,7 +87,7 @@ func printForXStatement(path *Path, options *Options, print PrintFunc) Doc {
 			await = " await"
 		}
 	}
-	return group(concatIn(path, "for",
+	return groupIn(path, concatIn(path, "for",
 		await,
 		// @system-inc: no space between `for` and `(`.
 		"(",
@@ -107,7 +107,7 @@ func printWhileStatement(path *Path, options *Options, print PrintFunc) Doc {
 	if node(path).Is("WithStatement") {
 		keyword = "with"
 	}
-	return group(concatIn(path, keyword,
+	return groupIn(path, concatIn(path, keyword,
 		// @system-inc: no space between the keyword and `(`.
 		"(",
 		printWhileStatementCondition(path, options, print),
@@ -122,7 +122,7 @@ func printDoWhileStatement(path *Path, options *Options, print PrintFunc) Doc {
 	if node(path).Child("body").Is("BlockStatement") {
 		separator = concatIn(path, " ")
 	}
-	return concatIn(path, group(concatIn(path, "do", printClause(path, options, print, "body"))),
+	return concatIn(path, groupIn(path, concatIn(path, "do", printClause(path, options, print, "body"))),
 		separator,
 		// @system-inc: no space between `while` and `(`.
 		"while(",
@@ -161,7 +161,7 @@ func printCatchClause(path *Path, options *Options, print PrintFunc) Doc {
 		printedParam := print("param", nil)
 		var parameter Doc
 		if parameterHasComments {
-			parameter = concatIn(path, "(", indent(concatIn(path, softline, printedParam)), softline, ") ")
+			parameter = concatIn(path, "(", indentIn(path, concatIn(path, softline, printedParam)), softline, ") ")
 		} else {
 			parameter = concatIn(path, "(", printedParam, ") ")
 		}
@@ -183,13 +183,13 @@ func printSwitchStatement(path *Path, options *Options, print PrintFunc) Doc {
 			}
 			return concatIn(path, print(nil, nil), blank)
 		}, "cases")
-		cases = indent(concatIn(path, hardline, join(hardline, printed)))
+		cases = indentIn(path, concatIn(path, hardline, join(hardline, printed)))
 	} else {
 		cases = printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{Indent: true})
 	}
-	return concatIn(path, group(concatIn(path, // @system-inc: no space between `switch` and `(`.
+	return concatIn(path, groupIn(path, concatIn(path, // @system-inc: no space between `switch` and `(`.
 		"switch(",
-		indent(concatIn(path, softline, print("discriminant", nil))),
+		indentIn(path, concatIn(path, softline, print("discriminant", nil))),
 		softline,
 		")",
 	)),
@@ -223,7 +223,7 @@ func printSwitchCase(path *Path, options *Options, print PrintFunc) Doc {
 		if len(consequent) == 1 && consequent[0].Is("BlockStatement") {
 			parts = append(parts, concatIn(path, " ", printed))
 		} else {
-			parts = append(parts, indent(concatIn(path, hardline, printed)))
+			parts = append(parts, indentIn(path, concatIn(path, hardline, printed)))
 		}
 	}
 	return concatIn(path, parts...)
@@ -258,12 +258,12 @@ func printClause(path *Path, options *Options, print PrintFunc, property string)
 			if isBlockStatement {
 				return concatIn(path, hardline, printed)
 			}
-			return indent(concatIn(path, hardline, printed))
+			return indentIn(path, concatIn(path, hardline, printed))
 		}
 		if isBlockStatement || current.Is("IfStatement") && parentOf(path).Is("IfStatement") && keyOf(path) == "alternate" {
 			return concatIn(path, " ", printed)
 		}
-		return indent(concatIn(path, line, printed))
+		return indentIn(path, concatIn(path, line, printed))
 	}, property)
 }
 

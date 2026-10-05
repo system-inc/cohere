@@ -2,7 +2,6 @@ package javascript
 
 import (
 	"fmt"
-	"github.com/system-inc/cohere/internal/format/arena"
 	"path/filepath"
 
 	"github.com/system-inc/cohere/internal/format/doc"
@@ -79,11 +78,8 @@ func format(fileName string, text string, options formatoptions.Options, parser 
 	nodes := estree.AcquireArena()
 	defer nodes.Release()
 	// The doc's parts come from a slab released with the tree, for the same reason.
-	docs := docSlabs.Get().(*arena.Slab[doc.Doc])
-	defer func() {
-		docs.Reset()
-		docSlabs.Put(docs)
-	}()
+	docs := acquireDocMemory()
+	defer docs.release()
 	document, err := printToDoc(fileName, text, options, parser, "", textToDoc, nodes, docs)
 	if err != nil {
 		return "", err
@@ -111,7 +107,7 @@ func PrintToDoc(fileName string, text string, options formatoptions.Options, par
 // that passes them releases them only once the doc is laid out, since the doc is printed from the tree and
 // is made of those parts.
 func printToDoc(fileName string, text string, options formatoptions.Options, parser string, parentParser string,
-	textToDoc printing.TextToDoc, nodes *estree.Arena, docs *arena.Slab[doc.Doc]) (document doc.Doc, err error) {
+	textToDoc printing.TextToDoc, nodes *estree.Arena, docs *docMemory) (document doc.Doc, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			document, err = nil, fmt.Errorf("formatting %s: %v", fileName, recovered)

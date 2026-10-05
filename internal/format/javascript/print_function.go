@@ -92,7 +92,7 @@ func printFunction(path *Path, options *Options, print PrintFunc, args *printArg
 	}
 	var parameters Doc = parametersDoc
 	if shouldGroupParameters {
-		parameters = group(parametersDoc)
+		parameters = groupIn(path, parametersDoc)
 	}
 	bodySpace := ""
 	if current.Truthy("body") {
@@ -110,7 +110,7 @@ func printFunction(path *Path, options *Options, print PrintFunc, args *printArg
 		idSpace,
 		idDoc,
 		print("typeParameters", nil),
-		group(concatIn(path, parameters,
+		groupIn(path, concatIn(path, parameters,
 			returnTypeDoc,
 		)),
 		bodySpace,
@@ -203,15 +203,15 @@ func printMethodValue(path *Path, options *Options, print PrintFunc) Doc {
 	)
 	var parameters Doc
 	if shouldBreakParameters {
-		parameters = groupWith(parametersDoc, doc.GroupOptions{ShouldBreak: true})
+		parameters = groupWithIn(path, parametersDoc, doc.GroupOptions{ShouldBreak: true})
 	} else if shouldGroupParameters {
-		parameters = group(parametersDoc)
+		parameters = groupIn(path, parametersDoc)
 	} else {
 		parameters = parametersDoc
 	}
 	parts := []any{
 		print("typeParameters", nil),
-		group(concatIn(path, parameters,
+		groupIn(path, concatIn(path, parameters,
 			returnTypeDoc,
 		)),
 	}

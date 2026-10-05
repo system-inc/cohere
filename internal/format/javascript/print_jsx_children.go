@@ -281,14 +281,14 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	if containsText {
 		content = fill(multilineChildren)
 	} else {
-		content = groupWith(multilineChildren, doc.GroupOptions{ShouldBreak: true})
+		content = groupWithIn(path, multilineChildren, doc.GroupOptions{ShouldBreak: true})
 	}
 
 	// Upstream wraps content in `cursor` when options.cursorNode, nodeBeforeCursor or nodeAfterCursor
 	// is a JSXText child. cohere never tracks a cursor (see printing.PrintAstToDoc), so that is dropped.
 
-	multiLineElem := group(concatIn(path, openingLines,
-		indent(concatIn(path, hardline, content)),
+	multiLineElem := groupIn(path, concatIn(path, openingLines,
+		indentIn(path, concatIn(path, hardline, content)),
 		hardline,
 		closingLines,
 	))
@@ -303,7 +303,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	}
 	flatParts = append(flatParts, closingLines)
 	return conditionalGroup([]Doc{
-		group(concatIn(path, flatParts...)),
+		groupIn(path, concatIn(path, flatParts...)),
 		multiLineElem,
 	}, doc.GroupOptions{})
 }

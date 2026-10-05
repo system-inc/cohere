@@ -41,16 +41,16 @@ func printMethodSignature(path *Path, options *Options, print PrintFunc) Doc {
 	)
 
 	if shouldGroupParameters {
-		parts = append(parts, group(parametersDoc))
+		parts = append(parts, groupIn(path, parametersDoc))
 	} else {
 		parts = append(parts, parametersDoc)
 	}
 
 	if current.Truthy("returnType") {
-		parts = append(parts, group(returnTypeDoc))
+		parts = append(parts, groupIn(path, returnTypeDoc))
 	}
 
-	return concatIn(path, group(concatIn(path, parts...)), printClassMemberSemicolon(path, options))
+	return concatIn(path, groupIn(path, concatIn(path, parts...)), printClassMemberSemicolon(path, options))
 }
 
 // print/enum.js. printFlowEnumBody and printLegacyFlowEnumBody print Flow enum bodies and are not
@@ -110,14 +110,14 @@ func printTypeAssertion(path *Path, options *Options, print PrintFunc) Doc {
 	shouldBreakAfterCast := !(isArrayExpression(current.Child("expression")) ||
 		isObjectExpression(current.Child("expression")))
 
-	castGroup := group(concatIn(path, "<",
-		indent(concatIn(path, softline, print("typeAnnotation", nil))),
+	castGroup := groupIn(path, concatIn(path, "<",
+		indentIn(path, concatIn(path, softline, print("typeAnnotation", nil))),
 		softline,
 		">",
 	))
 
 	exprContents := concatIn(path, ifBreak("(", ""),
-		indent(concatIn(path, softline, print("expression", nil))),
+		indentIn(path, concatIn(path, softline, print("expression", nil))),
 		softline,
 		ifBreak(")", ""),
 	)
@@ -125,11 +125,11 @@ func printTypeAssertion(path *Path, options *Options, print PrintFunc) Doc {
 	if shouldBreakAfterCast {
 		return conditionalGroup([]Doc{
 			concatIn(path, castGroup, print("expression", nil)),
-			concatIn(path, castGroup, groupWith(exprContents, doc.GroupOptions{ShouldBreak: true})),
+			concatIn(path, castGroup, groupWithIn(path, exprContents, doc.GroupOptions{ShouldBreak: true})),
 			concatIn(path, castGroup, print("expression", nil)),
 		}, doc.GroupOptions{})
 	}
-	return group(concatIn(path, castGroup, print("expression", nil)))
+	return groupIn(path, concatIn(path, castGroup, print("expression", nil)))
 }
 
 // print/index-signature.js
@@ -146,7 +146,7 @@ func printIndexSignature(path *Path, options *Options, print PrintFunc) Doc {
 		trailingComma = printTrailingComma(options, "")
 	}
 
-	parametersGroup := group(concatIn(path, indent(concatIn(path, softline, join(concatIn(path, ", ", softline), printAll(path, print, "parameters")))),
+	parametersGroup := groupIn(path, concatIn(path, indentIn(path, concatIn(path, softline, join(concatIn(path, ", ", softline), printAll(path, print, "parameters")))),
 		trailingComma,
 		softline,
 	))

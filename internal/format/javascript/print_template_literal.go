@@ -185,7 +185,7 @@ func printJestEachTemplateLiteral(path *Path, options *Options, print PrintFunc)
 
 		return concatIn(path, lineSuffixBoundary,
 			"`",
-			indent(concatIn(path, hardline,
+			indentIn(path, concatIn(path, hardline,
 				join(hardline, rowDocs),
 			)),
 			hardline,
@@ -272,7 +272,7 @@ func printTemplateExpression(path *Path, options *Options, print PrintFunc) Doc 
 			current.Is("SequenceExpression") ||
 			isBinaryCastExpression(current) ||
 			isBinaryish(current)) {
-		expressionDoc = concatIn(path, indent(concatIn(path, softline, expressionDoc)), softline)
+		expressionDoc = concatIn(path, indentIn(path, concatIn(path, softline, expressionDoc)), softline)
 	}
 
 	// For a template literal of the following form:
@@ -299,7 +299,7 @@ func printTemplateExpression(path *Path, options *Options, print PrintFunc) Doc 
 		expressionDoc = addAlignmentToDoc(expressionDoc, indentSize, settingsOf(options).TabWidth)
 	}
 
-	return group(concatIn(path, "${", expressionDoc, lineSuffixBoundary, "}"))
+	return groupIn(path, concatIn(path, "${", expressionDoc, lineSuffixBoundary, "}"))
 }
 
 // printTemplateExpressions is upstream's printTemplateExpressions.

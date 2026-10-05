@@ -162,13 +162,13 @@ const (
 	//
 	// `PrunedScope` is constructed by four passes -- `pruneUnusedScopes` (bundle 41515),
 	// `flattenReactiveLoopsHIR` (43404), `flattenScopesWithHooksOrUseHIR` (43487), and
-	// `pruneAlwaysInvalidatingScopes` (43563) -- and none of them exists in this tree. Adding the
-	// variant now would put a terminal in the set that nothing constructs, which is strictly worse
-	// than leaving it out: a consumer writes an arm for it, the arm never fires, and the dead branch
-	// reads as coverage. `Optional` is already that shape here and is the standing warning.
-	//
-	// A consumer that later ports any of those four passes adds the variant then, in the same commit
-	// as its producer, exactly as `Scope` was added in this one.
+	// `pruneAlwaysInvalidatingScopes` (43563). All four are ported, and none of them builds the
+	// variant: the two that run over this graph hand the builder the ids they pruned, the two that
+	// run over the reactive tree set `ReactiveScopeBlock.Pruned`, and the label case of the hook
+	// flatten rewrites to the `Label` this set already has. Adding the variant would put a terminal
+	// in the set that nothing constructs, which is strictly worse than leaving it out: a consumer
+	// writes an arm for it, the arm never fires, and the dead branch reads as coverage. `Optional` is
+	// already that shape here and is the standing warning.
 	ScopeTerminalsGapPrunedScope ScopeTerminalsGap = iota
 )
 

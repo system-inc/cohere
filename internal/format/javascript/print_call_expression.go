@@ -77,7 +77,7 @@ func printCallExpression(path *Path, options *Options, print PrintFunc) Doc {
 	// We group here when the callee is itself a call expression.
 	// See `isLongCurriedCallExpression` for more info.
 	if isDynamicImportLike || isCallExpression(current.Child("callee")) {
-		return group(contents)
+		return groupIn(path, contents)
 	}
 
 	return contents

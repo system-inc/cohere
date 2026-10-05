@@ -34,7 +34,7 @@ func printFunctionType(path *Path, options *Options, print PrintFunc) Doc {
 	returnTypeDoc := concatIn(path, printTypeAnnotationProperty(path, print, "returnType"))
 
 	if shouldGroupFunctionParameters(current, returnTypeDoc) {
-		parametersDoc = group(parametersDoc)
+		parametersDoc = groupIn(path, parametersDoc)
 	}
 
 	parts = append(parts, parametersDoc, returnTypeDoc)
@@ -44,5 +44,5 @@ func printFunctionType(path *Path, options *Options, print PrintFunc) Doc {
 		current.Is("TSCallSignatureDeclaration") {
 		semicolon = printClassMemberSemicolon(path, options)
 	}
-	return concatIn(path, group(concatIn(path, parts...)), semicolon)
+	return concatIn(path, groupIn(path, concatIn(path, parts...)), semicolon)
 }

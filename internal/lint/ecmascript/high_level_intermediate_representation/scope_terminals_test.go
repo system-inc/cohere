@@ -566,9 +566,9 @@ func TestScopeTerminalsGapsAreDeclared(t *testing.T) {
 // TestPrunedScopeIsNotDeclared pins the decision NOT to add the second variant.
 //
 // `PrunedScope` is constructed only by `pruneUnusedScopes`, `flattenReactiveLoopsHIR`,
-// `flattenScopesWithHooksOrUseHIR` and `pruneAlwaysInvalidatingScopes`, none of which is ported.
-// Adding it would create the exact `Optional` shape this package already carries as a warning. If a
-// later stage ports one of those passes, it adds the variant in the same commit and updates this.
+// `flattenScopesWithHooksOrUseHIR` and `pruneAlwaysInvalidatingScopes`. All four are ported and
+// record the decision as `ReactiveScopeBlock.Pruned` instead, so adding the variant would create the
+// exact `Optional` shape this package already carries as a warning.
 func TestPrunedScopeIsNotDeclared(t *testing.T) {
 	t.Parallel()
 

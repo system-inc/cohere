@@ -79,7 +79,7 @@ func printClassBody(path *Path, options *Options, print PrintFunc) Doc {
 				spacing = softline
 			}
 			content = concatIn(path, openingBrace,
-				indent(concatIn(path, append([]any{spacing}, parts...)...)),
+				indentIn(path, concatIn(path, append([]any{spacing}, parts...)...)),
 				spacing,
 				closingBrace,
 			)
@@ -97,12 +97,12 @@ func printClassBody(path *Path, options *Options, print PrintFunc) Doc {
 			return content
 		}
 
-		return groupWith(content, doc.GroupOptions{ShouldBreak: shouldBreak})
+		return groupWithIn(path, content, doc.GroupOptions{ShouldBreak: shouldBreak})
 	}
 
 	var body Doc = emptyDoc
 	if len(parts) > 0 {
-		body = concatIn(path, indent(concatIn(path, hardline, concatIn(path, parts...))), hardline)
+		body = concatIn(path, indentIn(path, concatIn(path, hardline, concatIn(path, parts...))), hardline)
 	}
 	return concatIn(path, openingBrace,
 		body,

@@ -20,7 +20,6 @@
 package javascript
 
 import (
-	"github.com/system-inc/cohere/internal/format/arena"
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
@@ -48,9 +47,9 @@ type settings struct {
 	formatoptions.Options
 	FilePath string
 
-	// docs is where concatIn takes its parts from for this format, released with the tree once the doc is
-	// laid out, or nil for the heap (#fyw36kf).
-	docs *arena.Slab[doc.Doc]
+	// docs is where this format's concatIn, groupIn and indentIn take their docs from, released with the
+	// tree once the doc is laid out, or nil for the heap (#fyw36kf).
+	docs *docMemory
 
 	// Parser is upstream's options.parser: "typescript", "babel" for JavaScript, or "json" or
 	// "json-stringify" for JSON files.

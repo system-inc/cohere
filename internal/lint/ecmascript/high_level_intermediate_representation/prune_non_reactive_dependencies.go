@@ -86,6 +86,14 @@ func (p *nonReactivePruner) walk(block ReactiveBlock) {
 		switch shape := statement.(type) {
 		case *ReactiveScopeBlock:
 			p.walk(shape.Instructions)
+			// A pruned scope is walked and nothing more. Upstream's visitor overrides `visitScope`
+			// only, and the base `visitPrunedScope` visits the body, so a pruned scope neither drops
+			// its dependencies nor makes its declarations reactive. Propagating through one marked
+			// a hook call's declarations reactive, `useRef`'s result among them, and a memo callback
+			// nested beside it then kept the ref as a dependency the developer never wrote.
+			if shape.Pruned {
+				continue
+			}
 			p.visitScope(shape)
 		case *ReactiveTerminalStatement:
 			p.walkTerminal(shape)

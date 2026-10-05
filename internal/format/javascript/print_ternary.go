@@ -258,7 +258,7 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 		// curly braces in an if statement.
 		wrap := func(document Doc) Doc {
 			return concatIn(path, ifBreak("(", ""),
-				indent(concatIn(path, softline, document)),
+				indentIn(path, concatIn(path, softline, document)),
 				softline,
 				ifBreak(")", ""),
 			)
@@ -320,7 +320,7 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 		*/
 		printBranch := func(nodePropertyName string) Doc {
 			if settingsOf(options).UseTabs {
-				return indent(print(nodePropertyName, nil))
+				return indentIn(path, print(nodePropertyName, nil))
 			}
 			return align(2, print(nodePropertyName, nil))
 		}
@@ -348,7 +348,7 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 			isParentTest {
 			parts = append(parts, part)
 		} else if settingsOf(options).UseTabs {
-			parts = append(parts, dedent(indent(part)))
+			parts = append(parts, dedent(indentIn(path, part)))
 		} else {
 			parts = append(parts, align(max(0, settingsOf(options).TabWidth-2), part))
 		}
@@ -356,7 +356,7 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 
 	maybeGroup := func(document Doc) Doc {
 		if parent == firstNonConditionalParent {
-			return group(document)
+			return groupIn(path, document)
 		}
 		return document
 	}
@@ -378,7 +378,7 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 	if forceNoIndent {
 		printedParts = concatIn(path, parts...)
 	} else {
-		printedParts = indent(concatIn(path, parts...))
+		printedParts = indentIn(path, concatIn(path, parts...))
 	}
 	var closing Doc = emptyDoc
 	if isConditionalExpression && breakClosingParen && !shouldExtraIndent {
@@ -387,7 +387,7 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 	result := maybeGroup(concatIn(path, printedTest, printedParts, closing))
 
 	if isParentTest || shouldExtraIndent {
-		return group(concatIn(path, indent(concatIn(path, softline, result)), softline))
+		return groupIn(path, concatIn(path, indentIn(path, concatIn(path, softline, result)), softline))
 	}
 	return result
 }

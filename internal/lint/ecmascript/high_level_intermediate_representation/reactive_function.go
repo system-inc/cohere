@@ -134,10 +134,10 @@ type ReactiveScopeBlock struct {
 	Scope        ScopeId
 	Range        MutableRange
 	Instructions ReactiveBlock
-	// Pruned marks a scope whose memoization was discarded. Always false today: the four upstream
-	// passes that set it -- `pruneUnusedScopes`, `flattenReactiveLoopsHIR`,
-	// `flattenScopesWithHooksOrUseHIR` and `pruneAlwaysInvalidatingScopes` -- are all downstream of
-	// this one and none exists here.
+	// Pruned marks a scope whose memoization was discarded, by any of the four upstream passes that
+	// build a `PrunedScope`: `flattenReactiveLoopsHIR` and `flattenScopesWithHooksOrUseHIR` through
+	// the ids `BuildReactiveFunctionWithFlattenedScopes` is handed, `pruneUnusedScopes` and
+	// `pruneAlwaysInvalidatingScopes` by setting it on the tree.
 	Pruned bool
 
 	// Merged are the scopes this one absorbed, by id.

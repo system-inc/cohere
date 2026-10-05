@@ -107,7 +107,7 @@ func printIfOrWhileConditionOrWithStatementObject(path *Path, options *Options, 
 	if shouldInlineCondition(current.Child(property)) {
 		return conditionDoc
 	}
-	return group(concatIn(path, indent(concatIn(path, softline, conditionDoc)), softline))
+	return groupIn(path, concatIn(path, indentIn(path, concatIn(path, softline, conditionDoc)), softline))
 }
 
 func printIfStatementCondition(path *Path, options *Options, print PrintFunc) Doc {
@@ -132,7 +132,7 @@ func printDanglingCommentsInList(path *Path, options *Options, filter func(Node)
 	if hasComment(current, commentDangling|commentLine, filter) {
 		closing = hardline
 	}
-	return concatIn(path, indent(concatIn(path, softline, printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{Filter: filter}))),
+	return concatIn(path, indentIn(path, concatIn(path, softline, printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{Filter: filter}))),
 		closing,
 	)
 }

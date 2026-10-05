@@ -34,7 +34,7 @@ func printClass(path *Path, options *Options, print PrintFunc) Doc {
 		decoratorsDoc := printDecorators(path, options, print)
 		needsParens := needsParentheses(path, options)
 		if needsParens {
-			return concatIn(path, indent(concatIn(path, softline, decoratorsDoc, printed)), softline)
+			return concatIn(path, indentIn(path, concatIn(path, softline, decoratorsDoc, printed)), softline)
 		}
 		return concatIn(path, decoratorsDoc, printed)
 	}
@@ -76,7 +76,7 @@ func printClassWithoutDecorators(path *Path, options *Options, print PrintFunc) 
 					leading, trailing := printing.PrintCommentsSeparately(path, options, nil)
 					return [2]Doc{leading, trailing}
 				}, property)
-				partsGroup = append(partsGroup, comments[0], print(property, nil), indent(comments[1]))
+				partsGroup = append(partsGroup, comments[0], print(property, nil), indentIn(path, comments[1]))
 			}
 		}
 	}
@@ -89,7 +89,7 @@ func printClassWithoutDecorators(path *Path, options *Options, print PrintFunc) 
 			return concatIn(path, "extends ", printing.PrintComments(path, printed, options, nil))
 		}, "superClass")
 		if groupMode {
-			extendsParts = append(extendsParts, line, group(printedWithComments))
+			extendsParts = append(extendsParts, line, groupIn(path, printedWithComments))
 		} else {
 			extendsParts = append(extendsParts, " ", printedWithComments)
 		}
@@ -106,7 +106,7 @@ func printClassWithoutDecorators(path *Path, options *Options, print PrintFunc) 
 	if groupMode {
 		heritageGroupId = getHeritageGroupId(options, current)
 		parts = append(parts,
-			groupWith(concatIn(path, append(partsGroup, indent(concatIn(path, extendsParts...)))...), doc.GroupOptions{ID: heritageGroupId}),
+			groupWithIn(path, concatIn(path, append(partsGroup, indentIn(path, concatIn(path, extendsParts...)))...), doc.GroupOptions{ID: heritageGroupId}),
 		)
 	} else {
 		parts = append(parts, partsGroup...)
@@ -216,7 +216,7 @@ func printHeritageClauses(path *Path, options *Options, print PrintFunc, listNam
 			heritageClausesDoc,
 		)
 		if shouldPrintClassInGroupMode(path) {
-			return concatIn(path, line, group(printed))
+			return concatIn(path, line, groupIn(path, printed))
 		}
 		return concatIn(path, " ", printed)
 	}
@@ -231,7 +231,7 @@ func printHeritageClauses(path *Path, options *Options, print PrintFunc, listNam
 		printedLeadingComments,
 		leadingCommentsBreak,
 		listName,
-		group(indent(concatIn(path, line, heritageClausesDoc))),
+		groupIn(path, indentIn(path, concatIn(path, line, heritageClausesDoc))),
 	)
 }
 
@@ -240,9 +240,7 @@ func printSuperClass(path *Path, options *Options, print PrintFunc) Doc {
 	printed := print("superClass", nil)
 	parent := parentOf(path)
 	if parent.Is("AssignmentExpression") {
-		return group(
-			ifBreak(concatIn(path, "(", indent(concatIn(path, softline, printed)), softline, ")"), printed),
-		)
+		return groupIn(path, ifBreak(concatIn(path, "(", indentIn(path, concatIn(path, softline, printed)), softline, ")"), printed))
 	}
 	return printed
 }

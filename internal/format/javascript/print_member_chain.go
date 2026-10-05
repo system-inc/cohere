@@ -303,7 +303,7 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 		for index, printedGroup := range groups {
 			printed[index] = printGroup(printedGroup)
 		}
-		return indent(concatIn(path, hardline, join(hardline, printed)))
+		return indentIn(path, concatIn(path, hardline, join(hardline, printed)))
 	}
 
 	printedGroups := make([]Doc, len(groups))
@@ -358,7 +358,7 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 		if isLongCurriedCallExpression(path) {
 			return oneLine
 		}
-		return group(oneLine)
+		return groupIn(path, oneLine)
 	}
 
 	// Find out the last node in the first group and check if it has an
@@ -449,7 +449,7 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 		(len(callExpressions) > 2 && someCallHasNonSimpleArgument()) ||
 		someGroupButTheLastWillBreak() ||
 		lastGroupWillBreakAndOtherCallsHaveFunctionArguments() {
-		result = group(expanded)
+		result = groupIn(path, expanded)
 	} else {
 		var breakParentDoc Doc = emptyDoc
 		// We only need to check `oneLine` because if `expanded` is chosen

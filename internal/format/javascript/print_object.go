@@ -82,7 +82,7 @@ func printObject(path *Path, options *Options, print PrintFunc) Doc {
 
 	var content Doc
 	if len(parts) == 0 {
-		content = group(concatIn(path, "{",
+		content = groupIn(path, concatIn(path, "{",
 			printDanglingCommentsInList(path, options, nil),
 			"}",
 			printOptionalToken(path),
@@ -98,7 +98,7 @@ func printObject(path *Path, options *Options, print PrintFunc) Doc {
 			trailingSeparator = printTrailingComma(options, "")
 		}
 		content = concatIn(path, "{",
-			indent(append([]Doc{spacing}, parts...)),
+			indentIn(path, append([]Doc{spacing}, parts...)),
 			trailingSeparator,
 			spacing,
 			"}",
@@ -148,7 +148,7 @@ func printObject(path *Path, options *Options, print PrintFunc) Doc {
 		return content
 	}
 
-	return groupWith(content, doc.GroupOptions{ShouldBreak: shouldBreak})
+	return groupWithIn(path, content, doc.GroupOptions{ShouldBreak: shouldBreak})
 }
 
 // shouldHugTheOnlyParameterPredicate adapts upstream's shouldHugTheOnlyParameter(node, name), which
