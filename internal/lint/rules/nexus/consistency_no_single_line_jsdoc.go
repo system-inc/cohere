@@ -30,10 +30,12 @@ func messageUseSimpleComment() rule.Message {
 // The fix is safe in a way most comment rewrites are not: the text is preserved verbatim and only
 // the delimiters change, so nothing a reader wrote is lost or reflowed.
 //
-// It is withheld in two cases. A comment whose description already holds a double-slash would
+// It is withheld in three cases. A comment whose description already holds a double-slash would
 // produce a line comment that reads as commented-out code, and a multi-line JSDoc collapses several
-// source lines into one, which moves every position after it in the file. Neither is a repair a
-// rule should make unattended.
+// source lines into one, which moves every position after it in the file. And a comment with code
+// after it on its line, `createQueryClient(/** options */);` or `[a, b /**, c */] = values`, would
+// comment that code out: the fix did not parse on trpc (#kq9vtva). None of them is a repair a rule
+// should make unattended.
 var ConsistencyNoSingleLineJsDoc = rule.Rule{
 	Name: "nexus/consistency-no-single-line-jsdoc",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
@@ -57,7 +59,8 @@ var ConsistencyNoSingleLineJsDoc = rule.Rule{
 
 					description := lines[0]
 					isSingleSourceLine := comment.StartLine == comment.EndLine
-					if strings.Contains(description, "//") || !isSingleSourceLine {
+					if strings.Contains(description, "//") || !isSingleSourceLine ||
+						consistencyNoSingleLineJsDocCodeFollows(ctx.SourceFile.Text(), comment.Range.End()) {
 						ctx.ReportRange(comment.Range, messageUseSimpleComment())
 						continue
 					}
@@ -74,4 +77,19 @@ var ConsistencyNoSingleLineJsDoc = rule.Rule{
 			},
 		}
 	},
+}
+
+// consistencyNoSingleLineJsDocCodeFollows reports whether anything but whitespace follows a comment on
+// its own line, which a line comment in its place would swallow.
+func consistencyNoSingleLineJsDocCodeFollows(source string, commentEnd int) bool {
+	for _, character := range source[commentEnd:] {
+		switch character {
+		case '\n', '\r':
+			return false
+		case ' ', '\t':
+			continue
+		}
+		return true
+	}
+	return false
 }

@@ -71,6 +71,16 @@ func TestConsistencyNoSingleLineJsDocStaysSilent(t *testing.T) {
 
 // TestConsistencyNoSingleLineJsDocFixes pins the fix text, because a fix that lands wrong is worse
 // than no fix: the finding disappears and the damage is committed.
+// TestConsistencyNoSingleLineJsDocFixesWithOnlyWhitespaceAfter keeps the repair for a comment that
+// trailing spaces follow, which a line comment swallows harmlessly.
+func TestConsistencyNoSingleLineJsDocFixesWithOnlyWhitespaceAfter(t *testing.T) {
+	t.Parallel()
+
+	result := rule_testing.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, "/** Does the thing. */  \t\nexport const value = 1;\n")
+	rule_testing.ExpectFindings(t, result, "useSimpleComment")
+	rule_testing.ExpectFixedSource(t, result, "// Does the thing.  \t\nexport const value = 1;\n")
+}
+
 func TestConsistencyNoSingleLineJsDocFixes(t *testing.T) {
 	t.Parallel()
 
@@ -86,8 +96,9 @@ func TestConsistencyNoSingleLineJsDocFixes(t *testing.T) {
 	}
 }
 
-// TestConsistencyNoSingleLineJsDocWithholdsUnsafeFixes covers the two cases where the rule reports
-// but must not repair. Both would produce a file that no longer says what the author wrote.
+// TestConsistencyNoSingleLineJsDocWithholdsUnsafeFixes covers the cases where the rule reports but
+// must not repair. Each would produce a file that no longer says what the author wrote, and the last
+// two, trpc's (#kq9vtva), a file that does not parse.
 func TestConsistencyNoSingleLineJsDocWithholdsUnsafeFixes(t *testing.T) {
 	t.Parallel()
 
@@ -100,6 +111,10 @@ func TestConsistencyNoSingleLineJsDocWithholdsUnsafeFixes(t *testing.T) {
 
 		// Collapsing three source lines into one moves every position after it.
 		{"multi line source", "/**\n * Does the thing.\n */\nexport const value = 1;\n"},
+
+		// A line comment would swallow the code after it on the same line.
+		{"code follows inside a call", "declare function create(options?: object): void;\ncreate(/** options */);\n"},
+		{"code follows inside a pattern", "declare const values: number[];\nconst [a, b /**, c */] = values;\n"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

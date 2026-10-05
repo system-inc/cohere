@@ -211,6 +211,19 @@ func TestConsistencyNoMultilineArrowFunctionFixes(t *testing.T) {
 			"const f = async <T>(value: T) => {\n    await value;\n};\n",
 			"const f = async function<T>(value: T) {\n    await value;\n};\n",
 		},
+		{
+			// trpc's invalidateQueries.test.tsx and issue-4049, reduced (#kq9vtva). An arrow that
+			// leads an expression statement became `function() { ... };`, which parses as a
+			// declaration with no name (TS1003). Parenthesized, it stays an expression.
+			"an arrow leading an expression statement", arrowPlainFile,
+			"function narrows() {\n    () => {\n        const utils = useUtils();\n        return utils;\n    };\n}\n",
+			"function narrows() {\n    (function() {\n        const utils = useUtils();\n        return utils;\n    });\n}\n",
+		},
+		{
+			"an async arrow leading an expression statement", arrowPlainFile,
+			"async (value) => {\n    await value;\n};\n",
+			"(async function(value) {\n    await value;\n});\n",
+		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

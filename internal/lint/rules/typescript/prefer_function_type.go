@@ -303,15 +303,21 @@ func preferFunctionTypeFix(
 			// The type parameters have to survive, so the alias is rebuilt from the source text
 			// spanning the name through the closing angle bracket rather than from the name alone.
 			nameStart := rule.TokenRange(ctx.SourceFile, name).Pos()
-			// TypeParameters.End() is the last parameter's end, so the closing angle bracket sits
-			// one byte past it. Upstream's `node.typeParameters.range[1]` is past the bracket,
-			// because estree models the parameter LIST as a node with its own delimiters. Measured:
-			// `interface Foo<T>` gives `Foo<T` at End() and `Foo<T>` at End()+1, and the same holds
-			// for a multi-parameter list with a constraint.
-			tail := declaration.TypeParameters.End() + 1
-			if tail > len(source) {
+			// TypeParameters.End() is the last parameter's end, and the closing angle bracket is the
+			// next token after it, past any trivia and a trailing comma. Upstream's
+			// `node.typeParameters.range[1]` is past the bracket, because estree models the parameter
+			// LIST as a node with its own delimiters. Taking the bracket as one byte past End() held
+			// for `interface Foo<T>` and broke on a list written one parameter per line, as Prettier
+			// writes a long one: `TFlags extends Flags = DefaultFlags,\n>` cut the alias at the comma
+			// and the fix did not parse (TS1139, trpc's mutationOptions.ts, #kq9vtva).
+			tail := scanner.SkipTrivia(source, declaration.TypeParameters.End())
+			if tail < len(source) && source[tail] == ',' {
+				tail = scanner.SkipTrivia(source, tail+1)
+			}
+			if tail >= len(source) || source[tail] != '>' {
 				return rule.Fix{}, false
 			}
+			tail++
 			suggestion = "type " + source[nameStart:tail] + " = " + suggestion + lastCharacter
 		} else {
 			suggestion = "type " + name.Text() + " = " + suggestion + lastCharacter
