@@ -39,6 +39,7 @@
 
 import * as NodeFileSystem from 'node:fs';
 import * as NodePath from 'node:path';
+import { locate } from '../corpus.mjs';
 
 const [, , packageRootArgument, corpusPathArgument] = process.argv;
 if (!packageRootArgument) {
@@ -320,15 +321,16 @@ const realFiles = corpusPathArgument
     : [];
 
 for (const entry of realFiles) {
-    const entryPath = NodePath.resolve(entry.path);
-    const content = NodeFileSystem.readFileSync(entryPath, 'utf8');
-    const theme = await loadTheme(content, NodePath.dirname(entryPath));
+    const entryLocated = locate(entry.path);
+    const content = NodeFileSystem.readFileSync(entryLocated.path, 'utf8');
+    const theme = await loadTheme(content, NodePath.dirname(entryLocated.path));
     cases.push({
         name: entry.name,
         source: 'repository',
         // The real cases carry the entry path rather than the content: the Go side resolves the
-        // same `@import` graph from disk, which is the thing under test.
-        entryPath,
+        // same `@import` graph from disk, which is the thing under test. A corpus spelling is
+        // recorded as given, so the fixture reads the same on every machine.
+        entryPath: entryLocated.recorded,
         theme: serializeTheme(theme),
     });
 }

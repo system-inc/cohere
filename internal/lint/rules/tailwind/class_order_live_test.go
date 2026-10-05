@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
@@ -78,17 +79,17 @@ func classOrderLiveLoadCorpus(t *testing.T) []classOrderLiveList {
 		t.Fatalf("read %s: %v", path, err)
 	}
 
-	var corpus classOrderLiveCorpus
-	if err := json.Unmarshal(contents, &corpus); err != nil {
+	var fixture classOrderLiveCorpus
+	if err := json.Unmarshal(contents, &fixture); err != nil {
 		t.Fatalf("parse %s: %v", path, err)
 	}
-	if corpus.TailwindVersion != "4.3.3" {
+	if fixture.TailwindVersion != "4.3.3" {
 		t.Fatalf("the fixture was captured from Tailwind %s and this port targets 4.3.3",
-			corpus.TailwindVersion)
+			fixture.TailwindVersion)
 	}
 
 	var lists []classOrderLiveList
-	for _, aCase := range corpus.Cases {
+	for _, aCase := range fixture.Cases {
 		if aCase.ClassOrder != nil && len(aCase.ClassOrder.Sorted) > 1 {
 			lists = append(lists, classOrderLiveList{
 				name:      aCase.Name,
@@ -117,10 +118,9 @@ func classOrderLiveLoadCorpus(t *testing.T) []classOrderLiveList {
 // classOrderLiveSystems builds one live design system per entry point the corpus names.
 //
 // Built from the repository on disk rather than from the fixture, which is the whole point of the
-// swap: the thing under test is the rule reading the repository in front of it. A missing entry point
-// skips that system's lists rather than failing, because the corpus records absolute paths from the
-// machine it was captured on, and a checkout that lacks one of the two repositories should still be
-// able to run the other's half.
+// swap: the thing under test is the rule reading the repository in front of it. The fixture spells each
+// entry point inside its corpus, so an unset corpus skips the test naming its variable, and a corpus
+// that is set but lacks the stylesheet fails.
 func classOrderLiveSystems(t *testing.T, lists []classOrderLiveList) map[string]DesignSystemResult {
 	t.Helper()
 
@@ -132,19 +132,16 @@ func classOrderLiveSystems(t *testing.T, lists []classOrderLiveList) map[string]
 		if _, built := systems[list.entryPath]; built {
 			continue
 		}
-		if _, err := os.Stat(list.entryPath); err != nil {
-			systems[list.entryPath] = DesignSystemResult{Err: err}
-			continue
-		}
-		packageRoot := findTailwindPackageRoot(filepath.Dir(list.entryPath), diskFileExists)
+		entryPoint := corpus.Resolve(t, list.entryPath)
+		packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint), diskFileExists)
 		if packageRoot == "" {
 			systems[list.entryPath] = DesignSystemResult{
-				Err: fmt.Errorf("no installed tailwindcss beside %s", list.entryPath),
+				Err: fmt.Errorf("no installed tailwindcss beside %s", entryPoint),
 			}
 			continue
 		}
 		system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
-			EntryPoint:          list.entryPath,
+			EntryPoint:          entryPoint,
 			TailwindPackageRoot: packageRoot,
 		})
 		if err != nil {
@@ -277,9 +274,9 @@ func classOrderLiveReversed(classes []string) []string {
 // After the swap that must be zero, and it must be zero over a population that did not shrink, which
 // is what the placed-class floor below is for.
 //
-// The floor is a floor rather than an equality because the corpus records absolute paths from the
-// machine it was captured on. A checkout holding one of the two repositories measures half the corpus
-// and must still be able to prove the property on that half.
+// The floor is a floor rather than an equality so that a fixture gaining or losing a handful of classes
+// does not fail it. Both corpora, ahra and connected, must be set for this to run, and it skips naming
+// the variable when either is not.
 func TestClassOrderLiveMatchesTheEngineOverTheCorpus(t *testing.T) {
 	t.Parallel()
 	lists := classOrderLiveLoadCorpus(t)
@@ -443,21 +440,18 @@ func TestClassOrderLiveReadsTheRepositoryRatherThanATable(t *testing.T) {
 	}
 }
 
-// classOrderLiveRepositorySystem builds the design system for the repository the tests run in.
+// classOrderLiveRepositorySystem builds the design system of ahra, the corpus these tests were written
+// against.
 //
-// Skips rather than fails when the repository is not on disk, because these tests read an absolute
-// path recorded when the corpus was captured, and a checkout elsewhere should report "not measured"
-// rather than "broken".
+// Skips naming the variable when the corpus is unset, so a checkout elsewhere reports "not measured"
+// rather than "broken", and fails when it is set but lacks the stylesheet or its installed tailwindcss.
 func classOrderLiveRepositorySystem(t *testing.T) DesignSystemResult {
 	t.Helper()
 
-	const entryPoint = "/Users/kirkouimet/Projects/ahra/app/_theme/styles/theme.css"
-	if _, err := os.Stat(entryPoint); err != nil {
-		t.Skipf("the corpus repository is not on this machine: %v", err)
-	}
+	entryPoint := corpus.Resolve(t, "ahra:app/_theme/styles/theme.css")
 	packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint), diskFileExists)
 	if packageRoot == "" {
-		t.Skip("no installed tailwindcss beside the corpus repository's stylesheet")
+		t.Fatalf("%s is set, but there is no installed tailwindcss beside %s", corpus.Ahra.Variable, entryPoint)
 	}
 	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,

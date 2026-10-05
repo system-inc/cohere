@@ -158,7 +158,7 @@ func unseenDesignSystem(t *testing.T) *LoadedDesignSystem {
 // Asserted on the live system rather than a list, so a repository adding such a pair joins this test.
 func TestARootDeclaredBothWaysKeepsBothKinds(t *testing.T) {
 	t.Parallel()
-	system, _ := liveTableFor(t, corpusRepositories[0].entryPoint)
+	system, _ := liveTableFor(t, corpusRepositories[0].spelling)
 	if system == nil {
 		t.Skip("no design system loaded")
 	}

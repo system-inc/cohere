@@ -1,6 +1,6 @@
 {
   "tailwindVersion": "4.3.3",
-  "entryPoint": "/Users/kirkouimet/Projects/ahra/app/_theme/styles/theme.css",
+  "entryPoint": "ahra:app/_theme/styles/theme.css",
   "groundTruth": "compileAstNodes propertySort, via readingOf",
   "rootCount": 26,
   "caseCount": 8096,

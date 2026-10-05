@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
@@ -123,44 +124,28 @@ func loadThemeCorpus(t *testing.T) themeCorpus {
 		t.Fatalf("read theme fixture: %v", err)
 	}
 
-	var corpus themeCorpus
-	if err := json.Unmarshal(raw, &corpus); err != nil {
+	var fixture themeCorpus
+	if err := json.Unmarshal(raw, &fixture); err != nil {
 		t.Fatalf("decode theme fixture: %v", err)
 	}
-	if len(corpus.Cases) == 0 {
+	if len(fixture.Cases) == 0 {
 		t.Fatal("theme fixture holds no cases")
 	}
-	return corpus
+	return fixture
 }
 
 // buildThemeForCase builds a Theme the way the case demands: a synthetic case is parsed from its
 // inline stylesheet, a repository case is loaded from disk through its whole import graph.
 //
-// A repository case whose tailwindcss install is missing skips rather than fails, because the
-// fixture is committed and the node_modules it was generated against are not. It skips loudly: a
+// A repository case's stylesheet is spelled inside its corpus, so the case skips naming the variable
+// when that corpus is unset, and fails when it is set and lacks the stylesheet. It skips loudly: a
 // silently absent repository half would turn the exit criterion into a synthetic-only suite that
 // still prints a green line, which is exactly the failure mode this slice has been bitten by.
 func buildThemeForCase(t *testing.T, aCase themeCase) (*Theme, []SkippedDirective, bool) {
 	t.Helper()
 
 	if aCase.Source == "repository" {
-		packageRoot, ok := tailwindPackageRoots[aCase.Name]
-		if !ok {
-			t.Fatalf("repository case %q has no tailwindcss package root registered in tailwindPackageRoots", aCase.Name)
-		}
-		if _, err := os.Stat(filepath.Join(packageRoot, "index.css")); err != nil {
-			t.Skipf("tailwindcss install for %q is not present at %s; run the generator to refresh", aCase.Name, packageRoot)
-			return nil, nil, false
-		}
-		if _, err := os.Stat(aCase.EntryPath); err != nil {
-			t.Skipf("stylesheet for %q is not present at %s", aCase.Name, aCase.EntryPath)
-			return nil, nil, false
-		}
-
-		theme, skipped, err := LoadThemeFromFile(aCase.EntryPath, NodeStylesheetResolver(packageRoot))
-		if err != nil {
-			t.Fatalf("load %s: %v", aCase.EntryPath, err)
-		}
+		theme, skipped := loadRepositoryTheme(t, aCase)
 		return theme, skipped, true
 	}
 
@@ -175,6 +160,45 @@ func buildThemeForCase(t *testing.T, aCase themeCase) (*Theme, []SkippedDirectiv
 	return loader.theme, loader.skipped, true
 }
 
+// loadRepositoryTheme loads a repository case's theme from its corpus, through the vendored tailwindcss
+// its name maps to.
+func loadRepositoryTheme(t *testing.T, aCase themeCase) (*Theme, []SkippedDirective) {
+	t.Helper()
+	packageRoot, ok := tailwindPackageRoots[aCase.Name]
+	if !ok {
+		t.Fatalf("repository case %q has no tailwindcss package root registered in tailwindPackageRoots", aCase.Name)
+	}
+	if _, err := os.Stat(filepath.Join(packageRoot, "index.css")); err != nil {
+		t.Fatalf("the vendored tailwindcss for %q is not at %s: %v", aCase.Name, packageRoot, err)
+	}
+	entryPath := corpus.Resolve(t, aCase.EntryPath)
+	theme, skipped, err := LoadThemeFromFile(entryPath, NodeStylesheetResolver(packageRoot))
+	if err != nil {
+		t.Fatalf("load %s: %v", entryPath, err)
+	}
+	return theme, skipped
+}
+
+// coveredRepositoryCases is how many of the fixture's repository cases have their corpus set, which is
+// how many a run must check: the rest skip, naming their variable.
+func coveredRepositoryCases(t *testing.T, fixture themeCorpus) int {
+	t.Helper()
+	covered := 0
+	for _, aCase := range fixture.Cases {
+		if aCase.Source != "repository" {
+			continue
+		}
+		repositoryCorpus, _, spelled, err := corpus.Spelled(aCase.EntryPath)
+		if err != nil || !spelled {
+			t.Fatalf("repository case %q records %q, which is not spelled <corpus>:<path in it>: %v", aCase.Name, aCase.EntryPath, err)
+		}
+		if repositoryCorpus.Covered() {
+			covered++
+		}
+	}
+	return covered
+}
+
 // TestThemeMatchesEngine is the differential: every answer the port gives, against the answer the
 // engine gave for the same question.
 //
@@ -184,13 +208,13 @@ func buildThemeForCase(t *testing.T, aCase themeCase) (*Theme, []SkippedDirectiv
 // not against a reading.
 func TestThemeMatchesEngine(t *testing.T) {
 	t.Parallel()
-	corpus := loadThemeCorpus(t)
+	fixture := loadThemeCorpus(t)
 
 	var totalEntries, totalNamespaces, totalNamespaceEntries, totalKeysInNamespace int
 	var totalResolutions, totalResolveWith, totalOptionQueries, totalNested int
 	var repositoriesChecked, syntheticChecked int
 
-	for _, aCase := range corpus.Cases {
+	for _, aCase := range fixture.Cases {
 		// Not parallel: its subtests add to totals the test checks after them, and a parallel subtest would run
 		// only after the test had returned, so the check would pass on nothing.
 		t.Run(aCase.Name, func(t *testing.T) {
@@ -350,12 +374,13 @@ func TestThemeMatchesEngine(t *testing.T) {
 
 	// Coverage. A count that has never been shown to be large is not a large count, and a suite
 	// that skipped its repository half would otherwise report the same green line as one that ran
-	// it.
-	if repositoriesChecked == 0 {
-		t.Error("no repository case ran: the exit criterion for this component is a comparison against two real design systems, and this run compared against none")
+	// it. Every repository case whose corpus is set must have run; the rest skipped naming their
+	// variable, so the run says what it did not compare.
+	if covered := coveredRepositoryCases(t, fixture); repositoriesChecked != covered {
+		t.Errorf("%d repository cases ran and %d have their corpus set: the exit criterion for this component is a comparison against two real design systems", repositoriesChecked, covered)
 	}
-	if syntheticChecked != corpus.SyntheticCaseCount {
-		t.Errorf("ran %d of %d synthetic cases", syntheticChecked, corpus.SyntheticCaseCount)
+	if syntheticChecked != fixture.SyntheticCaseCount {
+		t.Errorf("ran %d of %d synthetic cases", syntheticChecked, fixture.SyntheticCaseCount)
 	}
 
 	totalComparisons := totalEntries + totalNamespaceEntries + totalKeysInNamespace +
@@ -365,7 +390,7 @@ func TestThemeMatchesEngine(t *testing.T) {
 		"tailwind %s: %d repository and %d synthetic design systems; %d theme entries, "+
 			"%d namespaces holding %d entries and %d namespace keys, %d resolutions, "+
 			"%d resolveWith answers carrying %d nested values, %d option queries; %d compared answers",
-		corpus.TailwindVersion, repositoriesChecked, syntheticChecked,
+		fixture.TailwindVersion, repositoriesChecked, syntheticChecked,
 		totalEntries, totalNamespaces, totalNamespaceEntries, totalKeysInNamespace,
 		totalResolutions, totalResolveWith, totalNested, totalOptionQueries,
 		totalComparisons,
@@ -381,7 +406,7 @@ func TestThemeMatchesEngine(t *testing.T) {
 // quietly succeeding.
 func TestThemeRepositoriesDiffer(t *testing.T) {
 	t.Parallel()
-	corpus := loadThemeCorpus(t)
+	fixture := loadThemeCorpus(t)
 
 	type resolved struct {
 		name string
@@ -390,25 +415,11 @@ func TestThemeRepositoriesDiffer(t *testing.T) {
 	}
 	var themes []resolved
 
-	for _, aCase := range corpus.Cases {
+	for _, aCase := range fixture.Cases {
 		if aCase.Source != "repository" {
 			continue
 		}
-		packageRoot, ok := tailwindPackageRoots[aCase.Name]
-		if !ok {
-			t.Fatalf("repository case %q has no tailwindcss package root registered", aCase.Name)
-		}
-		if _, err := os.Stat(filepath.Join(packageRoot, "index.css")); err != nil {
-			t.Skipf("tailwindcss install for %q is not present", aCase.Name)
-		}
-		if _, err := os.Stat(aCase.EntryPath); err != nil {
-			t.Skipf("stylesheet for %q is not present", aCase.Name)
-		}
-
-		theme, _, err := LoadThemeFromFile(aCase.EntryPath, NodeStylesheetResolver(packageRoot))
-		if err != nil {
-			t.Fatalf("load %s: %v", aCase.EntryPath, err)
-		}
+		theme, _ := loadRepositoryTheme(t, aCase)
 		keys := make(map[string]string, theme.Size())
 		for _, entry := range theme.Entries() {
 			keys[entry.Key] = entry.Value
@@ -463,25 +474,14 @@ func TestThemeRepositoriesDiffer(t *testing.T) {
 // wrong count. See the boundary note in themeloader.go.
 func TestThemeLoaderReportsSkippedDirectives(t *testing.T) {
 	t.Parallel()
-	corpus := loadThemeCorpus(t)
+	fixture := loadThemeCorpus(t)
 
 	ran := 0
-	for _, aCase := range corpus.Cases {
+	for _, aCase := range fixture.Cases {
 		if aCase.Source != "repository" {
 			continue
 		}
-		packageRoot, ok := tailwindPackageRoots[aCase.Name]
-		if !ok {
-			continue
-		}
-		if _, err := os.Stat(aCase.EntryPath); err != nil {
-			t.Skipf("stylesheet for %q is not present", aCase.Name)
-		}
-
-		_, skipped, err := LoadThemeFromFile(aCase.EntryPath, NodeStylesheetResolver(packageRoot))
-		if err != nil {
-			t.Fatalf("load %s: %v", aCase.EntryPath, err)
-		}
+		_, skipped := loadRepositoryTheme(t, aCase)
 
 		// Both corpus repositories carry exactly one `@config`, pointing at a TypeScript file used
 		// for content globs. Anything else appearing here is a change in what the repository asks
@@ -497,7 +497,7 @@ func TestThemeLoaderReportsSkippedDirectives(t *testing.T) {
 	}
 
 	if ran == 0 {
-		t.Skip("no repository case available")
+		t.Fatal("the fixture holds no repository case, so this test checked nothing")
 	}
 	t.Logf("%d repositories each skip exactly one @config directive", ran)
 }
