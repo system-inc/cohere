@@ -127,19 +127,41 @@ func ViewProgram(program *compiler.Program, sourceFile *ast.SourceFile, subject 
 	return &programView{program: program, sourceFile: sourceFile, ruleName: subject.Name, reads: subject.ProgramReads}
 }
 
-// ViewProgramForEach is ViewProgram for every rule on one file, in one allocation, which is what the
-// walk calls once per file.
-func ViewProgramForEach(program *compiler.Program, sourceFile *ast.SourceFile, rules []Rule) []Program {
-	views := make([]Program, len(rules))
+// ProgramViewSlot is one rule's view of the program, kept by a walk worker and pointed at each file it
+// dispatches in turn. The walk used to build every rule's view afresh for each file, 101 MB of views on a
+// cold ahra run (#9xfg09f); a slot per rule per worker is a few hundred kilobytes for the whole run.
+//
+// A view is good for its file and no longer. Release ends it, and from then on every read through it
+// panics, naming the rule. The slot alternates between two views, so a Program a rule kept from one file
+// is still the ended view while the next file runs, and reading it fails loudly rather than reading through
+// whatever file the slot was pointed at next. A view kept across two or more files is not caught. What it
+// would read is the same program under the same rule's declared reads, so only ResolveModule's "is this
+// another file" check could answer differently.
+type ProgramViewSlot struct {
+	views [2]programView
+	next  int
+}
+
+// Point aims the slot at sourceFile for subject and returns the view as the rule's Program. A nil program
+// is a nil Program, as ViewProgram's is.
+func (slot *ProgramViewSlot) Point(program *compiler.Program, sourceFile *ast.SourceFile, subject Rule) Program {
 	if program == nil {
-		return views
+		return nil
 	}
-	backing := make([]programView, len(rules))
-	for index, subject := range rules {
-		backing[index] = programView{program: program, sourceFile: sourceFile, ruleName: subject.Name, reads: subject.ProgramReads}
-		views[index] = &backing[index]
+	view := &slot.views[slot.next]
+	slot.next = 1 - slot.next
+	*view = programView{program: program, sourceFile: sourceFile, ruleName: subject.Name, reads: subject.ProgramReads}
+	return view
+}
+
+// Release ends the file the slot was last pointed at: every read through that view panics from now on.
+func (slot *ProgramViewSlot) Release() {
+	view := &slot.views[1-slot.next]
+	if view.program == nil {
+		return
 	}
-	return views
+	view.ended = true
+	view.program = nil
 }
 
 type programView struct {
@@ -147,10 +169,22 @@ type programView struct {
 	sourceFile *ast.SourceFile
 	ruleName   string
 	reads      ProgramRead
+
+	// ended is set once the file the view was given is over (ProgramViewSlot.Release).
+	ended bool
 }
 
-// require panics unless the rule declared read.
+// live panics if the view's file is over.
+func (view *programView) live(method string) {
+	if view.ended {
+		panic(fmt.Sprintf("rule %s called Program.%s after the file it was given ended; a Program is good for its file only, so keep what it answered rather than the Program",
+			view.ruleName, method))
+	}
+}
+
+// require panics unless the view is live and the rule declared read.
 func (view *programView) require(read ProgramRead, method string) {
+	view.live(method)
 	if view.reads&read == 0 {
 		panic(fmt.Sprintf("rule %s called Program.%s, which is %s, and declares ProgramReads %s; declare the read so the findings cache does not replay a stale verdict",
 			view.ruleName, method, programReadNames[read], view.reads))
@@ -228,5 +262,6 @@ func (view *programView) DesignSystemFS() *RecordingFS {
 }
 
 func (view *programView) Identity() ProgramIdentity {
+	view.live("Identity")
 	return ProgramIdentity{program: view.program}
 }
