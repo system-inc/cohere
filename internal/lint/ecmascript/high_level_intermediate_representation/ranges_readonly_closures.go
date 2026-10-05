@@ -21,6 +21,7 @@ func hasReadOnlyClosureEffectsForCaptures(function *Function, captures []Place, 
 		return false
 	}
 	effects := InferAliasingEffects(function)
+	calleeProducers := newCalleeProducers(function)
 	producers := map[IdentifierId]InstructionValue{}
 	for _, instruction := range function.Instructions {
 		if instruction != nil {
@@ -39,11 +40,11 @@ func hasReadOnlyClosureEffectsForCaptures(function *Function, captures []Place, 
 				return false
 			}
 		case *MethodCall:
-			if _, known := lookupSignature(function, instruction, calleeName(function, instruction, value.Property)); !known {
+			if _, known := lookupSignature(function, calleeProducers, instruction, calleeName(function, instruction, value.Property)); !known {
 				return false
 			}
 		case *CallExpression:
-			if _, known := lookupSignature(function, instruction, calleeName(function, instruction, value.Callee)); !known {
+			if _, known := lookupSignature(function, calleeProducers, instruction, calleeName(function, instruction, value.Callee)); !known {
 				if _, global := producers[value.Callee.Identifier].(*LoadGlobal); !global {
 					return false
 				}

@@ -107,3 +107,51 @@ return <div onClick={callback}/>;
 		})
 	}
 }
+
+// TestCalleeProducersAreBuiltOncePerFunction guards the quadratic this table replaced: every call
+// in a function asks whether its callee is a module hook, and each ask used to walk every
+// instruction to build its own table. Five calls, three of them hooks reached through an import,
+// a namespace and a local alias, must share one build.
+func TestCalleeProducersAreBuiltOncePerFunction(t *testing.T) {
+	t.Parallel()
+	calls := 0
+	var builds []int
+	probe := rule.Rule{Name: "callee-producers", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
+		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+			forEachFunctionLike(node, func(node *ast.Node) {
+				if node.Name() == nil || node.Name().Text() != "Component" {
+					return
+				}
+				function := Lower(node, ctx.TypeChecker)
+				Construct(function)
+				producers := newCalleeProducers(function)
+				inferAliasingEffects(function, producers)
+				for _, instruction := range function.Instructions {
+					switch instruction.Value.(type) {
+					case *CallExpression, *MethodCall:
+						calls++
+					}
+				}
+				builds = append(builds, producers.builds)
+			})
+		}}
+	}}
+	rule_testing.RunTypedFiles(t, probe, map[string]string{
+		"/hooks.ts": `export function useData(value) {return value;} export function getData(value) {return value;}`,
+		"/fixture.tsx": `import {useData, getData} from './hooks'; import * as Hooks from './hooks';
+function Component() {
+	const useAlias = useData;
+	const a = useData(1);
+	const b = Hooks.useData(2);
+	const c = useAlias(3);
+	const d = getData(a);
+	return Hooks.getData([b, c, d]);
+}`,
+	}, "/fixture.tsx")
+	if calls != 5 {
+		t.Fatalf("lowered %d calls, want five", calls)
+	}
+	if len(builds) != 1 || builds[0] != 1 {
+		t.Fatalf("built the producer table %v times for one function, want once", builds)
+	}
+}

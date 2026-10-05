@@ -248,8 +248,8 @@ func TestManualMemoMarkersFreezeTheirOperands(t *testing.T) {
 		}
 		freezeCount := 0
 		for _, effect := range append(
-			effectsForInstruction(function, start),
-			effectsForInstruction(function, finish)...,
+			effectsForInstruction(function, newCalleeProducers(function), start),
+			effectsForInstruction(function, newCalleeProducers(function), finish)...,
 		) {
 			if effect.Kind == AliasingEffectFreeze && effect.Into.Identifier == value.Identifier {
 				freezeCount++
@@ -415,7 +415,7 @@ func TestFreezeFollowsOnlySharedAssignIdentity(t *testing.T) {
 			effects := &AliasingEffects{byInstruction: map[InstructionId][]AliasingEffect{
 				sourceInstruction.Id: {create(source, EffectValueMutable)},
 				aliasInstruction.Id:  relationEffects,
-				freezeInstruction.Id: effectsForInstruction(function, freezeInstruction),
+				freezeInstruction.Id: effectsForInstruction(function, newCalleeProducers(function), freezeInstruction),
 				callInstruction.Id: {
 					create(callResult, EffectValueMutable),
 					mutate(AliasingEffectMutateTransitiveConditionally, alias),
