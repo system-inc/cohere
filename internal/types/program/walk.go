@@ -530,13 +530,13 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 				if recording && replayed == nil {
 					if entry, eligible := recordableEntry(sourceFile, keys,
-						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes, visited, silenced); eligible {
+						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes, nil, visited, silenced); eligible {
 						reuse.keep(entry)
 					}
 				}
 				if recording && replayed != nil {
 					if entry, eligible := refreshClasses(*replayed, keys, hits,
-						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes); eligible {
+						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes, nil); eligible {
 						reuse.keep(entry)
 					}
 				}

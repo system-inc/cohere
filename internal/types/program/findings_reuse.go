@@ -39,6 +39,18 @@ type FindingsReuse struct {
 	// NoteDesignSystem.
 	designReads  []rule.FileRead
 	designLoaded bool
+
+	// readiness is whether this run measures Adamic readiness. See MeasureReadiness.
+	readiness bool
+}
+
+// MeasureReadiness says this run measures Adamic readiness, so an entry recorded by a run that did not is a
+// miss: its file was never measured, and replaying it would read as measured and clean. Called before any
+// worker runs.
+func (r *FindingsReuse) MeasureReadiness() {
+	if r != nil {
+		r.readiness = true
+	}
 }
 
 // NewFindingsReuse prepares a run's reuse. A previous cache under a different key is dropped at
@@ -163,7 +175,7 @@ type cacheKeys struct {
 // names; a file none of them applies to has nothing to replay or run.
 func (r *FindingsReuse) lookup(path string, keys cacheKeys) (entry LintCacheEntry, hits classHits) {
 	entry, pureHit := r.previous.Lookup(path, keys.contentHash, r.key, keys.pure)
-	if !pureHit {
+	if !pureHit || r.readiness && entry.Adamic == nil {
 		return LintCacheEntry{}, classHits{}
 	}
 	r.replayed.Add(1)
@@ -233,6 +245,24 @@ func replayEntry(entry LintCacheEntry, hits classHits, sourceFile *ast.SourceFil
 	return notesOf(entry.Notes, replays)
 }
 
+// replayedAdamic is the part of an entry's readiness record that its replayed classes produced, nil when the
+// entry has none. The walk adds what the rules it ran measured.
+func replayedAdamic(entry LintCacheEntry, hits classHits) *AdamicRecord {
+	return adamicOf(entry.Adamic, ruleSet(entry.Rules, classIf(hits.typed, entry.TypedRules),
+		classIf(hits.shaped, entry.ShapedRules), classIf(hits.design, entry.DesignRules)))
+}
+
+// ruleSet is every name in the lists, as a set.
+func ruleSet(lists ...[]string) map[string]bool {
+	names := map[string]bool{}
+	for _, list := range lists {
+		for _, name := range list {
+			names[name] = true
+		}
+	}
+	return names
+}
+
 // classIf is names when the class is included, and nothing otherwise.
 func classIf(included bool, names []string) []string {
 	if included {
@@ -281,8 +311,11 @@ func mergeNotes(first RuleNotes, second RuleNotes) RuleNotes {
 // accounting spans every rule in the file, cached and walked alike, and when any cacheable rule's
 // finding carries a fix or a suggestion, since a cached finding stores neither and the fix phase needs
 // the edit itself.
+//
+// fileAdamic is what the walk measured for readiness, nil when it measured nothing; only the cacheable rules'
+// part is kept, since the rest run on every walk.
 func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics []rule.Diagnostic,
-	fileListening map[string]int, fileNotes RuleNotes, visited int, silenced suppressionTally) (LintCacheEntry, bool) {
+	fileListening map[string]int, fileNotes RuleNotes, fileAdamic *AdamicRecord, visited int, silenced suppressionTally) (LintCacheEntry, bool) {
 	if silenced.applied != 0 || silenced.unusedDirectives != 0 {
 		return LintCacheEntry{}, false
 	}
@@ -302,6 +335,7 @@ func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics
 		DesignRules:      keys.design,
 		VisitedNodes:     visited,
 		Notes:            notesOf(fileNotes, isCacheable),
+		Adamic:           adamicOf(fileAdamic, isCacheable),
 	}
 	for _, name := range cacheable {
 		if fileListening[name] > 0 {
@@ -332,8 +366,11 @@ func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics
 // suggestion.
 //
 // A design-system class that ran takes a zero fingerprint, settled to this run's design system in Recorded.
+//
+// The readiness record merges the same way, rule by rule, and is nil when this walk measured nothing: an entry
+// half measured is unmeasured.
 func refreshClasses(old LintCacheEntry, keys cacheKeys, hits classHits,
-	fileDiagnostics []rule.Diagnostic, fileListening map[string]int, fileNotes RuleNotes) (LintCacheEntry, bool) {
+	fileDiagnostics []rule.Diagnostic, fileListening map[string]int, fileNotes RuleNotes, fileAdamic *AdamicRecord) (LintCacheEntry, bool) {
 	ran := map[string]bool{}
 	for _, name := range append(append(append([]string{}, classIf(!hits.typed, keys.typed)...), classIf(!hits.shaped, keys.shaped)...),
 		classIf(!hits.design, keys.design)...) {
@@ -355,6 +392,7 @@ func refreshClasses(old LintCacheEntry, keys cacheKeys, hits classHits,
 		DesignRules:      keys.design,
 		VisitedNodes:     old.VisitedNodes,
 		Notes:            mergeNotes(notesOf(old.Notes, kept), notesOf(fileNotes, ran)),
+		Adamic:           mergeAdamic(adamicOf(old.Adamic, kept), adamicOf(fileAdamic, ran)),
 	}
 	if hits.design {
 		refreshed.DesignFingerprint = old.DesignFingerprint
