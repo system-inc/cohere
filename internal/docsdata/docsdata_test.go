@@ -49,9 +49,10 @@ func staleAgainstCommitted(t *testing.T, files map[string][]byte) []string {
 	return stale
 }
 
-// TestTheCommittedFilesAreCurrent: docs/data is what Build produces now, every file but cli.json, which
-// needs the binary built and is checked by the generator's -check.
-func TestTheCommittedFilesAreCurrent(t *testing.T) {
+// TestTheRenderedFilesAreCurrent: docs/data is what Build renders now from the committed examples, every
+// file but cli.json, which needs the binary built. It is -check-rendering's depth: the examples themselves
+// are recaptured only by the generator's -check, which takes minutes and runs in the release's module check.
+func TestTheRenderedFilesAreCurrent(t *testing.T) {
 	t.Parallel()
 	if stale := staleAgainstCommitted(t, built(t, sourceInputs(t))); len(stale) > 0 {
 		t.Errorf("stale: %v; run go run ./internal/docsdata/tools/generate", stale)

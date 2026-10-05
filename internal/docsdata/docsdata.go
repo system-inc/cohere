@@ -10,8 +10,10 @@
 //
 // The per-rule .md files beside the rules are internal working notes and are never read here.
 //
-// Run `go run ./internal/docsdata/tools/generate` from the module root after a change; `-check` exits 1
-// on any stale file, writing nothing. The website vendors docs/data/ at a pinned commit.
+// Run `go run ./internal/docsdata/tools/generate` from the module root after a change. `-check` recaptures
+// the examples from the lint tests and exits 1 on any stale file, writing nothing; `-check-rendering` is
+// the fast check of everything rendered from the committed examples. The website vendors docs/data/ at a
+// pinned commit.
 package docsdata
 
 import (
