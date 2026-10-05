@@ -35,23 +35,7 @@ const translationsConfig = `{
 func runOnTranslations(t *testing.T, files map[string]string, subjectRelativePath string) rule_testing.Result {
 	t.Helper()
 
-	directory := t.TempDir()
-	files["tsconfig.json"] = translationsConfig
-	for name, contents := range files {
-		full := filepath.Join(directory, name)
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatalf("creating %s: %v", filepath.Dir(full), err)
-		}
-		if err := os.WriteFile(full, []byte(contents), 0o644); err != nil {
-			t.Fatalf("writing %s: %v", full, err)
-		}
-	}
-
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		t.Fatalf("building the program: %v", err)
-	}
-
+	graph, directory := buildTranslations(t, files)
 	subjectPath := filepath.Join(directory, subjectRelativePath)
 	var subject *ast.SourceFile
 	for _, sourceFile := range graph.ProjectFiles() {
@@ -79,6 +63,30 @@ func runOnTranslations(t *testing.T, files map[string]string, subjectRelativePat
 		walkForTest(subject.AsNode(), listeners)
 	}
 	return rule_testing.Result{Diagnostics: diagnostics, SourceFile: subject}
+}
+
+// buildTranslations writes files to a directory of their own, beside translationsConfig, and builds a real
+// program over them, returning it and the directory.
+func buildTranslations(t *testing.T, files map[string]string) (*program.Graph, string) {
+	t.Helper()
+
+	directory := t.TempDir()
+	files["tsconfig.json"] = translationsConfig
+	for name, contents := range files {
+		full := filepath.Join(directory, name)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatalf("creating %s: %v", filepath.Dir(full), err)
+		}
+		if err := os.WriteFile(full, []byte(contents), 0o644); err != nil {
+			t.Fatalf("writing %s: %v", full, err)
+		}
+	}
+
+	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if err != nil {
+		t.Fatalf("building the program: %v", err)
+	}
+	return graph, directory
 }
 
 func walkForTest(node *ast.Node, listeners rule.Listeners) {

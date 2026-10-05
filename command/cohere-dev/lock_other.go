@@ -15,8 +15,3 @@ func tryLockFile(*os.File) (bool, error) {
 }
 
 func unlockFile(*os.File) {}
-
-// lockFileWaiting takes nothing where flock does not exist; the cache trim does not run there (filesLock).
-func lockFileWaiting(*os.File) error {
-	return nil
-}

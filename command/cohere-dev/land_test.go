@@ -31,7 +31,7 @@ func newLandFixture(t *testing.T) *landFixture {
 	bin := t.TempDir()
 	fixture.log = filepath.Join(bin, "gates")
 	stand := "#!/bin/sh\n[ \"$1\" = vet ] && exit 0\n" +
-		"echo \"start $(basename \"$PWD\") $(ls | tr '\\n' ' ')\" >> '" + fixture.log + "'\nsleep 1\n" +
+		"echo \"start $(basename \"$PWD\") $(ls | tr '\\n' ' ')flags=$GOFLAGS\" >> '" + fixture.log + "'\nsleep 1\n" +
 		"echo \"end $(basename \"$PWD\")\" >> '" + fixture.log + "'\n"
 	if err := os.WriteFile(filepath.Join(bin, "go"), []byte(stand), 0o755); err != nil {
 		t.Fatal(err)
@@ -233,5 +233,20 @@ func TestLandChecksASymlinkedSubmoduleAgainstItsPin(t *testing.T) {
 	}
 	if files := fixture.git(fixture.repository, "ls-files"); !strings.Contains(files, "a.txt") {
 		t.Errorf("main holds %q after the landing", files)
+	}
+}
+
+// The gate runs the same for every landing, whatever the caller's shell sets: GOFLAGS carries only the pool's
+// -p. A caller's -trimpath once failed a land gate on tests that find their fixtures by their source path.
+func TestTheLandGateIgnoresTheCallersGoFlags(t *testing.T) {
+	t.Parallel()
+	fixture := newLandFixture(t)
+	fixture.environment = append(fixture.environment, "GOFLAGS=-trimpath -buildvcs=false -tags=extra")
+	if err := fixture.land("a").Wait(); err != nil {
+		t.Fatalf("the landing failed: %v", err)
+	}
+	gates := fixture.gates()
+	if len(gates) != 2 || !strings.HasSuffix(gates[0], "flags=-p=2") {
+		t.Errorf("the gate ran with %q, want GOFLAGS of the pool's -p alone", gates)
 	}
 }

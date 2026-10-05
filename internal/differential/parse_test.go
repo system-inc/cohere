@@ -18,12 +18,14 @@ package differential
 
 import "testing"
 
+// Not a machine path: the tree root the copied output names, trimmed from it as text; no file is read.
 const ahraTreeRoot = "/Users/kirkouimet/Projects/ahra"
 
 // TestParsesRealVerifyOutput uses cohere's own stdout, coverage lines and all, so the summary
 // lines have to be recognized as summaries rather than counted as unparsed findings.
 func TestParsesRealVerifyOutput(test *testing.T) {
 	test.Parallel()
+	// Not a machine path: cohere's output copied verbatim, whose tree root the parser trims.
 	output := `graph built in 1.752s — 9973 files in the program, 3407 of them ours
 /Users/kirkouimet/Projects/ahra/modules/mcp/McpApi.ts:240:16 - Identifier "params" should not be abbreviated. Use "parameters" or a more descriptive name. [consistency-no-abbreviated-identifier/noParams]
 lint: 1 findings — 22 rules over 3407 files, 2098253 nodes visited, in 1.036s
@@ -88,6 +90,7 @@ libraries/structure/source/components/files/FileCarousel.tsx:36:8: error structu
 // like, and it looks like working output.
 func TestTheTwoGatesAgreeOnOneFindingAfterParsing(test *testing.T) {
 	test.Parallel()
+	// Not a machine path: cohere's output copied verbatim, whose tree root the parser trims.
 	cohereResult, err := ParseCohere(
 		`/Users/kirkouimet/Projects/ahra/app/Component.tsx:198:1 - File contains a component with 96 lines. [react-component-no-multiple-primary/tooMany]`,
 		ahraTreeRoot,
