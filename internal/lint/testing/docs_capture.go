@@ -30,6 +30,19 @@ func newCapturedRun(subject rule.Rule, fileName string, otherFiles int, options 
 	return &capturedRun{rule: subject.Name, file: fileName, otherFiles: otherFiles, options: options}
 }
 
+// RecordAssertedCase records a case a test has just asserted by its own comparison rather than through
+// an Expect helper: a replayed upstream corpus that checks each finding's span, text and message, which
+// ExpectFindings cannot express. Call it only after that comparison passed. Without it the docs capture
+// never sees the case, and rules.json never learns a message id only such a corpus asserts.
+func RecordAssertedCase(t *testing.T, result Result) {
+	t.Helper()
+	outcome := capture.OutcomeFindings
+	if len(result.Diagnostics) == 0 {
+		outcome = capture.OutcomeClean
+	}
+	recordCase(t, result, outcome, "")
+}
+
 // recordCase writes the case an assertion just passed on. Called at the end of each Expect, after every
 // check, so only an asserted outcome is ever recorded.
 func recordCase(t *testing.T, result Result, outcome string, fixedSource string) {

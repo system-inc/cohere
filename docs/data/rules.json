@@ -2247,7 +2247,8 @@
                 "elements": "one"
             },
             "messageIds": [
-                "redeclared"
+                "redeclared",
+                "redeclaredAsBuiltin"
             ],
             "sets": [
                 {
@@ -3208,9 +3209,10 @@
             },
             "messageIds": [
                 "noUnusedVars",
+                "usedIgnoredVar",
                 "usedOnlyAsType"
             ],
-            "fixKind": "fix",
+            "fixKind": "both",
             "sets": [
                 {
                     "set": "cohere:next",

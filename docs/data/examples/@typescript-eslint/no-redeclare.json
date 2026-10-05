@@ -19,6 +19,7 @@
         "source": "var a = 1; var a = 2;"
     },
     "assertedMessageIds": [
-        "redeclared"
+        "redeclared",
+        "redeclaredAsBuiltin"
     ]
 }

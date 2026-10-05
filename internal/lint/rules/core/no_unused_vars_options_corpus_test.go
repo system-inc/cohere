@@ -90,11 +90,13 @@ func TestNoUnusedVarsOptionsUpstreamCorpus(t *testing.T) {
 					t.Fatalf("row %d is a recorded divergence (%s) where cohere reports %q, and it now reports %q",
 						row.index, divergence.reason, divergence.cohere, reported)
 				}
+				rule_testing.RecordAssertedCase(t, result)
 				return
 			}
 			if fmt.Sprint(reported) != fmt.Sprint(row.findings) {
 				t.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
 			}
+			rule_testing.RecordAssertedCase(t, result)
 		})
 	}
 }
