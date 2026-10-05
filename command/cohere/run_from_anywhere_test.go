@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -43,17 +44,36 @@ func fixtureProject(t *testing.T) string {
 	return root
 }
 
-// buildCohere builds this command once for the calling test. A build failure is fatal rather than a
-// skip: a skipped binary test reads exactly like a passing one, which is the failure this suite is
-// about.
+// sharedBinary is this command, built once for the whole package run and removed by TestMain. Every
+// test that runs the binary runs this one: about 39 builds of the same source used to cost most of
+// the package's wall time (#nxgt2ca). A test that needs a binary of its own, stamped or installed
+// somewhere particular, builds it itself.
+var sharedBinary struct {
+	once      sync.Once
+	directory string
+	path      string
+	output    []byte
+	err       error
+}
+
+// buildCohere returns this command's binary, built on the first call. A build failure is fatal rather
+// than a skip: a skipped binary test reads exactly like a passing one, which is the failure this suite
+// is about.
 func buildCohere(t *testing.T) string {
 	t.Helper()
-	binary := filepath.Join(t.TempDir(), "cohere")
-	build := exec.Command("go", "build", "-o", binary, ".")
-	if output, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("cannot build cohere: %v\n%s", err, output)
+	sharedBinary.once.Do(func() {
+		sharedBinary.directory, sharedBinary.err = os.MkdirTemp("", "cohere-test-binary-")
+		if sharedBinary.err != nil {
+			return
+		}
+		sharedBinary.path = filepath.Join(sharedBinary.directory, "cohere")
+		build := exec.Command("go", "build", "-o", sharedBinary.path, ".")
+		sharedBinary.output, sharedBinary.err = build.CombinedOutput()
+	})
+	if sharedBinary.err != nil {
+		t.Fatalf("cannot build cohere: %v\n%s", sharedBinary.err, sharedBinary.output)
 	}
-	return binary
+	return sharedBinary.path
 }
 
 // runCohere runs the binary from a directory and returns its combined output and exit code.
@@ -79,6 +99,7 @@ func runCohere(t *testing.T, binary string, directory string, arguments ...strin
 // of a helper. The helpers have their own fixtures; these are the composition, which is where the
 // lint config's path, the type phase's write, and the empty change set each went wrong before.
 func TestCohereRunsFromAnywhere(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 
 	// From two directories down, with a path typed relative to there. Before discovery this failed
@@ -182,6 +203,7 @@ func TestCohereRunsFromAnywhere(t *testing.T) {
 // enough to see it: the scoped one carries a debugger statement for the fixer to remove, and the two
 // unrelated ones must not appear in either phase's count.
 func TestAScopedRunKeepsItsScopeAfterAFixRewritesAFile(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{

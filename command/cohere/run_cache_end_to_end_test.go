@@ -34,6 +34,9 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	stopWatching()
 	os.RemoveAll(home)
+	if sharedBinary.directory != "" {
+		os.RemoveAll(sharedBinary.directory)
+	}
 	os.Exit(code)
 }
 
@@ -47,6 +50,7 @@ func TestMain(m *testing.M) {
 // Each scenario has been shown failing against a binary broken in the way it guards: the scope fact
 // ignored, the input recorder off, the fix-run decline removed, the invocation lines never tagged.
 func TestRunCacheEndToEnd(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	home := t.TempDir()
 	root := t.TempDir()

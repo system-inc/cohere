@@ -11,6 +11,7 @@ import (
 // without the setting does not, which is what makes the first half mean something. A key the block does
 // not know, and the block in a file another extends, are refused by name.
 func TestTheOutputSettingIsHonored(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	run := func(settings map[string]string) (string, int) {
 		t.Helper()

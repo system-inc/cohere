@@ -83,6 +83,7 @@ func assertWroteOnlyNamed(t *testing.T, root string, before map[string]string, w
 }
 
 func TestAFixRunWritesOnlyWhatWasNamed(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 
 	// Within the closure limit: the consumer is checked because it imports the named file, and it
@@ -162,6 +163,7 @@ func TestAFixRunWritesOnlyWhatWasNamed(t *testing.T) {
 // boundary. Both shapes a nested repository takes are covered: a clone, whose `.git` is a directory,
 // and a submodule, whose `.git` is a gitlink file.
 func TestAFixRunDoesNotWriteIntoANestedRepository(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	nestedViolation := "export function inside(): number {\n    debugger;\n    return 4;\n}\n"
 

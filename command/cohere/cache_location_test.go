@@ -20,6 +20,7 @@ import (
 // the tsconfig's build info byte for byte and second for second as they were, reports the same findings
 // as a cached run, and says it ran cold.
 func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	home := t.TempDir()
 	project := func(gitignore string) string {

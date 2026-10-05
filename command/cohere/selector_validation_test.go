@@ -17,11 +17,7 @@ import (
 func TestPipelineRefusesAZeroMatchOverrideSelector(t *testing.T) {
 	t.Parallel()
 
-	binary := filepath.Join(t.TempDir(), "cohere")
-	build := exec.Command("go", "build", "-o", binary, ".")
-	if output, err := build.CombinedOutput(); err != nil {
-		t.Skipf("cannot build: %v\n%s", err, output)
-	}
+	binary := buildCohere(t)
 
 	directory := t.TempDir()
 	writeSelectorValidationProject(t, directory, "missing/**")

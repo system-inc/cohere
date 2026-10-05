@@ -63,6 +63,7 @@ func assertTreeUnchanged(t *testing.T, root string, before map[string]string, ou
 // then rewrites, and after that rewrite the check is silent, so the two cannot disagree in either
 // direction.
 func TestNoFixReportsWhatFixAndFormatWouldChange(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{

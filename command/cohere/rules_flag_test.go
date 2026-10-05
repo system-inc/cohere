@@ -15,11 +15,7 @@ import (
 func TestRulesFlagListsEveryRegisteredRule(t *testing.T) {
 	t.Parallel()
 
-	binary := t.TempDir() + "/cohere"
-	build := exec.Command("go", "build", "-o", binary, ".")
-	if output, err := build.CombinedOutput(); err != nil {
-		t.Skipf("cannot build: %v\n%s", err, output)
-	}
+	binary := buildCohere(t)
 
 	output, err := exec.Command(binary, "-rules").Output()
 	if err != nil {
@@ -59,11 +55,7 @@ func TestRulesFlagListsEveryRegisteredRule(t *testing.T) {
 func TestRulesFlagDisclosesADevelopmentBuildBesideTheList(t *testing.T) {
 	t.Parallel()
 
-	binary := t.TempDir() + "/cohere"
-	build := exec.Command("go", "build", "-o", binary, ".")
-	if output, err := build.CombinedOutput(); err != nil {
-		t.Skipf("cannot build: %v\n%s", err, output)
-	}
+	binary := buildCohere(t)
 
 	command := exec.Command(binary, "-rules")
 	var standardError strings.Builder

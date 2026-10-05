@@ -21,6 +21,7 @@ import (
 // The report that prompted this was a lint-only run, which reads no cache, catching BaseWorker.ts between
 // two writes of one edit. It was the truth about that tree, reproduced cold. This holds the line it raised.
 func TestANestedRepositoryEditReachesItsImportersWarm(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	root := t.TempDir()
 	write := func(name string, contents string) {

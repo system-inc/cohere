@@ -10,6 +10,7 @@ import (
 // the early check when nothing was rewritten, and from a check of the rebuilt graph when the fixer rewrote
 // a file, whose early result described bytes that are gone (#zqsdzbq).
 func TestATypeErrorFoundAlongsideTheWalkIsReportedOnce(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	for _, arguments := range [][]string{{"--no-fix"}, {"--no-fix", "--no-cache"}, {}} {
 		name := strings.Join(arguments, " ")

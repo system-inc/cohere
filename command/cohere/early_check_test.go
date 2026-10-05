@@ -74,6 +74,7 @@ func TestAFixThatRewritesAFileDuringTheEarlyCheckDoesNotCrashTheRun(t *testing.T
 // `--no-fix` run with an explanation after it: the fixable file's bytes stay put, the fix phase says what it
 // would rewrite, and naming `--fix` beside it is refused.
 func TestExplainWritesNothing(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	root := t.TempDir()
 	write := func(name string, contents string) {

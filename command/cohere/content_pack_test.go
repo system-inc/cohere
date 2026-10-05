@@ -18,6 +18,7 @@ import (
 // the only thing between the disk and the compiler here. The rule is type-aware, so the declaration's
 // bytes decide the finding.
 func TestTheContentPackServesAReplacedDeclarationFresh(t *testing.T) {
+	t.Parallel()
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
 		t.Skip("the content pack serves nothing on this platform")
 	}

@@ -315,6 +315,7 @@ func TestTheNestedLineSaysWhatItRead(t *testing.T) {
 // inside the library formats and fixes the library and writes nothing in the project above it; and the
 // project's check is then clean of it.
 func TestALibraryIsFormattedFromItsOwnRootAndReadFromItsProject(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{

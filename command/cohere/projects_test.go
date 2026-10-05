@@ -46,6 +46,7 @@ func runWithEngine(t *testing.T, binary string, engine string, directory string,
 // engine, one line per project, and one summary. The run is green only when both are, a Swift finding
 // turns it red, and its exit code is the one the failing project's own run gives.
 func TestAMixedRepositoryIsCheckedWholeAndTheWorstExitWins(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	clean := fakeSwiftEngine(t, "cat "+filepath.Join(contractDirectory(t), "Clean.jsonl"))
 	findings := fakeSwiftEngine(t, "cat "+filepath.Join(contractDirectory(t), "Findings.jsonl")+"\nexit 1")
@@ -83,6 +84,7 @@ func TestAMixedRepositoryIsCheckedWholeAndTheWorstExitWins(t *testing.T) {
 // Both markers in one directory are two projects, each checked by its own engine; and projects nested two
 // levels down are found from the root.
 func TestBothMarkersInOneDirectoryAndProjectsNestedDeepAreEachChecked(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	clean := fakeSwiftEngine(t, "cat "+filepath.Join(contractDirectory(t), "Clean.jsonl"))
 
@@ -108,6 +110,7 @@ func TestBothMarkersInOneDirectoryAndProjectsNestedDeepAreEachChecked(t *testing
 // A project whose run fails without a verdict, here an engine that dies before reporting, fails the run
 // from the root; and a root holding no project at all fails loudly rather than passing over nothing.
 func TestACrashedProjectOrNoProjectFailsTheRun(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	crashed := fakeSwiftEngine(t, "exit 2")
 	root := mixedRepository(t, "apple/Toy")

@@ -299,6 +299,7 @@ func TestDeclaredSubmodulesReadsTheGitmodulesPaths(t *testing.T) {
 // lint-only cohere commit from reformatting the tree, and the one that must not keep a record across a
 // printer change.
 func TestTheRecordFollowsTheFormatterNotTheBinary(t *testing.T) {
+	t.Parallel()
 	// Every build compiles one snapshot of the source, taken once, so the three binaries differ only in
 	// the two stamps the test sets. Built from the shared working tree, they could carry different trees
 	// whenever another node edited it between builds, and the second build then discarded the record:

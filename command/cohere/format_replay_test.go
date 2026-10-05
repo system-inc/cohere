@@ -18,6 +18,7 @@ import (
 // old clean verdict over each, so each is checked to report its file, and each is undone and replayed
 // again so the next change starts from a replaying tree.
 func TestANoFixFormatRunReplaysUntilWhatItsWalkReadMoves(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	home := t.TempDir()
 	root := t.TempDir()
@@ -103,6 +104,7 @@ func TestANoFixFormatRunReplaysUntilWhatItsWalkReadMoves(t *testing.T) {
 // .git/info, which the walk never lists. A replay keyed only on directories would print the old verdict over
 // either edit, so each is made from a replaying tree, must not replay, and must report what the edit changed.
 func TestAnIgnoreFileTheWalkReadBreaksTheFormatReplay(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	home := t.TempDir()
 	root := t.TempDir()

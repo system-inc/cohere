@@ -14,6 +14,7 @@ import (
 // formatting would change one in the repository or in a nested repository it reads, or when the formatter
 // could not read one there.
 func TestTheFormatOnlyGateExitsOnFormattingAlone(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	root := t.TempDir()
 	debugged := "export function value(): number {\n  debugger;\n  return 1;\n}\n"
@@ -143,6 +144,7 @@ func removeForTest(t *testing.T, fileName string) {
 // whole run fails building the graph, and a format-only run must not notice: it checks, formats and says
 // it built no graph.
 func TestFormatOnlyBuildsNoGraph(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{

@@ -10,6 +10,7 @@ import (
 // type check lint fix format all in one call"): a bare cohere formats, --fix formats, --no-fix reports
 // formatting and exits on it, and --no-format leaves it out of all three.
 func TestABareRunFormats(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	unformatted := "export const ugly   =   1;\n"
 	formatted := "export const ugly = 1;\n"

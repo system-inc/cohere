@@ -16,6 +16,7 @@ import (
 // note, so the table here is overwritten rather than written by an older build. Both halves are held: the
 // default run read the table and rewrote it, so the note had something to say, and --verbose says it.
 func TestADefaultRunPrintsNoNotes(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{

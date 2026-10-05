@@ -39,6 +39,7 @@ func runCohereWithStdin(t *testing.T, binary string, directory string, stdin str
 // the fix's offsets would land in the wrong text. The markdown buffer has no program behind it, which
 // is the format-only path, and the one the gate itself used to bail on.
 func TestStdinAnswersWhatTheGateWrites(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 
 	for _, testCase := range []struct {
@@ -92,6 +93,7 @@ func TestStdinAnswersWhatTheGateWrites(t *testing.T) {
 // back as typed, and a file type nothing formats comes back as typed. A save is not where a typo is
 // reported, and a file cohere does not handle saves untouched.
 func TestStdinDeclinesWithoutAComplaint(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	root := t.TempDir()
 	fixScopeProject(t, root, map[string]string{"Data.txt": "plain\n"})
@@ -110,6 +112,7 @@ func TestStdinDeclinesWithoutAComplaint(t *testing.T) {
 
 // TestStdinNeedsFix: the mode answers what --fix writes, so without --fix there is no question.
 func TestStdinNeedsFix(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	root := t.TempDir()
 	fixScopeProject(t, root, nil)

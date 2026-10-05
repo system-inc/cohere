@@ -23,6 +23,7 @@ import (
 // an unedited one is not, a file edited and put back is unchanged, a deleted file drops out, a new
 // untracked one is seen, a declared submodule is walked, and a clone nobody declared is left alone.
 func TestCohereRunsNoGit(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 
 	fakeGit := t.TempDir()

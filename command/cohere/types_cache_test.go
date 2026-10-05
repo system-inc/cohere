@@ -18,6 +18,7 @@ import (
 // replayable, and an export edit leaves only the five. Enough of them that re-checking a.ts and b.ts is
 // under half the project, where the full check would take over.
 func TestTypeDiagnosticsReplayOnlyWhatAnEditCannotReach(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	root := t.TempDir()
 	write := func(name string, contents string) {
@@ -87,6 +88,7 @@ func TestTypeDiagnosticsReplayOnlyWhatAnEditCannotReach(t *testing.T) {
 // section too, and after an edit it still reports what a cold run of the same scope does (#hfv0ae3). Before,
 // such a run read and rewrote the incremental build info whatever its scope.
 func TestTypeDiagnosticsReplayOnAScopedRun(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	root := t.TempDir()
 	write := func(name string, contents string) {
@@ -153,6 +155,7 @@ func TestTypeDiagnosticsReplayOnAScopedRun(t *testing.T) {
 // fingerprint sees an option. So turning on strict, with no source file touched, must not replay the
 // diagnostics a lax run recorded: the implicit any it now reports would be replayed as clean (#hfv0ae3).
 func TestTypeDiagnosticsDoNotReplayAcrossCompilerOptions(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	root := t.TempDir()
 	write := func(name string, contents string) {
@@ -201,6 +204,7 @@ func TestTypeDiagnosticsDoNotReplayAcrossCompilerOptions(t *testing.T) {
 // changed. Here one file of seven gains a debugger statement the fixer removes: the run after the rewrite
 // replays the other files' types and findings, and reports exactly what a run with no cache reports.
 func TestARunWhoseFixRewritesAFileStillReplays(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	root := t.TempDir()
 	write := func(name string, contents string) {

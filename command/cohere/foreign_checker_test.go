@@ -17,6 +17,7 @@ import (
 // A fixture with type-aware findings and one with a type error always run. COHERE_FOREIGN_TREES, a list of
 // project roots separated by the platform's list separator, runs the same comparison on real trees.
 func TestEveryFileWalkedOnAForeignCheckerFindsTheSame(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	fixture := func(files map[string]string) string {
 		root := t.TempDir()

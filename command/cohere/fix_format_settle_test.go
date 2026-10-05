@@ -15,6 +15,7 @@ import (
 // One writing run must leave nothing for the check: the fix the printed text triggers lands in the
 // same run, and the fixed text is formatted again.
 func TestOneFixFormatRunSettlesAPrintedArrow(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{
@@ -48,6 +49,7 @@ func TestOneFixFormatRunSettlesAPrintedArrow(t *testing.T) {
 // statement and wrote the result unformatted. A rule switched on after a file was recorded is the same
 // case in one repository.
 func TestAFixToARecordedFileIsFormatted(t *testing.T) {
+	t.Parallel()
 	binary := buildCohere(t)
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{
