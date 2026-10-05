@@ -455,6 +455,29 @@ func TestSwiftEngineArguments(t *testing.T) {
 	}
 }
 
+// --format-only against a Swift package is refused by name, never dropped: dropped, it made a format gate
+// type-check and lint the whole package (#nqb3mjv). Typed as false it asks for nothing and passes.
+func TestSwiftEngineArgumentsRefuseFormatOnly(t *testing.T) {
+	t.Parallel()
+	location := projectLocation{Root: "/work/macos", Engine: engineSwift, ArgumentBase: "/work/macos"}
+	formatOnly := "true"
+	value := func(name string) string {
+		if name == "format-only" {
+			return formatOnly
+		}
+		return "true"
+	}
+	given := map[string]bool{"no-fix": true, "format-only": true}
+	if _, _, err := swiftEngineArguments(location, given, value, nil); err == nil ||
+		!strings.Contains(err.Error(), "--format-only is not implemented for Swift yet") || !strings.Contains(err.Error(), "nothing was checked") {
+		t.Errorf("--format-only was not refused by name: %v", err)
+	}
+	formatOnly = "false"
+	if arguments, _, err := swiftEngineArguments(location, given, value, nil); err != nil || strings.Join(arguments, " ") != "--contract 3 --root /work/macos --no-fix" {
+		t.Errorf("--format-only=false was refused or changed the run: %q (%v)", strings.Join(arguments, " "), err)
+	}
+}
+
 // TestSwiftRunListsTheFilesItRewrote: a fix record with its list fills the run summary the footer counts as
 // cohered, each path relative to the package, with the fixes by rule. A record from an engine before the list
 // has none, and the summary is left unlisted, never set to no files, so the footer prints no cohered count.

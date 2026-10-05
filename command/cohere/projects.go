@@ -159,7 +159,17 @@ type projectRun struct {
 	exitCode int
 	err      error
 	elapsed  time.Duration
+	// notChecked, when set, is why the project was not run at all: a gap the report names, never a pass.
+	notChecked string
 }
+
+// swiftFormatOnlyGap is why a Swift project is not run under --format-only. The engine has no format-only
+// mode, so a run would type-check and lint the package as well: a format gate on cohere's own checkout
+// spent 2m38s compiling swift/ and its tests, and at the house's load ran past the caller's patience
+// (#nqb3mjv). Skipped and named until the engine's mode lands, rather than refused, which would turn
+// every landing's format gate red over a gap that can be named.
+const swiftFormatOnlyGap = "not format-checked: the Swift engine has no format-only mode yet, and running it would " +
+	"type-check and lint the package as well (#nqb3mjv)"
 
 // runProjects checks every discovered project, each in its own run of this binary, all at once, and
 // reports them as one: a section per project in the order discovery found them, then one summary line.
@@ -190,7 +200,12 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 	runs := make([]projectRun, len(found.Projects))
 	var group sync.WaitGroup
 	running := make(chan struct{}, projectRunsAtOnce())
+	formatOnly := flagValue("format-only") == "true"
 	for index, project := range found.Projects {
+		if formatOnly && project.Engine == engineSwift {
+			runs[index] = projectRun{project: project, notChecked: swiftFormatOnlyGap}
+			continue
+		}
 		label := projectLabel(project)
 		yieldFile, err := writeProjectYield(found.Ownership.Yields[label], yieldDirectory)
 		if err != nil {
@@ -217,6 +232,15 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 	worst := 0
 	for _, checked := range runs {
 		fmt.Fprintf(account, "%s\n", sectionHeading(checked.project))
+		if checked.notChecked != "" {
+			fmt.Fprintf(account, "%s\n\n", checked.notChecked)
+			// Under --json the overall footer, which names every gap, is not printed, so the gap goes where a
+			// person running the program still sees it.
+			if activeOutput.Mode == outputJSON {
+				fmt.Fprintf(os.Stderr, "cohere: %s %s\n", projectLabel(checked.project), checked.notChecked)
+			}
+			continue
+		}
 		out.Write(checked.output)
 		if len(checked.output) > 0 && checked.output[len(checked.output)-1] != '\n' {
 			fmt.Fprintln(out)
@@ -232,6 +256,10 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 
 	fmt.Fprintf(account, "projects under %s:\n", found.Root)
 	for _, checked := range runs {
+		if checked.notChecked != "" {
+			fmt.Fprintf(account, "  %s (%s): %s\n", projectLabel(checked.project), checked.project.Engine, checked.notChecked)
+			continue
+		}
 		verdict := "green"
 		if checked.exitCode != 0 {
 			verdict = fmt.Sprintf("failed, exit %d", checked.exitCode)
@@ -255,6 +283,10 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 func overallFactsOf(runs []projectRun, total time.Duration) overallFacts {
 	facts := overallFacts{Total: total, ProjectsByEngine: map[string]int{}}
 	for _, checked := range runs {
+		if checked.notChecked != "" {
+			facts.NotChecked = append(facts.NotChecked, projectLabel(checked.project)+" "+checked.notChecked)
+			continue
+		}
 		facts.ProjectsByEngine[string(checked.project.Engine)]++
 		switch {
 		case checked.err != nil:
@@ -342,7 +374,14 @@ func sectionHeading(project discoveredProject) string {
 func summaryLine(found discovery, runs []projectRun) string {
 	counts := map[projectEngine]int{}
 	failed := 0
+	checkedCount := 0
+	notChecked := 0
 	for _, checked := range runs {
+		if checked.notChecked != "" {
+			notChecked++
+			continue
+		}
+		checkedCount++
 		counts[checked.project.Engine]++
 		if checked.exitCode != 0 {
 			failed++
@@ -363,8 +402,11 @@ func summaryLine(found discovery, runs []projectRun) string {
 		notRun = fmt.Sprintf("; not run: %d solution tsconfigs, %d whose every file a nearer tsconfig owns",
 			len(found.Ownership.Solutions), len(found.Ownership.Yielding))
 	}
+	if notChecked > 0 {
+		notRun += fmt.Sprintf("; not checked: %d, each named above", notChecked)
+	}
 	return fmt.Sprintf("projects: %d checked (%s), %s%s; not searched for projects: %d directories .gitignore ignores, "+
 		"%d dependency, build, cache or fixture directories, %d nested repositories",
-		len(runs), strings.Join(engines, ", "), verdict, notRun, found.Ignored, found.NeverDescended,
+		checkedCount, strings.Join(engines, ", "), verdict, notRun, found.Ignored, found.NeverDescended,
 		len(found.NestedRepositories)+found.Submodules)
 }

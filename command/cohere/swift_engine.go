@@ -26,6 +26,13 @@ var swiftPassThroughSwitches = []string{
 	"rules", "rules-enabled", "version", "unused", "unused-all", "unused-deep", "timing",
 }
 
+// swiftFormatOnlyRefusal is why --format-only is refused against a Swift package. It used to be dropped,
+// and a format gate then type-checked and linted the whole package, minutes of compiling under a verdict
+// that said formatting (#nqb3mjv). A mixed-repository run skips the package and names the gap instead
+// (see swiftFormatOnlyGap).
+const swiftFormatOnlyRefusal = "--format-only is not implemented for Swift yet: the engine has no format-only mode, " +
+	"and running it would type-check and lint the package as well (#nqb3mjv), so nothing was checked"
+
 // runSwiftEngine checks a Swift package by running cohere-swift on it and rendering its records.
 //
 // A released cohere runs the engine its package ships beside it. A development cohere resolves one the
@@ -181,6 +188,9 @@ func swiftEngineArguments(
 			// path and the engine's sentence would name the path rather than the flag.
 			return nil, "", fmt.Errorf("--%s is not implemented for Swift yet, so nothing was checked", refused)
 		}
+	}
+	if given["format-only"] && value("format-only") == "true" {
+		return nil, "", errors.New(swiftFormatOnlyRefusal)
 	}
 
 	arguments := []string{"--contract", fmt.Sprint(swiftContractVersion), "--root", location.Root}

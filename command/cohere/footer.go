@@ -208,6 +208,9 @@ type overallFacts struct {
 	Failed []string
 	// Unfinished is the projects whose run did not finish, which checked nothing anyone can rely on.
 	Unfinished int
+	// NotChecked is each project deliberately not run, as its label and why. A gap named on the line, never
+	// a pass and not a failure: the caller asked for something that project's engine cannot yet do alone.
+	NotChecked []string
 }
 
 // overallFooter renders the verdict line for a repository with several projects:
@@ -242,6 +245,9 @@ func overallFooter(facts overallFacts, style textStyle) string {
 	}
 	if facts.Unfinished > 0 {
 		line += " • ⚠ " + counted(facts.Unfinished, "project did not finish", "projects did not finish")
+	}
+	for _, gap := range facts.NotChecked {
+		line += " • ⚠ " + gap
 	}
 	return line
 }

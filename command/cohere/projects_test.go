@@ -126,6 +126,40 @@ func TestACrashedProjectOrNoProjectFailsTheRun(t *testing.T) {
 	}
 }
 
+// Under --format-only a Swift package is not run, since the engine has no format-only mode and would
+// type-check and lint it as well (#nqb3mjv): the engine never starts, and the final line names the gap
+// rather than passing over it. The same flag against the package alone is refused by name.
+func TestFormatOnlySkipsASwiftPackageAndNamesTheGap(t *testing.T) {
+	t.Parallel()
+	binary := buildCohere(t)
+	started := filepath.Join(t.TempDir(), "started")
+	engine := fakeSwiftEngine(t, "touch '"+started+"'\nexit 3")
+	root := newRepository(t, nil)
+	writeTree(t, filepath.Join(root, "apple", "Toy"), map[string]string{"Package.swift": discoveryPackage, "Sources/Toy/Toy.swift": "let toy = 1\n"})
+
+	command := exec.Command(binary, "--no-fix", "--format-only")
+	command.Dir = root
+	command.Env = append(os.Environ(), "COHERE_SWIFT_ENGINE="+engine, "COHERE_VERDICT_FD=")
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("a format-only run over a Swift package failed: %v\n%s", err, output)
+	}
+	if !strings.Contains(string(output), "⚠ apple/Toy not format-checked: the Swift engine has no format-only mode yet") {
+		t.Errorf("the final line does not name the Swift package it did not check:\n%s", output)
+	}
+	if _, err := os.Stat(started); err == nil {
+		t.Errorf("the Swift engine ran under --format-only")
+	}
+
+	output2, exitCode := runWithEngine(t, binary, engine, root, "--no-fix", "--format-only", "--directory", filepath.Join(root, "apple", "Toy"))
+	if exitCode == 0 || !strings.Contains(output2, "--format-only is not implemented for Swift yet") {
+		t.Errorf("--format-only against the package alone was not refused by name (exit %d):\n%s", exitCode, output2)
+	}
+	if _, err := os.Stat(started); err == nil {
+		t.Errorf("the Swift engine ran under a refused --format-only")
+	}
+}
+
 // contractDirectory is where the Swift contract's fixtures are.
 func contractDirectory(t *testing.T) string {
 	t.Helper()
