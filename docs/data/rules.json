@@ -583,12 +583,12 @@
                 "elements": "one"
             },
             "messageIds": [
-                "banTsComment",
-                "banTsCommentDescriptionFormat",
-                "banTsCommentPreferExpectError",
-                "banTsCommentRequiresDescription"
+                "tsDirectiveComment",
+                "tsDirectiveCommentDescriptionNotMatchPattern",
+                "tsDirectiveCommentRequiresDescription",
+                "tsIgnoreInsteadOfExpectError"
             ],
-            "fixKind": "fix",
+            "fixKind": "suggestion",
             "sets": [
                 {
                     "set": "cohere:adamic",
