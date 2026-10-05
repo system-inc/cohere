@@ -18,6 +18,7 @@ import (
 // file's rules. Two rules noting the same key in the same file stay apart, and a file nothing noted in
 // does not appear.
 func TestNotesAreCountedPerFilePerRulePerKey(t *testing.T) {
+	t.Parallel()
 	notingEachDeclaration := func(name string, key func(declaration *ast.Node) string) rule.Rule {
 		return rule.Rule{
 			Name: name,
@@ -70,6 +71,7 @@ func TestNotesAreCountedPerFilePerRulePerKey(t *testing.T) {
 // file declaring it, so --coverage can say which tag silenced how much. Two exempt writes in one file are
 // two notes; a write through an untagged type is a finding and no note.
 func TestTheCallerDataRuleNotesEachProcessStateExemption(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json":       minimalConfig,
 		"CohereSettings.json": `{"rules": {"nexus/correctness-no-caller-data-mutation": "error"}}`,
@@ -109,6 +111,7 @@ func TestTheCallerDataRuleNotesEachProcessStateExemption(t *testing.T) {
 // for api's jobs, and is reached through the override; the neighbouring parameter is a finding and no
 // note (#tnn31qs).
 func TestTheCallerDataRuleNotesEachOutParameterContract(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json":       minimalConfig,
 		"CohereSettings.json": `{"rules": {"nexus/correctness-no-caller-data-mutation": "error"}}`,

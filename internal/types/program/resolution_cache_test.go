@@ -49,6 +49,7 @@ func sampleCache(directories []string) *program.ResolutionCache {
 // decode, it decodes to empty while everything around it looks correct. Compare every field
 // rather than spot-checking, because a spot check is what lets one dropped field through.
 func TestResolutionCacheRoundTripsEveryField(t *testing.T) {
+	t.Parallel()
 	original := sampleCache([]string{t.TempDir()})
 
 	decoded, err := program.DecodeResolutionCache(original.Encode())
@@ -98,6 +99,7 @@ func TestResolutionCacheRoundTripsEveryField(t *testing.T) {
 // returning confident nonsense. Every case here would, without the length checks, produce
 // either a panic or entries pointing at the wrong strings.
 func TestResolutionCacheRejectsBadArtifacts(t *testing.T) {
+	t.Parallel()
 	valid := sampleCache([]string{t.TempDir()}).Encode()
 
 	cases := []struct {
@@ -112,6 +114,7 @@ func TestResolutionCacheRejectsBadArtifacts(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := program.DecodeResolutionCache(testCase.buffer)
 			if err == nil {
 				t.Fatalf("a %s artifact decoded without error into %d entries; the decoder "+
@@ -135,6 +138,7 @@ func TestResolutionCacheRejectsBadArtifacts(t *testing.T) {
 // here, and the content-edit case is included specifically to show the fingerprint does NOT
 // fire on it: that is correct, and it is why this cache cannot be keyed on content hashes.
 func TestFingerprintDetectsShapeChanges(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	directories := []string{directory}
 
@@ -171,6 +175,9 @@ func TestFingerprintDetectsShapeChanges(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
+		// Not parallel: each case acts on the directory the case before it left (removing the file "add a file"
+		// added, editing the one "rename a file" renamed), and each compares the shared directory's fingerprint
+		// before and after its own act, which a sibling acting at the same time would move.
 		t.Run(testCase.name, func(t *testing.T) {
 			settle()
 			before := program.FingerprintDirectories(directories)
@@ -196,6 +203,7 @@ func TestFingerprintDetectsShapeChanges(t *testing.T) {
 // filesystem, so the cache would never hit and nobody would see an error, only a tool that
 // is not faster.
 func TestFingerprintIsOrderIndependent(t *testing.T) {
+	t.Parallel()
 	first := t.TempDir()
 	second := t.TempDir()
 	third := t.TempDir()
@@ -213,6 +221,7 @@ func TestFingerprintIsOrderIndependent(t *testing.T) {
 // it, and pins the bias: any doubt resolves toward stale. A cache wrongly treated as fresh
 // reports a clean tree; one wrongly treated as stale costs a slow run.
 func TestStaleCacheIsDetected(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	cache := sampleCache([]string{directory})
 
@@ -232,6 +241,7 @@ func TestStaleCacheIsDetected(t *testing.T) {
 	}
 
 	t.Run("no directories reads as stale", func(t *testing.T) {
+		t.Parallel()
 		empty := &program.ResolutionCache{}
 		if !empty.IsStale() {
 			t.Fatal("a cache covering no directories reads as fresh, so it would be trusted " +
@@ -240,6 +250,7 @@ func TestStaleCacheIsDetected(t *testing.T) {
 	})
 
 	t.Run("nil reads as stale", func(t *testing.T) {
+		t.Parallel()
 		var nilCache *program.ResolutionCache
 		if !nilCache.IsStale() {
 			t.Fatal("a nil cache reads as fresh")

@@ -10,6 +10,7 @@ import (
 // for part of their run count once for the overlap, and a gap between formats counts for nothing. Summing
 // the calls would say 7s here, past the 6s the phase could have taken.
 func TestTheFormatClockCountsWallTimeNotCalls(t *testing.T) {
+	t.Parallel()
 	var moment time.Time
 	clock := newFormatClock()
 	clock.now = func() time.Time { return moment }
@@ -37,6 +38,7 @@ func TestTheFormatClockCountsWallTimeNotCalls(t *testing.T) {
 // TestTheFormatClockKeepsATransformsAnswer holds the wrapper to timing and nothing else: a nil transform
 // stays nil, which the fix phase reads as no transform, and a transform's text and error pass through.
 func TestTheFormatClockKeepsATransformsAnswer(t *testing.T) {
+	t.Parallel()
 	clock := newFormatClock()
 	if clock.timing(nil) != nil {
 		t.Error("a nil transform came back as a transform")
@@ -52,6 +54,7 @@ func TestTheFormatClockKeepsATransformsAnswer(t *testing.T) {
 // so the two partition it, and a formatting time past the phase's, which no run produces, never prints a
 // negative 🪄.
 func TestFixingAndFormattingAddUpToTheFixPhase(t *testing.T) {
+	t.Parallel()
 	records := []phaseRecord{{Name: phaseFix, Outcome: outcomeRan, Elapsed: 700 * time.Millisecond}}
 	got := phaseTimes(0, records, 300*time.Millisecond)
 	if len(got) != 2 || got[0] != "🪄 0.4s" || got[1] != "💅 0.3s" {

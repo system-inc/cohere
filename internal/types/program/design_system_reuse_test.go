@@ -41,6 +41,7 @@ func designSystemRule(root string) rule.Rule {
 // ways: re-running when nothing it read changed costs the saving, and replaying when something did is the
 // failure this cache must never have.
 func TestDesignSystemRulesReplayUntilWhatTheDesignSystemReadChanges(t *testing.T) {
+	t.Parallel()
 	root := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"theme.css":     "flag\n",
@@ -120,6 +121,7 @@ func TestDesignSystemRulesReplayUntilWhatTheDesignSystemReadChanges(t *testing.T
 // never loaded. If it did, this run's design-system findings would be recorded as independent of every
 // stylesheet, and the edit below would replay them stale (#35nqkwc, @system_cohere_lint's review).
 func TestAnotherProgramsDesignSystemDoesNotHideThisWalks(t *testing.T) {
+	t.Parallel()
 	root := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"theme.css":     "flag\n",

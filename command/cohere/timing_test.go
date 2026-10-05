@@ -14,6 +14,7 @@ import (
 // carrying work the other reads for free. Requiring three or more rules would have missed the case
 // that motivated this note: it was found on a pair, 3,407 nodes each, 83x apart.
 func TestPairsWithEqualNodesAndUnequalCostAreFlagged(t *testing.T) {
+	t.Parallel()
 	timings := program.NewTimings([]string{"expensive", "cheap"})
 	setCost(timings, "expensive", 100*time.Millisecond, 3407)
 	setCost(timings, "cheap", time.Millisecond, 3407)
@@ -34,6 +35,7 @@ func TestPairsWithEqualNodesAndUnequalCostAreFlagged(t *testing.T) {
 // on every pair sharing a node count would be noise, and noise in a diagnostic is how a real signal
 // stops being read.
 func TestSimilarCostsAreNotFlagged(t *testing.T) {
+	t.Parallel()
 	timings := program.NewTimings([]string{"first", "second"})
 	setCost(timings, "first", 10*time.Millisecond, 3407)
 	setCost(timings, "second", 8*time.Millisecond, 3407)
@@ -46,6 +48,7 @@ func TestSimilarCostsAreNotFlagged(t *testing.T) {
 // TestDifferentNodeCountsAreNotCompared keeps the note from pairing rules that never registered for
 // the same kinds, where a cost difference means nothing.
 func TestDifferentNodeCountsAreNotCompared(t *testing.T) {
+	t.Parallel()
 	timings := program.NewTimings([]string{"many-nodes", "few-nodes"})
 	setCost(timings, "many-nodes", 100*time.Millisecond, 600000)
 	setCost(timings, "few-nodes", time.Millisecond, 3407)
@@ -57,6 +60,7 @@ func TestDifferentNodeCountsAreNotCompared(t *testing.T) {
 
 // TestSharedFillIsReported proves the cost lands on the derivation rather than vanishing.
 func TestSharedFillIsReported(t *testing.T) {
+	t.Parallel()
 	timings := program.NewTimings([]string{"a-rule"})
 	setCost(timings, "a-rule", 10*time.Millisecond, 100)
 	timings.SetSharedForTest("nexus.allComments", 120*time.Millisecond)
@@ -92,6 +96,7 @@ func renderTimings(timings *program.Timings, wall time.Duration) string {
 // tests checked for the substring "differ" and for one rule name, both present in a line that was
 // wrong about everything else. This one requires the quoted numbers to belong to the named rules.
 func TestTheNamedRulesAreTheRulesWhoseCostsAreQuoted(t *testing.T) {
+	t.Parallel()
 	timings := program.NewTimings([]string{"aaa-middling", "mmm-dearest", "zzz-cheapest"})
 	setCost(timings, "aaa-middling", 50*time.Millisecond, 3407)
 	setCost(timings, "mmm-dearest", 400*time.Millisecond, 3407)
@@ -132,6 +137,7 @@ func TestTheNamedRulesAreTheRulesWhoseCostsAreQuoted(t *testing.T) {
 // read about 1.2s on it where its real cost was about 0.05s. The unit goes in the first line, and the
 // measurement's own cost per call in the second, so a reader cannot mistake what a row is.
 func TestTheHeaderNamesItsUnit(t *testing.T) {
+	t.Parallel()
 	timings := program.NewTimings([]string{"a-rule"})
 	setCost(timings, "a-rule", 120*time.Millisecond, 100)
 	timings.Account.Calls = 1000
@@ -150,6 +156,7 @@ func TestTheHeaderNamesItsUnit(t *testing.T) {
 // TestNoClockIsSaidRatherThanPrintedAsZero covers a platform with no thread CPU clock. A table of zeros
 // would read as every rule being free.
 func TestNoClockIsSaidRatherThanPrintedAsZero(t *testing.T) {
+	t.Parallel()
 	timings := program.NewTimings([]string{"a-rule"})
 	setCost(timings, "a-rule", 0, 100)
 	timings.Account.Unavailable = "this platform has no thread CPU clock to read"
@@ -173,6 +180,7 @@ func TestNoClockIsSaidRatherThanPrintedAsZero(t *testing.T) {
 // wall-clock table could only guess at that from wall clock, which absorbed every wait, and in a parallel
 // run it vanished entirely. The threads' clocks account for it, so the line states each part.
 func TestCoverageStatesEveryPartOfTheWalksCPU(t *testing.T) {
+	t.Parallel()
 	timings := program.NewTimings([]string{"a-rule"})
 	setCost(timings, "a-rule", 300*time.Millisecond, 100)
 	timings.SetSharedForTest("hir.Function", 100*time.Millisecond)
@@ -195,6 +203,7 @@ func TestCoverageStatesEveryPartOfTheWalksCPU(t *testing.T) {
 // walk workers means no share to state, and a share computed from a zero would be harder to notice than a
 // missing line.
 func TestCoverageSaysNothingRatherThanComputingFromZero(t *testing.T) {
+	t.Parallel()
 	var out strings.Builder
 	printCoverage(&out, program.NewTimings([]string{"a-rule"}))
 	if out.String() != "" {
@@ -208,6 +217,7 @@ func TestCoverageSaysNothingRatherThanComputingFromZero(t *testing.T) {
 // the behavior. It does not: deleting the call from printTimings leaves them green while the table goes
 // back to implying it explains the whole phase. Guard present, fixtures passing, behavior gone.
 func TestTheTableItselfCarriesTheCoverageLine(t *testing.T) {
+	t.Parallel()
 	timings := program.NewTimings([]string{"a-rule"})
 	setCost(timings, "a-rule", 285*time.Millisecond, 100)
 	timings.Account.WalkCPU = 700 * time.Millisecond

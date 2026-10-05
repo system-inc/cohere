@@ -13,6 +13,7 @@ import (
 // Reporting it beside a genuinely dead one would tell a reader to delete a suppression the gate
 // still needs.
 func TestADirectiveNamingOnlyUnrunRulesIsNotDead(t *testing.T) {
+	t.Parallel()
 	ranRule := map[string]bool{"no-invalid-regexp": true}
 
 	unrun := &suppression.Directive{Rules: []string{"structure/exhaustive-deps"}}
@@ -33,6 +34,7 @@ func TestADirectiveNamingOnlyUnrunRulesIsNotDead(t *testing.T) {
 // Without this, a helper that answered true for everything would pass the test above and move the
 // entire count into the not-dead bucket, which is the same silence as never having measured.
 func TestADirectiveWhoseRuleRanIsDead(t *testing.T) {
+	t.Parallel()
 	ranRule := map[string]bool{"no-invalid-regexp": true, "no-self-assign": true}
 
 	ran := &suppression.Directive{Rules: []string{"no-self-assign"}}

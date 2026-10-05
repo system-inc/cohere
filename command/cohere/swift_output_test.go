@@ -9,6 +9,7 @@ import (
 // TestASwiftWarningIsAWarning holds the contract's spelling: a compiler warning is `warning`, and the
 // view spells it warn, as the settings do; an error stays an error. Both count as type errors, since
 // both gate.
+// Not parallel: it swaps the package-level activeOutput and activeSummary, and acceptFinding counts into activeSummary
 func TestASwiftWarningIsAWarning(t *testing.T) {
 	saved, savedSummary := activeOutput, activeSummary
 	defer func() { activeOutput, activeSummary = saved, savedSummary }()
@@ -36,6 +37,7 @@ func TestASwiftWarningIsAWarning(t *testing.T) {
 // TestASwiftGapSaysItself is the footer's wording for files nothing checked: the count and the kinds,
 // since the notes that name the files are --verbose's.
 func TestASwiftGapSaysItself(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		withoutRecord, unreadable int
 		want                      string

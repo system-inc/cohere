@@ -63,6 +63,7 @@ func TestExplainNamedPathsOutsideProgramSaysWhy(t *testing.T) {
 				"too (.gitignore line 2, `modules/*/data/`)."},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if got := explainNamedPathsOutsideProgram(location, []string{testCase.path}); got != testCase.want {
 				t.Errorf("explanation is\n%q\nwant\n%q", got, testCase.want)
 			}

@@ -58,6 +58,7 @@ func narrowedNames(files []*ast.SourceFile) string {
 // produced seven new findings, four of them in a consumer two directories from the edit, and a run
 // scoped to the edited file alone saw three.
 func TestNarrowToClosureAddsConsumersAndCountsThem(t *testing.T) {
+	t.Parallel()
 	graph, directory := buildNarrowFixtureGraph(t, map[string]string{
 		"Producer.ts":  "export function value(): number {\n  return 1;\n}\n",
 		"Consumer.ts":  "import { value } from './Producer';\nexport const doubled = value() * 2;\n",
@@ -97,6 +98,7 @@ func TestNarrowToClosureAddsConsumersAndCountsThem(t *testing.T) {
 // and wrong in the direction that hides findings, which is the one failure a fast path must not
 // introduce, and it would look identical to a working scope from the coverage line.
 func TestNarrowToClosureFallsBackRatherThanTruncating(t *testing.T) {
+	t.Parallel()
 	files := map[string]string{"Producer.ts": "export function value(): number {\n  return 1;\n}\n"}
 	for index := 0; index <= program.DependentClosureLimit; index++ {
 		name := filepath.Join("consumers", "Consumer"+itoaForTest(index)+".ts")
@@ -139,6 +141,7 @@ func TestNarrowToClosureFallsBackRatherThanTruncating(t *testing.T) {
 // TestNarrowToClosureLeavesAWholeTreeScopeAlone is the case a bare run takes, and it must cost
 // nothing: no closure, no filtering, the same slice back.
 func TestNarrowToClosureLeavesAWholeTreeScopeAlone(t *testing.T) {
+	t.Parallel()
 	graph, _ := buildNarrowFixtureGraph(t, map[string]string{
 		"Producer.ts": "export function value(): number {\n  return 1;\n}\n",
 	})

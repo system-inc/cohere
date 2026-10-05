@@ -14,6 +14,7 @@ import (
 // override turning a rule off for one path, a rule nobody configured, and a core rule configured only
 // through its typescript-eslint twin's key.
 func TestPrintConfigResolvesEveryRegisteredRuleForAFile(t *testing.T) {
+	t.Parallel()
 	config := &configuration.Config{
 		Root: "/repository",
 		Rules: map[string]configuration.RuleSetting{

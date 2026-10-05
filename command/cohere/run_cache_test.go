@@ -15,6 +15,7 @@ import (
 // replayed as current: "graph built in 436ms" on a run that built nothing. Partial writes are the case
 // worth testing, since Fprintf can hand over a line in pieces.
 func TestTaggingWriterTagsEveryLine(t *testing.T) {
+	t.Parallel()
 	var out bytes.Buffer
 	writer := &taggingWriter{out: &out, tag: invocationTag, atLineStart: true}
 	fmt.Fprint(writer, "graph built in ")
@@ -29,6 +30,7 @@ func TestTaggingWriterTagsEveryLine(t *testing.T) {
 
 // Without a recording, invocationOutput is the writer itself, so a run that is not recorded prints
 // exactly what it printed before the run cache existed.
+// Not parallel: it sets the package-level activeRunCache to nil for its length
 func TestInvocationOutputIsUntouchedWithoutARecording(t *testing.T) {
 	previous := activeRunCache
 	activeRunCache = nil
@@ -46,6 +48,7 @@ func TestInvocationOutputIsUntouchedWithoutARecording(t *testing.T) {
 // front of a line; a tagged line reaching the buffer is replayed as a fact about this run. This drives
 // the real tee through a real pipe, since the pipe is the reason the tag travels in the stream.
 func TestTeeStripsTagsFromTheTerminalAndTheReplay(t *testing.T) {
+	t.Parallel()
 	terminal, err := os.Create(filepath.Join(t.TempDir(), "terminal"))
 	if err != nil {
 		t.Fatal(err)
@@ -89,6 +92,7 @@ func TestTeeStripsTagsFromTheTerminalAndTheReplay(t *testing.T) {
 // can say where it came from; and replayLines turns it into "label (from the cached run at T): rest"
 // with no tag left anywhere.
 func TestProvenanceLinesAreKeptTaggedAndReplayedWithTheirSource(t *testing.T) {
+	t.Parallel()
 	terminal, err := os.Create(filepath.Join(t.TempDir(), "terminal"))
 	if err != nil {
 		t.Fatal(err)
@@ -128,6 +132,7 @@ func TestProvenanceLinesAreKeptTaggedAndReplayedWithTheirSource(t *testing.T) {
 // Exactly two invocations may use the run cache: a bare run and `--no-fix` alone. Any other argument
 // widens what the output could depend on, and one admitted by accident would be cached on a key that
 // covers it but by a cache never shown to be correct for it.
+// Not parallel: it sets os.Args and the package-level cacheOff, which runCacheEligible reads
 func TestRunCacheEligibility(t *testing.T) {
 	previous := os.Args
 	defer func() { os.Args = previous }()

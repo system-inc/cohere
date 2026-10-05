@@ -46,6 +46,7 @@ func writeRaw(t *testing.T, directory string, name string, contents []byte) {
 // and so only a raw write can: whatever the version is now, never a number someone must remember to
 // update, the magic, and the section a file says it holds.
 func TestCacheTableRefusesAnotherFormat(t *testing.T) {
+	t.Parallel()
 	for name, header := range map[string]cacheTableHeader{
 		"an older version":  {Magic: cacheTableMagic, Version: cacheTableVersion - 1, Identity: internalTestIdentity, Section: cacheTableTypesSection},
 		"a newer version":   {Magic: cacheTableMagic, Version: cacheTableVersion + 1, Identity: internalTestIdentity, Section: cacheTableTypesSection},
@@ -54,6 +55,7 @@ func TestCacheTableRefusesAnotherFormat(t *testing.T) {
 		"another toolchain": {Magic: cacheTableMagic, Version: cacheTableVersion, Identity: CacheTableIdentity{SelfCommit: "test", CompilerCommit: "test", GoToolchain: "other", Platform: "test/test"}, Section: cacheTableTypesSection},
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			directory := t.TempDir()
 			writeRaw(t, directory, cacheTableFile(cacheTableTypesSection), encodeRaw(t, header, &TypesSection{Version: typesSectionVersion}))
 			table, err := ReadCacheTable(directory, internalTestIdentity, CacheTableSections{Types: true})
@@ -67,8 +69,10 @@ func TestCacheTableRefusesAnotherFormat(t *testing.T) {
 // TestCacheTableRefusesAListIndexPastItsTable pins the one check gob cannot make for us. The rule lists
 // are interned by hand, and an index trusted past its table would hand an entry another file's rules.
 func TestCacheTableRefusesAListIndexPastItsTable(t *testing.T) {
+	t.Parallel()
 	for _, field := range []string{"Rules", "TypedRules", "Listening", "ShapedRules"} {
 		t.Run(field, func(t *testing.T) {
+			t.Parallel()
 			entry := lintCacheWireEntry{Path: "/a.ts"}
 			reflect.ValueOf(&entry).Elem().FieldByName(field).SetInt(1)
 			wire := &lintCacheWire{Version: lintCacheVersion, Lists: [][]string{{"no-debugger"}}, Entries: []lintCacheWireEntry{entry}}
@@ -86,6 +90,7 @@ func TestCacheTableRefusesAListIndexPastItsTable(t *testing.T) {
 // changes in what an entry means rather than in its shape. One of another version is dropped, which is a
 // miss, and the run beside it is kept, since each is proven by its own key.
 func TestCacheTableDropsAFindingsSectionOfAnotherMeaning(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	writeRaw(t, directory, cacheTableRunFile("--no-fix"),
 		encodeRaw(t, currentHeader(cacheTableRunSection), cacheTableRunBody{Invocation: "--no-fix", Run: &RunCache{Key: "kept"}}))
@@ -107,6 +112,7 @@ func TestCacheTableDropsAFindingsSectionOfAnotherMeaning(t *testing.T) {
 // takes nothing else with it, and the error names it. The format record from another commit is the one file
 // kept, for its own key to decide. A run file answering for another invocation than its name is dropped too.
 func TestAFileFromAnotherCohereCommitIsDiscardedAlone(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	current := &CacheTable{
 		Runs:       map[string]*RunCache{"": {Key: "bare"}, "--no-fix": {Key: "no-fix"}},
@@ -156,6 +162,7 @@ func TestAFileFromAnotherCohereCommitIsDiscardedAlone(t *testing.T) {
 // The single file the table was before format 8 is removed on sight and never read: a table.gob of any
 // content is gone after a read, and the read reports nothing found.
 func TestTheSingleFileTableIsRemovedUnread(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	writeRaw(t, directory, legacyCacheTableFile, []byte("whatever an older cohere wrote"))
 	_, err := ReadCacheTable(directory, internalTestIdentity, EveryCacheTableSection)
@@ -185,6 +192,7 @@ var pinnedCacheTableShapes = map[int]string{
 }
 
 func TestCacheTableShapeIsPinnedToItsVersion(t *testing.T) {
+	t.Parallel()
 	shape := describeShape(reflect.TypeOf(cacheTableHeader{})) + "\n" + describeShape(reflect.TypeOf(cacheTableBodies{}))
 	sum := fmt.Sprintf("%x", sha256.Sum256([]byte(shape)))
 	pinned, found := pinnedCacheTableShapes[cacheTableVersion]
@@ -244,6 +252,7 @@ func describeShape(subject reflect.Type) string {
 // Rule lists are interned by their length and their two ends, and that key is only a filter: two lists that
 // share it and differ in the middle stay two lists, and every entry resolves back to exactly its own.
 func TestInterningKeepsListsThatShareTheirEndsApart(t *testing.T) {
+	t.Parallel()
 	cache := &LintCache{Version: lintCacheVersion}
 	lists := [][]string{
 		{"a", "b", "c"},

@@ -18,6 +18,7 @@ import (
 //
 // The descriptor arrives the way the dispatcher passes it, without close-on-exec, so a child would hold
 // it: the first spawn proves that, which is what makes the second one's answer mean something.
+// Not parallel: it sets the verdict variable with t.Setenv, which a parallel test may not
 func TestTheVerdictDescriptorIsNotInheritedByAChild(t *testing.T) {
 	reader, writer, err := os.Pipe()
 	if err != nil {
@@ -56,6 +57,7 @@ func TestTheVerdictDescriptorIsNotInheritedByAChild(t *testing.T) {
 // to it. A script that opened a log on 3 (`3>log`) and inherited the variable from somewhere would
 // otherwise find a stray byte in its log. A pipe in the same place is taken, which is what makes the
 // refusal mean something.
+// Not parallel: it sets the verdict variable with t.Setenv and assigns the package-level verdictFile
 func TestAVerdictDescriptorThatIsNotAPipeIsLeftAlone(t *testing.T) {
 	logPath := t.TempDir() + "/log"
 	log, err := os.Create(logPath)

@@ -271,6 +271,8 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	}
 
 	for _, scenario := range scenarios {
+		// Not parallel: each scenario changes and runs the one fixture repository at root and undoes its change after,
+		// so two at once would each see the other's edit
 		t.Run(scenario.name, func(t *testing.T) {
 			if scenario.prepare != nil {
 				scenario.prepare()
@@ -338,6 +340,8 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			func() { remove("docs/notes.md") },
 			func() { write("docs/notes.md", "notes\n") }},
 	} {
+		// Not parallel: each scenario changes and runs the one fixture repository at root and undoes its change after,
+		// so two at once would each see the other's edit
 		t.Run(scenario.name, func(t *testing.T) {
 			if scenario.prepare != nil {
 				scenario.prepare()
@@ -358,6 +362,7 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// A run whose fix phase rewrites a file is never replayed. The record step stats inputs after the
 	// rewrite, so without the decline the next run would match the fixed tree and replay "1 of 1 files
 	// rewritten" over a tree it never touched.
+	// Not parallel: it edits and runs the one fixture repository at root that every subtest here shares
 	t.Run("a fix run is not replayed", func(t *testing.T) {
 		establishHit()
 		write("source/a.ts", "export const a: number = 1;\ndebugger;\n")
@@ -380,6 +385,8 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// `--no-fix` is cached on its own key: it records and replays, and it never replays a bare run's
 	// verdict or hands its own to one. The two print different reports, since `--no-fix` reports what a
 	// writing run would rewrite, so either one replayed as the other would be a wrong report.
+	// Not parallel: it runs against the one fixture repository at root that every subtest here shares, and needs its
+	// cache to hold only its own runs
 	t.Run("--no-fix is cached apart from a bare run", func(t *testing.T) {
 		establishHit()
 		if output, _ := run(true, "--no-fix"); isReplay(output) {
@@ -402,6 +409,7 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// A cache table that cannot be trusted is thrown away, file by file, said so once, and replaced.
 	// Overwritten rather than deleted, because a missing table is a first run and proves nothing about the
 	// discard.
+	// Not parallel: it overwrites the cache table of the one fixture repository at root that every subtest here shares
 	t.Run("a corrupt cache table is discarded, said so, and rewritten", func(t *testing.T) {
 		establishHit()
 		// The table is the project's own, and the isolated home holds none.

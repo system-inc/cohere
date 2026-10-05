@@ -19,6 +19,7 @@ func render(report *pipelineReport) string {
 
 // A run where all three phases ran says so, and says nothing else.
 func TestACompleteRunPrintsNoWarning(t *testing.T) {
+	t.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseFix, outcomeRan, 4*time.Millisecond, "")
 	report.record(phaseTypes, outcomeRan, 12*time.Millisecond, "")
@@ -36,6 +37,7 @@ func TestACompleteRunPrintsNoWarning(t *testing.T) {
 // This is the case the whole file exists for. A run that bailed at types and a run that linted
 // cleanly both produce zero lint findings, and only this line separates them.
 func TestABailNamesTheUnreachedPhasesAndWarns(t *testing.T) {
+	t.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseFix, outcomeRan, 4*time.Millisecond, "")
 	report.record(phaseTypes, outcomeRan, 12*time.Millisecond, "")
@@ -60,6 +62,7 @@ func TestABailNamesTheUnreachedPhasesAndWarns(t *testing.T) {
 // exempting unused from the coverage warning is correct when nobody asked for it and wrong when
 // somebody did. Somebody who typed --unused and got no report has had something withheld.
 func TestARequestedUnusedPhaseCutOffByABailIsAGap(t *testing.T) {
+	t.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseFix, outcomeRan, 4*time.Millisecond, "")
 	report.record(phaseTypes, outcomeRan, 12*time.Millisecond, "")
@@ -77,6 +80,7 @@ func TestARequestedUnusedPhaseCutOffByABailIsAGap(t *testing.T) {
 // A bare run must not warn merely because unused was not requested, or the warning appears on every
 // ordinary run and people stop reading it — which costs exactly the case it exists for.
 func TestAnUnrequestedUnusedPhaseDoesNotWarn(t *testing.T) {
+	t.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseFix, outcomeRan, time.Millisecond, "")
 	report.record(phaseTypes, outcomeRan, time.Millisecond, "")
@@ -95,6 +99,7 @@ func TestAnUnrequestedUnusedPhaseDoesNotWarn(t *testing.T) {
 
 // A bail at the first phase must mark everything after it, not just the next one.
 func TestABailAtFixMarksBothLaterPhases(t *testing.T) {
+	t.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseFix, outcomeRan, time.Millisecond, "")
 	report.markRemainingNotReached(phaseFix, "the rewrite did not parse")
@@ -118,6 +123,7 @@ func warnsAboutCoverage(line string) bool {
 // warning that fires on every green run is one people stop reading — which costs exactly the case
 // the warning exists for.
 func TestNoFixChecksAndDoesNotWarn(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		wouldChange int
 		want        string
@@ -139,6 +145,7 @@ func TestNoFixChecksAndDoesNotWarn(t *testing.T) {
 // A reporting phase that was turned off is a real hole in the verdict and must warn, because its
 // findings are absent from the output and a reader cannot tell that from having none.
 func TestSkippingAReportingPhaseWarns(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		name    string
 		skipped phaseName
@@ -147,6 +154,7 @@ func TestSkippingAReportingPhaseWarns(t *testing.T) {
 		{"lint skipped", phaseLint},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			report := &pipelineReport{}
 			for _, name := range phaseOrder {
 				if name == testCase.skipped {
@@ -166,6 +174,7 @@ func TestSkippingAReportingPhaseWarns(t *testing.T) {
 // The warning must be able to fire and able to stay silent. A check that has only ever done one of
 // those has not been shown to discriminate.
 func TestTheWarningDiscriminates(t *testing.T) {
+	t.Parallel()
 	complete := &pipelineReport{}
 	for _, name := range phaseOrder {
 		complete.record(name, outcomeRan, time.Millisecond, "")
@@ -186,6 +195,7 @@ func TestTheWarningDiscriminates(t *testing.T) {
 // Phases print in pipeline order regardless of the order they were recorded in. The line is read as
 // a sequence, so a report that listed them by completion time would misdescribe the pipeline.
 func TestPhasesPrintInPipelineOrder(t *testing.T) {
+	t.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseLint, outcomeRan, time.Millisecond, "")
 	report.record(phaseFix, outcomeRan, time.Millisecond, "")
@@ -203,6 +213,7 @@ func TestPhasesPrintInPipelineOrder(t *testing.T) {
 // markRemainingNotReached must never overwrite a phase that already reported an outcome. The phase
 // that bailed ran, and recording it twice would print it twice.
 func TestMarkingDoesNotDuplicateAnAlreadyRecordedPhase(t *testing.T) {
+	t.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseFix, outcomeRan, time.Millisecond, "")
 	report.record(phaseTypes, outcomeRan, time.Millisecond, "")
@@ -225,6 +236,7 @@ func TestMarkingDoesNotDuplicateAnAlreadyRecordedPhase(t *testing.T) {
 // cost about a second. The counts printed beside it were real, which is what made the zero hard to
 // see — everything around it checked out.
 func TestAReusedPhaseNamesWhatItReused(t *testing.T) {
+	t.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseFix, outcomeRan, 1500*time.Millisecond, "")
 	report.record(phaseTypes, outcomeRan, 200*time.Millisecond, "")
@@ -244,6 +256,7 @@ func TestAReusedPhaseNamesWhatItReused(t *testing.T) {
 // reused phase would send a reader looking for a gap that is not there, which is the same
 // false-alarm failure this file's warnings exist to avoid in the other direction.
 func TestAReusedPhaseDoesNotWarn(t *testing.T) {
+	t.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseFix, outcomeRan, 1500*time.Millisecond, "")
 	report.record(phaseTypes, outcomeRan, 200*time.Millisecond, "")
@@ -260,6 +273,7 @@ func TestAReusedPhaseDoesNotWarn(t *testing.T) {
 // phase's elapsed time back into the sum would reintroduce it in the accounting line while the
 // phase line reads correctly, which is the harder half to notice.
 func TestAReusedPhaseIsNotDoubleCounted(t *testing.T) {
+	t.Parallel()
 	withReuse := &pipelineReport{processStart: time.Now().Add(-3 * time.Second)}
 	withReuse.graph = 500 * time.Millisecond
 	withReuse.record(phaseFix, outcomeRan, 1500*time.Millisecond, "")
@@ -290,6 +304,7 @@ func TestAReusedPhaseIsNotDoubleCounted(t *testing.T) {
 // The gap is the larger of the two: skipping a phase withholds one kind of finding, and skipping
 // files withholds every kind on every file skipped.
 func TestCoverageNamesTheFilesItDidNotLookAt(t *testing.T) {
+	t.Parallel()
 	scoped := &pipelineReport{filesInScope: 5, filesInProgram: 3542}
 	scoped.record(phaseLint, outcomeRan, 8*time.Millisecond, "")
 
@@ -326,6 +341,7 @@ func TestCoverageNamesTheFilesItDidNotLookAt(t *testing.T) {
 // Both directions, because a warning on every run is one people learn to skip, which would cost
 // exactly the case it exists for.
 func TestProvenanceWarningFiresOnlyOnAModifiedTree(t *testing.T) {
+	t.Parallel()
 	report := &pipelineReport{}
 
 	modified := &strings.Builder{}

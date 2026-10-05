@@ -66,6 +66,7 @@ func closureNames(closure []*ast.SourceFile) []string {
 // alone reports nothing about it. Measured on the real tree before this existed: one edited file
 // produced seven new findings, four of them in a consumer two directories away.
 func TestDependentClosureReachesConsumersThroughImports(t *testing.T) {
+	t.Parallel()
 	graph := buildFixtureGraph(t, map[string]string{
 		"Producer.ts":  "export function value(): number {\n  return 1;\n}\n",
 		"Consumer.ts":  "import { value } from './Producer';\nexport const doubled = value() * 2;\n",
@@ -99,6 +100,7 @@ func TestDependentClosureReachesConsumersThroughImports(t *testing.T) {
 // resolution map without reversing it would return the wrong set and still look plausible: same
 // size, same shape, findings in files that were genuinely related to the edit.
 func TestDependentClosureDoesNotFollowImportsForward(t *testing.T) {
+	t.Parallel()
 	graph := buildFixtureGraph(t, map[string]string{
 		"Producer.ts": "export function value(): number {\n  return 1;\n}\n",
 		"Consumer.ts": "import { value } from './Producer';\nexport const doubled = value() * 2;\n",
@@ -124,6 +126,7 @@ func TestDependentClosureDoesNotFollowImportsForward(t *testing.T) {
 // be fast, silent, and wrong in the direction that hides findings, which is the one failure mode
 // scoping must not introduce.
 func TestDependentClosureRefusesRatherThanTruncating(t *testing.T) {
+	t.Parallel()
 	files := map[string]string{"Producer.ts": "export function value(): number {\n  return 1;\n}\n"}
 	for index := 0; index <= DependentClosureLimit; index++ {
 		files[filepath.Join("consumers", "Consumer"+itoa(index)+".ts")] =

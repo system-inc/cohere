@@ -45,6 +45,7 @@ func writeMismatchFixture(t *testing.T, files map[string]string) string {
 // test to reach through. A production field that exists only so a test can poison it is a worse
 // defect than the one being guarded.
 func TestProjectFilesGuardFiresOnMismatch(t *testing.T) {
+	t.Parallel()
 	directory := writeMismatchFixture(t, map[string]string{
 		"tsconfig.json": mismatchFixtureConfig,
 		"Alpha.ts":      "export const alpha = 1;\n",
@@ -92,6 +93,7 @@ func TestProjectFilesGuardFiresOnMismatch(t *testing.T) {
 // TestProjectFilesGuardMessageNamesTheCause pins the wording, because a panic that says only
 // "mismatch" sends the next reader looking at the config instead of at path canonicalization.
 func TestProjectFilesGuardMessageNamesTheCause(t *testing.T) {
+	t.Parallel()
 	for _, want := range []string{"canonicalization mismatch", "not an empty project"} {
 		if !strings.Contains(projectFilesMismatchMessage(3407, 0), want) {
 			t.Errorf("guard message should contain %q", want)

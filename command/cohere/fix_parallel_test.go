@@ -24,6 +24,7 @@ import (
 // unformatted TypeScript (its formatting leads back to the rules, so it returns to the serial path), files
 // with proposals (serial from the start), and markdown, CSS and JSON, which have no rules to ask. Run under
 // -race, it is also the race test: the printers run side by side here as they do on a first run.
+// Not parallel: it sets the package-level parallelFormatWorkers, which the fix phase's format pass reads
 func TestTheParallelFormatPassMatchesTheSerialOne(t *testing.T) {
 	files := map[string]string{
 		"CohereSettings.json":      "{ \"extends\": \"./NexusCohereSettings.json\", \"rules\": { \"no-debugger\": \"error\" } }\n",
@@ -119,6 +120,7 @@ func stripRoot(text string, root string) string {
 // rules is left to the serial path, a file that failed keeps its failure for the serial loop to report in
 // order, and every other file is done.
 func TestFormatInParallelLeavesTheRulesToTheSerialPath(t *testing.T) {
+	t.Parallel()
 	fileNames := []string{"/a.ts", "/b.ts", "/c.ts", "/d.md"}
 	byFileName := map[string][]edit.Proposal{"/a.ts": {{RuleName: "no-debugger"}}}
 	failure := errors.New("does not parse")
@@ -157,6 +159,7 @@ func TestFormatInParallelLeavesTheRulesToTheSerialPath(t *testing.T) {
 // computed from other bytes than the program holds, a file edited between the two reads, is discarded, and so
 // is one for a file with a proposal; the file then takes the path it always took.
 func TestASpeculativeFormatResultStandsOnlyForTheWalksBytes(t *testing.T) {
+	t.Parallel()
 	graph, directory := buildNarrowFixtureGraph(t, map[string]string{"A.ts": "export const a = 1;\n"})
 	fileName := filepath.Join(directory, "A.ts")
 	speculation := func(read string) *formatSpeculation {

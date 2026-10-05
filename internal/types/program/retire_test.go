@@ -16,6 +16,7 @@ import (
 // longer exist, and recording it last would leave the successor's record overwritten. Each path is paired
 // with the same call on a live graph, which must record, so a pass here cannot be a path that never records.
 func TestARetiredGraphRecordsNothing(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "import { helper } from './helper';\nexport const value: number = helper();\n",

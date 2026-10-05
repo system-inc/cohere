@@ -12,6 +12,7 @@ import (
 )
 
 func TestJSONLines(t *testing.T) {
+	t.Parallel()
 	var out bytes.Buffer
 	finding := runFinding{Path: "/repo/a.ts", Line: 3, Column: 7, Severity: "error", Rule: "prefer-const", MessageID: "useConst", Message: "Use const."}
 	if err := writeJSONLine(&out, findingAsJSON(finding)); err != nil {
@@ -34,6 +35,7 @@ func TestJSONLines(t *testing.T) {
 }
 
 func TestJSONSummary(t *testing.T) {
+	t.Parallel()
 	summary := cleanSummary()
 	warmSummary(&summary)
 	summary.Findings = 2
@@ -73,6 +75,7 @@ func TestJSONSummary(t *testing.T) {
 // list is exactly the fields that are never omitted. A field added to a type without the schema, or a
 // property the code stopped writing, fails here rather than in a consumer.
 func TestOutputSchemaMatchesTheTypes(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("../../schema/CohereOutput.schema.json")
 	if err != nil {
 		t.Fatal(err)

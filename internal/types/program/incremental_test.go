@@ -60,6 +60,7 @@ func messagesOf(diagnostics []*ast.Diagnostic) []string {
 // exists to prevent is a cache that reports a clean tree forever, and a suite where every test
 // runs through the cache cannot tell that from a genuinely clean fixture.
 func TestIncrementalProgramSkipsUnchangedFiles(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json": incrementalConfig,
 		"clean.ts":      "export const value: number = 1;\n",
@@ -142,6 +143,7 @@ func TestIncrementalProgramSkipsUnchangedFiles(t *testing.T) {
 // wrong: nil is "no previous state", not "an error occurred". A caller that treats it as a
 // failure reports an error on every first run.
 func TestBuildInfoReaderReturnsNilBeforeAnyBuild(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json": incrementalConfig,
 		"main.ts":       "export const value: number = 1;\n",
@@ -178,6 +180,7 @@ func TestBuildInfoReaderReturnsNilBeforeAnyBuild(t *testing.T) {
 // That is precisely why cold-equals-warm is not the shape used: a stale cache reporting
 // yesterday's clean tree is the fastest run we would ever measure.
 func TestIncrementalDiagnosticsSurvivesAChange(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json": incrementalConfig,
 		"clean.ts":      "export const value: number = 1;\n",
@@ -267,6 +270,7 @@ func TestIncrementalDiagnosticsSurvivesAChange(t *testing.T) {
 // holds: the incremental path must produce the same findings as the full one, not merely
 // fewer of them faster.
 func TestIncrementalMatchesFullPass(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json": incrementalConfig,
 		"clean.ts":      "export const value: number = 1;\n",

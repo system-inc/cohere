@@ -28,6 +28,7 @@ func writeTree(t *testing.T, directory string, files map[string]string) {
 // modules/tasks/tsconfig.json", which is true and useless. Each case below is one sentence of the
 // precedence locateProject states, asserted on the value that decides it.
 func TestLocateProjectWalksUpToTheNearestTsconfig(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{
 		"tsconfig.json":                 "{}",
@@ -38,6 +39,7 @@ func TestLocateProjectWalksUpToTheNearestTsconfig(t *testing.T) {
 	deep := filepath.Join(root, "modules", "tasks", "source")
 
 	t.Run("discovered from a subdirectory", func(t *testing.T) {
+		t.Parallel()
 		location, err := locateProject(locationRequest{
 			WorkingDirectory:   deep,
 			ConfigFileName:     projectMarker,
@@ -67,6 +69,7 @@ func TestLocateProjectWalksUpToTheNearestTsconfig(t *testing.T) {
 
 	// The control for the note: at the root it must be silent, or it prints on every ordinary run.
 	t.Run("silent at the root", func(t *testing.T) {
+		t.Parallel()
 		location, err := locateProject(locationRequest{
 			WorkingDirectory: root, ConfigFileName: projectMarker, LintConfigFileName: "CohereSettings.json",
 		})
@@ -81,6 +84,7 @@ func TestLocateProjectWalksUpToTheNearestTsconfig(t *testing.T) {
 	// The nearest tsconfig wins, which is what makes a separate sub-project its own root rather than
 	// a directory of the project above it.
 	t.Run("the nearest tsconfig wins", func(t *testing.T) {
+		t.Parallel()
 		nested := filepath.Join(root, "projects", "nested")
 		location, err := locateProject(locationRequest{
 			WorkingDirectory: nested, ConfigFileName: projectMarker, LintConfigFileName: "CohereSettings.json",
@@ -94,6 +98,7 @@ func TestLocateProjectWalksUpToTheNearestTsconfig(t *testing.T) {
 	})
 
 	t.Run("--directory wins and is a cd", func(t *testing.T) {
+		t.Parallel()
 		location, err := locateProject(locationRequest{
 			WorkingDirectory:   deep,
 			Directory:          "../..",
@@ -114,6 +119,7 @@ func TestLocateProjectWalksUpToTheNearestTsconfig(t *testing.T) {
 	})
 
 	t.Run("--tsconfig wins and anchors the root", func(t *testing.T) {
+		t.Parallel()
 		location, err := locateProject(locationRequest{
 			WorkingDirectory:    deep,
 			ConfigFileName:      "../../../projects/nested/tsconfig.json",
@@ -133,6 +139,7 @@ func TestLocateProjectWalksUpToTheNearestTsconfig(t *testing.T) {
 	})
 
 	t.Run("a typed --lint-config resolves where it was typed", func(t *testing.T) {
+		t.Parallel()
 		location, err := locateProject(locationRequest{
 			WorkingDirectory:        deep,
 			ConfigFileName:          projectMarker,
@@ -155,6 +162,7 @@ func TestLocateProjectWalksUpToTheNearestTsconfig(t *testing.T) {
 // vendored inside that one, and a TypeScript project inside a Swift package. Each case is one sentence
 // of swiftProjectMarker's rule, asserted both ways so neither marker can win by always winning.
 func TestLocateProjectFindsSwiftPackages(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{
 		"tsconfig.json":                                  "{}",
@@ -186,6 +194,7 @@ func TestLocateProjectFindsSwiftPackages(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			location, err := locateProject(request(testCase.standingIn))
 			if err != nil {
 				t.Fatal(err)
@@ -206,6 +215,7 @@ func TestLocateProjectFindsSwiftPackages(t *testing.T) {
 	// A directory named like a marker is not a marker. Sources/App holds a directory called
 	// tsconfig.json, and the walk must pass it and reach the Package.swift above.
 	t.Run("a directory named tsconfig.json is not a project", func(t *testing.T) {
+		t.Parallel()
 		location, err := locateProject(request(filepath.Join(macos, "Sources", "App", "tsconfig.json")))
 		if err != nil {
 			t.Fatal(err)
@@ -216,6 +226,7 @@ func TestLocateProjectFindsSwiftPackages(t *testing.T) {
 	})
 
 	t.Run("--directory reads the markers of the directory it names", func(t *testing.T) {
+		t.Parallel()
 		location, err := locateProject(locationRequest{
 			WorkingDirectory: root, Directory: "projects/macos", ConfigFileName: projectMarker, LintConfigFileName: "CohereSettings.json",
 		})
@@ -228,6 +239,7 @@ func TestLocateProjectFindsSwiftPackages(t *testing.T) {
 	})
 
 	t.Run("--tsconfig is always TypeScript", func(t *testing.T) {
+		t.Parallel()
 		location, err := locateProject(locationRequest{
 			WorkingDirectory:    filepath.Join(macos, "Sources", "App"),
 			ConfigFileName:      filepath.Join(root, "tsconfig.json"),
@@ -246,6 +258,7 @@ func TestLocateProjectFindsSwiftPackages(t *testing.T) {
 // TestLocateProjectFailsLoudlyOutsideAnyProject holds that finding nothing is an error naming where
 // the walk began, never a fallback to the working directory.
 func TestLocateProjectFailsLoudlyOutsideAnyProject(t *testing.T) {
+	t.Parallel()
 	// t.TempDir is under the system temp directory, which has no tsconfig.json at or above it.
 	outside := t.TempDir()
 	for directory := outside; ; directory = filepath.Dir(directory) {
@@ -275,6 +288,7 @@ func TestLocateProjectFailsLoudlyOutsideAnyProject(t *testing.T) {
 // `.` against the working directory was correct. From `modules/tasks` it is not: `cohere .` there
 // would have checked all of ahra, turning the narrowest thing a caller can type into the widest run.
 func TestDotFromASubdirectoryIsThatSubdirectory(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{
 		"Top.ts":           "",

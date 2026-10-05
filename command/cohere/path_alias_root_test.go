@@ -42,6 +42,7 @@ func TestPathAliasRootIsAnchoredToTheConfig(t *testing.T) {
 		"an absent root defaults to the project":      `{` + aliases + `}`,
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			root := pathAliasProject(t, options)
 			output, _ := runCohere(t, binary, filepath.Join(root, "source", "features"), "--no-fix", "--lint")
 			if !strings.Contains(output, "import-require-path-alias") || !strings.Contains(output, "@project/foundation/Thing") {
@@ -52,6 +53,7 @@ func TestPathAliasRootIsAnchoredToTheConfig(t *testing.T) {
 
 	// Never silently inert: a root that cannot hold any checked file stops the run and names itself.
 	t.Run("an impossible root fails loudly", func(t *testing.T) {
+		t.Parallel()
 		root := pathAliasProject(t, `{`+aliases+`,"repositoryRoot":"./does-not-exist"}`)
 		output, code := runCohere(t, binary, root, "--no-fix", "--lint")
 		if code == 0 {

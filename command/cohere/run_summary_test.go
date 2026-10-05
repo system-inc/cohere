@@ -51,6 +51,7 @@ var coveredSkipCases = []struct {
 }
 
 func TestACoveredSkipIsAGapOnlyWhenItsCoverDidNotRun(t *testing.T) {
+	t.Parallel()
 	if wrong := wrongCoveredSkipVerdicts(runSummary.uncoveredSkips); len(wrong) > 0 {
 		for _, failure := range wrong {
 			t.Error(failure)
@@ -75,6 +76,7 @@ func TestACoveredSkipIsAGapOnlyWhenItsCoverDidNotRun(t *testing.T) {
 
 // The footer marks the gap the count decides, and only then.
 func TestACoveredSkipIsMarkedOnlyAsAGap(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range coveredSkipCases {
 		summary := cleanSummary()
 		summary.Phases, summary.Skips = testCase.phases, []ruleSkip{testCase.skip}

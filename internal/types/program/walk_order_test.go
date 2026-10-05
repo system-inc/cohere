@@ -30,6 +30,7 @@ import (
 // one rule reports a file's declarations last to first from the file node, which no merge order can
 // put in position order, and the rule that sorts first by name is dispatched second.
 func TestWalkReturnsFindingsInFileThenPositionOrder(t *testing.T) {
+	t.Parallel()
 	const fileCount = 12
 	const declarationCount = 3
 

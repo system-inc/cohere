@@ -105,6 +105,7 @@ func TestCohereRunsFromAnywhere(t *testing.T) {
 	// From two directories down, with a path typed relative to there. Before discovery this failed
 	// with "no tsconfig at .../sub/deeper/tsconfig.json".
 	t.Run("from a subdirectory, with a path typed there", func(t *testing.T) {
+		t.Parallel()
 		root := fixtureProject(t)
 		deeper := filepath.Join(root, "sub", "deeper")
 
@@ -122,6 +123,7 @@ func TestCohereRunsFromAnywhere(t *testing.T) {
 
 	// The control on the note: started at the root, the run says nothing about roots.
 	t.Run("from the root, no root note", func(t *testing.T) {
+		t.Parallel()
 		root := fixtureProject(t)
 		output, code := runCohere(t, binary, root, "--no-fix", "--lint")
 		if code != 0 {
@@ -133,6 +135,7 @@ func TestCohereRunsFromAnywhere(t *testing.T) {
 	})
 
 	t.Run("outside any project, a loud failure", func(t *testing.T) {
+		t.Parallel()
 		outside := t.TempDir()
 		output, code := runCohere(t, binary, outside, "--no-fix", "--lint")
 		if code == 0 {
@@ -148,6 +151,7 @@ func TestCohereRunsFromAnywhere(t *testing.T) {
 	// run would record the new file's hash, so identical bytes prove the write was withheld rather
 	// than that it happened to produce the same content.
 	t.Run("--no-fix writes no build info", func(t *testing.T) {
+		t.Parallel()
 		root := fixtureProject(t)
 		buildInfo := filepath.Join(root, "tsconfig.tsbuildinfo")
 
@@ -243,6 +247,7 @@ func TestAScopedRunKeepsItsScopeAfterAFixRewritesAFile(t *testing.T) {
 // CI run cold. The warm half is observed through findings: a planted error must still be found on a
 // run that read a build info recorded before the error existed.
 func TestTheTypePhaseReadsButDoesNotWriteWhenAskedNotTo(t *testing.T) {
+	t.Parallel()
 	root := fixtureProject(t)
 	buildInfo := filepath.Join(root, "tsconfig.tsbuildinfo")
 

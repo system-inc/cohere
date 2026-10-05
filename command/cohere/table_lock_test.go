@@ -14,6 +14,7 @@ import (
 // A run that reads the table waits while another run holds its lock, and reads the moment the lock is
 // released. Without the hold the wait returns at once, which is what makes the wait here mean something.
 func TestARunReadingTheTableWaitsForTheWriter(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	release, taken := holdTableReadLock(directory, time.Second)
 	release()
@@ -48,6 +49,7 @@ func TestARunReadingTheTableWaitsForTheWriter(t *testing.T) {
 
 // A writer waits for a reader holding the lock shared, so no file is renamed under a read in progress.
 func TestAWriterWaitsForAReader(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	releaseReader, taken := holdTableReadLock(directory, time.Second)
 	if !taken {
@@ -73,6 +75,7 @@ func TestAWriterWaitsForAReader(t *testing.T) {
 
 // A writer that never finishes costs the next run its bound and no more, and the run goes ahead.
 func TestAStuckWriterCostsTheNextRunItsBound(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	release := holdTableLock(directory)
 	defer release()
@@ -87,6 +90,8 @@ func TestAStuckWriterCostsTheNextRunItsBound(t *testing.T) {
 }
 
 // A lone run, with a lock file left by an earlier run and nobody holding it, pays an open and a lock.
+// Not parallel: it times a thousand lock round trips against a one millisecond bound, which tests competing
+// for the CPU in parallel would blow
 func TestALoneRunPaysAlmostNothingToWait(t *testing.T) {
 	directory := t.TempDir()
 	holdTableLock(directory)()
@@ -114,6 +119,8 @@ func TestALoneRunPaysAlmostNothingToWait(t *testing.T) {
 // shared lock and must never see one write's run beside another's findings. Run under -race, so the
 // goroutines' sharing is checked too. Without the reader's lock the pause between the two renames is where
 // it sees them disagree, and this test fails.
+// Not parallel: it needs its reader to overlap at least half of 60 timed writes, which tests competing for
+// the CPU in parallel can starve
 func TestAReaderNeverSeesOneWritersRunBesideAnothersFindings(t *testing.T) {
 	directory := t.TempDir()
 	identity := cacheTableIdentity()

@@ -76,8 +76,10 @@ func shapeFixture(t *testing.T) string {
 // alone, while the same rule keyed on contents re-runs on every importer too. Both must still report
 // exactly what an uncached walk reports.
 func TestABodyEditReplaysShapeKeyedFindingsOnImporters(t *testing.T) {
+	t.Parallel()
 	for name, reach := range map[string]rule.TypeReach{"shape-keyed": rule.TypeReachShapes, "content-keyed": rule.TypeReachContents} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			root := shapeFixture(t)
 			counter := &countingRule{ran: map[string]int{}}
 			typeAware := typeAwareRule(t)
@@ -129,6 +131,7 @@ func TestABodyEditReplaysShapeKeyedFindingsOnImporters(t *testing.T) {
 // An edit to what a dependency exports reaches a shape-keyed rule's findings on every importer: here
 // value() starts returning a number, and the finding on consumer goes away.
 func TestAnExportEditReachesShapeKeyedFindingsOnImporters(t *testing.T) {
+	t.Parallel()
 	root := shapeFixture(t)
 	counter := &countingRule{ran: map[string]int{}}
 	typeAware := typeAwareRule(t)
@@ -171,6 +174,7 @@ func TestAnExportEditReachesShapeKeyedFindingsOnImporters(t *testing.T) {
 
 // Without shapes the walk keys shape-keyed rules on the type fingerprint, which can only re-run more.
 func TestShapeKeyedRulesWithoutShapesFallBackToContents(t *testing.T) {
+	t.Parallel()
 	root := shapeFixture(t)
 	counter := &countingRule{ran: map[string]int{}}
 	typeAware := typeAwareRule(t)
@@ -192,11 +196,13 @@ func TestShapeKeyedRulesWithoutShapesFallBackToContents(t *testing.T) {
 // findings replayed: no rule can read a plain comment off an imported declaration without reading the file's
 // text, which keeps a rule on Contents (#zqsdzbq).
 func TestACommentEditReplaysShapeKeyedFindingsOnImporters(t *testing.T) {
+	t.Parallel()
 	for name, text := range map[string]string{
 		"appended":          "export function value(): string {\n  return \"1\";\n}\n// bench edit 1\n",
 		"before the export": "// a note\n\nexport function value(): string {\n  return \"1\";\n}\n",
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			root := shapeFixture(t)
 			counter := &countingRule{ran: map[string]int{}}
 			typeAware := typeAwareRule(t)

@@ -18,6 +18,7 @@ import (
 // main still has the defect. This is what fails if the pin moves back to upstream before Microsoft
 // merges, and it stays after they do. It was found on two Base authentication casts of this shape.
 func TestReverseMappedInferenceDoesNotExposePrivateMembers(t *testing.T) {
+	t.Parallel()
 	source := `class Entity {
     private secret = 1;
     markChanged(field: string): void {}

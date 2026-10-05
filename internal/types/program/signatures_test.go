@@ -94,6 +94,7 @@ func signatureFixture(t *testing.T) *signatureTree {
 // A body edit is the case the whole table exists for: the edited file's own fingerprint moves, and its
 // importer's does not, where the content fingerprint moves both.
 func TestABodyEditLeavesItsImportersSignatureFingerprintAlone(t *testing.T) {
+	t.Parallel()
 	tree := signatureFixture(t)
 	before := tree.state(nil)
 	tree.write(map[string]string{"b.ts": strings.Replace(signatureFixtureB, "return shape.width;", "return shape.width * 1;", 1)})
@@ -118,6 +119,7 @@ func TestABodyEditLeavesItsImportersSignatureFingerprintAlone(t *testing.T) {
 
 // An edit to what a file exports must reach every importer.
 func TestAnExportEditMovesItsImportersSignatureFingerprint(t *testing.T) {
+	t.Parallel()
 	tree := signatureFixture(t)
 	before := tree.state(nil)
 	tree.write(map[string]string{"b.ts": strings.Replace(signatureFixtureB, "export function measure(shape: Shape): number {", "export function measure(shape: Shape): number | string {", 1)})
@@ -134,6 +136,7 @@ func TestAnExportEditMovesItsImportersSignatureFingerprint(t *testing.T) {
 // Two levels down: c's exported type changes and b's declaration output, which only names `Shape`, does not.
 // a reaches c through b, so a's fingerprint must still move.
 func TestAChangeTwoLevelsDownReachesTheImporter(t *testing.T) {
+	t.Parallel()
 	tree := signatureFixture(t)
 	before := tree.state(nil)
 	tree.write(map[string]string{"c.ts": "export type Shape = { width: string };\n"})
@@ -150,6 +153,7 @@ func TestAChangeTwoLevelsDownReachesTheImporter(t *testing.T) {
 // JSDoc on an export is part of its declaration output, so a rule reading a deprecation through types sees
 // the change. Pinned because no-deprecated depends on it.
 func TestAJSDocEditOnAnExportChangesTheSignature(t *testing.T) {
+	t.Parallel()
 	tree := signatureFixture(t)
 	before := tree.state(nil)
 	tree.write(map[string]string{"b.ts": strings.Replace(signatureFixtureB, "export function measure(", "/** @deprecated use something else */\nexport function measure(", 1)})
@@ -163,6 +167,7 @@ func TestAJSDocEditOnAnExportChangesTheSignature(t *testing.T) {
 // `async` changes a declaration's syntax and not its output, which is the gap the syntax half of the shape
 // closes: the signature stays, the shape moves, and the importer's fingerprint moves with it.
 func TestAnAsyncOnlyEditReachesImportersThroughTheSyntaxHalf(t *testing.T) {
+	t.Parallel()
 	tree := signatureFixture(t)
 	before := tree.state(nil)
 	tree.write(map[string]string{"b.ts": strings.Replace(signatureFixtureB, "export async function load(): Promise<number> {\n  return 1;", "export function load(): Promise<number> {\n  return Promise.resolve(1);", 1)})
@@ -178,6 +183,7 @@ func TestAnAsyncOnlyEditReachesImportersThroughTheSyntaxHalf(t *testing.T) {
 
 // What stays invisible is a body's own text: an edit inside one moves neither half.
 func TestAnEditInsideABodyMovesNeitherHalf(t *testing.T) {
+	t.Parallel()
 	tree := signatureFixture(t)
 	before := tree.state(nil)
 	tree.write(map[string]string{"b.ts": strings.Replace(signatureFixtureB, "  return 1;", "  return 1 + 0;", 1)})
@@ -195,6 +201,7 @@ func TestAnEditInsideABodyMovesNeitherHalf(t *testing.T) {
 
 // A file that declares something global changes types everywhere without being imported.
 func TestAGlobalDeclarationMovesEverySignatureFingerprint(t *testing.T) {
+	t.Parallel()
 	tree := signatureFixture(t)
 	tree.write(map[string]string{"globals.d.ts": "declare global { interface Window { first: string } }\nexport {};\n"})
 	before := tree.state(nil)
@@ -210,6 +217,7 @@ func TestAGlobalDeclarationMovesEverySignatureFingerprint(t *testing.T) {
 
 // Nothing changed means nothing computed and nothing moved.
 func TestAnUnchangedTreeComputesNoSignatures(t *testing.T) {
+	t.Parallel()
 	tree := signatureFixture(t)
 	before := tree.state(nil)
 	if before.computed != 3 {
@@ -233,6 +241,7 @@ func TestAnUnchangedTreeComputesNoSignatures(t *testing.T) {
 // The compiler records a shape only for a file it saw change, so a first build's buildinfo has none. The
 // fixture builds, edits b, and builds again, which is how a real tree's buildinfo fills up.
 func TestSeededSignaturesEqualComputedOnes(t *testing.T) {
+	t.Parallel()
 	tree := signatureFixture(t)
 	tree.write(map[string]string{"tsconfig.json": `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler","incremental":true,"noEmit":true,"tsBuildInfoFile":".cache/tsconfig.tsbuildinfo"},"include":["**/*.ts"]}`})
 	tree.graph().IncrementalDiagnostics(context.Background())

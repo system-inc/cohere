@@ -53,6 +53,7 @@ import (
 // A probe that printed its result would have shown the panic as a crash with no verdict attached,
 // and the wrong belief would have reached the rule.
 func TestAliasAccessorsWalkTheChainToADeprecation(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		// otherSource is the imported module, where the deprecation is written.
@@ -86,6 +87,7 @@ func TestAliasAccessorsWalkTheChainToADeprecation(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			fileChecker, sourceFile, release := buildAliasSubject(t, testCase.otherSource)
 			defer release()
 
@@ -139,6 +141,7 @@ func TestAliasAccessorsWalkTheChainToADeprecation(t *testing.T) {
 // which of the two behaves this way. Both do, and a future upstream that softened either one would
 // fail here rather than silently making a caller's gate redundant.
 func TestAliasAccessorsRefuseANonAlias(t *testing.T) {
+	t.Parallel()
 	fileChecker, sourceFile, release := buildAliasSubject(t, "export function exported(): void {}\n")
 	defer release()
 
@@ -165,6 +168,8 @@ func TestAliasAccessorsRefuseANonAlias(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
+		// Not parallel: every case calls into the parent's one checker, which the parent's deferred release()
+		// returns when its body ends, before parallel subtests would start.
 		t.Run(testCase.accessor, func(t *testing.T) {
 			panicked := func() (panicked bool) {
 				defer func() {

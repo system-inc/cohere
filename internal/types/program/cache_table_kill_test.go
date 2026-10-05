@@ -21,6 +21,10 @@ import (
 // at the second. Before the first, both files are the old ones. Between them, the run is the new one and the
 // findings the old: the files are not atomic with each other, and need not be, since each carries its own
 // proof (#45ekc65).
+//
+// Not parallel: it kills a child writer 200ms after the writer's temporary appears, trusting the child to
+// reach its rename hook in that margin, and CPU taken by parallel siblings can eat it (it failed under load
+// before). Serial, it runs before every parallel test in the package, with the cores to itself.
 func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(t *testing.T) {
 	identity := CacheTableIdentity{SelfCommit: "kill-test"}
 	sections := CacheTableSections{Runs: []string{"--no-fix"}, Findings: true}
@@ -45,6 +49,8 @@ func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(t *testing.T) {
 	}
 
 	for _, stopAt := range []int{1, 2} {
+		// Not parallel: the same 200ms kill margin as the test, which the other case's child writer, run at the
+		// same time, would share the CPU with.
 		t.Run(fmt.Sprintf("killed at rename %d", stopAt), func(t *testing.T) {
 			directory := t.TempDir()
 			if err := WriteCacheTable(directory, tableSaying("old"), identity, sections); err != nil {

@@ -10,6 +10,7 @@ import (
 // A file handed to the formatter with CRLF is counted once, however many passes it takes, and the note
 // names the count and the .gitattributes line. A tree with none prints nothing.
 func TestCRLFFilesAreNamedOnceWithTheFix(t *testing.T) {
+	t.Parallel()
 	var lineEndings crlfFiles
 	transform := lineEndings.observing(func(fileName string, text string) (string, error) {
 		return strings.ReplaceAll(text, "\r\n", "\n"), nil

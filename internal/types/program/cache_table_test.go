@@ -42,6 +42,7 @@ func readEverySection(t *testing.T, directory string, identity program.CacheTabl
 
 // TestCacheTableRoundTripsEverySection is the table as a whole, through its files and back.
 func TestCacheTableRoundTripsEverySection(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	original := sampleCacheTable()
 	original.Signatures = map[string]program.SignatureEntry{"/project/source/a.ts": {Version: "1", Signature: "s", Syntax: "x"}}
@@ -86,6 +87,7 @@ func TestCacheTableRoundTripsEverySection(t *testing.T) {
 // every other file byte for byte, and a section named but nil in the table is not written, so a run with
 // nothing to say about a section never erases what another run left there.
 func TestAWriteReplacesOnlyTheSectionsItNames(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	if err := program.WriteCacheTable(directory, sampleCacheTable(), testIdentity, program.EveryCacheTableSection); err != nil {
 		t.Fatal(err)
@@ -136,6 +138,7 @@ func TestAWriteReplacesOnlyTheSectionsItNames(t *testing.T) {
 // discard with a reason rather than a section assembled out of the wrong bytes. A finding pointing at the
 // wrong rule and range is worse than no finding, because it reads as a real result.
 func TestCacheTableDiscardsWhatItCannotTrust(t *testing.T) {
+	t.Parallel()
 	source := t.TempDir()
 	if err := program.WriteCacheTable(source, sampleCacheTable(), testIdentity, program.CacheTableSections{Findings: true}); err != nil {
 		t.Fatalf("writing: %v", err)
@@ -168,6 +171,7 @@ func TestCacheTableDiscardsWhatItCannotTrust(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			directory := t.TempDir()
 			if err := os.WriteFile(filepath.Join(directory, "findings.gob"), testCase.buffer, 0o600); err != nil {
 				t.Fatal(err)
@@ -187,6 +191,7 @@ func TestCacheTableDiscardsWhatItCannotTrust(t *testing.T) {
 // Files from another cohere commit keep only their format record, whose own key decides whether it still
 // holds, and drop the runs and findings, whose keys name the binary and could never match anyway.
 func TestCacheTableFromAnotherCohereCommitKeepsOnlyTheFormatRecord(t *testing.T) {
+	t.Parallel()
 	otherCommit := testIdentity
 	otherCommit.SelfCommit = "another"
 	directory := t.TempDir()
@@ -213,7 +218,9 @@ func TestCacheTableFromAnotherCohereCommitKeepsOnlyTheFormatRecord(t *testing.T)
 // TestReadCacheTableAlwaysReturnsATable pins the caller's contract: a table to use, and an error that says
 // whether its emptiness is worth reporting. Nothing on disk is a first run; anything else is a discard.
 func TestReadCacheTableAlwaysReturnsATable(t *testing.T) {
+	t.Parallel()
 	t.Run("missing", func(t *testing.T) {
+		t.Parallel()
 		table, err := readEverySection(t, filepath.Join(t.TempDir(), "absent"), testIdentity)
 		if !errors.Is(err, os.ErrNotExist) {
 			t.Errorf("a missing table should say it is missing, got %v", err)
@@ -228,6 +235,7 @@ func TestReadCacheTableAlwaysReturnsATable(t *testing.T) {
 	})
 
 	t.Run("corrupt", func(t *testing.T) {
+		t.Parallel()
 		directory := t.TempDir()
 		if err := os.WriteFile(filepath.Join(directory, "findings.gob"), []byte("{not a table"), 0o600); err != nil {
 			t.Fatal(err)
@@ -246,6 +254,7 @@ func TestReadCacheTableAlwaysReturnsATable(t *testing.T) {
 // cache is truncated or half-visible, and asserts the directory holds only the finished files: a leftover
 // temporary means a failure path forgot to clean up, and it accumulates silently across runs.
 func TestCacheTableSurvivesDisk(t *testing.T) {
+	t.Parallel()
 	directory := filepath.Join(t.TempDir(), "nested")
 	original := sampleCacheTable()
 

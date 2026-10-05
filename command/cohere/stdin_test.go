@@ -59,6 +59,7 @@ func TestStdinAnswersWhatTheGateWrites(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			root := t.TempDir()
 			fixScopeProject(t, root, map[string]string{"Notes.md": "# Notes\n"})
 			path := filepath.Join(root, testCase.name)

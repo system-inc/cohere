@@ -7,6 +7,7 @@ import (
 )
 
 func TestMemoryPolicyTurnsCollectionOffUnderHalfOfWhatIsAvailable(t *testing.T) {
+	t.Parallel()
 	noEnvironment := func(string) (string, bool) { return "", false }
 	policy := decideMemoryPolicy(noEnvironment, func() (uint64, error) { return 108e9, nil })
 	if policy.ceiling != 54e9 {
@@ -22,6 +23,7 @@ func TestMemoryPolicyTurnsCollectionOffUnderHalfOfWhatIsAvailable(t *testing.T) 
 }
 
 func TestMemoryPolicyStepsAsideForTheEnvironment(t *testing.T) {
+	t.Parallel()
 	for _, set := range []map[string]string{{"GOGC": "100"}, {"GOMEMLIMIT": "2GiB"}, {"GOGC": "off", "GOMEMLIMIT": "6GiB"}} {
 		lookup := func(name string) (string, bool) { value, ok := set[name]; return value, ok }
 		asked := false
@@ -38,6 +40,7 @@ func TestMemoryPolicyStepsAsideForTheEnvironment(t *testing.T) {
 }
 
 func TestMemoryPolicyKeepsTheDefaultWhenMemoryCannotBeRead(t *testing.T) {
+	t.Parallel()
 	noEnvironment := func(string) (string, bool) { return "", false }
 	for _, reading := range []func() (uint64, error){
 		func() (uint64, error) { return 0, errors.New("no reader") },
@@ -51,12 +54,14 @@ func TestMemoryPolicyKeepsTheDefaultWhenMemoryCannotBeRead(t *testing.T) {
 }
 
 func TestDarwinAvailableMemoryCountsFreeFileBackedAndPurgeablePages(t *testing.T) {
+	t.Parallel()
 	if got := darwinAvailableMemory(16384, 2_898_869, 1_800_168, 57_667); got != 16384*(2_898_869+1_800_168+57_667) {
 		t.Fatalf("got %d", got)
 	}
 }
 
 func TestLinuxAvailableMemoryTakesTheSmallerOfMemAvailableAndTheCgroup(t *testing.T) {
+	t.Parallel()
 	meminfo := []byte("MemTotal:       16384000 kB\nMemFree:         1000000 kB\nMemAvailable:    8000000 kB\n")
 	host := uint64(8_000_000 * 1024)
 	cases := []struct {
@@ -85,6 +90,7 @@ func TestLinuxAvailableMemoryTakesTheSmallerOfMemAvailableAndTheCgroup(t *testin
 }
 
 func TestATestBinaryKeepsTheDefaultCollector(t *testing.T) {
+	t.Parallel()
 	if !activeMemoryPolicy.testBinary || activeMemoryPolicy.ceiling != 0 {
 		t.Fatalf("the test binary's policy is %+v, which would hold every graph it builds", activeMemoryPolicy)
 	}

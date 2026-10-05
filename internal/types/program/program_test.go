@@ -49,6 +49,7 @@ const minimalConfig = `{
 // TestBuildProducesAProgramAndAChecker is the claim the whole tool rests on: a tsconfig on disk
 // becomes a program in this process, and the checker is a function call away.
 func TestBuildProducesAProgramAndAChecker(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "export const greeting: string = 'hello';\n",
@@ -87,6 +88,7 @@ func TestBuildProducesAProgramAndAChecker(t *testing.T) {
 // That is the exact shape of failure this project exists to refuse, so it is asserted rather than
 // assumed.
 func TestProjectFilesExcludesDeclarations(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"Alpha.ts":      "export const alpha = 1;\n",
@@ -114,6 +116,7 @@ func TestProjectFilesExcludesDeclarations(t *testing.T) {
 // reports what it got back, which no amount of parsing can answer. A walk that dispatched rules but
 // handed them a nil or foreign checker would pass a syntax-only test and fail this one.
 func TestWalkDispatchesRulesWithALiveChecker(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "const counted: number = 41 + 1;\nconst named = 'ahra';\n",
@@ -181,6 +184,7 @@ func TestWalkDispatchesRulesWithALiveChecker(t *testing.T) {
 
 // TestWalkReportsCoverage asserts that a run says what it looked at, not only what it found.
 func TestWalkReportsCoverage(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "export const value = 1;\n",
@@ -235,13 +239,16 @@ func TestWalkReportsCoverage(t *testing.T) {
 // TestBuildFailsLoudly is the guard the whole package exists for: every way of ending up with no
 // files is an error, never an empty success.
 func TestBuildFailsLoudly(t *testing.T) {
+	t.Parallel()
 	t.Run("no config named", func(t *testing.T) {
+		t.Parallel()
 		if _, err := program.Build(program.Options{CurrentDirectory: t.TempDir()}); err == nil {
 			t.Fatal("building with no tsconfig returned no error")
 		}
 	})
 
 	t.Run("config does not exist", func(t *testing.T) {
+		t.Parallel()
 		_, err := program.Build(program.Options{
 			ConfigFileName:   "absent.json",
 			CurrentDirectory: t.TempDir(),
@@ -252,6 +259,7 @@ func TestBuildFailsLoudly(t *testing.T) {
 	})
 
 	t.Run("config matches no files", func(t *testing.T) {
+		t.Parallel()
 		directory := writeProject(t, map[string]string{
 			"tsconfig.json": `{"include":["./nothing-here/**/*.ts"]}`,
 		})
@@ -262,6 +270,7 @@ func TestBuildFailsLoudly(t *testing.T) {
 	})
 
 	t.Run("config does not parse", func(t *testing.T) {
+		t.Parallel()
 		directory := writeProject(t, map[string]string{
 			"tsconfig.json": `{"compilerOptions": {"target": "NotARealTarget"}}`,
 			"main.ts":       "export const value = 1;\n",
@@ -277,6 +286,7 @@ func TestBuildFailsLoudly(t *testing.T) {
 // A caller that filtered its file set down to nothing, or that forgot to register any rules, must
 // hear about it. Returning an empty Result with a nil error would render both as a passing run.
 func TestWalkRefusesAnEmptyRun(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "export const value = 1;\n",
@@ -298,7 +308,9 @@ func TestWalkRefusesAnEmptyRun(t *testing.T) {
 // TestDiagnosticsReportsRealTypeErrors proves the graph reports TypeScript's own findings, in both
 // directions: a broken file produces the error, and a correct one produces silence.
 func TestDiagnosticsReportsRealTypeErrors(t *testing.T) {
+	t.Parallel()
 	t.Run("reports a real error", func(t *testing.T) {
+		t.Parallel()
 		directory := writeProject(t, map[string]string{
 			"tsconfig.json": minimalConfig,
 			"main.ts":       "const value: number = 'not a number';\n",
@@ -328,6 +340,7 @@ func TestDiagnosticsReportsRealTypeErrors(t *testing.T) {
 	// The half a violations-only corpus never has. A checker that reported errors everywhere would
 	// pass the case above and fail this one.
 	t.Run("stays silent on correct code", func(t *testing.T) {
+		t.Parallel()
 		directory := writeProject(t, map[string]string{
 			"tsconfig.json": minimalConfig,
 			"main.ts":       "const value: number = 42;\nexport default value;\n",
@@ -348,6 +361,7 @@ func TestDiagnosticsReportsRealTypeErrors(t *testing.T) {
 // TestCheckerResolvesAcrossFiles proves the graph is one program rather than a set of isolated
 // parses: a type defined in one file is known when another file imports it.
 func TestCheckerResolvesAcrossFiles(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"Shape.ts":      "export interface Shape { sides: number; }\n",
@@ -393,6 +407,7 @@ func codesOf(diagnostics []*ast.Diagnostic) []int32 {
 // listener after reading the checker and one crashing in Run, and the rule beside them must still
 // report on every file.
 func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "const counted: number = 41 + 1;\n",
@@ -480,6 +495,7 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(t *testing.T) {
 // Without this, a boundary that recorded a crash for every file would pass the test above while
 // making the crash line meaningless, which is the same vacuous shape as a probe that cannot fail.
 func TestAWalkWithoutAPanicReportsNoCrashedFile(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "const counted: number = 41 + 1;\n",
@@ -520,6 +536,7 @@ func TestAWalkWithoutAPanicReportsNoCrashedFile(t *testing.T) {
 // before any rule looks at anything, so the sentence it prints is the entire output of a failing
 // verification.
 func TestACompilerDiagnosticRendersThroughLocalize(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "export const counted: string = 41 + 1;\n",

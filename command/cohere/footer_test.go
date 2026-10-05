@@ -55,6 +55,7 @@ func replaySummary(summary *runSummary) {
 
 // The golden lines are Kirk's, from his final footer of 2026-10-04 12:55.
 func TestFooterGolden(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		summary func(summary *runSummary)
@@ -173,6 +174,7 @@ func TestFooterGolden(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			summary := cleanSummary()
 			testCase.summary(&summary)
 			if err := summary.countsAgree(); err != nil {
@@ -188,6 +190,7 @@ func TestFooterGolden(t *testing.T) {
 // TestFooterColor pins the color on a terminal: the verdict and total bold, what was found red, the
 // parentheses dim. Without color there is not one escape code.
 func TestFooterColor(t *testing.T) {
+	t.Parallel()
 	summary := cleanSummary()
 	warmSummary(&summary)
 	want := "\x1b[1m✓ 💎 0.7s\x1b[22m \x1b[2m(480 rules • 3 checked • 3,923 cached)\x1b[22m"
@@ -210,6 +213,7 @@ func TestFooterColor(t *testing.T) {
 // TestCheckedAndCachedAreEveryFileInScope is the first count invariant: the two add up to the files in
 // scope, and a summary where they do not is refused rather than printed.
 func TestCheckedAndCachedAreEveryFileInScope(t *testing.T) {
+	t.Parallel()
 	summary := cleanSummary()
 	warmSummary(&summary)
 	if err := summary.countsAgree(); err != nil {
@@ -224,6 +228,7 @@ func TestCheckedAndCachedAreEveryFileInScope(t *testing.T) {
 // TestCoheredIsTheListAboveTheFooter is the second count invariant: the cohered count in the footer is
 // the number of files the 🪄 and 💅 lines list, including those the cap leaves to `--verbose`.
 func TestCoheredIsTheListAboveTheFooter(t *testing.T) {
+	t.Parallel()
 	for _, count := range []int{0, 1, 3, changedFilesShown, changedFilesShown + 7} {
 		summary := cleanSummary()
 		for index := range count {
@@ -312,12 +317,14 @@ var uncheckedConditions = []struct {
 // and then requires the check itself to catch a footer that drops the marker. Without the second half a
 // check that matched anything would pass, and a footer that went quiet about a gap would go unnoticed.
 func TestFooterSaysWhatWasNotChecked(t *testing.T) {
+	t.Parallel()
 	clean := footer(cleanSummary(), plain, footerOptions{})
 	if strings.Contains(clean, "⚠") || strings.Contains(clean, "not checked") {
 		t.Fatalf("a clean run's footer carries a marker it has no cause for: %s", clean)
 	}
 	for _, condition := range uncheckedConditions {
 		t.Run(condition.name, func(t *testing.T) {
+			t.Parallel()
 			summary := cleanSummary()
 			condition.plant(&summary)
 			if summary.failed() {
@@ -358,6 +365,7 @@ func (m *missingMarker) Error() string {
 
 // TestFooterGroupsCounts is Kirk's: a count is exact, its thousands grouped, never abbreviated.
 func TestFooterGroupsCounts(t *testing.T) {
+	t.Parallel()
 	for count, want := range map[int]string{
 		0: "0", 7: "7", 999: "999", 1000: "1,000", 3893: "3,893", 99_999: "99,999", 120_000: "120,000",
 		999_999: "999,999", 1_000_000: "1,000,000", 2_412_345: "2,412,345", 340_000_000: "340,000,000", -1234: "-1,234",
@@ -377,6 +385,7 @@ func TestFooterGroupsCounts(t *testing.T) {
 }
 
 func TestOverallFooterGolden(t *testing.T) {
+	t.Parallel()
 	engines := map[string]int{"TypeScript": 2, "Swift": 1}
 	cases := []struct {
 		name  string
@@ -407,6 +416,7 @@ func TestOverallFooterGolden(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if got := overallFooter(testCase.facts, plain); got != testCase.want {
 				t.Errorf("overallFooter:\n got  %s\n want %s", got, testCase.want)
 			}

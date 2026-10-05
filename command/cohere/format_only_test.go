@@ -108,6 +108,7 @@ func TestTheFormatOnlyGateExitsOnFormattingAlone(t *testing.T) {
 // formatter that broke on it is a file nobody checked; a skip about the run (outside the named paths, a
 // type the formatter does not handle) is a file that was never the run's to check.
 func TestOnlyAFileTheFormatterCouldNotReadIsUnchecked(t *testing.T) {
+	t.Parallel()
 	summary := edit.Summary{
 		NotTransformed: []edit.NotTransformedFile{
 			{FileName: "/a/Broken.json", Reason: unparseableSkipReason},

@@ -38,6 +38,7 @@ func isBundledLibrary(sourceFile *ast.SourceFile) bool {
 // everything else. The control is the project file: a cache that shared it would serve one test's fixture to
 // another.
 func TestLibraryParsesShareEachLibFileAcrossPrograms(t *testing.T) {
+	t.Parallel()
 	parses := program.NewLibraryParses()
 	first := buildWithLibraryParses(t, writeProject(t, map[string]string{
 		"tsconfig.json": libraryParsesConfig("ES2022", ""),
@@ -80,6 +81,7 @@ func TestLibraryParsesShareEachLibFileAcrossPrograms(t *testing.T) {
 // diagnostics, an unshared build of the same config does. Sharing must only ever save a parse, never change
 // which files a program holds or what it says about them.
 func TestLibraryParsesNeverChangeWhatAProgramLoadsOrReports(t *testing.T) {
+	t.Parallel()
 	parses := program.NewLibraryParses()
 	// One program fills the cache first with a wide lib set.
 	buildWithLibraryParses(t, writeProject(t, map[string]string{
@@ -103,6 +105,7 @@ func TestLibraryParsesNeverChangeWhatAProgramLoadsOrReports(t *testing.T) {
 		{"ES2022 with dom has both", "ES2022", `"es2022", "dom"`, "export const both = [1].at(0) ?? document.title;\n", false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			directory := writeProject(t, map[string]string{
 				"tsconfig.json": libraryParsesConfig(testCase.target, testCase.libs),
 				"main.ts":       testCase.source,
@@ -143,6 +146,7 @@ func TestLibraryParsesNeverChangeWhatAProgramLoadsOrReports(t *testing.T) {
 // Programs built and checked at once share parses without a race. Run under -race, this is the guard on the
 // cache's locking and on binding a shared file from several programs at once.
 func TestLibraryParsesAreSafeAcrossConcurrentPrograms(t *testing.T) {
+	t.Parallel()
 	parses := program.NewLibraryParses()
 	var group sync.WaitGroup
 	for index := range 8 {

@@ -109,6 +109,7 @@ func roundTripLintCache(t *testing.T, cache *program.LintCache) *program.LintCac
 // remembered. TestLintCacheFindingHasNoUncheckedFields now makes that structural: it fails when a
 // field exists that the comparison does not name, so the next field cannot be added silently.
 func TestLintCacheRoundTripsEveryField(t *testing.T) {
+	t.Parallel()
 	original := sampleLintCache()
 	decoded := roundTripLintCache(t, original)
 
@@ -199,10 +200,13 @@ func TestLintCacheRoundTripsEveryField(t *testing.T) {
 // every uncached file reads as clean and the tool reports a green tree it never linted. That
 // is the exact silent failure this whole domain exists to prevent, and it is one boolean away.
 func TestLintCacheLookupDistinguishesCleanFromUnknown(t *testing.T) {
+	t.Parallel()
 	cache := roundTripLintCache(t, sampleLintCache())
 	key := program.HashRuleSet([]string{"no-debugger", "no-empty"})
 	rules := []string{"no-debugger", "no-empty"}
 
+	// Not parallel: Lookup builds the shared cache's path index on its first call with the matching key,
+	// lazily and unlocked, so two subtests looking up at once would race to build it.
 	t.Run("a cached clean file is a hit with no findings", func(t *testing.T) {
 		entry, hit := cache.Lookup("/project/source/clean.ts",
 			program.HashContent("export const value = 1;\n"), key, rules)
@@ -215,6 +219,8 @@ func TestLintCacheLookupDistinguishesCleanFromUnknown(t *testing.T) {
 		}
 	})
 
+	// Not parallel: Lookup builds the shared cache's path index on its first call with the matching key,
+	// lazily and unlocked, so two subtests looking up at once would race to build it.
 	t.Run("an unknown file is a miss, not a clean hit", func(t *testing.T) {
 		_, hit := cache.Lookup("/project/source/never-seen.ts",
 			program.HashContent("whatever"), key, rules)
@@ -224,6 +230,8 @@ func TestLintCacheLookupDistinguishesCleanFromUnknown(t *testing.T) {
 		}
 	})
 
+	// Not parallel: Lookup builds the shared cache's path index on its first call with the matching key,
+	// lazily and unlocked, so two subtests looking up at once would race to build it.
 	t.Run("changed contents under a known path is a miss", func(t *testing.T) {
 		_, hit := cache.Lookup("/project/source/dirty.ts",
 			program.HashContent("something completely different\n"), key, rules)
@@ -234,6 +242,7 @@ func TestLintCacheLookupDistinguishesCleanFromUnknown(t *testing.T) {
 	})
 
 	t.Run("a changed key invalidates every entry", func(t *testing.T) {
+		t.Parallel()
 		_, hit := cache.Lookup("/project/source/clean.ts",
 			program.HashContent("export const value = 1;\n"),
 			program.HashRuleSet([]string{"no-debugger"}), rules)
@@ -246,6 +255,8 @@ func TestLintCacheLookupDistinguishesCleanFromUnknown(t *testing.T) {
 	// An override can change which rules reach one file while the key, built from the whole config's
 	// bytes, would also change. This guards the narrower case of the rule list itself differing, so a
 	// file never replays findings from a rule set it is not offered now.
+	// Not parallel: Lookup builds the shared cache's path index on its first call with the matching key,
+	// lazily and unlocked, so two subtests looking up at once would race to build it.
 	t.Run("a different applied rule list is a miss", func(t *testing.T) {
 		_, hit := cache.Lookup("/project/source/clean.ts",
 			program.HashContent("export const value = 1;\n"), key, []string{"no-debugger"})
@@ -255,6 +266,7 @@ func TestLintCacheLookupDistinguishesCleanFromUnknown(t *testing.T) {
 	})
 
 	t.Run("a nil cache is always a miss", func(t *testing.T) {
+		t.Parallel()
 		var nilCache *program.LintCache
 		if _, hit := nilCache.Lookup("anything", program.HashContent("x"), key, rules); hit {
 			t.Fatal("a nil cache reported a hit")
@@ -267,6 +279,7 @@ func TestLintCacheLookupDistinguishesCleanFromUnknown(t *testing.T) {
 // a later rule reads. This doc once said rule order decides the order findings come back in; it does
 // not, the walk sorts them, and HashRuleSet's own comment says so.
 func TestRuleSetHashIsOrderSensitive(t *testing.T) {
+	t.Parallel()
 	forward := program.HashRuleSet([]string{"alpha", "beta"})
 	backward := program.HashRuleSet([]string{"beta", "alpha"})
 	if forward == backward {
@@ -275,6 +288,7 @@ func TestRuleSetHashIsOrderSensitive(t *testing.T) {
 	}
 
 	t.Run("concatenation cannot collide", func(t *testing.T) {
+		t.Parallel()
 		// Without a separator, {"ab","c"} and {"a","bc"} hash identically. That is a real
 		// collision between two different rule sets, and it would serve one's cache to the
 		// other.
@@ -296,6 +310,7 @@ func TestRuleSetHashIsOrderSensitive(t *testing.T) {
 // named below AND compared above, which is the cheapest way to make "the encoder forgot a field"
 // impossible to ship — the exact bug this format has produced four times.
 func TestLintCacheFindingHasNoUncheckedFields(t *testing.T) {
+	t.Parallel()
 	// Every field the round-trip test compares. Kept in sync by this test failing, not by discipline.
 	compared := map[string]struct{}{
 		"RuleName":           {},
@@ -334,6 +349,7 @@ func TestLintCacheFindingHasNoUncheckedFields(t *testing.T) {
 // VisitedNodes. An entry field the round trip does not compare can be dropped by the encoder and still
 // pass, and a dropped VisitedNodes would change the coverage line of every replayed run.
 func TestLintCacheEntryHasNoUncheckedFields(t *testing.T) {
+	t.Parallel()
 	compared := map[string]struct{}{
 		"Path": {}, "ContentHash": {}, "Rules": {}, "TypedRules": {}, "TypeFingerprint": {}, "Listening": {},
 		"VisitedNodes": {}, "Findings": {}, "ShapedRules": {}, "ShapeFingerprint": {}, "DesignRules": {}, "DesignFingerprint": {},
@@ -358,6 +374,7 @@ func TestLintCacheEntryHasNoUncheckedFields(t *testing.T) {
 // which copy the index happened to keep, and the stale one would win or lose by insertion order,
 // which is exactly the kind of nondeterminism that reads as a flaky cache rather than a bug.
 func TestLintCacheStoreReplacesRatherThanAppends(t *testing.T) {
+	t.Parallel()
 	cache := &program.LintCache{Key: program.HashRuleSet([]string{"no-debugger"})}
 	path := "/project/source/edited.ts"
 	rules := []string{"no-debugger"}
@@ -397,6 +414,7 @@ func TestLintCacheStoreReplacesRatherThanAppends(t *testing.T) {
 // forever and the cache would save nothing on exactly the population it exists for, while looking
 // like it worked.
 func TestLintCacheStoreRecordsCleanFiles(t *testing.T) {
+	t.Parallel()
 	cache := &program.LintCache{Key: program.HashRuleSet([]string{"no-debugger"})}
 	contentHash := program.HashContent("export const value = 1;\n")
 	rules := []string{"no-debugger"}
@@ -419,6 +437,7 @@ func TestLintCacheStoreRecordsCleanFiles(t *testing.T) {
 // while that hash does not, and replaying such a rule serves zero findings forever on a file that now
 // has one.
 func TestCacheableRulesExcludesImpureRules(t *testing.T) {
+	t.Parallel()
 	pure := rule.Rule{Name: "pure"}
 	options := rule.Rule{Name: "options", ProgramReads: rule.ReadsCompilerOptions}
 	otherFiles := rule.Rule{Name: "other-files", ProgramReads: rule.ReadsOtherFiles}
@@ -448,6 +467,7 @@ func TestCacheableRulesExcludesImpureRules(t *testing.T) {
 // a cache miss. Those are not comparable, so a rule carrying any impurity declaration is excluded
 // even when it also looks pure by every other measure.
 func TestCacheableRulesDefaultsToExcluding(t *testing.T) {
+	t.Parallel()
 	// A rule that declares an impurity and nothing else must still be turned away, so a future
 	// declaration added to rule.Rule cannot quietly become cacheable by omission here.
 	for _, subject := range []rule.Rule{
@@ -468,6 +488,7 @@ func TestCacheableRulesDefaultsToExcluding(t *testing.T) {
 // whether to consult the cache at all, and a non-nil empty slice and a nil one must behave the same
 // at that decision.
 func TestCacheableRulesHandlesAnEmptySet(t *testing.T) {
+	t.Parallel()
 	cacheable, uncacheable := program.CacheableRules(nil)
 	if len(cacheable) != 0 || len(uncacheable) != 0 {
 		t.Errorf("empty input produced %d cacheable and %d uncacheable", len(cacheable), len(uncacheable))

@@ -100,6 +100,7 @@ func waitForClock(t *testing.T, path string) {
 // A run cache with nothing changed is a hit. This is the control for every case below: if it were
 // a miss, each "changing X invalidates" test would pass because the cache never hits at all.
 func TestRunCacheHitsWhenNothingChanged(t *testing.T) {
+	t.Parallel()
 	tree := newRunCacheTree(t)
 	cache := tree.record(t)
 	if err := cache.Check(tree.key); err != nil {
@@ -112,6 +113,7 @@ func TestRunCacheHitsWhenNothingChanged(t *testing.T) {
 // One row per category the task names. A category without a row is a category nobody has shown the
 // cache noticing, and the failure mode there is silence: a stale verdict replayed as current.
 func TestRunCacheInvalidatesOnEveryInputCategory(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		change func(t *testing.T, tree *runCacheTree)
@@ -152,6 +154,7 @@ func TestRunCacheInvalidatesOnEveryInputCategory(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			tree := newRunCacheTree(t)
 			cache := tree.record(t)
 			if err := cache.Check(tree.key); err != nil {
@@ -174,6 +177,7 @@ func TestRunCacheInvalidatesOnEveryInputCategory(t *testing.T) {
 // The key covers what is not a file: the flags, the directory, the binary. A run with different
 // flags over identical files is a different run.
 func TestRunCacheKeySeparatesRuns(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	lint, err := program.RunCacheKey([]string{"--lint"}, root)
 	if err != nil {
@@ -203,6 +207,7 @@ func TestRunCacheKeySeparatesRuns(t *testing.T) {
 // A run over the right files with the wrong key misses. The binary is part of the key, so this is
 // also the binary-changed case: a rebuilt cohere has a new mtime and therefore a new key.
 func TestRunCacheMissesOnADifferentKey(t *testing.T) {
+	t.Parallel()
 	tree := newRunCacheTree(t)
 	cache := tree.record(t)
 	if err := cache.Check(tree.key + "x"); !errors.Is(err, program.ErrRunCacheMiss) {
@@ -212,15 +217,18 @@ func TestRunCacheMissesOnADifferentKey(t *testing.T) {
 
 // Doubt is a miss. Each of these is a manifest the cache cannot prove anything from.
 func TestRunCacheDoubtIsAMiss(t *testing.T) {
+	t.Parallel()
 	tree := newRunCacheTree(t)
 
 	t.Run("no cache", func(t *testing.T) {
+		t.Parallel()
 		var cache *program.RunCache
 		if err := cache.Check(tree.key); !errors.Is(err, program.ErrRunCacheMiss) {
 			t.Fatalf("a nil cache did not miss: %v", err)
 		}
 	})
 	t.Run("a different format version", func(t *testing.T) {
+		t.Parallel()
 		cache := tree.record(t)
 		cache.Version++
 		if err := cache.Check(tree.key); !errors.Is(err, program.ErrRunCacheMiss) {
@@ -230,6 +238,7 @@ func TestRunCacheDoubtIsAMiss(t *testing.T) {
 	// A manifest with no inputs matches every tree, so it would replay forever. It can only come
 	// from a writer that recorded nothing, and that writer is the bug.
 	t.Run("a manifest with no inputs", func(t *testing.T) {
+		t.Parallel()
 		cache := tree.record(t)
 		cache.Inputs = nil
 		if err := cache.Check(tree.key); !errors.Is(err, program.ErrRunCacheMiss) {
@@ -238,6 +247,7 @@ func TestRunCacheDoubtIsAMiss(t *testing.T) {
 	})
 	// What a table holds when no run was recorded under an invocation, so the caller's lookup must miss.
 	t.Run("no recorded run", func(t *testing.T) {
+		t.Parallel()
 		var absent *program.RunCache
 		if err := absent.Check(tree.key); !errors.Is(err, program.ErrRunCacheMiss) {
 			t.Fatalf("a missing record was not a miss: %v", err)
@@ -251,6 +261,7 @@ func TestRunCacheDoubtIsAMiss(t *testing.T) {
 // job, one caller forgetting them would reintroduce it silently. So Record derives them, and this
 // asserts it did: every source's directory appears as a directory entry.
 func TestRunCacheRecordWatchesEveryDirectoryItself(t *testing.T) {
+	t.Parallel()
 	tree := newRunCacheTree(t)
 	cache := tree.record(t)
 
@@ -272,6 +283,7 @@ func TestRunCacheRecordWatchesEveryDirectoryItself(t *testing.T) {
 // The exit code matters as much as the output. A cache that printed a failing run's findings and
 // exited zero would pass CI while describing a failure.
 func TestRunCacheReplaysOutputAndExitCodeThroughDisk(t *testing.T) {
+	t.Parallel()
 	tree := newRunCacheTree(t)
 	directory := filepath.Join(t.TempDir(), "nested")
 	table := program.NewCacheTable()
@@ -309,6 +321,7 @@ func TestRunCacheReplaysOutputAndExitCodeThroughDisk(t *testing.T) {
 // then never hit, which no other test here could see: they all handed in files only. Found by running
 // the untouched-tree check against the real ahra tree.
 func TestRunCacheRecordsADirectoryAmongTheFilesAsADirectory(t *testing.T) {
+	t.Parallel()
 	tree := newRunCacheTree(t)
 	withDirectory := append(append([]string(nil), tree.files...), tree.subdir, tree.root)
 	cache, err := program.RecordRunCache(tree.key, withDirectory, nil, tree.absent, nil, []byte("x"), 0, time.Time{})
@@ -333,6 +346,7 @@ func TestRunCacheRecordsADirectoryAmongTheFilesAsADirectory(t *testing.T) {
 // changed into a fact, so a commit or a new untracked file must move the key even when no source file
 // the build read has changed.
 func TestRunCacheKeyCoversEveryFact(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	base, err := program.RunCacheKey(nil, root, "root=/a", "scope=x")
 	if err != nil {
@@ -359,6 +373,7 @@ func TestRunCacheKeyCoversEveryFact(t *testing.T) {
 // entries in the same order (files sorted, then their directories, then what was absent), each with its own
 // signature, and a path that vanished before the record is still an error rather than an absence (#a66sfmh).
 func TestRunCacheRecordsInParallelInTheSerialOrder(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	var files []string
 	for directory := range 12 {

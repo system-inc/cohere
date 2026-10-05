@@ -72,6 +72,7 @@ func (f *packFixture) dataFile() string {
 
 // A file read once is served from the pack the next time, unopened, and with the same bytes.
 func TestTheContentPackServesAnUnchangedFile(t *testing.T) {
+	t.Parallel()
 	fixture := newPackFixture(t)
 	fixture.write("a.ts", "export const a = 1;\n")
 	fixture.write("b.ts", "export const b = 2;\n")
@@ -91,6 +92,7 @@ func TestTheContentPackServesAnUnchangedFile(t *testing.T) {
 // modification time cannot: different bytes of the same size with the modification time put back, as
 // cp -p, rsync -t and touch -r all do. A replace by rename is a new inode.
 func TestTheContentPackNeverServesChangedBytes(t *testing.T) {
+	t.Parallel()
 	for _, change := range []struct {
 		name   string
 		change func(f *packFixture)
@@ -125,6 +127,7 @@ func TestTheContentPackNeverServesChangedBytes(t *testing.T) {
 		}},
 	} {
 		t.Run(change.name, func(t *testing.T) {
+			t.Parallel()
 			fixture := newPackFixture(t)
 			fixture.t = t
 			fixture.write("a.ts", "export const a = 1;\n")
@@ -147,6 +150,7 @@ func TestTheContentPackNeverServesChangedBytes(t *testing.T) {
 
 // A damaged pack costs reads from disk and never a wrong byte, and the next write leaves a sound pack.
 func TestADamagedContentPackIsReadAround(t *testing.T) {
+	t.Parallel()
 	for _, damage := range []struct {
 		name        string
 		damage      func(f *packFixture)
@@ -170,6 +174,7 @@ func TestADamagedContentPackIsReadAround(t *testing.T) {
 		{"a data file deleted", func(f *packFixture) { os.Remove(f.dataFile()) }, false},
 	} {
 		t.Run(damage.name, func(t *testing.T) {
+			t.Parallel()
 			fixture := newPackFixture(t)
 			fixture.t = t
 			fixture.write("a.ts", "export const a = 1;\n")
@@ -194,6 +199,7 @@ func TestADamagedContentPackIsReadAround(t *testing.T) {
 // A pack truncated in place while a run has it mapped faults on the copy. The fault is a read from disk,
 // not the end of the process.
 func TestAContentPackTruncatedUnderItsMappingIsReadAround(t *testing.T) {
+	t.Parallel()
 	fixture := newPackFixture(t)
 	fixture.write("a.ts", strings.Repeat("export const a = 1;\n", 4096))
 	fixture.run("a.ts")
@@ -216,6 +222,7 @@ func TestAContentPackTruncatedUnderItsMappingIsReadAround(t *testing.T) {
 // A run that reads one new file appends it rather than rewriting the pack, and a pack mostly dead is
 // compacted into a new data file, the old one removed.
 func TestTheContentPackAppendsAndCompacts(t *testing.T) {
+	t.Parallel()
 	fixture := newPackFixture(t)
 	fixture.write("a.ts", strings.Repeat("a", 1000))
 	fixture.write("b.ts", strings.Repeat("b", 1000))

@@ -77,6 +77,7 @@ func TestEveryFileWalkedOnAForeignCheckerFindsTheSame(t *testing.T) {
 	}
 	for name, root := range roots {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			home, foreign := run(t, root, false), run(t, root, true)
 			if len(home) == 0 {
 				t.Fatalf("the home run reported nothing, so an identical foreign run proves nothing")

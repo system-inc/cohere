@@ -26,6 +26,7 @@ func newRepository(t *testing.T, files map[string]string) string {
 // Every tsconfig.json and Package.swift the repository keeps is a project, nested at any depth, and a
 // directory holding both is two (#f9nftxz). Parents come before children and TypeScript before Swift.
 func TestDiscoveryFindsEveryProjectTheRepositoryKeeps(t *testing.T) {
+	t.Parallel()
 	root := newRepository(t, map[string]string{
 		"tsconfig.json":               discoveryTsconfig,
 		"Package.swift":               discoveryPackage,
@@ -55,6 +56,7 @@ func TestDiscoveryFindsEveryProjectTheRepositoryKeeps(t *testing.T) {
 // caches, fixtures, what .gitignore ignores, a repository of its own, a submodule, and a marker the root's
 // ignorePatterns refuse. Positive control: the same tree walked with every refusal lifted finds every
 // planted marker, so the pass is the refusals at work and not markers that were never there.
+// Not parallel: it swaps the package-level neverDescended and newIgnoreScope, which discoverProjects reads
 func TestDiscoveryNeverEntersWhatItMustNot(t *testing.T) {
 	root := newRepository(t, map[string]string{
 		"Package.swift":                         discoveryPackage,
@@ -123,6 +125,7 @@ func (ignoresNothing) Ignored(string, bool) bool         { return false }
 // project at or above them inside it: then the repository's root, which is how cohere's own repository
 // finds swift/. A project above the repository belongs to some other tree.
 func TestDiscoveryRootIsTheRepositoryTheCallerStandsIn(t *testing.T) {
+	t.Parallel()
 	repository := newRepository(t, map[string]string{
 		"swift/Package.swift": discoveryPackage,
 		"docs/readme.md":      "docs\n",
@@ -162,6 +165,7 @@ func TestDiscoveryRootIsTheRepositoryTheCallerStandsIn(t *testing.T) {
 // A run that names one project, by directory, tsconfig, lint config or path, checks that project alone, as
 // it always did, and so do the listings and explanations; a bare run discovers.
 func TestDiscoveryAppliesOnlyToARunThatNamesNoProject(t *testing.T) {
+	t.Parallel()
 	if !discoveryApplies(map[string]bool{"no-fix": true, "format-all": true}, nil) {
 		t.Error("a bare --no-fix --format-all run does not discover")
 	}

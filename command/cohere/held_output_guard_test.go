@@ -208,6 +208,7 @@ func failHeldOutput(report string) {
 // the test's wait for output hangs exactly as a leaked descendant would make it. Run in a child test
 // binary, since the watch ends the binary it runs in.
 func TestAHeldOutputNamesItsHolder(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("COHERE_HELD_OUTPUT_HELPER") == "1" {
 		watchForHeldOutput(2*time.Second, 200*time.Millisecond, failHeldOutput)
 		exec.Command("/bin/sh", "-c", "sleep 25 & echo started").CombinedOutput()

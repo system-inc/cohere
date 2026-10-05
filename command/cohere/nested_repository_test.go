@@ -42,6 +42,7 @@ func nestedTree(t *testing.T) string {
 // TestARunInsideALibraryWritesTheLibrary: the repository a run writes is the nearest one at or above
 // where it started, inside the project; the project itself everywhere else.
 func TestARunInsideALibraryWritesTheLibrary(t *testing.T) {
+	t.Parallel()
 	root := nestedTree(t)
 	for _, testCase := range []struct {
 		start string
@@ -72,6 +73,7 @@ func TestARunInsideALibraryWritesTheLibrary(t *testing.T) {
 // TestARunWritesOnlyItsOwnRepository: from inside a library, a file in the project above and a file in
 // a repository nested in the library are both somebody else's, named; the library's own file is not.
 func TestARunWritesOnlyItsOwnRepository(t *testing.T) {
+	t.Parallel()
 	root := nestedTree(t)
 	library := filepath.Join(root, "library")
 
@@ -93,6 +95,7 @@ func TestARunWritesOnlyItsOwnRepository(t *testing.T) {
 // ignore layers, and each file its own run would rewrite is reported under that repository. A clone
 // nobody declared is not read, and nothing is written.
 func TestTheProjectReadsItsLibrariesDrift(t *testing.T) {
+	t.Parallel()
 	root := nestedTree(t)
 	engine := prettierLike()
 	engine.enumerate = func(walkRoot string) (formatfiles.Enumeration, error) {
@@ -125,6 +128,7 @@ func TestTheProjectReadsItsLibrariesDrift(t *testing.T) {
 // never the parent's, and still reports every drifted file: one recorded clean and then misformatted, and
 // one whose recorded entry was written under another formatter's key or other options.
 func TestTheNestedCheckKeepsEachRepositorysOwnRecord(t *testing.T) {
+	t.Parallel()
 	root := nestedTree(t)
 	library := filepath.Join(root, "library")
 	inner := filepath.Join(library, "inner")
@@ -247,6 +251,7 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(t *testing.T) {
 // entry signed with its file's size and modification time vouches for the file without reading it, so
 // an edit, which moves both, must send the file back through the formatter.
 func TestASignedEntryStillReadsAnEditedFile(t *testing.T) {
+	t.Parallel()
 	root := nestedTree(t)
 	library := filepath.Join(root, "library")
 	if err := os.MkdirAll(cacheDirectory(library), 0o755); err != nil {
@@ -291,6 +296,7 @@ func TestASignedEntryStillReadsAnEditedFile(t *testing.T) {
 // TestTheNestedLineSaysWhatItRead: the files the formatter checked and the files taken on the record's
 // word are counted apart, and "would change" is said only of checked files.
 func TestTheNestedLineSaysWhatItRead(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		check nestedDriftCheck
 		want  string

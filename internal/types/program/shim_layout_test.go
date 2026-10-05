@@ -49,6 +49,7 @@ import (
 // the RIGHT size in the WRONG order, or an upstream field reordering that keeps the struct the same
 // size, moves these fields without changing any size the generator compares.
 func TestShimFieldAccessorsReadTheFieldsTheyName(t *testing.T) {
+	t.Parallel()
 	fileChecker, sourceFile, release := buildLayoutSubject(t)
 	defer release()
 

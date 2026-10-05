@@ -19,6 +19,7 @@ import (
 // right; cohere excused them as unported (#ezhwsbc). Walked through a real config, one file per
 // shape, so each count below is one directive's verdict.
 func TestADirectiveNamingAnOffRuleIsDead(t *testing.T) {
+	t.Parallel()
 	quiet := rule.Rule{
 		Name: "test-quiet",
 		Run: func(ctx rule.Context, options any) rule.Listeners {
@@ -67,6 +68,7 @@ func TestADirectiveNamingAnOffRuleIsDead(t *testing.T) {
 		{"an off rule beside an unported one the config turns on", "no-await-in-loop, plugin/unported-on", 0, 1},
 	} {
 		t.Run(shape.name, func(t *testing.T) {
+			t.Parallel()
 			directory := writeProject(t, map[string]string{
 				"tsconfig.json":       minimalConfig,
 				"CohereSettings.json": settings,
@@ -106,6 +108,7 @@ func TestADirectiveNamingAnOffRuleIsDead(t *testing.T) {
 // whole-program run. A file with one dead and one live directive names exactly the dead one, at its own
 // line, with the rules it names; the live one withheld a finding and is not listed.
 func TestADeadDirectiveIsNamedWhereItIs(t *testing.T) {
+	t.Parallel()
 	reporting := rule.Rule{
 		Name: "test-reporting",
 		Run: func(ctx rule.Context, options any) rule.Listeners {

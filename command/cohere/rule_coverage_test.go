@@ -56,6 +56,7 @@ func countedLineTerms(t *testing.T, output string) (int, map[string]int) {
 // the binary lacks, so a rule whose shape no case of the classifier names would fall out of the sum and
 // fail this rather than vanish from the line silently. The arithmetic is read back off the printed
 // line, because that line is what a reader checks.
+// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestCoverageCountsAddUpToTheRuleTotal(t *testing.T) {
 	rules := []rule.Rule{}
 	coverage := program.Coverage{
@@ -127,6 +128,7 @@ func TestCoverageCountsAddUpToTheRuleTotal(t *testing.T) {
 // A Swift record whose parts add up to more than its whole is refused rather than printed, because the
 // counted line would state arithmetic nobody can vouch for.
 func TestSwiftCoverageRefusesPartsLargerThanTheWhole(t *testing.T) {
+	t.Parallel()
 	_, err := classifySwiftCoverage(&swiftLintRecord{RulesRun: 2, RulesWatchedAndQuiet: 2, RulesSilent: []string{"a"}})
 	if err == nil || !strings.Contains(err.Error(), "more than that") {
 		t.Fatalf("a record counting 3 rules among 2 was accepted: %v", err)
@@ -140,6 +142,7 @@ func TestSwiftCoverageRefusesPartsLargerThanTheWhole(t *testing.T) {
 // read exactly like a dead one. They are opposite defects: one was handed files and declined them, the
 // other was never handed anything. The pair was once separable only because a second line about missing
 // config happened to print for one of them, which is why this asserts the categories themselves.
+// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestCoverageSeparatesUnwiredFromOfferedAndSilent(t *testing.T) {
 	rules := []rule.Rule{{Name: "satisfied-rule", NoListener: rule.NoListenerDeclinesIrrelevantFiles}, {Name: "unwired-rule"}}
 	coverage := program.Coverage{
@@ -162,6 +165,7 @@ func TestCoverageSeparatesUnwiredFromOfferedAndSilent(t *testing.T) {
 // Naming every rule that ran and found nothing is the wall this replaced: 370 of them on ahra, which
 // buried the lines a reader must act on. The count is the honest summary, and the names are one flag
 // away.
+// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestARuleThatRanIsCountedAndNotNamedByDefault(t *testing.T) {
 	rules := []rule.Rule{{Name: "quiet-rule"}, {Name: "working-rule"}, {Name: "eager-rule", NoListener: rule.NoListenerAnswersInRun}, {Name: "unconfigured-rule"}}
 	coverage := program.Coverage{
@@ -185,6 +189,7 @@ func TestARuleThatRanIsCountedAndNotNamedByDefault(t *testing.T) {
 // and again as "not in the config", and a rule the config turned off printed as "offered no files" and
 // again as "scoped off". The shapes here are the ones that used to print twice, plus the partial ones
 // whose second fact now rides beside the name.
+// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestCoverageDetailsNameEachRuleOnce(t *testing.T) {
 	rules := []rule.Rule{
 		{Name: "off-everywhere"}, {Name: "nobody-configured"}, {Name: "partly-off"},
@@ -228,6 +233,7 @@ func TestCoverageDetailsNameEachRuleOnce(t *testing.T) {
 // for `**/*.ts`, and a `.cjs` file still linted. They ran on 12 of 3,242 files and coverage counted
 // them with the rules that ran on all of them. The control is a rule that ran on every file, which
 // stays where it was; a rule that found something keeps that category and says where it did not run.
+// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestARuleOffByAnOverrideForMostFilesIsCountedApart(t *testing.T) {
 	rules := []rule.Rule{{Name: "eqeqeq"}, {Name: "no-var"}, {Name: "everywhere"}, {Name: "override-only"}}
 	coverage := program.Coverage{
@@ -261,6 +267,8 @@ func TestARuleOffByAnOverrideForMostFilesIsCountedApart(t *testing.T) {
 // Every category that needs action prints in full on a default run, whatever else moved behind
 // --coverage. One subtest per category in the design, so dropping any of them from the default output
 // fails by name.
+// Not parallel: its subtests render through writeLintReport and the Swift record stream, which set the package-level
+// activeSummary
 func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 	cleanCoverage := func() program.Coverage {
 		return program.Coverage{
@@ -270,6 +278,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 	}
 	rules := []rule.Rule{{Name: "quiet-rule"}}
 
+	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 	t.Run("findings", func(t *testing.T) {
 		coverage := cleanCoverage()
 		coverage.RulesReporting = map[string]int{"quiet-rule": 1}
@@ -283,6 +292,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 		requireLines(t, output, "error quiet-rule: this is wrong\n", "lint: 1 findings", "1 found something")
 	})
 
+	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 	t.Run("crashed files", func(t *testing.T) {
 		coverage := cleanCoverage()
 		coverage.FilesCrashed = []program.FileCrash{{FileName: "/project/Broken.ts", Cause: fmt.Errorf("Node.Text on a kind it does not handle")}}
@@ -293,6 +303,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 		)
 	})
 
+	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 	t.Run("a rule that could not finish a file", func(t *testing.T) {
 		coverage := cleanCoverage()
 		coverage.RulesCrashed = []program.RuleCrash{{RuleName: "prefer-arrow-callback", FileName: "/project/Broken.ts", Cause: fmt.Errorf("interface conversion")}}
@@ -303,11 +314,14 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 		)
 	})
 
+	// Not parallel: it drives the Swift record stream through renderRecords, whose acceptors set the package-level
+	// activeSummary
 	t.Run("unreadable files", func(t *testing.T) {
 		output, _, _ := renderRecords(t, swiftModeCheck, contractFixture(t, "Unreadable.jsonl"), 1)
 		requireLines(t, output, "  not checked: /project/Sources/Example/Latin1.swift (could not be read:")
 	})
 
+	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 	t.Run("config keys that match no rule", func(t *testing.T) {
 		config := &configuration.Config{Rules: map[string]configuration.RuleSetting{
 			"quiet-rule":   {Severity: configuration.SeverityError},
@@ -317,6 +331,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 		requireLines(t, output, `  config: key "no-dupe-keys" matches no registered rule, so its off never applies`)
 	})
 
+	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 	t.Run("a rule offered files that registered nothing when it should have", func(t *testing.T) {
 		// Three rules with the same numbers: offered 40 files, listened to none, reported nothing. Only
 		// the one declaring no reason is dead, and only it prints by default (#j69gvka). Before the
@@ -346,6 +361,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 		)
 	})
 
+	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 	t.Run("suppressions without a reason", func(t *testing.T) {
 		coverage := cleanCoverage()
 		coverage.Suppressed, coverage.SuppressedWithoutReason = 5, 2
@@ -353,6 +369,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 		requireLines(t, output, "5 findings suppressed, 2 without a reason")
 	})
 
+	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 	t.Run("disable comments that silenced nothing while their rule ran", func(t *testing.T) {
 		coverage := cleanCoverage()
 		coverage.UnusedSuppressions, coverage.UnusedSuppressionsForUnrunRules = 16, 13
@@ -362,6 +379,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 		forbidLines(t, output, "13 unused disable comments")
 	})
 
+	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 	t.Run("dead disable comments are named under --coverage", func(t *testing.T) {
 		coverage := cleanCoverage()
 		coverage.UnusedSuppressions = 3
@@ -385,6 +403,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 		forbidLines(t, output, "Alpha.ts", "dead disable comments (")
 	})
 
+	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 	t.Run("parity", func(t *testing.T) {
 		config := &configuration.Config{Rules: map[string]configuration.RuleSetting{
 			"quiet-rule":    {Severity: configuration.SeverityError},
@@ -399,12 +418,14 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 	})
 
 	t.Run("the modified-tree warning", func(t *testing.T) {
+		t.Parallel()
 		var out strings.Builder
 		(&pipelineReport{}).writeProvenanceWarning(&out, true)
 		requireLines(t, out.String(), "this binary was built from a modified tree")
 	})
 
 	t.Run("this run did not check everything", func(t *testing.T) {
+		t.Parallel()
 		for name, report := range map[string]*pipelineReport{
 			"a phase cut off": func() *pipelineReport {
 				report := &pipelineReport{}
@@ -433,6 +454,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 
 // A clean run prints the counts and nothing per rule: the shape of the default output, held so a
 // later printer that adds a per-rule line to every run has to change this test to do it.
+// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestACleanRunPrintsTwoCoverageLines(t *testing.T) {
 	rules := []rule.Rule{{Name: "quiet-rule"}, {Name: "off-rule"}, {Name: "unconfigured-rule"}, {Name: "eager-rule", NoListener: rule.NoListenerAnswersInRun}}
 	coverage := program.Coverage{
@@ -454,6 +476,7 @@ func TestACleanRunPrintsTwoCoverageLines(t *testing.T) {
 // A departure from a house ruling prints on every run, with the file and the reason, so a reasoned one
 // can never become a quiet allowance (#rkm5a31). The control is a config with none, which prints no
 // departure line at all.
+// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestADepartureFromAHouseRulingPrintsByDefault(t *testing.T) {
 	root := "/repository"
 	withDeparture := &configuration.Config{
@@ -482,6 +505,7 @@ func TestADepartureFromAHouseRulingPrintsByDefault(t *testing.T) {
 // sets, so an override standing in for unfinished work stays in front of every reader until it goes.
 // The control is an override with no reason beside it, which prints nothing: a scoped override needs
 // no reason, and printing every one would bury the few that carry one.
+// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestAnOverrideWithAReasonPrintsByDefault(t *testing.T) {
 	root := "/repository"
 	config := &configuration.Config{
@@ -518,6 +542,7 @@ func TestAnOverrideWithAReasonPrintsByDefault(t *testing.T) {
 // An off says why beside the rule wherever coverage names it, so whoever reads `--coverage` judges the
 // decision with its reason in front of them (#2qq4yr7). An off no file explains loads only outside our
 // tiers, where it is the project's choice (#bfxz13m): a default run counts it, and `--coverage` names it.
+// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestAnOffPrintsItsReasonAndAnUnreasonedOffIsCountedByDefault(t *testing.T) {
 	root := "/repository"
 	rules := []rule.Rule{{Name: "prefer-arrow-callback"}, {Name: "no-continue"}}
@@ -556,6 +581,7 @@ func TestAnOffPrintsItsReasonAndAnUnreasonedOffIsCountedByDefault(t *testing.T) 
 // What rules counted rather than reported is listed under `--coverage`, summed across files and sorted
 // by rule and key, so a `@processState` tag reads as its type and how many writes it exempted (#dz42gce).
 // A default run counts and names nothing of it: it is a fact to read, not an action.
+// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestCoverageListsWhatRulesNoted(t *testing.T) {
 	coverage := program.Coverage{
 		RulesOffered:   map[string]int{"nexus/correctness-no-caller-data-mutation": 2},
@@ -587,6 +613,7 @@ func TestCoverageListsWhatRulesNoted(t *testing.T) {
 // A skip is listed apart from what rules noted, by rule and reason with its count of files, under
 // `--coverage`, and named by default too, since a rule that declined every file still counts as having
 // run and no other line would show it (#pa7k7zv). A rule's other notes stay under notes.
+// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestCoverageNamesWhatRulesSkipped(t *testing.T) {
 	ruleName := "@typescript-eslint/no-useless-default-assignment"
 	skip := rule.SkippedNotePrefix + "strictNullChecks is off"
@@ -629,6 +656,7 @@ func TestCoverageNamesWhatRulesSkipped(t *testing.T) {
 
 // A rule that skipped some of the files it was offered and registered nothing on the rest gave no reason
 // for the rest, so it still prints as having checked nothing there
+// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestARuleThatSkippedSomeFilesStillNeedsActionForTheRest(t *testing.T) {
 	ruleName := "@typescript-eslint/no-useless-default-assignment"
 	result := program.Result{

@@ -16,6 +16,7 @@ import (
 // (#679s763). Never stopped, it keeps every file it leaves unchanged: the control, without which a
 // speculation that attempted nothing would pass.
 func TestAStoppedSpeculationBeginsNoMoreFiles(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	var candidates []string
 	for index := range 40 {

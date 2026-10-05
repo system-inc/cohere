@@ -35,6 +35,7 @@ func syntaxOf(t *testing.T, text string) string {
 // JSDoc, directives, pragmas, and every token, a regular expression or string holding "//" included
 // (#zqsdzbq: a comment appended to a file moved every importer's shape key).
 func TestTheSyntaxShapeIgnoresPlainCommentsAndKeepsWhatCanBeRead(t *testing.T) {
+	t.Parallel()
 	base := "/** The value. */\nexport function value(a: string): string {\n  return a;\n}\nexport const pattern = /a\\/\\/b/;\nexport const url = \"http://x\";\n"
 	original := syntaxOf(t, base)
 

@@ -13,6 +13,7 @@ import (
 // the read and the hashing is declined, since hashing its new bytes would key findings on a stylesheet no rule
 // read. And a key that is made holds until anything it covers changes, an absence included.
 func TestDesignSystemKeyDeclinesAMovedFileAndHoldsUntilAChange(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	theme := filepath.Join(directory, "theme.css")
 	missing := filepath.Join(directory, "missing.css")

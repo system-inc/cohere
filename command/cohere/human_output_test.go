@@ -10,6 +10,7 @@ import (
 // The lines are Kirk's, from the visual spec of 2026-10-04, with the glyph slots and path column filled
 // in as the spec describes them.
 func TestChangedFileLinesAlignMixedGlyphs(t *testing.T) {
+	t.Parallel()
 	files := []changedFile{
 		{Path: "modules/pensieve/Recall.ts", Formatted: true},
 		{Path: "app/os/SessionRow.tsx", Fixed: true, Formatted: true,
@@ -34,6 +35,7 @@ func TestChangedFileLinesAlignMixedGlyphs(t *testing.T) {
 }
 
 func TestChangedFileLinesAreCapped(t *testing.T) {
+	t.Parallel()
 	var files []changedFile
 	for index := range changedFilesShown + 5 {
 		files = append(files, changedFile{Path: fmt.Sprintf("file%02d.ts", index), Formatted: true})
@@ -51,6 +53,7 @@ func TestChangedFileLinesAreCapped(t *testing.T) {
 }
 
 func TestFindingLine(t *testing.T) {
+	t.Parallel()
 	finding := runFinding{
 		Path: "app/os/Session.ts", Line: 12, Column: 5, Severity: "error",
 		Rule: "nexus/consistency-no-abbreviated-identifier", MessageID: "abbreviated",
@@ -74,6 +77,7 @@ func TestFindingLine(t *testing.T) {
 }
 
 // TestStyleForHonorsNoColor sets NO_COLOR empty, which the convention counts as set.
+// Not parallel: it sets NO_COLOR with t.Setenv, which a parallel test may not
 func TestStyleForHonorsNoColor(t *testing.T) {
 	t.Setenv("NO_COLOR", "")
 	if style := styleFor(nil); style.color {
@@ -82,6 +86,7 @@ func TestStyleForHonorsNoColor(t *testing.T) {
 }
 
 // TestStyleForAFileIsPlain is output going to a file, as a log or a pipe would take it: no color.
+// Not parallel: it sets and unsets NO_COLOR in the process environment, which a parallel test may not
 func TestStyleForAFileIsPlain(t *testing.T) {
 	// Set first so the test restores whatever the environment held, then unset.
 	t.Setenv("NO_COLOR", "")

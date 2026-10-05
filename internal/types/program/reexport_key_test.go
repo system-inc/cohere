@@ -40,7 +40,9 @@ func keysOf(t *testing.T, root string, name string) ([sha256.Size]byte, [sha256.
 // two installed declaration files that both stay in the program, where no project edge exists and no file
 // enters or leaves the global component: a package.json's "types" changing is enough.
 func TestAReExportResolvingElsewhereMovesItsImportersKeys(t *testing.T) {
+	t.Parallel()
 	t.Run("into another project file", func(t *testing.T) {
+		t.Parallel()
 		root := writeProject(t, map[string]string{
 			"tsconfig.json": minimalConfig,
 			"a.ts":          "import { v } from \"./b\";\nconst negated = -v;\nexport const used = typeof negated === \"number\";\n",
@@ -66,6 +68,7 @@ func TestAReExportResolvingElsewhereMovesItsImportersKeys(t *testing.T) {
 	})
 
 	t.Run("between two installed files", func(t *testing.T) {
+		t.Parallel()
 		root := writeProject(t, map[string]string{
 			"tsconfig.json": minimalConfig,
 			"a.ts":          "import { v } from \"./b\";\nconst negated = -v;\nexport const used = typeof negated === \"number\";\n",

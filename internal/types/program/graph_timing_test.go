@@ -19,6 +19,7 @@ import (
 //
 // And timing must change nothing: the timed build holds the same files as an untimed one.
 func TestGraphTimingMeasuresTheBuildItTimes(t *testing.T) {
+	t.Parallel()
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json":                      minimalConfig,
 		"main.ts":                            "import { helper } from './helper';\nimport { packaged } from 'packaged';\nexport const value = helper() + packaged;\n",

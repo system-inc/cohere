@@ -12,6 +12,7 @@ import (
 // message blaming path casing (3,790 named, 3,789 loaded). These pin what Build does instead.
 
 func TestClassifyMissingRootsTellsTheFourCasesApart(t *testing.T) {
+	t.Parallel()
 	states := map[string]rootState{"gone.ts": rootAbsent, "locked.ts": rootUnreadable, "cased.ts": rootReadable}
 	inspect := func(fileName string) rootState { return states[fileName] }
 
@@ -39,6 +40,7 @@ func TestClassifyMissingRootsTellsTheFourCasesApart(t *testing.T) {
 // The whole path, with no seam: a root the glob lists and the program cannot read. Before this, Build
 // returned a graph and ProjectFiles panicked.
 func TestBuildRefusesARootItCannotReadInsteadOfPanicking(t *testing.T) {
+	t.Parallel()
 	directory := writeMismatchFixture(t, map[string]string{
 		"tsconfig.json": mismatchFixtureConfig,
 		"Alpha.ts":      "export const alpha = 1;\n",
@@ -72,6 +74,7 @@ func TestBuildRefusesARootItCannotReadInsteadOfPanicking(t *testing.T) {
 // A healthy build returns exactly the files the config named, which is the other direction of the
 // guard: a verification that refused everything would pass the test above.
 func TestBuildReturnsEveryNamedFileWhenNothingMoved(t *testing.T) {
+	t.Parallel()
 	directory := writeMismatchFixture(t, map[string]string{
 		"tsconfig.json": mismatchFixtureConfig,
 		"Alpha.ts":      "export const alpha = 1;\n",
@@ -89,6 +92,7 @@ func TestBuildReturnsEveryNamedFileWhenNothingMoved(t *testing.T) {
 // Real concurrency, no seam: files created and deleted while Build runs. Whatever the interleaving, a
 // build either returns every file its config named or an error, and never panics.
 func TestBuildNeverPanicsWhileTheTreeChangesUnderIt(t *testing.T) {
+	t.Parallel()
 	directory := writeMismatchFixture(t, map[string]string{
 		"tsconfig.json": mismatchFixtureConfig,
 		"Alpha.ts":      "export const alpha = 1;\n",

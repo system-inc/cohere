@@ -92,10 +92,12 @@ func prettierLike() *fakeEngine {
 // "already correctly formatted", so a formatter that handles nothing would report a whole tree as
 // clean. That is the ambiguity `edit.ErrSkipped` exists to remove.
 func TestAnUnhandledFileTypeIsSkippedWithItsReason(t *testing.T) {
+	t.Parallel()
 	transform := formatTransform(prettierLike())
 
 	for _, fileName := range []string{"Makefile", "notes.txt", "query.graphql", "script.sh"} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			_, err := transform(fileName, "anything at all\n")
 			if !errors.Is(err, edit.ErrSkipped) {
 				t.Fatalf("expected a skip for %s, got %v", fileName, err)
@@ -110,6 +112,7 @@ func TestAnUnhandledFileTypeIsSkippedWithItsReason(t *testing.T) {
 // The skip reason names the extension rather than the file, so a run over four hundred markdown
 // files reports one grouped reason instead of four hundred distinct ones.
 func TestSkipReasonsGroupByExtension(t *testing.T) {
+	t.Parallel()
 	transform := formatTransform(prettierLike())
 
 	_, firstError := transform("docs/one.txt", "x\n")
@@ -130,10 +133,12 @@ func TestSkipReasonsGroupByExtension(t *testing.T) {
 // Every file type the formatter does handle must not be skipped. A list that silently excluded a
 // real type would leave that type unformatted forever, reported as a clean run.
 func TestHandledFileTypesAreNotSkipped(t *testing.T) {
+	t.Parallel()
 	transform := formatTransform(prettierLike())
 
 	for _, fileName := range []string{"a.ts", "b.tsx", "c.js", "d.jsx", "e.mjs", "f.md", "g.css", "h.json"} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			_, err := transform(fileName, "const a = 1;\n")
 			if errors.Is(err, edit.ErrSkipped) {
 				t.Fatalf("%s was skipped but should be formatted: %v", fileName, err)
@@ -146,6 +151,7 @@ func TestHandledFileTypesAreNotSkipped(t *testing.T) {
 // file in that state and says so, and the types phase reports it in a form a reader can act on, so
 // a second complaint from the formatter adds noise rather than information.
 func TestAnUnparseableFileIsSkippedNotFailed(t *testing.T) {
+	t.Parallel()
 	_, err := formatTransform(parseFailingEngine())("broken.ts", "function alpha( {\n")
 
 	if !errors.Is(err, edit.ErrSkipped) {
@@ -163,6 +169,7 @@ func TestAnUnparseableFileIsSkippedNotFailed(t *testing.T) {
 // that alternated between two valid outputs would make every run rewrite every file, so a tree
 // would never reach a steady state and every commit would carry churn nobody authored.
 func TestFormattingIsIdempotent(t *testing.T) {
+	t.Parallel()
 	transform := formatTransform(prettierLike())
 	source := "const   alpha    =   1;\nfunction beta(  ) {   return alpha   }\n"
 
@@ -186,6 +193,7 @@ func TestFormattingIsIdempotent(t *testing.T) {
 // guard proves the pipeline is safe, this one proves the transform itself is not the thing
 // generating garbage.
 func TestFormattedOutputStillParses(t *testing.T) {
+	t.Parallel()
 	formatted, err := formatTransform(prettierLike())("sample.ts", "const   alpha  =  1;\nexport   { alpha };\n")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -198,6 +206,7 @@ func TestFormattedOutputStillParses(t *testing.T) {
 // extensionOf must name something a reader recognizes even for the awkward paths, since its output
 // goes straight into the summary line.
 func TestExtensionOfNamesTheType(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		fileName string
 		want     string
@@ -231,6 +240,7 @@ func parseFailingEngine() *fakeEngine {
 // says it looked and broke. Downgrading would hide a broken formatter behind the same number as a
 // file type nobody formats, which is the coverage-line failure wearing a different costume.
 func TestAFormatFailureIsNotDowngradedToASkip(t *testing.T) {
+	t.Parallel()
 	engine := &fakeEngine{
 		handled: []string{".ts"},
 		format: func(_ string, _ string) (string, error) {
@@ -255,6 +265,7 @@ func TestAFormatFailureIsNotDowngradedToASkip(t *testing.T) {
 // formatter to learn it should not have run, which on a 3,416-file tree is the difference between a
 // scoped pass and a full one.
 func TestAnUnhandledFileIsNeverHandedToTheEngine(t *testing.T) {
+	t.Parallel()
 	engine := prettierLike()
 	transform := formatTransform(engine)
 
@@ -280,6 +291,7 @@ func TestAnUnhandledFileIsNeverHandedToTheEngine(t *testing.T) {
 // not that no formatter is configured: a plain --no-fix run on ahra, which has a format block, printed
 // `11 not formatted (11 no formatter is configured)`.
 func TestAnUnrequestedFormatSkipsWithAReason(t *testing.T) {
+	t.Parallel()
 	_, err := formatTransform(nil)("a.ts", "const a = 1;\n")
 
 	if !errors.Is(err, edit.ErrSkipped) {
@@ -293,6 +305,7 @@ func TestAnUnrequestedFormatSkipsWithAReason(t *testing.T) {
 // isUnparseable must discriminate, not merely detect. A matcher that said yes to everything would
 // turn every real failure into a skip, which is the downgrade the fixture above forbids.
 func TestUnparseableDetectionDiscriminates(t *testing.T) {
+	t.Parallel()
 	for _, message := range []string{
 		"prettier: a.ts does not parse",
 		"SyntaxError: Unexpected token (3:1)",
@@ -324,6 +337,7 @@ func TestUnparseableDetectionDiscriminates(t *testing.T) {
 // Pinned here because a matcher tested only against strings I wrote myself is a matcher tested
 // against my imagination. The one that matters is the one the engine actually emits.
 func TestTheEnginesRealParseErrorsAreRecognized(t *testing.T) {
+	t.Parallel()
 	for _, message := range []string{
 		"SyntaxError: Property assignment expected. (1:12)",
 		"SyntaxError: Expression expected. (1:12)",
@@ -340,6 +354,7 @@ func TestTheEnginesRealParseErrorsAreRecognized(t *testing.T) {
 // are pinned: the matcher has to know the errors the engine actually emits, and switching engines
 // changes who emits them. Measured by formatting malformed source, never written by hand.
 func TestTheNativeEnginesParseErrorsAreRecognized(t *testing.T) {
+	t.Parallel()
 	engine, err := configuredFormatter(true)
 	if err != nil {
 		t.Fatal(err)
@@ -367,6 +382,7 @@ func TestTheNativeEnginesParseErrorsAreRecognized(t *testing.T) {
 
 // With formatting off there is no formatter, and saying so is the coverage line's job, not an error.
 func TestFormattingOffConfiguresNoFormatter(t *testing.T) {
+	t.Parallel()
 	engine, err := configuredFormatter(false)
 	if err != nil || engine != nil {
 		t.Fatalf("formatting off configured %v, %v; want no formatter and no error", engine, err)
@@ -376,6 +392,7 @@ func TestFormattingOffConfiguresNoFormatter(t *testing.T) {
 // A parse failure a native printer marks is a skip whatever its wording, and marking is the only way
 // an unfamiliar message gets there: the same words unmarked are still a broken formatter.
 func TestAMarkedSyntaxErrorIsUnparseableWhateverItSays(t *testing.T) {
+	t.Parallel()
 	plain := errors.New("json: line 1: a wording no matcher has seen")
 	if isUnparseable(plain) {
 		t.Fatal("an unmarked, unfamiliar message was read as a parse failure, so the marker proves nothing")
@@ -411,6 +428,7 @@ const nonIdempotentUnifiChain = `export function report(networkResults: PromiseS
 
 // The transform formats to a fixpoint, so what it writes is what the next run would leave alone.
 func TestTheTransformFormatsARealNonIdempotentInputToItsFixpoint(t *testing.T) {
+	t.Parallel()
 	// ahra's options, named rather than resolved: resolving from this test's directory finds no
 	// config and prints at Prettier's default width, where this input settles in one pass.
 	printer := native.Formatter{Options: formatoptions.Default()}
@@ -446,6 +464,7 @@ func TestTheTransformFormatsARealNonIdempotentInputToItsFixpoint(t *testing.T) {
 // the last pass written as though it were formatted. The stability check: a file that settles on the
 // second pass comes back settled, and an already formatted one costs a single pass.
 func TestTheFormatFixpointIsBoundedAndStopsWhenStable(t *testing.T) {
+	t.Parallel()
 	growing := &fakeEngine{
 		handled: []string{".ts"},
 		format:  func(_ string, text string) (string, error) { return text + "x", nil },

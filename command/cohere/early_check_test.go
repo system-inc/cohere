@@ -20,6 +20,7 @@ import (
 // and its rebuild are over, so it always runs after the point where the cancel used to happen, and
 // `--single-threaded` puts every file in one checker's group, so a cancelled checker always has a next file
 // to panic on. Cancelling the early check at the rebuild again fails this every time.
+// Not parallel: it sets COHERE_TEST_HOLD_EARLY_CHECK with t.Setenv for the binary it runs, which a parallel test may not
 func TestAFixThatRewritesAFileDuringTheEarlyCheckDoesNotCrashTheRun(t *testing.T) {
 	binary := buildCohere(t)
 	root := t.TempDir()

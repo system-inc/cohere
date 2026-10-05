@@ -93,6 +93,7 @@ func messageIdTexts(t *testing.T) (staticTexts map[string]map[string]struct{}, d
 // prints Message.Description directly and there is no id-to-text table. Drop the stored text and a
 // warm run replays a finding with the right file, range, rule and id, and the wrong sentence.
 func TestMessageIdAloneCannotIdentifyText(t *testing.T) {
+	t.Parallel()
 	staticTexts, dynamicIds := messageIdTexts(t)
 
 	// Ids whose text is interpolated at report time. One id maps to many strings, so no table could
@@ -130,6 +131,7 @@ func TestMessageIdAloneCannotIdentifyText(t *testing.T) {
 // one of them is the sharpest test of whether the format actually carries text: the stored sentence
 // has to come back with its runtime value in it, not a template or a placeholder.
 func TestStoredDescriptionSurvivesForAnInterpolatedMessage(t *testing.T) {
+	t.Parallel()
 	// The shape no_unsafe_unary_minus produces: the resolved type is interpolated, so this exact
 	// sentence exists nowhere in the source and cannot be rebuilt from "unaryMinus".
 	interpolated := "Argument of unary negation should be assignable to number | bigint but is string instead."
@@ -183,6 +185,7 @@ func TestStoredDescriptionSurvivesForAnInterpolatedMessage(t *testing.T) {
 // every assertion into a pass. This asserts the scan finds both kinds in a tree known to contain
 // both, so a broken pattern fails here rather than reporting a clean format.
 func TestMessageIdScanSeesBothKinds(t *testing.T) {
+	t.Parallel()
 	staticTexts, dynamicIds := messageIdTexts(t)
 
 	if len(staticTexts) < 100 {

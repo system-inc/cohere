@@ -34,6 +34,7 @@ import (
 // **The file count is the instrument here**, which is why it is written out rather than trimmed to
 // something tidier.
 func TestCheckerSurvivesTheParallelWalk(t *testing.T) {
+	t.Parallel()
 	files := map[string]string{"tsconfig.json": minimalConfig}
 
 	// Enough files, cross-importing, that several workers run at once and reach across checkers.

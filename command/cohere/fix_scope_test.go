@@ -89,6 +89,7 @@ func TestAFixRunWritesOnlyWhatWasNamed(t *testing.T) {
 	// Within the closure limit: the consumer is checked because it imports the named file, and it
 	// is not written because nobody named it.
 	t.Run("a dependent is checked and not written", func(t *testing.T) {
+		t.Parallel()
 		root := t.TempDir()
 		fixScopeProject(t, root, nil)
 		before := map[string]string{
@@ -111,6 +112,7 @@ func TestAFixRunWritesOnlyWhatWasNamed(t *testing.T) {
 
 	// Past the closure limit the whole tree is checked, which used to make the whole tree writable.
 	t.Run("the whole-tree fallback checks everything and writes only the named file", func(t *testing.T) {
+		t.Parallel()
 		root := t.TempDir()
 		consumers := map[string]string{}
 		for index := 0; index <= program.DependentClosureLimit; index++ {
@@ -139,6 +141,7 @@ func TestAFixRunWritesOnlyWhatWasNamed(t *testing.T) {
 	// The control on the boundary: with nothing named, the whole project is the caller's, and every
 	// file with a repair is written as it always was.
 	t.Run("with nothing named, every repair lands", func(t *testing.T) {
+		t.Parallel()
 		root := t.TempDir()
 		fixScopeProject(t, root, nil)
 
@@ -178,6 +181,7 @@ func TestAFixRunDoesNotWriteIntoANestedRepository(t *testing.T) {
 	}
 	for _, shape := range shapes {
 		t.Run(shape.name+": a whole-tree run leaves it alone and says so", func(t *testing.T) {
+			t.Parallel()
 			root := t.TempDir()
 			fixScopeProject(t, root, map[string]string{"nested/Inside.ts": nestedViolation})
 			shape.plant(t, filepath.Join(root, "nested"))
@@ -201,6 +205,7 @@ func TestAFixRunDoesNotWriteIntoANestedRepository(t *testing.T) {
 	}
 
 	t.Run("naming a path inside it writes it", func(t *testing.T) {
+		t.Parallel()
 		root := t.TempDir()
 		fixScopeProject(t, root, map[string]string{"nested/Inside.ts": nestedViolation})
 		plantClone(t, filepath.Join(root, "nested"))

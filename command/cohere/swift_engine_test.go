@@ -34,12 +34,15 @@ func runFakeSwiftEngine(t *testing.T, body string, mode swiftMode) (string, stri
 	return out.String(), standardError.String(), exitCode, err
 }
 
+// Not parallel: its subtests drive check runs through swiftRun, whose record acceptors set the package-level
+// activeSummary
 func TestRunEngineBinaryEndings(t *testing.T) {
 	fixtures, err := filepath.Abs(filepath.Join("..", "..", "swift", "Contract"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Not parallel: it drives a check run through swiftRun, whose record acceptors set the package-level activeSummary
 	t.Run("a real stream streams and exits with its summary", func(t *testing.T) {
 		out, _, exitCode, err := runFakeSwiftEngine(t, "cat '"+filepath.Join(fixtures, "Findings.jsonl")+"'; exit 1", swiftModeCheck)
 		if err != nil || exitCode != 1 {
@@ -50,6 +53,7 @@ func TestRunEngineBinaryEndings(t *testing.T) {
 		}
 	})
 
+	// Not parallel: it drives a check run through swiftRun, whose record acceptors set the package-level activeSummary
 	t.Run("the control: a clean stream exits 0", func(t *testing.T) {
 		_, _, exitCode, err := runFakeSwiftEngine(t, "cat '"+filepath.Join(fixtures, "Clean.jsonl")+"'", swiftModeCheck)
 		if err != nil || exitCode != 0 {
@@ -57,6 +61,7 @@ func TestRunEngineBinaryEndings(t *testing.T) {
 		}
 	})
 
+	// Not parallel: it drives a check run through swiftRun, whose record acceptors set the package-level activeSummary
 	t.Run("exit 2 passes stderr through and says nothing was checked", func(t *testing.T) {
 		_, standardError, exitCode, err := runFakeSwiftEngine(t, "echo 'cohere-swift: --timing is not implemented for Swift yet' >&2; exit 2", swiftModeCheck)
 		if err == nil || exitCode != 1 || !strings.Contains(err.Error(), "did not run, so nothing was checked") {
@@ -67,6 +72,7 @@ func TestRunEngineBinaryEndings(t *testing.T) {
 		}
 	})
 
+	// Not parallel: it drives a check run through swiftRun, whose record acceptors set the package-level activeSummary
 	t.Run("a signal is named as a signal, never as an exit code", func(t *testing.T) {
 		out, _, exitCode, err := runFakeSwiftEngine(t, "head -2 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; kill -9 $$", swiftModeCheck)
 		if err == nil || exitCode != 1 {
@@ -83,6 +89,7 @@ func TestRunEngineBinaryEndings(t *testing.T) {
 		}
 	})
 
+	// Not parallel: it drives a check run through swiftRun, whose record acceptors set the package-level activeSummary
 	t.Run("a broken record kills the engine rather than waiting on it", func(t *testing.T) {
 		start := time.Now()
 		_, _, exitCode, err := runFakeSwiftEngine(t, "head -1 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; echo 'Compiling swift-syntax'; sleep 30", swiftModeCheck)
@@ -96,6 +103,7 @@ func TestRunEngineBinaryEndings(t *testing.T) {
 
 	// The child is started before the broken record, so it is always alive when the engine is killed.
 	// Killing only the engine left it holding the pipes, and the front door waited out its 30 seconds.
+	// Not parallel: it drives a check run through swiftRun, whose record acceptors set the package-level activeSummary
 	t.Run("a broken engine's children die with it", func(t *testing.T) {
 		childFile := filepath.Join(t.TempDir(), "child")
 		start := time.Now()
@@ -113,6 +121,7 @@ func TestRunEngineBinaryEndings(t *testing.T) {
 
 	// SIGTERM rather than an interrupt, because a POSIX shell starts a background job with interrupts
 	// ignored, and the stand-in's child must be one the signal can end.
+	// Not parallel: it drives a check run through swiftRun, whose record acceptors set the package-level activeSummary
 	t.Run("a signal cohere receives is passed to the engine and everything it started", func(t *testing.T) {
 		childFile := filepath.Join(t.TempDir(), "child")
 		interrupts := make(chan os.Signal, 1)

@@ -16,6 +16,7 @@ import (
 // (#pa7k7zv). no-useless-default-assignment declined every file in ahra and www while every run read
 // green (#6ar414z); here the project turns strict off, which is the case that rule really declines.
 func TestARuleThatDeclinesOnACompilerOptionNotesASkipPerFile(t *testing.T) {
+	t.Parallel()
 	root := writeProject(t, map[string]string{
 		"tsconfig.json": strings.Replace(minimalConfig, `"strict": true`, `"strict": false`, 1),
 		"defaults.ts":   "export function withDefault(value: string | undefined = undefined): string { return value ?? ''; }\n",
@@ -48,6 +49,7 @@ func TestARuleThatDeclinesOnACompilerOptionNotesASkipPerFile(t *testing.T) {
 
 // The same rule in a strict project judges the file and notes no skip, so a skip is the option's doing.
 func TestTheSameRuleInAStrictProjectNotesNoSkip(t *testing.T) {
+	t.Parallel()
 	root := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"defaults.ts":   "export function withDefault(value: string | undefined = undefined): string { return value ?? ''; }\n",

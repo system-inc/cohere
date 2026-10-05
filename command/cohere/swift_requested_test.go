@@ -61,6 +61,7 @@ func editRecords(t *testing.T, lines []string, edit func(record map[string]any) 
 
 // A command line asks for the phases the TypeScript run would run for it.
 func TestSwiftRequestedPhasesReadTheFlagsAsTheTypeScriptRunDoes(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		flags []string
 		want  string
@@ -89,6 +90,7 @@ func TestSwiftRequestedPhasesReadTheFlagsAsTheTypeScriptRunDoes(t *testing.T) {
 
 // `cohere --lint` on a Swift package: the engine skips fix and types as not requested and calls the run
 // complete, which it is (swift/Contract.md, `complete`). LintOnly.jsonl is a real stream of that run.
+// Not parallel: it renders a check run through swiftRun, whose record acceptors set the package-level activeSummary
 func TestALintRunThatSkipsWhatItWasNotAskedForIsComplete(t *testing.T) {
 	lint := swiftRequestedPhases(flagsOf("lint"))
 
@@ -121,6 +123,7 @@ func TestALintRunThatSkipsWhatItWasNotAskedForIsComplete(t *testing.T) {
 }
 
 // A phase the caller asked for that comes back skipped still fails, whatever the engine calls it.
+// Not parallel: it renders a check run through swiftRun, whose record acceptors set the package-level activeSummary
 func TestARequestedPhaseThatComesBackSkippedStillFails(t *testing.T) {
 	// Skipped as not requested when it was requested: a bare run reported as though it were --lint. The
 	// engine is refused rather than believed.

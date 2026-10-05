@@ -31,6 +31,7 @@ func TestABareRunFormats(t *testing.T) {
 
 	for _, arguments := range [][]string{{}, {"--fix"}} {
 		t.Run("cohere "+strings.Join(arguments, " ")+" formats", func(t *testing.T) {
+			t.Parallel()
 			root := fixture(t)
 			output, _ := runCohere(t, binary, root, arguments...)
 			if got := readForTest(t, ugly(root)); got != formatted {
@@ -45,6 +46,7 @@ func TestABareRunFormats(t *testing.T) {
 	// Formatting by default keeps a warm run replayable: once the tree is formatted, an unchanged bare run is
 	// recorded and the next one replays it.
 	t.Run("a warm bare run still replays", func(t *testing.T) {
+		t.Parallel()
 		root := fixture(t)
 		runCohere(t, binary, root)
 		runCohere(t, binary, root)
@@ -55,6 +57,7 @@ func TestABareRunFormats(t *testing.T) {
 	})
 
 	t.Run("cohere --no-fix reports the misformat and exits on it", func(t *testing.T) {
+		t.Parallel()
 		root := fixture(t)
 		output, code := runCohere(t, binary, root, "--no-fix")
 		if code == 0 || !strings.Contains(output, ugly(root)+":1:1 - --fix would rewrite this file: format [fix/would-change]") {
@@ -67,6 +70,7 @@ func TestABareRunFormats(t *testing.T) {
 
 	for _, arguments := range [][]string{{"--no-format"}, {"--fix", "--no-format"}, {"--no-fix", "--no-format"}} {
 		t.Run("cohere "+strings.Join(arguments, " ")+" leaves formatting out", func(t *testing.T) {
+			t.Parallel()
 			root := fixture(t)
 			output, _ := runCohere(t, binary, root, arguments...)
 			if got := readForTest(t, ugly(root)); got != unformatted {
@@ -82,6 +86,7 @@ func TestABareRunFormats(t *testing.T) {
 	}
 
 	t.Run("--no-format refuses a flag that asks for formatting", func(t *testing.T) {
+		t.Parallel()
 		root := fixture(t)
 		for _, other := range []string{"--format", "--format-all", "--format-only"} {
 			output, code := runCohere(t, binary, root, "--no-format", other)

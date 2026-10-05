@@ -16,6 +16,7 @@ import (
 // whole-program check reports, part for part: the files the walk checked, the declaration it never visited,
 // an unused @ts-expect-error, and an error whose related information sits in another file.
 func TestAFusedCheckReportsWhatTheWholeProgramCheckReports(t *testing.T) {
+	t.Parallel()
 	files := map[string]string{
 		"tsconfig.json": minimalConfig,
 		"shared.ts":     "export function take(value: string): string {\n    return value;\n}\nexport interface Shape { a: number }\n",
@@ -67,6 +68,7 @@ func TestAFusedCheckReportsWhatTheWholeProgramCheckReports(t *testing.T) {
 
 // A file that does not parse stops a fused check at its syntactic diagnostics, as it stops the whole check.
 func TestAFusedCheckStopsAtASyntaxErrorAsTheWholeCheckDoes(t *testing.T) {
+	t.Parallel()
 	files := map[string]string{
 		"tsconfig.json": minimalConfig,
 		"broken.ts":     "export const value = ;\n",

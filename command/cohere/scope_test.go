@@ -18,6 +18,7 @@ import (
 // indistinguishable from a file that was already correctly formatted, and a run that formatted 12 of
 // 3,407 files must not print like a run that formatted everything.
 func TestAScopedTransformFormatsOnlyWhatIsInScope(t *testing.T) {
+	t.Parallel()
 	inner := func(_ string, text string) (string, error) {
 		return strings.ToUpper(text), nil
 	}
@@ -52,6 +53,7 @@ func TestAScopedTransformFormatsOnlyWhatIsInScope(t *testing.T) {
 // A whole-tree scope must not wrap the transform at all, so the flag costs nothing beyond the
 // formatting it asks for.
 func TestAWholeTreeScopeDoesNotFilter(t *testing.T) {
+	t.Parallel()
 	transform := scopedTransform(func(_ string, text string) (string, error) {
 		return text + "!", nil
 	}, wholeTreeScope())
@@ -71,6 +73,7 @@ func TestAWholeTreeScopeDoesNotFilter(t *testing.T) {
 // reports skips for a formatter that does not exist, which is a different and less useful statement
 // than "not requested".
 func TestScopingANilTransformStaysNil(t *testing.T) {
+	t.Parallel()
 	if scopedTransform(nil, wholeTreeScope()) != nil {
 		t.Fatalf("a nil transform became non-nil")
 	}
@@ -85,6 +88,7 @@ func TestScopingANilTransformStaysNil(t *testing.T) {
 // formatting run nobody asked for. Withholding formatting and saying why is the safe
 // direction.
 func TestAnEmptyScopeSkipsEverythingAndSaysWhy(t *testing.T) {
+	t.Parallel()
 	transform := scopedTransform(func(_ string, text string) (string, error) {
 		t.Fatalf("the inner transform ran under an empty scope")
 		return text, nil
@@ -102,6 +106,7 @@ func TestAnEmptyScopeSkipsEverythingAndSaysWhy(t *testing.T) {
 // The scope description must distinguish the three cases a reader needs to tell apart, since it is
 // the only thing in the output that says what was formatted and why.
 func TestScopeDescriptionsAreDistinct(t *testing.T) {
+	t.Parallel()
 	whole := wholeTreeScope().Description
 	narrow := formatScope{Description: "12 named paths"}.Description
 	failed := formatScope{Description: "nothing (could not enumerate the tree: the walk failed)"}.Description
@@ -121,6 +126,7 @@ func TestScopeDescriptionsAreDistinct(t *testing.T) {
 // assertion between them. This one watches whether the filter was consulted at all, by giving the
 // whole-tree scope an index that would exclude the file if anything looked at it.
 func TestAWholeTreeScopeBypassesTheFilterEntirely(t *testing.T) {
+	t.Parallel()
 	inner := func(_ string, text string) (string, error) { return text + "!", nil }
 
 	// Everything is set, and the index deliberately does not contain the file. If the returned
@@ -145,6 +151,7 @@ func TestAWholeTreeScopeBypassesTheFilterEntirely(t *testing.T) {
 // neither. That is the same shape as the summary-line defect from earlier tonight, where every
 // number was right and the composition was misleading.
 func TestTheScopeStatesBothCounts(t *testing.T) {
+	t.Parallel()
 	scope := formatScope{
 		FileNames: []string{"/repo/a.ts", "/repo/b.ts", "/repo/excluded.ts"},
 		index: map[string]struct{}{
@@ -171,6 +178,7 @@ func TestTheScopeStatesBothCounts(t *testing.T) {
 
 // A whole-tree scope has no git count to reconcile, so narrowing must leave it alone.
 func TestNarrowingAWholeTreeScopeChangesNothing(t *testing.T) {
+	t.Parallel()
 	before := wholeTreeScope()
 	after := before.narrowTo(map[string]struct{}{"/repo/a.ts": {}})
 
@@ -193,6 +201,7 @@ func TestNarrowingAWholeTreeScopeChangesNothing(t *testing.T) {
 // gets read as a check on the behavior, and the gap between them is where this lived. Caught by
 // running the real binary and reading its output, not by any assertion.
 func TestTheEmptyScopeNamingSurvivesNarrowing(t *testing.T) {
+	t.Parallel()
 	empty := formatScope{
 		FileNames:   nil,
 		index:       map[string]struct{}{},
@@ -224,6 +233,7 @@ func enumerationOf(root string, files []string, walked int, declined map[string]
 // handles. Intersecting with the type graph is what made css, markdown, json and yaml invisible,
 // because a tsconfig enumerates TypeScript by construction.
 func TestAWholeTreeScopeBecomesTheEnumeration(t *testing.T) {
+	t.Parallel()
 	files := []string{"/repo/a.ts", "/repo/b.css", "/repo/c.md", "/repo/d.json", "/repo/e.yaml"}
 	enumeration := enumerationOf("/repo", files, 12, map[string]int{".rb": 3, "(none)": 4}, nil, nil)
 
@@ -259,6 +269,7 @@ func TestAWholeTreeScopeBecomesTheEnumeration(t *testing.T) {
 // previously go missing without a word: a `.json` in a TypeScript project was never a candidate, so
 // the coverage line could not even report it as skipped.
 func TestDeclinedExtensionsAreNamedRatherThanOmitted(t *testing.T) {
+	t.Parallel()
 	enumeration := enumerationOf("/repo", []string{"/repo/a.ts"}, 61, map[string]int{".rb": 3, ".txt": 57, "(none)": 1}, nil, nil)
 
 	description := wholeTreeScope().narrowToEnumeration(enumeration).Description
@@ -275,6 +286,7 @@ func TestDeclinedExtensionsAreNamedRatherThanOmitted(t *testing.T) {
 
 // The description must say what it walked, so a small number is distinguishable from a wrong root.
 func TestTheEnumerationDescriptionNamesTheRootAndTheCounts(t *testing.T) {
+	t.Parallel()
 	enumeration := enumerationOf("/repo/deep", []string{"/repo/deep/a.ts"}, 900, nil, nil, nil)
 
 	description := wholeTreeScope().narrowToEnumeration(enumeration).Description
@@ -293,6 +305,7 @@ func TestTheEnumerationDescriptionNamesTheRootAndTheCounts(t *testing.T) {
 // wrote into a submodule; four nested repositories exist on this tree and three had not been
 // mentioned by anyone.
 func TestIgnoreLayersAndNestedRepositoriesAreReported(t *testing.T) {
+	t.Parallel()
 	enumeration := enumerationOf(
 		"/repo", []string{"/repo/a.ts"}, 500, nil,
 		[]string{"libraries/structure", "projects/ahraos-macos"},
@@ -315,6 +328,7 @@ func TestIgnoreLayersAndNestedRepositoriesAreReported(t *testing.T) {
 
 // A named scope keeps its own set and reports how much of it the formatter will see.
 func TestANarrowScopeReportsHowMuchIsFormattable(t *testing.T) {
+	t.Parallel()
 	scope := formatScope{
 		FileNames: []string{"/repo/a.ts", "/repo/b.rb", "/repo/c.css"},
 		index: map[string]struct{}{
@@ -341,6 +355,7 @@ func TestANarrowScopeReportsHowMuchIsFormattable(t *testing.T) {
 
 // An empty scope keeps the description that names where it looked, exactly as narrowTo does.
 func TestAnEmptyScopeSurvivesEnumerationNarrowing(t *testing.T) {
+	t.Parallel()
 	empty := formatScope{
 		index:       map[string]struct{}{},
 		Description: "0 files under the named paths in /some/where",
@@ -361,6 +376,7 @@ func TestAnEmptyScopeSurvivesEnumerationNarrowing(t *testing.T) {
 // had been ignored, which is why the assertions below are about membership rather than about a
 // count: a scope that silently held everything would satisfy a count.
 func TestNamedPathsScopeResolvesFilesAndDirectories(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 
 	write := func(relative string) string {
@@ -381,6 +397,7 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(t *testing.T) {
 	elsewhere := write("other/Elsewhere.ts")
 
 	t.Run("one file is one file", func(t *testing.T) {
+		t.Parallel()
 		scope, err := namedPathsScope(directory, directory, []string{"source/Named.ts"})
 		if err != nil {
 			t.Fatal(err)
@@ -398,6 +415,7 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(t *testing.T) {
 	})
 
 	t.Run("a directory is everything under it", func(t *testing.T) {
+		t.Parallel()
 		scope, err := namedPathsScope(directory, directory, []string{"source"})
 		if err != nil {
 			t.Fatal(err)
@@ -415,6 +433,7 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(t *testing.T) {
 	// `cohere --lint .` has always meant the whole tree and has to keep meaning it. A prefix match
 	// would make it a subset of one directory entry, silently.
 	t.Run("the working directory itself is the whole tree", func(t *testing.T) {
+		t.Parallel()
 		scope, err := namedPathsScope(directory, directory, []string{"."})
 		if err != nil {
 			t.Fatal(err)
@@ -427,6 +446,7 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(t *testing.T) {
 	// A typo must fail loudly. An empty scope reporting success is the green-over-zero-files failure,
 	// and this scope reached it once during development by resolving against an empty directory.
 	t.Run("a path that does not exist is an error", func(t *testing.T) {
+		t.Parallel()
 		if _, err := namedPathsScope(directory, directory, []string{"source/Missing.ts"}); err == nil {
 			t.Fatal("a nonexistent path resolved without error")
 		}
@@ -436,6 +456,7 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(t *testing.T) {
 	// against empty leaves a relative path, which never matches an absolute source file name, so
 	// every named path fell out of scope and the run checked nothing while reporting success.
 	t.Run("an empty working directory resolves against the process", func(t *testing.T) {
+		t.Parallel()
 		scope, err := namedPathsScope("", "", []string{"scope.go"})
 		if err != nil {
 			t.Fatal(err)
@@ -461,6 +482,7 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(t *testing.T) {
 // readings. What changed was the population handed to it, which is precisely the shape of mistake
 // the comment above that function was written about.
 func TestNarrowToUsesTheWholeProgramNotTheLintScope(t *testing.T) {
+	t.Parallel()
 	changed := formatScope{
 		FileNames: []string{"/repository/a.ts", "/repository/b.ts", "/repository/notes.md"},
 		index: map[string]struct{}{
@@ -500,6 +522,7 @@ func TestNarrowToUsesTheWholeProgramNotTheLintScope(t *testing.T) {
 // it. The assertions below are that both kinds survive unchanged, which is the property the four
 // defects each broke in a different direction.
 func TestNarrowToAppendsToTheScopesOwnWording(t *testing.T) {
+	t.Parallel()
 	population := map[string]struct{}{"/repository/a.ts": {}}
 
 	named := formatScope{

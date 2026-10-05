@@ -19,6 +19,7 @@ import (
 // file-scope disable must not silence a finding about a directive that silences nothing, and with
 // no registry supplied the check is off rather than reporting every name.
 func TestWalkReportsADirectiveNamingAnUnknownRule(t *testing.T) {
+	t.Parallel()
 	source := strings.Join([]string{
 		"/* eslint-disable */",
 		"// eslint-disable-next-line no-unused-var -- why",

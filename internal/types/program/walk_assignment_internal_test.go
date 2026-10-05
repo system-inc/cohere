@@ -14,6 +14,7 @@ import (
 // checker would contend for its lock, and a file handed to no worker or to two would be skipped or walked
 // twice (#zqsdzbq).
 func TestTheWalkGivesEachWorkerTheFilesOfOneChecker(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	config := `{"compilerOptions": {"target": "ES2022", "module": "esnext", "moduleResolution": "bundler", "strict": true, "noEmit": true}}`
 	if err := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(config), 0o644); err != nil {

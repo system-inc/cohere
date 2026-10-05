@@ -11,6 +11,7 @@ import "testing"
 // `nexus/consistency-no-enum` silences nothing (Covers needs the directive to be the more qualified
 // side), so it must not count as existing.
 func TestRuleNameCatalogExistsIsTheTestCoversApplies(t *testing.T) {
+	t.Parallel()
 	catalog := newRuleNameCatalog(
 		[]string{"no-console", "nexus/consistency-no-enum", "@typescript-eslint/no-explicit-any"},
 		[]string{"react-internal/not-ported-here"},

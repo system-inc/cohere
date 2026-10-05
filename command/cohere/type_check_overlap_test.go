@@ -18,6 +18,7 @@ func TestATypeErrorFoundAlongsideTheWalkIsReportedOnce(t *testing.T) {
 			name = "a writing run that rewrites a file"
 		}
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			root := t.TempDir()
 			fixScopeProject(t, root, map[string]string{"Broken.ts": "export const broken: number = \"text\";\n"})
 			output, code := runCohere(t, binary, root, arguments...)

@@ -56,6 +56,7 @@ func diagnosticKeys(diagnostics []rule.Diagnostic) []string {
 // cached; d.ts has a finding with a fix and must never be cached. Each premise is checked rather than
 // assumed, since a fixture whose rules happened not to fire would pass everything here for nothing.
 func TestAReplayingWalkReportsWhatAPlainWalkReports(t *testing.T) {
+	t.Parallel()
 	root := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"a.ts":          "export function f(x: number): number {\n  if (x === x) {\n    return 1;\n  }\n  switch (x) {\n    case 1:\n      break;\n    case 1:\n      break;\n  }\n  return 0;\n}\n",
@@ -126,6 +127,7 @@ func TestAReplayingWalkReportsWhatAPlainWalkReports(t *testing.T) {
 
 // An edited file is walked, not replayed, and reports what its new bytes say.
 func TestAnEditedFileIsWalkedNotReplayed(t *testing.T) {
+	t.Parallel()
 	root := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"a.ts":          "export function f(x: number): boolean {\n  return x === x;\n}\n",
@@ -175,6 +177,7 @@ func TestAnEditedFileIsWalkedNotReplayed(t *testing.T) {
 // A cache recorded under another key serves nothing: a new binary, config or rule set invalidates
 // every entry at once.
 func TestAFindingsCacheUnderAnotherKeyServesNothing(t *testing.T) {
+	t.Parallel()
 	root := writeProject(t, map[string]string{"tsconfig.json": minimalConfig, "b.ts": "export const b = 1;\n"})
 	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
 	if err != nil {
@@ -205,6 +208,7 @@ func TestAFindingsCacheUnderAnotherKeyServesNothing(t *testing.T) {
 // skipped and the file's node count comes from its entry. Counted as zero, the coverage line would
 // change on every such file.
 func TestAFileWithNothingLeftToWalkKeepsItsCoverage(t *testing.T) {
+	t.Parallel()
 	root := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"a.ts":          "export function f(x: number): boolean {\n  return x === x;\n}\n",
@@ -258,6 +262,7 @@ func TestAFileWithNothingLeftToWalkKeepsItsCoverage(t *testing.T) {
 // the file would replay those verdicts on the next run with the crash gone, and a cached run would
 // read as one where every rule finished the file.
 func TestAFileARuleCrashedOnIsWalkedAgainNotReplayed(t *testing.T) {
+	t.Parallel()
 	root := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"a.ts":          "export const a = 1;\n",
@@ -335,6 +340,7 @@ func plainWalk(t *testing.T, root string, rules []rule.Rule) program.Result {
 // rule runs again and its finding goes away. A cache keyed on consumer's bytes alone would replay the
 // finding over a tree where it is no longer true.
 func TestAnEditToADependencyReachesItsImportersTypeAwareFindings(t *testing.T) {
+	t.Parallel()
 	root := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"lib.ts":        "export const value: string = \"1\";\n",
@@ -395,6 +401,7 @@ func TestAnEditToADependencyReachesItsImportersTypeAwareFindings(t *testing.T) {
 // closure cannot see it. That is what the global component of the fingerprint is for: globals.d.ts is a
 // declaration file, so it is in every fingerprint.
 func TestAnEditToAGlobalDeclarationReachesEveryTypeAwareFinding(t *testing.T) {
+	t.Parallel()
 	root := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"globals.d.ts":  "declare const ambient: string;\n",
@@ -427,6 +434,7 @@ func TestAnEditToAGlobalDeclarationReachesEveryTypeAwareFinding(t *testing.T) {
 // covers both. Reading the design system makes a rule a design-system rule (#35nqkwc), unless it also
 // reads the types, which no key here covers together.
 func TestCacheClassesSplitsFourWays(t *testing.T) {
+	t.Parallel()
 	pure, typeAware, design, never := program.CacheClasses([]rule.Rule{
 		{Name: "pure"},
 		{Name: "options", ProgramReads: rule.ReadsCompilerOptions},
@@ -461,6 +469,7 @@ func TestCacheClassesSplitsFourWays(t *testing.T) {
 // changes its type, so consumer.ts replays its pure rule and walks its type-aware one again: its notes are
 // the old pure notes and no typed ones, and the run after that replays the refreshed entry.
 func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(t *testing.T) {
+	t.Parallel()
 	noting := func(name string, needsTypeChecker bool, reads rule.ProgramRead, key func(ctx rule.Context, declaration *ast.Node) string) rule.Rule {
 		return rule.Rule{
 			Name:             name,

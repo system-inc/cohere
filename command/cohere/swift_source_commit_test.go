@@ -17,6 +17,7 @@ import (
 // provenance failure this line exists to avoid, so each test pins one direction of that.
 
 func TestTheSwiftEngineLineNamesACommitOnlyWhenOneIsVouchedFor(t *testing.T) {
+	t.Parallel()
 	provenance := contractFixture(t, "Clean.jsonl")[0]
 	commit := "a97349d9534c52c831ec0835fe7ceba880637fd1"
 
@@ -50,6 +51,7 @@ func TestTheSwiftEngineLineNamesACommitOnlyWhenOneIsVouchedFor(t *testing.T) {
 }
 
 func TestOnlyACleanNamedCohereOffersACommitToTheSwiftEngine(t *testing.T) {
+	t.Parallel()
 	commit := "a97349d9534c52c831ec0835fe7ceba880637fd1"
 	cases := map[string]struct {
 		provenance release.Provenance
@@ -66,6 +68,7 @@ func TestOnlyACleanNamedCohereOffersACommitToTheSwiftEngine(t *testing.T) {
 	}
 }
 
+// Not parallel: it sets the Swift engine override variable with t.Setenv, which a parallel test may not
 func TestAnEngineNamedByTheOverrideVouchesForNoCommit(t *testing.T) {
 	engine := filepath.Join(t.TempDir(), "cohere-swift")
 	if err := os.WriteFile(engine, []byte("#!/bin/sh\n"), 0o755); err != nil {

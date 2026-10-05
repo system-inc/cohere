@@ -18,6 +18,7 @@ import (
 // so the cache could never hit. Built through the real Build so the probe reaches the recorder the way
 // the compiler sends it, not the way a test imagines it does.
 func TestInputRecorderRecordsAFileProbedAsADirectoryAsPresent(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	write := func(path, contents string) {
 		t.Helper()
@@ -76,6 +77,7 @@ func TestInputRecorderRecordsAFileProbedAsADirectoryAsPresent(t *testing.T) {
 // existence alone, even one holding nothing it read: a file added to an empty directory the include glob
 // walks still misses.
 func TestADirectoryOnlyProbedIsRecordedForItsExistence(t *testing.T) {
+	t.Parallel()
 	parent := t.TempDir()
 	root := filepath.Join(parent, "project")
 	write := func(path string, contents string) {

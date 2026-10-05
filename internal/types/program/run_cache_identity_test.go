@@ -17,6 +17,7 @@ import (
 // replay a verdict about bytes that are gone. The same recording made after the save, by a run that began
 // reading after it, is fine, which is what makes the refusal mean something.
 func TestARunIsNotRecordedOverAFileChangedWhileItRan(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	file := filepath.Join(directory, "a.ts")
 	if err := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); err != nil {
@@ -39,6 +40,7 @@ func TestARunIsNotRecordedOverAFileChangedWhileItRan(t *testing.T) {
 // Different bytes of the same size under the old modification time, as cp -p, rsync -t and touch -r leave
 // a file, are a miss. Only the change time moved.
 func TestASameSizeEditUnderARestoredModificationTimeIsAMiss(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	file := filepath.Join(directory, "a.ts")
 	if err := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); err != nil {
@@ -73,6 +75,7 @@ func TestASameSizeEditUnderARestoredModificationTimeIsAMiss(t *testing.T) {
 // something is created all day (#r9jevk9). A file's directory is still recorded, which is what catches a file
 // added beside one the run read.
 func TestADirectoryInputDoesNotMakeItsParentOne(t *testing.T) {
+	t.Parallel()
 	parent := t.TempDir()
 	project := filepath.Join(parent, "project")
 	if err := os.MkdirAll(filepath.Join(project, "source"), 0o755); err != nil {
@@ -109,6 +112,7 @@ func TestADirectoryInputDoesNotMakeItsParentOne(t *testing.T) {
 // --cache-dump says, under each recorded run, whether it would replay now, and when it would not, which input
 // changed: a miss is never silent (#r9jevk9).
 func TestTheCacheDumpNamesTheInputThatKeepsARunFromReplaying(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	file := filepath.Join(directory, "a.ts")
 	if err := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); err != nil {

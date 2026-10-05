@@ -117,6 +117,7 @@ func assertScope(t *testing.T, got []string, want ...string) {
 // repository's own boundary. Writes stay inside one repository (@system_cohere, 2026-10-03), so the
 // declared submodule is formatted by a run inside it and only read from here, by the check (see
 // checkNestedRepositories); it used to be walked into and written.
+// Not parallel: it sets HOME and XDG_CACHE_HOME with t.Setenv through newRecordFixture, which a parallel test may not
 func TestWithNoRecordEveryFileOfTheRepositoryIsInScopeAndNoSubmoduleIs(t *testing.T) {
 	fixture := newRecordFixture(t)
 	files, universe, _, description := fixture.scope(t)
@@ -133,6 +134,7 @@ func TestWithNoRecordEveryFileOfTheRepositoryIsInScopeAndNoSubmoduleIs(t *testin
 	}
 }
 
+// Not parallel: it sets HOME and XDG_CACHE_HOME with t.Setenv through newRecordFixture, which a parallel test may not
 func TestTheRecordScopesWhatChangedSinceCohereLastLooked(t *testing.T) {
 	fixture := newRecordFixture(t)
 	fixture.formatEverything(t)
@@ -162,6 +164,7 @@ func TestTheRecordScopesWhatChangedSinceCohereLastLooked(t *testing.T) {
 	assertScope(t, files, "New.ts")
 }
 
+// Not parallel: it sets HOME and XDG_CACHE_HOME with t.Setenv through newRecordFixture, which a parallel test may not
 func TestADeletedFileLeavesTheScopeAndTheRecord(t *testing.T) {
 	fixture := newRecordFixture(t)
 	fixture.formatEverything(t)
@@ -188,6 +191,7 @@ func TestADeletedFileLeavesTheScopeAndTheRecord(t *testing.T) {
 
 // An unformatted file checked under --no-fix records the text the formatter would write, which is not
 // what is on disk, so the file stays in scope and keeps being reported until it is written.
+// Not parallel: it sets HOME and XDG_CACHE_HOME with t.Setenv through newRecordFixture, which a parallel test may not
 func TestAnUnformattedFileStaysInScopeUntilItIsWritten(t *testing.T) {
 	fixture := newRecordFixture(t)
 	fixture.engine.format = func(fileName string, text string) (string, error) {
@@ -205,6 +209,7 @@ func TestAnUnformattedFileStaysInScopeUntilItIsWritten(t *testing.T) {
 	assertScope(t, files)
 }
 
+// Not parallel: it sets HOME and XDG_CACHE_HOME with t.Setenv through newRecordFixture, which a parallel test may not
 func TestAnOptionsChangeSendsItsFilesBackThroughTheFormatter(t *testing.T) {
 	fixture := newRecordFixture(t)
 	fixture.formatEverything(t)
@@ -219,6 +224,7 @@ func TestAnOptionsChangeSendsItsFilesBackThroughTheFormatter(t *testing.T) {
 	assertScope(t, files, "B.ts")
 }
 
+// Not parallel: it sets HOME and XDG_CACHE_HOME with t.Setenv through newRecordFixture, which a parallel test may not
 func TestARecordFromAnotherCohereSaysNothing(t *testing.T) {
 	fixture := newRecordFixture(t)
 	fixture.formatEverything(t)
@@ -245,6 +251,7 @@ func TestARecordFromAnotherCohereSaysNothing(t *testing.T) {
 
 // The stat shortcut is only taken once the bytes were read and matched, and a file whose bytes change
 // is caught whether or not its size does.
+// Not parallel: it sets HOME and XDG_CACHE_HOME with t.Setenv through newRecordFixture, which a parallel test may not
 func TestAVerifiedFileIsAnsweredByStatAndAnEditIsStillSeen(t *testing.T) {
 	fixture := newRecordFixture(t)
 	fixture.formatEverything(t)
@@ -270,6 +277,7 @@ func TestAVerifiedFileIsAnsweredByStatAndAnEditIsStillSeen(t *testing.T) {
 }
 
 func TestDeclaredSubmodulesReadsTheGitmodulesPaths(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	writeTree(t, directory, map[string]string{".gitmodules": "" +
 		"[submodule \"libraries/structure\"]\n" +

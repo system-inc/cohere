@@ -12,6 +12,7 @@ import (
 // with the replay's own time, every file answered by the cache and nothing checked fresh or rewritten.
 // The recorded run took 4.7s; a footer saying so would claim a run the replay did not do.
 func TestAReplaysFooterIsTheReplays(t *testing.T) {
+	t.Parallel()
 	recorded := cleanSummary()
 	recorded.Total = 4700 * time.Millisecond
 	recorded.Findings = 2
@@ -56,6 +57,7 @@ func isTheReplaysFooter(footerLine string, recorded runSummary) error {
 // TestARunWithNoSummaryIsNotRecorded is the guard that makes a replay without a footer impossible: a run
 // that recorded no summary is refused at record, and says so, rather than being stored for a replay that
 // would print a verdict with no footer.
+// Not parallel: it sets the package-level verdictSent, which cacheNote reads to choose where a note goes
 func TestARunWithNoSummaryIsNotRecorded(t *testing.T) {
 	directory := t.TempDir()
 	sent := verdictSent

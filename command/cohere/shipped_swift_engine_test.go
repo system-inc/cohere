@@ -74,6 +74,8 @@ func runInstalled(t *testing.T, binary string, directory string, arguments ...st
 
 // A released cohere runs the engine its package ships beside it, with no checkout anywhere, reached
 // through a symlink the way a package manager's `bin` link reaches it.
+// Not parallel: it clears the Swift engine override variable with t.Setenv through runInstalled, which a parallel test
+// may not
 func TestAReleasedCohereRunsTheEngineShippedBesideIt(t *testing.T) {
 	binary := installCohere(t, "1.0.0")
 	invoked := placeSiblingEngine(t, binary)
@@ -114,6 +116,8 @@ func TestAReleasedCohereRunsTheEngineShippedBesideIt(t *testing.T) {
 // A released cohere with no engine beside it is a broken install, and says so, even standing inside a
 // cohere checkout it could build one from: an engine built there would run unpaired rules under the
 // release's version.
+// Not parallel: it clears the Swift engine override variable with t.Setenv through runInstalled, which a parallel test
+// may not
 func TestAReleasedCohereWithNoEngineBesideItNeverBuildsOne(t *testing.T) {
 	binary := installCohere(t, "1.0.0")
 	checkout := t.TempDir()
@@ -147,6 +151,8 @@ func TestAReleasedCohereWithNoEngineBesideItNeverBuildsOne(t *testing.T) {
 
 // A development cohere never takes an engine from beside itself, so a stale cohere-swift next to a
 // `go build -o` cannot run in place of the checkout's. Outside a checkout it has none, and says so.
+// Not parallel: it clears the Swift engine override variable with t.Setenv through runInstalled, which a parallel test
+// may not
 func TestADevelopmentCohereIgnoresAnEngineBesideIt(t *testing.T) {
 	binary := installCohere(t, "")
 	invoked := placeSiblingEngine(t, binary)
@@ -164,6 +170,8 @@ func TestADevelopmentCohereIgnoresAnEngineBesideIt(t *testing.T) {
 // Where the engine does not ship, a Swift package is refused by name before anything is looked for or
 // built, whichever kind of cohere is running. The engine named by the override still runs: it is the
 // engine developer's, and naming one is saying what to run.
+// Not parallel: it sets the Swift engine override variable with t.Setenv, the working directory with t.Chdir,
+// and the package-level swiftEnginePlatform
 func TestSwiftIsRefusedByNameWhereTheEngineDoesNotShip(t *testing.T) {
 	t.Setenv(dispatch.SwiftEngineOverrideVariable, "")
 	// Outside any cohere module, so a resolver that skipped the refusal fails at once on the checkout it
