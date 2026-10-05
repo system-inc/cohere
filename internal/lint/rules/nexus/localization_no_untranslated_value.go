@@ -1,8 +1,11 @@
 package nexus
 
 import (
+	"crypto/sha256"
 	"regexp"
+	"slices"
 	"strings"
+	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
@@ -118,8 +121,12 @@ func messageIdenticalToSource(key string, locale string, value string) rule.Mess
 var LocalizationNoUntranslatedValue = rule.Rule{
 	Name: "nexus/localization-no-untranslated-value",
 
-	// The English translation table, en.ts, which this file does not import.
-	ProgramReads: rule.ReadsOtherFiles,
+	// The English translation table, en.ts, which this file does not import, and the current directory the
+	// fingerprint names those tables against.
+	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles,
+	// A file's verdict reads its own bytes and path and its directory's English tables, so every English
+	// table in the program is the fingerprint (#31ffaaa). See localizationNoUntranslatedValueFingerprint.
+	ProgramFingerprint: localizationNoUntranslatedValueFingerprint,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil
@@ -429,15 +436,84 @@ func translationFileInformation(sourceFile *ast.SourceFile) (string, string, boo
 		return "", "", false
 	}
 
-	// A whole path segment rather than a bare substring. Matching the substring would pull in a
-	// directory named "translations-archive" and, worse, would silently start linting whatever a
-	// future directory named that way holds.
-	if !imports.HasPathSegment(directory, "_translations") &&
-		!imports.HasPathSegment(directory, "translations") {
+	if !isTranslationsDirectory(directory) {
 		return "", "", false
 	}
 
 	return localeCode, directory, true
+}
+
+// isTranslationsDirectory is whether a directory holds a translation set: one with a `translations` or
+// `_translations` path segment. The rule and its fingerprint both ask it, so the English tables the
+// fingerprint hashes are exactly the ones a locale file can read.
+//
+// A whole path segment rather than a bare substring. Matching the substring would pull in a directory
+// named "translations-archive" and, worse, would silently start linting whatever a future directory named
+// that way holds.
+func isTranslationsDirectory(directory string) bool {
+	return imports.HasPathSegment(directory, "_translations") || imports.HasPathSegment(directory, "translations")
+}
+
+// localizationNoUntranslatedValueFingerprints holds the fingerprint for one program. The walk asks for it
+// on every worker that serves a selection, and the answer scans every file the program holds, so it is
+// made once per program.
+var localizationNoUntranslatedValueFingerprints struct {
+	sync.Mutex
+	program     rule.ProgramIdentity
+	fingerprint [sha256.Size]byte
+	made        bool
+}
+
+// localizationNoUntranslatedValueFingerprint is the rule's program fingerprint (#31ffaaa): every English
+// table in the program, en.ts and en.a in a translations directory, each named relative to the current
+// directory and hashed by its text, sorted by name.
+//
+// A locale file's verdict reads, beyond its own bytes and path, which English tables sit in its directory
+// and what they hold. Both present report ambiguousEnglishSibling with their names, neither present
+// reports missingEnglishSibling, and one is read for its values. One value has to serve every file, and
+// each file reads its own directory's tables, so every table any locale file could read is in it.
+// Presence is in it as much as content: adding, deleting or renaming either name moves it. The text
+// stands in for a version, since the rule reads the text, so an edit to a comment in en.ts moves it too.
+// Nothing else outside the file reaches a verdict: recognizing locale data reads only the file's own name.
+// The rule takes no options, so none reach it.
+func localizationNoUntranslatedValueFingerprint(program rule.Program, _ any) [sha256.Size]byte {
+	cache := &localizationNoUntranslatedValueFingerprints
+	cache.Lock()
+	defer cache.Unlock()
+	if cache.made && cache.program == program.Identity() {
+		return cache.fingerprint
+	}
+
+	type englishTable struct {
+		name string
+		text [sha256.Size]byte
+	}
+	var tables []englishTable
+	for _, sourceFile := range program.SourceFiles() {
+		fileName := imports.NormalizedFileName(sourceFile)
+		lastSlash := strings.LastIndex(fileName, "/")
+		if lastSlash < 0 {
+			continue
+		}
+		if baseName := fileName[lastSlash+1:]; baseName != "en.ts" && baseName != "en"+sourcename.AdamicExtension {
+			continue
+		}
+		if !isTranslationsDirectory(fileName[:lastSlash]) {
+			continue
+		}
+		tables = append(tables, englishTable{name: rule.FingerprintPath(program, fileName), text: sha256.Sum256([]byte(sourceFile.Text()))})
+	}
+	slices.SortFunc(tables, func(first englishTable, second englishTable) int { return strings.Compare(first.name, second.name) })
+
+	hash := sha256.New()
+	for _, table := range tables {
+		hash.Write([]byte(table.name))
+		hash.Write([]byte{0})
+		hash.Write(table.text[:])
+	}
+	copy(cache.fingerprint[:], hash.Sum(nil))
+	cache.program, cache.made = program.Identity(), true
+	return cache.fingerprint
 }
 
 // englishSibling finds a translation file's English table: en with the file's own extension first,
