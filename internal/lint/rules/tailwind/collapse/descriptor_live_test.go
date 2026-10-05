@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/corpus"
 )
 
 // The live table is verified against the engine, not against itself.
@@ -20,10 +22,11 @@ import (
 // reason the table is. Reproduce it with:
 //
 //	node internal/lint/rules/tailwind/tools/generate_descriptor_table/fixtures.mjs \
-//	    ~/Projects/connected/www-connected-app/app/_theme/styles/theme.css > /tmp/connected_fixtures.json
+//	    connected:app/_theme/styles/theme.css > /tmp/connected_fixtures.json
 //
-// The corpus repositories are read from disk. When one is missing the test skips rather than
-// passing, since a silent pass is what a broken lookup looks like.
+// The corpus repositories are read through internal/corpus. When one is unset the test skips naming
+// its variable rather than passing, since a silent pass is what a broken lookup looks like, and when
+// one is set but lacks its stylesheet or tailwindcss the test fails.
 
 // corpusRepositories are the design systems the port is measured on.
 //
@@ -31,31 +34,29 @@ import (
 // by a system whose theme differs, and a single repository would let a per-repository token pass as
 // a framework fact.
 var corpusRepositories = []struct {
-	name       string
-	entryPoint string
+	name     string
+	spelling string
 }{
-	{name: "ahra", entryPoint: filepath.Join(homeDirectory(), "Projects", "ahra", "app", "_theme", "styles", "theme.css")},
-	{name: "connected", entryPoint: filepath.Join(homeDirectory(), "Projects", "connected", "www-connected-app", "app", "_theme", "styles", "theme.css")},
+	{name: "ahra", spelling: "ahra:app/_theme/styles/theme.css"},
+	{name: "connected", spelling: "connected:app/_theme/styles/theme.css"},
 }
 
-func homeDirectory() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
+// liveEntryPointFor resolves a corpus repository's stylesheet and the tailwindcss installed beside it: a
+// skip naming the variable when the corpus is unset, and a failure when it is set but lacks either.
+func liveEntryPointFor(t testing.TB, spelling string) (entryPoint, packageRoot string) {
+	t.Helper()
+	entryPoint = corpus.Resolve(t, spelling)
+	packageRoot = findTailwindPackageRootForTest(filepath.Dir(entryPoint))
+	if packageRoot == "" {
+		t.Fatalf("%s holds no installed tailwindcss reachable from %s", spelling, entryPoint)
 	}
-	return home
+	return entryPoint, packageRoot
 }
 
 // liveTableFor loads a repository's design system and builds its table, or skips.
-func liveTableFor(t *testing.T, entryPoint string) (*LoadedDesignSystem, *Table) {
+func liveTableFor(t *testing.T, spelling string) (*LoadedDesignSystem, *Table) {
 	t.Helper()
-	if _, err := os.Stat(entryPoint); err != nil {
-		t.Skipf("design system not present at %s", entryPoint)
-	}
-	packageRoot := findTailwindPackageRootForTest(filepath.Dir(entryPoint))
-	if packageRoot == "" {
-		t.Skipf("no installed tailwindcss reachable from %s", entryPoint)
-	}
+	entryPoint, packageRoot := liveEntryPointFor(t, spelling)
 	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
 	if err != nil {
 		t.Fatalf("loading the design system at %s: %v", entryPoint, err)
@@ -99,7 +100,7 @@ func findTailwindPackageRootForTest(start string) string {
 func TestLiveTableAgreesWithTheEngineOverTheFixtureCorpus(t *testing.T) {
 	t.Parallel()
 	fixtures := loadDescriptorFixtures(t)
-	_, live := liveTableFor(t, corpusRepositories[0].entryPoint)
+	_, live := liveTableFor(t, corpusRepositories[0].spelling)
 
 	if fixtures.TailwindVersion != live.TailwindVersion {
 		t.Fatalf("the fixtures are Tailwind %s and the live table is Tailwind %s", fixtures.TailwindVersion, live.TailwindVersion)
@@ -173,7 +174,7 @@ func TestLiveTableCarriesTheRepositoryTheme(t *testing.T) {
 	for _, repository := range corpusRepositories {
 		t.Run(repository.name, func(t *testing.T) {
 			t.Parallel()
-			system, table := liveTableFor(t, repository.entryPoint)
+			system, table := liveTableFor(t, repository.spelling)
 
 			if len(table.Namespaces) == 0 {
 				t.Fatal("the table carries no namespaces, so every bare value resolves through inference alone")
@@ -279,7 +280,7 @@ func TestLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(t *testing.T) {
 	t.Parallel()
 	fixtures := loadDescriptorFixtures(t)
 	measured := testTable(t)
-	system, live := liveTableFor(t, corpusRepositories[0].entryPoint)
+	system, live := liveTableFor(t, corpusRepositories[0].spelling)
 
 	evaluator := system.Utilities()
 	if evaluator == nil {
@@ -340,14 +341,7 @@ func TestLiveTableIsNilWithoutADesignSystem(t *testing.T) {
 // the same counted path, once per program, so the question a reader has is whether adding it changed
 // the order of magnitude of a per-run cost, not whether it is fast in isolation.
 func BenchmarkNewTable(benchmark *testing.B) {
-	entryPoint := corpusRepositories[0].entryPoint
-	if _, err := os.Stat(entryPoint); err != nil {
-		benchmark.Skipf("design system not present at %s", entryPoint)
-	}
-	packageRoot := findTailwindPackageRootForTest(filepath.Dir(entryPoint))
-	if packageRoot == "" {
-		benchmark.Skipf("no installed tailwindcss reachable from %s", entryPoint)
-	}
+	entryPoint, packageRoot := liveEntryPointFor(benchmark, corpusRepositories[0].spelling)
 	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
 	if err != nil {
 		benchmark.Fatalf("loading the design system: %v", err)
@@ -366,14 +360,7 @@ func BenchmarkNewTable(benchmark *testing.B) {
 //
 // Load plus table, which is what `loadDesignSystemForProgram` does once per program.
 func BenchmarkLoadDesignSystemWithTable(benchmark *testing.B) {
-	entryPoint := corpusRepositories[0].entryPoint
-	if _, err := os.Stat(entryPoint); err != nil {
-		benchmark.Skipf("design system not present at %s", entryPoint)
-	}
-	packageRoot := findTailwindPackageRootForTest(filepath.Dir(entryPoint))
-	if packageRoot == "" {
-		benchmark.Skipf("no installed tailwindcss reachable from %s", entryPoint)
-	}
+	entryPoint, packageRoot := liveEntryPointFor(benchmark, corpusRepositories[0].spelling)
 
 	benchmark.ReportAllocs()
 	benchmark.ResetTimer()

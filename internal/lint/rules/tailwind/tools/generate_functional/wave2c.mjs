@@ -43,7 +43,7 @@ function flagValue(name) {
     return index === -1 ? undefined : process.argv[index + 1];
 }
 
-const { designSystem, tailwindVersion, entryPoint } = await loadDesignSystem(
+const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint } = await loadDesignSystem(
     entryPointArgument,
     flagValue('--resolve-root'),
 );
@@ -120,7 +120,7 @@ for (const root of roots) {
 
 process.stdout.write(JSON.stringify({
     tailwindVersion,
-    entryPoint,
+    entryPoint: recordedEntryPoint,
     groundTruth: 'compileAstNodes propertySort, via readingOf',
     rootCount: roots.length,
     caseCount: cases.length,

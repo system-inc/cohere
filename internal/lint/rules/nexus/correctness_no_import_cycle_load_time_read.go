@@ -344,8 +344,8 @@ func correctnessNoImportCycleLoadTimeReadBuildSyntacticGraph(program rule.Progra
 // file's type fingerprint already holds; that covers the checker's half, which edges survive elision
 // and which declaration a binding lands on. What this adds is the shape of the cycles themselves, so
 // an import that opens or closes a cycle anywhere moves it, and an edit that touches no cycle's
-// imports leaves it, and the findings replay.
-func correctnessNoImportCycleLoadTimeReadFingerprint(program rule.Program) [sha256.Size]byte {
+// imports leaves it, and the findings replay. The rule takes no options, so none reach it.
+func correctnessNoImportCycleLoadTimeReadFingerprint(program rule.Program, _ any) [sha256.Size]byte {
 	syntactic := correctnessNoImportCycleLoadTimeReadSyntacticGraphFor(program)
 	// The edges inside cycles are the whole shape: they name every file on a cycle, and which files share
 	// one is their strongly connected components.

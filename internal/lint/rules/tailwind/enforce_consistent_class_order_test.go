@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -76,11 +77,11 @@ import (
 // the bare `tailwindcss` specifier — rather than a path arranged for the test.
 const classOrderFixtureStylesheetPath = "app/_theme/styles/theme.css"
 
-// classOrderFixturePackageRoot is the installed tailwindcss the fixture stylesheets import.
-//
-// Empty when there is none, which every caller must handle rather than assume away.
+// classOrderFixturePackageRoot is the installed tailwindcss the fixture stylesheets import: the vendored
+// snapshot of 4.3.3, the version the class-order corpus in collapse/testdata was captured against, so the
+// fixtures and the corpus agree on which engine they mean, on any machine (#sycrdr6).
 func classOrderFixturePackageRoot() string {
-	return findTailwindPackageRoot(classOrderFixtureSearchRoot, diskFileExists)
+	return vendored.TailwindPackageRoot()
 }
 
 // classOrderFixtureStylesheet is the fixture's root stylesheet.
@@ -88,14 +89,6 @@ func classOrderFixturePackageRoot() string {
 // The bare specifier a real repository writes, resolved through the symlink `runClassOrderFixture`
 // plants. Nothing here is arranged for the test beyond the symlink itself.
 const classOrderFixtureStylesheet = `@import "tailwindcss";`
-
-// classOrderFixtureSearchRoot is where the upward walk for `node_modules/tailwindcss` begins.
-//
-// The corpus repository rather than this checkout, because `cohere` installs no npm packages and the
-// walk would find nothing from anywhere inside it. Same path the class-order corpus in
-// `internal/lint/rules/tailwind/collapse/testdata` was captured against, so the fixtures and the corpus agree on which
-// engine version they mean.
-const classOrderFixtureSearchRoot = "/Users/kirkouimet/Projects/ahra/app/_theme/styles"
 
 // runClassOrderFixture runs the rule against a one-file program that has a real design system.
 //
@@ -733,10 +726,9 @@ func TestClassOrderFixturesActuallyRan(t *testing.T) {
 	packageRoot := classOrderFixturePackageRoot()
 	if packageRoot == "" {
 		t.Fatalf(
-			"no installed tailwindcss found from %s, so every fixture in this file skipped and the "+
-				"package still reported ok. Either the search root is wrong or this machine has no "+
-				"Tailwind to test against; both need a human, and neither should read as a pass",
-			classOrderFixtureSearchRoot,
+			"the vendored tailwindcss at %s is missing, so every fixture in this file would skip and the "+
+				"package still report ok; restore it (internal/lint/rules/tailwind/vendored)",
+			vendored.TailwindPackageRoot(),
 		)
 	}
 

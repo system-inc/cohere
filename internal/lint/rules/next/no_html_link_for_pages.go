@@ -53,11 +53,13 @@ func noHtmlLinkForPagesMessage(hrefPath string) rule.Message {
 // directory; cohere reads no Next settings (the loader refuses `settings.next`), so it is the root
 // cohere checks, which is where every consumer starts ESLint.
 //
-// # Declared reads, and why it is never cached
+// # Declared reads, and how it is cached
 //
-// The page files are read through ctx.Program.FS(), declared ReadsOtherFiles, so the findings cache
-// never replays this rule: creating or deleting a page changes findings in files that did not change,
-// and nothing per file could key that. The model is built once per run and root, not per file.
+// The page files are read through ctx.Program.FS(), declared ReadsOtherFiles, since creating or
+// deleting a page changes findings in files that did not change. The model is built once per run and
+// root, not per file. Its routes are the rule's program fingerprint (noHtmlLinkForPagesFingerprint),
+// so the findings cache replays a file's verdict while its bytes and the routes hold, and walks every
+// file again once a page is added, removed or renamed (#s9k38p3).
 //
 // # Where upstream crashes, this reads on
 //
@@ -72,6 +74,8 @@ var NoHtmlLinkForPages = rule.Rule{
 	Name: "@next/next/no-html-link-for-pages",
 	// The root is the run's directory, and the routes come off the disk.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles,
+	// A file's verdict reads its own bytes and the route model, so the model is the whole fingerprint.
+	ProgramFingerprint: noHtmlLinkForPagesFingerprint,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[NoHtmlLinkForPagesOptions](options)
 		// A harness that builds its Context by hand has no program and so no disk to read, which is

@@ -7436,7 +7436,7 @@
     {
       "name": "ahra",
       "source": "repository",
-      "entryPath": "/Users/kirkouimet/Projects/ahra/app/_theme/styles/theme.css",
+      "entryPath": "ahra:app/_theme/styles/theme.css",
       "theme": {
         "prefix": null,
         "size": 744,
@@ -50775,7 +50775,7 @@
     {
       "name": "www-connected-app",
       "source": "repository",
-      "entryPath": "/Users/kirkouimet/Projects/connected/www-connected-app/app/_theme/styles/theme.css",
+      "entryPath": "connected:app/_theme/styles/theme.css",
       "theme": {
         "prefix": null,
         "size": 748,
