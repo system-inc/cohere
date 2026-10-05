@@ -1,4 +1,4 @@
-package dispatch
+package guard
 
 import (
 	"encoding/json"
@@ -31,11 +31,19 @@ import (
 // not carry fails the guard by name.
 func guardOverlay(t *testing.T) map[string][]byte {
 	t.Helper()
+	return guardOverlayFrom(t, os.Getenv("GOFLAGS"))
+}
+
+// guardOverlayFrom is guardOverlay reading goFlags in place of the environment's GOFLAGS, so the tests
+// that prove a named overlay is what the guards read can name one without t.Setenv, and run in parallel
+// (#nxgt2ca).
+func guardOverlayFrom(t *testing.T, goFlags string) map[string][]byte {
+	t.Helper()
 
 	refuseUnreachableOverlayFlag(t)
 
 	overlayFile := ""
-	for _, flag := range strings.Fields(os.Getenv("GOFLAGS")) {
+	for _, flag := range strings.Fields(goFlags) {
 		if value, found := strings.CutPrefix(flag, "-overlay="); found {
 			overlayFile = value
 		} else if value, found := strings.CutPrefix(flag, "--overlay="); found {
@@ -142,10 +150,10 @@ func writeOverlay(t *testing.T, target string, contents string) string {
 
 // The creating-getter guard reads an overlay GOFLAGS names: a GetLocals call that exists only in the
 // overlay is caught, and the working tree, which has none, is not what was read.
-//
-// Not parallel: it names its overlay in GOFLAGS with t.Setenv, which a parallel test may not call.
 func TestTheCreatingGetterGuardReadsTheGoFlagsOverlay(t *testing.T) {
-	root, err := filepath.Abs("../../..")
+	t.Parallel()
+
+	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,9 +166,7 @@ func TestTheCreatingGetterGuardReadsTheGoFlagsOverlay(t *testing.T) {
 	if planted == string(original) {
 		t.Fatal("no-shadow no longer ranges over node.Locals(), so the plant missed; update the probe")
 	}
-	t.Setenv("GOFLAGS", "-overlay="+writeOverlay(t, path, planted))
-
-	calls := creatingGetterCalls(t, guardOverlay(t))
+	calls := creatingGetterCalls(t, guardOverlayFrom(t, "-overlay="+writeOverlay(t, path, planted)))
 	if len(calls) != 1 || !strings.Contains(calls[0], "no_shadow.go") || !strings.HasSuffix(calls[0], "GetLocals") {
 		t.Fatalf("a GetLocals call that exists only in the GOFLAGS overlay was not caught: %v", calls)
 	}
@@ -168,10 +174,10 @@ func TestTheCreatingGetterGuardReadsTheGoFlagsOverlay(t *testing.T) {
 
 // The TypeReach guard reads an overlay GOFLAGS names: a Shapes claim added only in the overlay, to a rule
 // the scan already finds reading imported bodies, is caught.
-//
-// Not parallel: it names its overlay in GOFLAGS with t.Setenv, which a parallel test may not call.
 func TestTheTypeReachGuardReadsTheGoFlagsOverlay(t *testing.T) {
-	root, err := filepath.Abs("../../..")
+	t.Parallel()
+
+	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,9 +207,7 @@ func TestTheTypeReachGuardReadsTheGoFlagsOverlay(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%s: %v", file, err)
 	}
-	t.Setenv("GOFLAGS", "-overlay="+writeOverlay(t, file, string(planted)))
-
-	scan := scanTypeReach(t, guardOverlay(t))
+	scan := scanTypeReach(t, guardOverlayFrom(t, "-overlay="+writeOverlay(t, file, string(planted))))
 	caught := false
 	for _, name := range scan.claims {
 		caught = caught || (name == target && scan.mayReadImportedBodies[name])
@@ -262,7 +266,7 @@ func plantShapesClaim(source []byte) ([]byte, error) {
 func TestAShapesClaimPlantsIntoEveryRuleFile(t *testing.T) {
 	t.Parallel()
 
-	root, err := filepath.Abs("../../..")
+	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,11 +320,11 @@ func TestAnOverlayFlagGoFlagsDoesNotCarryIsRefused(t *testing.T) {
 		goFlags   string
 		refused   bool
 	}{
-		{"go test -overlay /tmp/x.json ./internal/release/dispatch", "", true},
-		{"go test -overlay=/tmp/x.json ./internal/release/dispatch", "", true},
-		{"go test ./internal/release/dispatch", "-overlay=/tmp/x.json", false},
-		{"go test -overlay=/tmp/x.json ./internal/release/dispatch", "-overlay=/tmp/x.json", false},
-		{"go test ./internal/release/dispatch", "", false},
+		{"go test -overlay /tmp/x.json ./internal/guard", "", true},
+		{"go test -overlay=/tmp/x.json ./internal/guard", "", true},
+		{"go test ./internal/guard", "-overlay=/tmp/x.json", false},
+		{"go test -overlay=/tmp/x.json ./internal/guard", "-overlay=/tmp/x.json", false},
+		{"go test ./internal/guard", "", false},
 	} {
 		if got := overlayFlagOutsideGoFlags(testCase.arguments, testCase.goFlags); got != testCase.refused {
 			t.Errorf("%q with GOFLAGS %q: refused %v, want %v", testCase.arguments, testCase.goFlags, got, testCase.refused)

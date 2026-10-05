@@ -1,4 +1,9 @@
-package dispatch
+// Package guard holds the checks that read cohere's own source as a whole: the rule packages' contracts
+// (creating getters, TypeReach, program and option reads, leaf imports) and gofmt over the module. It has
+// no code of its own. They read every rule file, so an edit to one reruns them, and they live apart from
+// the code they used to share a package with so that the edit reruns them alone: in
+// internal/release/dispatch, every lint edit reran dispatch's Swift and build tests too (#nxgt2ca).
+package guard
 
 import (
 	"go/ast"
@@ -37,7 +42,7 @@ func TestRulesCallNoCompilerGetterThatWrites(t *testing.T) {
 // this scan; the guard hands in the overlay GOFLAGS names (guardOverlay), and a probe hands in its own.
 func creatingGetterCalls(t *testing.T, overlay map[string][]byte) []string {
 	t.Helper()
-	root, err := filepath.Abs("../../..")
+	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +96,7 @@ func creatingGetterCalls(t *testing.T, overlay map[string][]byte) []string {
 func TestTheCreatingGetterScanSeesAPlantedCall(t *testing.T) {
 	t.Parallel()
 
-	root, err := filepath.Abs("../../..")
+	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
 	}

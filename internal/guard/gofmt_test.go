@@ -1,4 +1,4 @@
-package dispatch
+package guard
 
 import (
 	"bytes"
@@ -31,7 +31,8 @@ import (
 func TestEveryGoFileCohereOwnsIsGofmtClean(t *testing.T) {
 	t.Parallel()
 
-	module, err := FindModuleDirectory()
+	// This package sits two directories below the module root.
+	module, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}

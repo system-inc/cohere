@@ -1,4 +1,4 @@
-package dispatch
+package guard
 
 import (
 	"go/ast"

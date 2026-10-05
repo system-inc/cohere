@@ -1,4 +1,4 @@
-package dispatch
+package guard
 
 import (
 	"go/ast"
@@ -104,7 +104,7 @@ var shapeReaders = map[string]bool{"rule.ExportNameIn": true, "rule.ImportBindin
 func TestShapeReadersHandBackNoSyntax(t *testing.T) {
 	t.Parallel()
 
-	root, err := filepath.Abs("../../..")
+	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,7 +271,7 @@ func isOwnSourceFile(expression ast.Expr, info *types.Info) bool {
 // scanTypeReach reads the rule packages with overlay in place of the files it names.
 func scanTypeReach(t *testing.T, overlay map[string][]byte) typeReachScan {
 	t.Helper()
-	root, err := filepath.Abs("../../..")
+	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
 	}

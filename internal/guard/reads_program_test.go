@@ -1,4 +1,4 @@
-package dispatch
+package guard
 
 import (
 	"go/ast"
@@ -425,14 +425,14 @@ func isRuleSelector(expression ast.Expr, name string) bool {
 // ruleSourceFiles lists the non-test Go files under internal/lint/rules.
 func ruleSourceFiles(t *testing.T) []string {
 	t.Helper()
-	return goSourceFilesUnder(t, "../../lint/rules")
+	return goSourceFilesUnder(t, "../lint/rules")
 }
 
 // checkingSourceFiles lists the non-test Go files of the shared type-checking helpers, which take a
 // rule.Program from the rules that call them.
 func checkingSourceFiles(t *testing.T) []string {
 	t.Helper()
-	return goSourceFilesUnder(t, "../../lint/checking")
+	return goSourceFilesUnder(t, "../lint/checking")
 }
 
 func goSourceFilesUnder(t *testing.T, root string) []string {

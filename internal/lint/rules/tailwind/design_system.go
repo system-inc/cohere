@@ -121,7 +121,7 @@ var designSystemCache struct {
 // does not: zero findings, forever, indistinguishable from a clean tree.
 //
 // It takes the program rather than the rule's Context so that the declaration is enforced rather
-// than asked for. The guard in internal/release/dispatch is textual: a rule file that names
+// than asked for. The guard in internal/guard is textual: a rule file that names
 // `ctx.Program` must declare. When this took the Context, a rule could call it without ever writing
 // `ctx.Program`, and the five rules that did passed the guard only because each also checked
 // `ctx.Program == nil` somewhere else in the file (#ym4v8bc). Now the call itself is what the guard

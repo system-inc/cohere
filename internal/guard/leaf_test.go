@@ -1,4 +1,4 @@
-package dispatch
+package guard
 
 import (
 	"os/exec"
@@ -153,7 +153,7 @@ func runGoList(t *testing.T, arguments ...string) []string {
 	command := exec.Command("go", append([]string{"list"}, arguments...)...)
 	// Tests run in their own package directory, and the patterns here are written relative to the
 	// module root.
-	command.Dir = filepath.Join("..", "..", "..")
+	command.Dir = filepath.Join("..", "..")
 
 	output, err := command.Output()
 	if err != nil {
@@ -180,7 +180,7 @@ func registeringPackages(t *testing.T, packages []string) []string {
 	registering := make([]string, 0, len(packages))
 	for _, importPath := range packages {
 		directory := strings.TrimPrefix(importPath, modulePrefix)
-		matches, err := filepath.Glob(filepath.Join("..", "..", "..", directory, "*_register.go"))
+		matches, err := filepath.Glob(filepath.Join("..", "..", directory, "*_register.go"))
 		if err != nil {
 			t.Fatalf("looking for registrations in %s: %v", importPath, err)
 		}
