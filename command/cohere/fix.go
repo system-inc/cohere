@@ -92,6 +92,9 @@ func applyProposedFixes(
 		reportForeignCheckers(graph, walked, len(projectFiles))
 		result = walked
 	}
+	if graph != nil && graph.FusedCheck != nil {
+		speculation.stop()
+	}
 
 	// Group proposals by the file they belong to. A diagnostic carries its source file, so the
 	// grouping is exact rather than inferred from a range.
@@ -569,6 +572,11 @@ type formatSpeculation struct {
 	attempts map[string]formatAttempt
 	// read is the text each attempt was computed from, so a result is kept only for those exact bytes.
 	read map[string]string
+
+	// stopped, once closed, has the workers take no more files: what they have not begun is left to
+	// formatInParallel, which has every core. See stop.
+	stopped  chan struct{}
+	stopOnce sync.Once
 }
 
 // speculateFormat starts formatting every candidate at once, on its own workers, and returns at once.
@@ -587,7 +595,8 @@ type formatSpeculation struct {
 // the ones the walk read, is discarded too (keepable), so what is kept is exactly what formatInParallel would
 // have computed, and everything else is computed as it always was.
 func speculateFormat(candidates []string, transform edit.Transform, maxPasses int) *formatSpeculation {
-	speculation := &formatSpeculation{done: make(chan struct{}), attempts: map[string]formatAttempt{}, read: map[string]string{}}
+	speculation := &formatSpeculation{done: make(chan struct{}), attempts: map[string]formatAttempt{}, read: map[string]string{},
+		stopped: make(chan struct{})}
 	workers := speculationWorkers()
 	if transform == nil || len(candidates) == 0 || workers == 0 {
 		close(speculation.done)
@@ -604,7 +613,16 @@ func speculateFormat(candidates []string, transform edit.Transform, maxPasses in
 		group.Add(1)
 		go func() {
 			defer group.Done()
-			for fileName := range next {
+			for {
+				select {
+				case <-speculation.stopped:
+					return
+				default:
+				}
+				fileName, more := <-next
+				if !more {
+					return
+				}
 				first := true
 				unproposed := func(_ string, _ string) ([]edit.Proposal, error) {
 					if first {
@@ -645,6 +663,13 @@ func speculationWorkers() int {
 		return 0
 	}
 	return max(runtime.GOMAXPROCS(0)/4, 1)
+}
+
+// stop has the workers finish the files they are on and begin no more. Called once the walk is over on a run
+// whose walk also did the type check (program.FusedCheck): nothing else then wants the cores, and a quarter of
+// them formatting the rest would set the run's end (#679s763).
+func (speculation *formatSpeculation) stop() {
+	speculation.stopOnce.Do(func() { close(speculation.stopped) })
 }
 
 // wait returns once every attempt is in.
