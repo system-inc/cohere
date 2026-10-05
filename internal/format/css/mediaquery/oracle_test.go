@@ -191,6 +191,10 @@ var mediaQueryFixtures = []mediaQueryFixture{
 	// Non-ASCII: offsets differ between UTF-16 and bytes, and JavaScript's \s is wider than ASCII.
 	{name: "non-ASCII comment", params: "screen and (min-width: 1em) /* \xc3\xa9 */"},
 	{name: "non-ASCII type", params: "\xc3\xa9cran and (color)"},
+	// Before a feature's colon, where the feature is gathered byte by byte (@system_adamic's stream P2).
+	{name: "no-break space before a feature", params: "(\u00a0x: 1px)"},
+	{name: "non-ASCII in a feature", params: "(\xc3\xa9-width: 1px)"},
+	{name: "non-ASCII after a feature's colon", params: "(x: \xc3\xa9)"},
 	{name: "no-break space", params: "(max-width:\xc2\xa0100px)\xc2\xa0and\xc2\xa0print"},
 	{name: "ideographic space", params: "\xe3\x80\x80screen\xe3\x80\x80and (color)"},
 	{name: "emoji", params: "\xf0\x9f\x98\x80 and (a: \xf0\x9f\x98\x80), \xf0\x9f\x98\x80"},

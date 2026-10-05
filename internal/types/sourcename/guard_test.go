@@ -26,17 +26,6 @@ var tsDecisionsAllowed = map[string]string{
 	"internal/format/javascript/print_type_parameters.go: \\.ts$": "pending #6mhafvb: <T,>'s comma follows .ts for an .a file",
 	"internal/format/prettier/handles.go: .ts":                    "pending #6mhafvb: the comparison engine parses .a with typescript",
 
-	// Pending: lint converts its rule sites under #kwt1htp (@system_cohere_lint_sets).
-	"internal/lint/rules/base/consistency_no_bare_throw.go: .test.ts":                      "pending #kwt1htp",
-	"internal/lint/rules/nexus/localization_no_untranslated_value.go: .ts":                 "pending #kwt1htp",
-	"internal/lint/rules/nexus/localization_no_untranslated_value.go: Translations.ts":     "pending #kwt1htp",
-	"internal/lint/rules/nexus/localization_no_untranslated_value.go: TranslationsType.ts": "pending #kwt1htp",
-	"internal/lint/rules/nexus/localization_no_untranslated_value.go: Interface.ts":        "pending #kwt1htp",
-	"internal/lint/rules/structure/boundary_no_project_theme_value.go: Theme.ts":           "pending #kwt1htp",
-	"internal/lint/rules/structure/network_require_hook_request_suffix.go: .ts":            "pending #kwt1htp",
-	"internal/lint/rules/tailwind/no_physical_direction.go: .ts":                           "pending #kwt1htp",
-	"internal/lint/rules/typescript/no_explicit_any.go: .ts":                               "pending #kwt1htp",
-
 	// One file, by its house name: a pinned file is that file, never an Adamic one.
 	"internal/lint/rules/base/consistency_no_hand_built_declared_error.go: /BaseError.ts":        "Base's own BaseError.ts",
 	"internal/lint/rules/base/consistency_no_hand_built_declared_error.go: /CreateBaseErrors.ts": "Base's own CreateBaseErrors.ts",

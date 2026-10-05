@@ -93,16 +93,52 @@ func TestParseTrees(t *testing.T) {
       media-feature "x" @8 before="" after=""
 `,
 		},
+		{
+			// Non-ASCII before a feature's colon is kept byte for byte (@system_adamic's stream P2). The feature
+			// was gathered a byte at a time, each byte made a rune: the no-break space's two bytes became
+			// "\u00c2\u00a0", which is not whitespace, so it stayed in the feature's value rather than its before.
+			params: "(<nbsp>x: 1px)",
+			want: `media-query-list "(<nbsp>x: 1px)" @0 before="" after=""
+  media-query "(<nbsp>x: 1px)" @0 before="" after=""
+    media-feature-expression "(<nbsp>x: 1px)" @0 before="" after=""
+      media-feature "x" @3 before="<nbsp>" after=""
+      colon ":" @4 before="" after=" "
+      value "1px" @6 before=" " after=""
+`,
+		},
+		{
+			// The same in the middle of a feature's name, and sourceIndex still counts bytes after it.
+			params: "(<e>-width: 1px)",
+			want: `media-query-list "(<e>-width: 1px)" @0 before="" after=""
+  media-query "(<e>-width: 1px)" @0 before="" after=""
+    media-feature-expression "(<e>-width: 1px)" @0 before="" after=""
+      media-feature "<e>-width" @1 before="" after=""
+      colon ":" @9 before="" after=" "
+      value "1px" @11 before=" " after=""
+`,
+		},
+		{
+			// After the colon the value is sliced from the text, never gathered: the control.
+			params: "(x: <e>)",
+			want: `media-query-list "(x: <e>)" @0 before="" after=""
+  media-query "(x: <e>)" @0 before="" after=""
+    media-feature-expression "(x: <e>)" @0 before="" after=""
+      media-feature "x" @1 before="" after=""
+      colon ":" @2 before="" after=" "
+      value "<e>" @4 before=" " after=""
+`,
+		},
 	}
 	for _, each := range cases {
-		tree, err := Parse(each.params)
+		params := strings.NewReplacer("<e>", "\xc3\xa9", "<nbsp>", "\u00a0").Replace(each.params)
+		tree, err := Parse(params)
 		if err != nil {
 			t.Errorf("%q: %v", each.params, err)
 			continue
 		}
 		var builder strings.Builder
 		renderTree(tree, 0, &builder)
-		want := strings.ReplaceAll(each.want, "<e>", "\xc3\xa9")
+		want := strings.NewReplacer("<e>", "\xc3\xa9", "<nbsp>", "\u00a0").Replace(each.want)
 		if builder.String() != want {
 			t.Errorf("%q:\ngot\n%s\nwant\n%s", each.params, builder.String(), want)
 		}
