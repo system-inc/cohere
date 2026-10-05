@@ -37,7 +37,8 @@ func TestPostDominatorFrontiersMatchTheChainWalk(t *testing.T) {
 			"function early(a) { if (!a) { return; } for (let i = 0; i < a; i++) { if (i % 2) { continue; } foo(i); } }",
 		}, "\n"),
 	}
-	if paths, contents := pinnedCorpusFilesIfPresent(t, 400); paths != nil {
+	paths, contents := pinnedCorpusFilesIfPresent(t, 400)
+	if paths != nil {
 		for _, path := range paths {
 			sources[path] = contents[path]
 		}
@@ -74,7 +75,14 @@ func TestPostDominatorFrontiersMatchTheChainWalk(t *testing.T) {
 			compare(Lower(node, nil))
 		})
 	}
-	if compared < 20 {
+	// With the corpus, a count under 20 means the corpus parsed to almost nothing. Without it (its subtest
+	// skipped, naming the variable), the hand-written sources are all there is, and they must still give
+	// functions to compare. This failed on every machine without the Structure checkout until #sycrdr6.
+	minimum := 1
+	if paths != nil {
+		minimum = 20
+	}
+	if compared < minimum {
 		t.Fatalf("compared only %d functions, so this proved little", compared)
 	}
 	t.Logf("compared %d functions", compared)

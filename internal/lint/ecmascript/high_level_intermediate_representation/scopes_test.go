@@ -461,7 +461,7 @@ func corpusScopeStats(t *testing.T, limit int) (functions, scopes, members int, 
 	t.Helper()
 
 	var files []string
-	err := filepath.Walk(corpusRoot, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(corpusRoot(t), func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
@@ -839,7 +839,7 @@ func TestScopeMatchesTheDisjointSetPartition(t *testing.T) {
 	skipWithoutCorpus(t)
 
 	var files []string
-	filepath.Walk(corpusRoot, func(path string, info os.FileInfo, err error) error {
+	filepath.Walk(corpusRoot(t), func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
