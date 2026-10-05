@@ -35,8 +35,11 @@ func sampleLintCache() *program.LintCache {
 				DesignRules:      []string{"better-tailwindcss/no-unknown-classes"},
 				// Not zero and not either other fingerprint, for the same reason.
 				DesignFingerprint: program.HashContent("the design system debugger; was checked under"),
-				Listening:         []string{"no-debugger", "no-empty", "await-thenable", "no-floating-promises"},
-				VisitedNodes:      5,
+				DerivedRules:      []string{"structure/boundary-no-project-theme-value"},
+				// Not zero and not any other fingerprint, for the same reason.
+				DerivedFingerprint: program.HashContent("the derived debugger; was keyed on"),
+				Listening:          []string{"no-debugger", "no-empty", "await-thenable", "no-floating-promises"},
+				VisitedNodes:       5,
 				// Two rules sharing a key and one rule with two, so an encoder that summed across either could
 				// not match.
 				Notes: program.RuleNotes{
@@ -156,6 +159,12 @@ func TestLintCacheRoundTripsEveryField(t *testing.T) {
 		}
 		if strings.Join(got.DesignRules, ",") != strings.Join(want.DesignRules, ",") {
 			t.Errorf("entry %d DesignRules: %v against %v", index, got.DesignRules, want.DesignRules)
+		}
+		if strings.Join(got.DerivedRules, ",") != strings.Join(want.DerivedRules, ",") {
+			t.Errorf("entry %d DerivedRules: %v against %v", index, got.DerivedRules, want.DerivedRules)
+		}
+		if got.DerivedFingerprint != want.DerivedFingerprint {
+			t.Errorf("entry %d DerivedFingerprint: %x against %x", index, got.DerivedFingerprint, want.DerivedFingerprint)
 		}
 		if got.DesignFingerprint != want.DesignFingerprint {
 			t.Errorf("entry %d DesignFingerprint: %x against %x", index, got.DesignFingerprint, want.DesignFingerprint)
@@ -364,7 +373,7 @@ func TestLintCacheEntryHasNoUncheckedFields(t *testing.T) {
 	compared := map[string]struct{}{
 		"Path": {}, "ContentHash": {}, "Rules": {}, "TypedRules": {}, "TypeFingerprint": {}, "Listening": {},
 		"VisitedNodes": {}, "Findings": {}, "ShapedRules": {}, "ShapeFingerprint": {}, "DesignRules": {}, "DesignFingerprint": {},
-		"Notes": {}, "Adamic": {},
+		"DerivedRules": {}, "DerivedFingerprint": {}, "Notes": {}, "Adamic": {},
 	}
 	entryType := reflect.TypeOf(program.LintCacheEntry{})
 	for index := range entryType.NumField() {

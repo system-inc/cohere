@@ -894,7 +894,8 @@ func nodesReplayedClause(coverage program.Coverage) string {
 // tell the two apart, and how many replayed files ran type-aware rules again because something they import
 // changed: content-keyed rules on every importer of a changed file, shape-keyed ones only where a shape
 // changed. The design-system rules are counted apart, since what re-runs them is a stylesheet rather than an
-// import. Empty when nothing was replayed.
+// import, and so are the derived ones, re-run by the program-wide data their fingerprint covers. Empty when
+// nothing was replayed.
 func replayedFromCache(result program.Result) string {
 	if result.FilesReplayed == 0 {
 		return ""
@@ -905,6 +906,9 @@ func replayedFromCache(result program.Result) string {
 	}
 	if result.DesignSystemRerun > 0 {
 		replayed += fmt.Sprintf(" (design-system rules ran again on %d of them)", result.DesignSystemRerun)
+	}
+	if result.DerivedRerun > 0 {
+		replayed += fmt.Sprintf(" (derived rules ran again on %d of them)", result.DerivedRerun)
 	}
 	return replayed
 }

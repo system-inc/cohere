@@ -119,6 +119,15 @@ type LintCacheEntry struct {
 	// they cannot be replayed under any.
 	DesignFingerprint [sha256.Size]byte
 
+	// DerivedRules is the rules applied to this file that declare rule.ProgramFingerprint. Their findings replay
+	// while DerivedFingerprint matches.
+	DerivedRules []string
+
+	// DerivedFingerprint hashes each DerivedRules rule's name and program fingerprint, and the file's type
+	// fingerprint when any of them reads types, as they were when DerivedRules' findings were produced. Zero
+	// when one had no fingerprint that run, which no lookup matches.
+	DerivedFingerprint [sha256.Size]byte
+
 	// Listening is the subset of Rules and TypedRules that registered a listener on this file. A replay
 	// counts them as listening, which is what keeps the coverage line identical to a walked run's.
 	Listening []string
@@ -407,13 +416,17 @@ func (c *LintCache) Store(entry LintCacheEntry) {
 	c.index = nil
 }
 
-// CacheClasses splits a rule set four ways, in order: rules whose findings depend only on the file's
+// CacheClasses splits a rule set five ways, in order: rules whose findings depend only on the file's
 // bytes, type-aware rules whose findings also depend on the types the file can see, design-system rules
-// whose findings also depend on the stylesheets the design system read, and rules that may never be cached.
+// whose findings also depend on the stylesheets the design system read, derived rules whose findings also
+// depend on a program-wide fingerprint they declare, and rules that may never be cached.
 //
-// ReadsOtherFiles is the one disqualification left. A rule reading the program's file list, a file by
-// name, another file's imports, or the file system reaches something a per-file key cannot name, so
-// its answer can change while every key it could have is unmoved. The program's other reads are in
+// ReadsOtherFiles is the one disqualification left, unless the rule declares rule.ProgramFingerprint. A rule
+// reading the program's file list, a file by name, another file's imports, or the file system reaches
+// something a per-file key cannot name, so its answer can change while every key it could have is unmoved.
+// A rule that names it, as a hash of exactly the program-wide data its verdict reads, is derived: keyed on
+// that hash beside its bytes, and on the type fingerprint too when it reads types (#kdee854). Without one it
+// stays uncacheable, so the default is the sound one. The program's other reads are in
 // the key already: compiler options through the tsconfig chain, the default library through the
 // binary, and this file's own module resolution through the type fingerprint, whose edges come from
 // it. So a rule reading module resolution is type-aware even with no checker (#b8k3bp6).
@@ -431,12 +444,16 @@ func (c *LintCache) Store(entry LintCacheEntry) {
 // The asymmetry still holds. Including a rule wrongly serves stale findings silently and forever;
 // excluding one wrongly costs a cache miss. A rule that reads other files and the checker both is
 // excluded, since other files are the larger reach.
-func CacheClasses(rules []rule.Rule) (pure []rule.Rule, typeAware []rule.Rule, design []rule.Rule, uncacheable []rule.Rule) {
+func CacheClasses(rules []rule.Rule) (pure []rule.Rule, typeAware []rule.Rule, design []rule.Rule, derived []rule.Rule,
+	uncacheable []rule.Rule) {
 	for _, subject := range rules {
 		readsTypes := subject.NeedsTypeChecker || subject.ProgramReads&rule.ReadsModuleResolution != 0
 		readsDesignSystem := subject.ProgramReads&rule.ReadsDesignSystem != 0
+		readsOtherFiles := subject.ProgramReads&rule.ReadsOtherFiles != 0
 		switch {
-		case subject.ProgramReads&rule.ReadsOtherFiles != 0, readsDesignSystem && readsTypes:
+		case readsOtherFiles && subject.ProgramFingerprint != nil && !readsDesignSystem:
+			derived = append(derived, subject)
+		case readsOtherFiles, readsDesignSystem && readsTypes:
 			uncacheable = append(uncacheable, subject)
 		case readsDesignSystem:
 			design = append(design, subject)
@@ -446,12 +463,12 @@ func CacheClasses(rules []rule.Rule) (pure []rule.Rule, typeAware []rule.Rule, d
 			pure = append(pure, subject)
 		}
 	}
-	return pure, typeAware, design, uncacheable
+	return pure, typeAware, design, derived, uncacheable
 }
 
 // CacheableRules splits a rule set into the rules whose findings depend on nothing but the file's
 // bytes, and everything else. See CacheClasses for the three-way split the walk uses.
 func CacheableRules(rules []rule.Rule) (cacheable []rule.Rule, uncacheable []rule.Rule) {
-	pure, typeAware, design, never := CacheClasses(rules)
-	return pure, append(append(typeAware, design...), never...)
+	pure, typeAware, design, derived, never := CacheClasses(rules)
+	return pure, append(append(append(typeAware, design...), derived...), never...)
 }

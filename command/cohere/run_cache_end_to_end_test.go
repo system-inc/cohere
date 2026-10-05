@@ -78,7 +78,7 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// so it comes off before a comparison and is required or forbidden separately per scenario.
 	// The types phase's clause says how many files' semantic diagnostics were replayed; a cold run never has it.
 	typesClause := regexp.MustCompile(`; \d+ of \d+ files' semantic diagnostics replayed from cache`)
-	layerTwoClause := regexp.MustCompile(`; \d+ of \d+ files replayed from cache( \(type-aware rules ran again on \d+ of them, shape-keyed on \d+\))?( \(design-system rules ran again on \d+ of them\))?`)
+	layerTwoClause := regexp.MustCompile(`; \d+ of \d+ files replayed from cache( \(type-aware rules ran again on \d+ of them, shape-keyed on \d+\))?( \(design-system rules ran again on \d+ of them\))?( \(derived rules ran again on \d+ of them\))?`)
 	// A cold run is a `--no-cache` run, which says so in a line no cached run prints.
 	cacheOffLine := regexp.MustCompile(`(?m)^  cache: off, by --no-cache.*\n`)
 	// A cached run says how many shapes it keyed on content (#5txm9gg); a cold run keys none, so the line is

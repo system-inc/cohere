@@ -188,6 +188,10 @@ type Result struct {
 	// stylesheet the design system read changed or the last run's could not be keyed.
 	DesignSystemRerun int
 
+	// DerivedRerun is how many of the replayed files ran their derived rules again, because a rule's program
+	// fingerprint moved, or the file's type fingerprint did under a derived rule that reads types.
+	DerivedRerun int
+
 	// FilesOnForeignCheckers is how many files were walked on a checker other than the one that owns them:
 	// taken by a worker whose own group was done, or every file under WalkOnForeignCheckers. See walkQueue.
 	FilesOnForeignCheckers int
@@ -231,7 +235,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 	var mutex sync.Mutex
 	diagnostics := []rule.Diagnostic{}
-	filesReplayed, typeAwareRerun, shapeKeyedRerun, designSystemRerun := 0, 0, 0, 0
+	filesReplayed, typeAwareRerun, shapeKeyedRerun, designSystemRerun, derivedRerun := 0, 0, 0, 0, 0
 	filesOnForeignCheckers := 0
 
 	// Computed once per walk, before any worker runs, and only when the findings cache is in use: about
@@ -239,12 +243,14 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	// shapes, which the caller computes; without them the shape-keyed rules are keyed on the type
 	// fingerprint instead, which can only re-run them more often.
 	var fingerprints, shapeFingerprints map[tspath.Path][sha256.Size]byte
+	var programFingerprints map[string][sha256.Size]byte
 	if g.FindingsReuse != nil && !g.CollectTimings {
 		fingerprints = g.TypeFingerprints()
 		shapeFingerprints = fingerprints
 		if g.Shapes != nil {
 			shapeFingerprints = g.SignatureFingerprints(g.Shapes)
 		}
+		programFingerprints = g.programFingerprints(rules)
 	}
 	listeningCounts := make(map[string]int, len(rules))
 	reportingCounts := make(map[string]int, len(rules))
@@ -303,7 +309,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			defer waitGroup.Done()
 
 			localDiagnostics := []rule.Diagnostic{}
-			localReplayed, localTypeAwareRerun, localShapeKeyedRerun, localDesignSystemRerun := 0, 0, 0, 0
+			localReplayed, localTypeAwareRerun, localShapeKeyedRerun, localDesignSystemRerun, localDerivedRerun := 0, 0, 0, 0, 0
 			localListening := make(map[string]int, len(rules))
 			localReporting := make(map[string]int, len(rules))
 			localOffered := make(map[string]int, len(rules))
@@ -401,13 +407,15 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 						shaped:           classes.shaped,
 						shapeFingerprint: shapeFingerprints[sourceFile.Path()],
 						design:           classes.design,
+						derived:          classes.derived,
 					}
+					keys.derivedFingerprint = derivedKey(classes, programFingerprints, keys.typeFingerprint)
 					if entry, found := reuse.lookup(sourceFile.FileName(), keys); found.pure {
 						replayed = &entry
 						hits = found
 						replays := make(map[string]bool, len(selection.applicable))
 						for _, names := range [][]string{keys.pure, classIf(hits.typed, keys.typed), classIf(hits.shaped, keys.shaped),
-							classIf(hits.design, keys.design)} {
+							classIf(hits.design, keys.design), classIf(hits.derived, keys.derived)} {
 							for _, name := range names {
 								replays[name] = true
 							}
@@ -430,6 +438,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 						}
 						if !hits.design && len(keys.design) > 0 {
 							localDesignSystemRerun++
+						}
+						if !hits.derived && len(keys.derived) > 0 {
+							localDerivedRerun++
 						}
 						replayedNotes = replayEntry(entry, hits, sourceFile, &localDiagnostics, localReporting, localOffered, localListening)
 						if g.Readiness != nil {
@@ -496,7 +507,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				// A file being recorded counts its listening and offered rules into maps of its own, so
 				// the entry can say which cacheable rules listened on this file; they are merged into the
 				// worker's totals at once, before the crash check, exactly as passing the totals in did.
-				recording := reuse != nil && (replayed == nil || !hits.typed || !hits.shaped || !hits.design)
+				recording := reuse != nil && (replayed == nil || !hits.typed || !hits.shaped || !hits.design || !hits.derived)
 				listeningTarget, offeredTarget := localListening, localOffered
 				var fileListening, fileOffered map[string]int
 				if recording {
@@ -644,6 +655,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			typeAwareRerun += localTypeAwareRerun
 			shapeKeyedRerun += localShapeKeyedRerun
 			designSystemRerun += localDesignSystemRerun
+			derivedRerun += localDerivedRerun
 			filesOnForeignCheckers += localForeign
 			for name, count := range dispatcher.unrunRuleReferences {
 				unrunRuleReferences[name] += count
@@ -676,6 +688,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 		TypeAwareRerun:    typeAwareRerun,
 		ShapeKeyedRerun:   shapeKeyedRerun,
 		DesignSystemRerun: designSystemRerun,
+		DerivedRerun:      derivedRerun,
 
 		FilesOnForeignCheckers: filesOnForeignCheckers,
 		Notes:                  notes,
@@ -1532,19 +1545,30 @@ type ruleSelection struct {
 // ruleClassNames is the applicable rules' names in each findings-cache class. See CacheClasses and
 // ShapeClasses.
 type ruleClassNames struct {
-	pure   []string
-	typed  []string
-	shaped []string
-	design []string
+	pure    []string
+	typed   []string
+	shaped  []string
+	design  []string
+	derived []string
+
+	// derivedReadsTypes is whether any derived rule reads types, which puts the type fingerprint in the derived
+	// key. See derivedKey.
+	derivedReadsTypes bool
 }
 
 // classNames returns the selection's cache classes, made once. Made per file they were about 470 MB of a
 // cold ahra run's allocation (#9jpmqm9).
 func (s *ruleSelection) classNames() *ruleClassNames {
 	if s.classes == nil {
-		pure, typeAware, design, _ := CacheClasses(s.applicable)
+		pure, typeAware, design, derived, _ := CacheClasses(s.applicable)
 		shaped, typed := ShapeClasses(typeAware)
-		s.classes = &ruleClassNames{pure: ruleNames(pure), typed: ruleNames(typed), shaped: ruleNames(shaped), design: ruleNames(design)}
+		s.classes = &ruleClassNames{pure: ruleNames(pure), typed: ruleNames(typed), shaped: ruleNames(shaped), design: ruleNames(design),
+			derived: ruleNames(derived)}
+		for _, subject := range derived {
+			if subject.NeedsTypeChecker || subject.ProgramReads&rule.ReadsModuleResolution != 0 {
+				s.classes.derivedReadsTypes = true
+			}
+		}
 	}
 	return s.classes
 }
@@ -1708,4 +1732,48 @@ func foreignQueue(queues []*walkQueue, homeFiles []*ast.SourceFile, worker int) 
 		}
 	}
 	return queues[worker]
+}
+
+// programFingerprints is every derived rule's program fingerprint for this walk, by name, each computed once
+// through a Program viewed under the rule's own reads (rule.ProgramFingerprint). A fingerprint that panics is
+// left out, which keys no file: the rule's findings neither replay nor record this run.
+func (g *Graph) programFingerprints(rules []rule.Rule) map[string][sha256.Size]byte {
+	_, _, _, derived, _ := CacheClasses(rules)
+	fingerprints := make(map[string][sha256.Size]byte, len(derived))
+	for _, subject := range derived {
+		func() {
+			defer func() {
+				if recover() != nil {
+					delete(fingerprints, subject.Name)
+				}
+			}()
+			fingerprints[subject.Name] = subject.ProgramFingerprint(rule.ViewProgram(g.Program, nil, subject))
+		}()
+	}
+	return fingerprints
+}
+
+// derivedKey is a file's key for its derived rules: each one's name and program fingerprint, in the order they
+// apply, and the file's type fingerprint when any of them reads types. Zero when a derived rule has no
+// fingerprint this run, which no lookup matches, and when no derived rule applies.
+func derivedKey(classes *ruleClassNames, programFingerprints map[string][sha256.Size]byte, typeFingerprint [sha256.Size]byte) [sha256.Size]byte {
+	if len(classes.derived) == 0 {
+		return [sha256.Size]byte{}
+	}
+	hash := sha256.New()
+	for _, name := range classes.derived {
+		fingerprint, found := programFingerprints[name]
+		if !found {
+			return [sha256.Size]byte{}
+		}
+		hash.Write([]byte(name))
+		hash.Write([]byte{0})
+		hash.Write(fingerprint[:])
+	}
+	if classes.derivedReadsTypes {
+		hash.Write(typeFingerprint[:])
+	}
+	var key [sha256.Size]byte
+	copy(key[:], hash.Sum(nil))
+	return key
 }

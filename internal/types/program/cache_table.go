@@ -117,6 +117,8 @@ type CacheTableIdentity struct {
 // half is enforced by TestCacheTableShapeIsPinnedToItsVersion; the meaning half is the reason each
 // section also keeps its own version.
 //
+// 14: findings entries carry derived rules and their fingerprint (#kdee854).
+//
 // 13: a signature entry carries Abandoned, set on a file whose emit outran the post-verdict graduation, so it is
 // never emitted again while its bytes are the same (#9knyr86).
 //
@@ -144,7 +146,7 @@ type CacheTableIdentity struct {
 // design system's key.
 //
 // 2: findings entries carry shape-keyed rules and their fingerprint, and the table holds Signatures.
-const cacheTableVersion = 13
+const cacheTableVersion = 14
 
 // cacheTableMagic opens every file of the table, so a file that is not one is refused on its first field.
 const cacheTableMagic = "cohere cache table"
@@ -251,6 +253,9 @@ type lintCacheWireEntry struct {
 
 	DesignRules       int
 	DesignFingerprint [sha256.Size]byte
+
+	DerivedRules       int
+	DerivedFingerprint [sha256.Size]byte
 
 	Notes []lintCacheWireNote
 
@@ -423,6 +428,9 @@ func (c *LintCache) wire() *lintCacheWire {
 			DesignRules:       intern(entry.DesignRules),
 			DesignFingerprint: entry.DesignFingerprint,
 
+			DerivedRules:       intern(entry.DerivedRules),
+			DerivedFingerprint: entry.DerivedFingerprint,
+
 			Notes: wireNotes(entry.Notes),
 
 			Adamic: entry.Adamic,
@@ -460,6 +468,8 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 
 			DesignFingerprint: stored.DesignFingerprint,
 
+			DerivedFingerprint: stored.DerivedFingerprint,
+
 			Notes: ruleNotes(stored.Notes),
 
 			Adamic: stored.Adamic,
@@ -479,6 +489,9 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 		}
 		if entry.DesignRules, err = list(stored.DesignRules); err != nil {
 			return nil, fmt.Errorf("entry %d design-system rules: %v", position, err)
+		}
+		if entry.DerivedRules, err = list(stored.DerivedRules); err != nil {
+			return nil, fmt.Errorf("entry %d derived rules: %v", position, err)
 		}
 		cache.Entries = append(cache.Entries, entry)
 	}

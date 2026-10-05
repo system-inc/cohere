@@ -1,6 +1,9 @@
 package structure
 
 import (
+	"crypto/sha256"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 
@@ -101,6 +104,9 @@ var BoundaryNoProjectThemeValue = rule.Rule{
 
 	// Every theme file in the program.
 	ProgramReads: rule.ReadsOtherFiles,
+	// A file's verdict reads its own bytes, its own path, and the theme map, so the theme map is the whole
+	// fingerprint (#kdee854). See themeFingerprint.
+	ProgramFingerprint: themeFingerprint,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName()).IsInLibrariesStructure {
 			return nil
@@ -109,7 +115,7 @@ var BoundaryNoProjectThemeValue = rule.Rule{
 			return nil
 		}
 
-		themes := themeValuesForProgram(ctx)
+		themes := themeValuesForProgram(ctx.Program)
 		if len(themes) == 0 {
 			// No themes found means the rule cannot decide anything, and reporting nothing would be
 			// indistinguishable from a clean tree. Declining is the honest answer; the coverage
@@ -223,28 +229,54 @@ var themeCache struct {
 // against 0.54ms of listening across 1,862 files, which was 64.5% of all rule time for a rule that
 // reports nothing on this tree. The scan was being redone per file, so the cost was the file count
 // rather than the work.
-func themeValuesForProgram(ctx rule.Context) map[string]map[string][]string {
+func themeValuesForProgram(program rule.Program) map[string]map[string][]string {
 	themeCache.Lock()
 	defer themeCache.Unlock()
 
-	if themeCache.program == ctx.Program.Identity() && themeCache.values != nil {
+	if themeCache.program == program.Identity() && themeCache.values != nil {
 		return themeCache.values
 	}
 
-	values := themeValuesFromProgram(ctx)
-	themeCache.program = ctx.Program.Identity()
+	values := themeValuesFromProgram(program)
+	themeCache.program = program.Identity()
 	themeCache.values = values
 	return values
+}
+
+// themeFingerprint is the rule's program fingerprint: the theme map, every component, suffix and value, in the
+// order a message lists them. Components and suffixes are sorted, since a map has no order; values keep theirs,
+// since the message names them in it. Nothing else outside a file reaches its verdict, so an edit anywhere but a
+// theme interface's exported keys leaves this alone and the file's findings replay (#kdee854).
+func themeFingerprint(program rule.Program) [sha256.Size]byte {
+	themes := themeValuesForProgram(program)
+	hash := sha256.New()
+	for _, component := range slices.Sorted(maps.Keys(themes)) {
+		hash.Write([]byte(component))
+		hash.Write([]byte{0})
+		for _, suffix := range slices.Sorted(maps.Keys(themes[component])) {
+			hash.Write([]byte(suffix))
+			hash.Write([]byte{1})
+			for _, value := range themes[component][suffix] {
+				hash.Write([]byte(value))
+				hash.Write([]byte{2})
+			}
+			hash.Write([]byte{3})
+		}
+		hash.Write([]byte{4})
+	}
+	var fingerprint [sha256.Size]byte
+	copy(fingerprint[:], hash.Sum(nil))
+	return fingerprint
 }
 
 // themeValuesFromProgram collects every theme interface's keys, by component and by suffix.
 //
 // Call `themeValuesForProgram` rather than this: an uncached call rescans every source file in the
 // program and this rule runs on 1,862 of them.
-func themeValuesFromProgram(ctx rule.Context) map[string]map[string][]string {
+func themeValuesFromProgram(program rule.Program) map[string]map[string][]string {
 	themes := map[string]map[string][]string{}
 
-	for _, sourceFile := range ctx.Program.SourceFiles() {
+	for _, sourceFile := range program.SourceFiles() {
 		if sourceFile == nil || !isThemeFileName(sourceFile.FileName()) {
 			continue
 		}
