@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"iter"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -110,71 +111,76 @@ var MaxLines = rule.Rule{
 		}
 
 		text := ctx.SourceFile.Text()
-		lines := maxLinesSplit(text)
-
-		var commentLines map[int]bool
+		var commentOnly func(start int, end int) bool
 		if settings.SkipComments {
-			commentLines = maxLinesCommentOnlyLines(text, lines, comments.ForFile(ctx))
+			commentOnly = maxLinesCommentOnly(text, comments.ForFile(ctx))
 		}
 
-		counted := []int{}
-		for index, line := range lines {
-			if settings.SkipBlankLines && maxLinesIsBlank(text[line.start:line.end]) {
+		// Counted as the lines go by, keeping only where the first line past the maximum starts, so a
+		// file is never held as a slice of its lines.
+		counted := 0
+		excessStart := 0
+		for start, end := range maxLinesEach(text) {
+			if settings.SkipBlankLines && maxLinesIsBlank(text[start:end]) {
 				continue
 			}
-			if commentLines[index] {
+			if commentOnly != nil && commentOnly(start, end) {
 				continue
 			}
-			counted = append(counted, index)
+			if counted == settings.Maximum {
+				excessStart = start
+			}
+			counted++
 		}
-		if len(counted) <= settings.Maximum {
+		if counted <= settings.Maximum {
 			return nil
 		}
-		ctx.ReportRange(core.NewTextRange(lines[counted[settings.Maximum]].start, len(text)),
-			maxLinesMessage(len(counted), settings.Maximum))
+		ctx.ReportRange(core.NewTextRange(excessStart, len(text)), maxLinesMessage(counted, settings.Maximum))
 		return nil
 	},
 }
 
-// maxLinesLine is one line's text, without its line break, as byte offsets into the file.
-type maxLinesLine struct {
-	start int
-	end   int
+// maxLinesEach yields each line's start and end, without its line break, as byte offsets into the
+// file, split at upstream's line breaks. It drops the empty line a final break leaves, as upstream
+// does.
+//
+// Yielded rather than returned as a slice: a slice of every line of every file was 29 MB on a cold
+// ahra run, for a rule that only needs a count and one offset.
+func maxLinesEach(text string) iter.Seq2[int, int] {
+	return func(yield func(int, int) bool) {
+		start := 0
+		for index := 0; index < len(text); {
+			breakLength := 0
+			switch {
+			case strings.HasPrefix(text[index:], "\r\n"):
+				breakLength = 2
+			case text[index] == '\r' || text[index] == '\n':
+				breakLength = 1
+			case strings.HasPrefix(text[index:], "\u2028") || strings.HasPrefix(text[index:], "\u2029"):
+				breakLength = len("\u2028")
+			}
+			if breakLength == 0 {
+				index++
+				continue
+			}
+			if !yield(start, index) {
+				return
+			}
+			index += breakLength
+			start = index
+		}
+		// The text after the last break is a line, unless the text ended on that break: then it is
+		// the empty line upstream pops. A text with no break at all is one line, even an empty one.
+		if start == len(text) && start > 0 {
+			return
+		}
+		yield(start, len(text))
+	}
 }
 
-// maxLinesSplit splits text into lines at upstream's line breaks, and drops the empty line a final
-// break leaves, as upstream does.
-func maxLinesSplit(text string) []maxLinesLine {
-	lines := []maxLinesLine{}
-	start := 0
-	for index := 0; index < len(text); {
-		breakLength := 0
-		switch {
-		case strings.HasPrefix(text[index:], "\r\n"):
-			breakLength = 2
-		case text[index] == '\r' || text[index] == '\n':
-			breakLength = 1
-		case strings.HasPrefix(text[index:], "\u2028") || strings.HasPrefix(text[index:], "\u2029"):
-			breakLength = len("\u2028")
-		}
-		if breakLength == 0 {
-			index++
-			continue
-		}
-		lines = append(lines, maxLinesLine{start: start, end: index})
-		index += breakLength
-		start = index
-	}
-	lines = append(lines, maxLinesLine{start: start, end: len(text)})
-	if len(lines) > 1 && lines[len(lines)-1].start == lines[len(lines)-1].end {
-		lines = lines[:len(lines)-1]
-	}
-	return lines
-}
-
-// maxLinesCommentOnlyLines returns the indexes of lines a comment touches that hold no character
-// outside comments, other than whitespace.
-func maxLinesCommentOnlyLines(text string, lines []maxLinesLine, fileComments []comments.Comment) map[int]bool {
+// maxLinesCommentOnly returns a test for whether a line is touched by a comment and holds no
+// character outside comments, other than whitespace.
+func maxLinesCommentOnly(text string, fileComments []comments.Comment) func(start int, end int) bool {
 	inComment := make([]bool, len(text))
 	for _, comment := range fileComments {
 		for offset := comment.Range.Pos(); offset < comment.Range.End() && offset < len(text); offset++ {
@@ -183,22 +189,19 @@ func maxLinesCommentOnlyLines(text string, lines []maxLinesLine, fileComments []
 			}
 		}
 	}
-	commentOnly := map[int]bool{}
-	for index, line := range lines {
+	var outside strings.Builder
+	return func(start int, end int) bool {
 		touched := false
-		var outside strings.Builder
-		for offset := line.start; offset < line.end; offset++ {
+		outside.Reset()
+		for offset := start; offset < end; offset++ {
 			if inComment[offset] {
 				touched = true
 				continue
 			}
 			outside.WriteByte(text[offset])
 		}
-		if touched && maxLinesIsBlank(outside.String()) {
-			commentOnly[index] = true
-		}
+		return touched && maxLinesIsBlank(outside.String())
 	}
-	return commentOnly
 }
 
 // maxLinesIsBlank is upstream's `text.trim() === ""`. JavaScript's trim also drops a byte order mark,
