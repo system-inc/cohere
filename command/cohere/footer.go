@@ -213,7 +213,10 @@ type overallFacts struct {
 	Unfinished int
 	// NotChecked is each project deliberately not run, as its label and why. A gap named on the line, never
 	// a pass and not a failure: the caller asked for something that project's engine cannot yet do alone.
+	// When it is every project, the run checked nothing, and that is a failure (#71a0ts8).
 	NotChecked []string
+	// Root is the directory the projects were found under, named when nothing under it was checked.
+	Root string
 }
 
 // overallFooter renders the verdict line for a repository with several projects:
@@ -236,10 +239,14 @@ func overallFooter(facts overallFacts, style textStyle) string {
 	}
 
 	verdict := "✓ 💎 "
-	if len(facts.Failed) > 0 || facts.Unfinished > 0 {
+	if len(facts.Failed) > 0 || facts.Unfinished > 0 || total == 0 {
 		verdict = "✗ ☠️ "
 	}
 	line := style.bold(verdict+footerSeconds(facts.Total)) + " • " + counted(total, "project", "projects")
+	if total == 0 {
+		// Every project found was skipped, so the run checked nothing, which is never a pass (#71a0ts8).
+		line = style.bold(verdict+footerSeconds(facts.Total)) + " • " + style.red("nothing checked under "+facts.Root)
+	}
 	if len(byEngine) > 1 {
 		line += ": " + strings.Join(byEngine, ", ")
 	}

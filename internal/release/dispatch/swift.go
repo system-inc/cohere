@@ -9,10 +9,13 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
+	"syscall"
+	"time"
 )
 
 // SwiftEngineOverrideVariable points cohere at a specific Swift engine binary, the counterpart of
@@ -166,14 +169,6 @@ func swiftEngineHash(engineDirectory string, toolchain string) (string, error) {
 // measured at 225s, and the decisions worth testing are which tree is built and when, not SwiftPM.
 var buildSwiftProduct = buildSwiftProductWithSwiftPM
 
-// buildSwiftProductWithSwiftPM builds the engine in release mode and copies the product to binaryPath.
-//
-// A cold build compiles swift-syntax and swift-format and takes minutes, so it announces itself on
-// stderr before starting, whatever the verbosity: a command that is silent for three minutes reads as
-// hung. SwiftPM's progress goes to stderr too, because this process's stdout is the report.
-//
-// Copied rather than linked, because the next build replaces the product in place, and a link would
-// turn every hash-named binary into whichever engine was built last.
 // lastLines is a tool's kept output for an error: its last count lines, on lines of their own after the
 // error's, or nothing when it printed nothing.
 func lastLines(output string, count int) string {
@@ -187,6 +182,60 @@ func lastLines(output string, count int) string {
 	return "\n" + strings.Join(lines, "\n")
 }
 
+// buildToolGrace is how long a build tool's group has to end after a terminate before it is killed.
+const buildToolGrace = 5 * time.Second
+
+// buildToolWaitDelay bounds how long Wait waits on a tool's output pipes once the tool has ended, so a
+// compiler that left the group while holding a pipe cannot hold this process with it.
+const buildToolWaitDelay = 2 * time.Second
+
+// runBuildTool runs a build tool as the leader of a process group of its own, and ends the whole group if
+// this process is interrupted, terminated or hung up while the tool runs.
+//
+// Without it a signal ended this process alone and left `swift build` and its compilers running, with
+// nobody to read their result, and holding SwiftPM's lock on the scratch path so the next run's build waited
+// behind them (#nqb3mjv). A kill this process cannot catch still leaves them: nothing can forward that.
+func runBuildTool(command *exec.Cmd) error {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	defer signal.Stop(signals)
+	return runBuildToolUntil(command, signals)
+}
+
+// runBuildToolUntil is runBuildTool with the signals given, so a test can send one without signaling
+// itself.
+func runBuildToolUntil(command *exec.Cmd, signals <-chan os.Signal) error {
+	startInOwnGroup(command)
+	command.WaitDelay = buildToolWaitDelay
+	if err := command.Start(); err != nil {
+		return err
+	}
+	done := make(chan error, 1)
+	go func() { done <- command.Wait() }()
+
+	select {
+	case err := <-done:
+		return err
+	case received := <-signals:
+		signalGroup(command, syscall.SIGTERM)
+		select {
+		case <-done:
+		case <-time.After(buildToolGrace):
+			signalGroup(command, syscall.SIGKILL)
+			<-done
+		}
+		return fmt.Errorf("stopped by %v, and everything it started was ended with it", received)
+	}
+}
+
+// buildSwiftProductWithSwiftPM builds the engine in release mode and copies the product to binaryPath.
+//
+// A cold build compiles swift-syntax and swift-format and takes minutes, so it announces itself on
+// stderr before starting, whatever the verbosity: a command that is silent for three minutes reads as
+// hung. SwiftPM's progress goes to stderr too, because this process's stdout is the report.
+//
+// Copied rather than linked, because the next build replaces the product in place, and a link would
+// turn every hash-named binary into whichever engine was built last.
 func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory string, binaryPath string) error {
 	if err := os.MkdirAll(filepath.Dir(binaryPath), 0o755); err != nil {
 		return fmt.Errorf("creating the binary cache directory: %w", err)
@@ -215,7 +264,7 @@ func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory stri
 	if stream := Report.ToolOutput(); stream != nil {
 		build.Stdout, build.Stderr = stream, stream
 	}
-	if err := build.Run(); err != nil {
+	if err := runBuildTool(build); err != nil {
 		return fmt.Errorf("building the Swift engine (swift %s): %w%s", strings.Join(arguments, " "), err, lastLines(kept.String(), 40))
 	}
 

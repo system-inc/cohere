@@ -6,11 +6,13 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"syscall"
 	"time"
 
@@ -26,12 +28,23 @@ var swiftPassThroughSwitches = []string{
 	"rules", "rules-enabled", "version", "unused", "unused-all", "unused-deep", "timing",
 }
 
-// swiftFormatOnlyRefusal is why --format-only is refused against a Swift package. It used to be dropped,
-// and a format gate then type-checked and linted the whole package, minutes of compiling under a verdict
-// that said formatting (#nqb3mjv). A mixed-repository run skips the package and names the gap instead
-// (see swiftFormatOnlyGap).
-const swiftFormatOnlyRefusal = "--format-only is not implemented for Swift yet: the engine has no format-only mode, " +
-	"and running it would type-check and lint the package as well (#nqb3mjv), so nothing was checked"
+// swiftFrontDoorFlags are the flags the front door answers for a Swift run itself: where the package is,
+// the lint config and fix passes it forwards with their values, how the report is printed, and the profile
+// of this process. Any flag given that is in neither list is refused by name (see swiftEngineArguments).
+// It used to be dropped, and `--format-only` dropped meant a format gate that type-checked and linted the
+// whole package, minutes of compiling under a verdict that said formatting (#nqb3mjv).
+var swiftFrontDoorFlags = []string{
+	"directory", "lint-config", "fix-passes", "verbose", "json", "phases", "coverage", "profile",
+}
+
+// swiftRefusals say why a flag the engine cannot honor yet is refused, where the general sentence would
+// not say enough.
+var swiftRefusals = map[string]string{
+	"format-only": "--format-only is not implemented for Swift yet: the engine has no format-only mode, and running " +
+		"it would type-check and lint the package as well (#nqb3mjv), so nothing was checked",
+	"no-format": "--no-format is not implemented for Swift yet: the engine formats on every run (swift/Contract.md), " +
+		"so its format findings would still count (#nqb3mjv), and nothing was checked",
+}
 
 // runSwiftEngine checks a Swift package by running cohere-swift on it and rendering its records.
 //
@@ -189,8 +202,17 @@ func swiftEngineArguments(
 			return nil, "", fmt.Errorf("--%s is not implemented for Swift yet, so nothing was checked", refused)
 		}
 	}
-	if given["format-only"] && value("format-only") == "true" {
-		return nil, "", errors.New(swiftFormatOnlyRefusal)
+	// Sorted, so a command line naming two of them is refused for the same one every time.
+	for _, name := range slices.Sorted(maps.Keys(given)) {
+		// A switch turned off asks for nothing, so there is nothing to honor or refuse.
+		if slices.Contains(swiftPassThroughSwitches, name) || slices.Contains(swiftFrontDoorFlags, name) ||
+			name == "tsconfig" || value(name) == "false" {
+			continue
+		}
+		if reason, explained := swiftRefusals[name]; explained {
+			return nil, "", errors.New(reason)
+		}
+		return nil, "", fmt.Errorf("--%s is not implemented for Swift yet, so the run was refused rather than run without it, and nothing was checked", name)
 	}
 
 	arguments := []string{"--contract", fmt.Sprint(swiftContractVersion), "--root", location.Root}

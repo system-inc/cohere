@@ -166,8 +166,8 @@ type projectRun struct {
 // swiftFormatOnlyGap is why a Swift project is not run under --format-only. The engine has no format-only
 // mode, so a run would type-check and lint the package as well: a format gate on cohere's own checkout
 // spent 2m38s compiling swift/ and its tests, and at the house's load ran past the caller's patience
-// (#nqb3mjv). Skipped and named until the engine's mode lands, rather than refused, which would turn
-// every landing's format gate red over a gap that can be named.
+// (#nqb3mjv). Skipped and named until the engine's mode lands, so a mixed run still checks its other
+// projects. A run whose every project is skipped checked nothing, and fails (#71a0ts8).
 const swiftFormatOnlyGap = "not format-checked: the Swift engine has no format-only mode yet, and running it would " +
 	"type-check and lint the package as well (#nqb3mjv)"
 
@@ -197,6 +197,9 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 	}
 	defer os.RemoveAll(yieldDirectory)
 
+	children := forwardSignalsToChildren()
+	defer children.stop()
+
 	runs := make([]projectRun, len(found.Projects))
 	var group sync.WaitGroup
 	running := make(chan struct{}, projectRunsAtOnce())
@@ -213,7 +216,9 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 			continue
 		}
 		projectArguments := arguments
-		if found.Ownership.SharedDirectory[label] {
+		// TypeScript runs alone: the cache it turns off is cohere's table in the directory, which a Swift run
+		// never reads or writes, and the Swift engine refuses --no-cache by name.
+		if found.Ownership.SharedDirectory[label] && project.Engine == engineTypeScript {
 			projectArguments = append(slices.Clone(arguments), "--no-cache")
 		}
 		group.Add(1)
@@ -221,7 +226,7 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 			defer group.Done()
 			running <- struct{}{}
 			defer func() { <-running }()
-			runs[index] = runProject(executable, found.Root, project, projectArguments, yieldFile)
+			runs[index] = runProject(executable, found.Root, project, projectArguments, yieldFile, children)
 		}()
 	}
 	group.Wait()
@@ -272,8 +277,23 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 	fmt.Fprintln(account, summaryLine(found, runs))
 	// The overall verdict, last, in the human views. Under `--json` each project's own summary line, with its
 	// label, is the record, and a program reads the worst from them.
+	facts := overallFactsOf(runs, time.Since(processStart))
+	facts.Root = found.Root
 	if activeOutput.Mode != outputJSON {
-		fmt.Fprintln(out, overallFooter(overallFactsOf(runs, time.Since(processStart)), activeOutput.Style))
+		fmt.Fprintln(out, overallFooter(facts, activeOutput.Style))
+	}
+	// A run whose every project was skipped checked nothing, and fails the way a run that found none does
+	// (#71a0ts8). Under --json the exit code is what says so, beside each gap on stderr.
+	if len(facts.NotChecked) == len(runs) {
+		worst = max(worst, 1)
+		if activeOutput.Mode == outputJSON {
+			fmt.Fprintf(os.Stderr, "cohere: nothing checked under %s: every project found was skipped\n", found.Root)
+		}
+	}
+	// A run stopped by a signal ends the way the signal would have ended it, after every child has, so the
+	// caller that sent it reads it as stopped and not as a verdict.
+	if received := children.received(); received != 0 {
+		return 128 + received
 	}
 	return worst
 }
@@ -306,8 +326,9 @@ func projectRunsAtOnce() int {
 }
 
 // runProject runs one project's check as a child and keeps everything it printed. yieldFile, when set,
-// names what it yields to nearer projects (see ownership.go).
-func runProject(executable string, root string, project discoveredProject, arguments []string, yieldFile string) projectRun {
+// names what it yields to nearer projects (see ownership.go). The child is held in children while it runs,
+// so a signal to this run reaches it.
+func runProject(executable string, root string, project discoveredProject, arguments []string, yieldFile string, children *projectChildren) projectRun {
 	directory := filepath.Join(root, filepath.FromSlash(project.Directory))
 	prefix := []string{"--directory", directory}
 	if project.ConfigFile != "" {
@@ -329,7 +350,7 @@ func runProject(executable string, root string, project discoveredProject, argum
 	child.Stderr = &output
 
 	started := time.Now()
-	err := child.Run()
+	err := children.run(child)
 	run := projectRun{project: project, output: output.Bytes(), elapsed: time.Since(started)}
 	var exited *exec.ExitError
 	switch {
