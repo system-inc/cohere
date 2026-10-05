@@ -74,24 +74,40 @@ function Component(props) {
  const callback = React.useCallback(() => setState(1), []);
  return <div onClick={callback}>{state}</div>;
 }`
+	// Every verdict below is React Compiler's, from the copy bundled in eslint-plugin-react-hooks 7.1.1
+	// run without the lint gate: "mutable", "global" and "primitive mutable" raise "Existing
+	// memoization could not be preserved", "missing dependency" raises a memo dependency error, and
+	// the other four compile clean.
+	//
+	// The three marked reactivityGap are findings upstream makes and this rule does not. Upstream's
+	// callback scope keeps `setState` as a reactive dependency, because `setState` shares a mutable
+	// alias set with `items` and InferReactivePlaces marks a whole set at once. `InferReactive` keys on
+	// the identifier instead (`ReactiveGapMutation`, `ReactiveGapAliasing`). These rows used to fire
+	// only because the scope holding `setState` stayed live and handed its reactivity to every
+	// declaration in it; it is the `useState` call's scope, which upstream's
+	// `flattenScopesWithHooksOrUseHIR` prunes, and a pruned scope hands on nothing. They assert the
+	// silence so that closing the gap (#pdxkp8z) fails here and flips them to fires.
 	for _, testCase := range []struct {
-		name, source string
-		fires        bool
+		name, source  string
+		fires         bool
+		reactivityGap bool
 	}{
-		{"mixed", source, false},
-		{"conditional", strings.Replace(source, "props.items ?? []", "props.flag ? props.items : []", 1), false},
-		{"frozen", strings.Replace(source, "props.items ?? []", "props.items", 1), false},
-		{"mutable", strings.Replace(source, "props.items ?? []", "getItems() ?? []", 1), true},
-		{"global", strings.Replace(source, "props.items ?? []", "props.flag ? externalItems : []", 1), true},
-		{"primitive mutable", strings.Replace(source, "props.items ?? []", "props.flag ? [] : null", 1), true},
-		{"missing dependency", strings.Replace(source, "() => setState(1)", "() => [props.value, setState(1)]", 1), true},
-		{"direct method", strings.Replace(source, "function findItem(id) { return items.find(item => item.id === id); }\n const item = findItem(props.id);", "const item = items.find(item => item.id === props.id);", 1), true},
+		{"mixed", source, false, false},
+		{"conditional", strings.Replace(source, "props.items ?? []", "props.flag ? props.items : []", 1), false, false},
+		{"frozen", strings.Replace(source, "props.items ?? []", "props.items", 1), false, false},
+		{"mutable", strings.Replace(source, "props.items ?? []", "getItems() ?? []", 1), true, true},
+		{"global", strings.Replace(source, "props.items ?? []", "props.flag ? externalItems : []", 1), true, true},
+		{"primitive mutable", strings.Replace(source, "props.items ?? []", "props.flag ? [] : null", 1), true, true},
+		{"missing dependency", strings.Replace(source, "() => setState(1)", "() => [props.value, setState(1)]", 1), true, false},
+		{"direct method", strings.Replace(source, "function findItem(id) { return items.find(item => item.id === id); }\n const item = findItem(props.id);", "const item = items.find(item => item.id === props.id);", 1), false, false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			findings, lowered := findingsForSource(t, testCase.source)
-			if !lowered || (len(findings) > 0) != testCase.fires {
-				t.Fatalf("lowered=%t findings=%v; want fires=%t", lowered, findings, testCase.fires)
+			reported := testCase.fires && !testCase.reactivityGap
+			if !lowered || (len(findings) > 0) != reported {
+				t.Fatalf("lowered=%t findings=%v; want reported=%t (upstream fires=%t, reactivity gap=%t)",
+					lowered, findings, reported, testCase.fires, testCase.reactivityGap)
 			}
 		})
 	}

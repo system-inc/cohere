@@ -1,8 +1,9 @@
 // The terminal set.
 //
-// 21 variants. Upstream has 22; the one absent is `PrunedScope`, which later passes
+// 21 variants. Upstream has 22; the one absent is `PrunedScope`, which four later passes
 // (`flattenReactiveLoopsHIR`, `flattenScopesWithHooksOrUseHIR`, `pruneUnusedScopes`,
-// `pruneAlwaysInvalidatingScopes`) construct and none of which exists here. `Scope` was absent for
+// `pruneAlwaysInvalidatingScopes`) construct. All four are ported, and each records its decision as
+// `ReactiveScopeBlock.Pruned` rather than as a terminal, so nothing here needs the variant. `Scope` was absent for
 // the same reason until `BuildReactiveScopeTerminals` landed to construct it; see that terminal's
 // comment for why the cost was paid at that moment and not earlier. See high_level_intermediate_representation.go's package comment for
 // the rule that puts JSX in the core instruction set and kept these outside it.

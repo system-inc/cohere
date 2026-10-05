@@ -599,12 +599,13 @@ func TestMemoInclusiveInliningCallSitesAreReviewed(t *testing.T) {
 	// and the structural probes, including state-setter pruning, use the complete prefix above.
 	knownCallSites := map[string]bool{
 		"../../ecmascript/high_level_intermediate_representation/cache.go": true,
-		"cache.go":                       true,
-		"dependency_oracle_test.go":      true,
-		"effects_react_state_test.go":    true,
-		"hoistable_test.go":              true,
-		"preserve_manual_memoization.go": true,
-		"scope_oracle_test.go":           true,
+		"cache.go":                          true,
+		"dependency_oracle_test.go":         true,
+		"effects_react_state_test.go":       true,
+		"flatten_scopes_with_hooks_test.go": true,
+		"hoistable_test.go":                 true,
+		"preserve_manual_memoization.go":    true,
+		"scope_oracle_test.go":              true,
 	}
 
 	entries, err := os.ReadDir(".")

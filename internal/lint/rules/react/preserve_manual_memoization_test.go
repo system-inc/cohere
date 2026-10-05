@@ -397,6 +397,8 @@ const preserveManualMemoizationReactDeclarations = `declare module 'react' {
   export function useTransition(): [boolean, (callback: () => void) => void];
   export function useOptimistic<S, A>(state: S, reducer?: (state: S, action: A) => S): [S, (action: A) => void];
   export function useActionState<S, P>(action: (state: S, payload: P) => S, initial: S): [S, (payload: P) => void, boolean];
+  export function useEffect(effect: () => void | (() => void), deps?: unknown[]): void;
+  export function useSyncExternalStore<T>(subscribe: (onStoreChange: () => void) => () => void, getSnapshot: () => T, getServerSnapshot?: () => T): T;
 }`
 
 // runPreserveManualMemoization runs the rule over one fixture with the `react` module in scope.
@@ -893,6 +895,149 @@ function Component(props) {
 				t.Errorf("%s: %d findings, want none; a memo that mutates only what it created "+
 					"has nothing for the compiler to fail to preserve", name, len(result.Diagnostics))
 			}
+		})
+	}
+}
+
+// TestPreserveManualMemoizationAroundAHookCall runs memo blocks that sit inside a hook call's scope.
+//
+// A `useCallback` passed inline to `React.useSyncExternalStore` nests inside that call's scope, which
+// opens at the method property, before the arguments. Upstream prunes every scope a hook call sits in
+// (`flattenScopesWithHooksOrUseHIR`), and a pruned scope neither absorbs the scopes nested in it nor
+// hands its reactivity to its declarations. Without the first, the callback's scope was merged into
+// the hook's and reported as lost; without the second, a `useRef` declared beside the hook call turned
+// reactive and was reported as a dependency the developer left out. The first three rows are TanStack
+// Query's useMutation.ts and useMutationState.ts, cut down (#zx5xvtg), the fourth the same shape
+// through a hook that is not React's. Every verdict was read from React Compiler as bundled in
+// eslint-plugin-react-hooks 7.1.1, which compiles the first four clean and reports the last twice.
+func TestPreserveManualMemoizationAroundAHookCall(t *testing.T) {
+	t.Parallel()
+
+	for _, row := range []struct {
+		name     string
+		source   string
+		reported bool
+	}{
+		{
+			name: "a subscribe callback passed inline to React.useSyncExternalStore",
+			source: `import * as React from 'react';
+declare function makeObserver(): { subscribe: (listener: () => void) => () => void; get: () => number };
+export function useStore() {
+  const [observer] = React.useState(() => makeObserver());
+  return React.useSyncExternalStore(
+    React.useCallback((onStoreChange: () => void) => observer.subscribe(onStoreChange), [observer]),
+    () => observer.get(),
+  );
+}
+`,
+		},
+		{
+			name: "a second callback after it, as useMutation's mutate",
+			source: `import * as React from 'react';
+declare function makeObserver(): {
+  subscribe: (listener: () => void) => () => void;
+  get: () => number;
+  mutate: (value: number) => Promise<void>;
+  setOptions: (options: { retry?: number }) => void;
+};
+export function useMutation(options: { retry?: number }) {
+  const [observer] = React.useState(() => makeObserver());
+  React.useEffect(() => {
+    observer.setOptions(options);
+  }, [observer, options]);
+  const result = React.useSyncExternalStore(
+    React.useCallback((onStoreChange: () => void) => observer.subscribe(onStoreChange), [observer]),
+    () => observer.get(),
+  );
+  const mutate = React.useCallback((...args: [number]) => {
+    observer.mutate(args[0]).catch(() => {});
+  }, [observer]);
+  if (result > 1) {
+    throw new Error('failed');
+  }
+  return { result, mutate };
+}
+`,
+		},
+		{
+			name: "refs read inside the callback, as useMutationState",
+			source: `import * as React from 'react';
+interface Cache { subscribe: (listener: () => void) => () => void }
+declare function useCache(): { getCache: () => Cache };
+declare function getResult(cache: Cache, options: { a?: number }): Array<number>;
+declare function same(previous: Array<number> | null, next: Array<number>): Array<number>;
+declare const notify: { schedule: (callback: () => void) => void };
+export function useMutationState(options: { a?: number } = {}): Array<number> {
+  const mutationCache = useCache().getCache();
+  const optionsRef = React.useRef(options);
+  const resultRef = React.useRef<Array<number> | null>(null);
+  if (resultRef.current === null) {
+    resultRef.current = getResult(mutationCache, options);
+  }
+  React.useEffect(() => {
+    optionsRef.current = options;
+  });
+  return React.useSyncExternalStore(
+    React.useCallback(
+      (onStoreChange: () => void) =>
+        mutationCache.subscribe(() => {
+          const nextResult = same(resultRef.current, getResult(mutationCache, optionsRef.current));
+          if (resultRef.current !== nextResult) {
+            resultRef.current = nextResult;
+            notify.schedule(onStoreChange);
+          }
+        }),
+      [mutationCache],
+    ),
+    () => resultRef.current,
+    () => resultRef.current,
+  )!;
+}
+`,
+		},
+		{
+			name: "a hook reached through an object that is not React",
+			source: `import * as React from 'react';
+declare function makeObserver(): { subscribe: (listener: () => void) => () => void; get: () => number };
+declare const Library: { useConsume: (value: unknown, other: () => number) => number };
+export function useMemberCustom() {
+  const [observer] = React.useState(() => makeObserver());
+  return Library.useConsume(
+    React.useCallback((onStoreChange: () => void) => observer.subscribe(onStoreChange), [observer]),
+    () => observer.get(),
+  );
+}
+`,
+		},
+		{
+			name:     "a dependency reassigned after the hook call, which upstream reports",
+			reported: true,
+			source: `import * as React from 'react';
+declare function makeArray(): unknown[];
+declare const store: { subscribe: (listener: () => void) => () => void; get: () => number };
+export function useReassigned(properties: { value: number }) {
+  let x: unknown[] = [];
+  x.push(properties);
+  const value = React.useSyncExternalStore(
+    React.useCallback((onStoreChange: () => void) => { x.push(onStoreChange); return store.subscribe(onStoreChange); }, [x]),
+    () => store.get(),
+  );
+  x = makeArray();
+  return [value, x];
+}
+`,
+		},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			t.Parallel()
+			result := runPreserveManualMemoization(t, "hook.tsx", row.source)
+			if row.reported {
+				if len(result.Diagnostics) == 0 {
+					t.Error("upstream reports this program and the rule is silent")
+				}
+				return
+			}
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

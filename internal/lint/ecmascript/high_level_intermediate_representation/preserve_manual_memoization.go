@@ -460,6 +460,14 @@ func AnalyzePreservedManualMemoization(function *Function,
 	// collected. A scope inside a loop is pruned as policy rather than as a failure, and the
 	// validator has to be able to tell those apart -- see `flatten_reactive_loops.go`.
 	flattenedScopes := FlattenReactiveLoops(function)
+	// Then the scopes a hook call sits in, upstream's next pass. A pruned hook scope is no parent to
+	// the scopes nested in it, so a memo callback inside one keeps its own scope through the merge.
+	for scope := range FlattenScopesWithHooksOrUse(function) {
+		if flattenedScopes == nil {
+			flattenedScopes = map[ScopeId]bool{}
+		}
+		flattenedScopes[scope] = true
+	}
 
 	dependencies := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
 
