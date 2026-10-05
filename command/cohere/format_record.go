@@ -415,6 +415,12 @@ func unformattedScope(engine formatEngine, record *formatRecord, root string) (f
 	}
 
 	declareFormatWalk(universe.root)
+	return unformattedScopeOf(engine, record, universe), universe.files
+}
+
+// unformattedScopeOf is unformattedScope's answer for a universe already walked, with no side effect on the run
+// cache, so it can be computed off the main goroutine (startEarlyFormat) and declared there afterwards.
+func unformattedScopeOf(engine formatEngine, record *formatRecord, universe formatUniverse) formatScope {
 	unformatted := record.unformatted(universe.files, engine.OptionsFingerprint)
 	index := make(map[string]struct{}, len(unformatted))
 	for _, fileName := range unformatted {
@@ -433,7 +439,7 @@ func unformattedScope(engine formatEngine, record *formatRecord, root string) (f
 		recorded: func(fileName string, text string) bool {
 			return record.vouches(fileName, text, engine.OptionsFingerprint)
 		},
-	}, universe.files
+	}
 }
 
 // optionsFingerprintOf is a formatter's options fingerprint, or, with no formatter, a function that
