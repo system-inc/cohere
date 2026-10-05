@@ -1,10 +1,9 @@
 package registry
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 )
 
@@ -16,16 +15,9 @@ import (
 // links the rule set relinks on every rule edit: in configuration it cost each rule edit a link and a
 // second compile of the registry (#6gct10n).
 //
-// The config is COHERE_BENCHMARK_CONFIG when set, and otherwise ahra's beside this checkout's parent, so
-// the benchmark names no one's home directory and runs on any machine that has a config to load.
+// The config is ahra's, which is private, so the benchmark skips where the ahra corpus is not set (#sycrdr6).
 func BenchmarkLoadForTheLiveConfig(b *testing.B) {
-	path := os.Getenv("COHERE_BENCHMARK_CONFIG")
-	if path == "" {
-		path = filepath.Join("..", "..", "..", "..", "..", "ahra", "CohereSettings.json")
-	}
-	if _, err := os.Stat(path); err != nil {
-		b.Skipf("no config to load at %s; set COHERE_BENCHMARK_CONFIG", path)
-	}
+	path := corpus.Ahra.Path(b, "CohereSettings.json")
 	names := Names()
 	for b.Loop() {
 		if _, err := configuration.LoadFor(path, names); err != nil {

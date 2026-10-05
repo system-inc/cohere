@@ -3,14 +3,18 @@ package configuration
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/corpus"
 )
 
-// liveConfigPath is the real config cohere must agree with. Absent in CI checkouts of this repo
-// alone, which the test treats as a skip rather than a failure.
-const liveConfigPath = "/Users/kirkouimet/Projects/ahra/CohereSettings.json"
+// liveConfigPath is the real config cohere must agree with: ahra's, which is private, so a test that reads
+// it skips where the ahra corpus is not set, and the gate names it as not covered (#sycrdr6).
+func liveConfigPath(t testing.TB) string {
+	t.Helper()
+	return corpus.Ahra.Path(t, "CohereSettings.json")
+}
 
 // TestAgainstTheLiveConfig loads the actual file rather than a hand-written model of it.
 //
@@ -18,11 +22,8 @@ const liveConfigPath = "/Users/kirkouimet/Projects/ahra/CohereSettings.json"
 // gating the codebase, so a change there shows up here rather than at the next full run.
 func TestAgainstTheLiveConfig(t *testing.T) {
 	t.Parallel()
-	if _, err := os.Stat(liveConfigPath); err != nil {
-		t.Skipf("the live config is not present at %s", liveConfigPath)
-	}
 
-	loaded, err := Load(liveConfigPath)
+	loaded, err := Load(liveConfigPath(t))
 	if err != nil {
 		t.Fatalf("loading the live config: %v", err)
 	}
@@ -122,10 +123,7 @@ func TestAgainstTheLiveConfig(t *testing.T) {
 // match, so the difference is visible instead of blocking or being smoothed away.
 func TestBothPathsAgreeOnEveryPluginDefault(t *testing.T) {
 	t.Parallel()
-	if _, err := os.Stat(liveConfigPath); err != nil {
-		t.Skipf("the live config is not present at %s", liveConfigPath)
-	}
-	asWritten, err := Load(liveConfigPath)
+	asWritten, err := Load(liveConfigPath(t))
 	if err != nil {
 		t.Fatalf("loading the live config: %v", err)
 	}
@@ -142,7 +140,7 @@ func TestBothPathsAgreeOnEveryPluginDefault(t *testing.T) {
 	// into `Rules`, so a rule arriving only through the declaration is indistinguishable there from
 	// one named by hand -- which is exactly the distinction this test exists to measure. Reading the
 	// merged map made this guard pass on a config with three lines deliberately removed.
-	namedInFile, err := ruleNamesInChain(liveConfigPath)
+	namedInFile, err := ruleNamesInChain(liveConfigPath(t))
 	if err != nil {
 		t.Fatalf("reading the rules block: %v", err)
 	}
@@ -268,10 +266,7 @@ func ruleNamesInContents(contents []byte) (map[string]RuleSetting, error) {
 // exists so this one does neither.
 func TestTheGuardCatchesARemovedLine(t *testing.T) {
 	t.Parallel()
-	if _, err := os.Stat(liveConfigPath); err != nil {
-		t.Skipf("the live config is not present at %s", liveConfigPath)
-	}
-	intact, err := ruleNamesInChain(liveConfigPath)
+	intact, err := ruleNamesInChain(liveConfigPath(t))
 	if err != nil {
 		t.Fatalf("reading the rules blocks: %v", err)
 	}
