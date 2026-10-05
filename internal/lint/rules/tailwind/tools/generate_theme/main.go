@@ -17,7 +17,9 @@
 // themes and their whole `@import` graphs, which is what the exit criterion asks for: the argument
 // for this port is that two repositories on the same Tailwind resolve different themes, and that is
 // only checkable against two of them. Without it only the synthetic branch-coverage cases are
-// captured, and the Go test skips its repository half rather than passing vacuously.
+// captured, and the Go test skips its repository half rather than passing vacuously. A `path` spelled
+// inside a corpus, such as `ahra:app/_theme/styles/theme.css`, is found through the corpus's variable or
+// the corpora file and recorded as spelled, so the fixture reads the same on every machine (#sycrdr6).
 //
 // `-check` regenerates and fails when the committed fixture disagrees, which is what makes a
 // Tailwind upgrade that changes theme resolution show up as a failing gate instead of a silent

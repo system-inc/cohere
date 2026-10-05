@@ -5,9 +5,11 @@ package program
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 )
@@ -251,5 +253,37 @@ func TestTheContentPackAppendsAndCompacts(t *testing.T) {
 	}
 	if read, hits, _, _ := fixture.run("a.ts", "b.ts", "c.ts"); hits != 3 || read["a.ts"] != strings.Repeat("f", 1000) {
 		t.Fatalf("after compacting, served %d with a.ts %q...", hits, read["a.ts"][:5])
+	}
+}
+
+// A served file is a string over the pack's mapping, not a copy, and it stays whole after the pack that served
+// it is dropped and collected (#kdee854, 1b). The compiler keeps source text and substrings of it for the whole
+// run, so a view that died with its pack would hand the checker freed memory.
+func TestAServedFileIsAViewOfTheMappingThatOutlivesThePack(t *testing.T) {
+	t.Parallel()
+	fixture := newPackFixture(t)
+	want := strings.Repeat("export const a = 1;\n", 4096)
+	fixture.write("a.ts", want)
+	fixture.run("a.ts")
+
+	pack, err := OpenContentPack(fixture.cache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	served, ok := pack.wrap(osvfs.FS()).ReadFile(fixture.path("a.ts"))
+	if !ok {
+		t.Fatal("the pack served nothing, so nothing below is about a served file")
+	}
+	start := uintptr(unsafe.Pointer(unsafe.StringData(served)))
+	mapped := uintptr(unsafe.Pointer(&pack.mapped[0]))
+	if start < mapped || start+uintptr(len(served)) > mapped+uintptr(len(pack.mapped)) {
+		t.Errorf("the served file lies outside the pack's mapping, so it was copied")
+	}
+
+	pack = nil
+	runtime.GC()
+	runtime.GC()
+	if served != want {
+		t.Fatalf("a served file read after its pack was collected holds %d bytes that differ from the file's", len(served))
 	}
 }

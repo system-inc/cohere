@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
 // The fixture is what the shipped Tailwind 4.3.3 engine did with this repository's own `@utility`
@@ -120,9 +123,9 @@ type utilityReadingFixture struct {
 // utilityTailwindPackageRoot is the tailwindcss install the fixture's theme resolves
 // `@import "tailwindcss"` against.
 //
-// Named rather than derived, matching theme_test.go, and absent-means-skip for the same reason: the
-// fixture is committed and the node_modules it was generated against are not.
-const utilityTailwindPackageRoot = "/Users/kirkouimet/Projects/ahra/node_modules/.pnpm/tailwindcss@4.3.3/node_modules/tailwindcss"
+// The vendored snapshot of 4.3.3, the version the fixture was generated against, so it is present on any
+// machine (#sycrdr6).
+var utilityTailwindPackageRoot = vendored.TailwindPackageRoot()
 
 func utilityLoadCorpus(t *testing.T) utilityCorpus {
 	t.Helper()
@@ -131,40 +134,33 @@ func utilityLoadCorpus(t *testing.T) utilityCorpus {
 	if err != nil {
 		t.Fatalf("read utility fixture: %v", err)
 	}
-	var corpus utilityCorpus
-	if err := json.Unmarshal(raw, &corpus); err != nil {
+	var fixture utilityCorpus
+	if err := json.Unmarshal(raw, &fixture); err != nil {
 		t.Fatalf("decode utility fixture: %v", err)
 	}
-	if len(corpus.Cases) == 0 {
+	if len(fixture.Cases) == 0 {
 		t.Fatal("utility fixture holds no cases")
 	}
-	return corpus
+	return fixture
 }
 
 // utilityBuildEvaluator builds the evaluator the way production will: the theme from the repository's
 // own stylesheet graph, and the `@utility` definitions parsed out of the block text with the Go CSS
 // parser.
 //
-// It skips rather than fails when the tailwindcss install is absent, and it skips loudly, because a
-// silently absent corpus turns this suite into one that compares nothing and still prints green.
-func utilityBuildEvaluator(t *testing.T, corpus utilityCorpus) (*UtilityEvaluator, bool) {
+// The stylesheet is spelled inside its corpus, so this skips naming the variable when the corpus is
+// unset, and skips loudly, because a silently absent corpus turns this suite into one that compares
+// nothing and still prints green. A corpus that is set but lacks the stylesheet fails.
+func utilityBuildEvaluator(t *testing.T, fixture utilityCorpus) (*UtilityEvaluator, bool) {
 	t.Helper()
 
-	if _, err := os.Stat(filepath.Join(utilityTailwindPackageRoot, "index.css")); err != nil {
-		t.Skipf("tailwindcss install is not present at %s; run internal/lint/rules/tailwind/tools/generate_utility to refresh", utilityTailwindPackageRoot)
-		return nil, false
-	}
-	if _, err := os.Stat(corpus.EntryPath); err != nil {
-		t.Skipf("stylesheet is not present at %s", corpus.EntryPath)
-		return nil, false
-	}
-
-	theme, _, err := LoadThemeFromFile(corpus.EntryPath, NodeStylesheetResolver(utilityTailwindPackageRoot))
+	entryPath := corpus.Resolve(t, fixture.EntryPath)
+	theme, _, err := LoadThemeFromFile(entryPath, NodeStylesheetResolver(utilityTailwindPackageRoot))
 	if err != nil {
-		t.Fatalf("load theme from %s: %v", corpus.EntryPath, err)
+		t.Fatalf("load theme from %s: %v", entryPath, err)
 	}
 
-	definitions := utilityParseDefinitions(t, corpus)
+	definitions := utilityParseDefinitions(t, fixture)
 	return NewUtilityEvaluator(theme, definitions), true
 }
 
@@ -174,11 +170,11 @@ func utilityBuildEvaluator(t *testing.T, corpus utilityCorpus) (*UtilityEvaluato
 // for. A static `@utility` takes no value and has no `--value()` to resolve, so it is a constant
 // reading the descriptor table already carries; handling it here would be a second implementation of
 // something already measured.
-func utilityParseDefinitions(t *testing.T, corpus utilityCorpus) []*UtilityDefinition {
+func utilityParseDefinitions(t *testing.T, fixture utilityCorpus) []*UtilityDefinition {
 	t.Helper()
 
 	var definitions []*UtilityDefinition
-	for _, block := range corpus.UtilityBlocks {
+	for _, block := range fixture.UtilityBlocks {
 		if !strings.HasSuffix(block.Name, "-*") {
 			continue
 		}
@@ -244,8 +240,8 @@ func utilityCandidateFromCase(aCase utilityCase) *ParsedCandidate {
 // while looking identical in a summary that only counted matches.
 func TestUtilityMatchesEngine(t *testing.T) {
 	t.Parallel()
-	corpus := utilityLoadCorpus(t)
-	evaluator, ok := utilityBuildEvaluator(t, corpus)
+	fixture := utilityLoadCorpus(t)
+	evaluator, ok := utilityBuildEvaluator(t, fixture)
 	if !ok {
 		return
 	}
@@ -253,7 +249,7 @@ func TestUtilityMatchesEngine(t *testing.T) {
 	var compared, agreedCompiling, agreedRejecting int
 	var disagreements []string
 
-	for _, aCase := range corpus.Cases {
+	for _, aCase := range fixture.Cases {
 		if aCase.CandidateKind != string(ParsedCandidateKindFunctional) || !evaluator.Has(aCase.Root) {
 			continue
 		}
@@ -315,7 +311,7 @@ func TestUtilityMatchesEngine(t *testing.T) {
 
 	t.Logf(
 		"tailwind %s: %d functional classes on %d @utility roots; %d compiled and agreed, %d rejected and agreed",
-		corpus.TailwindVersion, compared, len(evaluator.Definitions), agreedCompiling, agreedRejecting,
+		fixture.TailwindVersion, compared, len(evaluator.Definitions), agreedCompiling, agreedRejecting,
 	)
 }
 
@@ -330,26 +326,26 @@ func TestUtilityMatchesEngine(t *testing.T) {
 // justification changed and that should be read rather than silently passed.
 func TestUtilityReproducesTheKnownExceptions(t *testing.T) {
 	t.Parallel()
-	corpus := utilityLoadCorpus(t)
-	evaluator, ok := utilityBuildEvaluator(t, corpus)
+	fixture := utilityLoadCorpus(t)
+	evaluator, ok := utilityBuildEvaluator(t, fixture)
 	if !ok {
 		return
 	}
 
-	if len(corpus.KnownExceptions) != 18 {
+	if len(fixture.KnownExceptions) != 18 {
 		t.Errorf(
 			"fixture holds %d known exceptions, Phase 0 measured 18; the population this component exists for has changed and the change should be read rather than absorbed",
-			len(corpus.KnownExceptions),
+			len(fixture.KnownExceptions),
 		)
 	}
 
-	byClassName := make(map[string]utilityCase, len(corpus.Cases))
-	for _, aCase := range corpus.Cases {
+	byClassName := make(map[string]utilityCase, len(fixture.Cases))
+	for _, aCase := range fixture.Cases {
 		byClassName[aCase.ClassName] = aCase
 	}
 
 	reproduced := 0
-	for _, exception := range corpus.KnownExceptions {
+	for _, exception := range fixture.KnownExceptions {
 		aCase, present := byClassName[exception.ClassName]
 		if !present {
 			t.Errorf("%s: the fixture names it an exception and holds no case for it", exception.ClassName)
@@ -385,8 +381,8 @@ func TestUtilityReproducesTheKnownExceptions(t *testing.T) {
 		reproduced++
 	}
 
-	if reproduced != len(corpus.KnownExceptions) {
-		t.Errorf("reproduced %d of %d known exceptions", reproduced, len(corpus.KnownExceptions))
+	if reproduced != len(fixture.KnownExceptions) {
+		t.Errorf("reproduced %d of %d known exceptions", reproduced, len(fixture.KnownExceptions))
 	}
 	t.Logf("reproduced all %d registry classes the descriptor model declines, each with a reading the table predicts differently", reproduced)
 }
@@ -401,23 +397,23 @@ func TestUtilityReproducesTheKnownExceptions(t *testing.T) {
 // empty population, which is the failure mode this whole slice has been bitten by.
 func TestUtilityFindsThePerDeclarationRoots(t *testing.T) {
 	t.Parallel()
-	corpus := utilityLoadCorpus(t)
-	evaluator, ok := utilityBuildEvaluator(t, corpus)
+	fixture := utilityLoadCorpus(t)
+	evaluator, ok := utilityBuildEvaluator(t, fixture)
 	if !ok {
 		return
 	}
 
-	if len(corpus.PerDeclarationRoots) == 0 {
+	if len(fixture.PerDeclarationRoots) == 0 {
 		t.Fatal("the fixture reports no per-declaration roots; this component's whole population is empty and every other test here is passing over nothing")
 	}
 
-	byClassName := make(map[string]utilityCase, len(corpus.Cases))
-	for _, aCase := range corpus.Cases {
+	byClassName := make(map[string]utilityCase, len(fixture.Cases))
+	for _, aCase := range fixture.Cases {
 		byClassName[aCase.ClassName] = aCase
 	}
 
 	checked := 0
-	for _, root := range corpus.PerDeclarationRoots {
+	for _, root := range fixture.PerDeclarationRoots {
 		if !evaluator.Has(root) {
 			t.Errorf("%s: the fixture reports it as per-declaration and no @utility block defines it", root)
 			continue
@@ -464,19 +460,19 @@ func TestUtilityFindsThePerDeclarationRoots(t *testing.T) {
 // drift away from what it is mutating.
 func TestUtilityDropIsNotDefault(t *testing.T) {
 	t.Parallel()
-	corpus := utilityLoadCorpus(t)
-	evaluator, ok := utilityBuildEvaluator(t, corpus)
+	fixture := utilityLoadCorpus(t)
+	evaluator, ok := utilityBuildEvaluator(t, fixture)
 	if !ok {
 		return
 	}
 
-	byClassName := make(map[string]utilityCase, len(corpus.Cases))
-	for _, aCase := range corpus.Cases {
+	byClassName := make(map[string]utilityCase, len(fixture.Cases))
+	for _, aCase := range fixture.Cases {
 		byClassName[aCase.ClassName] = aCase
 	}
 
 	caught, checked := 0, 0
-	for _, exception := range corpus.KnownExceptions {
+	for _, exception := range fixture.KnownExceptions {
 		aCase, present := byClassName[exception.ClassName]
 		if !present {
 			continue
@@ -522,14 +518,14 @@ func TestUtilityDropIsNotDefault(t *testing.T) {
 // is a branch this suite has not exercised.
 func TestUtilityRatioSpliceIsLoadBearing(t *testing.T) {
 	t.Parallel()
-	corpus := utilityLoadCorpus(t)
-	evaluator, ok := utilityBuildEvaluator(t, corpus)
+	fixture := utilityLoadCorpus(t)
+	evaluator, ok := utilityBuildEvaluator(t, fixture)
 	if !ok {
 		return
 	}
 
 	moved, unaffected := 0, 0
-	for _, aCase := range corpus.Cases {
+	for _, aCase := range fixture.Cases {
 		if aCase.Reading == nil || aCase.CandidateKind != string(ParsedCandidateKindFunctional) {
 			continue
 		}
@@ -571,8 +567,8 @@ func TestUtilityRatioSpliceIsLoadBearing(t *testing.T) {
 // the Go parser produces is a failure here rather than a surprise in the rule.
 func TestUtilityAgreesThroughTheGoCandidateParser(t *testing.T) {
 	t.Parallel()
-	corpus := utilityLoadCorpus(t)
-	evaluator, ok := utilityBuildEvaluator(t, corpus)
+	fixture := utilityLoadCorpus(t)
+	evaluator, ok := utilityBuildEvaluator(t, fixture)
 	if !ok {
 		return
 	}
@@ -581,7 +577,7 @@ func TestUtilityAgreesThroughTheGoCandidateParser(t *testing.T) {
 
 	var compared, agreed int
 	var disagreements []string
-	for _, aCase := range corpus.Cases {
+	for _, aCase := range fixture.Cases {
 		if aCase.CandidateKind != string(ParsedCandidateKindFunctional) || !evaluator.Has(aCase.Root) {
 			continue
 		}
@@ -643,17 +639,17 @@ func TestUtilityAgreesThroughTheGoCandidateParser(t *testing.T) {
 // wrong one.
 func TestUtilityDoesNotClaimTheShadowQuirk(t *testing.T) {
 	t.Parallel()
-	corpus := utilityLoadCorpus(t)
-	evaluator, ok := utilityBuildEvaluator(t, corpus)
+	fixture := utilityLoadCorpus(t)
+	evaluator, ok := utilityBuildEvaluator(t, fixture)
 	if !ok {
 		return
 	}
 
-	if len(corpus.ShadowQuirkProbes) != 4 {
-		t.Errorf("fixture holds %d shadow-quirk probes, Phase 0 measured 4", len(corpus.ShadowQuirkProbes))
+	if len(fixture.ShadowQuirkProbes) != 4 {
+		t.Errorf("fixture holds %d shadow-quirk probes, Phase 0 measured 4", len(fixture.ShadowQuirkProbes))
 	}
 
-	for _, probe := range corpus.ShadowQuirkProbes {
+	for _, probe := range fixture.ShadowQuirkProbes {
 		root := probe.ClassName
 		if index := strings.Index(root, "-["); index != -1 {
 			root = root[:index]
@@ -665,7 +661,7 @@ func TestUtilityDoesNotClaimTheShadowQuirk(t *testing.T) {
 			)
 		}
 	}
-	t.Logf("%d shadow-quirk probes are outside this component: none of their roots is an @utility block", len(corpus.ShadowQuirkProbes))
+	t.Logf("%d shadow-quirk probes are outside this component: none of their roots is an @utility block", len(fixture.ShadowQuirkProbes))
 }
 
 // TestUtilitySpacingMultiplierRejects pins the numeric guard that separates a surviving
@@ -738,14 +734,14 @@ func TestUtilityNormalizesValueArguments(t *testing.T) {
 // point so `@import "tailwindcss"` resolves, measures it, and deletes it.
 func TestUtilitySyntheticCasesMatchEngine(t *testing.T) {
 	t.Parallel()
-	corpus := utilityLoadCorpus(t)
+	fixture := utilityLoadCorpus(t)
 
-	if len(corpus.SyntheticCases) == 0 {
+	if len(fixture.SyntheticCases) == 0 {
 		t.Fatal("the fixture holds no synthetic cases; four ported branches then have no test at all")
 	}
 
 	var totalCompared, totalCompiling, totalRejecting int
-	for _, syntheticCase := range corpus.SyntheticCases {
+	for _, syntheticCase := range fixture.SyntheticCases {
 		// Not parallel: its subtests add to totals the test checks after them, and a parallel subtest would run
 		// only after the test had returned, so the check would pass on nothing.
 		t.Run(syntheticCase.Name, func(t *testing.T) {
@@ -829,7 +825,7 @@ func TestUtilitySyntheticCasesMatchEngine(t *testing.T) {
 
 	t.Logf(
 		"%d synthetic design systems; %d probes compared, %d compiled and agreed, %d rejected and agreed",
-		len(corpus.SyntheticCases), totalCompared, totalCompiling, totalRejecting,
+		len(fixture.SyntheticCases), totalCompared, totalCompiling, totalRejecting,
 	)
 }
 

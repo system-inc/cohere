@@ -1,6 +1,6 @@
 {
   "tailwindVersion": "4.3.3",
-  "entryPoint": "/Users/kirkouimet/Projects/connected/www-connected-app/libraries/structure/source/theme/styles/global.css",
+  "entryPoint": "connected:libraries/structure/source/theme/styles/global.css",
   "groundTruth": "compileAstNodes declarations; resolution is observed through its effect rather than read directly",
   "probeCount": 20,
   "rejectedCount": 4,
