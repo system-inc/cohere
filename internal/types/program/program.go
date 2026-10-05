@@ -528,6 +528,18 @@ func buildOnce(options Options) (*Graph, error) {
 	}
 	config.CompilerOptions().Checkers = &checkerCount
 
+	// The lib files TypeScript ships are never type-checked here, whatever the tsconfig says. A diagnostic
+	// in one is never reported, since a run reports the files the tsconfig names and those are never
+	// among them, so checking them was work whose output was thrown away: on a one-file program, 84ms of
+	// a 88ms types phase and 0.10s of 0.12s user CPU, every cold run of every small project and about 260
+	// launches of the test suite (#fay5rd1). A diagnostic about a file the tsconfig names comes from
+	// checking that file, and the globals every checker merges at startup are merged either way.
+	//
+	// The incremental build info compares the option only to decide whether the lib files' diagnostics
+	// can be copied, so a project's own tsc or tsgo sharing that build info rechecks the lib files after a
+	// cohere run and nothing else.
+	config.CompilerOptions().SkipDefaultLibCheck = core.TSTrue
+
 	// JSDocParsingMode used to be set here to parse JSDoc only where it can carry types. The option
 	// was removed from ProgramOptions in the move to `microsoft/TypeScript` — the compiler now decides
 	// per file rather than taking a program-wide mode — so there is nothing to pass and nothing to
