@@ -1,6 +1,9 @@
 package nexus
 
 import (
+	"crypto/sha256"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 
@@ -97,6 +100,43 @@ func buildImporterIndex(program rule.Program) *importerIndex {
 	}
 	index.roots = module_roots.Build(projectFiles)
 	return index
+}
+
+// constantCasingFingerprint is the rule's program fingerprint (#f96cnry): every file's entry in the
+// importer index, the names others take from it and whether something takes everything, and the
+// directories a computed `import()` roots. A file's verdict reads its own entry and whether it is a
+// root, which is a fact about its name and those directories, so an edit anywhere that changes no
+// import and no computed import directory leaves this alone, and the file's findings replay. The
+// rest of what the verdict reads, the checker's answers about the file, is the file's type
+// fingerprint's to cover.
+//
+// The options are not read. The rule's one option, frameworkConstantNames, judges a declaration inside
+// the file and chooses nothing the index reads, and the findings cache's key already holds every config
+// file, so a change of options re-runs the rule without the fingerprint having to move.
+func constantCasingFingerprint(program rule.Program, options any) [sha256.Size]byte {
+	hash := sha256.New()
+	if index := importerIndexFor(program); index != nil {
+		for _, path := range slices.Sorted(maps.Keys(index.byPath)) {
+			entry := index.byPath[path]
+			hash.Write([]byte(rule.FingerprintPath(program, string(path))))
+			hash.Write([]byte{0})
+			if entry.everything {
+				hash.Write([]byte{1})
+			}
+			for _, name := range slices.Sorted(maps.Keys(entry.names)) {
+				hash.Write([]byte(name))
+				hash.Write([]byte{2})
+			}
+			hash.Write([]byte{3})
+		}
+		for _, directory := range index.roots.DynamicImportDirectories() {
+			hash.Write([]byte(rule.FingerprintPath(program, directory)))
+			hash.Write([]byte{4})
+		}
+	}
+	var fingerprint [sha256.Size]byte
+	copy(fingerprint[:], hash.Sum(nil))
+	return fingerprint
 }
 
 // recordImportedNames adds what one specifier's statement takes from its target.

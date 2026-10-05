@@ -113,6 +113,19 @@ func (d *Directive) Covers(ruleName string, line int) bool {
 	return false
 }
 
+// Names is whether this directive could silence ruleName on some line: it names that rule, or names none.
+func (d *Directive) Names(ruleName string) bool {
+	if len(d.Rules) == 0 {
+		return true
+	}
+	for _, named := range d.Rules {
+		if matchesRuleName(named, ruleName) {
+			return true
+		}
+	}
+	return false
+}
+
 // matchesRuleName resolves a comment's rule name against a registry rule name.
 //
 // Exact first, then plugin-qualified. The suffix has to fall on a `/` boundary, or `no-enum` would
@@ -255,22 +268,40 @@ func namesIntersect(enableRules []string, blockRules []string) bool {
 // Recording on the query rather than in a separate pass is what makes an unused directive
 // detectable at all: nothing else in the system knows which findings were never reported.
 func (i *Index) Suppresses(ruleName string, offset int) bool {
+	return i.SuppressedBy(ruleName, offset) >= 0
+}
+
+// SuppressedBy is Suppresses answering with which directive silenced the finding, by its index in Directives,
+// or -1 when none did. The findings cache keeps the index, so a replay can mark the same directive applied
+// without producing the finding again (MarkApplied).
+func (i *Index) SuppressedBy(ruleName string, offset int) int {
 	if i == nil || len(i.directives) == 0 {
-		return false
+		return -1
 	}
 
 	line := i.lineOf(offset)
 	reportsOnDirectives := directives.IsSubject(ruleName)
-	for _, candidate := range i.directives {
+	for index, candidate := range i.directives {
 		if reportsOnDirectives && !coversAFindingAboutADirective(candidate, line) {
 			continue
 		}
 		if candidate.Covers(ruleName, line) {
 			candidate.applied++
-			return true
+			return index
 		}
 	}
-	return false
+	return -1
+}
+
+// MarkApplied records that the directive at index withheld a finding this run did not produce, because the
+// findings cache replayed the rule that would have, and reports false when no directive is at index. The index
+// is SuppressedBy's from a run over the same bytes, so it names the same directive.
+func (i *Index) MarkApplied(index int) bool {
+	if i == nil || index < 0 || index >= len(i.directives) {
+		return false
+	}
+	i.directives[index].applied++
+	return true
 }
 
 // Directives returns every directive found, in source order.

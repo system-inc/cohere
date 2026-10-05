@@ -53,8 +53,9 @@ func diagnosticKeys(diagnostics []rule.Diagnostic) []string {
 // would hold vacuously.
 //
 // The fixture is built so each path is exercised. a.ts has findings with no fix, so it is cached with
-// those findings and replayed; b.ts is clean; c.ts carries a suppression directive and must never be
-// cached; d.ts has a finding with a fix and must never be cached. Each premise is checked rather than
+// those findings and replayed; b.ts is clean; c.ts carries a suppression directive that silences a finding,
+// so it is cached with the finding its directive withheld, and its replay counts the directive applied, as the
+// coverage comparison below proves (#kdee854); d.ts has a finding with a fix and must never be cached. Each premise is checked rather than
 // assumed, since a fixture whose rules happened not to fire would pass everything here for nothing.
 func TestAReplayingWalkReportsWhatAPlainWalkReports(t *testing.T) {
 	t.Parallel()
@@ -99,8 +100,8 @@ func TestAReplayingWalkReportsWhatAPlainWalkReports(t *testing.T) {
 	if len(byFile["a.ts"].Findings) == 0 {
 		t.Fatal("a.ts was not recorded with findings, so findings replay is untested here")
 	}
-	if _, cached := byFile["c.ts"]; cached {
-		t.Error("c.ts carries a suppression directive and was cached; a directive's accounting spans every rule in the file")
+	if entry, cached := byFile["c.ts"]; !cached || !entry.Directives || len(entry.Withheld) != 1 {
+		t.Errorf("c.ts's directive silenced one finding, so it should be cached with that finding withheld: %+v", entry)
 	}
 	fixable := false
 	for _, diagnostic := range plain.Diagnostics {
