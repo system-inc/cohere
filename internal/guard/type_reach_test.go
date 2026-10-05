@@ -271,24 +271,7 @@ func isOwnSourceFile(expression ast.Expr, info *types.Info) bool {
 // scanTypeReach reads the rule packages with overlay in place of the files it names.
 func scanTypeReach(t *testing.T, overlay map[string][]byte) typeReachScan {
 	t.Helper()
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatal(err)
-	}
-	loaded, err := packages.Load(&packages.Config{
-		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes |
-			packages.NeedTypesInfo | packages.NeedImports | packages.NeedDeps,
-		Dir:     root,
-		Overlay: overlay,
-	}, "./internal/lint/...")
-	if err != nil {
-		t.Fatalf("loading the rule packages: %v", err)
-	}
-	for _, pkg := range loaded {
-		if len(pkg.Errors) > 0 {
-			t.Fatalf("loading %s: %v", pkg.PkgPath, pkg.Errors[0])
-		}
-	}
+	loaded := lintPackages(t, overlay)
 
 	type body struct {
 		node ast.Node

@@ -14,8 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"golang.org/x/tools/go/packages"
 )
 
 // creatingGetters are the compiler's getters that write: each creates the symbol table it is asked for
@@ -42,18 +40,7 @@ func TestRulesCallNoCompilerGetterThatWrites(t *testing.T) {
 // this scan; the guard hands in the overlay GOFLAGS names (guardOverlay), and a probe hands in its own.
 func creatingGetterCalls(t *testing.T, overlay map[string][]byte) []string {
 	t.Helper()
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatal(err)
-	}
-	loaded, err := packages.Load(&packages.Config{
-		Mode:    packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo,
-		Dir:     root,
-		Overlay: overlay,
-	}, "./internal/lint/...")
-	if err != nil {
-		t.Fatalf("loading the rule packages: %v", err)
-	}
+	loaded := lintPackages(t, overlay)
 
 	found := map[string]bool{}
 	calls := []string{}
