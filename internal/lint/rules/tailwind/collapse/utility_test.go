@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
 // The fixture is what the shipped Tailwind 4.3.3 engine did with this repository's own `@utility`
@@ -120,9 +122,9 @@ type utilityReadingFixture struct {
 // utilityTailwindPackageRoot is the tailwindcss install the fixture's theme resolves
 // `@import "tailwindcss"` against.
 //
-// Named rather than derived, matching theme_test.go, and absent-means-skip for the same reason: the
-// fixture is committed and the node_modules it was generated against are not.
-const utilityTailwindPackageRoot = "/Users/kirkouimet/Projects/ahra/node_modules/.pnpm/tailwindcss@4.3.3/node_modules/tailwindcss"
+// The vendored snapshot of 4.3.3, the version the fixture was generated against, so it is present on any
+// machine (#sycrdr6).
+var utilityTailwindPackageRoot = vendored.TailwindPackageRoot()
 
 func utilityLoadCorpus(t *testing.T) utilityCorpus {
 	t.Helper()
@@ -150,10 +152,6 @@ func utilityLoadCorpus(t *testing.T) utilityCorpus {
 func utilityBuildEvaluator(t *testing.T, corpus utilityCorpus) (*UtilityEvaluator, bool) {
 	t.Helper()
 
-	if _, err := os.Stat(filepath.Join(utilityTailwindPackageRoot, "index.css")); err != nil {
-		t.Skipf("tailwindcss install is not present at %s; run internal/lint/rules/tailwind/tools/generate_utility to refresh", utilityTailwindPackageRoot)
-		return nil, false
-	}
 	if _, err := os.Stat(corpus.EntryPath); err != nil {
 		t.Skipf("stylesheet is not present at %s", corpus.EntryPath)
 		return nil, false

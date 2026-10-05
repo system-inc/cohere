@@ -452,7 +452,7 @@ func TestAnEditToAGlobalDeclarationReachesEveryTypeAwareFinding(t *testing.T) {
 // stays uncacheable.
 func TestCacheClassesSplitsFiveWays(t *testing.T) {
 	t.Parallel()
-	fingerprint := func(rule.Program) [sha256.Size]byte { return [sha256.Size]byte{1} }
+	fingerprint := func(rule.Program, any) [sha256.Size]byte { return [sha256.Size]byte{1} }
 	pure, typeAware, design, derived, never := program.CacheClasses([]rule.Rule{
 		{Name: "pure"},
 		{Name: "options", ProgramReads: rule.ReadsCompilerOptions},

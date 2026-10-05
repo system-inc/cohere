@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
 // tailwindProjectConfig is a tsconfig for a project with TSX in it.
@@ -16,30 +16,13 @@ const tailwindProjectConfig = `{
     "include": ["**/*.ts", "**/*.tsx"]
 }`
 
-// installedTailwind is the tailwindcss the ahra corpus installs, for a fixture to link into its own
-// node_modules, since cohere installs no npm packages. The test skips, naming the variable, when the
-// corpus is not set, and returns empty when the corpus installs none.
-func installedTailwind(t *testing.T) string {
-	t.Helper()
-	for directory := corpus.Ahra.Path(t, "app", "_theme", "styles"); ; directory = filepath.Dir(directory) {
-		candidate := filepath.Join(directory, "node_modules", "tailwindcss")
-		if _, err := os.Stat(filepath.Join(candidate, "index.css")); err == nil {
-			return candidate
-		}
-		if filepath.Dir(directory) == directory {
-			return ""
-		}
-	}
-}
-
 // zeroConfigTailwindProject writes a project whose CohereSettings.json, when it has one, names no
 // cohere: set, so the run takes the house stack, with tailwindcss linked into its node_modules.
 func zeroConfigTailwindProject(t *testing.T, files map[string]string) string {
 	t.Helper()
-	packageRoot := installedTailwind(t)
-	if packageRoot == "" {
-		t.Fatal("the ahra corpus installs no tailwindcss to link into the fixture")
-	}
+	// The vendored snapshot of tailwindcss, since cohere installs no npm packages, so this runs on any
+	// machine (#sycrdr6). It used to be ahra's installed copy, through the ahra corpus.
+	packageRoot := vendored.TailwindPackageRoot()
 	root := t.TempDir()
 	files["tsconfig.json"] = tailwindProjectConfig
 	writeTree(t, root, files)

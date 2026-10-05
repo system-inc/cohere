@@ -1,6 +1,8 @@
 package program
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/configuration"
@@ -45,5 +47,47 @@ func TestFilesThatResolveAlikeShareOneSelectionAndStillCountPerFile(t *testing.T
 	}
 	if len(selections) != 2 {
 		t.Fatalf("three files in two resolutions made %d selections", len(selections))
+	}
+}
+
+// Two selections that give a derived rule different options fingerprint it apart, since an option can choose
+// what the rule reads, and one selection fingerprints it once however many files it serves (#s9k38p3).
+func TestSelectionsFingerprintADerivedRuleUnderTheirOwnOptions(t *testing.T) {
+	t.Parallel()
+	setting := func(marker string) configuration.RuleSetting {
+		return configuration.RuleSetting{Severity: configuration.SeverityError, Options: []json.RawMessage{json.RawMessage(`"` + marker + `"`)}}
+	}
+	graph := &Graph{
+		LintConfig: &configuration.Config{
+			Rules:     map[string]configuration.RuleSetting{"derived": setting("red")},
+			Overrides: []configuration.Override{{Files: []string{"special/**"}, Rules: map[string]configuration.RuleSetting{"derived": setting("blue")}}},
+		},
+		RuleOptions: configuration.OptionsRegistry{"derived": {Decode: func(raw json.RawMessage) (any, error) {
+			var marker string
+			err := json.Unmarshal(raw, &marker)
+			return marker, err
+		}}},
+	}
+	calls := 0
+	rules := []rule.Rule{{Name: "derived", ProgramReads: rule.ReadsOtherFiles, ProgramFingerprint: func(_ rule.Program, options any) [sha256.Size]byte {
+		calls++
+		return sha256.Sum256([]byte(options.(string)))
+	}}}
+	selections := map[any]*ruleSelection{}
+	scopedOff, unconfigured := map[string]int{}, map[string]int{}
+
+	first, _ := graph.rulesFor("source/a.ts", rules, selections, scopedOff, unconfigured)
+	second, _ := graph.rulesFor("source/b.ts", rules, selections, scopedOff, unconfigured)
+	special, _ := graph.rulesFor("special/c.ts", rules, selections, scopedOff, unconfigured)
+
+	red, blue := graph.programFingerprints(first)["derived"], graph.programFingerprints(special)["derived"]
+	if red != sha256.Sum256([]byte("red")) || blue != sha256.Sum256([]byte("blue")) {
+		t.Fatalf("the selections fingerprinted the rule as %x and %x, not under their own options", red[:4], blue[:4])
+	}
+	if graph.programFingerprints(second)["derived"] != red {
+		t.Fatal("two files that resolved alike fingerprinted the rule apart")
+	}
+	if calls != 2 {
+		t.Fatalf("the fingerprint was computed %d times for two selections, want once each", calls)
 	}
 }
