@@ -65,7 +65,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	current := node(path)
 
 	if current.Is("JSXElement") && isEmptyJsxElement(current) {
-		return concat(print("openingElement", nil), print("closingElement", nil))
+		return concatIn(path, print("openingElement", nil), print("closingElement", nil))
 	}
 
 	var openingLines Doc
@@ -89,7 +89,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 			parts = append(parts, printed)
 		}
 		parts = append(parts, closingLines)
-		return concat(parts...)
+		return concatIn(path, parts...)
 	}
 
 	// Convert `{" "}` to text nodes containing a space.
@@ -135,7 +135,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	if settingsOf(options).SingleQuote {
 		rawJsxWhitespace = "{' '}"
 	}
-	whitespace := ifBreak(concat(rawJsxWhitespace, softline), " ")
+	whitespace := ifBreak(concatIn(path, rawJsxWhitespace, softline), " ")
 
 	isFacebookTranslationTag := current.Child("openingElement").Child("name").String("name") == "fbt"
 
@@ -228,7 +228,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	// pushOntoLast is multilineChildren.push([multilineChildren.pop(), doc]).
 	pushOntoLast := func(document any) {
 		last := len(multilineChildren) - 1
-		multilineChildren[last] = concat(multilineChildren[last], document)
+		multilineChildren[last] = concatIn(path, multilineChildren[last], document)
 	}
 	for i, child := range children {
 		// There are a number of situations where we need to ensure we display
@@ -241,7 +241,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 					continue
 				}
 				// Leading whitespace
-				multilineChildren = append(multilineChildren, concat(rawJsxWhitespace, hardline), emptyDoc)
+				multilineChildren = append(multilineChildren, concatIn(path, rawJsxWhitespace, hardline), emptyDoc)
 				continue
 			}
 
@@ -287,9 +287,8 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	// Upstream wraps content in `cursor` when options.cursorNode, nodeBeforeCursor or nodeAfterCursor
 	// is a JSXText child. cohere never tracks a cursor (see printing.PrintAstToDoc), so that is dropped.
 
-	multiLineElem := group(concat(
-		openingLines,
-		indent(concat(hardline, content)),
+	multiLineElem := group(concatIn(path, openingLines,
+		indent(concatIn(path, hardline, content)),
 		hardline,
 		closingLines,
 	))
@@ -304,7 +303,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	}
 	flatParts = append(flatParts, closingLines)
 	return conditionalGroup([]Doc{
-		group(concat(flatParts...)),
+		group(concatIn(path, flatParts...)),
 		multiLineElem,
 	}, doc.GroupOptions{})
 }
@@ -334,7 +333,7 @@ func printJsxChildren(
 	push := func(document Doc) {
 		prevPart = document
 		last := len(parts) - 1
-		parts[last] = concat(parts[last], document)
+		parts[last] = concatIn(path, parts[last], document)
 	}
 	pushLine := func(document Doc) {
 		if isEmptyText(document) {

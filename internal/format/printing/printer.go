@@ -152,6 +152,7 @@ func PrintAstToDoc[N Node[N]](ast N, comments []N, options *Options[N]) (doc.Doc
 
 	cache := map[N]doc.Doc{}
 	path := NewAstPath(ast)
+	path.Settings = options.Settings
 	embeds := map[N]doc.Doc{}
 
 	var mainPrint PrintFunc

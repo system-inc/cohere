@@ -58,8 +58,7 @@ func printFunctionParameters(
 	}
 
 	if len(parameters) == 0 {
-		return concat(
-			typeParametersDoc,
+		return concatIn(path, typeParametersDoc,
 			"(",
 			printDanglingCommentsInList(
 				path,
@@ -108,8 +107,7 @@ func printFunctionParameters(
 			// Removing lines in this case leads to broken or ugly output
 			panic(argExpansionBailout{})
 		}
-		return group(concat(
-			doc.RemoveLines(typeParametersDoc),
+		return group(concatIn(path, doc.RemoveLines(typeParametersDoc),
 			"(",
 			doc.RemoveLines(doc.Concat(printed)),
 			")",
@@ -150,8 +148,7 @@ func printFunctionParameters(
 	if !hasRestParameter(functionNode) {
 		trailingComma = printTrailingComma(options, "all")
 	}
-	return concat(
-		typeParametersDoc,
+	return concatIn(path, typeParametersDoc,
 		"(",
 		indent(append([]Doc{softline}, printed...)),
 		trailingComma,

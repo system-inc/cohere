@@ -14,13 +14,13 @@ import (
 func printComment(path *Path, options *Options) Doc {
 	comment := node(path)
 	if isLineComment(comment) {
-		return concat(estree.TrimEndJavaScript(options.OriginalText[locStart(comment):locEnd(comment)]))
+		return concatIn(path, estree.TrimEndJavaScript(options.OriginalText[locStart(comment):locEnd(comment)]))
 	}
 	if estree.IsIndentableBlockComment(comment) {
 		return printIndentableBlockComment(comment)
 	}
 	if isBlockComment(comment) {
-		return concat("/*", replaceEndOfLine(comment.String("value")), "*/")
+		return concatIn(path, "/*", replaceEndOfLine(comment.String("value")), "*/")
 	}
 	panic("not a comment: " + comment.Type())
 }

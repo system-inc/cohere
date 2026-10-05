@@ -93,17 +93,15 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 			unshift(printedNode{
 				node:                 current,
 				hasTrailingEmptyLine: hasTrailingEmptyLine,
-				printed: concat(
-					printing.PrintComments(
-						path,
-						concat(
-							printOptionalToken(path),
-							print("typeArguments", nil),
-							printCallArguments(path, options, print),
-						),
-						options,
-						nil,
+				printed: concatIn(path, printing.PrintComments(
+					path,
+					concatIn(path, printOptionalToken(path),
+						print("typeArguments", nil),
+						printCallArguments(path, options, print),
 					),
+					options,
+					nil,
+				),
 					trailingLine,
 				),
 			})
@@ -121,7 +119,7 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 		} else if current.Is("TSNonNullExpression") && !needsParentheses(path, options) {
 			unshift(printedNode{
 				node:    current,
-				printed: printing.PrintComments(path, concat("!"), options, nil),
+				printed: printing.PrintComments(path, concatIn(path, "!"), options, nil),
 			})
 			call(path, rec, "expression")
 		} else {
@@ -138,8 +136,7 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
 	unshift(printedNode{
 		node: current,
-		printed: concat(
-			printOptionalToken(path),
+		printed: concatIn(path, printOptionalToken(path),
 			print("typeArguments", nil),
 			printCallArguments(path, options, print),
 		),
@@ -306,7 +303,7 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 		for index, printedGroup := range groups {
 			printed[index] = printGroup(printedGroup)
 		}
-		return indent(concat(hardline, join(hardline, printed)))
+		return indent(concatIn(path, hardline, join(hardline, printed)))
 	}
 
 	printedGroups := make([]Doc, len(groups))
@@ -377,7 +374,7 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 	var mergedGroup Doc = emptyDoc
 	if shouldMerge {
 		// upstream's groups.slice(1, 2).map(printGroup)
-		mergedGroup = concat(printGroup(groups[1]))
+		mergedGroup = concatIn(path, printGroup(groups[1]))
 	}
 	var emptyLineBeforeIndent Doc = emptyDoc
 	if shouldHaveEmptyLineBeforeIndent {
@@ -387,8 +384,7 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 	if shouldMerge {
 		indentedGroups = groups[2:]
 	}
-	expanded := concat(
-		printGroup(groups[0]),
+	expanded := concatIn(path, printGroup(groups[0]),
 		mergedGroup,
 		emptyLineBeforeIndent,
 		printIndentedGroup(indentedGroups),
@@ -462,8 +458,7 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 		if doc.WillBreak(oneLine) || shouldHaveEmptyLineBeforeIndent {
 			breakParentDoc = breakParent
 		}
-		result = concat(
-			breakParentDoc,
+		result = concatIn(path, breakParentDoc,
 			conditionalGroup([]Doc{oneLine, expanded}, doc.GroupOptions{}),
 		)
 	}

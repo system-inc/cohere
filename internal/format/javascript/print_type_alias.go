@@ -10,8 +10,7 @@ package javascript
 */
 func printTypeAlias(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
-	parts := concat(
-		printDeclareToken(path),
+	parts := concatIn(path, printDeclareToken(path),
 		"type ",
 		print("id", nil),
 		print("typeParameters", nil),
@@ -21,8 +20,7 @@ func printTypeAlias(path *Path, options *Options, print PrintFunc) Doc {
 	if current.Is("TSTypeAliasDeclaration") {
 		rightPropertyName = "typeAnnotation"
 	}
-	return concat(
-		printAssignment(path, options, print, parts, " =", rightPropertyName),
+	return concatIn(path, printAssignment(path, options, print, parts, " =", rightPropertyName),
 		printSemicolon(options),
 	)
 }

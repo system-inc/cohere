@@ -15,12 +15,11 @@ func printModuleDeclaration(path *Path, options *Options, print PrintFunc) Doc {
 	}
 	var body Doc
 	if current.Child("body") != nil {
-		body = concat(" ", group(print("body", nil)))
+		body = concatIn(path, " ", group(print("body", nil)))
 	} else {
 		body = printSemicolon(options)
 	}
-	return concat(
-		printDeclareToken(path),
+	return concatIn(path, printDeclareToken(path),
 		kind,
 		print("id", nil),
 		body,

@@ -34,9 +34,9 @@ func printTemplateLiteral(path *Path, options *Options, print PrintFunc) Doc {
 	parts := mapPath(path, func(_ *Path, index int) Doc {
 		isLast := index == quasiCount-1
 		if isLast {
-			return concat(print(nil, nil), "")
+			return concatIn(path, print(nil, nil), "")
 		}
-		return concat(print(nil, nil), expressionDocs[index])
+		return concatIn(path, print(nil, nil), expressionDocs[index])
 	}, "quasis")
 
 	result := []any{lineSuffixBoundary, "`"}
@@ -44,7 +44,7 @@ func printTemplateLiteral(path *Path, options *Options, print PrintFunc) Doc {
 		result = append(result, part)
 	}
 	result = append(result, "`")
-	return concat(result...)
+	return concatIn(path, result...)
 }
 
 // printTaggedTemplateExpression is upstream's printTaggedTemplateExpression.
@@ -75,8 +75,7 @@ func printTaggedTemplateExpression(path *Path, options *Options, print PrintFunc
 		}
 	}
 
-	return label(labelOf(quasiDoc), concat(
-		print("tag", nil),
+	return label(labelOf(quasiDoc), concatIn(path, print("tag", nil),
 		print("typeArguments", nil),
 		space,
 		lineSuffixBoundary,
@@ -184,11 +183,9 @@ func printJestEachTemplateLiteral(path *Path, options *Options, print PrintFunc)
 			rowDocs[rowIndex] = join(" | ", cellDocs)
 		}
 
-		return concat(
-			lineSuffixBoundary,
+		return concatIn(path, lineSuffixBoundary,
 			"`",
-			indent(concat(
-				hardline,
+			indent(concatIn(path, hardline,
 				join(hardline, rowDocs),
 			)),
 			hardline,
@@ -275,7 +272,7 @@ func printTemplateExpression(path *Path, options *Options, print PrintFunc) Doc 
 			current.Is("SequenceExpression") ||
 			isBinaryCastExpression(current) ||
 			isBinaryish(current)) {
-		expressionDoc = concat(indent(concat(softline, expressionDoc)), softline)
+		expressionDoc = concatIn(path, indent(concatIn(path, softline, expressionDoc)), softline)
 	}
 
 	// For a template literal of the following form:
@@ -302,7 +299,7 @@ func printTemplateExpression(path *Path, options *Options, print PrintFunc) Doc 
 		expressionDoc = addAlignmentToDoc(expressionDoc, indentSize, settingsOf(options).TabWidth)
 	}
 
-	return group(concat("${", expressionDoc, lineSuffixBoundary, "}"))
+	return group(concatIn(path, "${", expressionDoc, lineSuffixBoundary, "}"))
 }
 
 // printTemplateExpressions is upstream's printTemplateExpressions.

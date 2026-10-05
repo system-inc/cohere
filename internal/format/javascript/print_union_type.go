@@ -34,14 +34,14 @@ func printUnionType(path *Path, options *Options, print PrintFunc, args *printAr
 			if path.IsFirst() {
 				bar = ifBreak("| ", "")
 			} else {
-				bar = concat(line, "| ")
+				bar = concatIn(path, line, "| ")
 			}
 			typeDoc := print(nil, nil)
 			if hasComment(node(path), commentLeading, nil) {
-				return concat(bar, align(2, printing.PrintComments(path, typeDoc, options, nil)))
+				return concatIn(path, bar, align(2, printing.PrintComments(path, typeDoc, options, nil)))
 			}
 
-			return concat(bar, printing.PrintComments(path, align(2, typeDoc), options, nil))
+			return concatIn(path, bar, printing.PrintComments(path, align(2, typeDoc), options, nil))
 		}, "types"),
 	)
 
@@ -50,12 +50,11 @@ func printUnionType(path *Path, options *Options, print PrintFunc, args *printAr
 	}
 
 	if needsParentheses(path, options) {
-		return group(concat(indent(concat(softline, printed)), softline))
+		return group(concatIn(path, indent(concatIn(path, softline, printed)), softline))
 	}
 
 	if isMultipleTupleTypeElement(path) {
-		return group(concat(
-			indent(concat(ifBreak(concat("(", softline), ""), printed)),
+		return group(concatIn(path, indent(concatIn(path, ifBreak(concatIn(path, "(", softline), ""), printed)),
 			softline,
 			ifBreak(")", ""),
 		))
@@ -67,7 +66,7 @@ func printUnionType(path *Path, options *Options, print PrintFunc, args *printAr
 		return printed
 	}
 
-	return group(indent(concat(softline, printed)))
+	return group(indent(concatIn(path, softline, printed)))
 }
 
 // shouldIndentUnionType is upstream's shouldIndentUnionType. The Flow branches (a FunctionTypeParam's
@@ -103,9 +102,9 @@ func printIntersectionType(path *Path, options *Options, print PrintFunc) Doc {
 			// If both are objects, don't indent
 			if previousIsObjectType && currentIsObjectType {
 				if wasIndented {
-					return concat(" & ", indent(printed))
+					return concatIn(path, " & ", indent(printed))
 				}
-				return concat(" & ", printed)
+				return concatIn(path, " & ", printed)
 			}
 
 			if
@@ -113,7 +112,7 @@ func printIntersectionType(path *Path, options *Options, print PrintFunc) Doc {
 			(!previousIsObjectType && !currentIsObjectType) ||
 				hasLeadingOwnLineComment(options.OriginalText, node(path)) {
 				// experimentalOperatorPosition is always "end", so upstream's "start" branch is dropped.
-				return indent(concat(" &", line, printed))
+				return indent(concatIn(path, " &", line, printed))
 			}
 
 			// If you go from object to non-object or vis-versa, then inline it
@@ -122,9 +121,9 @@ func printIntersectionType(path *Path, options *Options, print PrintFunc) Doc {
 			}
 
 			if index > 1 {
-				return concat(" & ", indent(printed))
+				return concatIn(path, " & ", indent(printed))
 			}
-			return concat(" & ", printed)
+			return concatIn(path, " & ", printed)
 		}, "types"),
 	)
 }

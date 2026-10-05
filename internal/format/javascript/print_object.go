@@ -70,7 +70,7 @@ func printObject(path *Path, options *Options, print PrintFunc) Doc {
 
 	var separatorParts []any
 	parts := mapPath(path, func(path *Path, _ int) Doc {
-		result := concat(append(append([]any{}, separatorParts...), print(nil, nil))...)
+		result := concatIn(path, append(append([]any{}, separatorParts...), print(nil, nil))...)
 		separatorParts = []any{",", line}
 		if isNextLineEmptyAfter(node(path), options) {
 			separatorParts = append(separatorParts, hardline)
@@ -82,8 +82,7 @@ func printObject(path *Path, options *Options, print PrintFunc) Doc {
 
 	var content Doc
 	if len(parts) == 0 {
-		content = group(concat(
-			"{",
+		content = group(concatIn(path, "{",
 			printDanglingCommentsInList(path, options, nil),
 			"}",
 			printOptionalToken(path),
@@ -98,8 +97,7 @@ func printObject(path *Path, options *Options, print PrintFunc) Doc {
 		if canHaveTrailingSeparator {
 			trailingSeparator = printTrailingComma(options, "")
 		}
-		content = concat(
-			"{",
+		content = concatIn(path, "{",
 			indent(append([]Doc{spacing}, parts...)),
 			trailingSeparator,
 			spacing,

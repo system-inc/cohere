@@ -52,10 +52,9 @@ func printMemberExpression(path *Path, options *Options, print PrintFunc) Doc {
 	if shouldInline {
 		lookup = lookupDoc
 	} else {
-		lookup = group(indent(concat(softline, lookupDoc)))
+		lookup = group(indent(concatIn(path, softline, lookupDoc)))
 	}
-	return label(labelOf(objectDoc), concat(
-		objectDoc,
+	return label(labelOf(objectDoc), concatIn(path, objectDoc,
 		lineSuffixBoundary,
 		lookup,
 	))
@@ -68,12 +67,12 @@ func printMemberLookup(path *Path, options *Options, print PrintFunc) Doc {
 	optional := printOptionalToken(path)
 
 	if !current.Bool("computed") {
-		return concat(optional, ".", property)
+		return concatIn(path, optional, ".", property)
 	}
 
 	if current.Child("property") == nil || isNumericLiteral(current.Child("property")) {
-		return concat(optional, "[", property, "]")
+		return concatIn(path, optional, "[", property, "]")
 	}
 
-	return group(concat(optional, "[", indent(concat(softline, property)), softline, "]"))
+	return group(concatIn(path, optional, "[", indent(concatIn(path, softline, property)), softline, "]"))
 }

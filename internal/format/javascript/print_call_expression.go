@@ -21,7 +21,7 @@ func printCallExpression(path *Path, options *Options, print PrintFunc) Doc {
 	// `TSImportType.typeArguments` is after `qualifier`, not before the "arguments"
 	var typeArgumentsDoc Doc = emptyDoc
 	if !current.Is("TSImportType") && current.Child("typeArguments") != nil {
-		typeArgumentsDoc = concat(print("typeArguments", nil), lineSuffixBoundary)
+		typeArgumentsDoc = concatIn(path, print("typeArguments", nil), lineSuffixBoundary)
 	}
 
 	isTemplateLiteralSingleArg := len(args) == 1 && isTemplateOnItsOwnLine(args[0], originalText(options))
@@ -43,8 +43,7 @@ func printCallExpression(path *Path, options *Options, print PrintFunc) Doc {
 		})
 		// Upstream skips this return when `printed[0].label?.embed`. The JavaScript printer has no embed
 		// hook (printer.go), so no printed argument carries that label and the condition always holds.
-		return concat(
-			printCallee(path, print),
+		return concatIn(path, printCallee(path, print),
 			optional,
 			typeArgumentsDoc,
 			"(",
@@ -69,8 +68,7 @@ func printCallExpression(path *Path, options *Options, print PrintFunc) Doc {
 		}
 	}
 
-	contents := concat(
-		printCallee(path, print),
+	contents := concatIn(path, printCallee(path, print),
 		optional,
 		typeArgumentsDoc,
 		printCallArguments(path, options, print),
@@ -94,23 +92,22 @@ func printCallee(path *Path, print PrintFunc) Doc {
 		if current.Truthy("phase") {
 			phase = "." + current.String("phase")
 		}
-		return concat("import" + phase)
+		return concatIn(path, "import"+phase)
 	}
 
 	if current.Is("TSImportType") {
-		return concat("import")
+		return concatIn(path, "import")
 	}
 
 	if current.Is("TSExternalModuleReference") {
-		return concat("require")
+		return concatIn(path, "require")
 	}
 
 	newKeyword := ""
 	if current.Is("NewExpression") {
 		newKeyword = "new "
 	}
-	return concat(
-		newKeyword,
+	return concatIn(path, newKeyword,
 		print("callee", nil),
 		lineSuffixBoundary,
 	)

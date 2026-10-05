@@ -101,7 +101,7 @@ func printTernaryTest(path *Path, options *Options, print PrintFunc) Doc {
 	if isConditionalExpression {
 		printed = print("test", nil)
 	} else {
-		printed = concat(print("checkType", nil), " ", "extends", " ", print("extendsType", nil))
+		printed = concatIn(path, print("checkType", nil), " ", "extends", " ", print("extendsType", nil))
 	}
 	/**
 	 *     a
@@ -257,9 +257,8 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 		// parens when using ?: within JSX, because the parens are analogous to
 		// curly braces in an if statement.
 		wrap := func(document Doc) Doc {
-			return concat(
-				ifBreak("(", ""),
-				indent(concat(softline, document)),
+			return concatIn(path, ifBreak("(", ""),
+				indent(concatIn(path, softline, document)),
 				softline,
 				ifBreak(")", ""),
 			)
@@ -335,8 +334,7 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 		if consequentIsTernary {
 			closeParen = ifBreak("", ")")
 		}
-		part := concat(
-			line,
+		part := concatIn(path, line,
 			"? ",
 			openParen,
 			printedConsequent,
@@ -378,18 +376,18 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 	printedTest := printTernaryTest(path, options, print)
 	var printedParts Doc
 	if forceNoIndent {
-		printedParts = concat(parts...)
+		printedParts = concatIn(path, parts...)
 	} else {
-		printedParts = indent(concat(parts...))
+		printedParts = indent(concatIn(path, parts...))
 	}
 	var closing Doc = emptyDoc
 	if isConditionalExpression && breakClosingParen && !shouldExtraIndent {
 		closing = softline
 	}
-	result := maybeGroup(concat(printedTest, printedParts, closing))
+	result := maybeGroup(concatIn(path, printedTest, printedParts, closing))
 
 	if isParentTest || shouldExtraIndent {
-		return group(concat(indent(concat(softline, result)), softline))
+		return group(concatIn(path, indent(concatIn(path, softline, result)), softline))
 	}
 	return result
 }

@@ -46,9 +46,8 @@ func maybeWrapJsxElementInParens(path *Path, elem Doc, options *Options) Doc {
 		openParen, closeParen = ifBreak("(", nil), ifBreak(")", nil)
 	}
 	return groupWith(
-		concat(
-			openParen,
-			indent(concat(softline, elem)),
+		concatIn(path, openParen,
+			indent(concatIn(path, softline, elem)),
 			softline,
 			closeParen,
 		),
@@ -114,7 +113,7 @@ func printJsxAttribute(path *Path, options *Options, print PrintFunc) Doc {
 		parts = append(parts, "=", res)
 	}
 
-	return concat(parts...)
+	return concatIn(path, parts...)
 }
 
 // printJsxExpressionContainer is upstream's printJsxExpressionContainer.
@@ -141,12 +140,11 @@ func printJsxExpressionContainer(path *Path, options *Options, print PrintFunc) 
 	}
 
 	if shouldInline(current.Child("expression"), parentOf(path)) {
-		return group(concat("{", print("expression", nil), lineSuffixBoundary, "}"))
+		return group(concatIn(path, "{", print("expression", nil), lineSuffixBoundary, "}"))
 	}
 
-	return group(concat(
-		"{",
-		indent(concat(softline, print("expression", nil))),
+	return group(concatIn(path, "{",
+		indent(concatIn(path, softline, print("expression", nil))),
 		softline,
 		lineSuffixBoundary,
 		"}",
@@ -163,7 +161,7 @@ func printJsxOpeningElement(path *Path, options *Options, print PrintFunc) Doc {
 
 	// Don't break self-closing elements with no attributes and no comments
 	if current.Bool("selfClosing") && len(attributes) == 0 && !nameHasComments {
-		return concat("<", print("name", nil), print("typeArguments", nil), " />")
+		return concatIn(path, "<", print("name", nil), print("typeArguments", nil), " />")
 	}
 
 	// don't break up opening elements with a single long text attribute
@@ -195,7 +193,7 @@ func printJsxOpeningElement(path *Path, options *Options, print PrintFunc) Doc {
 		} else {
 			parts = append(parts, ">")
 		}
-		return group(concat(parts...))
+		return group(concatIn(path, parts...))
 	}
 
 	// We should print the opening element expanded if any prop value is a
@@ -220,16 +218,16 @@ func printJsxOpeningElement(path *Path, options *Options, print PrintFunc) Doc {
 				if path.IsFirst() {
 					separator = attributeLine
 				} else if isNextLineEmptyAfter(previousOf(path), options) {
-					separator = concat(hardline, hardline)
+					separator = concatIn(path, hardline, hardline)
 				} else {
 					separator = attributeLine
 				}
-				return concat(separator, print(nil, nil))
+				return concatIn(path, separator, print(nil, nil))
 			}, "attributes"),
 		),
 	}
 	parts = append(parts, printEndOfOpeningTag(current, options, nameHasComments)...)
-	return groupWith(concat(parts...), doc.GroupOptions{ShouldBreak: shouldBreak})
+	return groupWith(concatIn(path, parts...), doc.GroupOptions{ShouldBreak: shouldBreak})
 }
 
 // printEndOfOpeningTag is upstream's printEndOfOpeningTag; it returns the array upstream spreads.
@@ -278,7 +276,7 @@ func printJsxClosingElement(path *Path, options *Options, print PrintFunc) Doc {
 
 	printed := print("name", nil)
 	if hasComment(current.Child("name"), commentLeading|commentLine, nil) {
-		parts = append(parts, indent(concat(hardline, printed)), hardline)
+		parts = append(parts, indent(concatIn(path, hardline, printed)), hardline)
 	} else if hasComment(current.Child("name"), commentLeading|commentBlock, nil) {
 		parts = append(parts, " ", printed)
 	} else {
@@ -287,7 +285,7 @@ func printJsxClosingElement(path *Path, options *Options, print PrintFunc) Doc {
 
 	parts = append(parts, ">")
 
-	return concat(parts...)
+	return concatIn(path, parts...)
 }
 
 // printJsxOpeningClosingFragment is upstream's printJsxOpeningClosingFragment.
@@ -311,10 +309,8 @@ func printJsxOpeningClosingFragment(path *Path, options *Options) Doc {
 	if hasOwnLineComment {
 		trailing = hardline
 	}
-	return concat(
-		open,
-		indent(concat(
-			leading,
+	return concatIn(path, open,
+		indent(concatIn(path, leading,
 			printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}),
 		)),
 		trailing,
@@ -342,8 +338,7 @@ func printJsxEmptyExpression(path *Path, options *Options) Doc {
 	if requiresHardline {
 		trailing = hardline
 	}
-	return concat(
-		printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{Indent: requiresHardline}),
+	return concatIn(path, printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{Indent: requiresHardline}),
 		trailing,
 	)
 }
@@ -356,15 +351,13 @@ func printJsxSpreadAttributeOrChild(path *Path, options *Options, print PrintFun
 	if current.Is("JSXSpreadAttribute") {
 		name = "argument"
 	}
-	return concat(
-		"{",
+	return concatIn(path, "{",
 		call(path, func(path *Path) Doc {
-			printed := concat("...", print(nil, nil))
+			printed := concatIn(path, "...", print(nil, nil))
 			if !hasAnyComment(node(path)) {
 				return printed
 			}
-			return concat(
-				indent(concat(softline, printing.PrintComments(path, printed, options, nil))),
+			return concatIn(path, indent(concatIn(path, softline, printing.PrintComments(path, printed, options, nil))),
 				softline,
 			)
 		}, name),

@@ -34,9 +34,9 @@ func printClass(path *Path, options *Options, print PrintFunc) Doc {
 		decoratorsDoc := printDecorators(path, options, print)
 		needsParens := needsParentheses(path, options)
 		if needsParens {
-			return concat(indent(concat(softline, decoratorsDoc, printed)), softline)
+			return concatIn(path, indent(concatIn(path, softline, decoratorsDoc, printed)), softline)
 		}
-		return concat(decoratorsDoc, printed)
+		return concatIn(path, decoratorsDoc, printed)
 	}
 
 	return printed
@@ -82,12 +82,11 @@ func printClassWithoutDecorators(path *Path, options *Options, print PrintFunc) 
 	}
 
 	if current.Child("superClass") != nil {
-		printed := concat(
-			printSuperClass(path, options, print),
+		printed := concatIn(path, printSuperClass(path, options, print),
 			print("superTypeArguments", nil),
 		)
 		printedWithComments := call(path, func(path *Path) Doc {
-			return concat("extends ", printing.PrintComments(path, printed, options, nil))
+			return concatIn(path, "extends ", printing.PrintComments(path, printed, options, nil))
 		}, "superClass")
 		if groupMode {
 			extendsParts = append(extendsParts, line, group(printedWithComments))
@@ -107,7 +106,7 @@ func printClassWithoutDecorators(path *Path, options *Options, print PrintFunc) 
 	if groupMode {
 		heritageGroupId = getHeritageGroupId(options, current)
 		parts = append(parts,
-			groupWith(concat(append(partsGroup, indent(concat(extendsParts...)))...), doc.GroupOptions{ID: heritageGroupId}),
+			groupWith(concatIn(path, append(partsGroup, indent(concatIn(path, extendsParts...)))...), doc.GroupOptions{ID: heritageGroupId}),
 		)
 	} else {
 		parts = append(parts, partsGroup...)
@@ -130,7 +129,7 @@ func printClassWithoutDecorators(path *Path, options *Options, print PrintFunc) 
 
 	parts = append(parts, print("body", nil))
 
-	return concat(parts...)
+	return concatIn(path, parts...)
 }
 
 // hasMultipleHeritage is upstream's hasMultipleHeritage.
@@ -208,19 +207,18 @@ func printHeritageClauses(path *Path, options *Options, print PrintFunc, listNam
 		Marker: listName,
 	})
 
-	heritageClausesDoc := join(concat(",", line), printAll(path, print, listName))
+	heritageClausesDoc := join(concatIn(path, ",", line), printAll(path, print, listName))
 
 	// Make it print like `superClass`
 	if !hasMultipleHeritage(current) {
-		printed := concat(
-			listName+" ",
+		printed := concatIn(path, listName+" ",
 			printedLeadingComments,
 			heritageClausesDoc,
 		)
 		if shouldPrintClassInGroupMode(path) {
-			return concat(line, group(printed))
+			return concatIn(path, line, group(printed))
 		}
-		return concat(" ", printed)
+		return concatIn(path, " ", printed)
 	}
 
 	// upstream's `printedLeadingComments && hardline`
@@ -229,12 +227,11 @@ func printHeritageClauses(path *Path, options *Options, print PrintFunc, listNam
 		leadingCommentsBreak = hardline
 	}
 
-	return concat(
-		line,
+	return concatIn(path, line,
 		printedLeadingComments,
 		leadingCommentsBreak,
 		listName,
-		group(indent(concat(line, heritageClausesDoc))),
+		group(indent(concatIn(path, line, heritageClausesDoc))),
 	)
 }
 
@@ -244,7 +241,7 @@ func printSuperClass(path *Path, options *Options, print PrintFunc) Doc {
 	parent := parentOf(path)
 	if parent.Is("AssignmentExpression") {
 		return group(
-			ifBreak(concat("(", indent(concat(softline, printed)), softline, ")"), printed),
+			ifBreak(concatIn(path, "(", indent(concatIn(path, softline, printed)), softline, ")"), printed),
 		)
 	}
 	return printed
@@ -273,7 +270,7 @@ func printClassMethod(path *Path, options *Options, print PrintFunc) Doc {
 
 	parts = append(parts, printMethod(path, options, print))
 
-	return concat(parts...)
+	return concatIn(path, parts...)
 }
 
 /*
@@ -327,15 +324,14 @@ func printClassProperty(path *Path, options *Options, print PrintFunc) Doc {
 		rightPropertyName = ""
 	}
 
-	return concat(
-		printAssignment(
-			path,
-			options,
-			print,
-			concat(parts...),
-			" =",
-			rightPropertyName,
-		),
+	return concatIn(path, printAssignment(
+		path,
+		options,
+		print,
+		concatIn(path, parts...),
+		" =",
+		rightPropertyName,
+	),
 		printSemicolon(options),
 	)
 }

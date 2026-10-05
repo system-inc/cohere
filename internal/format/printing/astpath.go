@@ -14,6 +14,10 @@ import (
 // differently.
 type AstPath[N Node[N]] struct {
 	stack []any
+
+	// Settings is the print's Options.Settings, set by PrintAstToDoc, so a printer function given only the
+	// path reaches its language's per-print state. Nothing in this package reads it.
+	Settings any
 }
 
 // NewAstPath is upstream's `new AstPath(value)`.

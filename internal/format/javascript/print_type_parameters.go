@@ -95,8 +95,7 @@ func printTypeParameters(path *Path, options *Options, print PrintFunc, paramsKe
 			}))
 
 	if shouldInline {
-		return concat(
-			"<",
+		return concatIn(path, "<",
 			join(", ", printAll(path, print, paramsKey)),
 			printDanglingCommentsForInline(path, options),
 			">",
@@ -112,9 +111,8 @@ func printTypeParameters(path *Path, options *Options, print PrintFunc, paramsKe
 		trailingComma = printTrailingComma(options, "")
 	}
 
-	return group(concat(
-		"<",
-		indent(concat(softline, join(concat(",", line), printAll(path, print, paramsKey)))),
+	return group(concatIn(path, "<",
+		indent(concatIn(path, softline, join(concatIn(path, ",", line), printAll(path, print, paramsKey)))),
 		trailingComma,
 		softline,
 		">",
@@ -134,7 +132,7 @@ func printDanglingCommentsForInline(path *Path, options *Options) Doc {
 	if hasOnlyBlockComments {
 		return printed
 	}
-	return concat(printed, hardline)
+	return concatIn(path, printed, hardline)
 }
 
 // `TSTypeParameter` and `TypeParameter`
@@ -193,5 +191,5 @@ func printTypeParameter(path *Path, options *Options, print PrintFunc) Doc {
 		)
 	}
 
-	return group(concat(parts...))
+	return group(concatIn(path, parts...))
 }

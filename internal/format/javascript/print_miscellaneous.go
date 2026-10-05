@@ -12,9 +12,9 @@ func printOptionalToken(path *Path) Doc {
 	}
 	if isCallExpression(current) || isMemberExpression(current) && current.Bool("computed") ||
 		current.Is("OptionalIndexedAccessType") {
-		return concat("?.")
+		return concatIn(path, "?.")
 	}
-	return concat("?")
+	return concatIn(path, "?")
 }
 
 // printDefiniteToken is upstream's printDefiniteToken.
@@ -24,7 +24,7 @@ func printDefiniteToken(path *Path) Doc {
 		key, _ := name.(string)
 		return key == "id" && parent.Is("VariableDeclarator") && parent.Bool("definite")
 	}) {
-		return concat("!")
+		return concatIn(path, "!")
 	}
 	return emptyDoc
 }
@@ -48,7 +48,7 @@ func shouldPrintDeclareToken(path *Path) bool {
 // printDeclareToken is upstream's printDeclareToken.
 func printDeclareToken(path *Path) Doc {
 	if shouldPrintDeclareToken(path) {
-		return concat("declare ")
+		return concatIn(path, "declare ")
 	}
 	return emptyDoc
 }
@@ -62,7 +62,7 @@ func isTsAbstractNode(node Node) bool {
 func printAbstractToken(path *Path) Doc {
 	current := node(path)
 	if current.Truthy("abstract") || isTsAbstractNode(current) {
-		return concat("abstract ")
+		return concatIn(path, "abstract ")
 	}
 	return emptyDoc
 }
@@ -107,7 +107,7 @@ func printIfOrWhileConditionOrWithStatementObject(path *Path, options *Options, 
 	if shouldInlineCondition(current.Child(property)) {
 		return conditionDoc
 	}
-	return group(concat(indent(concat(softline, conditionDoc)), softline))
+	return group(concatIn(path, indent(concatIn(path, softline, conditionDoc)), softline))
 }
 
 func printIfStatementCondition(path *Path, options *Options, print PrintFunc) Doc {
@@ -132,8 +132,7 @@ func printDanglingCommentsInList(path *Path, options *Options, filter func(Node)
 	if hasComment(current, commentDangling|commentLine, filter) {
 		closing = hardline
 	}
-	return concat(
-		indent(concat(softline, printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{Filter: filter}))),
+	return concatIn(path, indent(concatIn(path, softline, printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{Filter: filter}))),
 		closing,
 	)
 }
