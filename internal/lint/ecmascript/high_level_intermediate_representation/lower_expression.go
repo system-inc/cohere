@@ -593,12 +593,17 @@ func (b *builder) lowerObjectLiteral(node *ast.Node) Place {
 			}
 			id := FunctionId(len(b.function.Functions))
 			b.function.Functions = append(b.function.Functions, nested)
+			// A method's name can be computed, `async *[Symbol.asyncIterator]() {}`, and a computed
+			// name has no text: reading it as text panicked every rule that lowers the function, on
+			// TanStack Query's own tests (#zx5xvtg). The key goes through objectPropertyKey as a
+			// property assignment's does, which lowers a computed name's expression after the value,
+			// as React Compiler's BuildHIR lowers the method and then its key.
 			key := ""
-			if property.Name() != nil {
-				key = property.Name().Text()
+			if name := property.Name(); name != nil && name.Kind != ast.KindComputedPropertyName {
+				key = name.Text()
 			}
 			value := b.emit(&ObjectMethod{Key: key, Function: id}, property)
-			properties = append(properties, ObjectProperty{Key: key, Value: value})
+			properties = append(properties, b.objectPropertyKey(property.Name(), value))
 
 		default:
 			value := b.emit(&UnsupportedNode{Node: property, Reason: "object member"}, property)
