@@ -46,10 +46,8 @@ func TestHomePathsFindsAPlantedHomePath(t *testing.T) {
 // count that grew, fails, and so does a count that fell until it is lowered here.
 var knownHomePaths = map[string]int{
 	"internal/differential/parse_test.go":                                                  3,
-	"internal/lint/configuration/live_test.go":                                             1,
 	"internal/lint/ecmascript/comments/guard_helpers_test.go":                              2,
 	"internal/lint/ecmascript/high_level_intermediate_representation/lower_corpus_test.go": 2,
-	"internal/lint/registry/live_wiring_test.go":                                           2,
 	"internal/lint/rules/next/no_before_interactive_script_outside_document_test.go":       4,
 	"internal/lint/rules/nexus/comment_corpus_test.go":                                     1,
 	"internal/lint/rules/nexus/shouting_mask_gate_test.go":                                 1,

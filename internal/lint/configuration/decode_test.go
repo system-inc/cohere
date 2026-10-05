@@ -242,9 +242,9 @@ func TestUnconfiguredIsNotScopedOff(t *testing.T) {
 // TestTheLiveGuardRuleGetsItsOptions is the specific rule that was inert, against the real configuration.
 func TestTheLiveGuardRuleGetsItsOptions(t *testing.T) {
 	t.Parallel()
-	loaded, err := Load(liveConfigPath)
+	loaded, err := Load(liveConfigPath(t))
 	if err != nil {
-		t.Skipf("the live config is not present: %v", err)
+		t.Fatalf("loading the live config: %v", err)
 	}
 
 	elements := loaded.Resolve("libraries/structure/source/api/Fetch.ts").RawOptionsFor("boundary-no-project-import")
