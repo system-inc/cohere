@@ -265,3 +265,14 @@ func (view *programView) Identity() ProgramIdentity {
 	view.live("Identity")
 	return ProgramIdentity{program: view.program}
 }
+
+// FingerprintPath is how a ProgramFingerprint names a file or directory: relative to the program's
+// current directory, so the hash holds when the same tree is checked out somewhere else, and the same
+// across fixtures built in different directories. Reading the current directory is ReadsCompilerOptions,
+// so a rule calling this declares it, which costs nothing: the findings key already hashes the root.
+func FingerprintPath(program Program, path string) string {
+	return tspath.GetRelativePathFromDirectory(program.GetCurrentDirectory(), path, tspath.ComparePathsOptions{
+		UseCaseSensitiveFileNames: program.UseCaseSensitiveFileNames(),
+		CurrentDirectory:          program.GetCurrentDirectory(),
+	})
+}

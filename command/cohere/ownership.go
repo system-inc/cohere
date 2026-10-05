@@ -399,6 +399,15 @@ func withoutYieldedDirectories(enumeration formatfiles.Enumeration) formatfiles.
 		kept = append(kept, fileName)
 	}
 	enumeration.Files = kept
+	keptAdamic := enumeration.Adamic[:0:0]
+	for _, fileName := range enumeration.Adamic {
+		if yieldsFile(yield.Directories, fileName) {
+			enumeration.IgnoredByLayer[nestedProjectsLayer]++
+			continue
+		}
+		keptAdamic = append(keptAdamic, fileName)
+	}
+	enumeration.Adamic = keptAdamic
 	return enumeration
 }
 

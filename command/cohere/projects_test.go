@@ -134,7 +134,7 @@ func TestFormatOnlySkipsASwiftPackageAndNamesTheGap(t *testing.T) {
 		output, err := command.CombinedOutput()
 		var exited *exec.ExitError
 		if errors.As(err, &exited) {
-			return string(output), exited.ExitCode()
+			return string(output), childExitCode(t, exited)
 		} else if err != nil {
 			t.Fatalf("running cohere: %v\n%s", err, output)
 		}

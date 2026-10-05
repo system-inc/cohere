@@ -195,6 +195,9 @@ func uncheckedMarkers(summary runSummary) []string {
 	if gaps.Unread != "" {
 		markers = append(markers, "⚠ "+gaps.Unread)
 	}
+	if gaps.AdamicIgnored > 0 {
+		markers = append(markers, "⚠ "+counted(gaps.AdamicIgnored, ".a file git ignores, not formatted", ".a files git ignores, not formatted"))
+	}
 	if gaps.ModifiedBuild {
 		markers = append(markers, "⚠ built from a modified tree")
 	}
