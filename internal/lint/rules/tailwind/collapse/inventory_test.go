@@ -41,6 +41,8 @@ import (
 //	                                     `functionalUtility`, so the shape had to be written out
 //	                                     instead of extracted, and gaproots_test.go holds all 57
 //	                                     against `candidatesToCss` on a live design system.
+//	valueOperators                   6   the operators the arbitrary-value printer unspaces, the
+//	                                     literal set in `printArbitraryValue` at 4.3.3
 //
 // # Ours, each answering something a reading cannot
 //
@@ -116,6 +118,7 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 		"baseReadings":                       len(baseReadings),
 		"baseStatics":                        len(baseStatics),
 		"GapRootDescriptions":                len(GapRootDescriptions),
+		"valueOperators":                     len(valueOperators),
 	}
 	ours := map[string]int{
 		"baseDescriptors":  len(baseDescriptors),

@@ -1,9 +1,7 @@
 package tailwind
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"sort"
 	"strings"
 	"unicode/utf16"
@@ -28,9 +26,10 @@ type EnforceConsistentClassOrderOptions struct {
 	Attributes []string `json:"attributes"`
 	Callees    []string `json:"callees"`
 	Variables  []string `json:"variables"`
-	// Order is upstream's `order`: `official` (the default) is Tailwind's own order, and `asc` and
-	// `desc` sort the classes as plain strings. `strict` is refused until it is ported.
-	Order classOrderAlgorithm `json:"order"`
+	// Order is upstream's `order`: `official` (the default) is Tailwind's own order, `strict` is that
+	// order regrouped by variant (strictClassOrder), and `asc` and `desc` sort the classes as plain
+	// strings.
+	Order string `json:"order"`
 	// UnknownClassPosition and UnknownClassOrder are upstream's options for the classes Tailwind
 	// ranks null: whether they go at the `start` (the default) or the `end`, and whether among
 	// themselves they keep their order (`preserve`, the default) or sort `asc` or `desc`.
@@ -44,29 +43,9 @@ type EnforceConsistentClassOrderOptions struct {
 	ComponentClassOrder    string `json:"componentClassOrder"`
 }
 
-// classOrderAlgorithm is the `order` option. Upstream's schema admits `strict`, and this refuses it
-// by name rather than accept a value it would then ignore: `strict` groups classes by their printed
-// variants, which needs Tailwind's variant printer, and that is not ported yet. The schema check that
-// runs after decoding refuses every other unknown value.
-type classOrderAlgorithm string
-
-// UnmarshalJSON decodes the option, refusing `strict`.
-func (algorithm *classOrderAlgorithm) UnmarshalJSON(data []byte) error {
-	var value string
-	if err := json.Unmarshal(data, &value); err != nil {
-		return err
-	}
-	if value == "strict" {
-		return fmt.Errorf("order %q is not ported yet, and is refused rather than read as %q: "+
-			"it groups classes by Tailwind's printed variants, which cohere cannot print yet", value, "official")
-	}
-	*algorithm = classOrderAlgorithm(value)
-	return nil
-}
-
 // classOrderOptions is how one literal is ordered, from the rule's options with upstream's defaults.
 type classOrderOptions struct {
-	order             classOrderAlgorithm
+	order             string
 	unknownPosition   string
 	unknownOrder      string
 	componentPosition string
@@ -551,6 +530,9 @@ func orderClasses(classes []string, designSystem DesignSystemResult, ordering cl
 		}
 		return within(ordered[left], ordered[right], leftGroup) < 0
 	})
+	if ordering.order == "strict" {
+		return strictClassOrder(ordered, designSystem.System), true
+	}
 	return ordered, true
 }
 
