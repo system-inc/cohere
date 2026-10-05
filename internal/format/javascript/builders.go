@@ -30,13 +30,47 @@ var (
 // emptyDoc is upstream's "".
 var emptyDoc Doc = doc.Text("")
 
+// internedTexts are the texts the printer writes most, each made a Doc once. A string becomes a Doc by
+// boxing it, which allocates every time; toDoc boxing the same punctuation over and over was 7.6M of the
+// printer's allocations on ahra (#fyw36kf). A text missing here is boxed as before.
+var internedTexts = func() map[string]Doc {
+	texts := map[string]Doc{}
+	for _, text := range []string{
+		"", " ", ",", ", ", ";", ":", ": ", "(", ")", "{", "}", "{ ", " }", "[", "]", "<", ">", ".", "?", "!",
+		"=", " =", " = ", "=>", " =>", "...", "?.", "|", "&", "| ", "& ", " | ", " & ", "+", "-", "*", "/", "%",
+		"@", "#", "'", "\"", "`", "${", "?:", "?: ", "-?", "+?", "<>", "</", "/>", " />", "{}", "()", "[]",
+		"++", "--", "**", "&&", "||", "??", "==", "===", "!=", "!==", "<=", ">=", "+=", "-=", "=>",
+		"export", "export ", "import", "import ", "const", "const ", "let ", "var ", "return", "return ", "async",
+		"async ", "await", "await ", "function", "function ", "new ", "typeof ", "keyof ", "readonly ",
+		"static ", "type ", "interface ", "extends ", " extends ", "implements ", " implements ", "as ", " as ",
+		"from ", " from ", "default", "default ", "case ", "if (", "if", "else", "else ", " else", " else ",
+		"for (", "while (", "do", "switch (", "try", "try ", "catch", " catch", " catch ", "finally", " finally ",
+		"throw ", "break", "continue", "declare ", "abstract ", "private ", "protected ", "public ",
+		"override ", "enum ", "namespace ", "module ", "of ", " of ", "in ", " in ", "instanceof", "delete ",
+		"void ", "yield", "yield ", "yield*", "get ", "set ", "this", "super", "null", "undefined", "true",
+		"false", "is ", " is ", "asserts ", "infer ", "unique ", "satisfies", " satisfies ", "accessor ",
+		"declare", "global", "out ", "in", "out", "new", "class", "class ", "debugger", "with (",
+	} {
+		texts[text] = doc.Text(text)
+	}
+	return texts
+}()
+
+// textDoc is text as a Doc, from internedTexts when it is there.
+func textDoc(text string) Doc {
+	if interned, present := internedTexts[text]; present {
+		return interned
+	}
+	return doc.Text(text)
+}
+
 // toDoc converts a JavaScript-shaped doc value.
 func toDoc(value any) Doc {
 	switch typed := value.(type) {
 	case nil:
 		return emptyDoc
 	case string:
-		return doc.Text(typed)
+		return textDoc(typed)
 	case doc.Doc:
 		return typed
 	case []Doc:

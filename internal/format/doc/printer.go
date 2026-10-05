@@ -3,6 +3,7 @@ package doc
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"unicode/utf16"
 )
 
@@ -134,13 +135,35 @@ func generateIndent(base *indentation, command indentCommand, options Options) *
 	return &indentation{value: value.String(), length: length, queue: queue, root: base.root}
 }
 
+// indentations is one Print's indentations, each built once from its base and command. An indentation is
+// immutable, and one print's options are fixed, so the same base and command always build the same one;
+// building it again for every indent and align the printer met was 3.0M of the JavaScript printer's
+// allocations on ahra (#fyw36kf). Per print rather than global, because the options differ between prints.
+type indentations map[indentKey]*indentation
+
+type indentKey struct {
+	base    *indentation
+	command indentCommand
+}
+
+// generate is generateIndent, from the print's indentations when this base and command were built before.
+func (built indentations) generate(base *indentation, command indentCommand, options Options) *indentation {
+	key := indentKey{base: base, command: command}
+	if known, present := built[key]; present {
+		return known
+	}
+	generated := generateIndent(base, command, options)
+	built[key] = generated
+	return generated
+}
+
 // makeIndent is upstream's makeIndent.
-func makeIndent(base *indentation, options Options) *indentation {
-	return generateIndent(base, indentCommand{kind: indentCommandIndent}, options)
+func makeIndent(base *indentation, options Options, built indentations) *indentation {
+	return built.generate(base, indentCommand{kind: indentCommandIndent}, options)
 }
 
 // makeAlign is upstream's makeAlign.
-func makeAlign(base *indentation, align *Align, options Options) *indentation {
+func makeAlign(base *indentation, align *Align, options Options, built indentations) *indentation {
 	switch align.Kind {
 	case AlignRoot:
 		copied := *base
@@ -152,29 +175,32 @@ func makeAlign(base *indentation, align *Align, options Options) *indentation {
 		if align.String == "" {
 			return base
 		}
-		return generateIndent(base, indentCommand{kind: indentCommandString, string: align.String}, options)
+		return built.generate(base, indentCommand{kind: indentCommandString, string: align.String}, options)
 	default:
 		if align.Width == 0 {
 			return base
 		}
 		if align.Width < 0 {
-			return generateIndent(base, indentCommand{kind: indentCommandDedent}, options)
+			return built.generate(base, indentCommand{kind: indentCommandDedent}, options)
 		}
-		return generateIndent(base, indentCommand{kind: indentCommandWidth, width: align.Width}, options)
+		return built.generate(base, indentCommand{kind: indentCommandWidth, width: align.Width}, options)
 	}
 }
 
-// trimIndentation is upstream's trimIndentation: trailing spaces and tabs only, and their count.
-func trimIndentation(text string) (string, int) {
+// fitsCommands holds fits' command stacks between calls.
+var fitsCommands = sync.Pool{New: func() any { return new([]command) }}
+
+// trailingIndentation is how many spaces and tabs text ends in once appended to text that ended in
+// previous of them: all of text's when text is nothing else, added to previous, and otherwise text's own.
+func trailingIndentation(text string, previous int) int {
 	count := 0
 	for index := len(text) - 1; index >= 0; index-- {
-		if text[index] == ' ' || text[index] == '\t' {
-			count++
-		} else {
-			break
+		if text[index] != ' ' && text[index] != '\t' {
+			return count
 		}
+		count++
 	}
-	return text[:len(text)-count], count
+	return previous + count
 }
 
 // printResult is upstream's PrintResult without cursor tracking.
@@ -183,29 +209,36 @@ func trimIndentation(text string) (string, int) {
 // Upstream needs it for cursor positions. For text it is unobservable: everything settled was settled
 // by a trim, so it ends in a non-space, and a trim reaching past it would remove nothing. A mutation
 // that stopped settling survived 5,000 differential docs, and that is why this comment says so.
+//
+// Both halves are one buffer, with the settled length marked, so settling copies nothing and the unsettled
+// half keeps its memory from line to line: two builders, one reset on every settle, regrew it each line,
+// and were 2.7M of the JavaScript printer's allocations on ahra (#fyw36kf).
 type printResult struct {
-	settled   strings.Builder
-	unsettled strings.Builder
+	buffer  []byte
+	settled int
 }
 
-func (result *printResult) write(text string) { result.unsettled.WriteString(text) }
+func (result *printResult) write(text string) { result.buffer = append(result.buffer, text...) }
 
-func (result *printResult) settle() {
-	result.settled.WriteString(result.unsettled.String())
-	result.unsettled.Reset()
-}
+func (result *printResult) settle() { result.settled = len(result.buffer) }
 
+// trim is upstream's trimIndentation over the unsettled half: its trailing spaces and tabs, and their count.
 func (result *printResult) trim() int {
-	trimmed, count := trimIndentation(result.unsettled.String())
-	result.unsettled.Reset()
-	result.unsettled.WriteString(trimmed)
+	count := 0
+	for index := len(result.buffer) - 1; index >= result.settled; index-- {
+		if result.buffer[index] != ' ' && result.buffer[index] != '\t' {
+			break
+		}
+		count++
+	}
+	result.buffer = result.buffer[:len(result.buffer)-count]
 	result.settle()
 	return count
 }
 
 func (result *printResult) finish() string {
 	result.settle()
-	return result.settled.String()
+	return string(result.buffer)
 }
 
 // command is one entry of the printer's stack.
@@ -224,11 +257,23 @@ type fillProgress struct {
 func (*fillProgress) isDoc() {}
 
 // fits is upstream's fits, printer/printer.js.
+//
+// Upstream keeps the text it measured, for a trim to remove trailing whitespace from. Only the count of that
+// trailing whitespace is ever read, so it is kept instead of the text: the builder was 1.7M of the
+// JavaScript printer's allocations on ahra (#fyw36kf). The command stack comes from a pool for the same
+// reason.
 func fits(next command, rest []command, remainingWidth int, hasLineSuffix bool, groupModes map[*GroupID]mode, mustBeFlat bool) bool {
 	restIndex := len(rest)
 	hasPendingSpace := false
-	commands := []command{next}
-	var output strings.Builder
+	pooled := fitsCommands.Get().(*[]command)
+	commands := append((*pooled)[:0], next)
+	defer func() {
+		*pooled = commands[:0]
+		fitsCommands.Put(pooled)
+	}()
+	// trailing is how many spaces and tabs the text measured so far ends in, which is what upstream's trimIndentation
+	// would remove from it.
+	trailing := 0
 
 	for remainingWidth >= 0 {
 		if len(commands) == 0 {
@@ -247,11 +292,11 @@ func fits(next command, rest []command, remainingWidth int, hasLineSuffix bool, 
 		case Text:
 			if document != "" {
 				if hasPendingSpace {
-					output.WriteString(" ")
+					trailing++
 					remainingWidth--
 					hasPendingSpace = false
 				}
-				output.WriteString(string(document))
+				trailing = trailingIndentation(string(document), trailing)
 				remainingWidth -= StringWidth(string(document))
 			}
 
@@ -280,10 +325,8 @@ func fits(next command, rest []command, remainingWidth int, hasLineSuffix bool, 
 			commands = append(commands, command{mode: current.mode, doc: document.Contents})
 
 		case trimDoc:
-			trimmed, count := trimIndentation(output.String())
-			output.Reset()
-			output.WriteString(trimmed)
-			remainingWidth += count
+			remainingWidth += trailing
+			trailing = 0
 
 		case *Group:
 			if mustBeFlat && document.Break {
@@ -355,6 +398,7 @@ func Print(document Doc, options Options) string {
 	shouldRemeasure := false
 	var lineSuffix []command
 	result := &printResult{}
+	built := indentations{}
 
 	PropagateBreaks(document)
 
@@ -377,10 +421,10 @@ func Print(document Doc, options Options) string {
 			}
 
 		case *Indent:
-			commands = append(commands, command{indent: makeIndent(current.indent, options), mode: current.mode, doc: document.Contents})
+			commands = append(commands, command{indent: makeIndent(current.indent, options, built), mode: current.mode, doc: document.Contents})
 
 		case *Align:
-			commands = append(commands, command{indent: makeAlign(current.indent, document, options), mode: current.mode, doc: document.Contents})
+			commands = append(commands, command{indent: makeAlign(current.indent, document, options, built), mode: current.mode, doc: document.Contents})
 
 		case trimDoc:
 			position -= result.trim()
@@ -473,7 +517,8 @@ func Print(document Doc, options Options) string {
 				}
 			} else {
 				result.trim()
-				result.write("\n" + current.indent.value)
+				result.write("\n")
+				result.write(current.indent.value)
 				position = current.indent.length
 			}
 

@@ -30,6 +30,7 @@ var estreePrinter = &printing.Printer[*estree.Node]{
 	},
 	AvoidAstMutation: true,
 	Embed:            embed,
+	MayHoldEmbed:     holdsTemplateLiteral,
 	TemplateQuasis: func(node Node) ([]Node, bool) {
 		if !node.Is("TemplateLiteral") {
 			return nil, false
@@ -72,7 +73,7 @@ func JSONParser(fileName string) string {
 // format parses, prints and lays out one file. Byte order marks and line endings, main/core.js's part,
 // are normalized by the caller, native.Formatter, once for every printer.
 func format(fileName string, text string, options formatoptions.Options, parser string, textToDoc printing.TextToDoc) (string, error) {
-	document, err := printToDoc(fileName, text, options, parser, "", textToDoc)
+	document, err := printToDoc(fileName, text, options, parser, "", textToDoc, nil)
 	if err != nil {
 		return "", err
 	}
@@ -85,7 +86,8 @@ func format(fileName string, text string, options formatoptions.Options, parser 
 // "json-stringify"; parentParser is the outer file's parser, which upstream sets on every embed.
 func PrintToDoc(fileName string, text string, options formatoptions.Options, parser string, parentParser string,
 	textToDoc printing.TextToDoc) (doc.Doc, error) {
-	document, err := printToDoc(fileName, text, options, parser, parentParser, textToDoc)
+	// The doc is laid out later, by the outer printer, so its tree outlives this call and comes from the heap.
+	document, err := printToDoc(fileName, text, options, parser, parentParser, textToDoc, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -93,8 +95,11 @@ func PrintToDoc(fileName string, text string, options formatoptions.Options, par
 }
 
 // printToDoc parses with the parser and prints the tree to a doc.
+//
+// The tree's nodes come from nodes, or the heap when it is nil. A caller that passes an arena releases it
+// only once the doc is laid out, since the doc is printed from the tree.
 func printToDoc(fileName string, text string, options formatoptions.Options, parser string, parentParser string,
-	textToDoc printing.TextToDoc) (document doc.Doc, err error) {
+	textToDoc printing.TextToDoc, nodes *estree.Arena) (document doc.Doc, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			document, err = nil, fmt.Errorf("formatting %s: %v", fileName, recovered)
@@ -106,9 +111,9 @@ func printToDoc(fileName string, text string, options formatoptions.Options, par
 	printer := estreePrinter
 	switch parser {
 	case "typescript":
-		root, comments, err = estree.ParseTypeScript(fileName, text)
+		root, comments, err = estree.ParseTypeScript(fileName, text, nodes)
 	case "babel":
-		root, comments, err = estree.ParseJavaScript(fileName, text)
+		root, comments, err = estree.ParseJavaScript(fileName, text, nodes)
 	case "json":
 		root, comments, err = estree.ParseJSON(text, true)
 		// main/normalize-format-options.js: the json parser never prints a trailing comma.

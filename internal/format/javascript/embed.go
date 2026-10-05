@@ -66,6 +66,33 @@ func embed(path *Path, options *Options) embedPrint {
 	return createTemplateLiteralPrint(printer.print)
 }
 
+// holdsTemplateLiteral reports whether a TemplateLiteral is reachable from node through its visitor keys:
+// embed answers for nothing else, so a tree without one has no embed to find. It walks the nodes directly,
+// allocating nothing, where the embed walk goes through the path.
+func holdsTemplateLiteral(node *estree.Node) bool {
+	if node == nil {
+		return false
+	}
+	if node.Is("TemplateLiteral") {
+		return true
+	}
+	for _, key := range estree.VisitorKeys(node) {
+		switch child := node.Get(key).(type) {
+		case *estree.Node:
+			if holdsTemplateLiteral(child) {
+				return true
+			}
+		case []*estree.Node:
+			for _, element := range child {
+				if holdsTemplateLiteral(element) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // createTemplateLiteralPrint is upstream's createTemplateLiteralPrint: the printed doc is labelled as
 // an embed, which print/call-arguments.js and print/arrow-function.js read.
 func createTemplateLiteralPrint(print embedPrint) embedPrint {
