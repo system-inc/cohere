@@ -45,19 +45,15 @@ func TestHomePathsFindsAPlantedHomePath(t *testing.T) {
 // while #sycrdr6 moves each corpus behind internal/corpus. It may only shrink: a file not listed, or a
 // count that grew, fails, and so does a count that fell until it is lowered here.
 var knownHomePaths = map[string]int{
-	"internal/differential/parse_test.go":                                                  3,
-	"internal/lint/ecmascript/comments/guard_helpers_test.go":                              2,
-	"internal/lint/ecmascript/high_level_intermediate_representation/lower_corpus_test.go": 2,
-	"internal/lint/rules/next/no_before_interactive_script_outside_document_test.go":       4,
-	"internal/lint/rules/nexus/comment_corpus_test.go":                                     1,
-	"internal/lint/rules/nexus/shouting_mask_gate_test.go":                                 1,
-	"internal/lint/rules/tailwind/class_order_live_test.go":                                1,
-	"internal/lint/rules/tailwind/collapse/framework_utility_test.go":                      2,
-	"internal/lint/rules/tailwind/collapse/theme_test.go":                                  2,
-	"internal/lint/rules/tailwind/collapse/utility_test.go":                                1,
-	"internal/lint/rules/tailwind/design_system_live_walk_test.go":                         1,
-	"internal/lint/rules/tailwind/enforce_consistent_class_order_test.go":                  1,
-	"internal/lint/rules/tailwind/no_unknown_classes_test.go":                              1,
+	"internal/differential/parse_test.go":                                            3,
+	"internal/lint/rules/next/no_before_interactive_script_outside_document_test.go": 4,
+	"internal/lint/rules/tailwind/class_order_live_test.go":                          1,
+	"internal/lint/rules/tailwind/collapse/framework_utility_test.go":                2,
+	"internal/lint/rules/tailwind/collapse/theme_test.go":                            2,
+	"internal/lint/rules/tailwind/collapse/utility_test.go":                          1,
+	"internal/lint/rules/tailwind/design_system_live_walk_test.go":                   1,
+	"internal/lint/rules/tailwind/enforce_consistent_class_order_test.go":            1,
+	"internal/lint/rules/tailwind/no_unknown_classes_test.go":                        1,
 }
 
 // TestNoCohereTestNamesAHomeDirectory holds the module to reading outside code by name (#sycrdr6).

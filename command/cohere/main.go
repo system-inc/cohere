@@ -1332,6 +1332,8 @@ func rebuildGraph(
 	yieldedFiles map[string]struct{},
 ) (*program.Graph, time.Duration, error) {
 	start := time.Now()
+	// The check's stats predate the rewrite. See distrustCheckStats.
+	distrustCheckStats()
 	rebuilt, err := program.Build(program.Options{
 		ConfigFileName:   configFileName,
 		CurrentDirectory: directory,
