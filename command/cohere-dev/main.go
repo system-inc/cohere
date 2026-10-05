@@ -3,6 +3,7 @@
 //	go run ./command/cohere-dev test ./...            every package, through a machine-wide slot
 //	go run ./command/cohere-dev test ./internal/edit  one package, at once
 //	go run ./command/cohere-dev test --fast           the edit loop: all but the landing gate's own (fast.go)
+//	go run ./command/cohere-dev test --full-priority  any of these, not niced, for a timed measurement
 //
 // A whole-module run builds and links seventy-odd test binaries on every core the machine has, and
 // several members starting one together made the machine crawl for all of them. So a run naming ./...
@@ -13,6 +14,9 @@
 // A whole-module run never passes -count=1. Go's test cache skips every package whose inputs did not
 // change, which on a one-file change is most of the module, and -count=1 throws that away. A flaky test
 // is fixed, not re-run around; name its package to re-run it alone.
+//
+// Every run is nice 10, and so is everything it starts, so tests use the cores no one else is using and
+// yield to a person typing. --full-priority keeps the priority the run was started with, for a measurement.
 package main
 
 import (
@@ -35,14 +39,52 @@ const defaultSlots = 1
 
 func main() {
 	if len(os.Args) < 2 || os.Args[1] != "test" {
-		fmt.Fprintln(os.Stderr, "usage: cohere-dev test [go test flags] [packages] | cohere-dev test --fast [go test flags]")
+		fmt.Fprintln(os.Stderr, "usage: cohere-dev test [--full-priority] [go test flags] [packages] | cohere-dev test --fast [--full-priority] [go test flags]")
 		os.Exit(2)
 	}
 	os.Exit(test(os.Args[2:]))
 }
 
+// fullPriorityFlag keeps a run at the priority it was started with, for a timed measurement. Without it a
+// run lowers itself to testNiceness first.
+const fullPriorityFlag = "--full-priority"
+
+// testNiceness is how nice a run makes itself, and so every go command and test binary it starts. Tests
+// compiling and running on every core held the machine at load 168 on 16 cores and made Kirk's typing lag
+// (2026-10-05); at nice 10 they still take every idle cycle and yield to what a person is doing.
+const testNiceness = 10
+
+// nicenessVariable sets another niceness than testNiceness, from 0 to 19, for whoever wants their tests
+// to yield more, and for the test that shows a run is niced whatever priority it was started at.
+const nicenessVariable = "COHERE_DEV_NICENESS"
+
+// niceness is how nice a run makes itself: testNiceness, or what nicenessVariable says.
+func niceness() (int, error) {
+	value := os.Getenv(nicenessVariable)
+	if value == "" {
+		return testNiceness, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 || parsed > 19 {
+		return 0, fmt.Errorf("%s is %q, want a whole number from 0 to 19", nicenessVariable, value)
+	}
+	return parsed, nil
+}
+
 // test runs go test with the arguments given, through a slot when it names the whole module.
 func test(arguments []string) int {
+	arguments, fullPriority := withoutFlag(arguments, fullPriorityFlag)
+	if !fullPriority {
+		level, err := niceness()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+			return 2
+		}
+		if err := lowerPriority(level); err != nil {
+			fmt.Fprintf(os.Stderr, "cohere-dev: lowering this run's priority: %v\n", err)
+			return 1
+		}
+	}
 	if len(arguments) > 0 && arguments[0] == "--fast" {
 		return fastTest(arguments[1:])
 	}
@@ -129,6 +171,21 @@ func test(arguments []string) int {
 		}
 		time.Sleep(time.Second)
 	}
+}
+
+// withoutFlag returns the arguments with every copy of flag removed, and whether there was one, so a flag of
+// this wrapper's never reaches go test.
+func withoutFlag(arguments []string, flag string) ([]string, bool) {
+	kept := make([]string, 0, len(arguments))
+	found := false
+	for _, argument := range arguments {
+		if argument == flag {
+			found = true
+			continue
+		}
+		kept = append(kept, argument)
+	}
+	return kept, found
 }
 
 // wholeModule reports whether the arguments name every package, the run that takes a slot.

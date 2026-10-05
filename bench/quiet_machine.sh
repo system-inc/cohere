@@ -2,6 +2,10 @@
 # The quiet-machine benchmark: how long `cohere` takes on a real project, cold, on an unchanged replay,
 # and after a one-file edit, measured so that the number means what it says.
 #
+# It runs at the priority it is started with, never niced as the house's test and build runs are
+# (cohere-dev test, #2qc6j8g): it measures, and a niced run's times say how busy the machine was rather
+# than how fast cohere is. Run it only in a quiet window, where nothing else is competing.
+#
 # It measures a copy of the project pinned to its commits, never the project itself, with one cohere
 # engine for every run. pinned.zsh, which it shares with rivals.sh, says how and why.
 #
