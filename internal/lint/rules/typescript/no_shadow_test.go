@@ -7,40 +7,11 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// TestNoShadowFires runs every invalid case from upstream corpus that carries no options key.
-//
-// RunTyped rather than Run, and not because the rule asks a type question. The locals tables this
-// rule reads are populated by the binder, and the binder runs with the program, so under the plain
-// harness every table is empty and every case here would pass vacuously clean while asserting the
-// opposite. TestNoShadowNeedsTheTypedHarness pins that below.
-func TestNoShadowFires(t *testing.T) {
-	t.Parallel()
-
-	for _, testCase := range noShadowFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoShadow, "file.ts", testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.messages...)
-		})
-	}
-}
-
-// TestNoShadowStaysSilent runs every valid case from the same corpus slice.
-//
-// These are the false positives upstream already thought about, and they are the half that catches
-// a port reporting too much. Several pass here for a reason upstream needs an option for: the
-// binder MERGES a type and a value of the same name into one symbol, so there is no pair to compare.
-func TestNoShadowStaysSilent(t *testing.T) {
-	t.Parallel()
-
-	for _, testCase := range noShadowSilentCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoShadow, "file.ts", testCase.source)
-			rule_testing.ExpectClean(t, result)
-		})
-	}
-}
+// Upstream's own rows, all of them, replay in no_shadow_corpus_test.go. The tests here pin shapes
+// the corpus does not write, each measured against the installed rule. Every one runs under RunTyped
+// rather than Run, and not because the rule asks a type question: the locals tables this rule reads
+// are populated by the binder, and the binder runs with the program, so under the plain harness every
+// table is empty and every case would pass vacuously clean. TestNoShadowNeedsTheTypedHarness pins it.
 
 // TestNoShadowDeclaresTheTypeChecker pins the declaration itself.
 //
