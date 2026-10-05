@@ -415,3 +415,54 @@ func TestALibraryIsFormattedFromItsOwnRootAndReadFromItsProject(t *testing.T) {
 		}
 	}
 }
+
+// TestAFreshClonesLibrariesGetTheirCacheAtStartup: a checkout where nobody has run cohere inside a library, a
+// fresh clone or a CI machine, kept no cache there, so every check formatted every library file, every run
+// (#v0etgwx). The run's start now makes the cache, only in a library whose own .gitignore ignores it, and the
+// next check reads that library's record. The control is the inner library, whose .gitignore does not ignore
+// .cache: it gets no directory, and every one of its files is still checked.
+func TestAFreshClonesLibrariesGetTheirCacheAtStartup(t *testing.T) {
+	t.Parallel()
+	root := nestedTree(t)
+	writeTree(t, root, map[string]string{"library/.gitignore": "ignored/\n.cache/\n"})
+	library := filepath.Join(root, "library")
+	inner := filepath.Join(library, "inner")
+	engine := prettierLike()
+	engine.enumerate = func(walkRoot string) (formatfiles.Enumeration, error) {
+		return formatfiles.Enumerate(walkRoot, engine.Handles)
+	}
+
+	prepareNestedCacheDirectories(root)
+	if information, err := os.Stat(cacheDirectory(library)); err != nil || !information.IsDir() {
+		t.Fatalf("the library, whose .gitignore ignores .cache, has no cache after the run's start (%v)", err)
+	}
+	if _, err := os.Stat(cacheDirectory(inner)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("the inner library, whose .gitignore does not ignore .cache, got a cache directory (%v)", err)
+	}
+
+	checked := func(label string) int {
+		t.Helper()
+		result, err := checkNestedRepositories(engine, root, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(result.Drift) != 2 {
+			t.Fatalf("%s: %d files drift, want Thing.ts and Deep.ts", label, len(result.Drift))
+		}
+		return result.Checked
+	}
+	// The first check formats all four and records the library's. The second takes the library's clean file
+	// on its record's word; its misformatted file and the inner library's two are checked again.
+	if got := checked("the first check"); got != 4 {
+		t.Fatalf("the first check formatted %d files, want 4", got)
+	}
+	if got := checked("the second check"); got != 3 {
+		t.Fatalf("the second check formatted %d files, want 3: the library's record was not read", got)
+	}
+
+	// Run again, the start leaves an existing cache as it is.
+	prepareNestedCacheDirectories(root)
+	if got := checked("the third check"); got != 3 {
+		t.Fatalf("after a second start the check formatted %d files, want 3", got)
+	}
+}
