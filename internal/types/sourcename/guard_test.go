@@ -24,17 +24,6 @@ var tsDecisionsAllowed = map[string]string{
 	"internal/edit/write.go: .ts":              "TypeScriptParsable reads its list with sourcename.TreatedAs(fileName)",
 	"internal/format/prettier/handles.go: .ts": "parserFor reads its table with sourcename.TreatedAs(fileName)",
 
-	// Pending: lint converts its rule sites under #kwt1htp (@system_cohere_lint_sets).
-	"internal/lint/rules/base/consistency_no_bare_throw.go: .test.ts":                      "pending #kwt1htp",
-	"internal/lint/rules/nexus/localization_no_untranslated_value.go: .ts":                 "pending #kwt1htp",
-	"internal/lint/rules/nexus/localization_no_untranslated_value.go: Translations.ts":     "pending #kwt1htp",
-	"internal/lint/rules/nexus/localization_no_untranslated_value.go: TranslationsType.ts": "pending #kwt1htp",
-	"internal/lint/rules/nexus/localization_no_untranslated_value.go: Interface.ts":        "pending #kwt1htp",
-	"internal/lint/rules/structure/boundary_no_project_theme_value.go: Theme.ts":           "pending #kwt1htp",
-	"internal/lint/rules/structure/network_require_hook_request_suffix.go: .ts":            "pending #kwt1htp",
-	"internal/lint/rules/tailwind/no_physical_direction.go: .ts":                           "pending #kwt1htp",
-	"internal/lint/rules/typescript/no_explicit_any.go: .ts":                               "pending #kwt1htp",
-
 	// A tool's disk walk with no program to ask, so it cannot tell Adamic source from a static library.
 	"command/formatter_comparison/main.go: .ts":                        "the comparison tool's corpus walk, which has no program",
 	"internal/lint/rules/tailwind/tools/generate_variant/main.go: .ts": "the variant generator's walk of a Tailwind consumer, which has no program",

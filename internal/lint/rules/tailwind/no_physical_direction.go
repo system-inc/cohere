@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/types/sourcename"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -131,8 +132,9 @@ var NoPhysicalDirection = rule.Rule{
 		if ctx.SourceFile == nil {
 			return nil
 		}
+		// An Adamic `.a` file is checked as the `.ts` it is (#kwt1htp).
 		fileName := ctx.SourceFile.FileName()
-		if !strings.HasSuffix(fileName, ".ts") && !strings.HasSuffix(fileName, ".tsx") {
+		if !strings.HasSuffix(sourcename.TreatedAs(fileName), ".ts") && !strings.HasSuffix(fileName, ".tsx") {
 			return nil
 		}
 

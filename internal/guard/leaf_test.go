@@ -23,6 +23,10 @@ var allowedRuleImports = map[string]bool{
 	// three warm rounds each under the same load: editing a rule that imports it rebuilds in 1.13 to
 	// 1.25s, editing one that does not in 1.21 to 1.23s, and editing policy itself in about 0.2s.
 	"github.com/system-inc/cohere/policy": true,
+	// How a source file's name reads to a TypeScript decision: an Adamic `.a` name as `.ts` (#6mhafvb).
+	// Every rule that decides on a name's `.ts` ending asks it (#kwt1htp), and a guard of its own holds
+	// them to it. It imports only `strings`, so it is a leaf itself and costs a rule edit nothing.
+	"github.com/system-inc/cohere/internal/types/sourcename": true,
 }
 
 // allowedRuleImportPrefixes are subtrees a rule package may depend on wholesale.

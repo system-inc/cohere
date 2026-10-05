@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/types/sourcename"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -196,7 +197,8 @@ func consistencyNoBareThrowFileIsExempt(fileName string) bool {
 			return true
 		}
 	}
-	if strings.HasSuffix(fileName, ".test.ts") {
+	// `Dog.test.a`, Adamic's test file, is one too (#kwt1htp).
+	if strings.HasSuffix(sourcename.TreatedAs(fileName), ".test.ts") {
 		return true
 	}
 	for _, testPath := range consistencyNoBareThrowTestPaths {

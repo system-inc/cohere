@@ -273,7 +273,8 @@
         },
         {
             "files": [
-                "**/*.test.ts"
+                "**/*.test.ts",
+                "**/*.test.a"
             ],
             "rules": {
                 "no-use-before-define": [
