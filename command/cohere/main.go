@@ -196,7 +196,11 @@ func run() error {
 	// A root holding more than one project, TypeScript and Swift side by side or nested, checks each with
 	// its own engine and reports them as one (#f9nftxz). One project is checked here, as it always was.
 	if discoveryApplies(given, flag.Args()) {
-		exitCode, checked, err := checkDiscoveredProjects(location, locateError, workingDirectory)
+		namedLintConfig := ""
+		if given["lint-config"] {
+			namedLintConfig = absoluteFrom(workingDirectory, *lintConfigFileName)
+		}
+		exitCode, checked, err := checkDiscoveredProjects(location, locateError, workingDirectory, namedLintConfig)
 		if err != nil {
 			return err
 		}
@@ -471,6 +475,12 @@ func run() error {
 		startFormatWalkAhead(formatter, writeRepositoryRoot(location.ArgumentBase, location.Root))
 	}
 
+	// What this run leaves to nearer projects, when it is one project of several (see ownership.go).
+	yield, err := activeProjectYield()
+	if err != nil {
+		return err
+	}
+
 	// Under --timing the build says what it was made of, not only how long it took (#cazsft3).
 	var graphTiming *program.GraphTiming
 	if *showTiming {
@@ -498,6 +508,7 @@ func run() error {
 			Inputs:           runCacheInputs,
 			ContentPack:      contentPack,
 			Timing:           graphTiming,
+			Yielded:          yield.yieldedFiles(),
 		})
 		if err != nil {
 			// A program that fails to build is a loud failure and never an empty result. An empty file list
@@ -600,6 +611,13 @@ func run() error {
 				len(projectFiles), lintScope.RequestDescription,
 			)
 		}
+	}
+
+	// A file the tsconfig includes and a nearer one owns is that one's run's to report, so this one's count
+	// says where the rest went (see ownership.go).
+	if graph != nil && graph.YieldedFiles > 0 {
+		fmt.Fprintf(accountOutput(invocationOutput(os.Stdout)),
+			"left %d files the tsconfig includes to the nearer tsconfigs that own them, whose runs check them\n", graph.YieldedFiles)
 	}
 
 	if graphTiming != nil && graph != nil {
@@ -915,7 +933,7 @@ func run() error {
 		// longer exists — which is the same stale-read corruption the edit engine refuses internally,
 		// one level up.
 		if mutate && fixSummary.FilesChanged > 0 && (runTypes || runLint) {
-			rebuiltGraph, rebuildDuration, err := rebuildGraph(location.ConfigFileName, location.Root, *singleThreaded, lintConfig)
+			rebuiltGraph, rebuildDuration, err := rebuildGraph(location.ConfigFileName, location.Root, *singleThreaded, lintConfig, yield.yieldedFiles())
 			if err != nil {
 				report.markRemainingNotReachedFor(phaseFix, fmt.Sprintf("the graph could not be rebuilt after fixing: %v", err), unusedRequest)
 				writeRunEnd(report, os.Stdout)
@@ -1016,10 +1034,20 @@ func run() error {
 		//
 		// Bailing here is only honest because the phase line says lint did not run. Without it, a
 		// bailed run and a clean lint print the same absence of findings.
-		if len(typeDiagnostics) > 0 && runLint {
+		//
+		// Only source diagnostics stop it. One about the compiler options, `baseUrl` removed in TypeScript
+		// 7 say, is still counted in the verdict above, but it does not make the semantics wrong; where it
+		// does, the source fails to type-check and that stops lint. See program.IsOptionsDiagnostic.
+		sourceDiagnostics := 0
+		for _, diagnostic := range typeDiagnostics {
+			if !graph.IsOptionsDiagnostic(diagnostic) {
+				sourceDiagnostics++
+			}
+		}
+		if sourceDiagnostics > 0 && runLint {
 			report.markRemainingNotReachedFor(
 				phaseTypes,
-				fmt.Sprintf("%d type diagnostics — lint findings against wrong semantics are noise", len(typeDiagnostics)),
+				fmt.Sprintf("%d type diagnostics — lint findings against wrong semantics are noise", sourceDiagnostics),
 				unusedRequest,
 			)
 			// Lint will not report, but the fix phase walked the same rules, and its skips are the ones lint
@@ -1213,6 +1241,7 @@ func rebuildGraph(
 	directory string,
 	singleThreaded bool,
 	lintConfig *configuration.Config,
+	yieldedFiles map[string]struct{},
 ) (*program.Graph, time.Duration, error) {
 	start := time.Now()
 	rebuilt, err := program.Build(program.Options{
@@ -1220,6 +1249,7 @@ func rebuildGraph(
 		CurrentDirectory: directory,
 		SingleThreaded:   singleThreaded,
 		ContentPack:      openContentPack(directory),
+		Yielded:          yieldedFiles,
 	})
 	if err != nil {
 		return nil, time.Since(start), err

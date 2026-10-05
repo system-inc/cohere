@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -99,6 +100,10 @@ type Graph struct {
 	// complete there. ProjectFiles returns it rather than recomputing, so the check that every named
 	// file made it into the program happens where a failure can be returned instead of panicked.
 	projectFiles []*ast.SourceFile
+
+	// YieldedFiles is how many files the tsconfig named that a nearer one owns, left out of ProjectFiles.
+	// See Options.Yielded.
+	YieldedFiles int
 
 	// typeGraphOnce and typeGraphParts hold typeGraph's answer, computed once: the type and the shape
 	// fingerprints both read it, and the program it describes never changes after Build.
@@ -203,6 +208,12 @@ type Options struct {
 	// that builds its fixture from a map. The bundled lib files are laid over it as over the real disk.
 	// Nil reads the real disk, as before.
 	FileSystem vfs.FS
+
+	// Yielded is files this tsconfig includes that a nearer one owns, by absolute path: they stay in the
+	// program, so every type question about them is answered, and leave ProjectFiles, so no phase lints
+	// them or reports their diagnostics here. Nil yields nothing. See ReadProjectConfig, and discovery's
+	// ownership in the command.
+	Yielded map[string]struct{}
 }
 
 // Build resolves a tsconfig and constructs the program and its checkers.
@@ -245,7 +256,25 @@ func Build(options Options) (*Graph, error) {
 	case rootsUnmatched:
 		return nil, errors.New(projectFilesMismatchMessage(len(graph.Config.FileNames()), len(graph.projectFiles)))
 	}
+	// After verifying, which holds the program to every file the config named, yielded ones included.
+	graph.yield(options.Yielded)
 	return graph, nil
+}
+
+// yield takes the files a nearer tsconfig owns out of ProjectFiles, and counts them.
+func (g *Graph) yield(yielded map[string]struct{}) {
+	if len(yielded) == 0 {
+		return
+	}
+	kept := g.projectFiles[:0:0]
+	for _, sourceFile := range g.projectFiles {
+		if _, isYielded := yielded[filepath.Clean(filepath.FromSlash(sourceFile.FileName()))]; isYielded {
+			g.YieldedFiles++
+			continue
+		}
+		kept = append(kept, sourceFile)
+	}
+	g.projectFiles = kept
 }
 
 // timedVerify is verifyProjectFiles against the disk, timed when the build is. A build over another
@@ -447,7 +476,11 @@ func buildOnce(options Options) (*Graph, error) {
 	// GetConfigFileParsingDiagnostics entry. Checking only the slice — which is what reading the
 	// signature suggests — means a config with a typo builds a program against silently wrong options
 	// and reports whatever that produces as truth.
-	if configFileDiagnostics := config.GetConfigFileParsingDiagnostics(); len(configFileDiagnostics) > 0 {
+	//
+	// Except a diagnostic about one option's name or value, an option TypeScript 7 no longer knows above
+	// all: the graph builds over it, and it is reported with the program's own diagnostics (they include
+	// the config's), so the options are never silently wrong. See configParsingOptionCodes.
+	if configFileDiagnostics := config.GetConfigFileParsingDiagnostics(); len(configFileDiagnostics) > 0 && !onlyOptionValueDiagnostics(configFileDiagnostics) {
 		return nil, fmt.Errorf("reading %s: %w", configFileName, joinDiagnostics(configFileDiagnostics))
 	}
 

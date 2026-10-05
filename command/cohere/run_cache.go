@@ -226,6 +226,9 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		"tsconfig="+location.ConfigFileName,
 		"lint-config="+location.LintConfigFileName,
 		fmt.Sprintf("color=%t", activeOutput.Style.color),
+		// What the run leaves to nearer projects changes what it reports, and it arrives by a variable the
+		// arguments do not show. See ownership.go.
+		"yield="+activeProjectYieldFingerprint(),
 	)
 	if err != nil {
 		return nil

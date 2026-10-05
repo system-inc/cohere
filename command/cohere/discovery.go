@@ -47,6 +47,10 @@ type discoveredProject struct {
 	// root itself.
 	Directory string
 	Engine    projectEngine
+
+	// ConfigFile is a TypeScript project's tsconfig when it is not the tsconfig.json in Directory: one a
+	// solution root references by another name, such as Vite's tsconfig.app.json. Empty for the rest.
+	ConfigFile string
 }
 
 // discovery is everything one walk found, including what it passed over and why.
@@ -70,6 +74,9 @@ type discovery struct {
 	// and fixture directories, none of them entered.
 	Ignored        int
 	NeverDescended int
+
+	// Ownership is what reading the TypeScript projects decided. See ownership.go.
+	Ownership ownership
 }
 
 // ignoreScope is what discovery asks of the gitignore matcher for one directory: internal/gitignore's
@@ -293,17 +300,26 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		return discovery{}, firstError
 	}
 
-	// Parents before children and TypeScript before Swift in one directory, whatever order the reads
-	// finished in, so the report reads the same on every run.
-	sort.Slice(found.Projects, func(left, right int) bool {
-		if found.Projects[left].Directory != found.Projects[right].Directory {
-			return pathBefore(found.Projects[left].Directory, found.Projects[right].Directory)
-		}
-		return found.Projects[left].Engine == engineTypeScript && found.Projects[right].Engine == engineSwift
-	})
+	found.sortProjects()
 	sort.Strings(found.Refused)
 	sort.Strings(found.NestedRepositories)
 	return found, nil
+}
+
+// sortProjects puts parents before children, TypeScript before Swift in one directory, and a directory's
+// tsconfig.json before its other tsconfigs, whatever order the reads finished in, so the report reads the
+// same on every run.
+func (found *discovery) sortProjects() {
+	sort.SliceStable(found.Projects, func(left, right int) bool {
+		leftProject, rightProject := found.Projects[left], found.Projects[right]
+		if leftProject.Directory != rightProject.Directory {
+			return pathBefore(leftProject.Directory, rightProject.Directory)
+		}
+		if leftProject.Engine != rightProject.Engine {
+			return leftProject.Engine == engineTypeScript
+		}
+		return leftProject.ConfigFile < rightProject.ConfigFile
+	})
 }
 
 // discoveryParallelism is how many directories discovery reads at once.

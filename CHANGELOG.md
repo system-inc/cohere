@@ -40,6 +40,14 @@ chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
   program and Swift package with its own engine, in parallel, in one report whose exit code is the worst
   of theirs. Finding them never enters what `.gitignore` ignores, `node_modules`, `.build`, `.cache`,
   `testdata` or a nested repository. `--directory` or a path still narrows the run to one project.
+  `--lint-config` doesn't narrow it. Each file is checked once, by the nearest tsconfig that includes
+  it, and formatted once, by the project whose directory holds it. A solution tsconfig (`"files": []`
+  with `references`) runs what it references, so a root that covers only config files, one with no
+  tsconfig at all, and a solution root each check every project below them.
+- A diagnostic about the compiler options, such as TS5102 for `baseUrl` (removed in TypeScript 7) or
+  TS5023 for an option TypeScript 7 doesn't know, is reported and fails the run, but it no longer stops
+  lint. Only a type error in source does. An unknown option, or an option's value of the wrong type or
+  outside its values, no longer refuses the build.
 - `--json` prints newline-delimited JSON for a program to read, a line per finding and per rewritten file
   and a summary last, described by `schema/CohereOutput.schema.json`.
 
