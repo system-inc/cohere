@@ -7,8 +7,10 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
@@ -696,6 +698,79 @@ func TestNoHtmlLinkForPagesFingerprintsTheConfiguredPagesDirectory(t *testing.T)
 			t.Errorf("the settings %q and %q fingerprint one tree alike, though they read different pages", earlier, option)
 		}
 		fingerprints[fingerprint] = option
+	}
+}
+
+// countingProgram is a Program whose file system counts the existence checks asked of it, by path.
+type countingProgram struct {
+	rule.Program
+	fileSystem *countingFileSystem
+}
+
+func (program countingProgram) FS() vfs.FS { return program.fileSystem }
+
+// countingFileSystem counts DirectoryExists calls by path. A route model build asks each candidate
+// directory once, so the count for one of them is how many builds there were.
+type countingFileSystem struct {
+	vfs.FS
+	mutex  sync.Mutex
+	checks map[string]int
+}
+
+func (fileSystem *countingFileSystem) DirectoryExists(path string) bool {
+	fileSystem.mutex.Lock()
+	fileSystem.checks[path]++
+	fileSystem.mutex.Unlock()
+	return fileSystem.FS.DirectoryExists(path)
+}
+
+// Not parallel: the route models are one process-wide slot keyed on the program, and a parallel test
+// building another program's model would empty it between these calls and count a second build that
+// was not this test's.
+//
+// The walk takes a rule's program fingerprint on every worker that serves a selection, so several
+// workers ask at once (#s9k38p3). They must all get one answer from one build of the route model, which
+// reads the disk: sixteen goroutines asking together build it once.
+func TestNoHtmlLinkForPagesFingerprintsOnSeveralWorkersFromOneBuild(t *testing.T) {
+	const workers = 16
+	var fingerprints [workers][sha256.Size]byte
+	var fileSystem *countingFileSystem
+	probe := NoHtmlLinkForPages
+	probe.Run = func(ctx rule.Context, options any) rule.Listeners {
+		fileSystem = &countingFileSystem{FS: ctx.Program.FS(), checks: map[string]int{}}
+		program := countingProgram{Program: ctx.Program, fileSystem: fileSystem}
+		var wait sync.WaitGroup
+		for worker := range workers {
+			wait.Add(1)
+			go func() {
+				defer wait.Done()
+				fingerprints[worker] = NoHtmlLinkForPages.ProgramFingerprint(program, nil)
+			}()
+		}
+		wait.Wait()
+		return nil
+	}
+	rule_testing.RunTypedFiles(t, probe, htmlLinkTree(nil, "pages/index.tsx", "pages/about.tsx", "app/page.tsx"), "foo.tsx")
+
+	if fileSystem == nil {
+		t.Fatal("the probe never ran, so nothing was asked")
+	}
+	builds := 0
+	for path, count := range fileSystem.checks {
+		if filepath.Base(path) == "pages" && filepath.Base(filepath.Dir(path)) != "src" {
+			builds = count
+		}
+	}
+	if builds != 1 {
+		t.Errorf("%d workers asking at once built the route model %d times, want once (existence checks %v)", workers, builds, fileSystem.checks)
+	}
+	for worker := 1; worker < workers; worker++ {
+		if fingerprints[worker] != fingerprints[0] {
+			t.Fatalf("worker %d got a different fingerprint from worker 0 for one program", worker)
+		}
+	}
+	if fingerprints[0] == ([sha256.Size]byte{}) {
+		t.Fatal("no fingerprint was read")
 	}
 }
 

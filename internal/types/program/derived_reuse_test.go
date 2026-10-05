@@ -281,9 +281,14 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(t *testing.T) {
 			var recorded *program.LintCache
 			walk := func(cached bool) (program.Result, *sync.Map) {
 				t.Helper()
-				graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+				// Four checkers, so the walk runs on several workers and each takes its selections' fingerprints at
+				// once, which is the case -race has to see.
+				graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), Checkers: 4})
 				if err != nil {
 					t.Fatal(err)
+				}
+				if graph.Workers() < 2 {
+					t.Fatalf("the walk runs on %d worker, so no two fingerprints are ever taken at once", graph.Workers())
 				}
 				graph.LintConfig, graph.RuleOptions = config, registry
 				runs := &sync.Map{}
