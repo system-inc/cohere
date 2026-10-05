@@ -90,3 +90,11 @@ chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
   `foo() || (x = 0)` or `y = x = 0`, is no longer taken for one that initializes, and under
   `ignoreReadBeforeAssign` the declaration's own name no longer counts as a read, so `let x; x = 0;`
   reports there too.
+- `no-useless-backreference` reports where ESLint does and with its ids (`nested`, `disjunctive`,
+  `forward`, `backward`, `intoNegativeLookaround`): at the whole regex literal, or the whole `RegExp`
+  call, rather than at the backreference, which the message names. A call is found as ESLint's reference
+  tracker finds it, so a local named `RegExp` is not the global, and an alias or `globalThis.RegExp` is.
+  The pattern and flags are read as constants are, a `const` or never-written binding's value included,
+  and flags that cannot be read count as none. Every regex literal is checked under its own flags, one
+  passed to `RegExp` too. A named reference to a duplicated group reports only when every group of that
+  name is out of its reach.

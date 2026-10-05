@@ -297,3 +297,57 @@ func TestConstantString(t *testing.T) {
 		}
 	}
 }
+
+// TestConstantStringIn pins getStringIfConstant's reading with a scope: a binding counts when it has one
+// declaration naming it alone, and is `const` or never written after its initializer. Each case
+// evaluates the argument of `probe(...)`, and every answer is the installed eslint-utils 4.10.1's,
+// read by running its getStringIfConstant with the scope over the same code under @typescript-eslint/parser.
+func TestConstantStringIn(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		code     string
+		want     string
+		constant bool
+	}{
+		{`const a = 'x'; probe(a);`, "x", true},
+		{`let a = 'x'; probe(a);`, "x", true},
+		{`var a = 'x'; probe(a);`, "x", true},
+		{`const a = 'x'; function f() { probe(a); }`, "x", true},
+		{`const a = 'x', b = a + 'y'; probe(b);`, "xy", true},
+		{"const a = 'x'; probe(`${a}y`);", "xy", true},
+		{`probe(/a\1/g);`, `/a\1/g`, true},
+		{`const a = /x/; probe(a + '');`, "/x/", true},
+		{`let a = 'x'; a = 'y'; probe(a);`, "", false},
+		{`let a = 'x'; function g() { a = 'z'; } probe(a);`, "", false},
+		{`let a = 'x'; [a] = ['y']; probe(a);`, "", false},
+		{`let a = 'x'; function g() { let a = 'q'; a = 'z'; } probe(a);`, "x", true},
+		{`let a; a = 'x'; probe(a);`, "", false},
+		{`const {a} = {a: 'x'}; probe(a);`, "", false},
+		{`function f(a = 'x') { probe(a); }`, "", false},
+		{`const a = b, b = a; probe(a);`, "", false},
+		{`probe(undeclared);`, "", false},
+	}
+	for _, testCase := range cases {
+		var got string
+		var constant bool
+		rule_testing.RunTyped(t, rule.Rule{
+			Name:             "constant-in-probe",
+			NeedsTypeChecker: true,
+			Run: func(ctx rule.Context, options any) rule.Listeners {
+				return rule.Listeners{
+					ast.KindCallExpression: func(node *ast.Node) {
+						call := node.AsCallExpression()
+						if call.Expression.Text() != "probe" {
+							return
+						}
+						got, constant = reference.ConstantStringIn(ctx, call.Arguments.Nodes[0])
+					},
+				}
+			},
+		}, "input.ts", testCase.code)
+		if constant != testCase.constant || got != testCase.want {
+			t.Errorf("%s evaluated to %q (%v), want %q (%v)", testCase.code, got, constant, testCase.want, testCase.constant)
+		}
+	}
+}

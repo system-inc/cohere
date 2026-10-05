@@ -5,8 +5,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/literal"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -30,25 +29,22 @@ import (
 //
 // # Five ways a group cannot have run, and they are five findings
 //
-// Upstream emits five different sentences and this port carries five ids, because the kind is the
-// diagnosis rather than decoration. A port collapsing them to one id passes a fixture that asserts
-// only that something fired, while calling a different-alternative case a forward reference.
+// It reports five ids, ESLint's, since the kind is the diagnosis rather than decoration. A port collapsing
+// them to one id passes a fixture that asserts only that something fired, while calling a
+// different-alternative case a forward reference.
 //
-//	inside its own group      /(a\1)/       the group is still open, so it has captured nothing
-//	another alternative       /(a|\1b)/     only one branch runs, so the other never captured
-//	before its group          /\1(a)/       matching is left to right and the group has not run
-//	after its group, behind   /(?<=(a)\1)b/ a lookbehind matches right to left, so this is early
-//	into a negative lookaround /\1(?!(a))/  the group only runs on a path that fails
+//	nested                  /(a\1)/       the group is still open, so it has captured nothing
+//	disjunctive             /(a|\1b)/     only one branch runs, so the other never captured
+//	forward                 /\1(a)/       matching is left to right and the group has not run
+//	backward                /(?<=(a)\1)b/ a lookbehind matches right to left, so this is early
+//	intoNegativeLookaround  /\1(?!(a))/   the group only runs on a path that fails
 //
-// The middle two are mirror images and the naming upstream chose for them is inverted relative to
-// ESLint's: oxc's `Problem::Forward` is the lookbehind case and its `Problem::Backward` is the
-// ordinary left-to-right forward reference. The ids here describe the geometry instead, so neither
-// convention has to be remembered to read a finding.
+// oxc names the middle pair the other way round: its `Problem::Forward` is the lookbehind case. The
+// ids here are ESLint's (#jjfa7qb), where forward is the ordinary left-to-right case.
 //
-// Upstream's own doc comment gets this pair wrong. It lists `/(?<=\1(a))b/` as incorrect code and
-// again as the `Problem::Forward` illustration, and that exact pattern is in its **pass** vector,
-// correctly: a lookbehind matches right to left, so the group is reached before the reference and
-// has captured. The corpus is right and the prose is wrong, so the corpus is what this follows.
+// oxc's doc comment also lists `/(?<=\1(a))b/` as incorrect, and that exact pattern is a pass case in
+// both corpora, correctly: a lookbehind matches right to left, so the group is reached before the
+// reference and has captured.
 //
 // # Why this is not built on regexpattern.Walk
 //
@@ -64,143 +60,70 @@ import (
 // `ClassEnd` handles v-flag nesting and `\q{...}`, which is what makes the two class cases in the
 // corpus come out right without a second scanner.
 //
-// # Where it diverges from upstream, deliberately
+// # Where a finding points, and which calls are read
 //
-// Upstream declines a `RegExp` that is locally shadowed: `function foo(RegExp) { new
-// RegExp('\\1(a)'); }` is one of its pass cases. Answering that is name resolution rather than a
-// property of the enclosing construct, so it needs the checker, and `no-new-native-nonconstructor`
-// is the shipped rule that establishes there is no structural answer. This rule does not take the
-// checker, so five of upstream's pass cases report here. The divergence can only fire on code that
-// has redefined `RegExp`, which is confusing for a second reason. Rather than dropping those five
-// cases quietly, `TestNoUselessBackreferenceReportsAShadowedRegExp` asserts the reporting, so the
-// disagreement is on the record and a later change toward parity fails loudly.
+// Each finding names the whole regex literal, or the whole `RegExp(...)` or `new RegExp(...)` call,
+// as ESLint reports it (#jjfa7qb). The message names the backreference and the group, so pointing at
+// the node loses nothing a reader needs, and it keeps one place per pattern however many references
+// in it are useless.
+//
+// Every regex literal is checked under its own flags, including one passed to `RegExp`. The calls are
+// found the way ESLint finds them, through the shelf's port of eslint-utils' ReferenceTracker: a call
+// or construction of the global `RegExp`, directly or through anything the tracker follows, so a
+// local named `RegExp` is not it and `const r = RegExp; new r(...)` is. The pattern and the flags are
+// read as getStringIfConstant reads them, through reference.ConstantStringIn: a constant binding's
+// value counts, and flags that are not constant read as none, as ESLint's `flags || ""` does. A
+// pattern that is not constant is not checked.
 var NoUselessBackreference = rule.Rule{
 	Name: "no-useless-backreference",
+
+	// The tracker tells the global `RegExp` from a local that shares its spelling by asking where its
+	// symbol is declared, and a constant argument is followed to its binding the same way.
+	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
+
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
-				// A literal that is the pattern argument of a RegExp call is checked by the call,
-				// whose flags argument replaces this literal's own flags.
-				if regexLiteralIsRegExpArgument(node) {
-					return
-				}
-				text := node.Text()
-				pattern, flags := regexsyntax.PatternAndFlags(text)
+				pattern, flags := regexsyntax.PatternAndFlags(node.Text())
 				if pattern == "" {
 					return
 				}
-				// Pos() sits before leading trivia, so the literal's start is derived from its end.
-				literalStart := node.End() - len(text)
-				reportUselessBackreferences(ctx, pattern, flags, literalStart+1, nil)
+				reportUselessBackreferences(ctx, node, pattern, flags)
 			},
-			ast.KindCallExpression: func(node *ast.Node) {
-				call := node.AsCallExpression()
-				checkBackreferencesInRegExpCall(ctx, call.Expression, call.Arguments)
-			},
-			ast.KindNewExpression: func(node *ast.Node) {
-				expression := node.AsNewExpression()
-				checkBackreferencesInRegExpCall(ctx, expression.Expression, expression.Arguments)
+			ast.KindSourceFile: func(node *ast.Node) {
+				// Every trace starts at a reference to `RegExp`, so a file that never spells it has
+				// nothing to follow, and the tracker's index is never built.
+				if ctx.TypeChecker == nil || !strings.Contains(ctx.SourceFile.Text(), "RegExp") {
+					return
+				}
+				tracker := reference.NewTracker(ctx.SourceFile, ctx.TypeChecker, nil)
+				for _, tracked := range tracker.GlobalReferences(regExpCallTraceMap) {
+					checkBackreferencesInRegExpCall(ctx, tracked.Node)
+				}
 			},
 		}
 	},
 }
 
-// checkBackreferencesInRegExpCall checks a `RegExp(...)` or `new RegExp(...)` whose pattern reads.
-//
-// The flags argument is consulted first because a flag decides what the pattern means: `v` changes
-// how a character class nests, and a class is where a `\1` stops being a backreference. When the
-// flags argument is present and is not a literal the call is skipped rather than guessed at, which
-// is upstream's behavior and the reason `RegExp('\\1(a){', flags)` is a fail case while
-// `new RegExp('\\1(a){', 'u')` is a pass: without the flag the trailing brace is literal and the
-// pattern parses, and with `u` it is a syntax error the parser refuses.
-func checkBackreferencesInRegExpCall(ctx rule.Context, callee *ast.Node, arguments *ast.NodeList) {
-	if !calleeIsRegExp(callee) {
-		return
-	}
-	if arguments == nil || len(arguments.Nodes) == 0 {
-		return
-	}
+// regExpCallTraceMap asks the tracker for every call and construction of the global RegExp.
+var regExpCallTraceMap = map[string]*reference.TraceMap{"RegExp": {Call: true, Construct: true}}
 
-	flags, flagsKnown := regexConstructorFlags(arguments)
-	if !flagsKnown {
+// checkBackreferencesInRegExpCall checks a call or construction of RegExp whose pattern is a constant.
+func checkBackreferencesInRegExpCall(ctx rule.Context, call *ast.Node) {
+	arguments := call.Arguments()
+	if len(arguments) == 0 {
 		return
 	}
-
-	patternNode := ast.SkipParentheses(arguments.Nodes[0])
-	if patternNode == nil {
+	pattern, isConstant := reference.ConstantStringIn(ctx, arguments[0])
+	if !isConstant {
 		return
 	}
-
-	if patternNode.Kind == ast.KindRegularExpressionLiteral {
-		text := patternNode.Text()
-		pattern, ownFlags := regexsyntax.PatternAndFlags(text)
-		if pattern == "" {
-			return
-		}
-		if len(arguments.Nodes) < 2 {
-			flags = ownFlags
-		}
-		literalStart := patternNode.End() - len(text)
-		reportUselessBackreferences(ctx, pattern, flags, literalStart+1, nil)
-		return
+	flags := ""
+	if len(arguments) > 1 {
+		flags, _ = reference.ConstantStringIn(ctx, arguments[1])
 	}
-
-	pattern, ok := regexConstructorPattern(patternNode)
-	if !ok {
-		return
-	}
-
-	// The pattern the engine sees is the literal's cooked value, and cooked offsets are not file
-	// offsets: `'(a)\\2(b)'` is eleven bytes on disk and eight cooked, so a span taken from the
-	// cooked string lands mid-literal. The mapping is the same one no-misleading-character-class
-	// builds, for the same reason and against the same defect.
-	//
-	// The raw text has to come from the source rather than from `Text()`, which returns the cooked
-	// value for a string literal. Deriving the literal's start as `End() - len(Text())` therefore
-	// lands three bytes into this pattern, and every constructor case in the corpus went silent
-	// that way while every regex-literal case passed. That is exactly the failure the brief warns
-	// about, found here by a probe rather than by the fixtures, which assert ids and not spans.
-	rawBody, bodyStart, ok := rawStringLiteralBody(ctx, patternNode)
-	if !ok {
-		return
-	}
-
-	offsets := literal.CookedToRaw(rawBody, pattern)
-	if offsets == nil {
-		return
-	}
-	reportUselessBackreferences(ctx, pattern, flags, bodyStart, offsets)
-}
-
-// rawStringLiteralBody returns a string or template literal's raw source text between its quotes,
-// and the file offset that text starts at.
-//
-// `Pos()` sits before leading trivia, so the literal's own extent is found by scanning forward to
-// its opening quote rather than trusting `Pos()` directly.
-func rawStringLiteralBody(ctx rule.Context, node *ast.Node) (string, int, bool) {
-	if ctx.SourceFile == nil {
-		return "", 0, false
-	}
-	source := ctx.SourceFile.Text()
-	start, end := node.Pos(), node.End()
-	if start < 0 || end > len(source) || start >= end {
-		return "", 0, false
-	}
-	for start < end && (source[start] == ' ' || source[start] == '\t' ||
-		source[start] == '\n' || source[start] == '\r') {
-		start++
-	}
-	if start >= end {
-		return "", 0, false
-	}
-	quote := source[start]
-	if quote != '\'' && quote != '"' && quote != '`' {
-		return "", 0, false
-	}
-	if end-1 <= start || source[end-1] != quote {
-		return "", 0, false
-	}
-	return source[start+1 : end-1], start + 1, true
+	reportUselessBackreferences(ctx, call, pattern, flags)
 }
 
 // regexNodeKind is what a node on a backreference's or group's enclosing path is.
@@ -254,11 +177,9 @@ type regexStructure struct {
 	backreferences []backreference
 }
 
-// reportUselessBackreferences scans one pattern and reports every backreference that cannot match.
-//
-// offsets maps a pattern byte to the byte in the file that produced it, or nil when the pattern is
-// the file text and the mapping is the identity.
-func reportUselessBackreferences(ctx rule.Context, pattern string, flagsText string, patternStart int, offsets []int) {
+// reportUselessBackreferences scans one pattern and reports every backreference that cannot match, at
+// the node the pattern came from.
+func reportUselessBackreferences(ctx rule.Context, node *ast.Node, pattern string, flagsText string) {
 	flags := regexsyntax.ParseRegexFlags(flagsText)
 
 	structure, ok := scanRegexStructure(pattern, flags)
@@ -285,33 +206,45 @@ func reportUselessBackreferences(ctx rule.Context, pattern string, flagsText str
 	}
 
 	for _, reference := range structure.backreferences {
-		group, found := resolveBackreference(reference, structure.groups, groupCount)
-		if !found {
+		groups := resolveBackreference(reference, structure.groups, groupCount)
+		if len(groups) == 0 {
 			continue
 		}
 
-		problem, ok := classifyBackreference(reference, group, structure.nodes)
-		if !ok {
+		// Every group the reference names is judged, and one the reference can reach clears it. Of
+		// the problems left, those in the reference's own disjunction are reported if there are any,
+		// else all of them: the first is named and the rest are counted, as ESLint words it.
+		type judged struct {
+			problem backreferenceProblem
+			group   capturingGroup
+		}
+		var all, sameDisjunction []judged
+		reachable := false
+		for _, group := range groups {
+			problem, ok := classifyBackreference(reference, group, structure.nodes)
+			if !ok {
+				reachable = true
+				break
+			}
+			all = append(all, judged{problem, group})
+			if problem.id != problemAnotherAlternative.id {
+				sameDisjunction = append(sameDisjunction, judged{problem, group})
+			}
+		}
+		if reachable {
 			continue
 		}
-
-		start, end := mapPatternRange(reference.start, reference.end, patternStart, offsets)
-		ctx.ReportRange(core.NewTextRange(start, end), rule.Message{
-			Id:          problem.id,
-			Description: problem.describe(pattern[reference.start:reference.end], pattern[group.start:group.end]),
+		toReport := all
+		if len(sameDisjunction) > 0 {
+			toReport = sameDisjunction
+		}
+		first := toReport[0]
+		ctx.ReportNode(node, rule.Message{
+			Id: first.problem.id,
+			Description: first.problem.describe(pattern[reference.start:reference.end],
+				pattern[first.group.start:first.group.end], len(toReport)-1),
 		})
 	}
-}
-
-// mapPatternRange turns a pattern-relative span into a file span.
-func mapPatternRange(start int, end int, patternStart int, offsets []int) (int, int) {
-	if offsets == nil {
-		return patternStart + start, patternStart + end
-	}
-	if start >= len(offsets) || end >= len(offsets) {
-		return patternStart, patternStart
-	}
-	return patternStart + offsets[start], patternStart + offsets[end]
 }
 
 // patternIsWellFormed reports whether the engine would accept the pattern.
@@ -421,31 +354,38 @@ type backreferenceProblem struct {
 }
 
 // describe builds the finding's sentence from the reference and the group it names.
-func (problem backreferenceProblem) describe(reference string, group string) string {
-	return fmt.Sprintf("The backreference %s can never match, because %s %s. It matches the empty "+
+func (problem backreferenceProblem) describe(reference string, group string, otherGroups int) string {
+	also := ""
+	switch {
+	case otherGroups == 1:
+		also = " (and so does one other group of that name)"
+	case otherGroups > 1:
+		also = fmt.Sprintf(" (and so do %d other groups of that name)", otherGroups)
+	}
+	return fmt.Sprintf("The backreference %s can never match, because %s %s%s. It matches the empty "+
 		"string instead of failing, so the pattern quietly matches more than it looks like it does.",
-		reference, group, problem.reason)
+		reference, group, problem.reason, also)
 }
 
 var (
 	problemInsideItsOwnGroup = backreferenceProblem{
-		id:     "backreferenceInsideItsOwnGroup",
+		id:     "nested",
 		reason: "encloses the reference and so has captured nothing yet when it is reached",
 	}
 	problemAnotherAlternative = backreferenceProblem{
-		id:     "backreferenceToAnotherAlternative",
+		id:     "disjunctive",
 		reason: "sits in a different branch of the same disjunction, and only one branch ever runs",
 	}
 	problemBeforeItsGroup = backreferenceProblem{
-		id:     "backreferenceBeforeItsGroup",
+		id:     "forward",
 		reason: "appears later in the pattern, and matching runs left to right",
 	}
 	problemAfterItsGroupInLookbehind = backreferenceProblem{
-		id:     "backreferenceAfterItsGroupInLookbehind",
+		id:     "backward",
 		reason: "appears earlier in a lookbehind, which matches right to left",
 	}
 	problemIntoNegativeLookaround = backreferenceProblem{
-		id:     "backreferenceIntoNegativeLookaround",
+		id:     "intoNegativeLookaround",
 		reason: "sits in a negative lookaround, so it only runs on a path that then fails",
 	}
 )
@@ -459,20 +399,22 @@ var (
 // A name can be declared more than once under ES2025 duplicate named groups, where
 // `(?<foo>a)|(?<foo>b)` is legal because the two live in different branches. Upstream reports such
 // a reference only when **every** group carrying the name is unreachable from it, which is why
-// `/((?<foo>bar)\k<foo>|(?<foo>baz))/` is clean: one of the two `foo` groups does run first.
-func resolveBackreference(reference backreference, groups []capturingGroup, groupCount int) (capturingGroup, bool) {
+// `/((?<foo>bar)\k<foo>|(?<foo>baz))/` is clean: one of the two `foo` groups does run first. So a
+// named reference resolves to every group carrying its name, in pattern order.
+func resolveBackreference(reference backreference, groups []capturingGroup, groupCount int) []capturingGroup {
 	if reference.name == "" {
 		if reference.index < 1 || reference.index > groupCount {
-			return capturingGroup{}, false
+			return nil
 		}
-		return groups[reference.index-1], true
+		return groups[reference.index-1 : reference.index]
 	}
+	var named []capturingGroup
 	for _, group := range groups {
 		if group.name == reference.name {
-			return group, true
+			named = append(named, group)
 		}
 	}
-	return capturingGroup{}, false
+	return named
 }
 
 // classifyBackreference decides which of the five problems a reference has, or that it has none.

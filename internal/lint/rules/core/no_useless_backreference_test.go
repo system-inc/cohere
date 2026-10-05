@@ -30,100 +30,102 @@ func TestNoUselessBackreferenceFires(t *testing.T) {
 		sourceText string
 		findings   []string
 	}{
-		{`/(b)(\2a)/`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`/\k<foo>(?<foo>bar)/`, []string{"backreferenceBeforeItsGroup"}},
-		{`RegExp('(a|bc)|\\1')`, []string{"backreferenceToAnotherAlternative"}},
-		{`new RegExp('(?!(?<foo>\\n))\\1')`, []string{"backreferenceIntoNegativeLookaround"}},
-		{`/(?<!(a)\1)b/`, []string{"backreferenceAfterItsGroupInLookbehind"}},
-		{`new RegExp('(\\1)')`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`/^(a\1)$/`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`/^((a)\1)$/`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`new RegExp('^(a\\1b)$')`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`RegExp('^((\\1))$')`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`/((\2))/`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`/a(?<foo>(.)b\1)/`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`/a(?<foo>\k<foo>)b/`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`/^(\1)*$/`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`/^(?:a)(?:((?:\1)))*$/`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`/(?!(\1))/`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`/a|(b\1c)/`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`/(a|(\1))/`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`/(a|(\2))/`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`/(?:a|(\1))/`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`/(a)?(b)*(\3)/`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`/(?<=(a\1))b/`, []string{"backreferenceInsideItsOwnGroup"}},
-		{`/\1(a)/`, []string{"backreferenceBeforeItsGroup"}},
-		{`/\1.(a)/`, []string{"backreferenceBeforeItsGroup"}},
-		{`/(?:\1)(?:(a))/`, []string{"backreferenceBeforeItsGroup"}},
-		{`/(?:\1)(?:((a)))/`, []string{"backreferenceBeforeItsGroup"}},
-		{`/(?:\2)(?:((a)))/`, []string{"backreferenceBeforeItsGroup"}},
-		{`/(?:\1)(?:((?:a)))/`, []string{"backreferenceBeforeItsGroup"}},
-		{`/(\2)(a)/`, []string{"backreferenceBeforeItsGroup"}},
-		{`RegExp('(a)\\2(b)')`, []string{"backreferenceBeforeItsGroup"}},
-		{`/(?:a)(b)\2(c)/`, []string{"backreferenceBeforeItsGroup"}},
-		{`/\k<foo>(?<foo>a)/`, []string{"backreferenceBeforeItsGroup"}},
-		{`/(?:a(b)\2)(c)/`, []string{"backreferenceBeforeItsGroup"}},
-		{`new RegExp('(a)(b)\\3(c)')`, []string{"backreferenceBeforeItsGroup"}},
-		{`/\1(?<=(a))./`, []string{"backreferenceBeforeItsGroup"}},
-		{`/\1(?<!(a))./`, []string{"backreferenceBeforeItsGroup"}},
-		{`/(?<=\1)(?<=(a))/`, []string{"backreferenceBeforeItsGroup"}},
-		{`/(?<!\1)(?<!(a))/`, []string{"backreferenceBeforeItsGroup"}},
-		{`/(?=\1(a))./`, []string{"backreferenceBeforeItsGroup"}},
-		{`/(?!\1(a))./`, []string{"backreferenceBeforeItsGroup"}},
-		{`/(?<=(a)\1)b/`, []string{"backreferenceAfterItsGroupInLookbehind"}},
-		{`/(?<!.(a).\1.)b/`, []string{"backreferenceAfterItsGroupInLookbehind"}},
-		{`/(.)(?<!(b|c)\2)d/`, []string{"backreferenceAfterItsGroupInLookbehind"}},
-		{`/(?<=(?:(a)\1))b/`, []string{"backreferenceAfterItsGroupInLookbehind"}},
-		{`/(?<=(?:(a))\1)b/`, []string{"backreferenceAfterItsGroupInLookbehind"}},
-		{`/(?<=(a)(?:\1))b/`, []string{"backreferenceAfterItsGroupInLookbehind"}},
-		{`/(?<!(?:(a))(?:\1))b/`, []string{"backreferenceAfterItsGroupInLookbehind"}},
-		{`/(?<!(?:(a))(?:\1)|.)b/`, []string{"backreferenceAfterItsGroupInLookbehind"}},
-		{`/.(?!(?<!(a)\1))./`, []string{"backreferenceAfterItsGroupInLookbehind"}},
-		{`/.(?=(?<!(a)\1))./`, []string{"backreferenceAfterItsGroupInLookbehind"}},
-		{`/.(?!(?<=(a)\1))./`, []string{"backreferenceAfterItsGroupInLookbehind"}},
-		{`/.(?=(?<=(a)\1))./`, []string{"backreferenceAfterItsGroupInLookbehind"}},
-		{`/(a)|\1b/`, []string{"backreferenceToAnotherAlternative"}},
-		{`/^(?:(a)|\1b)$/`, []string{"backreferenceToAnotherAlternative"}},
-		{`/^(?:(a)|b(?:c|\1))$/`, []string{"backreferenceToAnotherAlternative"}},
-		{`/^(?:a|b(?:(c)|\1))$/`, []string{"backreferenceToAnotherAlternative"}},
-		{`/^(?:(a(?!b))|\1b)+$/`, []string{"backreferenceToAnotherAlternative"}},
-		{`/^(?:(?:(a)(?!b))|\1b)+$/`, []string{"backreferenceToAnotherAlternative"}},
-		{`/^(?:(a(?=a))|\1b)+$/`, []string{"backreferenceToAnotherAlternative"}},
-		{`/^(?:(a)(?=a)|\1b)+$/`, []string{"backreferenceToAnotherAlternative"}},
-		{`/.(?:a|(b)).|(?:(\1)|c)./`, []string{"backreferenceToAnotherAlternative"}},
-		{`/.(?!(a)|\1)./`, []string{"backreferenceToAnotherAlternative"}},
-		{`/.(?<=\1|(a))./`, []string{"backreferenceToAnotherAlternative"}},
-		{`/a(?!(b)).\1/`, []string{"backreferenceIntoNegativeLookaround"}},
-		{`/(?<!(a))b\1/`, []string{"backreferenceIntoNegativeLookaround"}},
-		{`/(?<!(a))(?:\1)/`, []string{"backreferenceIntoNegativeLookaround"}},
-		{`/.(?<!a|(b)).\1/`, []string{"backreferenceIntoNegativeLookaround"}},
-		{`/.(?!(a)).(?!\1)./`, []string{"backreferenceIntoNegativeLookaround"}},
-		{`/.(?<!(a)).(?<!\1)./`, []string{"backreferenceIntoNegativeLookaround"}},
-		{`/.(?=(?!(a))\1)./`, []string{"backreferenceIntoNegativeLookaround"}},
-		{`/.(?<!\1(?!(a)))/`, []string{"backreferenceIntoNegativeLookaround"}},
-		{`/\1(a)(b)\2/`, []string{"backreferenceBeforeItsGroup"}},
-		{`/\1(a)\1/`, []string{"backreferenceBeforeItsGroup"}},
-		{`/\1(a)\2(b)/`, []string{"backreferenceBeforeItsGroup", "backreferenceBeforeItsGroup"}},
-		{`/\1.(?<=(a)\1)/`, []string{"backreferenceBeforeItsGroup", "backreferenceAfterItsGroupInLookbehind"}},
-		{`/(?!\1(a)).\1/`, []string{"backreferenceBeforeItsGroup", "backreferenceIntoNegativeLookaround"}},
-		{`/(a)\2(b)/; RegExp('(\\1)');`, []string{"backreferenceBeforeItsGroup", "backreferenceInsideItsOwnGroup"}},
-		{`RegExp('\\1(a){', flags);`, []string{"backreferenceBeforeItsGroup"}},
-		{`new RegExp('\\1([[A--B]])', 'v')`, []string{"backreferenceBeforeItsGroup"}},
-		{`/\k<foo>((?<foo>bar)|(?<foo>baz))/`, []string{"backreferenceBeforeItsGroup"}},
-		{`/((?<foo>bar)|\k<foo>(?<foo>baz))/`, []string{"backreferenceToAnotherAlternative"}},
-		{`/\k<foo>((?<foo>bar)|(?<foo>baz)|(?<foo>qux))/`, []string{"backreferenceBeforeItsGroup"}},
-		{`/((?<foo>bar)|\k<foo>(?<foo>baz)|(?<foo>qux))/`, []string{"backreferenceToAnotherAlternative"}},
-		{`/((?<foo>bar)|\k<foo>|(?<foo>baz))/`, []string{"backreferenceToAnotherAlternative"}},
-		{`/((?<foo>bar)|\k<foo>|(?<foo>baz)|(?<foo>qux))/`, []string{"backreferenceToAnotherAlternative"}},
-		{`/((?<foo>bar)|(?<foo>baz\k<foo>)|(?<foo>qux\k<foo>))/`, []string{"backreferenceToAnotherAlternative", "backreferenceToAnotherAlternative"}},
-		{`/(?<=((?<foo>bar)|(?<foo>baz))\k<foo>)/`, []string{"backreferenceAfterItsGroupInLookbehind"}},
-		{`/((?!(?<foo>bar))|(?!(?<foo>baz)))\k<foo>/`, []string{"backreferenceIntoNegativeLookaround"}},
+		{`/(b)(\2a)/`, []string{"nested"}},
+		{`/\k<foo>(?<foo>bar)/`, []string{"forward"}},
+		{`RegExp('(a|bc)|\\1')`, []string{"disjunctive"}},
+		{`new RegExp('(?!(?<foo>\\n))\\1')`, []string{"intoNegativeLookaround"}},
+		{`/(?<!(a)\1)b/`, []string{"backward"}},
+		{`new RegExp('(\\1)')`, []string{"nested"}},
+		{`/^(a\1)$/`, []string{"nested"}},
+		{`/^((a)\1)$/`, []string{"nested"}},
+		{`new RegExp('^(a\\1b)$')`, []string{"nested"}},
+		{`RegExp('^((\\1))$')`, []string{"nested"}},
+		{`/((\2))/`, []string{"nested"}},
+		{`/a(?<foo>(.)b\1)/`, []string{"nested"}},
+		{`/a(?<foo>\k<foo>)b/`, []string{"nested"}},
+		{`/^(\1)*$/`, []string{"nested"}},
+		{`/^(?:a)(?:((?:\1)))*$/`, []string{"nested"}},
+		{`/(?!(\1))/`, []string{"nested"}},
+		{`/a|(b\1c)/`, []string{"nested"}},
+		{`/(a|(\1))/`, []string{"nested"}},
+		{`/(a|(\2))/`, []string{"nested"}},
+		{`/(?:a|(\1))/`, []string{"nested"}},
+		{`/(a)?(b)*(\3)/`, []string{"nested"}},
+		{`/(?<=(a\1))b/`, []string{"nested"}},
+		{`/\1(a)/`, []string{"forward"}},
+		{`/\1.(a)/`, []string{"forward"}},
+		{`/(?:\1)(?:(a))/`, []string{"forward"}},
+		{`/(?:\1)(?:((a)))/`, []string{"forward"}},
+		{`/(?:\2)(?:((a)))/`, []string{"forward"}},
+		{`/(?:\1)(?:((?:a)))/`, []string{"forward"}},
+		{`/(\2)(a)/`, []string{"forward"}},
+		{`RegExp('(a)\\2(b)')`, []string{"forward"}},
+		{`/(?:a)(b)\2(c)/`, []string{"forward"}},
+		{`/\k<foo>(?<foo>a)/`, []string{"forward"}},
+		{`/(?:a(b)\2)(c)/`, []string{"forward"}},
+		{`new RegExp('(a)(b)\\3(c)')`, []string{"forward"}},
+		{`/\1(?<=(a))./`, []string{"forward"}},
+		{`/\1(?<!(a))./`, []string{"forward"}},
+		{`/(?<=\1)(?<=(a))/`, []string{"forward"}},
+		{`/(?<!\1)(?<!(a))/`, []string{"forward"}},
+		{`/(?=\1(a))./`, []string{"forward"}},
+		{`/(?!\1(a))./`, []string{"forward"}},
+		{`/(?<=(a)\1)b/`, []string{"backward"}},
+		{`/(?<!.(a).\1.)b/`, []string{"backward"}},
+		{`/(.)(?<!(b|c)\2)d/`, []string{"backward"}},
+		{`/(?<=(?:(a)\1))b/`, []string{"backward"}},
+		{`/(?<=(?:(a))\1)b/`, []string{"backward"}},
+		{`/(?<=(a)(?:\1))b/`, []string{"backward"}},
+		{`/(?<!(?:(a))(?:\1))b/`, []string{"backward"}},
+		{`/(?<!(?:(a))(?:\1)|.)b/`, []string{"backward"}},
+		{`/.(?!(?<!(a)\1))./`, []string{"backward"}},
+		{`/.(?=(?<!(a)\1))./`, []string{"backward"}},
+		{`/.(?!(?<=(a)\1))./`, []string{"backward"}},
+		{`/.(?=(?<=(a)\1))./`, []string{"backward"}},
+		{`/(a)|\1b/`, []string{"disjunctive"}},
+		{`/^(?:(a)|\1b)$/`, []string{"disjunctive"}},
+		{`/^(?:(a)|b(?:c|\1))$/`, []string{"disjunctive"}},
+		{`/^(?:a|b(?:(c)|\1))$/`, []string{"disjunctive"}},
+		{`/^(?:(a(?!b))|\1b)+$/`, []string{"disjunctive"}},
+		{`/^(?:(?:(a)(?!b))|\1b)+$/`, []string{"disjunctive"}},
+		{`/^(?:(a(?=a))|\1b)+$/`, []string{"disjunctive"}},
+		{`/^(?:(a)(?=a)|\1b)+$/`, []string{"disjunctive"}},
+		{`/.(?:a|(b)).|(?:(\1)|c)./`, []string{"disjunctive"}},
+		{`/.(?!(a)|\1)./`, []string{"disjunctive"}},
+		{`/.(?<=\1|(a))./`, []string{"disjunctive"}},
+		{`/a(?!(b)).\1/`, []string{"intoNegativeLookaround"}},
+		{`/(?<!(a))b\1/`, []string{"intoNegativeLookaround"}},
+		{`/(?<!(a))(?:\1)/`, []string{"intoNegativeLookaround"}},
+		{`/.(?<!a|(b)).\1/`, []string{"intoNegativeLookaround"}},
+		{`/.(?!(a)).(?!\1)./`, []string{"intoNegativeLookaround"}},
+		{`/.(?<!(a)).(?<!\1)./`, []string{"intoNegativeLookaround"}},
+		{`/.(?=(?!(a))\1)./`, []string{"intoNegativeLookaround"}},
+		{`/.(?<!\1(?!(a)))/`, []string{"intoNegativeLookaround"}},
+		{`/\1(a)(b)\2/`, []string{"forward"}},
+		{`/\1(a)\1/`, []string{"forward"}},
+		{`/\1(a)\2(b)/`, []string{"forward", "forward"}},
+		{`/\1.(?<=(a)\1)/`, []string{"forward", "backward"}},
+		{`/(?!\1(a)).\1/`, []string{"forward", "intoNegativeLookaround"}},
+		// The call is found from the file, before the walk reaches the literal, so its finding comes first.
+		{`/(a)\2(b)/; RegExp('(\\1)');`, []string{"nested", "forward"}},
+		{`RegExp('\\1(a){', flags);`, []string{"forward"}},
+		{`new RegExp('\\1([[A--B]])', 'v')`, []string{"forward"}},
+		{`/\k<foo>((?<foo>bar)|(?<foo>baz))/`, []string{"forward"}},
+		// Among a name's groups, a problem in the reference's own branch is the one named (ESLint's corpus).
+		{`/((?<foo>bar)|\k<foo>(?<foo>baz))/`, []string{"forward"}},
+		{`/\k<foo>((?<foo>bar)|(?<foo>baz)|(?<foo>qux))/`, []string{"forward"}},
+		{`/((?<foo>bar)|\k<foo>(?<foo>baz)|(?<foo>qux))/`, []string{"forward"}},
+		{`/((?<foo>bar)|\k<foo>|(?<foo>baz))/`, []string{"disjunctive"}},
+		{`/((?<foo>bar)|\k<foo>|(?<foo>baz)|(?<foo>qux))/`, []string{"disjunctive"}},
+		{`/((?<foo>bar)|(?<foo>baz\k<foo>)|(?<foo>qux\k<foo>))/`, []string{"nested", "nested"}},
+		{`/(?<=((?<foo>bar)|(?<foo>baz))\k<foo>)/`, []string{"backward"}},
+		{`/((?!(?<foo>bar))|(?!(?<foo>baz)))\k<foo>/`, []string{"intoNegativeLookaround"}},
 	}
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoUselessBackreference, backreferenceFile, testCase.sourceText),
+				rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, testCase.sourceText),
 				testCase.findings...)
 		})
 	}
@@ -243,7 +245,7 @@ func TestNoUselessBackreferenceStaysSilent(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoUselessBackreference, backreferenceFile, testCase.sourceText))
+				rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, testCase.sourceText))
 		})
 	}
 }
@@ -261,63 +263,57 @@ func TestNoUselessBackreferenceStaysSilent(t *testing.T) {
 func TestNoUselessBackreferenceStillReportsBesideALegacyOctal(t *testing.T) {
 	t.Parallel()
 
-	result := rule_testing.Run(t, NoUselessBackreference, backreferenceFile, `/\1(a)\2/`)
-	rule_testing.ExpectFindings(t, result, "backreferenceBeforeItsGroup")
+	result := rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, `/\1(a)\2/`)
+	rule_testing.ExpectFindings(t, result, "forward")
 
 	// The same text under `u` is a syntax error, so the rule steps aside entirely.
 	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, NoUselessBackreference, backreferenceFile, `/\1(a)\2/u`))
+		rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, `/\1(a)\2/u`))
 }
 
-// TestNoUselessBackreferenceHandlesConstructorArgumentShapesUpstreamNeverExercises covers two
-// branches the corpus leaves untested.
+// TestNoUselessBackreferenceHandlesConstructorArgumentShapes covers arguments the corpus leaves untested.
 //
-// Both were written for surviving mutants and both are real behaviors rather than defensive code.
+// A regex literal handed to RegExp is a literal like any other and is checked under its own flags, and
+// the call is checked too, its pattern being the literal's text as String() makes it, `/\1(a)/`. So the
+// pattern reports twice, at the literal and at the call, which is what ESLint does with these exact
+// inputs.
 //
-// A regex literal handed to the constructor is checked once, by the call, because the call's flags
-// argument replaces the literal's own. Dropping the guard that makes the literal listener step
-// aside reports the same pattern twice, and no upstream case passes a regex literal to `RegExp` at
-// all.
-//
-// A flags argument that is a template with substitutions cannot be read, and the substitution may
-// supply the `u` that decides whether the pattern is even valid, so the call is skipped. Upstream
-// draws the same line and distinguishes it from a plain identifier: `RegExp('\\1(a){', flags)` is
-// one of its fail cases, because an unreadable identifier is treated as no flags and the pattern
-// parses without `u`. Only the template form returns early.
-func TestNoUselessBackreferenceHandlesConstructorArgumentShapesUpstreamNeverExercises(t *testing.T) {
+// Flags that cannot be read check the pattern under none, as ESLint's `flags || ""` does, whether the
+// argument is an identifier nothing gives a constant value or a template with a substitution. Flags held
+// in a constant binding are read: `const flags = 'gus'` puts the pattern under `u`, where its brace is a
+// syntax error and the rule steps aside.
+func TestNoUselessBackreferenceHandlesConstructorArgumentShapes(t *testing.T) {
 	t.Parallel()
 
-	t.Run("a regex literal argument reports once, not twice", func(t *testing.T) {
-		rule_testing.ExpectFindings(t,
-			rule_testing.Run(t, NoUselessBackreference, backreferenceFile, `RegExp(/\1(a)/, '')`),
-			"backreferenceBeforeItsGroup")
+	t.Run("a regex literal argument reports at the literal and at the call", func(t *testing.T) {
+		result := rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, `RegExp(/\1(a)/, '');`)
+		rule_testing.ExpectFindings(t, result, "forward", "forward")
 	})
 
-	t.Run("an unreadable template flags argument skips the call", func(t *testing.T) {
-		rule_testing.ExpectClean(t,
-			rule_testing.Run(t, NoUselessBackreference, backreferenceFile,
-				"RegExp('\\\\1(a)', `${flags}`)"))
-	})
+	for _, sourceText := range []string{
+		`RegExp('\\1(a)', flags);`,
+		"RegExp('\\\\1(a)', `${flags}`);",
+	} {
+		t.Run("unreadable flags check under none: "+sourceText, func(t *testing.T) {
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, sourceText), "forward")
+		})
+	}
 
-	// The contrast that makes the line above a real distinction rather than a blanket skip: an
-	// identifier is unreadable too, and upstream still checks the pattern with no flags.
-	t.Run("an identifier flags argument still checks the pattern", func(t *testing.T) {
-		rule_testing.ExpectFindings(t,
-			rule_testing.Run(t, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a)', flags)`),
-			"backreferenceBeforeItsGroup")
+	t.Run("flags in a constant binding are read", func(t *testing.T) {
+		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile,
+			`const flags = 'gus'; RegExp('\\1(a){', flags);`))
+		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile,
+			`let flags = 'u'; flags = ''; RegExp('\\1(a){', flags);`), "forward")
 	})
 }
 
-// TestNoUselessBackreferenceReportsAShadowedRegExp pins the one place this port disagrees with
-// upstream, so the disagreement is a decision on the record rather than a gap.
+// TestNoUselessBackreferenceIgnoresALocalRegExp pins that a local named RegExp is not the global.
 //
-// Upstream consults the scope and declines a `RegExp` that is locally bound, which is why these
-// five inputs are in its pass list. Answering that is name resolution and needs the checker, and
-// `no-new-native-nonconstructor` is the shipped rule establishing there is no structural answer for
-// this shape: the shadow can be a parameter, a `var`, a `const` or an import in any enclosing
-// scope. This rule does not take the checker, so it reports. If a later change makes it silent
-// here, that is upstream parity and this test should be deleted rather than worked around.
-func TestNoUselessBackreferenceReportsAShadowedRegExp(t *testing.T) {
+// These five are ESLint's own pass cases. The port used to report them, since it read the callee's
+// spelling and had no checker to ask what the name was bound to; the shelf's ReferenceTracker asks, and
+// follows the global through an alias or `globalThis` as well, which the table covers.
+func TestNoUselessBackreferenceIgnoresALocalRegExp(t *testing.T) {
 	t.Parallel()
 
 	cases := []string{
@@ -329,58 +325,50 @@ func TestNoUselessBackreferenceReportsAShadowedRegExp(t *testing.T) {
 	}
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoUselessBackreference, backreferenceFile, sourceText),
-				"backreferenceBeforeItsGroup")
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, sourceText))
 		})
 	}
 }
 
-// TestNoUselessBackreferencePointsAtTheBackreference asserts where each finding lands, which
-// ExpectFindings cannot see.
-//
-// This rule carries no repair, and that is exactly why the spans need asserting: a rule whose only
-// output is a location passes a complete id fixture while pointing anywhere at all. The constructor
-// rows are the ones that matter. The pattern the rule scans is the literal's cooked value and the
-// file holds the raw text, so `'(a)\\2(b)'` is eleven bytes on disk and eight cooked. Every
-// constructor case in the corpus went silent while this was wrong, but a pattern differing only in
-// escape width would have reported at a plausible-looking wrong offset instead, and no id fixture
-// would have noticed.
-func TestNoUselessBackreferencePointsAtTheBackreference(t *testing.T) {
+// TestNoUselessBackreferenceDeclinesAPatternABuiltinBuilds pins the one place this port departs from
+// ESLint. ESLint evaluates `String.raw`...“ by calling String.raw, and reports the call below;
+// reference.ConstantStringIn evaluates no built-in call, so the pattern is not a constant here and the
+// call is not checked, the silent direction.
+func TestNoUselessBackreferenceDeclinesAPatternABuiltinBuilds(t *testing.T) {
+	t.Parallel()
+
+	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile,
+		"RegExp(String.raw`\\1(a)`);"))
+}
+
+// TestNoUselessBackreferencePointsAtThePattern asserts where each finding lands, which ExpectFindings
+// cannot see: the whole regex literal, or the whole RegExp call, as ESLint reports it. The message names
+// the backreference, so two useless references in one pattern are two findings at one place.
+func TestNoUselessBackreferencePointsAtThePattern(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
 		sourceText string
 		reported   []string
 	}{
-		{`/\1(a)/`, []string{`\1`}},
-		{`/(b)(\2a)/`, []string{`\2`}},
-		{`/(a|\1b)/`, []string{`\1`}},
-		{`/\1(?!(a))/`, []string{`\1`}},
-		// A lookbehind matches right to left, so the reference is the one that comes late here.
-		{`/(?<=(a)\1)b/`, []string{`\1`}},
-		{`/\k<foo>(?<foo>bar)/`, []string{`\k<foo>`}},
-		// Two findings in one pattern, so the second span cannot be right by accident.
-		{`/\1(a)\2(b)/`, []string{`\1`, `\2`}},
-		// The constructor rows: raw and cooked differ, so an offset taken from the cooked pattern
-		// lands mid-literal.
-		{`RegExp('(a)\\2(b)')`, []string{`\\2`}},
-		{`new RegExp('(\\1)')`, []string{`\\1`}},
-		{`RegExp('(a|bc)|\\1')`, []string{`\\1`}},
-		{`new RegExp('(?!(?<foo>\\n))\\1')`, []string{`\\1`}},
-		{`new RegExp('\\1([[A--B]])', 'v')`, []string{`\\1`}},
+		{`/\1(a)/`, []string{`/\1(a)/`}},
+		{`x = /(a|\1b)/g`, []string{`/(a|\1b)/g`}},
+		{`/\1(a)\2(b)/`, []string{`/\1(a)\2(b)/`, `/\1(a)\2(b)/`}},
+		{`RegExp('(a)\\2(b)')`, []string{`RegExp('(a)\\2(b)')`}},
+		{`new RegExp('\\1([[A--B]])', 'v')`, []string{`new RegExp('\\1([[A--B]])', 'v')`}},
+		{"foo;\nnew RegExp(\n  '\\\\1(a)'\n)", []string{"new RegExp(\n  '\\\\1(a)'\n)"}},
 	}
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := rule_testing.Run(t, NoUselessBackreference, backreferenceFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.reported) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.reported), len(result.Diagnostics))
 			}
+			source := result.SourceFile.Text()
 			for index, want := range testCase.reported {
 				diagnostic := result.Diagnostics[index]
-				got := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
-				if got != want {
+				if got := source[diagnostic.Range.Pos():diagnostic.Range.End()]; got != want {
 					t.Errorf("finding %d points at %q, expected %q", index, got, want)
 				}
 			}
@@ -456,7 +444,7 @@ func TestNoUselessBackreferenceStaysSilentOnAPatternTheEngineWouldRefuse(t *test
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoUselessBackreference, backreferenceFile, testCase.sourceText))
+				rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, testCase.sourceText))
 		})
 	}
 
@@ -466,12 +454,12 @@ func TestNoUselessBackreferenceStaysSilentOnAPatternTheEngineWouldRefuse(t *test
 	// quantifier and the pattern is judged well-formed under `u` when it is not.
 	t.Run("a literal brace does not suppress the finding", func(t *testing.T) {
 		rule_testing.ExpectFindings(t,
-			rule_testing.Run(t, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a){,}')`),
-			"backreferenceBeforeItsGroup")
+			rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a){,}')`),
+			"forward")
 	})
 	t.Run("the same brace under u is a syntax error", func(t *testing.T) {
 		rule_testing.ExpectClean(t,
-			rule_testing.Run(t, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a){,}', 'u')`))
+			rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a){,}', 'u')`))
 	})
 }
 
@@ -494,7 +482,9 @@ func TestNoUselessBackreferenceIsRegistered(t *testing.T) {
 	if found == nil {
 		t.Fatal("no-useless-backreference is absent from the registry")
 	}
-	if found.Rule.NeedsTypeChecker {
-		t.Error("the registered copy declares NeedsTypeChecker; this rule is purely syntactic")
+	// The global RegExp is told from a local one, and a constant argument followed to its binding,
+	// through the checker, so a registered copy without it would find no call at all.
+	if !found.Rule.NeedsTypeChecker {
+		t.Error("the registered copy does not declare NeedsTypeChecker, so it would check no RegExp call")
 	}
 }

@@ -11393,13 +11393,13 @@
             "language": "TypeScript",
             "origin": "core",
             "upstreamName": "no-useless-backreference",
-            "typeAware": false,
+            "typeAware": true,
             "messageIds": [
-                "backreferenceAfterItsGroupInLookbehind",
-                "backreferenceBeforeItsGroup",
-                "backreferenceInsideItsOwnGroup",
-                "backreferenceIntoNegativeLookaround",
-                "backreferenceToAnotherAlternative"
+                "backward",
+                "disjunctive",
+                "forward",
+                "intoNegativeLookaround",
+                "nested"
             ],
             "sets": [
                 {

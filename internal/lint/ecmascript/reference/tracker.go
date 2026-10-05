@@ -425,17 +425,21 @@ func patternKey(name *ast.Node) (string, bool) {
 // binding resolved answers false. Numbers are taken as written by the parser, which normalizes them,
 // and adding two numbers declines rather than reproduce JavaScript's number formatting.
 func ConstantString(expression *ast.Node) (string, bool) {
-	text, _, isConstant := constantValue(expression)
+	text, _, isConstant := constantValue(expression, nil)
 	return text, isConstant
 }
 
 // constantValue folds an expression, saying also whether the value is a string, which decides what
-// `+` does.
-func constantValue(expression *ast.Node) (text string, isString bool, isConstant bool) {
+// `+` does. A nil resolve is the scope-less reading; ConstantStringIn passes one that reads a name's
+// binding and a regex literal's text.
+func constantValue(expression *ast.Node, resolve func(*ast.Node) (string, bool, bool)) (text string, isString bool, isConstant bool) {
 	if expression == nil {
 		return "", false, false
 	}
 	expression = ast.SkipParentheses(expression)
+	if resolve != nil && (expression.Kind == ast.KindIdentifier || expression.Kind == ast.KindRegularExpressionLiteral) {
+		return resolve(expression)
+	}
 	switch expression.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
 		return expression.Text(), true, true
@@ -452,7 +456,7 @@ func constantValue(expression *ast.Node) (text string, isString bool, isConstant
 		var builder strings.Builder
 		builder.WriteString(template.Head.Text())
 		for _, span := range template.TemplateSpans.Nodes {
-			text, _, isConstant := constantValue(span.AsTemplateSpan().Expression)
+			text, _, isConstant := constantValue(span.AsTemplateSpan().Expression, resolve)
 			if !isConstant {
 				return "", false, false
 			}
@@ -465,8 +469,8 @@ func constantValue(expression *ast.Node) (text string, isString bool, isConstant
 		if binary.OperatorToken.Kind != ast.KindPlusToken {
 			return "", false, false
 		}
-		left, leftIsString, leftIsConstant := constantValue(binary.Left)
-		right, rightIsString, rightIsConstant := constantValue(binary.Right)
+		left, leftIsString, leftIsConstant := constantValue(binary.Left, resolve)
+		right, rightIsString, rightIsConstant := constantValue(binary.Right, resolve)
 		if !leftIsConstant || !rightIsConstant || (!leftIsString && !rightIsString) {
 			return "", false, false
 		}
