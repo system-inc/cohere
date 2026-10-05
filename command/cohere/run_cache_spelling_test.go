@@ -130,6 +130,12 @@ func TestARunThatMissesTheCacheSaysWhy(t *testing.T) {
 	if !regexp.MustCompile(`"filesReplayed":[1-9]`).MatchString(counted) {
 		t.Errorf("a run that replayed files' findings reports none in --json:\n%s", counted)
 	}
+	// And a whole replay counts every file in scope, never the 0 a full check reads.
+	if replayed, _ := fixture.run(true, "--json"); !isRunCacheReplay(replayed) && !strings.Contains(replayed, `"replayed":true`) {
+		t.Errorf("an unchanged tree's second --json run did not replay:\n%s", replayed)
+	} else if !regexp.MustCompile(`"filesReplayed":[1-9]`).MatchString(replayed) {
+		t.Errorf("a whole replay reports no file replayed in --json:\n%s", replayed)
+	}
 
 	copied := filepath.Join(t.TempDir(), "cohere")
 	contents, err := os.ReadFile(fixture.binary)
