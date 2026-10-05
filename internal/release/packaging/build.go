@@ -580,9 +580,10 @@ type compilerPin struct {
 //
 // Both halves are read rather than written down here, because the upstream has already moved: the
 // compiler was vendored from `microsoft/typescript-go` until that repository was archived, then from
-// `microsoft/TypeScript`, and is now the fork `kirkouimet/TypeScript`. A hardcoded label survives a
-// migration like that while quietly becoming false, and a commit reported against the wrong
-// repository is worse than no commit at all: it resolves to nothing and gives a reader no hint why.
+// `microsoft/TypeScript`, then from the fork `kirkouimet/TypeScript`, and is now System, Inc.'s fork
+// `system-inc/TypeScript`. A hardcoded label survives a migration like that while quietly becoming
+// false, and a commit reported against the wrong repository is worse than no commit at all: it resolves
+// to nothing and gives a reader no hint why.
 //
 // The commit is the gitlink, and the submodule's checkout has to agree with it. The build compiles
 // whatever the checkout holds, so a checkout moved without a commit would ship a compiler that no

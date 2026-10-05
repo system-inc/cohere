@@ -2,8 +2,8 @@ cohere
 Copyright (c) 2026 System, Inc.
 
 cohere includes the TypeScript compiler (typescript-go), Copyright (c) Microsoft Corporation, licensed
-under the Apache License, Version 2.0. cohere builds a modified version of it, from the fork at
-https://github.com/kirkouimet/TypeScript, which changes files of the original.
+under the Apache License, Version 2.0. cohere builds a modified version of it, from System, Inc.'s fork at
+https://github.com/system-inc/TypeScript, which changes files of the original.
 
 The original's NOTICE.txt follows, unmodified but for its line endings. The licenses of everything else
 cohere is built on are in THIRD_PARTY_NOTICES.md.
