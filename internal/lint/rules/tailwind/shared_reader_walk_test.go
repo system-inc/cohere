@@ -49,6 +49,7 @@ export const elements = [
 // design-system rules decline without a stylesheet, so the fixture links the installed package in as
 // a repository has it.
 func TestSharedReaderFindsWhatEachRuleFindsAlone(t *testing.T) {
+	t.Parallel()
 	packageRoot := classOrderFixturePackageRoot()
 	if packageRoot == "" {
 		t.Skip("no installed tailwindcss on this machine, so there is no design system to ask")

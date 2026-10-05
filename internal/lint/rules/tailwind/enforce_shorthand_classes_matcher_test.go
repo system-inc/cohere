@@ -19,6 +19,7 @@ import (
 // near misses and written-out classes, and requires the two matchers to return the same collapses in
 // the same order. The draw is seeded, so a disagreement reproduces.
 func TestShorthandMatcherAgreesWithTheExpressions(t *testing.T) {
+	t.Parallel()
 	random := rand.New(rand.NewSource(20261004))
 
 	var roots []string
@@ -142,6 +143,7 @@ func TestShorthandMatcherAgreesWithTheExpressions(t *testing.T) {
 // fixtures and the migration's corpus name, where a disagreement would be a real finding gained or
 // lost.
 func TestShorthandMatcherAgreesOnTheFixtureCorpus(t *testing.T) {
+	t.Parallel()
 	for _, classes := range []string{
 		"ps-4 pe-4", "pt-2 pb-2", "ml-1 mr-1 mt-1 mb-1", "w-4 h-4", "top-0 right-0 bottom-0 left-0",
 		"hover:ps-4 hover:pe-4", "-mt-2 -mb-2", "!pt-2 !pb-2", "pt-2! pb-2!", "ps-[2px] pe-[2px]",

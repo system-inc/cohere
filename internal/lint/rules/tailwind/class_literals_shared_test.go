@@ -25,6 +25,7 @@ const sharedReaderSource = "const buttonClassName = (open ? 'flex flex' : 'hidde
 	"const notClasses = 'flex flex';\n"
 
 func TestClassLiteralReaderIsSharedPerSettingsPerFile(t *testing.T) {
+	t.Parallel()
 	twSettings := DefaultClassLiteralSettings()
 	twSettings.AttributeNames = []string{"tw"}
 
@@ -60,6 +61,7 @@ func TestClassLiteralReaderIsSharedPerSettingsPerFile(t *testing.T) {
 }
 
 func TestSharedReadingAgreesWithAFreshOne(t *testing.T) {
+	t.Parallel()
 	fileName := tspath.NormalizePath("/Component.tsx")
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: fileName, Path: tspath.Path(fileName),
