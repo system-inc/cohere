@@ -175,70 +175,78 @@ func TestLiveTableCarriesTheRepositoryTheme(t *testing.T) {
 		t.Run(repository.name, func(t *testing.T) {
 			t.Parallel()
 			system, table := liveTableFor(t, repository.spelling)
-
-			if len(table.Namespaces) == 0 {
-				t.Fatal("the table carries no namespaces, so every bare value resolves through inference alone")
-			}
-			// Longest-first is the engine's precedence and a contract of the field.
-			for index := 1; index < len(table.Namespaces); index++ {
-				if len(table.Namespaces[index-1]) < len(table.Namespaces[index]) {
-					t.Fatalf("namespaces are not longest-first at %d: %q before %q",
-						index, table.Namespaces[index-1], table.Namespaces[index])
-				}
-			}
-
-			// Every namespace the table names must actually hold keys from this theme, and every
-			// key must be one the theme reports. Otherwise the table's namespaces came from
-			// somewhere other than the repository.
-			for _, namespace := range table.Namespaces {
-				keys := table.KeysByNamespace[namespace]
-				if len(keys) == 0 {
-					t.Fatalf("namespace %q holds no keys", namespace)
-				}
-				fromTheme := map[string]bool{}
-				for _, key := range system.Theme().KeysInNamespaces([]string{namespace}) {
-					fromTheme[key] = true
-				}
-				for key := range keys {
-					if !fromTheme[key] {
-						t.Fatalf("namespace %q holds key %q, which this repository's theme does not", namespace, key)
-					}
-				}
-			}
-
-			// The repository's own contributions, by count rather than by name, so the assertion
-			// holds on a repository this test has never seen.
-			staticRoots, functionalRoots := 0, 0
-			// Each kind separately rather than a switch, because a root can be declared both ways:
-			// `@utility fade-in` and `@utility fade-in-*` are two blocks naming one root, and
-			// sixteen roots in this repository have that shape. A switch counted each such root once
-			// and checked only whichever kind happened to win.
-			for root, kinds := range system.utilityRoots {
-				if kinds[UtilityKindStatic] {
-					if _, found := table.Statics[root]; !found {
-						t.Errorf("static `@utility %s` is missing from the table's statics", root)
-					}
-					staticRoots++
-				}
-				if kinds[UtilityKindFunctional] {
-					descriptor, found := table.Descriptors[root]
-					if !found {
-						t.Errorf("functional `@utility %s` is missing from the table's descriptors", root)
-						continue
-					}
-					if !descriptor.PerDeclaration {
-						t.Errorf("functional `@utility %s` is not marked PerDeclaration, so the table would answer it from a row rather than declining to the evaluator", root)
-					}
-					functionalRoots++
-				}
-			}
-			if staticRoots+functionalRoots == 0 {
-				t.Fatal("this repository declares no `@utility` blocks, so this test proved nothing about composition")
-			}
-			t.Logf("%s: %d namespaces, %d static and %d functional `@utility` roots composed in",
-				repository.name, len(table.Namespaces), staticRoots, functionalRoots)
+			checkTableCarriesTheTheme(t, repository.name, system, table)
 		})
 	}
+}
+
+// checkTableCarriesTheTheme is the composition TestLiveTableCarriesTheRepositoryTheme asserts, shared with
+// its public twin: namespaces longest-first and drawn from the theme, and every `@utility` block composed
+// into the table, functional ones marked PerDeclaration.
+func checkTableCarriesTheTheme(t *testing.T, name string, system *LoadedDesignSystem, table *Table) {
+	t.Helper()
+
+	if len(table.Namespaces) == 0 {
+		t.Fatal("the table carries no namespaces, so every bare value resolves through inference alone")
+	}
+	// Longest-first is the engine's precedence and a contract of the field.
+	for index := 1; index < len(table.Namespaces); index++ {
+		if len(table.Namespaces[index-1]) < len(table.Namespaces[index]) {
+			t.Fatalf("namespaces are not longest-first at %d: %q before %q",
+				index, table.Namespaces[index-1], table.Namespaces[index])
+		}
+	}
+
+	// Every namespace the table names must actually hold keys from this theme, and every
+	// key must be one the theme reports. Otherwise the table's namespaces came from
+	// somewhere other than the repository.
+	for _, namespace := range table.Namespaces {
+		keys := table.KeysByNamespace[namespace]
+		if len(keys) == 0 {
+			t.Fatalf("namespace %q holds no keys", namespace)
+		}
+		fromTheme := map[string]bool{}
+		for _, key := range system.Theme().KeysInNamespaces([]string{namespace}) {
+			fromTheme[key] = true
+		}
+		for key := range keys {
+			if !fromTheme[key] {
+				t.Fatalf("namespace %q holds key %q, which this repository's theme does not", namespace, key)
+			}
+		}
+	}
+
+	// The repository's own contributions, by count rather than by name, so the assertion
+	// holds on a repository this test has never seen.
+	staticRoots, functionalRoots := 0, 0
+	// Each kind separately rather than a switch, because a root can be declared both ways:
+	// `@utility fade-in` and `@utility fade-in-*` are two blocks naming one root, and
+	// sixteen roots in this repository have that shape. A switch counted each such root once
+	// and checked only whichever kind happened to win.
+	for root, kinds := range system.utilityRoots {
+		if kinds[UtilityKindStatic] {
+			if _, found := table.Statics[root]; !found {
+				t.Errorf("static `@utility %s` is missing from the table's statics", root)
+			}
+			staticRoots++
+		}
+		if kinds[UtilityKindFunctional] {
+			descriptor, found := table.Descriptors[root]
+			if !found {
+				t.Errorf("functional `@utility %s` is missing from the table's descriptors", root)
+				continue
+			}
+			if !descriptor.PerDeclaration {
+				t.Errorf("functional `@utility %s` is not marked PerDeclaration, so the table would answer it from a row rather than declining to the evaluator", root)
+			}
+			functionalRoots++
+		}
+	}
+	if staticRoots+functionalRoots == 0 {
+		t.Fatal("this repository declares no `@utility` blocks, so this test proved nothing about composition")
+	}
+	t.Logf("%s: %d namespaces, %d static and %d functional `@utility` roots composed in",
+		name, len(table.Namespaces), staticRoots, functionalRoots)
 }
 
 // TestLiveTableBaseHalfCarriesNoRepositoryTokens is the other side of the same claim.

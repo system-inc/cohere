@@ -416,52 +416,53 @@ func TestClassOrderReportsWithoutAFixItCannotPlace(t *testing.T) {
 // the test this replaces; the mechanism asked is the live sort rather than the pairwise comparator.
 func TestClassOrderDimensionsAreAllUsed(t *testing.T) {
 	t.Parallel()
-	designSystem := classOrderLiveRepositorySystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
 
-	testCases := []struct {
-		name      string
-		first     string
-		second    string
-		dimension string
-	}{
-		{
-			name:      "class position",
-			first:     "flex",
-			second:    "items-center",
-			dimension: "the design system's own readings; their roots share no ordering the names suggest",
-		},
-		{
-			name:      "variant grouping",
-			first:     "px-4",
-			second:    "hover:px-8",
-			dimension: "the variant mask; without it the two interleave by property alone",
-		},
-		{
-			name:      "markers first",
-			first:     "group",
-			second:    "flex",
-			dimension: "the marker partition; `group` has no reading and must not be sorted by one",
-		},
-	}
+		testCases := []struct {
+			name      string
+			first     string
+			second    string
+			dimension string
+		}{
+			{
+				name:      "class position",
+				first:     "flex",
+				second:    "items-center",
+				dimension: "the design system's own readings; their roots share no ordering the names suggest",
+			},
+			{
+				name:      "variant grouping",
+				first:     "px-4",
+				second:    "hover:px-8",
+				dimension: "the variant mask; without it the two interleave by property alone",
+			},
+			{
+				name:      "markers first",
+				first:     "group",
+				second:    "flex",
+				dimension: "the marker partition; `group` has no reading and must not be sorted by one",
+			},
+		}
 
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			forward := classOrderLiveSort(t, designSystem, []string{testCase.first, testCase.second})
-			reverse := classOrderLiveSort(t, designSystem, []string{testCase.second, testCase.first})
-			want := []string{testCase.first, testCase.second}
+		for _, testCase := range testCases {
+			t.Run(testCase.name, func(t *testing.T) {
+				t.Parallel()
+				forward := classOrderLiveSort(t, designSystem, []string{testCase.first, testCase.second})
+				reverse := classOrderLiveSort(t, designSystem, []string{testCase.second, testCase.first})
+				want := []string{testCase.first, testCase.second}
 
-			if strings.Join(forward, " ") != strings.Join(want, " ") {
-				t.Errorf("got %v, expected %v, decided by %s", forward, want, testCase.dimension)
-			}
-			// Sorted from the other input too, because a sort that merely preserves its input would
-			// pass the first assertion and order nothing.
-			if strings.Join(reverse, " ") != strings.Join(want, " ") {
-				t.Errorf("from reversed input got %v, expected %v; the sort is not deciding, it is "+
-					"preserving", reverse, want)
-			}
-		})
-	}
+				if strings.Join(forward, " ") != strings.Join(want, " ") {
+					t.Errorf("got %v, expected %v, decided by %s", forward, want, testCase.dimension)
+				}
+				// Sorted from the other input too, because a sort that merely preserves its input would
+				// pass the first assertion and order nothing.
+				if strings.Join(reverse, " ") != strings.Join(want, " ") {
+					t.Errorf("from reversed input got %v, expected %v; the sort is not deciding, it is "+
+						"preserving", reverse, want)
+				}
+			})
+		}
+	})
 }
 
 // TestClassOrderVariantDimensions pins the variant dimensions, with the engine's answers.
@@ -473,48 +474,49 @@ func TestClassOrderDimensionsAreAllUsed(t *testing.T) {
 // The two dropped cases are the subject of TestClassOrderDepthIsNotADimension below.
 func TestClassOrderVariantDimensions(t *testing.T) {
 	t.Parallel()
-	designSystem := classOrderLiveRepositorySystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
 
-	testCases := []struct {
-		name     string
-		input    []string
-		expected []string
-		fixture  string
-		why      string
-	}{
-		{
-			name:     "compound resolves on its inner variant",
-			input:    []string{"dark:focus:flex", "dark:placeholder:flex"},
-			expected: []string{"dark:placeholder:flex", "dark:focus:flex"},
-			fixture:  "class-order/compound-inner-segment",
-			why:      "both are `dark:` compounds, so only the inner variant separates them",
-		},
-		{
-			name:     "a named group sorts where its unnamed form does",
-			input:    []string{"group-hover/pdf:flex", "group-hover/csv:flex", "group-hover:flex"},
-			expected: []string{"group-hover:flex", "group-hover/csv:flex", "group-hover/pdf:flex"},
-			fixture:  "class-order/named-groups",
-			why:      "the name is a modifier on the variant, and an unnamed compound precedes a named one",
-		},
-		{
-			name:     "unknown functional variants order by their own value",
-			input:    []string{"data-[show=true]:flex", "data-[show=false]:flex", "hover:flex"},
-			expected: []string{"hover:flex", "data-[show=false]:flex", "data-[show=true]:flex"},
-			fixture:  "class-order/functional-data",
-			why:      "two `data-` variants tie on registration order and separate on their value text",
-		},
-	}
+		testCases := []struct {
+			name     string
+			input    []string
+			expected []string
+			fixture  string
+			why      string
+		}{
+			{
+				name:     "compound resolves on its inner variant",
+				input:    []string{"dark:focus:flex", "dark:placeholder:flex"},
+				expected: []string{"dark:placeholder:flex", "dark:focus:flex"},
+				fixture:  "class-order/compound-inner-segment",
+				why:      "both are `dark:` compounds, so only the inner variant separates them",
+			},
+			{
+				name:     "a named group sorts where its unnamed form does",
+				input:    []string{"group-hover/pdf:flex", "group-hover/csv:flex", "group-hover:flex"},
+				expected: []string{"group-hover:flex", "group-hover/csv:flex", "group-hover/pdf:flex"},
+				fixture:  "class-order/named-groups",
+				why:      "the name is a modifier on the variant, and an unnamed compound precedes a named one",
+			},
+			{
+				name:     "unknown functional variants order by their own value",
+				input:    []string{"data-[show=true]:flex", "data-[show=false]:flex", "hover:flex"},
+				expected: []string{"hover:flex", "data-[show=false]:flex", "data-[show=true]:flex"},
+				fixture:  "class-order/functional-data",
+				why:      "two `data-` variants tie on registration order and separate on their value text",
+			},
+		}
 
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			ordered := classOrderLiveSort(t, designSystem, testCase.input)
-			if strings.Join(ordered, " ") != strings.Join(testCase.expected, " ") {
-				t.Errorf("got %v, %s says %v: %s",
-					ordered, testCase.fixture, testCase.expected, testCase.why)
-			}
-		})
-	}
+		for _, testCase := range testCases {
+			t.Run(testCase.name, func(t *testing.T) {
+				t.Parallel()
+				ordered := classOrderLiveSort(t, designSystem, testCase.input)
+				if strings.Join(ordered, " ") != strings.Join(testCase.expected, " ") {
+					t.Errorf("got %v, %s says %v: %s",
+						ordered, testCase.fixture, testCase.expected, testCase.why)
+				}
+			})
+		}
+	})
 }
 
 // TestClassOrderDepthIsNotADimension is the correction, and it is the point of this task.
@@ -544,29 +546,30 @@ func TestClassOrderVariantDimensions(t *testing.T) {
 // and the stacked one carries `disabled` on top of it, so its mask is strictly larger.
 func TestClassOrderDepthIsNotADimension(t *testing.T) {
 	t.Parallel()
-	designSystem := classOrderLiveRepositorySystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
 
-	t.Run("a superset mask sorts after the subset it extends", func(t *testing.T) {
-		t.Parallel()
-		ordered := classOrderLiveSort(t, designSystem,
-			[]string{"group-hover:disabled:flex", "group-hover:flex"})
-		expected := []string{"group-hover:flex", "group-hover:disabled:flex"}
-		if strings.Join(ordered, " ") != strings.Join(expected, " ") {
-			t.Errorf("got %v, expected %v: both carry the `group-hover` bit and the stacked class "+
-				"carries `disabled` on top of it, so its mask is strictly larger", ordered, expected)
-		}
-	})
+		t.Run("a superset mask sorts after the subset it extends", func(t *testing.T) {
+			t.Parallel()
+			ordered := classOrderLiveSort(t, designSystem,
+				[]string{"group-hover:disabled:flex", "group-hover:flex"})
+			expected := []string{"group-hover:flex", "group-hover:disabled:flex"}
+			if strings.Join(ordered, " ") != strings.Join(expected, " ") {
+				t.Errorf("got %v, expected %v: both carry the `group-hover` bit and the stacked class "+
+					"carries `disabled` on top of it, so its mask is strictly larger", ordered, expected)
+			}
+		})
 
-	t.Run("but a stacked variant precedes a higher-ranked single one", func(t *testing.T) {
-		t.Parallel()
-		ordered := classOrderLiveSort(t, designSystem,
-			[]string{"dark:flex", "group-hover:disabled:flex"})
-		expected := []string{"group-hover:disabled:flex", "dark:flex"}
-		if strings.Join(ordered, " ") != strings.Join(expected, " ") {
-			t.Errorf("got %v, class-order/stacked-against-single says %v; the deleted rule asserted "+
-				"'every single variant precedes every stacked one' and the engine does no such thing",
-				ordered, expected)
-		}
+		t.Run("but a stacked variant precedes a higher-ranked single one", func(t *testing.T) {
+			t.Parallel()
+			ordered := classOrderLiveSort(t, designSystem,
+				[]string{"dark:flex", "group-hover:disabled:flex"})
+			expected := []string{"group-hover:disabled:flex", "dark:flex"}
+			if strings.Join(ordered, " ") != strings.Join(expected, " ") {
+				t.Errorf("got %v, class-order/stacked-against-single says %v; the deleted rule asserted "+
+					"'every single variant precedes every stacked one' and the engine does no such thing",
+					ordered, expected)
+			}
+		})
 	})
 }
 
@@ -594,34 +597,35 @@ func TestClassOrderDepthIsNotADimension(t *testing.T) {
 // table with a different shape, so the two tests were never asking the same question.
 func TestClassOrderReadingsKeepCustomProperties(t *testing.T) {
 	t.Parallel()
-	designSystem := classOrderLiveRepositorySystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
 
-	keys, unplaceable, resolved := classOrderKeys(
-		[]string{"shadow-lg", "ring-1"}, designSystem.System, designSystem.Table)
-	if !resolved {
-		t.Fatalf("could not place %q", unplaceable)
-	}
+		keys, unplaceable, resolved := classOrderKeys(
+			[]string{"shadow-lg", "ring-1"}, designSystem.System, designSystem.Table)
+		if !resolved {
+			t.Fatalf("could not place %q", unplaceable)
+		}
 
-	shadow, ring := keys["shadow-lg"], keys["ring-1"]
-	// Both indices, because one index each is what dropping the custom property would leave.
-	if len(shadow.order) < 2 || len(ring.order) < 2 {
-		t.Fatalf("expected both to declare a custom property and box-shadow, got %v and %v; a single "+
-			"index each means the `--tw-*` property was dropped and the two cannot be separated",
-			shadow.order, ring.order)
-	}
-	// And they must still differ somewhere, which for these two is the second index.
-	if shadow.order[0] == ring.order[0] && shadow.order[1] == ring.order[1] {
-		t.Errorf("shadow-lg %v and ring-1 %v are identical readings, so the sort cannot separate "+
-			"them and the engine does", shadow.order, ring.order)
-	}
-	// The engine's own numbers, quoted so a drift in either reading fails here rather than silently
-	// changing every class list that holds a shadow and a ring.
-	if shadow.order[0] != 315 || shadow.order[1] != 316 {
-		t.Errorf("shadow-lg reads %v; classorder_fixtures.json recorded [315 316]", shadow.order)
-	}
-	if ring.order[0] != 315 || ring.order[1] != 318 {
-		t.Errorf("ring-1 reads %v; classorder_fixtures.json recorded [315 318]", ring.order)
-	}
+		shadow, ring := keys["shadow-lg"], keys["ring-1"]
+		// Both indices, because one index each is what dropping the custom property would leave.
+		if len(shadow.order) < 2 || len(ring.order) < 2 {
+			t.Fatalf("expected both to declare a custom property and box-shadow, got %v and %v; a single "+
+				"index each means the `--tw-*` property was dropped and the two cannot be separated",
+				shadow.order, ring.order)
+		}
+		// And they must still differ somewhere, which for these two is the second index.
+		if shadow.order[0] == ring.order[0] && shadow.order[1] == ring.order[1] {
+			t.Errorf("shadow-lg %v and ring-1 %v are identical readings, so the sort cannot separate "+
+				"them and the engine does", shadow.order, ring.order)
+		}
+		// The engine's own numbers, quoted so a drift in either reading fails here rather than silently
+		// changing every class list that holds a shadow and a ring.
+		if shadow.order[0] != 315 || shadow.order[1] != 316 {
+			t.Errorf("shadow-lg reads %v; classorder_fixtures.json recorded [315 316]", shadow.order)
+		}
+		if ring.order[0] != 315 || ring.order[1] != 318 {
+			t.Errorf("ring-1 reads %v; classorder_fixtures.json recorded [315 318]", ring.order)
+		}
+	})
 }
 
 // TestClassOrderRootsResolveAgainstTheDesignSystem is the known-dirty control for the table-choice bug.
@@ -636,22 +640,23 @@ func TestClassOrderReadingsKeepCustomProperties(t *testing.T) {
 // is still worth pinning, and it is pinned the same way: the two classes must not share a reading.
 func TestClassOrderRootsResolveAgainstTheDesignSystem(t *testing.T) {
 	t.Parallel()
-	designSystem := classOrderLiveRepositorySystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
 
-	keys, unplaceable, resolved := classOrderKeys(
-		[]string{"ring-offset-1", "ring-1"}, designSystem.System, designSystem.Table)
-	if !resolved {
-		t.Fatalf("could not place %q", unplaceable)
-	}
+		keys, unplaceable, resolved := classOrderKeys(
+			[]string{"ring-offset-1", "ring-1"}, designSystem.System, designSystem.Table)
+		if !resolved {
+			t.Fatalf("could not place %q", unplaceable)
+		}
 
-	offset, ring := keys["ring-offset-1"], keys["ring-1"]
-	if len(offset.order) == 0 || len(ring.order) == 0 {
-		t.Fatalf("both should declare properties, got %v and %v", offset.order, ring.order)
-	}
-	if offset.order[0] == ring.order[0] {
-		t.Errorf("ring-offset-1 and ring-1 lead with the same property index %d, so the sort cannot "+
-			"separate them and the engine does", offset.order[0])
-	}
+		offset, ring := keys["ring-offset-1"], keys["ring-1"]
+		if len(offset.order) == 0 || len(ring.order) == 0 {
+			t.Fatalf("both should declare properties, got %v and %v", offset.order, ring.order)
+		}
+		if offset.order[0] == ring.order[0] {
+			t.Errorf("ring-offset-1 and ring-1 lead with the same property index %d, so the sort cannot "+
+				"separate them and the engine does", offset.order[0])
+		}
+	})
 }
 
 // TestClassOrderMarkersLeadRegardlessOfVariant covers the interaction that produced the final three
@@ -662,13 +667,14 @@ func TestClassOrderRootsResolveAgainstTheDesignSystem(t *testing.T) {
 // partition would put `group` in the middle of the list. It belongs at the front, ahead of both.
 func TestClassOrderMarkersLeadRegardlessOfVariant(t *testing.T) {
 	t.Parallel()
-	designSystem := classOrderLiveRepositorySystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
 
-	ordered := classOrderLiveSort(t, designSystem, []string{"hover:px-8", "group", "flex"})
-	if ordered[0] != "group" {
-		t.Errorf("got %v: a marker must lead even when the other classes carry variants, which "+
-			"means the partition has to happen before the mask is consulted", ordered)
-	}
+		ordered := classOrderLiveSort(t, designSystem, []string{"hover:px-8", "group", "flex"})
+		if ordered[0] != "group" {
+			t.Errorf("got %v: a marker must lead even when the other classes carry variants, which "+
+				"means the partition has to happen before the mask is consulted", ordered)
+		}
+	})
 }
 
 // TestClassOrderMarkersKeepSourceOrder pins the tiebreak.
@@ -678,15 +684,16 @@ func TestClassOrderMarkersLeadRegardlessOfVariant(t *testing.T) {
 // accepts both, and an alphabetical tiebreak would rewrite the first.
 func TestClassOrderMarkersKeepSourceOrder(t *testing.T) {
 	t.Parallel()
-	designSystem := classOrderLiveRepositorySystem(t)
+	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
 
-	for _, input := range [][]string{{"group", "peer", "flex"}, {"peer", "group", "flex"}} {
-		ordered := classOrderLiveSort(t, designSystem, input)
-		if strings.Join(ordered, " ") != strings.Join(input, " ") {
-			t.Errorf("got %v from %v: two markers must keep the order they were written in, and "+
-				"alphabetical would rewrite `peer group`", ordered, input)
+		for _, input := range [][]string{{"group", "peer", "flex"}, {"peer", "group", "flex"}} {
+			ordered := classOrderLiveSort(t, designSystem, input)
+			if strings.Join(ordered, " ") != strings.Join(input, " ") {
+				t.Errorf("got %v from %v: two markers must keep the order they were written in, and "+
+					"alphabetical would rewrite `peer group`", ordered, input)
+			}
 		}
-	}
+	})
 }
 
 // classOrderLiveSort runs the rule's own ordering over a class list.
