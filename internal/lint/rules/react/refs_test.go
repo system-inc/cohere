@@ -853,3 +853,40 @@ export function Component({label}: {label: string}) {
 		}
 	}
 }
+
+// TestRefsReportsARefReadInsideUseMemoAtTheRead is TanStack Query's HydrationBoundary, reduced
+// (#zx5xvtg item 8). A memo callback runs during render, so a ref read inside it is read during
+// render, and React reports it at the read: upstream erases manual memoization before any validator
+// runs, so the callback's body is render code. HydrationBoundary.tsx writes
+// `// eslint-disable-next-line react-hooks/refs` above that read, and React honours it.
+//
+// cohere reported the same verdict at the `useMemo` call instead, one screen above, where the
+// author's disable comment does not reach. The rule now lowers through the memo-erased graph, as
+// upstream's validator reads it, so the finding is on the read and the suppression covers it.
+func TestRefsReportsARefReadInsideUseMemoAtTheRead(t *testing.T) {
+	t.Parallel()
+
+	result := runRefsFixture(t, refsFixture{
+		Name: "ref read inside a memo callback",
+		Source: `function hydrate(options: unknown): void {}
+function HydrationBoundary({state}: {state: number}) {
+  const optionsRef = useRef(state);
+  const queue = useMemo(() => {
+    hydrate(optionsRef.current);
+    return state;
+  }, [state]);
+  return <div>{queue}</div>;
+}
+`,
+	})
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("expected one finding, got %v", result.MessageIds())
+	}
+	source := result.SourceFile.Text()
+	reported := strings.Count(source[:result.Diagnostics[0].Range.Pos()], "\n")
+	read := strings.Count(source[:strings.Index(source, "optionsRef.current")], "\n")
+	if reported != read {
+		t.Errorf("the finding is on line %d, the ref read on line %d: %q", reported+1, read+1,
+			source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()])
+	}
+}

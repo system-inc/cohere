@@ -180,7 +180,7 @@ var Refs = rule.Rule{
 					return
 				}
 				refsForEachCompiledFunction(node, func(functionNode *ast.Node) {
-					lowered := high_level_intermediate_representation.ForFunction(ctx, functionNode)
+					lowered := high_level_intermediate_representation.ForFunctionWithoutManualMemoization(ctx, functionNode)
 					if lowered == nil {
 						return
 					}
@@ -230,7 +230,7 @@ func refsAnalyzeCompilationUnit(ctx rule.Context, function *high_level_intermedi
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
 	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
-		high_level_intermediate_representation.ForFunction)
+		high_level_intermediate_representation.ForFunctionWithoutManualMemoization)
 	findings := refsSweepFunction(ctx, function)
 	for _, finding := range findings {
 		refsReport(ctx, function, finding)
