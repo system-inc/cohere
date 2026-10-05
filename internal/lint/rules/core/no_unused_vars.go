@@ -283,22 +283,55 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 	}
 
 	for _, candidate := range candidates {
-		if isExemptFromUnusedReport(ctx, candidate, candidates, settings, reads) {
+		// The gates before the exemptions run in upstream's order, collectUnusedVariables', because
+		// reportUsedIgnorePattern makes the order visible: a name an earlier gate sets aside is never
+		// asked whether it is used. `vars: "local"` first, then an ignored array element, then a class
+		// with a static block, then the two kinds a mode skips whole, then each kind's ignore pattern,
+		// then `using`. See isExemptFromUnusedReport for what follows.
+		if settings.Vars == "local" && isGlobalScopeBinding(ctx.SourceFile, candidate) {
 			continue
 		}
 		name := candidate.name.Text()
 		var candidateWrites []*ast.Node
 		usedOnlyAsType := false
-		if symbol := ctx.TypeChecker.GetSymbolAtLocation(candidate.name); symbol != nil {
+		symbol := ctx.TypeChecker.GetSymbolAtLocation(candidate.name)
+		if symbol != nil {
 			candidateWrites = writes[symbol]
 			usedOnlyAsType = typeOnlyReads[symbol]
 		}
-		// Before either report, as upstream's gate is: a rest sibling read only through `typeof` is
-		// silent too, and so is an ignored array element.
+		// Upstream asks this of every kind before any other: a parameter or a caught error
+		// destructured from an array is an ignored array element first.
 		arrayElement := destructuredArrayIgnore != nil && isDestructuredFromAnArray(candidate, candidateWrites)
 		if arrayElement && destructuredArrayIgnore.MatchString(name) {
+			reportUsedIgnoredName(ctx, candidate, symbol, candidateWrites, settings, reads,
+				"destructuredArrayIgnorePattern", settings.DestructuredArrayIgnorePattern, "an element of array destructuring")
 			continue
 		}
+		if settings.IgnoreClassWithStaticInitBlock && candidate.declaration.Kind == ast.KindClassDeclaration &&
+			hasStaticBlock(candidate.declaration) {
+			continue
+		}
+		// `caughtErrors: "none"` skips every caught error, including each name destructured out of
+		// one, and `args: "none"` every parameter, before their patterns are asked.
+		if candidate.kind == bindingCaughtError && settings.CaughtErrors == "none" {
+			continue
+		}
+		if candidate.kind == bindingParameter && settings.Args == "none" {
+			continue
+		}
+		if matchesIgnorePattern(candidate, settings) {
+			option, pattern, noun := ignorePatternFor(candidate.kind, settings)
+			reportUsedIgnoredName(ctx, candidate, symbol, candidateWrites, settings, reads, option, pattern, noun)
+			continue
+		}
+		if settings.IgnoreUsingDeclarations && isUsingDeclaration(candidate) {
+			continue
+		}
+		if isExemptFromUnusedReport(ctx, candidate, symbol, candidates, settings, reads) {
+			continue
+		}
+		// Before either report, as upstream's gate is: a rest sibling read only through `typeof` is
+		// silent too.
 		if settings.IgnoreRestSiblings && hasRestSiblingDeclarationOrWrite(candidate, candidateWrites) {
 			continue
 		}
@@ -1023,30 +1056,17 @@ func isDestructuredFromAnArray(candidate candidateBinding, writes []*ast.Node) b
 // isExemptFromUnusedReport reports whether a binding nothing reads is nonetheless not a finding.
 //
 // Every arm here is an upstream exemption rather than a judgment of ours, and each one is the
-// difference between a rule that is usable and one that reports every well-written file.
+// difference between a rule that is usable and one that reports every well-written file. The gates
+// upstream asks first (`vars: "local"`, the ignore patterns, `caughtErrors` and `args` at "none",
+// static-block classes and `using`) run before this, in analyzeUnusedBindings, in upstream's order.
 func isExemptFromUnusedReport(
 	ctx rule.Context,
 	candidate candidateBinding,
+	symbol *ast.Symbol,
 	all []candidateBinding,
 	settings NoUnusedVarsOptions,
 	reads map[*ast.Symbol]bool,
 ) bool {
-	// The ignore pattern is checked before resolution because it is by far the cheapest test and it
-	// settles the majority of real-tree candidates on its own.
-	if matchesIgnorePattern(candidate, settings) {
-		return true
-	}
-
-	// `caughtErrors: "none"` skips every caught error, including each name destructured out of one.
-	if candidate.kind == bindingCaughtError && settings.CaughtErrors == "none" {
-		return true
-	}
-
-	// `vars: "local"` skips what another script could read. See isGlobalScopeBinding.
-	if settings.Vars == "local" && isGlobalScopeBinding(ctx.SourceFile, candidate) {
-		return true
-	}
-
 	// An import named `React` or `h` in a file containing JSX is used by the JSX transform, which
 	// no source-level read expresses. Under the classic `"jsx": "react"` transform every element
 	// compiles to `React.createElement`, so the import is load-bearing while looking untouched.
@@ -1082,14 +1102,11 @@ func isExemptFromUnusedReport(
 		return true
 	}
 
-	// A parameter under `args: "none"` is never reported. Under the default `after-used`, only
-	// parameters following the last used one are. A name destructured out of a parameter is a
+	// Under the default `after-used`, only parameters following the last used one are reported
+	// (`args: "none"` was settled before this). A name destructured out of a parameter is a
 	// parameter for all of this except the last: upstream's isAfterLastUsedArg applies only when the
 	// name's parent is the function itself, so `({ a, b }) => b` reports `a` under `after-used`.
 	if candidate.kind == bindingParameter {
-		if settings.Args == "none" {
-			return true
-		}
 		// A setter's parameter cannot be removed: `set foo() {}` is a syntax error. Upstream
 		// exempts it for exactly that reason at `allowed.rs`'s
 		// `is_allowed_param_because_of_method`, and so does a constructor parameter carrying an
@@ -1143,13 +1160,20 @@ func isExemptFromUnusedReport(
 		return true
 	}
 
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(candidate.name)
 	if symbol == nil {
 		// A name the checker cannot resolve is not provably unused. Reporting it would be a guess
 		// in the direction that costs a false positive on code that is very likely fine.
 		return true
 	}
 
+	return isUsedBinding(ctx, candidate, symbol, reads)
+}
+
+// isUsedBinding reports whether something keeps a resolved binding alive: a read, through its own
+// symbol or the one an import aliases, the for-in leading-return idiom, or an export. It is the half
+// of upstream's usedVariables this rule computes, asked both by isExemptFromUnusedReport and, for a
+// name an ignore pattern set aside, by reportUsedIgnorePattern.
+func isUsedBinding(ctx rule.Context, candidate candidateBinding, symbol *ast.Symbol, reads map[*ast.Symbol]bool) bool {
 	if reads[symbol] {
 		return true
 	}
@@ -2095,6 +2119,74 @@ func hasExportModifier(node *ast.Node) bool {
 	return false
 }
 
+// noUnusedVarsUsedIgnoredMessage renders typescript-eslint's `usedIgnoredVar`: a name an ignore
+// pattern marks as deliberately unused, which is used.
+func noUnusedVarsUsedIgnoredMessage(name string, option string, pattern string, noun string) rule.Message {
+	return rule.Message{
+		Id: "usedIgnoredVar",
+		Description: "'" + name + "' matches " + option + " " + pattern + ", which marks " + noun +
+			" as deliberately unused, but it is used. The name now says the opposite of what the code " +
+			"does, and the pattern that should catch a forgotten binding is hiding this one from every " +
+			"later check. Rename it so it no longer matches.",
+	}
+}
+
+// reportUsedIgnoredName reports `usedIgnoredVar` on a name its kind's ignore pattern set aside, when
+// reportUsedIgnorePattern is on and the name is used, at the node an unused finding would take.
+// A name the checker cannot resolve is not provably used, so it stays silent.
+func reportUsedIgnoredName(
+	ctx rule.Context,
+	candidate candidateBinding,
+	symbol *ast.Symbol,
+	writes []*ast.Node,
+	settings NoUnusedVarsOptions,
+	reads map[*ast.Symbol]bool,
+	option string,
+	pattern string,
+	noun string,
+) {
+	if !settings.ReportUsedIgnorePattern || symbol == nil || !isUsedBinding(ctx, candidate, symbol, reads) {
+		return
+	}
+	ctx.ReportNode(unusedBindingReportNode(candidate, writes), noUnusedVarsUsedIgnoredMessage(candidate.name.Text(), option, pattern, noun))
+}
+
+// ignorePatternFor names the ignore pattern a kind of binding answers to, as nameMatchesIgnorePattern
+// chooses it, and what the pattern calls that kind.
+func ignorePatternFor(kind unusedBindingKind, settings NoUnusedVarsOptions) (string, string, string) {
+	switch kind {
+	case bindingParameter:
+		return "argsIgnorePattern", settings.ArgsIgnorePattern, "an argument"
+	case bindingCaughtError:
+		return "caughtErrorsIgnorePattern", settings.CaughtErrorsIgnorePattern, "a caught error"
+	}
+	return "varsIgnorePattern", settings.VarsIgnorePattern, "a variable"
+}
+
+// hasStaticBlock reports whether a class's body holds a `static {}` block, which
+// ignoreClassWithStaticInitBlock exempts: the block runs when the class is defined, so a class nothing
+// reads can still be there for its side effect.
+func hasStaticBlock(class *ast.Node) bool {
+	for _, member := range class.Members() {
+		if member.Kind == ast.KindClassStaticBlockDeclaration {
+			return true
+		}
+	}
+	return false
+}
+
+// isUsingDeclaration reports whether a variable is declared with `using` or `await using`, which
+// ignoreUsingDeclarations exempts: the declaration exists to dispose of its value at the end of the
+// scope, whether or not anything reads it.
+func isUsingDeclaration(candidate candidateBinding) bool {
+	if candidate.kind != bindingVariable || candidate.declaration.Kind != ast.KindVariableDeclaration {
+		return false
+	}
+	list := candidate.declaration.Parent
+	// The Using bit alone: `await using` is Const|Using, so masking with it would also match `const`.
+	return list != nil && list.Kind == ast.KindVariableDeclarationList && list.Flags&ast.NodeFlagsUsing != 0
+}
+
 // matchesIgnorePattern reports whether a binding's name says the omission is deliberate.
 func matchesIgnorePattern(candidate candidateBinding, settings NoUnusedVarsOptions) bool {
 	return nameMatchesIgnorePattern(candidate.name.Text(), candidate.kind, settings)
@@ -2146,11 +2238,9 @@ func nameMatchesIgnorePattern(name string, kind unusedBindingKind, settings NoUn
 // never consulted until #6esg2nx, so a config setting them changed nothing; the registry guard
 // TestEveryOptionFieldARuleDecodesIsRead now fails on a field like that.
 //
-// Upstream 8.71 has four more keys: `ignoreClassWithStaticInitBlock`, `ignoreUsingDeclarations`,
-// `reportUsedIgnorePattern` (a `usedIgnoredVar` finding on an ignored name that is used) and
-// `enableAutofixRemoval`. None is declared here, so a config writing one is refused at load by name
-// rather than loaded and ignored. No config in ahra, phi or connected sets any of them (2026-10-04);
-// porting one is a decision for the day one does.
+// `ignoreClassWithStaticInitBlock`, `ignoreUsingDeclarations` and `reportUsedIgnorePattern` are
+// typescript-eslint 8.71's and ESLint 10.8.1's core schema's too, ported against upstream's rows
+// (#e1zk9s0). Each defaults false, the zero value.
 type NoUnusedVarsOptions struct {
 	// Vars is `all` or `local`. Default `all`. `local` skips a binding in the global scope, which
 	// only a script has; see isGlobalScopeBinding.
@@ -2176,6 +2266,15 @@ type NoUnusedVarsOptions struct {
 	// skip: `const [_first, second] = pair`. It is asked before the other patterns and applies to a
 	// parameter or a caught error destructured from an array too. See isDestructuredFromAnArray.
 	DestructuredArrayIgnorePattern string `json:"destructuredArrayIgnorePattern"`
+	// IgnoreClassWithStaticInitBlock exempts a class whose body holds a `static {}` block, which runs
+	// when the class is defined. See hasStaticBlock.
+	IgnoreClassWithStaticInitBlock bool `json:"ignoreClassWithStaticInitBlock"`
+	// IgnoreUsingDeclarations exempts a `using` or `await using` binding, which exists to dispose of
+	// its value. See isUsingDeclaration.
+	IgnoreUsingDeclarations bool `json:"ignoreUsingDeclarations"`
+	// ReportUsedIgnorePattern reports `usedIgnoredVar` on a name an ignore pattern sets aside that is
+	// used, so the pattern cannot hide a name that lies about itself. See reportUsedIgnoredName.
+	ReportUsedIgnorePattern bool `json:"reportUsedIgnorePattern"`
 }
 
 // noUnusedVarsOptionFields is NoUnusedVarsOptions without its UnmarshalJSON, the shape the object

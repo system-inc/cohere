@@ -21,8 +21,8 @@ import (
  * The first 25 rows are upstream's own: every row in its v8.71.0 test files that sets one of the
  * three, extracted by transpiling the files and stubbing RuleTester. Those files run under
  * `sourceType: "script"`, as cohere reads a file with no import or export. Three of them also set
- * `reportUsedIgnorePattern`, which cohere does not declare (see NoUnusedVarsOptions); the key is
- * dropped from both columns, and upstream's answer without it is what they assert. The rest are edge
+ * `reportUsedIgnorePattern`. Here the key is dropped from both columns, and upstream's answer without
+ * it is what they assert; with it, they are replayed by TestNoUnusedVarsOptionsUpstreamCorpus. The rest are edge
  * rows written for this port, each replayed under the source type cohere gives it: a script unless
  * it imports or exports. Findings in their prelude are left out, as in
  * TestNoUnusedVarsIgnoreRestSiblings. Upstream's id `unusedVar` is this rule's `noUnusedVars`.
@@ -193,6 +193,10 @@ func TestDecodeNoUnusedVarsOptionsModesAndShorthand(t *testing.T) {
 		`{"destructuredArrayIgnorePattern": "^_"}`: {
 			Vars: "all", Args: "after-used", CaughtErrors: "all", DestructuredArrayIgnorePattern: "^_",
 		},
+		`{"ignoreClassWithStaticInitBlock": true, "ignoreUsingDeclarations": true, "reportUsedIgnorePattern": true}`: {
+			Vars: "all", Args: "after-used", CaughtErrors: "all",
+			IgnoreClassWithStaticInitBlock: true, IgnoreUsingDeclarations: true, ReportUsedIgnorePattern: true,
+		},
 	}
 	for raw, want := range accepted {
 		decoded, err := DecodeNoUnusedVarsOptions(json.RawMessage(raw))
@@ -206,13 +210,13 @@ func TestDecodeNoUnusedVarsOptionsModesAndShorthand(t *testing.T) {
 	}
 
 	refused := map[string]string{
-		`"locals"`:                          `"locals"`,
-		`{"vars": "locals"}`:                `vars is one of`,
-		`{"vars": "Local"}`:                 `"Local"`,
-		`{"args": "after_used"}`:            `args is one of`,
-		`{"caughtErrors": "never"}`:         `caughtErrors is one of`,
-		`{"reportUsedIgnorePattern": true}`: `reportUsedIgnorePattern`,
-		`{"Vars": "local"}`:                 `"Vars"`,
+		`"locals"`:                           `"locals"`,
+		`{"vars": "locals"}`:                 `vars is one of`,
+		`{"vars": "Local"}`:                  `"Local"`,
+		`{"args": "after_used"}`:             `args is one of`,
+		`{"caughtErrors": "never"}`:          `caughtErrors is one of`,
+		`{"reportUsedIgnorePatterns": true}`: `reportUsedIgnorePatterns`,
+		`{"Vars": "local"}`:                  `"Vars"`,
 	}
 	for raw, naming := range refused {
 		_, err := DecodeNoUnusedVarsOptions(json.RawMessage(raw))
