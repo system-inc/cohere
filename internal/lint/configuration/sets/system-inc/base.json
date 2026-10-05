@@ -2,6 +2,15 @@
     "extends": "cohere:typescript",
     "ignorePatterns": ["**/wasm/photon/core/photon_rs_bg.js", "**/wasm/photon/core/photon_rs_bg.d.ts"],
     "departures": {
+        "@typescript-eslint/ban-ts-comment": "Allows @ts-expect-error with a description, and @ts-check, as before the cohere:adamic split, which bans all four directives: api-phi-health has 7 at cohere 5f65dd9d, so this holds until its fix wave reads 0 in every consumer (#cwycf2h).",
+        "@typescript-eslint/unbound-method": "Measured, not a gap: 79 findings across the repos, none a defect. 52 are expect(mock.method) in tests, where the method is passed to the assertion, never called unbound (#smnjh4c). cohere:adamic turns it on for outsiders.",
+        "adamic/invariant-mutable": "cohere:adamic turns it on, and our code has 721 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#phhrgfw). Outsiders get it on.",
+        "adamic/no-definite-assignment": "cohere:adamic turns it on, and our code has 34 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#vk7621w). Outsiders get it on.",
+        "adamic/no-optional-widening": "cohere:adamic turns it on, and our code has 401 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#aaajpke). Outsiders get it on.",
+        "adamic/no-type-predicate": "cohere:adamic turns it on, and our code has 155 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#05k4swm). Outsiders get it on.",
+        "adamic/no-unchecked-cast": "cohere:adamic turns it on, and our code has 1,340 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#v2r1xst). Outsiders get it on.",
+        "adamic/nominal-class": "cohere:adamic turns it on, and our code has 1,396 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#zeqjfyx). Outsiders get it on.",
+        "adamic/single-spread": "cohere:adamic turns it on, and our code has 232 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#hzk757e). Outsiders get it on.",
         "no-restricted-globals": "Adds Buffer to the house list: our code runs on Cloudflare Workers, where @cloudflare/workers-types declares Buffer as any, and @nexus/source/encoding/ByteEncoding replaces it. Every other entry is cohere:typescript's.",
         "no-implicit-globals": "Base's tsconfig sets no moduleDetection, so a file with no import or export is a script whose top-level declarations are globals, and this rule is what stops them. It comes back out when Base adopts moduleDetection force (#tz23yx2, #rbvd7sv).",
         "@typescript-eslint/no-require-imports": "off for every .cjs: CommonJS has no import statement and import() is async, so require is the only module form a .cjs can use (#na0hgjz)",
@@ -9,6 +18,23 @@
         "@typescript-eslint/unified-signatures": "ignoreDifferentlyNamedParameters, ruled by @system_cohere in 17339 and corrected in 17361, mirrored in Base ESLint defaults c4d3916 (api 3f87fa5e)"
     },
     "rules": {
+        "@typescript-eslint/ban-ts-comment": [
+            "error",
+            {
+                "ts-expect-error": "allow-with-description",
+                "ts-ignore": true,
+                "ts-nocheck": true,
+                "ts-check": false
+            }
+        ],
+        "@typescript-eslint/unbound-method": "off",
+        "adamic/invariant-mutable": "off",
+        "adamic/no-definite-assignment": "off",
+        "adamic/no-optional-widening": "off",
+        "adamic/no-type-predicate": "off",
+        "adamic/no-unchecked-cast": "off",
+        "adamic/nominal-class": "off",
+        "adamic/single-spread": "off",
         "nexus/boundary-no-nexus-outside-import": "error",
         "no-restricted-properties": [
             "error",

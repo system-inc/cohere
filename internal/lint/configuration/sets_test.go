@@ -3,6 +3,7 @@ package configuration
 import (
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -23,6 +24,10 @@ func withSetFiles(t *testing.T, files map[string]string) {
 	t.Cleanup(func() { setFiles = original })
 }
 
+// rootSets are the sets that extend nothing: cohere:adamic, the soundness rules, and cohere:house, the
+// taste rules, which cohere:typescript composes (#drbrp8c). Every other set sits on cohere:typescript.
+var rootSets = []string{SetPrefix + "adamic", SetPrefix + "house"}
+
 func TestEverySetCohereCarriesLoads(t *testing.T) {
 	t.Parallel()
 	names := SetNames()
@@ -35,8 +40,20 @@ func TestEverySetCohereCarriesLoads(t *testing.T) {
 		if len(loaded.Rules) == 0 {
 			t.Errorf("%s loaded with no rules", name)
 		}
-		if loaded.Sources[len(loaded.Sources)-1] != SetPrefix+"typescript" {
+		chain := loaded.Sources[1:]
+		if slices.Contains(rootSets, name) {
+			if !reflect.DeepEqual(chain, []string{name}) {
+				t.Errorf("%s is a root set and extends nothing, but its sources are %v", name, loaded.Sources)
+			}
+			continue
+		}
+		if !slices.Contains(chain, SetPrefix+"typescript") {
 			t.Errorf("%s does not sit on cohere:typescript: its sources are %v", name, loaded.Sources)
+		}
+		for _, root := range rootSets {
+			if !slices.Contains(chain, root) {
+				t.Errorf("%s does not reach %s: its sources are %v", name, root, loaded.Sources)
+			}
 		}
 	}
 }

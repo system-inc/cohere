@@ -31,6 +31,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -449,6 +453,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -494,6 +502,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -579,6 +591,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -616,6 +632,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -659,6 +679,10 @@
             "fixKind": "suggestion",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -701,6 +725,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -742,6 +770,10 @@
             ],
             "fixKind": "both",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -804,6 +836,10 @@
             "fixKind": "both",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -863,6 +899,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -907,6 +947,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -943,6 +987,10 @@
                 "shouldBeLast"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -985,6 +1033,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -1043,6 +1095,10 @@
             "fixKind": "both",
             "sets": [
                 {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -1080,6 +1136,10 @@
             ],
             "fixKind": "suggestion",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -1247,6 +1307,10 @@
             "fixKind": "both",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -1377,6 +1441,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -1427,6 +1495,10 @@
             "fixKind": "suggestion",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -1467,6 +1539,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -1547,6 +1623,10 @@
                 "onlyStatic"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -1707,6 +1787,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -1747,6 +1831,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -1829,6 +1917,10 @@
             ],
             "fixKind": "both",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -2115,6 +2207,10 @@
             "fixKind": "suggestion",
             "sets": [
                 {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -2195,6 +2291,10 @@
                 "primitiveOverridden"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -2289,6 +2389,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -2375,6 +2479,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -2412,6 +2520,10 @@
             ],
             "fixKind": "suggestion",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -2451,6 +2563,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -2488,6 +2604,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -2527,6 +2647,10 @@
             "fixKind": "suggestion",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -2564,6 +2688,10 @@
             ],
             "fixKind": "suggestion",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -2604,6 +2732,10 @@
                 "unsafeTupleSpread"
             ],
             "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -2647,6 +2779,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -2689,6 +2825,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -2725,6 +2865,10 @@
                 "unsafeMerging"
             ],
             "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -2801,6 +2945,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -2844,6 +2992,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -2881,6 +3033,10 @@
                 "unsafeReturnAssignment"
             ],
             "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -3095,6 +3251,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -3132,6 +3292,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -3262,6 +3426,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -3312,6 +3480,10 @@
             "fixKind": "suggestion",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -3348,6 +3520,10 @@
                 "preferForOf"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -3388,6 +3564,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -3426,6 +3606,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -3480,6 +3664,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -3522,6 +3710,10 @@
             ],
             "fixKind": "suggestion",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -3601,6 +3793,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -3639,6 +3835,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -3676,6 +3876,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -3921,6 +4125,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -4002,6 +4210,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -4040,6 +4252,28 @@
             "messageIds": [
                 "unbound",
                 "unboundWithoutThisAnnotation"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
             ]
         },
         {
@@ -4059,6 +4293,10 @@
                 "singleParameterDifference"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -4146,6 +4384,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -4177,7 +4419,29 @@
             "namespace": "adamic",
             "origin": "house",
             "category": "adamic",
-            "typeAware": true
+            "typeAware": true,
+            "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ]
         },
         {
             "name": "adamic/no-definite-assignment",
@@ -4185,7 +4449,29 @@
             "namespace": "adamic",
             "origin": "house",
             "category": "adamic",
-            "typeAware": false
+            "typeAware": false,
+            "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ]
         },
         {
             "name": "adamic/no-optional-widening",
@@ -4193,7 +4479,29 @@
             "namespace": "adamic",
             "origin": "house",
             "category": "adamic",
-            "typeAware": true
+            "typeAware": true,
+            "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ]
         },
         {
             "name": "adamic/no-type-predicate",
@@ -4201,7 +4509,29 @@
             "namespace": "adamic",
             "origin": "house",
             "category": "adamic",
-            "typeAware": false
+            "typeAware": false,
+            "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ]
         },
         {
             "name": "adamic/no-unchecked-cast",
@@ -4209,7 +4539,29 @@
             "namespace": "adamic",
             "origin": "house",
             "category": "adamic",
-            "typeAware": true
+            "typeAware": true,
+            "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ]
         },
         {
             "name": "adamic/nominal-class",
@@ -4217,7 +4569,29 @@
             "namespace": "adamic",
             "origin": "house",
             "category": "adamic",
-            "typeAware": true
+            "typeAware": true,
+            "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ]
         },
         {
             "name": "adamic/single-spread",
@@ -4225,7 +4599,29 @@
             "namespace": "adamic",
             "origin": "house",
             "category": "adamic",
-            "typeAware": false
+            "typeAware": false,
+            "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ]
         },
         {
             "name": "array-callback-return",
@@ -4288,6 +4684,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -4900,6 +5300,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -5497,6 +5901,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -5535,6 +5943,14 @@
                 "missingSome"
             ],
             "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "warn"
+                },
+                {
+                    "set": "cohere:house",
+                    "severity": "warn"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -5585,6 +6001,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -5620,6 +6040,10 @@
                 "shouldBeLast"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -5675,6 +6099,10 @@
             ],
             "fixKind": "both",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -5768,6 +6196,14 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:adamic",
+                    "severity": "warn"
+                },
+                {
+                    "set": "cohere:house",
+                    "severity": "warn"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -5807,6 +6243,10 @@
                 "notGrouped"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -5905,6 +6345,10 @@
             "fixKind": "both",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -5943,6 +6387,10 @@
                 "maximumExceeded"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -5996,6 +6444,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -6035,6 +6487,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -6072,6 +6528,10 @@
                 "outsideInternal"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -6270,6 +6730,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -6314,6 +6778,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -6355,6 +6823,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -6394,6 +6866,10 @@
                 "forIn"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -6435,6 +6911,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -6475,6 +6955,10 @@
                 "isoStringCutToDate"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -6521,6 +7005,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -6564,6 +7052,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -6603,6 +7095,10 @@
                 "noPropertyAlias"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -6645,6 +7141,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -6690,6 +7190,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -6734,6 +7238,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -6774,6 +7282,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -6818,6 +7330,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -6859,6 +7375,10 @@
                 "noUtils"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -6935,6 +7455,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -6976,6 +7500,10 @@
                 "noTypeAliasSuffix"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -7766,6 +8294,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -7808,6 +8340,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -7872,6 +8408,10 @@
             "category": "localization",
             "typeAware": false,
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -8131,6 +8671,14 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:adamic",
+                    "severity": "warn"
+                },
+                {
+                    "set": "cohere:house",
+                    "severity": "warn"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -8203,6 +8751,14 @@
                 "noClassAssign"
             ],
             "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "warn"
+                },
+                {
+                    "set": "cohere:house",
+                    "severity": "warn"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -8314,6 +8870,14 @@
                 "noConstAssign"
             ],
             "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "warn"
+                },
+                {
+                    "set": "cohere:house",
+                    "severity": "warn"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -8589,6 +9153,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -8624,6 +9192,14 @@
                 "noDupeClassMembers"
             ],
             "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "warn"
+                },
+                {
+                    "set": "cohere:house",
+                    "severity": "warn"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -8736,6 +9312,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -8852,6 +9432,10 @@
             ],
             "fixKind": "suggestion",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -8978,6 +9562,14 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:adamic",
+                    "severity": "warn"
+                },
+                {
+                    "set": "cohere:house",
+                    "severity": "warn"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -9090,6 +9682,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -9131,6 +9727,10 @@
             "fixKind": "both",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -9167,6 +9767,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -9244,6 +9848,14 @@
                 "noFuncAssign"
             ],
             "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "warn"
+                },
+                {
+                    "set": "cohere:house",
+                    "severity": "warn"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -9324,6 +9936,10 @@
             "fixKind": "both",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -9392,6 +10008,14 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:adamic",
+                    "severity": "warn"
+                },
+                {
+                    "set": "cohere:house",
+                    "severity": "warn"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -9443,6 +10067,10 @@
                 "moveDeclToRoot"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -9572,6 +10200,14 @@
             "fixKind": "suggestion",
             "sets": [
                 {
+                    "set": "cohere:adamic",
+                    "severity": "warn"
+                },
+                {
+                    "set": "cohere:house",
+                    "severity": "warn"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -9607,6 +10243,10 @@
                 "identifierClashWithLabel"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -9649,6 +10289,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -9686,6 +10330,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -9722,6 +10370,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -9853,6 +10505,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -9888,6 +10544,10 @@
                 "multilineString"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -9934,6 +10594,10 @@
                 "noNewStatement"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -10006,6 +10670,14 @@
                 "noNewNativeNonconstructor"
             ],
             "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "warn"
+                },
+                {
+                    "set": "cohere:house",
+                    "severity": "warn"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -10117,6 +10789,14 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:adamic",
+                    "severity": "warn"
+                },
+                {
+                    "set": "cohere:house",
+                    "severity": "warn"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -10153,6 +10833,10 @@
             ],
             "fixKind": "suggestion",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -10265,6 +10949,10 @@
                 "assignmentToFunctionParamProp"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -10580,6 +11268,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -10730,6 +11422,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -10765,6 +11461,14 @@
                 "noSetterReturn"
             ],
             "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "warn"
+                },
+                {
+                    "set": "cohere:house",
+                    "severity": "warn"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -10913,6 +11617,14 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:adamic",
+                    "severity": "warn"
+                },
+                {
+                    "set": "cohere:house",
+                    "severity": "warn"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -11022,6 +11734,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -11152,6 +11868,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -11270,6 +11990,14 @@
             "fixKind": "suggestion",
             "sets": [
                 {
+                    "set": "cohere:adamic",
+                    "severity": "warn"
+                },
+                {
+                    "set": "cohere:house",
+                    "severity": "warn"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -11347,6 +12075,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -11395,6 +12127,10 @@
                 "usedBeforeDefined"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -11585,6 +12321,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -11620,6 +12360,10 @@
                 "unexpectedConcat"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -11657,6 +12401,10 @@
             ],
             "fixKind": "suggestion",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -11698,6 +12446,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -11738,6 +12490,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -11775,6 +12531,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -11810,6 +12570,10 @@
                 "unexpectedVar"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -11850,6 +12614,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -11885,6 +12653,14 @@
                 "noWith"
             ],
             "sets": [
+                {
+                    "set": "cohere:adamic",
+                    "severity": "warn"
+                },
+                {
+                    "set": "cohere:house",
+                    "severity": "warn"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -11932,6 +12708,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -11978,6 +12758,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -12018,6 +12802,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -12073,6 +12861,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -12124,6 +12916,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -12160,6 +12956,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -12198,6 +12998,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -12235,6 +13039,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -12291,6 +13099,10 @@
             "fixKind": "suggestion",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -12326,6 +13138,10 @@
                 "preferRestParams"
             ],
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -12363,6 +13179,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -12399,6 +13219,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -12485,6 +13309,10 @@
             ],
             "fixKind": "suggestion",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -14272,6 +15100,10 @@
             "fixKind": "fix",
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -14996,6 +15828,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -15036,6 +15872,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"
@@ -15153,6 +15993,10 @@
             ],
             "sets": [
                 {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
+                {
                     "set": "cohere:next",
                     "severity": "error"
                 },
@@ -15192,6 +16036,10 @@
             ],
             "fixKind": "fix",
             "sets": [
+                {
+                    "set": "cohere:house",
+                    "severity": "error"
+                },
                 {
                     "set": "cohere:next",
                     "severity": "error"

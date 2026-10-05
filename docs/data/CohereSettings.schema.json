@@ -1551,6 +1551,8 @@
             "oneOf": [
                 {
                     "examples": [
+                        "cohere:adamic",
+                        "cohere:house",
                         "cohere:next",
                         "cohere:react",
                         "cohere:system-inc/base",
@@ -1564,6 +1566,8 @@
                 {
                     "items": {
                         "examples": [
+                            "cohere:adamic",
+                            "cohere:house",
                             "cohere:next",
                             "cohere:react",
                             "cohere:system-inc/base",
