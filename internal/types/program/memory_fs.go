@@ -1,12 +1,14 @@
 package program
 
 import (
+	"encoding/binary"
 	"errors"
 	"io/fs"
 	"path"
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf16"
 
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
@@ -83,9 +85,43 @@ func (m *MemoryFS) FileExists(fileName string) bool {
 	return exists
 }
 
+// ReadFile answers as the disk does: a file's bytes decoded the way the real filesystem decodes them, so a
+// fixture's byte order mark or UTF-16 reaches the compiler as it would from a file.
 func (m *MemoryFS) ReadFile(fileName string) (string, bool) {
 	contents, exists := m.files[path.Clean(fileName)]
-	return contents, exists
+	if !exists {
+		return "", false
+	}
+	return decodeLikeDisk(contents), true
+}
+
+// decodeLikeDisk is typescript-go's decodeBytes, TypeScript/tsc/internal/vfs/internal/internal.go, which every
+// on-disk read goes through and which the shim cannot reach: UTF-16 in either byte order behind its byte
+// order mark is decoded, and a UTF-8 byte order mark is dropped. Copied rather than approximated, and held
+// to the disk byte for byte by TestMemoryFSReadsBytesAsTheDiskDoes, which is where a change upstream shows.
+func decodeLikeDisk(s string) string {
+	if len(s) >= 2 {
+		switch [2]byte{s[0], s[1]} {
+		case [2]byte{0xFF, 0xFE}:
+			return decodeUtf16LikeDisk(s[2:], binary.LittleEndian)
+		case [2]byte{0xFE, 0xFF}:
+			return decodeUtf16LikeDisk(s[2:], binary.BigEndian)
+		}
+	}
+	if len(s) >= 3 && s[0] == 0xEF && s[1] == 0xBB && s[2] == 0xBF {
+		s = s[3:]
+	}
+	return s
+}
+
+// decodeUtf16LikeDisk is typescript-go's decodeUtf16, beside decodeBytes: a trailing odd byte is dropped, as
+// binary.Read into len/2 code units leaves it unread.
+func decodeUtf16LikeDisk(s string, order binary.ByteOrder) string {
+	ints := make([]uint16, len(s)/2)
+	if err := binary.Read(strings.NewReader(s), order, &ints); err != nil {
+		return ""
+	}
+	return string(utf16.Decode(ints))
 }
 
 func (m *MemoryFS) WriteFile(string, string) error             { return errMemoryFSReadOnly }

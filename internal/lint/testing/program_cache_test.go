@@ -2,7 +2,7 @@ package rule_testing
 
 import (
 	"fmt"
-	"os"
+	"strings"
 	"testing"
 )
 
@@ -75,21 +75,30 @@ func TestTheProgramCacheHoldsNoMoreThanItsBound(t *testing.T) {
 }
 
 // TestARebuiltFixtureDoesNotRewriteTheDirectoryAnEvictedGraphReads covers what eviction must not break. A
-// test can still hold a graph the cache has evicted, and the compiler reads its files lazily, so a
-// rebuild of the same fixture writes a directory of its own and leaves the first one in place.
+// test can still hold a graph the cache has evicted, so a rebuild of the same fixture gets a root of its own,
+// and the evicted graph keeps reading its own files. Each build reads a memory filesystem of its own, which
+// nothing writes after it is made, so the evicted graph's file is what it was built from.
 //
 // Not parallel: it sets the package-wide cache capacity to one, which would evict other tests' builds.
 func TestARebuiltFixtureDoesNotRewriteTheDirectoryAnEvictedGraphReads(t *testing.T) {
 	withProgramCacheCapacity(t, 1)
 
-	first := cachedFixture(t, 100)
+	files := map[string]string{"bound.ts": "export const planted100 = 100;\n"}
+	firstGraph, first, err := buildCachedProgram(files, "bound.ts", false)
+	if err != nil {
+		t.Fatal(err)
+	}
 	cachedFixture(t, 101)
 	second := cachedFixture(t, 100)
 
 	if first == second {
-		t.Fatalf("a rebuilt fixture reused the evicted build's directory %s", first)
+		t.Fatalf("a rebuilt fixture reused the evicted build's root %s", first)
 	}
-	if _, err := os.Stat(first); err != nil {
-		t.Fatalf("the evicted build's directory is gone, under any test still reading it: %v", err)
+	held := false
+	for _, sourceFile := range firstGraph.ProjectFiles() {
+		held = held || (sourceFile.FileName() == first+"/bound.ts" && strings.Contains(sourceFile.Text(), "planted100"))
+	}
+	if !held {
+		t.Fatalf("the evicted graph no longer holds its own bound.ts under %s", first)
 	}
 }

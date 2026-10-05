@@ -3,10 +3,13 @@ package program_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -148,5 +151,40 @@ func TestAMemoryFSListsItsTree(t *testing.T) {
 	}
 	if err := memory.WriteFile("/project/new.ts", "x"); err == nil || memory.FileExists("/project/new.ts") {
 		t.Error("a write to the read-only filesystem succeeded")
+	}
+}
+
+// MemoryFS reads a file's bytes as the disk does, case by case against osvfs, the filesystem every real build
+// reads. A fixture holds bytes as they would sit in a file, and the compiler must see what it would see
+// there, so the corpus rows about byte order marks and irregular whitespace mean the same from memory.
+func TestMemoryFSReadsBytesAsTheDiskDoes(t *testing.T) {
+	t.Parallel()
+
+	directory := t.TempDir()
+	for _, testCase := range []struct {
+		name  string
+		bytes string
+	}{
+		{"empty", ""},
+		{"utf-8", "export const a = 1;\n"},
+		{"utf-8 with a byte order mark", "\xEF\xBB\xBFexport const a = 1;\n"},
+		{"a byte order mark alone", "\xEF\xBB\xBF"},
+		{"utf-16 little endian", "\xFF\xFEa\x00=\x00\xe9\x00\n\x00"},
+		{"utf-16 big endian", "\xFE\xFF\x00a\x00=\x00\xe9\x00\n"},
+		{"utf-16 with an odd trailing byte", "\xFF\xFEa\x00b"},
+		{"utf-16 with a lone surrogate", "\xFF\xFE\x00\xd8a\x00"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			onDisk := filepath.ToSlash(filepath.Join(directory, strings.ReplaceAll(testCase.name, " ", "-")+".ts"))
+			if err := os.WriteFile(onDisk, []byte(testCase.bytes), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			fromDisk, diskOk := osvfs.FS().ReadFile(onDisk)
+			fromMemory, memoryOk := program.NewMemoryFS(map[string]string{"/fixture/a.ts": testCase.bytes}).ReadFile("/fixture/a.ts")
+			if fromMemory != fromDisk || memoryOk != diskOk {
+				t.Fatalf("memory read %q (%v), the disk %q (%v)", fromMemory, memoryOk, fromDisk, diskOk)
+			}
+		})
 	}
 }

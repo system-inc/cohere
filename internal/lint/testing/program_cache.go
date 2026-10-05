@@ -5,11 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"sync"
-	"testing"
 
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -77,63 +75,10 @@ var (
 	// programCacheCapacity is how many built programs the cache holds at once.
 	programCacheCapacity = defaultProgramCacheCapacity
 
-	// programCacheBuilds counts builds, so each one writes a directory of its own. A key evicted and
-	// built again must not rewrite the directory the first build used: a test still holding that
-	// graph may read its files later, since the compiler reads lazily.
+	// programCacheBuilds counts builds, so each one gets a root of its own. A key evicted and built
+	// again must not share a root with the first build, which a test may still be holding.
 	programCacheBuilds int
-
-	// One directory for every cached fixture, not `t.TempDir()`.
-	//
-	// This is the reason the cache needs a root of its own. `t.TempDir()` is removed when the test
-	// that asked for it finishes, and a graph outliving that test would then hold paths to files
-	// that no longer exist. The compiler reads lazily, so the failure would not appear at build time
-	// but later, in whichever unrelated test happened to reuse the entry.
-	programCacheRootOnce sync.Once
-	programCacheRoot     string
-	programCacheRootErr  error
 )
-
-// RunTestsAndCleanUp is the TestMain body for a package that uses the typed harness.
-//
-// Every package whose tests build a type graph shares one on-disk fixture cache, and that cache has
-// to be swept when the test binary exits. Packages delegate here rather than each writing the same
-// run-then-remove dance, so the sweep cannot drift between them:
-//
-//	func TestMain(m *testing.M) { rule_testing.RunTestsAndCleanUp(m) }
-//
-// The cleanup runs before the exit code is handed back, and it runs whatever the outcome, so a
-// failing suite does not leave its fixtures behind.
-func RunTestsAndCleanUp(m *testing.M) {
-	code := m.Run()
-	CleanUpCachedFixtures()
-	os.Exit(code)
-}
-
-// CleanUpCachedFixtures removes everything the cache wrote to disk.
-//
-// This exists because the cached fixtures outlive the test that first asked for them, which is the
-// whole point of the cache and also the reason nothing else will clean them up. `t.TempDir()` is
-// removed when its test ends; a directory shared by every test in the binary has no such moment, so
-// without this each run of each package would leave its fixtures behind forever. Measured at 494MB
-// across twenty-seven runs before this was added.
-//
-// Call it from `TestMain` after `m.Run()`. It is safe to call when the cache was never used.
-func CleanUpCachedFixtures() {
-	programCacheMutex.Lock()
-	defer programCacheMutex.Unlock()
-
-	if programCacheRoot != "" {
-		os.RemoveAll(programCacheRoot)
-	}
-}
-
-// cacheRoot returns the directory cached fixtures are written under, creating it once.
-func cacheRoot() (string, error) {
-	programCacheRootOnce.Do(func() {
-		programCacheRoot, programCacheRootErr = os.MkdirTemp("", "cohere-rule-testing-*")
-	})
-	return programCacheRoot, programCacheRootErr
-}
 
 // programCacheKey hashes everything that can change what a build produces.
 //
@@ -158,9 +103,8 @@ func programCacheKey(files map[string]string, subjectFileName string, verbatim b
 
 // buildCachedProgram returns the graph for a fixture set, building it at most once per distinct set.
 //
-// The returned directory is where the fixture was written, for a caller that needs to name a path
-// inside it. It is owned by the cache and must not be modified: another test is very likely holding
-// the same graph.
+// The returned directory is the fixture's root in its memory filesystem, for a caller that needs to name a
+// path inside it. Nothing on disk is there.
 func buildCachedProgram(files map[string]string, subjectFileName string, verbatim bool) (*program.Graph, string, error) {
 	key := programCacheKey(files, subjectFileName, verbatim)
 
@@ -196,7 +140,7 @@ const defaultProgramCacheCapacity = 16
 
 // evictBeyondCapacity drops the least recently used entries until the cache is within its capacity.
 // The caller holds programCacheMutex. An evicted graph lives on in any test still holding it, and is
-// collected when the last one lets go; its files stay on disk until the binary exits.
+// collected when the last one lets go, with the memory filesystem it reads.
 func evictBeyondCapacity() {
 	for len(programCache) > programCacheCapacity {
 		oldest := programCacheRecency.Back()
@@ -206,42 +150,34 @@ func evictBeyondCapacity() {
 	}
 }
 
-// buildProgramInto writes one fixture set to its own directory under the cache root, named directoryName,
-// and builds it.
+// memoryFixtureRoot is the directory every cached fixture's own root sits under. Only the fixture's memory
+// filesystem holds it, so no path a cached build reads is on disk.
+const memoryFixtureRoot = "/cohere-fixture"
+
+// buildProgramInto builds one fixture set from memory, rooted at a directory of its own named
+// directoryName under memoryFixtureRoot, and returns that root.
+//
+// Nothing is written to disk. Each cached build used to write a directory under the cache root, about
+// 16,000 for a registry run, and three costs came with them: the writes, deleting them at exit (3.7s of
+// registry's 7.6s), and the module resolution's stats and opens around them, which went into the test log
+// Go replays on every cached run (about 420,000 lines for registry, 6.5s to say "cached") (#nxgt2ca).
 func buildProgramInto(directoryName string, files map[string]string, subjectFileName string, verbatim bool) (*program.Graph, string, error) {
-	root, err := cacheRoot()
-	if err != nil {
-		return nil, "", fmt.Errorf("creating the fixture cache root: %w", err)
-	}
-
-	directory := filepath.Join(root, directoryName)
-	if err := os.MkdirAll(directory, 0o755); err != nil {
-		return nil, "", fmt.Errorf("creating the fixture directory: %w", err)
-	}
-
-	for name, contents := range files {
-		path := filepath.Join(directory, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return nil, "", fmt.Errorf("creating the fixture directory for %s: %w", name, err)
+	directory := memoryFixtureRoot + "/" + directoryName
+	contents := make(map[string]string, len(files)+1)
+	for name, text := range files {
+		if !verbatim {
+			text = FixtureText(text)
 		}
-		text := FixtureText(contents)
-		if verbatim {
-			text = contents
-		}
-		if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-			return nil, "", fmt.Errorf("writing the fixture %s: %w", name, err)
-		}
+		contents[directory+"/"+filepath.ToSlash(name)] = text
 	}
-
-	configPath := filepath.Join(directory, "tsconfig.json")
-	if err := os.WriteFile(configPath, []byte(defaultTsConfig), 0o644); err != nil {
-		return nil, "", fmt.Errorf("writing the tsconfig: %w", err)
-	}
+	configPath := directory + "/tsconfig.json"
+	contents[configPath] = defaultTsConfig
 
 	graph, err := program.Build(program.Options{
 		ConfigFileName:   configPath,
 		CurrentDirectory: directory,
 		LibraryParses:    libraryParses,
+		FileSystem:       program.NewMemoryFS(contents),
 		// One checker rather than several: a fixture is one file, and the parallel path adds
 		// scheduling nondeterminism to a test whose whole value is being deterministic.
 		SingleThreaded: true,
