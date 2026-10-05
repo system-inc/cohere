@@ -621,7 +621,7 @@ func run() error {
 	}
 
 	if graphTiming != nil && graph != nil {
-		printGraphTiming(os.Stdout, graphTiming, buildDuration, contentPackOpened)
+		printGraphTiming(os.Stdout, graphTiming, buildDuration, contentPackOpened, graph.Workers())
 	}
 
 	findings := 0
