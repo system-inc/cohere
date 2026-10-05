@@ -2,6 +2,7 @@ package javascript
 
 import (
 	"fmt"
+	"github.com/system-inc/cohere/internal/format/arena"
 	"path/filepath"
 
 	"github.com/system-inc/cohere/internal/format/doc"
@@ -77,7 +78,13 @@ func format(fileName string, text string, options formatoptions.Options, parser 
 	// released once the text is printed (#fyw36kf).
 	nodes := estree.AcquireArena()
 	defer nodes.Release()
-	document, err := printToDoc(fileName, text, options, parser, "", textToDoc, nodes)
+	// The doc's parts come from a slab released with the tree, for the same reason.
+	docs := docSlabs.Get().(*arena.Slab[doc.Doc])
+	defer func() {
+		docs.Reset()
+		docSlabs.Put(docs)
+	}()
+	document, err := printToDoc(fileName, text, options, parser, "", textToDoc, nodes, docs)
 	if err != nil {
 		return "", err
 	}
@@ -91,7 +98,7 @@ func format(fileName string, text string, options formatoptions.Options, parser 
 func PrintToDoc(fileName string, text string, options formatoptions.Options, parser string, parentParser string,
 	textToDoc printing.TextToDoc) (doc.Doc, error) {
 	// The doc is laid out later, by the outer printer, so its tree outlives this call and comes from the heap.
-	document, err := printToDoc(fileName, text, options, parser, parentParser, textToDoc, nil)
+	document, err := printToDoc(fileName, text, options, parser, parentParser, textToDoc, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -100,10 +107,11 @@ func PrintToDoc(fileName string, text string, options formatoptions.Options, par
 
 // printToDoc parses with the parser and prints the tree to a doc.
 //
-// The tree's nodes come from nodes, or the heap when it is nil. A caller that passes an arena releases it
-// only once the doc is laid out, since the doc is printed from the tree.
+// The tree's nodes come from nodes, and the doc's parts from docs, or the heap when either is nil. A caller
+// that passes them releases them only once the doc is laid out, since the doc is printed from the tree and
+// is made of those parts.
 func printToDoc(fileName string, text string, options formatoptions.Options, parser string, parentParser string,
-	textToDoc printing.TextToDoc, nodes *estree.Arena) (document doc.Doc, err error) {
+	textToDoc printing.TextToDoc, nodes *estree.Arena, docs *arena.Slab[doc.Doc]) (document doc.Doc, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			document, err = nil, fmt.Errorf("formatting %s: %v", fileName, recovered)
@@ -134,7 +142,7 @@ func printToDoc(fileName string, text string, options formatoptions.Options, par
 	printOptions := &Options{
 		Printer:                    printer,
 		OriginalText:               text,
-		Settings:                   &settings{Options: options, FilePath: fileName, Parser: parser, ParentParser: parentParser},
+		Settings:                   &settings{Options: options, FilePath: fileName, Parser: parser, ParentParser: parentParser, docs: docs},
 		EmbeddedLanguageFormatting: "auto",
 		TextToDoc:                  textToDoc,
 	}

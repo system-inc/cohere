@@ -66,7 +66,7 @@ func TestTheParallelFormatPassMatchesTheSerialOne(t *testing.T) {
 		defer func() { parallelFormatWorkers = previous }()
 
 		summary, _, _, err := applyProposedFixes(context.Background(), graph, graph.ProjectFiles(), registry.All(),
-			formatTransform(engine), enumeration.Files, wholeTreeScope(), graph.Config.GetCurrentDirectory(), 0, write)
+			formatTransform(engine), enumeration.Files, wholeTreeScope(), graph.Config.GetCurrentDirectory(), 0, write, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

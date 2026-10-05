@@ -57,7 +57,7 @@ func printBinaryishExpression(path *Path, options *Options, print PrintFunc) Doc
 		// `UnaryExpression` adds parentheses and indention when argument has comment
 		parent.Is("UnaryExpression") && !hasAnyComment(current) ||
 		isMemberExpression(parent) && !parent.Bool("computed") {
-		return group(concat(indent(concat(softline, doc.Concat(parts))), softline))
+		return group(concatIn(path, indent(concatIn(path, softline, doc.Concat(parts))), softline))
 	}
 
 	// Avoid indenting sub-expressions in some cases where the first sub-expression is already
@@ -152,7 +152,7 @@ func printBinaryishExpression(path *Path, options *Options, print PrintFunc) Doc
 	}
 
 	jsxPart := parts[len(parts)-1]
-	return group(concat(chain, indentIfBreak(jsxPart, groupID, false)))
+	return group(concatIn(path, chain, indentIfBreak(jsxPart, groupID, false)))
 }
 
 // For binary expressions to be consistent, we need to group
@@ -210,11 +210,11 @@ func printBinaryishExpressions(path *Path, options *Options, print PrintFunc, is
 	if shouldInline {
 		var rightContent Doc
 		if hasLeadingOwnLineComment(originalText(options), rightNodeToCheckComments) {
-			rightContent = indent(concat(line, print("right", nil), emptyDoc))
+			rightContent = indent(concatIn(path, line, print("right", nil), emptyDoc))
 		} else {
-			rightContent = concat(" ", print("right", nil), emptyDoc)
+			rightContent = concatIn(path, " ", print("right", nil), emptyDoc)
 		}
-		right = concat(operator, rightContent)
+		right = concatIn(path, operator, rightContent)
 	} else {
 		// Upstream's isHackPipeline recursion into "right" is unreachable for TypeScript.
 		rightContent := print("right", nil)
@@ -224,7 +224,7 @@ func printBinaryishExpressions(path *Path, options *Options, print PrintFunc, is
 			beforeOperator = line
 			afterOperator = doc.Text(" ")
 		}
-		right = concat(beforeOperator, operator, afterOperator, rightContent, emptyDoc)
+		right = concatIn(path, beforeOperator, operator, afterOperator, rightContent, emptyDoc)
 	}
 
 	// If there's only a single binary expression, we want to create a group

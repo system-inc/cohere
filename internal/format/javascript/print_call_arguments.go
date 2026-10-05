@@ -20,7 +20,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 	args := getCallArguments(current)
 
 	if len(args) == 0 {
-		return group(concat("(", printDanglingCommentsInList(path, options, nil), ")"))
+		return group(concatIn(path, "(", printDanglingCommentsInList(path, options, nil), ")"))
 	}
 
 	lastArgIndex := len(args) - 1
@@ -36,7 +36,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 			}
 		})
 		parts = append(parts, ")")
-		return concat(parts...)
+		return concatIn(path, parts...)
 	}
 
 	anyArgEmptyLine := false
@@ -49,9 +49,9 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 			// do nothing
 		} else if isNextLineEmptyAfter(arg, options) {
 			anyArgEmptyLine = true
-			argDoc = concat(argDoc, ",", hardline, hardline)
+			argDoc = concatIn(path, argDoc, ",", hardline, hardline)
 		} else {
-			argDoc = concat(argDoc, ",", line)
+			argDoc = concatIn(path, argDoc, ",", line)
 		}
 
 		printedArguments = append(printedArguments, argDoc)
@@ -69,7 +69,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 
 	allArgsBrokenOut := func() Doc {
 		return groupWith(
-			concat("(", indent(concat(spreadDocs(line, printedArguments)...)), trailingComma, line, ")"),
+			concatIn(path, "(", indent(concatIn(path, spreadDocs(line, printedArguments)...)), trailingComma, line, ")"),
 			doc.GroupOptions{ShouldBreak: true},
 		)
 	}
@@ -96,18 +96,17 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 		}
 
 		if doc.WillBreak(firstArg) {
-			return concat(
-				breakParent,
+			return concatIn(path, breakParent,
 				conditionalGroup([]Doc{
-					concat(spreadDocs("(", groupWith(firstArg, doc.GroupOptions{ShouldBreak: true}), ", ", tailArgs, ")")...),
+					concatIn(path, spreadDocs("(", groupWith(firstArg, doc.GroupOptions{ShouldBreak: true}), ", ", tailArgs, ")")...),
 					allArgsBrokenOut(),
 				}, doc.GroupOptions{}),
 			)
 		}
 
 		return conditionalGroup([]Doc{
-			concat(spreadDocs("(", firstArg, ", ", tailArgs, ")")...),
-			concat(spreadDocs("(", groupWith(firstArg, doc.GroupOptions{ShouldBreak: true}), ", ", tailArgs, ")")...),
+			concatIn(path, spreadDocs("(", firstArg, ", ", tailArgs, ")")...),
+			concatIn(path, spreadDocs("(", groupWith(firstArg, doc.GroupOptions{ShouldBreak: true}), ", ", tailArgs, ")")...),
 			allArgsBrokenOut(),
 		}, doc.GroupOptions{})
 	}
@@ -129,25 +128,23 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 		}
 
 		if doc.WillBreak(lastArg) {
-			return concat(
-				breakParent,
+			return concatIn(path, breakParent,
 				conditionalGroup([]Doc{
-					concat(spreadDocs("(", headArgs, groupWith(lastArg, doc.GroupOptions{ShouldBreak: true}), ")")...),
+					concatIn(path, spreadDocs("(", headArgs, groupWith(lastArg, doc.GroupOptions{ShouldBreak: true}), ")")...),
 					allArgsBrokenOut(),
 				}, doc.GroupOptions{}),
 			)
 		}
 
 		return conditionalGroup([]Doc{
-			concat(spreadDocs("(", headArgs, lastArg, ")")...),
-			concat(spreadDocs("(", headArgs, groupWith(lastArg, doc.GroupOptions{ShouldBreak: true}), ")")...),
+			concatIn(path, spreadDocs("(", headArgs, lastArg, ")")...),
+			concatIn(path, spreadDocs("(", headArgs, groupWith(lastArg, doc.GroupOptions{ShouldBreak: true}), ")")...),
 			allArgsBrokenOut(),
 		}, doc.GroupOptions{})
 	}
 
-	contents := concat(
-		"(",
-		indent(concat(spreadDocs(softline, printedArguments)...)),
+	contents := concatIn(path, "(",
+		indent(concatIn(path, spreadDocs(softline, printedArguments)...)),
 		trailingComma,
 		softline,
 		")",

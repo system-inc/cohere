@@ -2,7 +2,9 @@ package javascript
 
 import (
 	"fmt"
+	"sync"
 
+	"github.com/system-inc/cohere/internal/format/arena"
 	"github.com/system-inc/cohere/internal/format/doc"
 )
 
@@ -93,6 +95,27 @@ func concat(parts ...any) Doc {
 	}
 	return result
 }
+
+// concatIn is concat with its parts from the format's slab (settings.docs), when the path's print has one:
+// a fresh slice per concatenation was half of concat's 8M allocations a pass on ahra (#fyw36kf). The
+// other half, boxing the slice into a Doc, stays.
+func concatIn(path *Path, parts ...any) Doc {
+	formatSettings, _ := path.Settings.(*settings)
+	if formatSettings == nil || formatSettings.docs == nil {
+		return concat(parts...)
+	}
+	result := doc.Concat(formatSettings.docs.Make(len(parts))[:len(parts)])
+	for index, part := range parts {
+		result[index] = toDoc(part)
+	}
+	return result
+}
+
+// docSlabs hold the slabs concatIn takes parts from, between formats. A released part reads as
+// poisonedDoc under cohere_poison, so a doc read after its file was printed shows in the output.
+var docSlabs = sync.Pool{New: func() any { return &arena.Slab[doc.Doc]{Poison: poisonedDoc} }}
+
+var poisonedDoc Doc = doc.Text("CoherePoisonedDoc")
 
 // docs converts a list of doc values, for the builders that take arrays.
 func docs(parts ...any) []Doc {

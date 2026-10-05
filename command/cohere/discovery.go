@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/types/program"
 )
 
 // Discovery is how one cohere checks a repository that holds more than one project: TypeScript programs
@@ -77,6 +78,10 @@ type discovery struct {
 
 	// Ownership is what reading the TypeScript projects decided. See ownership.go.
 	Ownership ownership
+
+	// Listings are every directory listing the walk read, for the build to serve its tsconfig's include
+	// enumeration from rather than listing the same directories again (#bjv0tg4).
+	Listings *program.DirectoryListings
 }
 
 // ignoreScope is what discovery asks of the gitignore matcher for one directory: internal/gitignore's
@@ -171,7 +176,7 @@ func repositoryKind(directory string) nestedRepository {
 // discoverProjects walks root and returns every project it finds. ignorePatterns are the root's, as lint
 // globs relative to root.
 func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
-	found := discovery{Root: root}
+	found := discovery{Root: root, Listings: program.NewDirectoryListings()}
 
 	// The matcher is the repository's, a submodule's own when the root is inside one, so the .gitignore
 	// files between its root and this one apply too.
@@ -226,6 +231,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 			fail(fmt.Errorf("reading %s: %w", filepath.Join(root, relative), err))
 			return
 		}
+		found.Listings.Add(filepath.Join(root, relative), entries)
 
 		names := map[string]bool{}
 		for _, entry := range entries {

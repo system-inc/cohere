@@ -50,14 +50,14 @@ func printExpressionStatement(path *Path, options *Options, print PrintFunc) Doc
 			typeCastCommentDoc := printing.PrintLeadingComments(path, options, func(comment Node) bool {
 				return comment == typeCastComment
 			})
-			return printing.PrintComments(path, concat(append([]any{";", typeCastCommentDoc}, parts...)...), options,
+			return printing.PrintComments(path, concatIn(path, append([]any{";", typeCastCommentDoc}, parts...)...), options,
 				func(comment Node) bool { return comment != typeCastComment })
 		}
 		parts = append([]any{";"}, parts...)
 	} else if shouldPrintSemicolon(path, options) {
 		parts = append(parts, ";")
 	}
-	return concat(parts...)
+	return concatIn(path, parts...)
 }
 
 // shouldExpressionStatementPrintLeadingSemicolon is upstream's function of that name.

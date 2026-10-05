@@ -27,7 +27,7 @@ func printArray(path *Path, options *Options, print PrintFunc) Doc {
 	}
 	elements := current.List(elementsProperty)
 	if len(elements) == 0 {
-		parts = append(parts, group(concat("[", printDanglingCommentsInList(path, options, nil), "]")))
+		parts = append(parts, group(concatIn(path, "[", printDanglingCommentsInList(path, options, nil), "]")))
 	} else {
 		lastElem := elements[len(elements)-1]
 		canHaveTrailingComma := !lastElem.Is("RestElement")
@@ -90,17 +90,14 @@ func printArray(path *Path, options *Options, print PrintFunc) Doc {
 		if shouldUseConciseFormatting {
 			elementsDoc = printArrayElementsConcisely(path, options, print, trailingComma)
 		} else {
-			elementsDoc = concat(
-				printArrayElements(path, options, print, elementsProperty),
+			elementsDoc = concatIn(path, printArrayElements(path, options, print, elementsProperty),
 				trailingComma,
 			)
 		}
 
 		parts = append(parts, groupWith(
-			concat(
-				"[",
-				indent(concat(
-					softline,
+			concatIn(path, "[",
+				indent(concatIn(path, softline,
 					elementsDoc,
 					printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}),
 				)),
@@ -116,7 +113,7 @@ func printArray(path *Path, options *Options, print PrintFunc) Doc {
 		printTypeAnnotationProperty(path, print),
 	)
 
-	return concat(parts...)
+	return concatIn(path, parts...)
 }
 
 // everyElement is upstream's Array.prototype.every over a node list, with the index.
@@ -186,7 +183,7 @@ func printArrayElements(path *Path, options *Options, print PrintFunc, elementsP
 			if current != nil && isLineAfterElementEmpty(path, options) {
 				separator = softline
 			}
-			parts = append(parts, concat(",", line, separator))
+			parts = append(parts, concatIn(path, ",", line, separator))
 		}
 	}, elementsProperty)
 
@@ -203,12 +200,12 @@ func printArrayElementsConcisely(path *Path, options *Options, print PrintFunc, 
 		if isLast {
 			separator = trailingComma
 		}
-		parts = append(parts, concat(print(nil, nil), separator))
+		parts = append(parts, concatIn(path, print(nil, nil), separator))
 
 		if !isLast {
 			switch {
 			case isLineAfterElementEmpty(path, options):
-				parts = append(parts, concat(hardline, hardline))
+				parts = append(parts, concatIn(path, hardline, hardline))
 			case hasComment(nextOf(path), commentLeading|commentLine, nil):
 				parts = append(parts, hardline)
 			default:
@@ -233,8 +230,7 @@ func printNamedTupleMember(path *Path, options *Options, print PrintFunc) Doc {
 	if current.Bool("optional") {
 		optional = "?"
 	}
-	return concat(
-		print("label", nil),
+	return concatIn(path, print("label", nil),
 		optional,
 		": ",
 		print("elementType", nil),

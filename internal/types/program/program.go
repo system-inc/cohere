@@ -222,6 +222,11 @@ type Options struct {
 	// them or reports their diagnostics here. Nil yields nothing. See ReadProjectConfig, and discovery's
 	// ownership in the command.
 	Yielded map[string]struct{}
+
+	// Listings, when set, serve the build's directory listings from ones already read, discovery's, rather
+	// than reading those directories again. Beneath the input recorder, so a run cache still records every
+	// listing the build asked for. Nil reads every listing from disk. See DirectoryListings.
+	Listings *DirectoryListings
 }
 
 // Build resolves a tsconfig and constructs the program and its checkers.
@@ -440,6 +445,9 @@ func buildOnce(options Options) (*Graph, error) {
 	var disk vfs.FS = osvfs.FS()
 	if options.FileSystem != nil {
 		disk = options.FileSystem
+	}
+	if options.Listings != nil {
+		disk = &listingFS{FS: disk, listings: options.Listings}
 	}
 	if options.ContentPack != nil {
 		disk = options.ContentPack.wrap(disk)

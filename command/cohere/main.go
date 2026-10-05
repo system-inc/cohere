@@ -471,8 +471,26 @@ func run() error {
 	if runFix {
 		formatter, formatterError = configuredFormatter(!*noFormat && (*explainFile == "" || *format || *formatAll))
 	}
+	// And the repository the run may write: the project's, or, for a run started inside a library that is a
+	// repository of its own (libraries/structure in ahra), that library's. Writes stay inside one
+	// repository (@system_cohere, 2026-10-03), so the run there formats and fixes the library, and its
+	// check still reads the whole program. See nested_repository.go. Computed once, here, since the format
+	// walk ahead and the early format pass read the tree it names before the fix phase does.
+	repositoryRoot := writeRepositoryRoot(location.ArgumentBase, location.Root)
 	if formatter != nil && len(flag.Args()) == 0 {
-		startFormatWalkAhead(formatter, writeRepositoryRoot(location.ArgumentBase, location.Root))
+		startFormatWalkAhead(formatter, repositoryRoot)
+	}
+
+	// A bare run's format pass begins now, on the cores the graph build leaves idle, rather than with the walk
+	// (#g3046x5). Only the default scope, the one a bare run takes below. See earlyFormat.
+	var early *earlyFormat
+	if formatter != nil && len(flag.Args()) == 0 && runFix && !*formatAll && !*formatOnly && *explainFile == "" &&
+		parallelFormatWorkers() != 0 {
+		earlyRecord := formatRecordOff("the cache is off (--no-cache)")
+		if !cacheOff {
+			earlyRecord = loadFormatRecord(repositoryRoot)
+		}
+		early = startEarlyFormat(formatter, earlyRecord, repositoryRoot, *maxFixPasses)
 	}
 
 	// What this run leaves to nearer projects, when it is one project of several (see ownership.go).
@@ -509,6 +527,7 @@ func run() error {
 			ContentPack:      contentPack,
 			Timing:           graphTiming,
 			Yielded:          yield.yieldedFiles(),
+			Listings:         discoveredListings,
 		})
 		if err != nil {
 			// A program that fails to build is a loud failure and never an empty result. An empty file list
@@ -563,11 +582,6 @@ func run() error {
 	// outside them is reported, not repaired. With nothing named the whole project is the caller's.
 	writeScope := formatScope{Everything: true}
 
-	// And the repository it may write: the project's, or, for a run started inside a library that is a
-	// repository of its own (libraries/structure in ahra), that library's. Writes stay inside one
-	// repository (@system_cohere, 2026-10-03), so the run there formats and fixes the library, and its
-	// check still reads the whole program. See nested_repository.go.
-	repositoryRoot := writeRepositoryRoot(location.ArgumentBase, location.Root)
 	if len(flag.Args()) > 0 && !*listRules && !*listRulesEnabled {
 		scope, err := namedPathsScope(location.ArgumentBase, location.Root, flag.Args())
 		if err != nil {
@@ -720,6 +734,8 @@ func run() error {
 		// it, and the default scope is read from it. See format_record.go.
 		var record *formatRecord
 		switch {
+		case early != nil:
+			record = early.record
 		case formatter != nil && cacheOff:
 			record = formatRecordOff("the cache is off (--no-cache)")
 		case formatter != nil:
@@ -807,7 +823,11 @@ func run() error {
 			// draws also reads the format record, which changes nothing a replay could print wrongly: an entry is
 			// a proof that bytes are already formatted, so the record decides how much is formatted again, never
 			// what would change.
-			scope, recordUniverse = unformattedScope(formatter, record, repositoryRoot)
+			if early != nil {
+				scope, recordUniverse = early.formatScopeOf()
+			} else {
+				scope, recordUniverse = unformattedScope(formatter, record, repositoryRoot)
+			}
 		}
 
 		// The submodules this repository declares are read, never written: each file a run inside one
@@ -828,6 +848,9 @@ func run() error {
 
 		fixStart := time.Now()
 		formatting := newFormatClock()
+		if early != nil {
+			formatting = early.formatting
+		}
 		fixSummary, fixWalk, lineEndings, err := applyProposedFixes(
 			ctx, graph, fixFiles, fixRules,
 			formatting.timing(scopedTransform(record.observe(formatTransform(formatter), optionsFingerprintOf(formatter)), scope)),
@@ -836,6 +859,7 @@ func run() error {
 			repositoryRoot,
 			*maxFixPasses,
 			mutate,
+			early,
 		)
 		fixDuration := time.Since(fixStart)
 		// With no formatter the transform only declines each file, which is not formatting.

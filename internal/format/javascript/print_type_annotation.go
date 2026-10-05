@@ -48,7 +48,7 @@ func printTypeAnnotationProperty(path *Path, print PrintFunc, property ...string
 	}
 
 	if shouldPrintLeadingSpace {
-		return concat(" ", print(propertyName, nil))
+		return concatIn(path, " ", print(propertyName, nil))
 	}
 	return print(propertyName, nil)
 }
@@ -106,7 +106,7 @@ func getTypeAnnotationFirstToken(path *Path) string {
 func printTypeAnnotation(path *Path, options *Options, print PrintFunc) Doc {
 	token := getTypeAnnotationFirstToken(path)
 	if token != "" {
-		return concat(token, " ", print("typeAnnotation", nil))
+		return concatIn(path, token, " ", print("typeAnnotation", nil))
 	}
 	return print("typeAnnotation", nil)
 }

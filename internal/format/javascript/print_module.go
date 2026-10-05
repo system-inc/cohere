@@ -21,8 +21,7 @@ func printImportDeclaration(path *Path, options *Options, print PrintFunc) Doc {
 	if current.Truthy("phase") {
 		phase = " " + current.String("phase")
 	}
-	return concat(
-		"import",
+	return concatIn(path, "import",
 		phase,
 		// Upstream's printImportKind(node) leaves spaceBeforeKind undefined, which defaults to true.
 		printImportKind(current, true),
@@ -94,7 +93,7 @@ func printExportDeclaration(path *Path, options *Options, print PrintFunc) Doc {
 
 	parts = append(parts, printSemicolonAfterExportDeclaration(current, options))
 
-	return concat(parts...)
+	return concatIn(path, parts...)
 }
 
 // shouldOmitSemicolon is upstream's shouldOmitSemicolon, a createTypeCheckFunction.
@@ -160,7 +159,7 @@ func printModuleSource(path *Path, options *Options, print PrintFunc) Doc {
 	if shouldPrintSpecifiers(current, options) {
 		from = " from"
 	}
-	return concat(from, " ", print("source", nil))
+	return concatIn(path, from, " ", print("source", nil))
 }
 
 // printModuleSpecifiers is upstream's printModuleSpecifiers.
@@ -211,11 +210,9 @@ func printModuleSpecifiers(path *Path, options *Options, print PrintFunc) Doc {
 					spacingLine = line
 				}
 				parts = append(parts,
-					group(concat(
-						"{",
-						indent(concat(
-							spacingLine,
-							join(concat(",", line), groupedSpecifiers),
+					group(concatIn(path, "{",
+						indent(concatIn(path, spacingLine,
+							join(concatIn(path, ",", line), groupedSpecifiers),
 						)),
 						printTrailingComma(options, ""),
 						spacingLine,
@@ -232,13 +229,13 @@ func printModuleSpecifiers(path *Path, options *Options, print PrintFunc) Doc {
 					single = append(single, specifier)
 				}
 				single = append(single, spacing, "}")
-				parts = append(parts, concat(single...))
+				parts = append(parts, concatIn(path, single...))
 			}
 		}
 	} else {
 		parts = append(parts, "{}")
 	}
-	return concat(parts...)
+	return concatIn(path, parts...)
 }
 
 // specifiersHaveComment is upstream's inline `node.specifiers.some((node) => hasComment(node))`.
@@ -334,7 +331,7 @@ func printImportAttributes(path *Path, options *Options, print PrintFunc) Doc {
 		attributesDoc = doc.RemoveLines(attributesDoc)
 	}
 
-	return concat(" "+keyword+" ", attributesDoc)
+	return concatIn(path, " "+keyword+" ", attributesDoc)
 }
 
 // printModuleSpecifier is upstream's printModuleSpecifier.
@@ -373,8 +370,7 @@ func printModuleSpecifier(path *Path, options *Options, print PrintFunc) Doc {
 	if !isEmptyString(left) && !isEmptyString(right) {
 		as = " as "
 	}
-	return concat(
-		printImportOrExportKind(kind, false /* spaceBeforeKind */),
+	return concatIn(path, printImportOrExportKind(kind, false /* spaceBeforeKind */),
 		left,
 		as,
 		right,

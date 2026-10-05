@@ -103,16 +103,14 @@ func printFunction(path *Path, options *Options, print PrintFunc, args *printArg
 		semicolon = printSemicolon(options)
 	}
 
-	return concat(
-		printDeclareToken(path),
+	return concatIn(path, printDeclareToken(path),
 		async,
 		keyword,
 		generator,
 		idSpace,
 		idDoc,
 		print("typeParameters", nil),
-		group(concat(
-			parameters,
+		group(concatIn(path, parameters,
 			returnTypeDoc,
 		)),
 		bodySpace,
@@ -179,7 +177,7 @@ func printMethod(path *Path, options *Options, print PrintFunc) Doc {
 		valueDoc,
 	)
 
-	return concat(parts...)
+	return concatIn(path, parts...)
 }
 
 /*
@@ -213,8 +211,7 @@ func printMethodValue(path *Path, options *Options, print PrintFunc) Doc {
 	}
 	parts := []any{
 		print("typeParameters", nil),
-		group(concat(
-			parameters,
+		group(concatIn(path, parameters,
 			returnTypeDoc,
 		)),
 	}
@@ -225,7 +222,7 @@ func printMethodValue(path *Path, options *Options, print PrintFunc) Doc {
 		parts = append(parts, printSemicolon(options))
 	}
 
-	return concat(parts...)
+	return concatIn(path, parts...)
 }
 
 // canPrintParamsWithoutParens is upstream's canPrintParamsWithoutParens.
@@ -269,5 +266,5 @@ func printReturnType(path *Path, print PrintFunc) Doc {
 		parts = append(parts, print("predicate", nil))
 	}
 
-	return concat(parts...)
+	return concatIn(path, parts...)
 }

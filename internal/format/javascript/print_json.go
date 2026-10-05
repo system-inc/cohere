@@ -48,7 +48,7 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 	current := node(path)
 	switch current.Type() {
 	case "JsonRoot":
-		return concat(print("node", nil), hardline)
+		return concatIn(path, print("node", nil), hardline)
 	case "ArrayExpression":
 		elements := current.List("elements")
 		if len(elements) == 0 {
@@ -60,20 +60,20 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 			}
 			return print(nil, nil)
 		}, "elements")
-		return concat("[", indent(concat(hardline, join(concat(",", hardline), printed))), hardline, "]")
+		return concatIn(path, "[", indent(concatIn(path, hardline, join(concatIn(path, ",", hardline), printed))), hardline, "]")
 	case "ObjectExpression":
 		if len(current.List("properties")) == 0 {
 			return doc.Text("{}")
 		}
-		return concat("{", indent(concat(hardline, join(concat(",", hardline), printAll(path, print, "properties")))), hardline, "}")
+		return concatIn(path, "{", indent(concatIn(path, hardline, join(concatIn(path, ",", hardline), printAll(path, print, "properties")))), hardline, "}")
 	case "ObjectProperty":
-		return concat(print("key", nil), ": ", print("value", nil))
+		return concatIn(path, print("key", nil), ": ", print("value", nil))
 	case "UnaryExpression":
 		operator := current.String("operator")
 		if operator == "+" {
 			operator = ""
 		}
-		return concat(operator, print("argument", nil))
+		return concatIn(path, operator, print("argument", nil))
 	case "NullLiteral":
 		return doc.Text("null")
 	case "BooleanLiteral":

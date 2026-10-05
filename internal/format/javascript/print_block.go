@@ -12,7 +12,7 @@ func printBlock(path *Path, options *Options, print PrintFunc) Doc {
 
 	if current.Is("Program") && !parent.Is("ModuleExpression") {
 		if bodyDoc != nil {
-			return concat(bodyDoc, hardline)
+			return concatIn(path, bodyDoc, hardline)
 		}
 		return emptyDoc
 	}
@@ -23,7 +23,7 @@ func printBlock(path *Path, options *Options, print PrintFunc) Doc {
 	}
 	parts = append(parts, "{")
 	if bodyDoc != nil {
-		parts = append(parts, indent(concat(hardline, bodyDoc)), hardline)
+		parts = append(parts, indent(concatIn(path, hardline, bodyDoc)), hardline)
 	} else {
 		parentParent := grandparentOf(path)
 		if !(parent.Is("ArrowFunctionExpression", "FunctionExpression", "FunctionDeclaration", "ComponentDeclaration",
@@ -36,7 +36,7 @@ func printBlock(path *Path, options *Options, print PrintFunc) Doc {
 		}
 	}
 	parts = append(parts, "}")
-	return concat(parts...)
+	return concatIn(path, parts...)
 }
 
 // printBlockBody is upstream's printBlockBody. It returns nil where upstream returns "", the falsy
@@ -75,7 +75,7 @@ func printBlockBody(path *Path, options *Options, print PrintFunc) Doc {
 	if hasDanglingComments {
 		parts = append(parts, printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}))
 	}
-	return concat(parts...)
+	return concatIn(path, parts...)
 }
 
 // printStatementSequence is upstream's printStatementSequence.
@@ -106,5 +106,5 @@ func printStatementSequence(path *Path, options *Options, print PrintFunc, prope
 		}
 	}, property)
 
-	return concat(parts...)
+	return concatIn(path, parts...)
 }

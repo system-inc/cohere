@@ -25,8 +25,8 @@ func printBinaryCastExpression(path *Path, options *Options, print PrintFunc) Do
 
 	if key == "callee" && isCallOrNewExpression(parent) ||
 		key == "object" && isMemberExpression(parent) {
-		return group(concat(indent(concat(append([]any{softline}, parts...)...)), softline))
+		return group(concatIn(path, indent(concatIn(path, append([]any{softline}, parts...)...)), softline))
 	}
 
-	return concat(parts...)
+	return concatIn(path, parts...)
 }

@@ -28,17 +28,16 @@ func printAssignment(
 	switch layout {
 	// First break after operator, then the sides are broken independently on their own lines
 	case "break-after-operator":
-		return group(concat(group(leftDoc), operator, group(indent(concat(line, rightDoc)))))
+		return group(concatIn(path, group(leftDoc), operator, group(indent(concatIn(path, line, rightDoc)))))
 
 	// First break right-hand side, then left-hand side
 	case "never-break-after-operator":
-		return group(concat(group(leftDoc), operator, " ", rightDoc))
+		return group(concatIn(path, group(leftDoc), operator, " ", rightDoc))
 
 	// First break right-hand side, then after operator
 	case "fluid":
 		groupID := newGroupID("assignment")
-		return group(concat(
-			group(leftDoc),
+		return group(concatIn(path, group(leftDoc),
 			operator,
 			groupWith(indent(line), doc.GroupOptions{ID: groupID}),
 			lineSuffixBoundary,
@@ -46,18 +45,18 @@ func printAssignment(
 		))
 
 	case "break-lhs":
-		return group(concat(leftDoc, operator, " ", group(rightDoc)))
+		return group(concatIn(path, leftDoc, operator, " ", group(rightDoc)))
 
 	// Parts of assignment chains aren't wrapped in groups.
 	// Once one of them breaks, the chain breaks too.
 	case "chain":
-		return concat(group(leftDoc), operator, line, rightDoc)
+		return concatIn(path, group(leftDoc), operator, line, rightDoc)
 
 	case "chain-tail":
-		return concat(group(leftDoc), operator, indent(concat(line, rightDoc)))
+		return concatIn(path, group(leftDoc), operator, indent(concatIn(path, line, rightDoc)))
 
 	case "chain-tail-arrow-chain":
-		return concat(group(leftDoc), operator, rightDoc)
+		return concatIn(path, group(leftDoc), operator, rightDoc)
 
 	case "only-left":
 		return leftDoc
@@ -74,7 +73,7 @@ func printAssignmentExpression(path *Path, options *Options, print PrintFunc) Do
 		options,
 		print,
 		print("left", nil),
-		concat(" ", current.String("operator")),
+		concatIn(path, " ", current.String("operator")),
 		"right",
 	)
 }

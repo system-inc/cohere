@@ -108,18 +108,24 @@ func TestADirectoryOnlyProbedIsRecordedForItsExistence(t *testing.T) {
 		return cache
 	}
 
+	// The parent is probed and nothing more. Since #zc57tqg it is left out of the record entirely, since the
+	// project's own directory beneath it says the same thing; either way it must never be watched at full
+	// signature, or the unrelated directory below would cost the replay.
 	cache := record()
-	parentProbed := false
+	rootRecorded := false
 	for _, input := range cache.Inputs {
-		if input.Path == parent && input.ExistenceOnly {
-			parentProbed = true
+		if input.Path == parent && !input.ExistenceOnly {
+			t.Fatal("the project's parent, which the build only probed, was recorded at full signature")
 		}
-		if input.Path == root && input.ExistenceOnly {
-			t.Error("the project's own directory, which the build lists, was recorded for its existence alone")
+		if input.Path == root {
+			rootRecorded = true
+			if input.ExistenceOnly {
+				t.Error("the project's own directory, which the build lists, was recorded for its existence alone")
+			}
 		}
 	}
-	if !parentProbed {
-		t.Fatal("the project's parent was not recorded as only probed, so nothing below is about probing")
+	if !rootRecorded {
+		t.Fatal("the project's own directory was not recorded, so nothing below is about what a listing catches")
 	}
 
 	if err := os.Mkdir(filepath.Join(parent, "unrelated"), 0o755); err != nil {
@@ -143,5 +149,53 @@ func TestADirectoryOnlyProbedIsRecordedForItsExistence(t *testing.T) {
 	write(filepath.Join(root, "empty", "added.ts"), "export const added = 2;\n")
 	if err := cache.Check("k"); err == nil {
 		t.Error("a file added to a directory the include glob lists, holding nothing the build read, still replayed")
+	}
+}
+
+// Removing a package's directory misses, though since #zc57tqg the probe of that directory is no longer
+// recorded: the package.json the build read beneath it is, and it cannot stay present without the directory.
+// That is the argument for leaving the probe out, so it is planted here rather than assumed: record, remove
+// the package, and the check must fail; and the control, the same record over the untouched tree, must hit.
+func TestRemovingAPackageWhoseProbeWasLeftOutStillMisses(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	write := func(path string, contents string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(filepath.Join(root, "tsconfig.json"), `{"compilerOptions":{"strict":true,"noEmit":true,"module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
+	write(filepath.Join(root, "source", "index.ts"), "import { value } from 'pkg';\nexport const doubled: number = value * 2;\n")
+	write(filepath.Join(root, "node_modules", "pkg", "package.json"), `{"name":"pkg","types":"index.d.ts"}`)
+	write(filepath.Join(root, "node_modules", "pkg", "index.d.ts"), "export declare const value: number;\n")
+
+	recorder := program.NewInputRecorder()
+	if _, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root, Inputs: recorder}); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	present, absent, probed := recorder.Inputs()
+	pkg := filepath.Join(root, "node_modules", "pkg")
+	if !slices.Contains(present, filepath.Join(pkg, "package.json")) {
+		t.Fatal("the package's package.json was not recorded, so nothing below is about what it covers")
+	}
+	if slices.Contains(probed, pkg) {
+		t.Errorf("%s has a recorded path beneath it and was still recorded as a probe", pkg)
+	}
+	cache, err := program.RecordRunCache("k", present, nil, absent, probed, nil, 0, time.Time{})
+	if err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	if err := cache.Check("k"); err != nil {
+		t.Fatalf("the untouched tree missed: %v", err)
+	}
+	if err := os.Rename(pkg, pkg+"-moved"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cache.Check("k"); err == nil {
+		t.Error("the package's directory was moved away and the record still replayed")
 	}
 }

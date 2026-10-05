@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -48,6 +49,7 @@ func applyProposedFixes(
 	repositoryRoot string,
 	maxPasses int,
 	write bool,
+	early *earlyFormat,
 ) (edit.Summary, program.Result, *crlfFiles, error) {
 	// This walk is the run's FIRST walk over the program, and it is returned so the lint phase can
 	// reuse it rather than repeat it.
@@ -72,6 +74,9 @@ func applyProposedFixes(
 	// Counted on the way into the formatter, so a checkout git wrote with CRLF is named once below rather
 	// than left to read as a tree of unformatted files.
 	lineEndings := &crlfFiles{}
+	if early != nil {
+		lineEndings = early.lineEndings
+	}
 	if transform != nil {
 		transform = lineEndings.observing(transform)
 	}
@@ -80,7 +85,15 @@ func applyProposedFixes(
 	// Every format candidate is formatted as if no rule proposed anything for it; after the walk, a result
 	// is kept only for a file the walk proposed nothing for and whose bytes are the ones the walk read,
 	// and every other file takes the path it always took. See speculateFormat.
-	speculation := speculateFormat(formatCandidates, transform, maxPasses)
+	var speculation *formatSpeculation
+	if early != nil {
+		// Begun during the graph build on every idle core; the walk wants the cores now, so it keeps the share it
+		// always had. See startEarlyFormat.
+		speculation = early.speculation
+		speculation.narrow(speculationWorkers())
+	} else {
+		speculation = speculateFormat(formatCandidates, transform, maxPasses)
+	}
 
 	var result program.Result
 	if len(projectFiles) > 0 {
@@ -584,6 +597,9 @@ type formatSpeculation struct {
 	// formatInParallel, which has every core. See stop.
 	stopped  chan struct{}
 	stopOnce sync.Once
+
+	// limit is how many of the workers may take another file. See narrow.
+	limit atomic.Int32
 }
 
 // speculateFormat starts formatting every candidate at once, on its own workers, and returns at once.
@@ -602,9 +618,14 @@ type formatSpeculation struct {
 // the ones the walk read, is discarded too (keepable), so what is kept is exactly what formatInParallel would
 // have computed, and everything else is computed as it always was.
 func speculateFormat(candidates []string, transform edit.Transform, maxPasses int) *formatSpeculation {
+	return speculateFormatOn(candidates, transform, maxPasses, speculationWorkers())
+}
+
+// speculateFormatOn is speculateFormat on a given number of workers.
+func speculateFormatOn(candidates []string, transform edit.Transform, maxPasses int, workers int) *formatSpeculation {
 	speculation := &formatSpeculation{done: make(chan struct{}), attempts: map[string]formatAttempt{}, read: map[string]string{},
 		stopped: make(chan struct{})}
-	workers := speculationWorkers()
+	speculation.limit.Store(int32(workers))
 	if transform == nil || len(candidates) == 0 || workers == 0 {
 		close(speculation.done)
 		return speculation
@@ -616,7 +637,7 @@ func speculateFormat(candidates []string, transform edit.Transform, maxPasses in
 	close(next)
 	var mutex sync.Mutex
 	var group sync.WaitGroup
-	for range workers {
+	for worker := range workers {
 		group.Add(1)
 		go func() {
 			defer group.Done()
@@ -625,6 +646,9 @@ func speculateFormat(candidates []string, transform edit.Transform, maxPasses in
 				case <-speculation.stopped:
 					return
 				default:
+				}
+				if int32(worker) >= speculation.limit.Load() {
+					return
 				}
 				fileName, more := <-next
 				if !more {
@@ -675,6 +699,12 @@ func speculationWorkers() int {
 // stop has the workers finish the files they are on and begin no more. Called once the walk is over on a run
 // whose walk also did the type check (program.FusedCheck): nothing else then wants the cores, and a quarter of
 // them formatting the rest would set the run's end (#679s763).
+// narrow has all but the first workers finish the file they are on and take no more. The files left go to the
+// workers that remain, and what they have not begun when the walk ends goes to formatInParallel.
+func (speculation *formatSpeculation) narrow(workers int) {
+	speculation.limit.Store(int32(workers))
+}
+
 func (speculation *formatSpeculation) stop() {
 	speculation.stopOnce.Do(func() { close(speculation.stopped) })
 }

@@ -17,10 +17,10 @@ func printReturnOrThrowArgument(path *Path, options *Options, print PrintFunc) D
 	current := node(path)
 	argumentDoc := print(nil, nil)
 	if returnArgumentHasLeadingComment(current, options) {
-		return concat("(", indent(concat(hardline, argumentDoc)), hardline, ")")
+		return concatIn(path, "(", indent(concatIn(path, hardline, argumentDoc)), hardline, ")")
 	}
 	if isBinaryish(current) {
-		return group(concat(ifBreak("(", ""), indent(concat(softline, argumentDoc)), softline, ifBreak(")", "")))
+		return group(concatIn(path, ifBreak("(", ""), indent(concatIn(path, softline, argumentDoc)), softline, ifBreak(")", "")))
 	}
 	return argumentDoc
 }
@@ -35,11 +35,11 @@ func printReturnOrThrowStatement(path *Path, options *Options, print PrintFunc) 
 	}
 	var argument Doc = emptyDoc
 	if current.Child("argument") != nil {
-		argument = concat(" ", call(path, func(path *Path) Doc {
+		argument = concatIn(path, " ", call(path, func(path *Path) Doc {
 			return printReturnOrThrowArgument(path, options, print)
 		}, "argument"))
 	}
-	return concat(keyword, argument, printSemicolon(options))
+	return concatIn(path, keyword, argument, printSemicolon(options))
 }
 
 func printReturnStatement(path *Path, options *Options, print PrintFunc) Doc {
@@ -77,7 +77,7 @@ func printVariableDeclaration(path *Path, options *Options, print PrintFunc) Doc
 
 	var first Doc = emptyDoc
 	if firstVariable != nil {
-		first = concat(" ", firstVariable)
+		first = concatIn(path, " ", firstVariable)
 	}
 	rest := make([]any, 0, len(printed))
 	for _, declaration := range printed[min(1, len(printed)):] {
@@ -85,17 +85,16 @@ func printVariableDeclaration(path *Path, options *Options, print PrintFunc) Doc
 		if hasValue && !isForXStatementInitializer {
 			separator = hardline
 		}
-		rest = append(rest, concat(",", separator, declaration))
+		rest = append(rest, concatIn(path, ",", separator, declaration))
 	}
 	var semicolon Doc = emptyDoc
 	if !isForXStatementInitializer {
 		semicolon = printSemicolon(options)
 	}
-	return group(concat(
-		printDeclareToken(path),
+	return group(concatIn(path, printDeclareToken(path),
 		current.String("kind"),
 		first,
-		indent(concat(rest...)),
+		indent(concatIn(path, rest...)),
 		semicolon,
 	))
 }
@@ -119,14 +118,14 @@ func printSequenceExpression(path *Path, options *Options, print PrintFunc) Doc 
 			if path.IsFirst() {
 				parts = append(parts, print(nil, nil))
 			} else {
-				parts = append(parts, ",", indent(concat(line, print(nil, nil))))
+				parts = append(parts, ",", indent(concatIn(path, line, print(nil, nil))))
 			}
 		}, "expressions")
-		return group(concat(parts...))
+		return group(concatIn(path, parts...))
 	}
-	parts := join(concat(",", line), printAll(path, print, "expressions"))
+	parts := join(concatIn(path, ",", line), printAll(path, print, "expressions"))
 	if shouldIndentSequenceExpression(path, options) {
-		return group(ifBreak(concat(indent(concat(softline, parts)), softline), parts))
+		return group(ifBreak(concatIn(path, indent(concatIn(path, softline, parts)), softline), parts))
 	}
 	return group(parts)
 }
@@ -140,7 +139,7 @@ func printAwaitExpression(path *Path, options *Options, print PrintFunc) Doc {
 		parent := parentOf(path)
 		if isCallExpression(parent) && parent.Child("callee") == current ||
 			isMemberExpression(parent) && parent.Child("object") == current {
-			parts = []any{indent(concat(append([]any{softline}, parts...)...)), softline}
+			parts = []any{indent(concatIn(path, append([]any{softline}, parts...)...)), softline}
 			// avoid printing `await (await` on one line
 			parentAwaitOrBlock, _ := path.FindAncestor(func(node Node) bool {
 				return node.Is("AwaitExpression", "BlockStatement")
@@ -149,17 +148,17 @@ func printAwaitExpression(path *Path, options *Options, print PrintFunc) Doc {
 				!startsWithNoLookaheadToken(parentAwaitOrBlock.Child("argument"), func(leftmost Node) bool {
 					return leftmost == current
 				}) {
-				return group(concat(parts...))
+				return group(concatIn(path, parts...))
 			}
 		}
 	}
-	return concat(parts...)
+	return concatIn(path, parts...)
 }
 
 // printRestOrSpreadElement is upstream's printRestOrSpreadElement, exported upstream as
 // printRestElement and printSpreadElement.
 func printRestOrSpreadElement(path *Path, print PrintFunc) Doc {
-	return concat("...", print("argument", nil), printTypeAnnotationProperty(path, print))
+	return concatIn(path, "...", print("argument", nil), printTypeAnnotationProperty(path, print))
 }
 
 func printRestElement(path *Path, print PrintFunc) Doc { return printRestOrSpreadElement(path, print) }
@@ -273,7 +272,7 @@ func printKey(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
 	property := getKeyProperty(current)
 	if isComputedKey(current) {
-		return concat("[", print(property, nil), "]")
+		return concatIn(path, "[", print(property, nil), "]")
 	}
 	if shouldQuoteKey(path, options) {
 		// a -> "a"
@@ -285,7 +284,7 @@ func printKey(path *Path, options *Options, print PrintFunc) Doc {
 			name = javaScriptNumberString(key.Get("value").(float64))
 		}
 		printed := printString(jsonStringify(name), options)
-		return call(path, func(path *Path) Doc { return printing.PrintComments(path, concat(printed), options, nil) }, property)
+		return call(path, func(path *Path) Doc { return printing.PrintComments(path, concatIn(path, printed), options, nil) }, property)
 	}
 	if shouldUnquoteKey(path, options) {
 		value := getKey(current).String("value")
@@ -293,7 +292,7 @@ func printKey(path *Path, options *Options, print PrintFunc) Doc {
 		if leadingDigit.MatchString(value) {
 			printed = printNumber(value)
 		}
-		return call(path, func(path *Path) Doc { return printing.PrintComments(path, concat(printed), options, nil) }, property)
+		return call(path, func(path *Path) Doc { return printing.PrintComments(path, concatIn(path, printed), options, nil) }, property)
 	}
 	return print(property, nil)
 }

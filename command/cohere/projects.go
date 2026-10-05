@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/system-inc/cohere/internal/types/program"
 )
 
 // projectEngineVariable names the engine a child run checks its --directory with. A directory holding both
@@ -81,6 +83,8 @@ func checkDiscoveredProjects(location projectLocation, locateError error, workin
 			len(found.NestedRepositories)+found.Submodules)
 	}
 	if found.isTheLocatedProject(location, locateError) {
+		// The project runs here, and its build lists the directories discovery just did.
+		discoveredListings = found.Listings
 		for _, note := range found.notes() {
 			fmt.Fprintf(accountOutput(os.Stderr), "cohere: %s\n", note)
 		}
@@ -88,6 +92,10 @@ func checkDiscoveredProjects(location projectLocation, locateError error, workin
 	}
 	return runProjects(found, childArguments(os.Args[1:], lintConfigFileName), os.Stdout), true, nil
 }
+
+// discoveredListings are the directory listings discovery read, when the one project it found runs in this
+// process, for its build to serve the tsconfig's include enumeration from. Nil otherwise. See #bjv0tg4.
+var discoveredListings *program.DirectoryListings
 
 // childArguments are the arguments every project's run gets: this run's, with a named lint config made
 // absolute. Discovery runs only when no path was named, so every argument is a flag, and a flag's value is

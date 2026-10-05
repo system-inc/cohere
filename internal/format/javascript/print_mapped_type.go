@@ -56,7 +56,7 @@ func printTypeScriptMappedType(path *Path, options *Options, print PrintFunc) Do
 				hasNewline(options.OriginalText, locEnd(lastComment)) {
 				separator = hardline
 			}
-			danglingCommentsDoc = append(danglingCommentsDoc, group(concat(parts[len(parts)-1], separator)))
+			danglingCommentsDoc = append(danglingCommentsDoc, group(concatIn(path, parts[len(parts)-1], separator)))
 		}
 	}
 
@@ -67,12 +67,12 @@ func printTypeScriptMappedType(path *Path, options *Options, print PrintFunc) Do
 
 	var readonly Doc = emptyDoc
 	if current.Truthy("readonly") {
-		readonly = concat(printTypeScriptMappedTypeModifier(current.Get("readonly"), "readonly"), " ")
+		readonly = concatIn(path, printTypeScriptMappedTypeModifier(current.Get("readonly"), "readonly"), " ")
 	}
 
 	var nameType Doc = emptyDoc
 	if current.Truthy("nameType") {
-		nameType = concat(" as ", print("nameType", nil))
+		nameType = concatIn(path, " as ", print("nameType", nil))
 	}
 
 	optional := ""
@@ -94,10 +94,8 @@ func printTypeScriptMappedType(path *Path, options *Options, print PrintFunc) Do
 	indented = append(indented, danglingCommentsDoc...)
 	indented = append(indented,
 		readonly,
-		group(concat(
-			"[",
-			indent(concat(
-				softline,
+		group(concatIn(path, "[",
+			indent(concatIn(path, softline,
 				print("key", nil),
 				" in ",
 				print("constraint", nil),
@@ -113,9 +111,8 @@ func printTypeScriptMappedType(path *Path, options *Options, print PrintFunc) Do
 	)
 
 	return groupWith(
-		concat(
-			"{",
-			indent(concat(indented...)),
+		concatIn(path, "{",
+			indent(concatIn(path, indented...)),
 			bracketLine,
 			"}",
 		),

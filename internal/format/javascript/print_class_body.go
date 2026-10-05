@@ -78,9 +78,8 @@ func printClassBody(path *Path, options *Options, print PrintFunc) Doc {
 			if !settingsOf(options).BracketSpacing || (isEmpty && !shouldBreak) {
 				spacing = softline
 			}
-			content = concat(
-				openingBrace,
-				indent(concat(append([]any{spacing}, parts...)...)),
+			content = concatIn(path, openingBrace,
+				indent(concatIn(path, append([]any{spacing}, parts...)...)),
 				spacing,
 				closingBrace,
 			)
@@ -103,10 +102,9 @@ func printClassBody(path *Path, options *Options, print PrintFunc) Doc {
 
 	var body Doc = emptyDoc
 	if len(parts) > 0 {
-		body = concat(indent(concat(hardline, concat(parts...))), hardline)
+		body = concatIn(path, indent(concatIn(path, hardline, concatIn(path, parts...))), hardline)
 	}
-	return concat(
-		openingBrace,
+	return concatIn(path, openingBrace,
 		body,
 		closingBrace,
 	)

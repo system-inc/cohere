@@ -62,7 +62,7 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 			signatureDocs = append(signatureDocs, signatureDoc)
 		} else {
 			leading, trailing := printing.PrintCommentsSeparately(path, options, nil)
-			signatureDocs = append(signatureDocs, concat(leading, signatureDoc))
+			signatureDocs = append(signatureDocs, concatIn(path, leading, signatureDoc))
 			bodyComments = append([]Doc{trailing}, bodyComments...)
 		}
 
@@ -129,7 +129,7 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 		if shouldPrintSoftlineInIndent {
 			softlineDoc = softline
 		}
-		signatures = indent(concat(softlineDoc, signaturesDoc))
+		signatures = indent(concatIn(path, softlineDoc, signaturesDoc))
 	}
 	var body Doc
 	if shouldPrintAsChain {
@@ -141,8 +141,7 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 	if shouldPrintAsChain && isCallee {
 		trailing = ifBreakWithGroup(softline, "", chainGroupID)
 	}
-	return group(concat(
-		groupWith(signatures, doc.GroupOptions{ShouldBreak: shouldBreakSignatures, ID: chainGroupID}),
+	return group(concatIn(path, groupWith(signatures, doc.GroupOptions{ShouldBreak: shouldBreakSignatures, ID: chainGroupID}),
 		" =>",
 		body,
 		trailing,
@@ -170,14 +169,13 @@ func printArrowFunctionSignature(path *Path, options *Options, print PrintFunc, 
 			returnTypeDoc = group(doc.RemoveLines(returnTypeDoc))
 		}
 		parts = append(parts,
-			group(concat(
-				printFunctionParameters(
-					path,
-					options,
-					print,
-					shouldExpandParameters,
-					/* shouldPrintTypeParameters */ true,
-				),
+			group(concatIn(path, printFunctionParameters(
+				path,
+				options,
+				print,
+				shouldExpandParameters,
+				/* shouldPrintTypeParameters */ true,
+			),
 				returnTypeDoc,
 			)),
 		)
@@ -189,7 +187,7 @@ func printArrowFunctionSignature(path *Path, options *Options, print PrintFunc, 
 	if !isEmptyString(dangling) {
 		parts = append(parts, " ", dangling)
 	}
-	return concat(parts...)
+	return concatIn(path, parts...)
 }
 
 // mayBreakAfterShortPrefix is upstream's mayBreakAfterShortPrefix.
@@ -226,10 +224,9 @@ func printArrowFunctionSignatures(
 	if (key != "callee" && isCallLikeExpression(parent)) ||
 		isBinaryish(parent) {
 		return groupWith(
-			concat(
-				signatureDocs[0],
+			concatIn(path, signatureDocs[0],
 				" =>",
-				indent(concat(line, join(concat(" =>", line), signatureDocs[1:]))),
+				indent(concatIn(path, line, join(concatIn(path, " =>", line), signatureDocs[1:]))),
 			),
 			doc.GroupOptions{ShouldBreak: shouldBreak},
 		)
@@ -238,10 +235,10 @@ func printArrowFunctionSignatures(
 	if (key == "callee" && isCallLikeExpression(parent)) ||
 		// isAssignmentRhs
 		args.assignmentLayout != "" {
-		return groupWith(join(concat(" =>", line), signatureDocs), doc.GroupOptions{ShouldBreak: shouldBreak})
+		return groupWith(join(concatIn(path, " =>", line), signatureDocs), doc.GroupOptions{ShouldBreak: shouldBreak})
 	}
 
-	return groupWith(indent(join(concat(" =>", line), signatureDocs)), doc.GroupOptions{ShouldBreak: shouldBreak})
+	return groupWith(indent(join(concatIn(path, " =>", line), signatureDocs)), doc.GroupOptions{ShouldBreak: shouldBreak})
 }
 
 // printArrowFunctionBody is upstream's printArrowFunctionBody. Upstream's options object { bodyDoc,
@@ -274,11 +271,9 @@ func printArrowFunctionBody(
 	}
 
 	if shouldPutBodyOnSameLine && shouldAddParensIfNotBreak(functionBody) {
-		return concat(
-			" ",
-			group(concat(
-				ifBreak("", "("),
-				indent(concat(softline, bodyDoc)),
+		return concatIn(path, " ",
+			group(concatIn(path, ifBreak("", "("),
+				indent(concatIn(path, softline, bodyDoc)),
 				ifBreak("", ")"),
 				trailingComma,
 				trailingSpace,
@@ -288,7 +283,7 @@ func printArrowFunctionBody(
 	}
 
 	if shouldPutBodyOnSameLine {
-		return concat(" ", bodyDoc, bodyComments)
+		return concatIn(path, " ", bodyDoc, bodyComments)
 	}
-	return concat(indent(concat(line, bodyDoc, bodyComments)), trailingComma, trailingSpace)
+	return concatIn(path, indent(concatIn(path, line, bodyDoc, bodyComments)), trailingComma, trailingSpace)
 }

@@ -13,26 +13,26 @@ import (
 func printLiteral(path *Path, options *Options) Doc {
 	current := node(path)
 	if regex, isRegex := current.Get("regex").(*estree.Regex); isRegex {
-		return concat(printRegex(regex))
+		return concatIn(path, printRegex(regex))
 	}
 	if current.Truthy("bigint") {
-		return concat(printBigInt(current.String("raw")))
+		return concatIn(path, printBigInt(current.String("raw")))
 	}
 	switch value := current.Get("value").(type) {
 	case float64:
-		return concat(printNumber(current.String("raw")))
+		return concatIn(path, printNumber(current.String("raw")))
 	case string:
 		if isDirective(path) {
-			return concat(printDirective(current.String("raw"), options))
+			return concatIn(path, printDirective(current.String("raw"), options))
 		}
 		return replaceEndOfLine(printString(current.String("raw"), options))
 	case bool:
 		if value {
-			return concat("true")
+			return concatIn(path, "true")
 		}
-		return concat("false")
+		return concatIn(path, "false")
 	case nil:
-		return concat("null")
+		return concatIn(path, "null")
 	}
 	panic("unknown literal value")
 }
