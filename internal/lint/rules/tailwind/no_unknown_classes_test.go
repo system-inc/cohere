@@ -5,7 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -35,11 +37,6 @@ import (
 // by the same path it uses on a real repository.
 const unknownFixtureStylesheetPath = "app/_theme/styles/theme.css"
 
-// unknownFixtureSearchRoot is where the upward walk for `node_modules/tailwindcss` begins.
-//
-// The corpus repository rather than this checkout, because `cohere` installs no npm packages.
-const unknownFixtureSearchRoot = "/Users/kirkouimet/Projects/ahra/app/_theme/styles"
-
 // unknownFixtureStylesheet is the fixture's root stylesheet, and it declares utilities of its own.
 //
 // This is the one place this file's fixtures differ from the class-order ones, and the difference is
@@ -68,9 +65,11 @@ const unknownFixtureStylesheet = `@import "tailwindcss";
     margin: --value(--frobnicate-*, [length]);
 }`
 
-// unknownFixturePackageRoot is the installed tailwindcss the fixture stylesheet imports.
+// unknownFixturePackageRoot is the installed tailwindcss the fixture stylesheet imports: the vendored
+// snapshot, so the fixtures run on any machine (#sycrdr6). It used to be found by walking up from ahra's
+// checkout, which only one laptop has.
 func unknownFixturePackageRoot() string {
-	return findTailwindPackageRoot(unknownFixtureSearchRoot, diskFileExists)
+	return vendored.TailwindPackageRoot()
 }
 
 // runUnknownFixture runs the rule against a one-file program that has a real design system.
@@ -581,10 +580,9 @@ func TestUnknownClassFixturesActuallyRan(t *testing.T) {
 	packageRoot := unknownFixturePackageRoot()
 	if packageRoot == "" {
 		t.Fatalf(
-			"no installed tailwindcss found from %s, so every fixture in this file skipped and the "+
-				"package still reported ok. Either the search root is wrong or this machine has no "+
-				"Tailwind to test against; both need a human, and neither should read as a pass",
-			unknownFixtureSearchRoot,
+			"the vendored tailwindcss at %s is missing, so every fixture in this file would skip and the "+
+				"package still report ok; restore it (internal/lint/rules/tailwind/vendored)",
+			vendored.TailwindPackageRoot(),
 		)
 	}
 
@@ -596,20 +594,18 @@ func TestUnknownClassFixturesActuallyRan(t *testing.T) {
 // unknownFixtureLiveSystem builds the corpus repository's design system, for the unit-level tests.
 //
 // The repository on disk rather than the fixture's temp directory, because these tests ask about
-// classes the fixture stylesheet does not declare and the corpus repository does. Skips rather than
-// fails when the repository is absent, matching how the corpus-backed tests elsewhere handle a
-// checkout that lacks one of the two repositories.
+// classes the fixture stylesheet does not declare and the corpus repository does. ahra is private, so
+// it skips naming COHERE_CORPUS_AHRA where the corpus is not set, and fails where it is set and the
+// stylesheet is missing (#sycrdr6). The stylesheet's tailwindcss is the vendored snapshot, the same
+// version ahra installs.
 func unknownFixtureLiveSystem(t *testing.T) *tailwindengine.LoadedDesignSystem {
 	t.Helper()
 
-	entryPoint := filepath.Join(unknownFixtureSearchRoot, "theme.css")
+	entryPoint := corpus.Ahra.Path(t, "app", "_theme", "styles", "theme.css")
 	if _, err := os.Stat(entryPoint); err != nil {
-		t.Skipf("no corpus stylesheet at %s, so there is no live design system to ask", entryPoint)
+		t.Fatalf("the ahra corpus has no stylesheet at %s, so there is no live design system to ask", entryPoint)
 	}
 	packageRoot := unknownFixturePackageRoot()
-	if packageRoot == "" {
-		t.Skip("no installed tailwindcss on this machine")
-	}
 
 	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,

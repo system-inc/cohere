@@ -38,6 +38,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // StylesheetResolver maps an `@import` specifier to a file path.
@@ -192,7 +194,7 @@ func (loader *themeLoader) ingest(nodes []*Node, path string) error {
 // as a plain one produces a theme whose entries all lack ThemeOptionReference, which is a wrong
 // answer that looks exactly like a right one.
 func (loader *themeLoader) followImport(node *Node, path string) error {
-	parts := segment(strings.TrimSpace(node.Params), ' ')
+	parts := segment(text.TrimWhitespace(node.Params), ' ')
 	if len(parts) == 0 || parts[0] == "" {
 		return fmt.Errorf("%s: @import with no specifier", path)
 	}
@@ -200,7 +202,7 @@ func (loader *themeLoader) followImport(node *Node, path string) error {
 	specifier := strings.Trim(parts[0], `"'`)
 
 	for _, modifier := range parts[1:] {
-		modifier = strings.TrimSpace(modifier)
+		modifier = text.TrimWhitespace(modifier)
 		if modifier == "" {
 			continue
 		}
@@ -292,7 +294,7 @@ func parseThemeOptions(params string) (ThemeOptions, string) {
 	options := ThemeOptionNone
 	prefix := ""
 
-	for _, option := range segment(strings.TrimSpace(params), ' ') {
+	for _, option := range segment(text.TrimWhitespace(params), ' ') {
 		switch {
 		case option == "reference":
 			options |= ThemeOptionReference

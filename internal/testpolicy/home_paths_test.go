@@ -48,12 +48,8 @@ var knownHomePaths = map[string]int{
 	"internal/differential/parse_test.go":                                            3,
 	"internal/lint/rules/next/no_before_interactive_script_outside_document_test.go": 4,
 	"internal/lint/rules/tailwind/class_order_live_test.go":                          1,
-	"internal/lint/rules/tailwind/collapse/framework_utility_test.go":                2,
-	"internal/lint/rules/tailwind/collapse/theme_test.go":                            2,
-	"internal/lint/rules/tailwind/collapse/utility_test.go":                          1,
+	"internal/lint/rules/tailwind/collapse/framework_utility_test.go":                1,
 	"internal/lint/rules/tailwind/design_system_live_walk_test.go":                   1,
-	"internal/lint/rules/tailwind/enforce_consistent_class_order_test.go":            1,
-	"internal/lint/rules/tailwind/no_unknown_classes_test.go":                        1,
 }
 
 // TestNoCohereTestNamesAHomeDirectory holds the module to reading outside code by name (#sycrdr6).

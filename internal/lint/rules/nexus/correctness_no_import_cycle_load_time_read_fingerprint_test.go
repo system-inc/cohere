@@ -15,7 +15,7 @@ func correctnessNoImportCycleLoadTimeReadFingerprintOf(t *testing.T, files map[s
 	var fingerprint [sha256.Size]byte
 	probe := CorrectnessNoImportCycleLoadTimeRead
 	probe.Run = func(ctx rule.Context, options any) rule.Listeners {
-		fingerprint = CorrectnessNoImportCycleLoadTimeRead.ProgramFingerprint(ctx.Program)
+		fingerprint = CorrectnessNoImportCycleLoadTimeRead.ProgramFingerprint(ctx.Program, options)
 		return nil
 	}
 	rule_testing.RunTypedFiles(t, probe, files, subject)

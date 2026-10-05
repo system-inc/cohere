@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"unicode"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -219,7 +219,8 @@ var noRestrictedTypesKeywordKinds = map[string]ast.Kind{
 // noRestrictedTypesNameOf reads a node's source text with every whitespace character removed.
 //
 // Upstream's `removeSpaces` uses the regular expression `\s`, which is Unicode-aware in JavaScript,
-// so `unicode.IsSpace` is the matching predicate rather than a test against the five ASCII ones.
+// so `text.IsWhitespace`, JavaScript's set, is the matching predicate rather than a test against the
+// five ASCII ones or Go's `unicode.IsSpace`.
 func noRestrictedTypesNameOf(ctx rule.Context, node *ast.Node) string {
 	nodeRange := rule.TokenRange(ctx.SourceFile, node)
 	return noRestrictedTypesRemoveSpaces(ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()])
@@ -227,13 +228,13 @@ func noRestrictedTypesNameOf(ctx rule.Context, node *ast.Node) string {
 
 // noRestrictedTypesRemoveSpaces is upstream's `removeSpaces`, applied to both the configured key and
 // the source text so the two are compared in the same shape.
-func noRestrictedTypesRemoveSpaces(text string) string {
+func noRestrictedTypesRemoveSpaces(typeSpelling string) string {
 	return strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) {
+		if text.IsWhitespace(r) {
 			return -1
 		}
 		return r
-	}, text)
+	}, typeSpelling)
 }
 
 // NoRestrictedTypesOptions is the rule's option surface.
@@ -345,6 +346,7 @@ func DecodeNoRestrictedTypesOptions(raw []byte) (any, error) {
 // object; dropping the entry for that would silently stop banning the type, where the lenient decode
 // before it dropped only the key (#4a4yse4).
 func decodeNoRestrictedTypesBan(entry json.RawMessage) (NoRestrictedTypesBan, bool, error) {
+	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 	trimmed := strings.TrimSpace(string(entry))
 	if trimmed == "null" {
 		// Upstream's `bannedType == null` test treats a null entry as not banned.

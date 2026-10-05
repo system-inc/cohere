@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -97,12 +98,12 @@ func isFoldableLineComment(comment comments.Comment, sourceLines []string) bool 
 	if comment.StartColumn > len(line) {
 		return false
 	}
-	return strings.TrimSpace(line[:comment.StartColumn]) == ""
+	return text.TrimWhitespace(line[:comment.StartColumn]) == ""
 }
 
 // isDirectiveComment reports whether a comment is a pragma rather than prose.
 func isDirectiveComment(comment comments.Comment) bool {
-	body := strings.TrimSpace(strings.TrimPrefix(comment.Text, "//"))
+	body := text.TrimWhitespace(strings.TrimPrefix(comment.Text, "//"))
 	for _, prefix := range directivePrefixes {
 		if strings.HasPrefix(body, prefix) {
 			return true
@@ -163,13 +164,13 @@ func blockCommentFromRun(run []comments.Comment) string {
 	var builder strings.Builder
 	builder.WriteString("/*\n")
 	for _, comment := range run {
-		text := strings.TrimPrefix(comment.Text, "//")
-		text = strings.TrimPrefix(text, " ")
-		if strings.TrimSpace(text) == "" {
+		body := strings.TrimPrefix(comment.Text, "//")
+		body = strings.TrimPrefix(body, " ")
+		if text.TrimWhitespace(body) == "" {
 			builder.WriteString(indent + " *\n")
 			continue
 		}
-		builder.WriteString(indent + " * " + text + "\n")
+		builder.WriteString(indent + " * " + body + "\n")
 	}
 	builder.WriteString(indent + " */")
 	return builder.String()

@@ -79,6 +79,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // LoadedDesignSystem is one repository's resolved design system, immutable once built.
@@ -674,7 +676,7 @@ func (collector *stylesheetCollector) ingest(nodes []*Node, path string) error {
 // looks exactly like a right one. Same judgement as themeloader.go's followImport, and deliberately
 // the same error text so a repository hitting it finds one explanation rather than two.
 func (collector *stylesheetCollector) resolveImport(node *Node, path string) (string, error) {
-	parts := segment(strings.TrimSpace(node.Params), ' ')
+	parts := segment(text.TrimWhitespace(node.Params), ' ')
 	if len(parts) == 0 || parts[0] == "" {
 		return "", fmt.Errorf("%s: @import with no specifier", path)
 	}
@@ -682,7 +684,7 @@ func (collector *stylesheetCollector) resolveImport(node *Node, path string) (st
 	specifier := strings.Trim(parts[0], `"'`)
 
 	for _, modifier := range parts[1:] {
-		modifier = strings.TrimSpace(modifier)
+		modifier = text.TrimWhitespace(modifier)
 		if modifier == "" {
 			continue
 		}
@@ -760,7 +762,7 @@ func (collector *stylesheetCollector) ingestThemeBlock(node *Node, path string) 
 // A block whose name is neither shape is an error rather than a skip. Upstream throws on it, and a
 // silently dropped `@utility` is a repository utility every rule then treats as an unknown class.
 func (collector *stylesheetCollector) ingestUtilityBlock(node *Node, path string) error {
-	name := strings.TrimSpace(node.Params)
+	name := text.TrimWhitespace(node.Params)
 	if name == "" {
 		return fmt.Errorf("%s: `@utility` with no name", path)
 	}
@@ -821,11 +823,11 @@ func (collector *stylesheetCollector) ingestUtilityBlock(node *Node, path string
 // CSS and a variant's sort position does not depend on what it emits — see the file comment in
 // variant.go, where both corpus repositories redefine `dark` and keep the framework's position.
 func (collector *stylesheetCollector) ingestCustomVariant(node *Node) {
-	parts := segment(strings.TrimSpace(node.Params), ' ')
+	parts := segment(text.TrimWhitespace(node.Params), ' ')
 	if len(parts) == 0 {
 		return
 	}
-	name := strings.TrimSpace(parts[0])
+	name := text.TrimWhitespace(parts[0])
 	// A functional custom variant is written `@custom-variant foo-*`, and the root is the name
 	// without the suffix, the same split `@utility` uses.
 	name = strings.TrimSuffix(name, "-*")

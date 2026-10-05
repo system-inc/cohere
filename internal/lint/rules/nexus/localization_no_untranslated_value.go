@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/types/sourcename"
 	"github.com/system-inc/cohere/policy"
@@ -192,7 +193,7 @@ func reportUntranslated(
 			return
 		}
 
-		if strings.TrimSpace(value) == "" && strings.TrimSpace(englishValue) != "" {
+		if text.TrimWhitespace(value) == "" && text.TrimWhitespace(englishValue) != "" {
 			ctx.ReportNode(valueNode, messageMissingTranslation(key, localeCode))
 			return
 		}

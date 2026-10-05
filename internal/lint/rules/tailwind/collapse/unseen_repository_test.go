@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
 // The measurement `#twany` opened with, re-run at the end of it.
@@ -131,12 +133,8 @@ func unseenDesignSystem(t *testing.T) *LoadedDesignSystem {
 		t.Skipf("the unseen design system is not present at %s", entryPoint)
 	}
 
-	// Any repository with tailwindcss installed, borrowed for the package rather than vendored, the
-	// same way the extractor that generated this file's rows borrows one.
-	packageRoot := findTailwindPackageRootForTest(filepath.Join(homeDirectory(), "Projects", "ahra"))
-	if packageRoot == "" {
-		t.Skip("no installed tailwindcss to resolve the unseen system against")
-	}
+	// The vendored snapshot of tailwindcss, so the unseen system resolves on any machine (#sycrdr6).
+	packageRoot := vendored.TailwindPackageRoot()
 
 	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
 	if err != nil {

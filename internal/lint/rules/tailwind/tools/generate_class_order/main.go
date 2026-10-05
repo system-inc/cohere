@@ -84,6 +84,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "read committed fixture: %v\n", err)
 			os.Exit(1)
 		}
+		// Go whitespace: this tool comparing its own committed fixture with its own output.
 		if !bytes.Equal(bytes.TrimSpace(committed), bytes.TrimSpace(generated)) {
 			fmt.Fprintf(os.Stderr, "%s is stale: the engine now reads at least one class differently. Re-run without -check and read the diff.\n", *output)
 			os.Exit(1)

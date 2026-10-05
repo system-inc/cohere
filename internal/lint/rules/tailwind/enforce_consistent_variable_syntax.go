@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -156,7 +157,7 @@ func rewriteVariableForm(base string, syntax string) (string, bool) {
 		case isArbitraryVariable(contents):
 			// `[var(--x)]` holds a call; its own parentheses carry the property name.
 			_, inner, trailing, hasInner := extractBalanced(contents, '(', ')')
-			if !hasInner || strings.TrimSpace(strings.ReplaceAll(trailing, "_", " ")) != "" {
+			if !hasInner || text.TrimWhitespace(strings.ReplaceAll(trailing, "_", " ")) != "" {
 				return "", false
 			}
 			return before + "(" + inner + ")" + after, true

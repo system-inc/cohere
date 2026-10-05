@@ -905,6 +905,7 @@ func DefaultClassLiteralPropertyStyleOptions() ClassLiteralPropertyStyleOptions 
 // loaded clean doing it. Upstream's schema is a string enum and refuses it at load, and the config
 // layer now refuses a decoder's error by rule name, so refusing is what tells the author (#rfbha44).
 func DecodeClassLiteralPropertyStyleOptions(raw []byte) (any, error) {
+	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 	trimmed := strings.TrimSpace(string(raw))
 	if trimmed == "" || trimmed == "null" {
 		return DefaultClassLiteralPropertyStyleOptions(), nil

@@ -1,6 +1,10 @@
 package tailwind
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
+)
 
 // PrintVariant writes a parsed variant back as Tailwind spells it, which is upstream's
 // `printVariant` (candidate.ts), ported from the 4.3.3 bundle together with the arbitrary-value
@@ -150,11 +154,11 @@ func printArbitraryValue(value string) string {
 					break
 				}
 				removed[before], removed[after] = true, true
-			case node.kind == ValueNodeKindSeparator && node.value != "" && strings.TrimSpace(node.value) == "":
+			case node.kind == ValueNodeKindSeparator && node.value != "" && text.TrimWhitespace(node.value) == "":
 				if index == 0 || index == len(siblings)-1 {
 					removed[node] = true
 				}
-			case node.kind == ValueNodeKindSeparator && strings.TrimSpace(node.value) == ",":
+			case node.kind == ValueNodeKindSeparator && text.TrimWhitespace(node.value) == ",":
 				node.value = ","
 			case node.kind == ValueNodeKindFunction && strings.HasPrefix(node.value, "--"):
 				if index <= 0 {
