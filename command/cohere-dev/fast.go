@@ -25,10 +25,22 @@ import (
 // alone runs can skip itself. The corpus walks in high_level_intermediate_representation read it.
 const fastTierVariable = "COHERE_FAST_TIER"
 
-// fastBudget is what an entry in landingGateOnly must still cost, measured alone with -count=1, to stay
-// out of the fast tier: more than this wall, or more than this CPU. An entry that falls under both belongs
-// back in the edit loop, and TestEveryLandingGateOnlyEntryStillEarnsItsPlace fails until it is moved.
-var fastBudget = struct{ wallSeconds, cpuSeconds float64 }{wallSeconds: 2, cpuSeconds: 15}
+// fastBudgetCPUSeconds is what an entry in landingGateOnly must still cost in CPU, user plus system,
+// measured alone with -count=1 and its test binary already built, to stay out of the fast tier. An entry at
+// or under it belongs back in the edit loop, and TestEveryLandingGateOnlyEntryStillEarnsItsPlace fails until
+// it is moved.
+//
+// CPU and not wall, because wall moves with the machine's load and CPU does not (#1qbez1f). With a 2s wall
+// budget beside it, the registry's ESLint corpus passed two gates at 2.5s and 3.5s under load and failed the
+// third at 1.1s on a quieter machine, while its CPU read 10.5 to 12.7s throughout. A gate whose verdict
+// depends on who else is running is a flaky test.
+//
+// CPU is steadier than wall, not load-invariant. A heavily parallel package's CPU inflates under contention:
+// command/cohere read 926 to 933s of CPU at load 105 to 166 against 49.4s at load about 10, and
+// crosscompile 36 to 41s against 26, while hir held at 29 to 31s at every load measured. Every change load
+// made tonight was upward, so a verdict at low load is the strict one, and every entry today clears 15 at
+// load about 10 and at load 166 alike.
+const fastBudgetCPUSeconds = 15
 
 // landingGateEntry is one thing the fast tier leaves to the full gate.
 type landingGateEntry struct {
@@ -41,7 +53,8 @@ type landingGateEntry struct {
 
 	// wallSeconds and cpuSeconds are its cost measured alone with -count=1 on a quiet machine, when it was
 	// added; for part of a package, the package run in full less the package run in the fast tier.
-	// TestEveryLandingGateOnlyEntryStillEarnsItsPlace measures it again.
+	// TestEveryLandingGateOnlyEntryStillEarnsItsPlace measures both again and judges the CPU; the wall is
+	// what the fast tier prints, for a reader, and judges nothing.
 	wallSeconds, cpuSeconds float64
 
 	reason string
