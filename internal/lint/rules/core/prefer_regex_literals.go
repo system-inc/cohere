@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/regexpattern"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -157,9 +158,8 @@ func messageReplaceWithIntendedLiteralAndFlags(flags string) rule.Message {
 var PreferRegexLiterals = rule.Rule{
 	Name: "prefer-regex-literals",
 
-	// The rule cannot tell `new RegExp('a')` from the same call inside a function that takes
-	// `RegExp` as a parameter without resolving the name, and eleven of upstream's clean cases
-	// are exactly that shadow.
+	// The calls come from the shelf's ReferenceTracker, which tells the global RegExp from a local one
+	// by where its symbol is declared: eleven of upstream's clean cases are exactly that shadow.
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
@@ -173,18 +173,7 @@ var PreferRegexLiterals = rule.Rule{
 		settings, _ := rule.OptionsAs[PreferRegexLiteralsOptions](options)
 
 		check := func(node *ast.Node) {
-			callee, arguments := calleeAndArguments(node)
-			if callee == nil {
-				return
-			}
-			if !namesTheRegExpGlobal(ctx, callee) {
-				return
-			}
-
-			var argumentNodes []*ast.Node
-			if arguments != nil {
-				argumentNodes = arguments.Nodes
-			}
+			argumentNodes := node.Arguments()
 
 			if settings.DisallowRedundantWrapping && wrapsARegexLiteral(ctx, argumentNodes) {
 				reportRedundantWrapping(ctx, node, argumentNodes)
@@ -197,89 +186,19 @@ var PreferRegexLiterals = rule.Rule{
 		}
 
 		return rule.Listeners{
-			ast.KindNewExpression:  check,
-			ast.KindCallExpression: check,
+			ast.KindSourceFile: func(node *ast.Node) {
+				// Every trace starts at a reference to RegExp, so a file that never spells it has
+				// nothing to follow, and the tracker's index is never built.
+				if !strings.Contains(ctx.SourceFile.Text(), "RegExp") {
+					return
+				}
+				tracker := reference.NewTracker(ctx.SourceFile, ctx.TypeChecker, nil)
+				for _, tracked := range tracker.GlobalReferences(regExpCallTraceMap) {
+					check(tracked.Node)
+				}
+			},
 		}
 	},
-}
-
-// calleeAndArguments reads the two fields both call shapes carry under different names.
-//
-// `new RegExp` with no argument list has a nil Arguments rather than an empty one, which is why the
-// caller reads the length off a slice built here instead of dereferencing.
-func calleeAndArguments(node *ast.Node) (*ast.Node, *ast.NodeList) {
-	switch node.Kind {
-	case ast.KindNewExpression:
-		return node.AsNewExpression().Expression, node.AsNewExpression().Arguments
-	case ast.KindCallExpression:
-		return node.AsCallExpression().Expression, node.AsCallExpression().Arguments
-	default:
-		return nil, nil
-	}
-}
-
-// namesTheRegExpGlobal reports whether a callee is the global `RegExp`, written bare or through a
-// global object.
-//
-// Two spellings qualify and upstream's corpus carries both. The bare `RegExp` is the ordinary one.
-// `globalThis.RegExp` qualifies because upstream's ReferenceTracker follows a global object's
-// property, and it is in the corpus twice under an ecmaVersion that has `globalThis`.
-//
-// `window.RegExp` is upstream's third spelling and it is NOT reproduced. Upstream reports it only
-// when the config declares `window` as a global, which is a config surface we do not have; measured
-// here, the checker returns no symbol for `window` at all in a file with no DOM lib, so the call
-// declines. The one corpus case using it is marked in the fixture table.
-func namesTheRegExpGlobal(ctx rule.Context, callee *ast.Node) bool {
-	// No `SkipParentheses`, matching upstream, which tests the node type directly. A parenthesized
-	// callee is a different node in ESTree too, so `(RegExp)('a')` is clean on both sides.
-	switch callee.Kind {
-	case ast.KindIdentifier:
-		if callee.Text() != "RegExp" {
-			return false
-		}
-		return resolvesToAGlobal(ctx, callee)
-	case ast.KindPropertyAccessExpression:
-		access := callee.AsPropertyAccessExpression()
-		if access.Name() == nil || access.Name().Text() != "RegExp" {
-			return false
-		}
-		return isTheGlobalObject(ctx, access.Expression)
-	}
-	return false
-}
-
-// isTheGlobalObject reports whether an expression names `globalThis`.
-//
-// Deliberately narrower than "an object carrying a RegExp property": upstream reaches this through
-// its global-scope table, and the only member of that table reachable here without a config surface
-// for declaring globals is `globalThis`, which the standard library declares. See
-// `namesTheRegExpGlobal` for why `window` is left out.
-func isTheGlobalObject(ctx rule.Context, expression *ast.Node) bool {
-	if expression == nil || expression.Kind != ast.KindIdentifier {
-		return false
-	}
-	if expression.Text() != "globalThis" {
-		return false
-	}
-	// NOT `resolvesToAGlobal`, and this is measured rather than stylistic. That helper answers false
-	// when the symbol carries no declarations, and `globalThis` is exactly such a symbol: probed
-	// directly, `GetSymbolAtLocation` returns a non-nil symbol with ZERO declarations, so the helper
-	// declines every case this rule must report. It is the same shape the brief records for
-	// `undefined`, arriving through a different name.
-	//
-	// So the predicate is the complement: `globalThis` is the global unless something in SOURCE
-	// declares that name. A symbol with declarations, all of which sit in source files, is a shadow.
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(expression)
-	if symbol == nil {
-		return false
-	}
-	for _, declaration := range symbol.Declarations {
-		declaringFile := ast.GetSourceFileOfNode(declaration)
-		if declaringFile != nil && !declaringFile.IsDeclarationFile {
-			return false
-		}
-	}
-	return true
 }
 
 // staticStringValue answers the pattern or flags a node contributes, and whether it contributes one

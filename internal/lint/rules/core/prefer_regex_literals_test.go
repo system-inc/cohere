@@ -709,17 +709,19 @@ func TestPreferRegexLiteralsRecordsTheLanguageEditionDivergence(t *testing.T) {
 	}
 }
 
-// TestPreferRegexLiteralsIsSilentWithoutADeclaredGlobal pins the `window` row.
+// TestPreferRegexLiteralsFollowsWindowAsTheGlobalObject pins the `window` row.
 //
-// Separate from the table above because it is a different mechanism with the opposite outcome:
-// nothing about the language edition is involved, the checker simply resolves no `window` in a
-// program with no DOM library, so the call is declined. Upstream reports it only because its config
-// declares `window` a global, which is the same missing surface as the `globals: off` cases.
-func TestPreferRegexLiteralsIsSilentWithoutADeclaredGlobal(t *testing.T) {
+// The calls come from the shelf's ReferenceTracker, which takes an undeclared `window` for the runtime's
+// global object, as it does for every rule on it. ESLint's corpus runs this row with `window` declared a
+// browser global and reports it, so the two agree here; without that config ESLint is silent, which is
+// the one edge the ESLint table leaves out.
+func TestPreferRegexLiteralsFollowsWindowAsTheGlobalObject(t *testing.T) {
 	t.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferRegexLiterals, preferRegexLiteralsFile,
-		"new window['RegExp']('\\x56\\x78\\x45', '');"))
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferRegexLiterals, preferRegexLiteralsFile,
+		"new window['RegExp']('\\x56\\x78\\x45', '');"), "unexpectedRegExp")
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferRegexLiterals, preferRegexLiteralsFile,
+		"window.RegExp('a');"), "unexpectedRegExp")
 }
 
 func TestPreferRegexLiteralsStaysSilent(t *testing.T) {
