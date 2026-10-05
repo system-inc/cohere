@@ -268,9 +268,8 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		table:      table,
 		key:        key,
 		recorder:   program.NewInputRecorder(),
-		// Taken here, after the cache directory exists and before the build reads anything, so an input
-		// changed after it is one the run may have read before the change. See program.RecordRunCache.
-		readSince: time.Now(),
+		// See startRunCacheClock: before discovery reads anything, after the cache directory exists.
+		readSince: runCacheClock,
 	}
 	if err := session.stdout.start(&os.Stdout); err != nil {
 		return nil
@@ -306,6 +305,24 @@ func cacheDirectory(root string) string {
 // The warning is a warning rather than a refusal: the cache is still the project's to keep, and the line
 // to add is named so it is one edit away. What it must never be is a silent write into tracked space.
 var prepareCacheDirectoryOnce sync.Once
+
+// runCacheClock is when the run began reading its inputs, the time a recording's inputs must not have changed
+// since. Set by startRunCacheClock.
+var runCacheClock time.Time
+
+// startRunCacheClock starts the run cache's clock: after the cache directory exists, since creating it moves the
+// project root's time, and before discovery lists the tree. The clock was taken at the session's start, in
+// beginRunCache, until discovery's listings came to serve the build's enumeration (#bjv0tg4); discovery runs
+// before the session, so a file created between its listing and the session's start was missing from the
+// enumeration while its directory's time already counted it, and the next run replayed over it
+// (TestAFileCreatedAfterDiscoveryIsNeverReplayedOver). An earlier clock costs only a run whose inputs change in
+// that moment, which is then not recorded.
+func startRunCacheClock(location projectLocation, locateError error) {
+	if locateError == nil && runCacheEligible() {
+		prepareCacheDirectory(location.Root)
+	}
+	runCacheClock = time.Now()
+}
 
 func prepareCacheDirectory(root string) {
 	prepareCacheDirectoryOnce.Do(func() {

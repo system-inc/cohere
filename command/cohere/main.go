@@ -193,6 +193,8 @@ func run() error {
 		Engine:                  projectEngine(os.Getenv(projectEngineVariable)),
 	})
 
+	startRunCacheClock(location, locateError)
+
 	// A root holding more than one project, TypeScript and Swift side by side or nested, checks each with
 	// its own engine and reports them as one (#f9nftxz). One project is checked here, as it always was.
 	if discoveryApplies(given, flag.Args()) {
@@ -206,6 +208,13 @@ func run() error {
 		}
 		if checked {
 			exitProcess(exitCode)
+		}
+		// A test instrument: a file created in the moment after discovery listed the tree and before anything else
+		// reads it. See TestAFileCreatedAfterDiscoveryIsNeverReplayedOver.
+		if created := os.Getenv("COHERE_TEST_CREATE_AFTER_DISCOVERY"); created != "" {
+			if err := os.WriteFile(created, []byte("export const late: number = \"x\";\n"), 0o644); err != nil {
+				return err
+			}
 		}
 	}
 
