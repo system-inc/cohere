@@ -543,11 +543,26 @@ func (c Context) ReportRangeWithFixes(textRange core.TextRange, message Message,
 // receiver (`RuleFixReplace(file, node, text)`), so the call that forgets it is available. Ours is
 // not. Exposing both would give a rule author two reachable spellings of one act, one of them
 // unsafe, and two helpers that almost agree drift permanently.
+//
+// The first token's start is read with scanner.GetTokenPosOfNode, the compiler's own trivia skip. It used to
+// come from scanner.GetRangeOfTokenAtPosition, which builds a scanner on every call: 252 MB and 1.5M objects of
+// a cold ahra run, for a position a trivia skip gives directly (#9xfg09f). The text is read inside the compiler
+// rather than with sourceFile.Text() here, since the shape-keyed rules' guard cannot tell this file from an
+// imported declaration's (TestRulesClaimShapesOnlyWhereTheScanAllowsIt).
+//
+// GetTokenPosOfNode is a plain trivia skip, the scanner's answer, except for four shapes it reads on purpose
+// another way: a missing node, whose position it returns unskipped; JSDoc and JSX text, where it stops at a
+// comment; and a node inside JSDoc. Those keep the scanner. TestTokenRangeStartsWhereTheScannerDoes holds the
+// two to the scanner's start on every node of the fixtures and of the four consumers, and found exactly those
+// shapes when the scanner was dropped for every node (14,522 of 6,024,171).
 func TokenRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 	if sourceFile == nil || node == nil {
 		return node.Loc
 	}
-	return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())
+	if ast.NodeIsMissing(node) || ast.IsJSDocNode(node) || node.Kind == ast.KindJsxText || node.Flags&ast.NodeFlagsJSDoc != 0 {
+		return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())
+	}
+	return core.NewTextRange(scanner.GetTokenPosOfNode(node, sourceFile, false), node.End())
 }
 
 // NodeText is a node's own source text, from its first token to its end, without the leading trivia
