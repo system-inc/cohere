@@ -53,7 +53,7 @@ func init() {
 		rule.Registration{Rule: NoWillUpdateSetState, Decode: DecodeNoMethodSetStateOptions},
 		rule.Registration{Rule: Purity, Decode: DecodeCompilerRuleOptions},
 		rule.Registration{Rule: Refs, Decode: DecodeCompilerRuleOptions},
-		rule.Registration{Rule: RulesOfHooks},
+		rule.Registration{Rule: RulesOfHooks, Decode: rule.DecodeOptionsInto[RulesOfHooksOptions]()},
 		rule.Registration{Rule: SetStateInEffect, Decode: DecodeCompilerRuleOptions},
 		rule.Registration{Rule: SetStateInRender, Decode: DecodeCompilerRuleOptions},
 		rule.Registration{Rule: StaticComponents, Decode: DecodeCompilerRuleOptions},
