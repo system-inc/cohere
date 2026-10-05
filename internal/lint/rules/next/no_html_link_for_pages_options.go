@@ -53,6 +53,7 @@ func decodeNoHtmlLinkForPagesOptions(raw []byte, base rule.OptionsBase) (any, er
 		return NoHtmlLinkForPagesOptions{}, nil
 	}
 
+	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 	trimmed := bytes.TrimSpace(raw)
 	var written []string
 	switch {
@@ -75,6 +76,7 @@ func decodeNoHtmlLinkForPagesOptions(raw []byte, base rule.OptionsBase) (any, er
 		seen := make(map[string]bool, len(elements))
 		for index, element := range elements {
 			var directory string
+			// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 			if err := json.Unmarshal(element, &directory); err != nil || bytes.TrimSpace(element)[0] != '"' {
 				return nil, fmt.Errorf("element %d of the pages directory list is %s, and each must be a string", index+1, element)
 			}

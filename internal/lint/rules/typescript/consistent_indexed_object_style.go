@@ -40,6 +40,7 @@ func DefaultConsistentIndexedObjectStyleSettings() ConsistentIndexedObjectStyleO
 func DecodeConsistentIndexedObjectStyleOptions(raw []byte) (any, error) {
 	options := DefaultConsistentIndexedObjectStyleSettings()
 
+	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 	trimmed := strings.TrimSpace(string(raw))
 	if trimmed == "" || trimmed == "null" {
 		return options, nil

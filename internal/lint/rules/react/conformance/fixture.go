@@ -277,6 +277,7 @@ func ParseExpectation(text string) (Expectation, error) {
 
 	lines := strings.Split(block, "\n")
 	for index := 0; index < len(lines); index++ {
+		// Go whitespace: the layout of a vendored markdown golden, which no upstream code parses.
 		line := strings.TrimSpace(lines[index])
 
 		if count, ok := parseFoundHeader(line); ok {
@@ -290,12 +291,14 @@ func ParseExpectation(text string) (Expectation, error) {
 			continue
 		}
 
+		// Go whitespace: the layout of a vendored markdown golden, which no upstream code parses.
 		expected := ExpectedError{Heading: heading, Message: strings.TrimSpace(message)}
 
 		// The location follows the message and its prose, and is the next line that parses as
 		// `path:line:col`. Scanning forward to the next heading bounds the search so a multi-error
 		// golden does not attach the second error's location to the first.
 		for scan := index + 1; scan < len(lines); scan++ {
+			// Go whitespace: the layout of a vendored markdown golden, which no upstream code parses.
 			candidate := strings.TrimSpace(lines[scan])
 			if _, _, isHeading := cutHeading(candidate); isHeading {
 				break

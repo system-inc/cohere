@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -103,13 +104,13 @@ func startsWithEffectPrefix(comment comments.Comment) bool {
 
 	switch {
 	case strings.HasPrefix(body, "//"):
-		return strings.HasPrefix(strings.TrimSpace(body[2:]), effectCommentPrefix)
+		return strings.HasPrefix(text.TrimWhitespace(body[2:]), effectCommentPrefix)
 
 	case strings.HasPrefix(body, "/*"):
 		body = strings.TrimPrefix(body, "/*")
 		body = strings.TrimSuffix(body, "*/")
 		for _, line := range strings.Split(body, "\n") {
-			line = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "*"))
+			line = text.TrimWhitespace(strings.TrimLeft(text.TrimWhitespace(line), "*"))
 			if line == "" {
 				continue
 			}

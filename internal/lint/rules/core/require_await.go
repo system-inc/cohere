@@ -653,6 +653,7 @@ func requireAwaitDescribe(ctx rule.Context, node *ast.Node) string {
 			return fmt.Sprintf("Async %s '%s'", kind, text)
 		}
 	}
+	// Go whitespace: kind is one of this function's own Go literals, never source text.
 	return "Async " + strings.TrimSpace(kind)
 }
 

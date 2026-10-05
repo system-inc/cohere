@@ -76,6 +76,7 @@ func For(ruleName string) (*Schema, bool, error) {
 		return nil, false, fmt.Errorf("reading the embedded option schemas: %w", err)
 	}
 	raw, present := schemas.Rules[ruleName]
+	// Go whitespace: raw JSON bytes of an embedded schema, whose whitespace is the same in both sets.
 	if !present || bytes.Equal(bytes.TrimSpace(raw), []byte("false")) {
 		return nil, false, nil
 	}

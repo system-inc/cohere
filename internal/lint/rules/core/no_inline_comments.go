@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -147,7 +148,7 @@ func noInlineCommentsIsInline(
 	// The text before the comment on its first line, and after it on its last.
 	preamble := ""
 	if comment.StartColumn <= len(startLine) {
-		preamble = strings.TrimSpace(startLine[:comment.StartColumn])
+		preamble = text.TrimWhitespace(startLine[:comment.StartColumn])
 	}
 	// The shelf's Comment carries StartLine, StartColumn and EndLine but no EndColumn, so it is
 	// derived: the comment's end offset minus the offset at which its last line begins. Computed
@@ -156,7 +157,7 @@ func noInlineCommentsIsInline(
 	postamble := ""
 	endColumn := comment.Range.End() - noInlineCommentsLineStartOffset(lines, comment.EndLine)
 	if endColumn >= 0 && endColumn <= len(endLine) {
-		postamble = strings.TrimSpace(endLine[endColumn:])
+		postamble = text.TrimWhitespace(endLine[endColumn:])
 	}
 
 	// Nothing on either side: the comment owns its lines, which is the whole point of the rule.
@@ -201,7 +202,7 @@ func noInlineCommentsBody(comment *comments.Comment) string {
 	} else {
 		body = strings.TrimPrefix(body, "//")
 	}
-	return strings.TrimSpace(body)
+	return text.TrimWhitespace(body)
 }
 
 // noInlineCommentsIsDirective answers upstream's `astUtils.isDirectiveComment`.

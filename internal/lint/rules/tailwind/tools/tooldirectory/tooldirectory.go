@@ -28,6 +28,7 @@ func Of(callerPath string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("this tool was built with -trimpath, so its source is named by import path %s, and go list could not find it (run it from inside the cohere checkout): %w", importPath, err)
 		}
+		// Go whitespace: the directory `go list` printed, which no JavaScript tool reads.
 		directory = strings.TrimSpace(string(listed))
 	}
 	if _, err := os.Stat(filepath.Join(directory, filepath.Base(callerPath))); err != nil {

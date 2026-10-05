@@ -508,6 +508,7 @@ func settingOrDefaultBanTsComment(raw json.RawMessage, fallback BanTsCommentSett
 	var asObject struct {
 		DescriptionFormat *string `json:"descriptionFormat"`
 	}
+	// Go whitespace: JSON wire bytes, whose whitespace is space, tab, LF and CR in either set.
 	if trimmed := strings.TrimSpace(string(raw)); strings.HasPrefix(trimmed, "{") {
 		if err := rule.UnmarshalOptions(raw, &asObject); err != nil {
 			return fallback, err

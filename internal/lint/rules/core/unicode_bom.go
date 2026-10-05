@@ -111,6 +111,7 @@ type unicodeBomUnknownSetting struct {
 }
 
 func (e *unicodeBomUnknownSetting) Error() string {
+	// Go whitespace: the bad option value echoed in cohere's own error message, which decides nothing.
 	return "unicode-bom takes \"always\" or \"never\", got " + strings.TrimSpace(e.configured)
 }
 

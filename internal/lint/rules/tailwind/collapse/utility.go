@@ -72,6 +72,8 @@ package tailwind
 import (
 	"strconv"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // bareValueDataTypes is upstream's `BARE_VALUE_DATA_TYPES`, the only data types a `--value()` may
@@ -571,7 +573,7 @@ func (state *utilityEvaluation) resolveBareArgument(argument string, value *Pars
 		// Reprinted with spaces around the slash, matching upstream, so the substituted text is
 		// `1 / 2` rather than `1/2`. A bare `1/2` inside a `calc()` would be a division the browser
 		// reads differently from the ratio the engine intends.
-		return ParseValue(strings.TrimSpace(parts[0]) + " / " + strings.TrimSpace(parts[1])), true, true
+		return ParseValue(text.TrimWhitespace(parts[0]) + " / " + text.TrimWhitespace(parts[1])), true, true
 	case DataTypeNumber:
 		if !isValidSpacingMultiplier(resolved) {
 			return nil, false, false

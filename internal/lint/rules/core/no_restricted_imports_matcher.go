@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // noRestrictedImportsGlob is one compiled gitignore-style pattern from a `group` entry.
@@ -122,7 +123,7 @@ func noRestrictedImportsCompileGlob(pattern string, caseSensitive bool) (*noRest
 
 	// `ignore` skips blank lines and comments. A `#` can be escaped to mean a literal one, which is
 	// the `\#foo` case in the corpus, matching `#foo/bar`.
-	if strings.TrimSpace(trimmed) == "" {
+	if text.TrimWhitespace(trimmed) == "" {
 		return nil, true
 	}
 	if strings.HasPrefix(trimmed, "#") {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // ClassTemplate is a template literal on a class surface, broken at its interpolation boundaries.
@@ -184,12 +185,12 @@ func templatesFrom(node *ast.Node, origin ClassLiteralOrigin) []ClassTemplate {
 // Empty text is fine: `${a}${b}` has nothing glued to anything, so there is no fragment whose name
 // got broken. Text ending in whitespace is also fine, and is the shape the rule is teaching people
 // to write.
-func boundaryBeforeHole(text string, textRange core.TextRange) (TemplateBoundary, bool) {
-	if text == "" || endsWithWhitespace(text) {
+func boundaryBeforeHole(spanText string, textRange core.TextRange) (TemplateBoundary, bool) {
+	if spanText == "" || endsWithWhitespace(spanText) {
 		return TemplateBoundary{}, false
 	}
 
-	fields := strings.Fields(text)
+	fields := text.WhitespaceFields(spanText)
 	if len(fields) == 0 {
 		return TemplateBoundary{}, false
 	}
@@ -202,12 +203,12 @@ func boundaryBeforeHole(text string, textRange core.TextRange) (TemplateBoundary
 }
 
 // boundaryAfterHole reports the class fragment right touching an interpolation on its left.
-func boundaryAfterHole(text string, textRange core.TextRange) (TemplateBoundary, bool) {
-	if text == "" || startsWithWhitespace(text) {
+func boundaryAfterHole(spanText string, textRange core.TextRange) (TemplateBoundary, bool) {
+	if spanText == "" || startsWithWhitespace(spanText) {
 		return TemplateBoundary{}, false
 	}
 
-	fields := strings.Fields(text)
+	fields := text.WhitespaceFields(spanText)
 	if len(fields) == 0 {
 		return TemplateBoundary{}, false
 	}
