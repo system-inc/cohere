@@ -39,6 +39,11 @@ const threadsVariable = "COHERE_DEV_THREADS"
 // heldTokenVariable is set, to the token's number, in the environment of everything a token's run starts.
 const heldTokenVariable = "COHERE_DEV_TOKEN"
 
+// coresVariable is set, in the environment of everything a token's run starts, to the cores the token is
+// worth: its packages times its threads. A runner that is not Go (Jest's workers, node's test concurrency)
+// sizes itself by it, through `cohere-dev exec --`, without knowing Go's split (#wrawfdb).
+const coresVariable = "COHERE_DEV_CORES"
+
 // The pool's shape: four runs at once, each two packages at a time on two threads, sixteen threads on a
 // sixteen-core machine. Measured in a quiet window on 2026-10-05 replaying the morning's mix, four gates and
 // two builds started at once: this shape finished in 112s at a mean load of 28, against 113s at 119 for
@@ -199,7 +204,7 @@ func budgetEnvironment(base []string, token int, shape poolShape) []string {
 	for _, variable := range base {
 		name, value, _ := strings.Cut(variable, "=")
 		switch name {
-		case "GOMAXPROCS", heldTokenVariable:
+		case "GOMAXPROCS", heldTokenVariable, coresVariable:
 			continue
 		case "GOFLAGS":
 			for _, flag := range strings.Fields(value) {
@@ -213,7 +218,7 @@ func budgetEnvironment(base []string, token int, shape poolShape) []string {
 	}
 	flags = append(flags, "-p="+strconv.Itoa(shape.packages))
 	return append(environment, "GOFLAGS="+strings.Join(flags, " "), "GOMAXPROCS="+strconv.Itoa(shape.threads),
-		heldTokenVariable+"="+strconv.Itoa(token))
+		heldTokenVariable+"="+strconv.Itoa(token), coresVariable+"="+strconv.Itoa(shape.packages*shape.threads))
 }
 
 // status prints the pool: its shape, who holds each token, and who waits in line, oldest first.
