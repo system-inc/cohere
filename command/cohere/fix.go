@@ -48,7 +48,7 @@ func applyProposedFixes(
 	repositoryRoot string,
 	maxPasses int,
 	write bool,
-) (edit.Summary, program.Result, error) {
+) (edit.Summary, program.Result, *crlfFiles, error) {
 	// This walk is the run's FIRST walk over the program, and it is returned so the lint phase can
 	// reuse it rather than repeat it.
 	//
@@ -71,7 +71,7 @@ func applyProposedFixes(
 	// handed on as a walk: the caller reuses it only when projectFiles is non-empty.
 	// Counted on the way into the formatter, so a checkout git wrote with CRLF is named once below rather
 	// than left to read as a tree of unformatted files.
-	var lineEndings crlfFiles
+	lineEndings := &crlfFiles{}
 	if transform != nil {
 		transform = lineEndings.observing(transform)
 	}
@@ -87,7 +87,7 @@ func applyProposedFixes(
 		walked, err := graph.Walk(ctx, projectFiles, rules)
 		if err != nil {
 			speculation.wait()
-			return edit.Summary{}, program.Result{}, fmt.Errorf("collecting proposals: %w", err)
+			return edit.Summary{}, program.Result{}, nil, fmt.Errorf("collecting proposals: %w", err)
 		}
 		reportForeignCheckers(graph, walked, len(projectFiles))
 		result = walked
@@ -177,7 +177,7 @@ func applyProposedFixes(
 		// with "the fixer never ran".
 		summary := edit.Summarize(nil)
 		summary.Checked = !write
-		return summary, result, nil
+		return summary, result, lineEndings, nil
 	}
 
 	process := edit.FixAndTransformFile
@@ -259,7 +259,7 @@ func applyProposedFixes(
 
 	summary := edit.Summarize(results)
 	summary.Checked = !write
-	return summary, result, nil
+	return summary, result, lineEndings, nil
 }
 
 // errRelintRefused is what the parallel format pass's proposer answers when a file would need its
@@ -341,9 +341,16 @@ func formatInParallel(fileNames []string, byFileName map[string][]edit.Proposal,
 // behind a repair already print under lint at their own positions. What this adds is the fact the
 // rest of the run cannot state, that this file is not what the gate would leave, and which rules or
 // the formatter would change it. Before it, an unformatted file passed a clean `--no-fix` run unseen.
-func printWouldChange(out io.Writer, changed []edit.ChangedFile) {
+//
+// A file that arrived with CRLF says so, with the .gitattributes line that stops git writing it that way:
+// the run's CRLF note prints only under --verbose, and without the cause a fresh Windows checkout reads
+// as a tree of unformatted files (#dr78rt8).
+func printWouldChange(out io.Writer, changed []edit.ChangedFile, lineEndings *crlfFiles) {
 	for _, file := range changed {
 		message := "--fix would rewrite this file: " + strings.Join(file.Changers, ", ")
+		if lineEndings.has(file.FileName) {
+			message += crlfReason
+		}
 		printFinding(out,
 			runFinding{Path: file.FileName, Line: 1, Column: 1, Severity: "error", Rule: "fix", MessageID: "would-change", Message: message},
 			fmt.Sprintf("%s:1:1 - %s [fix/would-change]\n", file.FileName, message))

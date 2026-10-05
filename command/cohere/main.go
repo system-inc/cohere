@@ -828,7 +828,7 @@ func run() error {
 
 		fixStart := time.Now()
 		formatting := newFormatClock()
-		fixSummary, fixWalk, err := applyProposedFixes(
+		fixSummary, fixWalk, lineEndings, err := applyProposedFixes(
 			ctx, graph, fixFiles, fixRules,
 			formatting.timing(scopedTransform(record.observe(formatTransform(formatter), optionsFingerprintOf(formatter)), scope)),
 			scope.formatCandidates(),
@@ -895,7 +895,7 @@ func run() error {
 		} else {
 			// Each file a writing run would change is a finding, and the count joins the verdict: a
 			// `--no-fix` run over a tree `--fix` would rewrite is not clean.
-			printWouldChange(os.Stdout, fixSummary.ChangedFiles)
+			printWouldChange(os.Stdout, fixSummary.ChangedFiles, lineEndings)
 			findings += len(fixSummary.ChangedFiles)
 			activeSummary.WouldChange += len(fixSummary.ChangedFiles)
 

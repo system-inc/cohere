@@ -37,6 +37,22 @@ func (c *crlfFiles) observing(transform edit.Transform) edit.Transform {
 	}
 }
 
+// has reports whether fileName arrived with CRLF. A nil set holds none.
+func (c *crlfFiles) has(fileName string) bool {
+	if c == nil {
+		return false
+	}
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	_, held := c.files[fileName]
+	return held
+}
+
+// crlfReason is what a CRLF file's would-change finding adds, so the cause and its one-line fix reach a
+// default run, where the note above does not (#dr78rt8).
+const crlfReason = ". It has CRLF line endings, and the house format is LF. If git converts them on checkout " +
+	"(core.autocrlf, the default on Windows), add `* text=auto eol=lf` to the repository's .gitattributes"
+
 // report prints the note once, after the fix phase, when any file arrived with CRLF.
 func (c *crlfFiles) report(out io.Writer, write bool) {
 	if len(c.files) == 0 {
