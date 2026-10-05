@@ -5,6 +5,7 @@
 //	go run ./command/cohere-dev test --fast           the edit loop: all but the landing gate's own (fast.go)
 //	go run ./command/cohere-dev build|vet [packages]  go build or go vet
 //	go run ./command/cohere-dev exec -- <command>     any other heavy command: a bench, a cohere run, clang
+//	go run ./command/cohere-dev land                  merge main, gate and fast-forward main, one landing at a time
 //	go run ./command/cohere-dev status                the pool: its tokens, their holders, the line, the cache
 //
 // Every one of them takes a token from the machine's pool, in arrival order, and runs with Go held to the
@@ -40,7 +41,7 @@ func main() {
 		os.Exit(status())
 	case trimCacheVerb:
 		os.Exit(trimCache())
-	case "test", "build", "vet", "exec":
+	case "test", "build", "vet", "exec", "land":
 		os.Exit(run(os.Args[1], os.Args[2:]))
 	}
 	usage()
@@ -50,6 +51,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage: cohere-dev test [--fast] [--full-priority] [go test flags] [packages]\n"+
 		"       cohere-dev build|vet [--full-priority] [go flags] [packages]\n"+
 		"       cohere-dev exec [--full-priority] -- <command> [arguments]\n"+
+		"       cohere-dev land\n"+
 		"       cohere-dev status")
 	os.Exit(2)
 }
@@ -96,6 +98,8 @@ func run(verb string, arguments []string) int {
 	}
 
 	switch verb {
+	case "land":
+		return land(arguments)
 	case "exec":
 		if len(arguments) > 0 && arguments[0] == "--" {
 			arguments = arguments[1:]
