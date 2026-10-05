@@ -106,3 +106,6 @@ chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
   decline the call. Its message ids are ESLint's: `surrogatePair`, `surrogatePairWithoutUFlag`,
   `combiningClass`, `emojiModifier`, `regionalIndicatorSymbol` and `zwj`, and the suggestion's is
   `suggestUnicodeFlag`.
+- `prefer-regex-literals` finds `RegExp` calls as ESLint's reference tracker does: through an alias
+  (`const R = RegExp`), a parenthesized callee, a pattern destructured from `globalThis`, and `window`,
+  which an undeclared name makes the runtime's global object. A local named `RegExp` is still not it.

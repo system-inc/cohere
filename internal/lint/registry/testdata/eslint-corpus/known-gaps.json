@@ -904,9 +904,6 @@
         "68f83719ed32": "globals",
         "a25ca62b9654": "extra"
     },
-    "prefer-regex-literals": {
-        "901e4ce83647": "globals"
-    },
     "prefer-spread": {
         "ff7f9aa3e4c1": "missing"
     },
