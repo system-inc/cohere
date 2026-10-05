@@ -109,7 +109,11 @@ func buildImporterIndex(program rule.Program) *importerIndex {
 // import and no computed import directory leaves this alone, and the file's findings replay. The
 // rest of what the verdict reads, the checker's answers about the file, is the file's type
 // fingerprint's to cover.
-func constantCasingFingerprint(program rule.Program) [sha256.Size]byte {
+//
+// The options are not read. The rule's one option, frameworkConstantNames, judges a declaration inside
+// the file and chooses nothing the index reads, and the findings cache's key already holds every config
+// file, so a change of options re-runs the rule without the fingerprint having to move.
+func constantCasingFingerprint(program rule.Program, options any) [sha256.Size]byte {
 	hash := sha256.New()
 	if index := importerIndexFor(program); index != nil {
 		for _, path := range slices.Sorted(maps.Keys(index.byPath)) {

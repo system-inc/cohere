@@ -12,10 +12,16 @@ import (
 // walk hands the rule, viewed under its own reads.
 func constantCasingFingerprintOf(t *testing.T, files map[string]string, subject string) [sha256.Size]byte {
 	t.Helper()
+	return constantCasingFingerprintWithOptions(t, files, subject, nil)
+}
+
+// constantCasingFingerprintWithOptions is constantCasingFingerprintOf under the rule's options.
+func constantCasingFingerprintWithOptions(t *testing.T, files map[string]string, subject string, options any) [sha256.Size]byte {
+	t.Helper()
 	var fingerprint [sha256.Size]byte
 	probe := ConsistencyRequireConstantCasing
 	probe.Run = func(ctx rule.Context, options any) rule.Listeners {
-		fingerprint = ConsistencyRequireConstantCasing.ProgramFingerprint(ctx.Program)
+		fingerprint = ConsistencyRequireConstantCasing.ProgramFingerprint(ctx.Program, options)
 		return nil
 	}
 	rule_testing.RunTypedFiles(t, probe, files, subject)
@@ -81,5 +87,30 @@ func TestConsistencyRequireConstantCasingFingerprintsExactlyTheImporterIndex(t *
 		if constantCasingFingerprintOf(t, files, source) != original {
 			t.Errorf("%s moved the fingerprint, so files whose verdict cannot change would not replay", name)
 		}
+	}
+}
+
+// The options choose nothing the fingerprint covers: frameworkConstantNames judges a declaration inside
+// the file, and the findings cache's key already holds the config that sets it (#f96cnry). So different
+// options give the same fingerprint, and hashing them would only cost replays. The control: the same
+// options do change the verdict, so the equality below is not a rule that ignored its options.
+func TestConsistencyRequireConstantCasingFingerprintDoesNotHashItsOptions(t *testing.T) {
+	t.Parallel()
+	const source = "/repository/source/Settings.ts"
+	files := map[string]string{
+		source:                         "export const runtime = 'edge';\n",
+		"/repository/source/Server.ts": "import { runtime } from './Settings';\nexport const Runtime = runtime;\n",
+	}
+	framework := ConsistencyRequireConstantCasingOptions{FrameworkConstantNames: []string{"runtime"}}
+
+	if constantCasingFingerprintWithOptions(t, files, source, nil) != constantCasingFingerprintWithOptions(t, files, source, framework) {
+		t.Fatal("the options moved the fingerprint, though nothing the index reads depends on them")
+	}
+
+	without := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing, files, source)
+	with := rule_testing.RunTypedFilesWithOptions(t, ConsistencyRequireConstantCasing, files, source, framework)
+	if len(without.Diagnostics) == 0 || len(with.Diagnostics) != 0 {
+		t.Fatalf("control: the option should silence `runtime`, got %d findings without it and %d with it",
+			len(without.Diagnostics), len(with.Diagnostics))
 	}
 }
