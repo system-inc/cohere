@@ -190,3 +190,48 @@ func TestLandRefusesUncommittedWorkAndUndoesAConflict(t *testing.T) {
 		t.Error("the conflicting merge was not undone")
 	}
 }
+
+// A worktree whose submodule is a symlink to the main checkout's, as most of the house's are made, lands
+// when that checkout is at the pin, and is refused, naming both commits, when it is not. git status refuses
+// such a worktree outright, which land used to read as uncommitted changes with none named (#fz6xejy).
+func TestLandChecksASymlinkedSubmoduleAgainstItsPin(t *testing.T) {
+	t.Parallel()
+	fixture := newLandFixture(t)
+	library := t.TempDir()
+	fixture.git(library, "init", "-q", "-b", "main")
+	fixture.commit(library, "first.txt")
+	pinned := fixture.git(library, "rev-parse", "HEAD")
+	fixture.commit(library, "second.txt")
+	moved := fixture.git(library, "rev-parse", "HEAD")
+	fixture.git(library, "checkout", "-q", "--detach", pinned)
+
+	fixture.git(fixture.repository, "-c", "protocol.file.allow=always", "submodule", "add", "-q", library, "library")
+	fixture.git(fixture.repository, "commit", "-q", "-m", "pin library")
+	a := fixture.worktree("a")
+	fixture.git(a, "merge", "-q", "--no-edit", "main")
+	// The worktree's submodule, a symlink to the main checkout's, at the pin.
+	os.RemoveAll(filepath.Join(a, "library"))
+	if err := os.Symlink(filepath.Join(fixture.repository, "library"), filepath.Join(a, "library")); err != nil {
+		t.Fatal(err)
+	}
+
+	// Moved off the pin, it is refused, both commits named.
+	fixture.git(filepath.Join(fixture.repository, "library"), "checkout", "-q", "--detach", moved)
+	refused := exec.Command(fixture.wrapper, "land")
+	refused.Dir, refused.Env = a, fixture.environment
+	output, err := refused.CombinedOutput()
+	if err == nil || !strings.Contains(string(output), "pins "+pinned[:8]) || !strings.Contains(string(output), "library is at") {
+		t.Errorf("a submodule off its pin was not refused by name (%v):\n%s", err, output)
+	}
+
+	// Back on the pin, it lands.
+	fixture.git(filepath.Join(fixture.repository, "library"), "checkout", "-q", "--detach", pinned)
+	landing := exec.Command(fixture.wrapper, "land")
+	landing.Dir, landing.Env = a, fixture.environment
+	if output, err := landing.CombinedOutput(); err != nil || !strings.Contains(string(output), "landed") {
+		t.Errorf("a worktree with a symlinked submodule at its pin did not land (%v):\n%s", err, output)
+	}
+	if files := fixture.git(fixture.repository, "ls-files"); !strings.Contains(files, "a.txt") {
+		t.Errorf("main holds %q after the landing", files)
+	}
+}
