@@ -52,24 +52,43 @@ func ReversePostorder(function *Function) {
 		return
 	}
 	postorder := make([]*BasicBlock, 0, len(function.Blocks))
-	visited := make(map[BlockId]bool, len(function.Blocks))
-	used := make(map[BlockId]bool, len(function.Blocks))
-	usedFallthroughs := make(map[BlockId]bool, len(function.Blocks))
 
-	// Iterative rather than recursive. A block may be visited first as a structural fallthrough and
-	// later revisited through a real edge, so each frame retains whether this is the visit that owns
-	// the postorder append, exactly as upstream's `wasVisited` local does.
+	// The three sets are dense slices over block ids rather than maps, and the walk keeps its frames
+	// and their successors in two flat buffers rather than a frame and two slices per block. The
+	// traversal is unchanged; only where its bookkeeping lives moved, because this runs for every
+	// lowered function and the per-block allocations were a million objects on a cold ahra run
+	// (#rwsffzm). Ids are bounded by `nextBlock`, and by the largest id in the table for a function
+	// built by hand without `NewFunction`.
+	bound := int(function.nextBlock)
+	for id := range function.blocksById {
+		if int(id) >= bound {
+			bound = int(id) + 1
+		}
+	}
+	visited := make([]bool, bound)
+	used := make([]bool, bound)
+	usedFallthroughs := make([]bool, bound)
+	inRange := func(id BlockId) bool { return int(id) < bound }
+
 	type successor struct {
 		id     BlockId
 		isUsed bool
 	}
 	type frame struct {
-		block      *BasicBlock
-		successors []successor
-		next       int
-		ownsAppend bool
+		block *BasicBlock
+		// successors are this frame's entries in the shared buffer, from start to end. A child's
+		// entries are appended after them and truncated away when the child is popped, so the
+		// buffer is a stack in step with the frames.
+		start, end, next int
+		ownsAppend       bool
 	}
-	enter := func(id BlockId, isUsed bool) *frame {
+	var successors []successor
+	var real []BlockId
+	collect := func(next BlockId) { real = append(real, next) }
+	enter := func(id BlockId, isUsed bool) (frame, bool) {
+		if !inRange(id) {
+			return frame{}, false
+		}
 		wasUsed := used[id]
 		wasVisited := visited[id]
 		visited[id] = true
@@ -77,48 +96,47 @@ func ReversePostorder(function *Function) {
 			used[id] = true
 		}
 		if wasVisited && (wasUsed || !isUsed) {
-			return nil
+			return frame{}, false
 		}
 
 		block, ok := function.Block(id)
 		if !ok {
-			return nil
+			return frame{}, false
 		}
-		var successors []successor
+		start := len(successors)
 		if fallthroughBlock, ok := Fallthrough(block.Terminal); ok {
-			if isUsed {
+			if isUsed && inRange(fallthroughBlock) {
 				usedFallthroughs[fallthroughBlock] = true
 			}
 			successors = append(successors, successor{id: fallthroughBlock, isUsed: false})
 		}
-		var real []BlockId
-		EachSuccessor(block.Terminal, func(next BlockId) {
-			real = append(real, next)
-		})
+		real = real[:0]
+		EachSuccessor(block.Terminal, collect)
 		for index := len(real) - 1; index >= 0; index-- {
 			successors = append(successors, successor{id: real[index], isUsed: isUsed})
 		}
-		return &frame{block: block, successors: successors, ownsAppend: !wasVisited}
+		return frame{block: block, start: start, end: len(successors), next: start, ownsAppend: !wasVisited}, true
 	}
 
-	entry := enter(function.Entry, true)
-	if entry == nil {
+	entry, ok := enter(function.Entry, true)
+	if !ok {
 		return
 	}
-	stack := []*frame{entry}
+	stack := []frame{entry}
 
 	for len(stack) > 0 {
-		top := stack[len(stack)-1]
-		if top.next == len(top.successors) {
+		top := &stack[len(stack)-1]
+		if top.next == top.end {
 			if top.ownsAppend {
 				postorder = append(postorder, top.block)
 			}
+			successors = successors[:top.start]
 			stack = stack[:len(stack)-1]
 			continue
 		}
-		next := top.successors[top.next]
+		next := successors[top.next]
 		top.next++
-		if child := enter(next.id, next.isUsed); child != nil {
+		if child, ok := enter(next.id, next.isUsed); ok {
 			stack = append(stack, child)
 		}
 	}
@@ -127,9 +145,9 @@ func ReversePostorder(function *Function) {
 	for index := len(postorder) - 1; index >= 0; index-- {
 		block := postorder[index]
 		switch {
-		case used[block.Id]:
+		case inRange(block.Id) && used[block.Id]:
 			blocks = append(blocks, block)
-		case usedFallthroughs[block.Id]:
+		case inRange(block.Id) && usedFallthroughs[block.Id]:
 			placeholder := &BasicBlock{
 				Id:           block.Id,
 				Kind:         block.Kind,
@@ -143,7 +161,7 @@ func ReversePostorder(function *Function) {
 	function.Blocks = blocks
 
 	for id := range function.blocksById {
-		if !used[id] && !usedFallthroughs[id] {
+		if !inRange(id) || (!used[id] && !usedFallthroughs[id]) {
 			delete(function.blocksById, id)
 		}
 	}
