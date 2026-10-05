@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -79,7 +80,7 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(bin, "go"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	home := t.TempDir()
+	home := privatePool(t)
 	environment := append(outsideThePool(os.Environ()), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"), tokensVariable+"=1")
 
@@ -150,7 +151,7 @@ func TestWaitersTakeTheSlotInArrivalOrder(t *testing.T) {
 	}
 	bin := t.TempDir()
 	order := filepath.Join(bin, "order")
-	home := t.TempDir()
+	home := privatePool(t)
 	slots := filepath.Join(home, "cache", "cohere", "test-slots")
 	if runtime.GOOS == "darwin" {
 		slots = filepath.Join(home, "Library", "Caches", "cohere", "test-slots")
@@ -244,7 +245,7 @@ func TestARunIsNiceUnlessItAsksForFullPriority(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A pool of its own, so the run never waits in line behind the machine's real ones.
-	home := t.TempDir()
+	home := privatePool(t)
 	niceOf := func(arguments ...string) (int, string) {
 		t.Helper()
 		command := exec.Command(wrapper, append([]string{"test"}, arguments...)...)
@@ -305,14 +306,15 @@ func outsideThePool(environment []string) []string {
 	return kept
 }
 
-// A token's run starts its commands with Go held to the token's packages and threads and the token named,
+// A token's run starts its commands with Go held to the token's packages and threads, the token named, and
+// the cores it is worth for a runner that is not Go,
 // replacing any -p and GOMAXPROCS the caller had and keeping its other GOFLAGS, so every go command and test
 // binary beneath it stays in its share (#qhg0ntb).
 func TestABudgetHoldsGoToTheTokensThreads(t *testing.T) {
 	t.Parallel()
 	environment := budgetEnvironment([]string{"HOME=/home", "GOMAXPROCS=16", "GOFLAGS=-trimpath -p=16 -buildvcs=false", heldTokenVariable + "=9"},
 		2, poolShape{tokens: 4, packages: 3, threads: 5})
-	want := []string{"HOME=/home", "GOFLAGS=-trimpath -buildvcs=false -p=3", "GOMAXPROCS=5", heldTokenVariable + "=2"}
+	want := []string{"HOME=/home", "GOFLAGS=-trimpath -buildvcs=false -p=3", "GOMAXPROCS=5", heldTokenVariable + "=2", coresVariable + "=15"}
 	if strings.Join(environment, "|") != strings.Join(want, "|") {
 		t.Errorf("the budget environment is %q, want %q", environment, want)
 	}
@@ -340,7 +342,7 @@ func TestThePoolRunsAsManyAsItHasTokens(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	home := t.TempDir()
+	home := privatePool(t)
 	start := func(name string, environment []string, arguments ...string) *exec.Cmd {
 		command := exec.Command(wrapper, arguments...)
 		command.Env = append(environment, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
@@ -400,4 +402,130 @@ func TestThePoolRunsAsManyAsItHasTokens(t *testing.T) {
 	if !strings.Contains(string(contents), "start nested token=7 flags=-p=6 threads=5 test ./internal/edit") {
 		t.Errorf("a run already under a token did not run in its parent's share:\n%s", contents)
 	}
+}
+
+// The cache trim keeps the builds out rather than guessing which entries they read (#jc6ca7r): over its cap
+// it waits for every token, so it does not touch the cache while a run holds one, then trims the least
+// recently used entries to three quarters of the cap, sparing what was just written, gives the tokens back,
+// and says what it did in cohere-dev status. A cache under the cap costs no token. Looks are rationed to one
+// every ten minutes.
+func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("the trim holds tokens, a Unix lock")
+	}
+	wrapper := filepath.Join(t.TempDir(), "cohere-dev")
+	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
+		t.Fatalf("building: %v\n%s", err, output)
+	}
+	home := t.TempDir()
+	slots := filepath.Join(home, "cache", "cohere", "test-slots")
+	if runtime.GOOS == "darwin" {
+		slots = filepath.Join(home, "Library", "Caches", "cohere", "test-slots")
+	}
+	if err := os.MkdirAll(slots, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// A Go build cache of ten 1 KB entries three hours old, and one written a minute ago.
+	cache := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	put := func(name string, age time.Duration) string {
+		path := filepath.Join(cache, name[:2], name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, make([]byte, 1024), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		when := time.Now().Add(-age)
+		if err := os.Chtimes(path, when, when); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	old := []string{}
+	for index := 0; index < 10; index++ {
+		old = append(old, put(fmt.Sprintf("%02xaa-d", index), 3*time.Hour+time.Duration(index)*time.Minute))
+	}
+	fresh := put("a0aa-a", time.Minute)
+	size := func() int64 {
+		var total int64
+		filepath.WalkDir(cache, func(path string, entry os.DirEntry, err error) error {
+			if err == nil && !entry.IsDir() && entry.Name() != "README" {
+				information, _ := entry.Info()
+				total += information.Size()
+			}
+			return nil
+		})
+		return total
+	}
+	// A cap of 6 KB, so the trim brings 11 KB down to three quarters of it.
+	capGigabytes := strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64)
+	environment := append(outsideThePool(os.Environ()), "HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"),
+		"GOCACHE="+cache, tokensVariable+"=2", cacheCapVariable+"="+capGigabytes)
+
+	// A run holds a token, so the trim must wait for it before it touches the cache.
+	held, err := takeSlot(slots, 2, "a run that holds a token")
+	if err != nil || held == nil || held.number != 1 {
+		t.Fatalf("taking a token for the test: %v", err)
+	}
+	trim := exec.Command(wrapper, trimCacheVerb)
+	trim.Env = environment
+	if err := trim.Start(); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(2 * time.Second)
+	if remaining := size(); remaining != 11*1024 {
+		held.release()
+		t.Fatalf("the trim removed entries while a run held a token: %d bytes left", remaining)
+	}
+	held.release()
+	if err := trim.Wait(); err != nil {
+		t.Fatalf("the trim failed: %v", err)
+	}
+	if remaining := size(); remaining > 6*1024/4*3 {
+		t.Errorf("the trim left %d bytes, over three quarters of the 6 KB cap", remaining)
+	}
+	if _, err := os.Stat(fresh); err != nil {
+		t.Error("the entry written a minute ago was trimmed")
+	}
+	if _, err := os.Stat(old[9]); err == nil {
+		t.Error("the oldest entry survived the trim")
+	}
+
+	status := exec.Command(wrapper, "status")
+	status.Env = environment
+	output, err := status.CombinedOutput()
+	if err != nil || !strings.Contains(string(output), "trimmed from") || !strings.Contains(string(output), "Go build cache: cap") {
+		t.Errorf("cohere-dev status does not report the trim (%v):\n%s", err, output)
+	}
+
+	if !claimCacheLook(t.TempDir(), time.Now()) {
+		t.Error("a first look was not due")
+	}
+	rationed := t.TempDir()
+	claimCacheLook(rationed, time.Now())
+	if claimCacheLook(rationed, time.Now().Add(time.Minute)) {
+		t.Error("a second look a minute later was due, inside the ten minutes")
+	}
+}
+
+// privatePool is a home of its own for the wrappers a test starts, so they queue in a pool of their own, with
+// its cache already looked at, so no wrapper starts the background trim: it would run the test's stand-in go
+// to find the cache.
+func privatePool(t *testing.T) string {
+	t.Helper()
+	home := t.TempDir()
+	slots := filepath.Join(home, "cache", "cohere", "test-slots")
+	if runtime.GOOS == "darwin" {
+		slots = filepath.Join(home, "Library", "Caches", "cohere", "test-slots")
+	}
+	if err := os.MkdirAll(slots, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	claimCacheLook(slots, time.Now())
+	return home
 }

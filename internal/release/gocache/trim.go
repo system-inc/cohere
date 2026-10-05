@@ -33,17 +33,21 @@ const readmeMarker = "This directory holds cached build artifacts from the Go bu
 // burst can stand above the cap by what it wrote inside the window, and it never breaks a build.
 const InUseWindow = 90 * time.Minute
 
-// Limit is the size a cache may reach before it is trimmed, and the size a trim brings it down to.
-// Trimming below the cap means a cache growing steadily is trimmed once in a while rather than on every
-// look.
+// Limit is the size a cache may reach before it is trimmed, the size a trim brings it down to, and how
+// recently used an entry may be and still be spared. Trimming below the cap means a cache growing steadily
+// is trimmed once in a while rather than on every look.
 type Limit struct {
 	Cap    int64
 	Target int64
+	// Spare is how recently used an entry may be and never be removed: InUseWindow for a trim that runs
+	// beside builds it cannot see, less for one that has kept them out (cohere-dev's, which holds every
+	// token of the pool while it trims).
+	Spare time.Duration
 }
 
-// LimitFor caps a cache at the given size and trims it to three quarters of that.
+// LimitFor caps a cache at the given size, trims it to three quarters of that, and spares InUseWindow.
 func LimitFor(capBytes int64) Limit {
-	return Limit{Cap: capBytes, Target: capBytes / 4 * 3}
+	return Limit{Cap: capBytes, Target: capBytes / 4 * 3, Spare: InUseWindow}
 }
 
 // Trimmed is what one trim found and removed.
@@ -52,8 +56,8 @@ type Trimmed struct {
 	Before    int64
 	After     int64
 	Removed   int
-	// InUse is the bytes of entries used within InUseWindow, which no trim removes. When After is over
-	// the cap, this is why.
+	// InUse is the bytes of entries used within the limit's Spare window, which the trim did not remove.
+	// When After is over the cap, this is why.
 	InUse int64
 }
 
@@ -67,7 +71,7 @@ type entry struct {
 }
 
 // Trim removes a Go build cache's least recently used entries once it is over limit.Cap, until it is at or
-// under limit.Target or only entries used within InUseWindow are left.
+// under limit.Target or only entries used within limit.Spare are left.
 //
 // Only the 256 entry subdirectories are touched, and in them only what Go's own trim removes: names
 // ending -a or -d. Every removal is one named file. An entry already gone is skipped, since the go command
@@ -78,7 +82,7 @@ func Trim(directory string, limit Limit, now time.Time) (Trimmed, error) {
 		return trimmed, err
 	}
 
-	inUseSince := now.Add(-InUseWindow)
+	inUseSince := now.Add(-limit.Spare)
 	entries := []entry{}
 	for index := 0; index < 256; index++ {
 		subdirectory := filepath.Join(directory, fmt.Sprintf("%02x", index))
