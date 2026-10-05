@@ -36,7 +36,6 @@ var goWhitespaceFunctions = map[string][]string{
 var goWhitespaceUnswept = map[string]int{
 	// lint, @system_cohere_lint_rules.
 	"internal/lint/configuration/configuration.go":                                   6,
-	"internal/lint/configuration/version_pin.go":                                     2,
 	"internal/lint/ecmascript/comments/comments.go":                                  3,
 	"internal/lint/ecmascript/dotnotation/dotnotation.go":                            1,
 	"internal/lint/optionschema/validate.go":                                         1,
@@ -72,7 +71,6 @@ var goWhitespaceUnswept = map[string]int{
 	"internal/lint/rules/react/jsx_no_script_url.go":                                 1,
 	"internal/lint/rules/react/jsx_no_useless_fragment.go":                           2,
 	"internal/lint/rules/react/no_adjacent_inline_elements.go":                       2,
-	"internal/lint/rules/react/no_invalid_html_attribute.go":                         3,
 	"internal/lint/rules/react/no_object_type_as_default_prop.go":                    1,
 	"internal/lint/rules/structure/consistency_require_organized_imports_section.go": 1,
 	"internal/lint/rules/structure/react_hook_require_effect_comment.go":             3,
@@ -86,7 +84,6 @@ var goWhitespaceUnswept = map[string]int{
 	"internal/lint/rules/tailwind/collapse/variant_printer.go":                       2,
 	"internal/lint/rules/tailwind/enforce_consistent_variable_syntax.go":             1,
 	"internal/lint/rules/tailwind/no_physical_direction.go":                          2,
-	"internal/lint/rules/tailwind/tools/generate_candidate/main.go":                  2,
 	"internal/lint/rules/tailwind/tools/generate_class_order/main.go":                2,
 	"internal/lint/rules/tailwind/tools/generate_css_parser/main.go":                 2,
 	"internal/lint/rules/tailwind/tools/generate_data_type/main.go":                  2,
@@ -97,7 +94,6 @@ var goWhitespaceUnswept = map[string]int{
 	"internal/lint/rules/tailwind/tools/generate_variant/main.go":                    4,
 	"internal/lint/rules/tailwind/tools/tooldirectory/tooldirectory.go":              1,
 	"internal/lint/rules/typescript/array_type.go":                                   1,
-	"internal/lint/rules/typescript/ban_ts_comment.go":                               1,
 	"internal/lint/rules/typescript/ban_tslint_comment.go":                           1,
 	"internal/lint/rules/typescript/class_literal_property_style.go":                 1,
 	"internal/lint/rules/typescript/consistent_generic_constructors.go":              1,
