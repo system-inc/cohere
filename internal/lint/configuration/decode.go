@@ -3,6 +3,8 @@ package configuration
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -92,6 +94,10 @@ func (o OptionsRegistry) Decode(ruleName string, elements []json.RawMessage) (an
 		return nil, nil
 	}
 
+	if err := refuseNulls(elements); err != nil {
+		return nil, fmt.Errorf("rule %s: %w", ruleName, err)
+	}
+
 	var raw json.RawMessage
 	decode := declared.Decode
 	switch {
@@ -122,6 +128,70 @@ func (o OptionsRegistry) Decode(ruleName string, elements []json.RawMessage) (an
 		return nil, fmt.Errorf("rule %s: %w", ruleName, err)
 	}
 	return decoded, nil
+}
+
+// refuseNulls refuses a JSON null anywhere in a rule's option elements, naming the element and the
+// path to it.
+//
+// No ported rule's upstream schema admits null, and ESLint's validator refuses it: measured on
+// 2026-10-05 across the 185 option-taking rules from core, typescript-eslint, react, react-hooks,
+// next and eslint-comments, plus better-tailwindcss, and none of ESLint 10.8.1's 6,641 corpus option
+// rows writes one. Go's decoder reads it differently, as "leave this field alone", so
+// `{"allowConstructorFlags": null}` loaded as the default with no error. That is a shape no ESLint
+// version accepts, quietly accepted, which is what #pd2chkx exists to end. Refusing it here, the
+// one layer every rule's elements pass through, covers every decoder at once, including the ones
+// that read their element with json.Unmarshal rather than rule.UnmarshalOptions.
+func refuseNulls(elements []json.RawMessage) error {
+	for index, element := range elements {
+		var value any
+		if err := json.Unmarshal(element, &value); err != nil {
+			// Malformed JSON is the decoder's to report, in its own words.
+			continue
+		}
+		if path, found := nullPath(value, ""); found {
+			at := fmt.Sprintf("element %d", index+1)
+			if path != "" {
+				at += " at " + path
+			}
+			return fmt.Errorf("%s is null, which no ESLint version accepts in a rule's options. "+
+				"Remove it to take the default", at)
+		}
+	}
+	return nil
+}
+
+// nullPath finds the first null in a decoded JSON value, walking object keys in sorted order so the
+// same config always names the same path, and returns its dotted path.
+func nullPath(value any, path string) (string, bool) {
+	switch typed := value.(type) {
+	case nil:
+		return path, true
+	case []any:
+		for index, member := range typed {
+			if found, isNull := nullPath(member, joinPath(path, strconv.Itoa(index))); isNull {
+				return found, true
+			}
+		}
+	case map[string]any:
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			if found, isNull := nullPath(typed[key], joinPath(path, key)); isNull {
+				return found, true
+			}
+		}
+	}
+	return "", false
+}
+
+func joinPath(path, key string) string {
+	if path == "" {
+		return key
+	}
+	return path + "." + key
 }
 
 // describeElements names the option elements from index `from` on, numbered the way a config
