@@ -381,6 +381,81 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	})
 }
 
+// TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory is the derived class's proof through the
+// real binary, on the rule whose option chooses what it reads (#s9k38p3). @next/next/no-html-link-for-pages is
+// configured with pagesDir `custom`, and `pages/team.tsx` stands where the default would read it, so a run that
+// ignored the option would report the anchor from the start. An edit to another file replays the anchor's file
+// with its derived rule, and a page added under `custom` runs that rule again on every replayed file and
+// reports the anchor, whose own bytes never changed. Each run is held against a cold one.
+func TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory(t *testing.T) {
+	t.Parallel()
+	binary := buildCohere(t)
+	fixture := newRunCacheFixture(t, binary)
+	fixture.write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","jsx":"preserve","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`)
+	fixture.write("CohereSettings.json", `{"plugins":["@next"],"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off",`+
+		`"no-debugger":"error","@next/next/no-html-link-for-pages":["error","custom"]}}`)
+	// Without React's types an intrinsic element is a type error, and a run whose types bail never lints.
+	fixture.write("source/jsx.d.ts", "declare namespace JSX {\n    interface IntrinsicElements {\n        [elementName: string]: unknown;\n    }\n}\n")
+	fixture.write("source/link.tsx", "export const TeamLink = () => <a href=\"/team\">Team</a>;\n")
+	fixture.write("custom/about.tsx", "export {};\n")
+	fixture.write("pages/team.tsx", "export {};\n")
+	fixture.commit("a pages directory configured")
+
+	durations := regexp.MustCompile(`\d+(\.\d+)?(ms|s|µs| GB)\b`)
+	lintLine := regexp.MustCompile(`(?m)^lint: .*$`)
+	finding := "@next/next/no-html-link-for-pages"
+	// The lint line and the footer are the invocation's; every other line is the tree's verdict.
+	verdict := func(output string) string {
+		output = lintLine.ReplaceAllString(durations.ReplaceAllString(output, "T"), "")
+		kept := []string{}
+		for _, line := range strings.Split(output, "\n") {
+			if !strings.HasPrefix(line, "  ") && !strings.HasPrefix(line, "✓") && !strings.HasPrefix(line, "✗") &&
+				!strings.HasPrefix(line, "cache: ") && !strings.HasPrefix(line, "graph built in ") && !strings.HasPrefix(line, "types: ") &&
+				!strings.HasPrefix(line, "phases: ") {
+				kept = append(kept, line)
+			}
+		}
+		return strings.Join(kept, "\n")
+	}
+
+	fixture.establishHit("--no-fix")
+	if output, _ := fixture.run(false, "--no-fix"); strings.Contains(output, finding) {
+		t.Fatalf("the anchor reports before any page under custom names it, so the option was not read:\n%s", output)
+	}
+
+	// An edit elsewhere: the anchor's file replays, its derived rule with it.
+	fixture.write("source/a.ts", "export const a: number = 2;\n")
+	warm, warmExit := fixture.run(true, "--no-fix")
+	cold, coldExit := fixture.run(false, "--no-fix")
+	if isRunCacheReplay(warm) || !strings.Contains(lintLine.FindString(warm), "files replayed from cache") {
+		t.Fatalf("an edit to a.ts served nothing from the findings cache:\n%s", warm)
+	}
+	if strings.Contains(warm, "derived rules ran again") {
+		t.Errorf("an edit outside the routes ran the derived rule again on replayed files:\n%s", warm)
+	}
+	if verdict(warm) != verdict(cold) || warmExit != coldExit {
+		t.Fatalf("the warm run differs from a cold one (exit %d against %d):\n--- warm\n%s\n--- cold\n%s", warmExit, coldExit, warm, cold)
+	}
+
+	// A page added under the configured directory: no file the rule checks changed, and the anchor now reports.
+	fixture.write("custom/team.tsx", "export {};\n")
+	warm, warmExit = fixture.run(true, "--no-fix")
+	cold, coldExit = fixture.run(false, "--no-fix")
+	if isRunCacheReplay(warm) {
+		t.Fatalf("a page added under the configured directory was not noticed, and the run was replayed whole:\n%s", warm)
+	}
+	if !strings.Contains(cold, finding) {
+		t.Fatalf("a cold run does not report the anchor after its page was added, so this case proves nothing:\n%s", cold)
+	}
+	if !strings.Contains(lintLine.FindString(warm), "derived rules ran again") {
+		t.Errorf("a page added under the configured directory did not run the derived rule again on the replayed files:\n%s", warm)
+	}
+	if verdict(warm) != verdict(cold) || warmExit != coldExit {
+		t.Fatalf("after a page was added the warm run differs from a cold one (exit %d against %d):\n--- warm\n%s\n--- cold\n%s",
+			warmExit, coldExit, warm, cold)
+	}
+}
+
 // runCacheFixture is a repository TestRunCacheEndToEnd's scenarios run cohere in: a small project committed
 // once, with a home of its own. Each scenario has its own, so they run in parallel; on one shared
 // repository they ran one after another, each undoing its change for the next (#nxgt2ca).

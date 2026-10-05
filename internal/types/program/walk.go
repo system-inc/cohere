@@ -242,15 +242,16 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	// 47ms on ahra, the one cost type-aware caching adds over the walk. Shape fingerprints need this run's
 	// shapes, which the caller computes; without them the shape-keyed rules are keyed on the type
 	// fingerprint instead, which can only re-run them more often.
+	//
+	// The derived rules' program fingerprints depend on each rule's options, so they are made per selection
+	// instead. See programFingerprints.
 	var fingerprints, shapeFingerprints map[tspath.Path][sha256.Size]byte
-	var programFingerprints map[string][sha256.Size]byte
 	if g.FindingsReuse != nil && !g.CollectTimings {
 		fingerprints = g.TypeFingerprints()
 		shapeFingerprints = fingerprints
 		if g.Shapes != nil {
 			shapeFingerprints = g.SignatureFingerprints(g.Shapes)
 		}
-		programFingerprints = g.programFingerprints(rules)
 	}
 	listeningCounts := make(map[string]int, len(rules))
 	reportingCounts := make(map[string]int, len(rules))
@@ -409,7 +410,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 						design:           classes.design,
 						derived:          classes.derived,
 					}
-					keys.derivedFingerprint = derivedKey(classes, programFingerprints, keys.typeFingerprint)
+					keys.derivedFingerprint = derivedKey(classes, g.programFingerprints(selection), keys.typeFingerprint)
 					if entry, found := reuse.lookup(sourceFile.FileName(), keys); found.pure {
 						replayed = &entry
 						hits = found
@@ -1540,6 +1541,10 @@ type ruleSelection struct {
 	// slots is the worker's slot for each applicable rule, aligned with applicable, found on first use. See
 	// fileDispatcher.slotsFor.
 	slots []*ruleSlot
+
+	// programFingerprints is each derived rule's program fingerprint under this selection's options, made on
+	// first use. See Graph.programFingerprints.
+	programFingerprints map[string][sha256.Size]byte
 }
 
 // ruleClassNames is the applicable rules' names in each findings-cache class. See CacheClasses and
@@ -1554,6 +1559,10 @@ type ruleClassNames struct {
 	// derivedReadsTypes is whether any derived rule reads types, which puts the type fingerprint in the derived
 	// key. See derivedKey.
 	derivedReadsTypes bool
+
+	// derivedRules is the derived rules themselves, in derived's order, for their program fingerprints. See
+	// programFingerprints.
+	derivedRules []rule.Rule
 }
 
 // classNames returns the selection's cache classes, made once. Made per file they were about 470 MB of a
@@ -1563,7 +1572,7 @@ func (s *ruleSelection) classNames() *ruleClassNames {
 		pure, typeAware, design, derived, _ := CacheClasses(s.applicable)
 		shaped, typed := ShapeClasses(typeAware)
 		s.classes = &ruleClassNames{pure: ruleNames(pure), typed: ruleNames(typed), shaped: ruleNames(shaped), design: ruleNames(design),
-			derived: ruleNames(derived)}
+			derived: ruleNames(derived), derivedRules: derived}
 		for _, subject := range derived {
 			if subject.NeedsTypeChecker || subject.ProgramReads&rule.ReadsModuleResolution != 0 {
 				s.classes.derivedReadsTypes = true
@@ -1734,11 +1743,18 @@ func foreignQueue(queues []*walkQueue, homeFiles []*ast.SourceFile, worker int) 
 	return queues[worker]
 }
 
-// programFingerprints is every derived rule's program fingerprint for this walk, by name, each computed once
-// through a Program viewed under the rule's own reads (rule.ProgramFingerprint). A fingerprint that panics is
-// left out, which keys no file: the rule's findings neither replay nor record this run.
-func (g *Graph) programFingerprints(rules []rule.Rule) map[string][sha256.Size]byte {
-	_, _, _, derived, _ := CacheClasses(rules)
+// programFingerprints is the selection's derived rules' program fingerprints, by name, each computed through a
+// Program viewed under the rule's own reads and with the options the selection decoded for it
+// (rule.ProgramFingerprint). An option can choose what a rule reads, so two selections giving one rule
+// different options can fingerprint it differently (#s9k38p3). Made once per selection, which is once per
+// distinct resolution on each worker, so a rule's fingerprint may be computed on several workers at once. A
+// fingerprint that panics is left out, which keys no file the selection serves: the rule's findings there
+// neither replay nor record this run.
+func (g *Graph) programFingerprints(selection *ruleSelection) map[string][sha256.Size]byte {
+	if selection.programFingerprints != nil {
+		return selection.programFingerprints
+	}
+	derived := selection.classNames().derivedRules
 	fingerprints := make(map[string][sha256.Size]byte, len(derived))
 	for _, subject := range derived {
 		func() {
@@ -1747,9 +1763,10 @@ func (g *Graph) programFingerprints(rules []rule.Rule) map[string][sha256.Size]b
 					delete(fingerprints, subject.Name)
 				}
 			}()
-			fingerprints[subject.Name] = subject.ProgramFingerprint(rule.ViewProgram(g.Program, nil, subject))
+			fingerprints[subject.Name] = subject.ProgramFingerprint(rule.ViewProgram(g.Program, nil, subject), selection.options[subject.Name])
 		}()
 	}
+	selection.programFingerprints = fingerprints
 	return fingerprints
 }
 

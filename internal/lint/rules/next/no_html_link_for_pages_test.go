@@ -1,6 +1,7 @@
 package next
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -559,6 +560,142 @@ func TestNoHtmlLinkForPagesPointsAtTheOpeningElement(t *testing.T) {
 				t.Errorf("finding points at %q, want %q", reported, testCase.reported)
 			}
 		})
+	}
+}
+
+// htmlLinkFingerprintOf is the rule's program fingerprint over a fixture tree on disk, read through the
+// Program the walk hands the rule, under option written as runHtmlLinkTreeWithOption writes it, or under
+// no option at all when it is "".
+func htmlLinkFingerprintOf(t *testing.T, files map[string]string, option string) [sha256.Size]byte {
+	t.Helper()
+	var fingerprint [sha256.Size]byte
+	probe := NoHtmlLinkForPages
+	probe.Run = func(ctx rule.Context, options any) rule.Listeners {
+		fingerprint = NoHtmlLinkForPages.ProgramFingerprint(ctx.Program, options)
+		return nil
+	}
+	rule_testing.RunTypedFilesWithOptionsFor(t, probe, files, "foo.tsx", func(directory string) any {
+		if option == "" {
+			return nil
+		}
+		quoted, _ := json.Marshal(directory)
+		raw := strings.ReplaceAll(option, "{root}", strings.Trim(string(quoted), `"`))
+		decoded, err := decodeNoHtmlLinkForPagesOptions([]byte(raw), rule.OptionsBase{ConfigDirectory: directory, ProjectRoot: directory})
+		if err != nil {
+			t.Fatalf("decoding %s: %v", raw, err)
+		}
+		return decoded
+	})
+	if fingerprint == ([sha256.Size]byte{}) {
+		t.Fatal("the probe never ran, so no fingerprint was read")
+	}
+	return fingerprint
+}
+
+// htmlLinkFingerprintCase is one change to a fixture tree: paths to add as empty pages, paths to remove,
+// and files to write with the text given.
+type htmlLinkFingerprintCase struct {
+	add    []string
+	remove []string
+	write  map[string]string
+}
+
+// expectHtmlLinkFingerprint checks each case against the base tree's fingerprint: every case in moves must
+// change it and every case in holds must leave it.
+func expectHtmlLinkFingerprint(t *testing.T, base []string, option string, moves, holds map[string]htmlLinkFingerprintCase) {
+	t.Helper()
+	tree := func(change htmlLinkFingerprintCase) map[string]string {
+		files := htmlLinkTree([]htmlLinkRow{{`<a href="/about">x</a>`, nil}}, base...)
+		for _, path := range change.add {
+			files[path] = "export {};"
+		}
+		for _, path := range change.remove {
+			delete(files, path)
+		}
+		for path, text := range change.write {
+			files[path] = text
+		}
+		return files
+	}
+	original := htmlLinkFingerprintOf(t, tree(htmlLinkFingerprintCase{}), option)
+	for name, change := range moves {
+		if htmlLinkFingerprintOf(t, tree(change), option) == original {
+			t.Errorf("%s left the fingerprint unchanged, so a stale finding would replay", name)
+		}
+	}
+	for name, change := range holds {
+		if htmlLinkFingerprintOf(t, tree(change), option) != original {
+			t.Errorf("%s moved the fingerprint, so files whose records cannot change were walked again", name)
+		}
+	}
+}
+
+// The fingerprint is the whole of what a file's record reads beyond the file (#s9k38p3), proven both ways:
+// every change to the routes moves it, a route found a second way included, since it reports a second
+// time, and so does a directory appearing, since that is the difference between listening and not; and
+// every change the routes cannot see leaves it, so the findings cache replays across it.
+func TestNoHtmlLinkForPagesFingerprintsExactlyTheRoutes(t *testing.T) {
+	t.Parallel()
+
+	base := []string{"pages/index.tsx", "pages/about.tsx", "pages/blog/[slug].tsx", "app/shop/[id]/page.tsx", "lib/util.ts"}
+	expectHtmlLinkFingerprint(t, base, "", map[string]htmlLinkFingerprintCase{
+		"a page added":                     {add: []string{"pages/contact.tsx"}},
+		"a page removed":                   {remove: []string{"pages/about.tsx"}},
+		"a page renamed":                   {add: []string{"pages/team.tsx"}, remove: []string{"pages/about.tsx"}},
+		"a page moved into a directory":    {add: []string{"pages/info/about.tsx"}, remove: []string{"pages/about.tsx"}},
+		"an index page added below":        {add: []string{"pages/blog/index.tsx"}},
+		"an app page added":                {add: []string{"app/cart/[id]/page.tsx"}},
+		"the root defined by app as well":  {add: []string{"app/page.tsx"}},
+		"a src pages directory beside":     {add: []string{"src/pages/only.tsx"}},
+		"a page under a dynamic directory": {add: []string{"pages/blog/[slug]/comments.tsx"}},
+		// Routes are de-duplicated on their text before the wildcard goes in, so `/shop/[a]/[id]` and
+		// `/shop/[id]` are two routes that compile alike, and a matching anchor reports twice.
+		"a second app route the wildcard compiles alike": {add: []string{"app/shop/[a]/[id]/page.tsx"}},
+	}, map[string]htmlLinkFingerprintCase{
+		"a page's contents edited":           {write: map[string]string{"pages/about.tsx": "export const about = 1;"}},
+		"the file checked edited":            {write: map[string]string{"foo.tsx": htmlLinkRowsSource([]htmlLinkRow{{`<a href="/nothing">x</a>`, nil}})}},
+		"a file outside the directories":     {add: []string{"lib/more.ts", "components/about.tsx"}},
+		"a file in pages that is not a page": {add: []string{"pages/readme.md", "pages/styles.css", "pages/x.mjs"}},
+		"a dynamic segment renamed":          {add: []string{"pages/blog/[id].tsx"}, remove: []string{"pages/blog/[slug].tsx"}},
+		"a top-level app layout":             {add: []string{"app/layout.tsx"}},
+		"a page whose name does not compile": {add: []string{"pages/c(d.tsx"}},
+	})
+
+	// With no pages or app directory the rule attaches no listener; with an empty one it listens and
+	// reports nothing. The cache replays coverage with findings, so the first page-less directory moves it,
+	// and the routes alone could not tell.
+	expectHtmlLinkFingerprint(t, []string{"lib/util.ts"}, "", map[string]htmlLinkFingerprintCase{
+		"a pages directory with no page in it": {add: []string{"pages/readme.md"}},
+		"the first page":                       {add: []string{"pages/index.tsx"}},
+	}, map[string]htmlLinkFingerprintCase{
+		"a file outside the directories": {add: []string{"lib/more.ts"}},
+	})
+}
+
+// Under a configured pages directory the fingerprint is that directory's routes (#s9k38p3): a page added
+// there moves it, and a page added to the default `pages/`, which the setting replaced, does not.
+func TestNoHtmlLinkForPagesFingerprintsTheConfiguredPagesDirectory(t *testing.T) {
+	t.Parallel()
+
+	base := []string{"custom/about.tsx", "pages/index.tsx", "lib/util.ts"}
+	expectHtmlLinkFingerprint(t, base, `"custom"`, map[string]htmlLinkFingerprintCase{
+		"a page added under it":   {add: []string{"custom/team.tsx"}},
+		"a page removed under it": {remove: []string{"custom/about.tsx"}},
+		"an app page added":       {add: []string{"app/page.tsx"}},
+	}, map[string]htmlLinkFingerprintCase{
+		"a page added to the pages directory it replaced": {add: []string{"pages/team.tsx"}},
+		"a page removed from the pages directory":         {remove: []string{"pages/index.tsx"}},
+	})
+
+	// One tree, two settings: the option chooses the data, so the fingerprint follows it.
+	files := htmlLinkTree(nil, "custom/about.tsx", "other/team.tsx", "pages/index.tsx")
+	fingerprints := map[[sha256.Size]byte]string{}
+	for _, option := range []string{"", `"custom"`, `"other"`, `["custom", "other"]`} {
+		fingerprint := htmlLinkFingerprintOf(t, files, option)
+		if earlier, seen := fingerprints[fingerprint]; seen {
+			t.Errorf("the settings %q and %q fingerprint one tree alike, though they read different pages", earlier, option)
+		}
+		fingerprints[fingerprint] = option
 	}
 }
 

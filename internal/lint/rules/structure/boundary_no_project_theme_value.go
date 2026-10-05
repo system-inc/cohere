@@ -246,8 +246,9 @@ func themeValuesForProgram(program rule.Program) map[string]map[string][]string 
 // themeFingerprint is the rule's program fingerprint: the theme map, every component, suffix and value, in the
 // order a message lists them. Components and suffixes are sorted, since a map has no order; values keep theirs,
 // since the message names them in it. Nothing else outside a file reaches its verdict, so an edit anywhere but a
-// theme interface's exported keys leaves this alone and the file's findings replay (#kdee854).
-func themeFingerprint(program rule.Program) [sha256.Size]byte {
+// theme interface's exported keys leaves this alone and the file's findings replay (#kdee854). The rule takes no
+// options, so none reach it.
+func themeFingerprint(program rule.Program, _ any) [sha256.Size]byte {
 	themes := themeValuesForProgram(program)
 	hash := sha256.New()
 	for _, component := range slices.Sorted(maps.Keys(themes)) {

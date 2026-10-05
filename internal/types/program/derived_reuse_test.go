@@ -3,6 +3,7 @@ package program_test
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -18,7 +20,7 @@ import (
 // markerRule is a rule that reads another file: it reports every variable declaration with the text of
 // marker.ts, which it finds through the program's file list. fingerprint is its ProgramFingerprint, nil for
 // none. runs counts the files it was run on, by base name.
-func markerRule(name string, fingerprint func(rule.Program) [sha256.Size]byte, runs *sync.Map) rule.Rule {
+func markerRule(name string, fingerprint func(rule.Program, any) [sha256.Size]byte, runs *sync.Map) rule.Rule {
 	return rule.Rule{
 		Name:               name,
 		ProgramReads:       rule.ReadsOtherFiles,
@@ -48,7 +50,7 @@ func markerText(program rule.Program) string {
 }
 
 // markerFingerprint is markerRule's complete fingerprint: marker.ts's text is all it reads beyond its file.
-func markerFingerprint(program rule.Program) [sha256.Size]byte {
+func markerFingerprint(program rule.Program, _ any) [sha256.Size]byte {
 	return sha256.Sum256([]byte(markerText(program)))
 }
 
@@ -70,11 +72,11 @@ func TestADerivedRuleReplaysWhileItsProgramFingerprintHolds(t *testing.T) {
 	t.Parallel()
 	for _, scenario := range []struct {
 		name        string
-		fingerprint func(rule.Program) [sha256.Size]byte
+		fingerprint func(rule.Program, any) [sha256.Size]byte
 		wantStale   bool
 	}{
 		{"complete fingerprint", markerFingerprint, false},
-		{"control: a fingerprint that misses the marker", func(rule.Program) [sha256.Size]byte { return [sha256.Size]byte{7} }, true},
+		{"control: a fingerprint that misses the marker", func(rule.Program, any) [sha256.Size]byte { return [sha256.Size]byte{7} }, true},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			t.Parallel()
@@ -160,10 +162,10 @@ func TestARuleWithNoUsableProgramFingerprintIsWalkedEveryRun(t *testing.T) {
 	t.Parallel()
 	for _, scenario := range []struct {
 		name        string
-		fingerprint func(rule.Program) [sha256.Size]byte
+		fingerprint func(rule.Program, any) [sha256.Size]byte
 	}{
 		{"none declared", nil},
-		{"one that panics", func(rule.Program) [sha256.Size]byte { panic("a fingerprint that fails") }},
+		{"one that panics", func(rule.Program, any) [sha256.Size]byte { panic("a fingerprint that fails") }},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			t.Parallel()
@@ -194,6 +196,152 @@ func TestARuleWithNoUsableProgramFingerprintIsWalkedEveryRun(t *testing.T) {
 					t.Errorf("run %d: %d findings, want a.ts's one", run, len(result.Diagnostics))
 				}
 				recorded = roundTripLintCache(t, reuse.Recorded())
+			}
+		})
+	}
+}
+
+// optionMarkerRule is a derived rule whose option names the marker file it reads: it reports every variable
+// declaration with that file's text. fingerprint is its ProgramFingerprint. runs counts the files it was run
+// on, by base name, the markers excluded.
+func optionMarkerRule(fingerprint func(rule.Program, any) [sha256.Size]byte, runs *sync.Map) rule.Rule {
+	return rule.Rule{
+		Name:               "test-derived-options",
+		ProgramReads:       rule.ReadsOtherFiles,
+		ProgramFingerprint: fingerprint,
+		Run: func(ctx rule.Context, options any) rule.Listeners {
+			if strings.HasSuffix(filepath.Base(ctx.SourceFile.FileName()), "-marker.ts") {
+				return nil
+			}
+			count, _ := runs.LoadOrStore(filepath.Base(ctx.SourceFile.FileName()), new(int))
+			*count.(*int)++
+			marker := namedMarkerText(ctx.Program, options.(string))
+			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
+				ctx.ReportNode(node, rule.Message{Id: "marker", Description: "the marker says " + marker})
+			}}
+		},
+	}
+}
+
+// namedMarkerText is the text of the file with that base name, trimmed, read through the program's file list.
+func namedMarkerText(program rule.Program, name string) string {
+	for _, sourceFile := range program.SourceFiles() {
+		if filepath.Base(sourceFile.FileName()) == name {
+			return strings.TrimSpace(sourceFile.Text())
+		}
+	}
+	return ""
+}
+
+// A derived rule whose option chooses what it reads is fingerprinted under each selection's own options
+// (#s9k38p3): files configured to read red-marker.ts replay while only blue-marker.ts changes, files
+// configured to read blue-marker.ts run again, and every walk agrees with one with no cache. The control
+// fingerprints every selection under the top-level option, as a fingerprint with no options in hand must, and
+// replays the blue files' old marker after it changed, so the comparison is shown able to fail.
+func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(t *testing.T) {
+	t.Parallel()
+	for _, scenario := range []struct {
+		name        string
+		fingerprint func(rule.Program, any) [sha256.Size]byte
+		wantStale   bool
+	}{
+		{"the options' marker", func(program rule.Program, options any) [sha256.Size]byte {
+			return sha256.Sum256([]byte(namedMarkerText(program, options.(string))))
+		}, false},
+		{"control: the top-level option's marker, whatever the selection", func(program rule.Program, _ any) [sha256.Size]byte {
+			return sha256.Sum256([]byte(namedMarkerText(program, "red-marker.ts")))
+		}, true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			t.Parallel()
+			root := writeProject(t, map[string]string{
+				"tsconfig.json": `{"compilerOptions":{"target":"ES2022","module":"esnext","moduleResolution":"bundler","strict":true,"noEmit":true},` +
+					`"include":["**/*.ts"]}`,
+				"red-marker.ts":  "// red\n",
+				"blue-marker.ts": "// blue\n",
+				"reds/a.ts":      "export const a = 1;\n",
+				"blues/b.ts":     "export const b = 2;\n",
+			})
+			setting := func(marker string) configuration.RuleSetting {
+				return configuration.RuleSetting{Severity: configuration.SeverityError, Options: []json.RawMessage{json.RawMessage(`"` + marker + `"`)}}
+			}
+			config := &configuration.Config{
+				Root:  root,
+				Rules: map[string]configuration.RuleSetting{"test-derived-options": setting("red-marker.ts")},
+				Overrides: []configuration.Override{{Files: []string{"blues/**"},
+					Rules: map[string]configuration.RuleSetting{"test-derived-options": setting("blue-marker.ts")}}},
+			}
+			registry := configuration.OptionsRegistry{"test-derived-options": {Decode: func(raw json.RawMessage) (any, error) {
+				var marker string
+				err := json.Unmarshal(raw, &marker)
+				return marker, err
+			}}}
+			ctx := context.Background()
+			key := program.HashRuleSet([]string{"derived-options"})
+			var recorded *program.LintCache
+			walk := func(cached bool) (program.Result, *sync.Map) {
+				t.Helper()
+				graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+				if err != nil {
+					t.Fatal(err)
+				}
+				graph.LintConfig, graph.RuleOptions = config, registry
+				runs := &sync.Map{}
+				var reuse *program.FindingsReuse
+				if cached {
+					reuse = program.NewFindingsReuse(key, recorded, program.PathAnchor{})
+					graph.FindingsReuse = reuse
+				}
+				result, err := graph.Walk(ctx, graph.ProjectFiles(), []rule.Rule{optionMarkerRule(scenario.fingerprint, runs)})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if cached {
+					recorded = roundTripLintCache(t, reuse.Recorded())
+				}
+				return result, runs
+			}
+			agrees := func(warm program.Result) bool {
+				t.Helper()
+				cold, _ := walk(false)
+				if len(cold.Diagnostics) != 2 {
+					t.Fatalf("an uncached walk reports %d findings, want a.ts's and b.ts's", len(cold.Diagnostics))
+				}
+				return reflect.DeepEqual(diagnosticKeys(warm.Diagnostics), diagnosticKeys(cold.Diagnostics))
+			}
+			ran := func(runs *sync.Map, name string) bool {
+				_, found := runs.Load(name)
+				return found
+			}
+
+			walk(true)
+			warm, runs := walk(true)
+			if runsOf(runs) != 0 || warm.FilesReplayed != 4 {
+				t.Errorf("nothing changed, and the rule ran on %d files with %d replayed; want 0 and all 4", runsOf(runs), warm.FilesReplayed)
+			}
+
+			// Only the blue files' data changes: they run again, and the red files replay.
+			if err := os.WriteFile(filepath.Join(root, "blue-marker.ts"), []byte("// navy\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			warm, runs = walk(true)
+			stale := !agrees(warm)
+			if stale != scenario.wantStale {
+				t.Errorf("after the blue marker changed the replay is stale: %v, want %v (the rule ran on %d files)", stale, scenario.wantStale,
+					runsOf(runs))
+			}
+			if !scenario.wantStale && (!ran(runs, "b.ts") || ran(runs, "a.ts")) {
+				t.Errorf("after the blue marker changed the rule ran on b.ts: %v and a.ts: %v, want b.ts alone", ran(runs, "b.ts"), ran(runs, "a.ts"))
+			}
+
+			// And the red files' data: they run again, and the blue files replay.
+			if err := os.WriteFile(filepath.Join(root, "red-marker.ts"), []byte("// crimson\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			warm, runs = walk(true)
+			if !scenario.wantStale && (!agrees(warm) || !ran(runs, "a.ts") || ran(runs, "b.ts")) {
+				t.Errorf("after the red marker changed the rule ran on a.ts: %v and b.ts: %v, want a.ts alone, agreeing with an uncached walk",
+					ran(runs, "a.ts"), ran(runs, "b.ts"))
 			}
 		})
 	}
