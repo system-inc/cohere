@@ -16,6 +16,7 @@ import * as NodeFileSystem from 'node:fs';
 import * as NodeModule from 'node:module';
 import * as NodePath from 'node:path';
 import * as NodeUrl from 'node:url';
+import { locate } from '../corpus.mjs';
 
 /*
  * Resolve Tailwind's ESM entry.
@@ -126,9 +127,14 @@ async function loadInferDataType(tailwindModuleUrl) {
  * loaded.
  *
  * Defaults to the entry point's directory, so every repository invocation is unchanged.
+ *
+ * `entryPointArgument` may be a corpus spelling such as `ahra:app/_theme/styles/theme.css` (see
+ * `../corpus.mjs`). `entryPoint` is then the file it names, and `recordedEntryPoint` the spelling,
+ * which is what a fixture records so it reads the same on every machine.
  */
 export async function loadDesignSystem(entryPointArgument, resolveRootArgument, entrySourceOverride) {
-    const entryPointPath = NodePath.resolve(entryPointArgument);
+    const entryPointLocated = locate(entryPointArgument);
+    const entryPointPath = entryPointLocated.path;
     const entryDirectory = NodePath.dirname(entryPointPath);
     const resolveRoot = NodePath.resolve(resolveRootArgument ?? entryDirectory);
     const tailwindModuleUrl = resolveModuleUrl('tailwindcss', resolveRoot);
@@ -183,6 +189,7 @@ export async function loadDesignSystem(entryPointArgument, resolveRootArgument, 
         designSystem,
         tailwindVersion,
         entryPoint: entryPointPath,
+        recordedEntryPoint: entryPointLocated.recorded,
         resolveRoot,
         inferDataType: await loadInferDataType(tailwindModuleUrl),
     };

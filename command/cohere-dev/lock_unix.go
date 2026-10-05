@@ -25,8 +25,3 @@ func tryLockFile(file *os.File) (bool, error) {
 func unlockFile(file *os.File) {
 	syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
 }
-
-// lockFileWaiting takes an exclusive lock on the file, waiting for its holder to let go.
-func lockFileWaiting(file *os.File) error {
-	return syscall.Flock(int(file.Fd()), syscall.LOCK_EX)
-}

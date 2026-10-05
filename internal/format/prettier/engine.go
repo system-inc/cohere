@@ -124,6 +124,7 @@ func drainPromise(vm *goja.Runtime, value goja.Value) (string, error) {
 	case goja.PromiseStateFulfilled:
 		return promise.Result().String(), nil
 	case goja.PromiseStateRejected:
+		// Go whitespace: a rejection's message, trimmed for a person to read, and compared with nothing.
 		return "", fmt.Errorf("%s", strings.TrimSpace(promise.Result().String()))
 	default:
 		return "", fmt.Errorf("the formatter's promise never settled after %d pumps", maxPumps)

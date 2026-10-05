@@ -42,6 +42,7 @@
 
 import * as NodeFileSystem from 'node:fs';
 import * as NodePath from 'node:path';
+import { locate } from '../corpus.mjs';
 
 const [, , packageRootArgument, corpusPathArgument] = process.argv;
 if (!packageRootArgument) {
@@ -412,16 +413,17 @@ for (const customCase of customVariantStylesheets) {
 if (corpusPathArgument) {
     const corpus = JSON.parse(NodeFileSystem.readFileSync(NodePath.resolve(corpusPathArgument), 'utf8'));
     for (const entry of corpus) {
-        const entryPath = NodePath.resolve(entry.path);
-        const css = NodeFileSystem.readFileSync(entryPath, 'utf8');
-        const base = NodePath.dirname(entryPath);
+        // A corpus spelling is recorded as given, so the fixture reads the same on every machine.
+        const entryLocated = locate(entry.path);
+        const css = NodeFileSystem.readFileSync(entryLocated.path, 'utf8');
+        const base = NodePath.dirname(entryLocated.path);
 
         const registryDesignSystem = await loadDesignSystem(css, base);
         cases.push({
             name: entry.name,
             source: 'repository',
             input: '',
-            entryPath,
+            entryPath: entryLocated.recorded,
             registry: describeRegistry(registryDesignSystem),
         });
 
@@ -439,7 +441,7 @@ if (corpusPathArgument) {
             name: `${entry.name}/class-lists`,
             source: 'repository',
             input: '',
-            entryPath,
+            entryPath: entryLocated.recorded,
             classLists: captured,
         });
     }

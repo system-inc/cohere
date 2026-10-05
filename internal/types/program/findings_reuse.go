@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/suppression"
 )
 
 // FindingsReuse is one run's use of the findings cache: what the last run recorded, and what this
@@ -214,8 +215,16 @@ type cacheKeys struct {
 // content-keyed rules run again, while its shape-keyed rules replay unless the edit changed a shape. The
 // design-system rules replay while the design system still holds (NewFindingsReuse) and is the one the entry
 // names; a file none of them applies to has nothing to replay or run.
-func (r *FindingsReuse) lookup(path string, keys cacheKeys) (entry LintCacheEntry, hits classHits) {
+//
+// An entry whose withheld findings do not fit the file's directives as they read now, a directive index out of
+// range, one that cannot silence the rule it is said to have silenced, or a rule the entry did not run, is not
+// replayed: it is a miss, never repaired. text is the file's bytes, which a pure hit has already proven are the
+// entry's.
+func (r *FindingsReuse) lookup(path string, keys cacheKeys, text string) (entry LintCacheEntry, hits classHits) {
 	entry, pureHit := r.previous.Lookup(path, keys.contentHash, r.key, keys.pure)
+	if pureHit && !withheldFits(entry, text) {
+		pureHit = false
+	}
 	switch {
 	case !pureHit && r.previous.holds(path):
 		r.changedEntries.Add(1)
@@ -238,6 +247,29 @@ func (r *FindingsReuse) lookup(path string, keys cacheKeys) (entry LintCacheEntr
 		derived: equalStrings(entry.DerivedRules, keys.derived) && (len(keys.derived) == 0 ||
 			keys.derivedFingerprint != [sha256.Size]byte{} && entry.DerivedFingerprint == keys.derivedFingerprint),
 	}
+}
+
+// withheldFits reports whether every finding an entry says a directive withheld names a rule the entry ran and a
+// directive in text that could silence it.
+func withheldFits(entry LintCacheEntry, text string) bool {
+	if len(entry.Withheld) == 0 {
+		return true
+	}
+	ran := make(map[string]bool, len(entry.Rules)+len(entry.TypedRules)+len(entry.ShapedRules)+len(entry.DesignRules)+
+		len(entry.DerivedRules))
+	for _, names := range [][]string{entry.Rules, entry.TypedRules, entry.ShapedRules, entry.DesignRules, entry.DerivedRules} {
+		for _, name := range names {
+			ran[name] = true
+		}
+	}
+	directives := suppression.Build(text).Directives()
+	for _, withheld := range entry.Withheld {
+		if !ran[withheld.RuleName] || withheld.Directive < 0 || int(withheld.Directive) >= len(directives) ||
+			!directives[withheld.Directive].Names(withheld.RuleName) {
+			return false
+		}
+	}
+	return true
 }
 
 // classHits is which of a file's classes replay: pure, the two type-aware ones, the design-system rules and the
@@ -359,18 +391,15 @@ func mergeNotes(first RuleNotes, second RuleNotes) RuleNotes {
 // recordableEntry builds the entry a fully walked file would leave, or reports that it must not leave
 // one.
 //
-// A file is not recorded when any of its directives did anything or went unused, since a directive's
-// accounting spans every rule in the file, cached and walked alike, and when any cacheable rule's
-// finding carries a fix or a suggestion, since a cached finding stores neither and the fix phase needs
-// the edit itself.
+// A file is not recorded when any cacheable rule's finding carries a fix or a suggestion, since a cached
+// finding stores neither and the fix phase needs the edit itself. A file with directives is recorded with the
+// findings they withheld from its cacheable rules, which a replay marks applied again (#kdee854): a directive's
+// accounting spans every rule in the file, cached and walked alike, and those are what the cached part adds.
 //
 // fileAdamic is what the walk measured for readiness, nil when it measured nothing; only the cacheable rules'
 // part is kept, since the rest run on every walk.
 func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics []rule.Diagnostic,
 	fileListening map[string]int, fileNotes RuleNotes, fileAdamic *AdamicRecord, visited int, silenced suppressionTally) (LintCacheEntry, bool) {
-	if silenced.applied != 0 || silenced.unusedDirectives != 0 {
-		return LintCacheEntry{}, false
-	}
 	cacheable := append(append(append(append(append([]string{}, keys.pure...), keys.typed...), keys.shaped...), keys.design...),
 		keys.derived...)
 	isCacheable := make(map[string]bool, len(cacheable))
@@ -390,6 +419,8 @@ func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics
 		DerivedFingerprint: keys.derivedFingerprint,
 		VisitedNodes:       visited,
 		Notes:              notesOf(fileNotes, isCacheable),
+		Directives:         silenced.directives,
+		Withheld:           withheldBy(silenced.withheld, isCacheable),
 		Adamic:             adamicOf(fileAdamic, isCacheable),
 	}
 	for _, name := range cacheable {
@@ -415,6 +446,17 @@ func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics
 	return entry, true
 }
 
+// withheldBy is the withheld findings of the named rules, nil when none.
+func withheldBy(withheld []LintCacheWithheld, names map[string]bool) []LintCacheWithheld {
+	var kept []LintCacheWithheld
+	for _, finding := range withheld {
+		if names[finding.RuleName] {
+			kept = append(kept, finding)
+		}
+	}
+	return kept
+}
+
 // refreshClasses is an entry whose pure part was replayed and one or more of whose keyed classes just ran
 // again: the old findings, listening and notes of every class that replayed, and the fresh ones of every class
 // that ran, under this run's fingerprints. Refused, like any recording, when a fresh finding carries a fix or a
@@ -424,8 +466,8 @@ func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics
 //
 // The readiness record merges the same way, rule by rule, and is nil when this walk measured nothing: an entry
 // half measured is unmeasured.
-func refreshClasses(old LintCacheEntry, keys cacheKeys, hits classHits,
-	fileDiagnostics []rule.Diagnostic, fileListening map[string]int, fileNotes RuleNotes, fileAdamic *AdamicRecord) (LintCacheEntry, bool) {
+func refreshClasses(old LintCacheEntry, keys cacheKeys, hits classHits, fileDiagnostics []rule.Diagnostic,
+	fileListening map[string]int, fileNotes RuleNotes, fileAdamic *AdamicRecord, silenced suppressionTally) (LintCacheEntry, bool) {
 	ran := map[string]bool{}
 	for _, name := range append(append(append(append([]string{}, classIf(!hits.typed, keys.typed)...), classIf(!hits.shaped, keys.shaped)...),
 		classIf(!hits.design, keys.design)...), classIf(!hits.derived, keys.derived)...) {
@@ -449,6 +491,8 @@ func refreshClasses(old LintCacheEntry, keys cacheKeys, hits classHits,
 		DerivedFingerprint: keys.derivedFingerprint,
 		VisitedNodes:       old.VisitedNodes,
 		Notes:              mergeNotes(notesOf(old.Notes, kept), notesOf(fileNotes, ran)),
+		Directives:         old.Directives,
+		Withheld:           append(withheldBy(old.Withheld, kept), withheldBy(silenced.withheld, ran)...),
 		Adamic:             mergeAdamic(adamicOf(old.Adamic, kept), adamicOf(fileAdamic, ran)),
 	}
 	if hits.design {

@@ -25,8 +25,21 @@
         "@next/next/no-sync-scripts": "error",
         "@next/next/no-title-in-document-head": "error",
         "@next/next/no-typos": "error",
-        "@next/next/no-unwanted-polyfillio": "error"
+        "@next/next/no-unwanted-polyfillio": "error",
+        "nexus/correctness-no-load-time-import-meta-path": "error"
     },
+    "overrides": [
+        {
+            "files": [
+                "**/*.test.*",
+                "**/eslint.config.*"
+            ],
+            "reason": "A test file or an ESLint config is run by Node or the test runner directly and never bundled, so a module-scope import.meta path is correct there (#ay7a8vx).",
+            "rules": {
+                "nexus/correctness-no-load-time-import-meta-path": "off"
+            }
+        }
+    ],
     "ignorePatterns": [
         "**/.next/**",
         "**/.open-next/**",

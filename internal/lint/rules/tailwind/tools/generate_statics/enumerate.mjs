@@ -46,7 +46,7 @@ function flagValue(name) {
     return index === -1 ? undefined : process.argv[index + 1];
 }
 
-const { designSystem, tailwindVersion, entryPoint } = await loadDesignSystem(
+const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint } = await loadDesignSystem(
     entryPointArgument,
     flagValue('--resolve-root'),
 );
@@ -138,7 +138,7 @@ entries.sort((left, right) => (left.name < right.name ? -1 : left.name > right.n
 
 process.stdout.write(JSON.stringify({
     tailwindVersion,
-    entryPoint,
+    entryPoint: recordedEntryPoint,
     groundTruth: 'compileAstNodes (internal API), with readingOf as an independent check',
     registeredStatics: staticNames.length,
     emitted: entries.length,

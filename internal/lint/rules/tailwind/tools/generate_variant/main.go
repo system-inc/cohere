@@ -18,7 +18,9 @@
 // engine loads; `sourceRoot` is the tree this tool harvests real class lists from, so the fixture
 // carries the class lists two real repositories actually wrote rather than only the ones a test
 // author thought to invent. Both repositories in the default corpus declare their own
-// `@custom-variant dark`, which is the per-repository fact the whole port exists to respect.
+// `@custom-variant dark`, which is the per-repository fact the whole port exists to respect. Either
+// may be spelled inside a corpus, such as `ahra:` for ahra's root, found through the corpus's variable
+// or the corpora file and recorded as spelled, so the fixture reads the same on every machine (#sycrdr6).
 //
 // `-check` regenerates and fails when the committed fixture disagrees, which is what makes a
 // Tailwind upgrade that changes variant ordering show up as a failing gate instead of a silent
@@ -40,12 +42,13 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 func main() {
 	packageRoot := flag.String("package-root", "", "path to the tailwindcss package root (the directory holding package.json)")
-	corpus := flag.String("corpus", "", "path to a JSON array of {name, path, sourceRoot} naming real repositories to include")
+	corpusFile := flag.String("corpus", "", "path to a JSON array of {name, path, sourceRoot} naming real repositories to include")
 	output := flag.String("output", filepath.Join("internal", "tailwind", "testdata", "variant_fixtures.json"), "where to write the fixture")
 	maximumClassLists := flag.Int("max-class-lists", 1200, "how many harvested class lists to keep per repository")
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")
@@ -56,7 +59,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	generated, err := enumerate(*packageRoot, *corpus, *maximumClassLists)
+	generated, err := enumerate(*packageRoot, *corpusFile, *maximumClassLists)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "enumerate: %v\n", err)
 		os.Exit(1)
@@ -201,7 +204,12 @@ func readCorpus(corpusPath string, maximumClassLists int) ([]corpusEntry, error)
 		if entries[index].SourceRoot == "" {
 			continue
 		}
-		classLists, err := harvestClassLists(entries[index].SourceRoot, maximumClassLists)
+		// A corpus spelling such as "ahra:" names a private checkout, found the way the tests find it.
+		sourceRoot, err := corpus.Locate(entries[index].SourceRoot)
+		if err != nil {
+			return nil, fmt.Errorf("harvest %s: %w", entries[index].Name, err)
+		}
+		classLists, err := harvestClassLists(sourceRoot, maximumClassLists)
 		if err != nil {
 			return nil, fmt.Errorf("harvest %s: %w", entries[index].Name, err)
 		}

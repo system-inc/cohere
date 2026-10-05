@@ -27,7 +27,7 @@ if (!entryPointArgument) {
 const limitFlagIndex = restArguments.indexOf('--limit');
 const limit = limitFlagIndex >= 0 ? Number(restArguments[limitFlagIndex + 1]) : Infinity;
 
-const { designSystem, tailwindVersion, entryPoint } = await loadDesignSystem(entryPointArgument);
+const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint } = await loadDesignSystem(entryPointArgument);
 
 /*
  * The populations, and why there is more than one.
@@ -229,7 +229,7 @@ for (const className of Array.from(classNames).sort()) {
 
 process.stdout.write(JSON.stringify({
     tailwindVersion,
-    entryPoint,
+    entryPoint: recordedEntryPoint,
     counts: {
         cases: cases.length,
         classesConsidered: classNames.size,

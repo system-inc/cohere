@@ -48,7 +48,7 @@ if (!entryPointArgument) {
 const resolveRootFlagIndex = process.argv.indexOf('--resolve-root');
 const resolveRootArgument = resolveRootFlagIndex >= 0 ? process.argv[resolveRootFlagIndex + 1] : null;
 
-const { designSystem, tailwindVersion, entryPoint, resolveRoot } = await loadDesignSystem(
+const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint, resolveRoot } = await loadDesignSystem(
     entryPointArgument,
     resolveRootArgument,
 );
@@ -208,7 +208,7 @@ const unlistedStatics = {};
 
 process.stdout.write(JSON.stringify({
     tailwindVersion,
-    entryPoint,
+    entryPoint: recordedEntryPoint,
     namespaces,
     keysByNamespace,
     propertyOrder,
