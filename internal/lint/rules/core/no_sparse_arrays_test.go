@@ -59,6 +59,56 @@ func TestNoSparseArraysStaysSilent(t *testing.T) {
 	}
 }
 
+// A hole in a destructuring target skips a value; it builds no array. ESLint never sees these:
+// ESTree spells an assignment target as an ArrayPattern and the rule listens only to
+// ArrayExpression, while TypeScript's tree spells both as an ArrayLiteralExpression.
+func TestNoSparseArraysSkipsDestructuringTargets(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		sourceText string
+	}{
+		// excalidraw packages/element/src/image.ts:138, verbatim
+		{"an assignment target", "declare const match: string[];\nlet width = '';\nlet height = '';\n[, width, height] = match;\n"},
+		{"a target nested in a target", "declare const x: string[][];\nlet a = '';\n[[, a]] = x;\n"},
+		{"a target under an object property", "declare const y: { p: string[] };\nlet b = '';\n({ p: [, b] } = y);\n"},
+		{"a for-of head", "declare const z: string[][];\nlet c = '';\nfor([, c] of z) {}\n"},
+		{"a for-in head's array", "declare const w: Record<string, string>;\nlet d = '';\nfor([, d] in w) {}\n"},
+		{"a parenthesized target", "declare const v: string[];\nlet e = '';\n([, e]) = v;\n"},
+		{"a target with a default", "declare const u: string[][];\nlet f = '';\n[[, f] = []] = u;\n"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoSparseArrays, sparseArrayFile, testCase.sourceText))
+		})
+	}
+}
+
+// The controls beside the destructuring cases: an array literal that is a value, even one sitting
+// next to a target, still builds an array, so its hole still reports.
+func TestNoSparseArraysStillFiresBesideDestructuring(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		sourceText string
+	}{
+		{"a declaration's holes", "export const holes = [1, , 2];\n"},
+		{"an array on the right side", "let a = 0;\nlet b = 0;\n[a, b] = [1, , 2];\n"},
+		{"an argument", "declare function take(values: unknown[]): void;\ntake([1, , 2]);\n"},
+		{"a destructuring default's value", "declare const u: number[][];\nlet a = 0;\n[[a] = [1, , 2]] = u;\n"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoSparseArrays, sparseArrayFile, testCase.sourceText),
+				"unexpectedSparseArray")
+		})
+	}
+}
+
 // One finding per array rather than one per hole, so a two-hole array reports once. Reported on the
 // literal rather than the hole because the hole has no text of its own to point at.
 func TestNoSparseArraysReportsOncePerArray(t *testing.T) {

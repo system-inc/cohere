@@ -22,6 +22,7 @@ var messageUnexpectedSparseArray = rule.Message{
 //	valid:   [1, 2, 3, ]
 //	invalid: [1, , 3]
 //	invalid: [, 2]
+//	valid:   [, width, height] = match   (a destructuring target, not an array)
 //
 // A trailing comma is not a hole and does not report. `[1, 2, 3, ]` has three elements, which is
 // the form every formatter in this stack emits, so flagging it would put this rule in a fight with
@@ -36,6 +37,13 @@ var NoSparseArrays = rule.Rule{
 			ast.KindArrayLiteralExpression: func(node *ast.Node) {
 				literal := node.AsArrayLiteralExpression()
 				if literal == nil || literal.Elements == nil {
+					return
+				}
+				// A destructuring target (`[, width] = match`, nested, or a for-of head) builds no
+				// array; its hole skips a value. ESTree spells it as an ArrayPattern, which ESLint's
+				// rule never visits, while TypeScript spells both as an ArrayLiteralExpression, so
+				// tell them apart the way the checker does.
+				if ast.IsAssignmentTarget(node) {
 					return
 				}
 				// A hole parses as an omitted expression. A trailing comma produces no element at
