@@ -372,17 +372,17 @@ func (w *workerMeter) setup(timing *RuleTiming, run func()) {
 	run()
 }
 
-// listener wraps a listener to count the nodes it is offered and bill each call to the rule.
-func (w *workerMeter) listener(timing *RuleTiming, listener func(node *ast.Node)) func(node *ast.Node) {
+// call calls a rule's listener on a node, counting the node and billing the call to the rule. Without a
+// meter it only calls the listener.
+func (w *workerMeter) call(timing *RuleTiming, listener func(node *ast.Node), node *ast.Node) {
 	if w == nil {
-		return listener
-	}
-	return func(node *ast.Node) {
-		timing.NodesOffered++
-		opened := w.open()
-		defer func() { timing.ListenerCPU += w.close(opened) }()
 		listener(node)
+		return
 	}
+	timing.NodesOffered++
+	opened := w.open()
+	defer func() { timing.ListenerCPU += w.close(opened) }()
+	listener(node)
 }
 
 // aroundFill runs one cache fill as a frame billed to its derivation's family: the key up to its first

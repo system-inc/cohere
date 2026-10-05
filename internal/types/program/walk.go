@@ -299,6 +299,13 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			// Timings. Nil otherwise.
 			meter := startWorkerMeter(localTimings)
 
+			// Made once for the worker rather than once per file, like everything the dispatcher holds.
+			report := func(diagnostic rule.Diagnostic) {
+				localDiagnostics = append(localDiagnostics, diagnostic)
+				localReporting[diagnostic.RuleName]++
+			}
+			dispatcher := newFileDispatcher(g, localTimings, catalog)
+
 			// walkFile walks one file on the checker that owns checkerFile.
 			walkFile := func(index int, checkerFile *ast.SourceFile) {
 				if checkerFile != files[index] {
@@ -346,7 +353,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				//
 				// Design-system rules replay while every path the design system read last time still holds and the
 				// entry was produced under that design system. See DesignSystemKey.
-				walkRules := selection.applicable
+				walkRules, walkSlots := selection.applicable, dispatcher.slotsFor(selection)
 				var replayed *LintCacheEntry
 				var replayedNotes RuleNotes
 				var hits classHits
@@ -374,10 +381,11 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 						}
 						// The rules still to walk, in the order they were configured: the order rules run in
 						// can decide which findings exist (HashRuleSet).
-						walkRules = nil
-						for _, subject := range selection.applicable {
+						walkRules, walkSlots = nil, nil
+						for index, subject := range selection.applicable {
 							if !replays[subject.Name] {
 								walkRules = append(walkRules, subject)
+								walkSlots = append(walkSlots, selection.slots[index])
 							}
 						}
 						localReplayed++
@@ -443,8 +451,8 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					fileChecker, release = g.CheckerForFile(ctx, checkerFile)
 				}
 
-				// A rule's Report closure captures the rule it belongs to, so a rule cannot report under
-				// another rule's name even by accident.
+				// A rule's Report closure belongs to the rule's slot, so a rule cannot report under another
+				// rule's name even by accident. See fileDispatcher.
 				//
 				// A file being recorded counts its listening and offered rules into maps of its own, so
 				// the entry can say which cacheable rules listened on this file; they are merged into the
@@ -458,10 +466,8 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					listeningTarget, offeredTarget = fileListening, fileOffered
 				}
 				diagnosticsBefore := len(localDiagnostics)
-				visited, silenced, fileNotes, ruleCrashes, crashed := dispatchFileSafely(sourceFile, func(diagnostic rule.Diagnostic) {
-					localDiagnostics = append(localDiagnostics, diagnostic)
-					localReporting[diagnostic.RuleName]++
-				}, walkRules, g, fileChecker, listeningTarget, offeredTarget, selection.options, localTimings, catalog, resolution)
+				visited, silenced, fileNotes, ruleCrashes, crashed := dispatcher.dispatchFileSafely(sourceFile, report,
+					walkRules, walkSlots, fileChecker, listeningTarget, offeredTarget, selection.options, resolution)
 
 				release()
 
@@ -793,18 +799,6 @@ func (c *ruleContainment) run(subject rule.Rule, context rule.Context, options a
 	return subject.Run(context, options)
 }
 
-// listener wraps one of the rule's listeners in the boundary. Once the rule has crashed on this file
-// its listeners are skipped, because a rule past its panic is in a state nobody tested.
-func (c *ruleContainment) listener(listener func(node *ast.Node)) func(node *ast.Node) {
-	return func(node *ast.Node) {
-		if c.crash != nil {
-			return
-		}
-		defer c.recoverPanic()
-		listener(node)
-	}
-}
-
 // anyRuleNeedsTypeChecker reports whether any of these rules declared that it reads the checker.
 //
 // Asked per file against the applicable set rather than once against the whole catalog, because
@@ -819,6 +813,150 @@ func anyRuleNeedsTypeChecker(rules []rule.Rule) bool {
 	return false
 }
 
+// fileDispatcher is one worker's dispatch machinery, made once and reused for every file the worker walks.
+//
+// Everything a rule was handed for a file used to be made for that file: a Report closure, a RecordNote
+// closure and a containment per rule, a wrapping closure per listener, and the merged table's slices. Over
+// 484 rules and 3,978 files that was about 370 MB of a cold ahra run's allocation, for answers that do not
+// change between files (#9jpmqm9). Now each rule has one slot per worker, made the first time the worker
+// meets the rule, and the slot's closures read the file being dispatched from the dispatcher.
+//
+// That makes a rule's Report good only while its file is being dispatched, which is what rule.Context
+// says. A rule that kept it and called it later would file a finding against whichever file the worker had
+// moved on to, so between files the dispatcher holds no file and a late Report panics, naming the rule.
+// Checked when this was written: no rule keeps a Context, a Report or a RecordNote past Run and its
+// listeners, none starts a goroutine, and the run-scoped caches (the design system, the theme map, the
+// import indexes) keep only what they built.
+//
+// Not safe for concurrent use, and it need not be: a worker dispatches one file at a time.
+type fileDispatcher struct {
+	graph   *Graph
+	timings *Timings
+	catalog *ruleNameCatalog
+
+	// slots is this worker's slot for each rule it has met, by name.
+	slots map[string]*ruleSlot
+
+	// listeners is the merged dispatch table of the file being dispatched, indexed by kind. A kind may have
+	// listeners from several rules, so each holds a slice, and a slice index rather than a map key, since the
+	// walk reads it once per node: about 100ms of CPU across a cold ahra walk (#zqsdzbq). Kept across files:
+	// after each walk the kinds in used are emptied, and their backing arrays serve the next file.
+	listeners [][]listenerCall
+	used      []ast.Kind
+
+	// The file being dispatched, all nil between files.
+	sourceFile *ast.SourceFile
+	directives *suppression.Index
+	notes      RuleNotes
+	report     func(rule.Diagnostic)
+}
+
+// ruleSlot is one rule on one worker: what dispatching the rule needs that does not change between files.
+type ruleSlot struct {
+	name   string
+	timing *RuleTiming
+
+	// containment is the rule's boundary on the file being dispatched, made afresh each time the rule is
+	// offered a file.
+	containment ruleContainment
+
+	report     func(rule.Diagnostic)
+	recordNote func(key string)
+}
+
+// listenerCall is one rule's listener for one kind in the merged table. It is called through its rule's
+// slot rather than wrapped, so the table holds no closure of its own.
+type listenerCall struct {
+	listener func(node *ast.Node)
+	slot     *ruleSlot
+}
+
+func newFileDispatcher(graph *Graph, timings *Timings, catalog *ruleNameCatalog) *fileDispatcher {
+	return &fileDispatcher{
+		graph:     graph,
+		timings:   timings,
+		catalog:   catalog,
+		slots:     map[string]*ruleSlot{},
+		listeners: make([][]listenerCall, ast.KindCount),
+	}
+}
+
+// slotsFor is the slots of a selection's applicable rules, in the same order, found once per selection.
+func (d *fileDispatcher) slotsFor(selection *ruleSelection) []*ruleSlot {
+	if selection.slots == nil {
+		selection.slots = make([]*ruleSlot, len(selection.applicable))
+		for index, subject := range selection.applicable {
+			selection.slots[index] = d.slotFor(subject.Name)
+		}
+	}
+	return selection.slots
+}
+
+// slotFor is the worker's slot for a rule, made the first time it is asked for.
+//
+// The slot's Report carries the rule's name, so a rule cannot report under another rule's name even by
+// accident.
+func (d *fileDispatcher) slotFor(ruleName string) *ruleSlot {
+	if slot, made := d.slots[ruleName]; made {
+		return slot
+	}
+	slot := &ruleSlot{name: ruleName, timing: d.timings.forRule(ruleName)}
+	slot.report = func(diagnostic rule.Diagnostic) {
+		d.requireFile(ruleName, "Report")
+		diagnostic.RuleName = ruleName
+		if diagnostic.SourceFile == nil {
+			diagnostic.SourceFile = d.sourceFile
+		}
+
+		// Filtering here rather than after the walk is what keeps a suppressed finding from
+		// ever existing as a finding. The alternative — collect everything, drop some later —
+		// leaves a window where a caller can read the unfiltered slice and report a number the
+		// user will never see explained.
+		if slot.timing != nil {
+			slot.timing.Findings++
+		}
+
+		if d.directives.Suppresses(diagnostic.RuleName, diagnostic.Range.Pos()) {
+			return
+		}
+
+		d.report(diagnostic)
+	}
+	slot.recordNote = func(key string) {
+		d.requireFile(ruleName, "RecordNote")
+		// Made for the file on its first note, and never reused: the file's notes outlive its dispatch, in
+		// the walk's result and the findings cache.
+		if d.notes == nil {
+			d.notes = RuleNotes{}
+		}
+		if d.notes[ruleName] == nil {
+			d.notes[ruleName] = map[string]int{}
+		}
+		d.notes[ruleName][key]++
+	}
+	d.slots[ruleName] = slot
+	return slot
+}
+
+// requireFile panics unless a file is being dispatched: a rule called one of its Context's functions after
+// the file it was handed for was over. See fileDispatcher.
+func (d *fileDispatcher) requireFile(ruleName string, function string) {
+	if d.sourceFile == nil {
+		panic(fmt.Sprintf("rule %s called its Context's %s after its file's dispatch ended; a Context is good only "+
+			"during Run and the listeners Run returns", ruleName, function))
+	}
+}
+
+// hear calls one of the rule's listeners inside its containment. Once the rule has crashed on this file its
+// listeners are skipped, because a rule past its panic is in a state nobody tested.
+func (s *ruleSlot) hear(meter *workerMeter, listener func(node *ast.Node), node *ast.Node) {
+	if s.containment.crash != nil {
+		return
+	}
+	defer s.containment.recoverPanic()
+	meter.call(s.timing, listener, node)
+}
+
 // dispatchFileSafely is dispatchFile with a boundary around it.
 //
 // A rule is ordinary Go code walking a tree it did not build, and the compiler's own accessors panic
@@ -831,17 +969,17 @@ func anyRuleNeedsTypeChecker(rules []rule.Rule) bool {
 // left, a panic outside any rule (reading the file's directives, say), and loses the file, because
 // then nothing in it can be trusted. A rule's findings from before its panic are kept: they are real,
 // and the crash is named beside them, so nothing claims the rule finished the file.
-func dispatchFileSafely(
+//
+// rules and slots are aligned: slots[index] is the worker's slot for rules[index].
+func (d *fileDispatcher) dispatchFileSafely(
 	sourceFile *ast.SourceFile,
 	report func(rule.Diagnostic),
-	applicable []rule.Rule,
-	g *Graph,
+	rules []rule.Rule,
+	slots []*ruleSlot,
 	fileChecker *checker.Checker,
 	listeningCounts map[string]int,
 	offeredCounts map[string]int,
 	ruleOptions map[string]any,
-	timings *Timings,
-	catalog *ruleNameCatalog,
 	resolution configuration.Resolved,
 ) (visited int, silenced suppressionTally, notes RuleNotes, ruleCrashes []RuleCrash, crashed error) {
 	defer func() {
@@ -856,8 +994,8 @@ func dispatchFileSafely(
 		}
 	}()
 
-	visited, silenced, notes, ruleCrashes = dispatchFile(sourceFile, report, applicable, g, fileChecker,
-		listeningCounts, offeredCounts, ruleOptions, timings, catalog, resolution)
+	visited, silenced, notes, ruleCrashes = d.dispatchFile(sourceFile, report, rules, slots, fileChecker,
+		listeningCounts, offeredCounts, ruleOptions, resolution)
 	return visited, silenced, notes, ruleCrashes, nil
 }
 
@@ -867,31 +1005,29 @@ func dispatchFileSafely(
 // Merging before walking is what makes the cost per node independent of the rule count: the walk
 // does one table read per node regardless of whether one rule or five hundred registered for that
 // kind.
-
-func dispatchFile(
+func (d *fileDispatcher) dispatchFile(
 	sourceFile *ast.SourceFile,
 	report func(rule.Diagnostic),
 	rules []rule.Rule,
-	graph *Graph,
+	slots []*ruleSlot,
 	fileChecker *checker.Checker,
 	listeningCounts map[string]int,
 	offeredCounts map[string]int,
 	ruleOptions map[string]any,
-	timings *Timings,
-	catalog *ruleNameCatalog,
 	resolution configuration.Resolved,
 ) (visitedNodes int, silenced suppressionTally, notes RuleNotes, ruleCrashes []RuleCrash) {
-	// A kind may have listeners from several rules, so the merged table holds a slice per kind rather
-	// than one function. Indexed by kind rather than keyed by it: the walk reads it once per node, and a
-	// slice index is cheaper than a map lookup, about 100ms of CPU across a cold ahra walk (#zqsdzbq).
-	merged := make([][]func(node *ast.Node), ast.KindCount)
 	listened := false
 
 	// Directives are read once per file, before any rule runs, because every rule's findings filter
 	// through the same index. Scanning is proportional to the file rather than to the rule count, so
 	// a file with no directives costs one pass and then answers every query with an empty slice.
 	directives := suppression.Build(sourceFile.Text())
-	reportUnknownRuleReferences(sourceFile, directives, catalog, report)
+	reportUnknownRuleReferences(sourceFile, directives, d.catalog, report)
+
+	d.sourceFile, d.directives, d.report = sourceFile, directives, report
+	// However the dispatch ends, a panic included, so the next file starts from an empty table and no slot
+	// can report into a file that is over.
+	defer d.endFile()
 
 	// One cache per file, shared by every rule that runs on it. Work a rule derives from the file
 	// outside the walk is paid for by that rule alone, so three rules deriving the same thing pay
@@ -902,55 +1038,23 @@ func dispatchFile(
 
 	// Under --timing, the worker's meter, which bills each call in this file to its rule and each cache
 	// fill to its derivation. Nil otherwise.
-	meter := timings.workerMeter()
+	meter := d.timings.workerMeter()
 	meter.watchFills(fileCache)
-
-	containments := make([]*ruleContainment, 0, len(rules))
-	notes = RuleNotes{}
 
 	// Each rule reads the program through a view of what it declared (rule.ProgramReads), built for
 	// the whole file in one allocation.
-	programViews := rule.ViewProgramForEach(graph.Program, sourceFile, rules)
+	programViews := rule.ViewProgramForEach(d.graph.Program, sourceFile, rules)
 
 	for ruleIndex, subject := range rules {
-		ruleName := subject.Name
-
-		var timing *RuleTiming
-		if timings != nil {
-			timing = timings.forRule(ruleName)
-		}
+		slot := slots[ruleIndex]
 
 		context := rule.Context{
 			SourceFile:  sourceFile,
 			Program:     programViews[ruleIndex],
 			TypeChecker: fileChecker,
 			FileCache:   fileCache,
-			Report: func(diagnostic rule.Diagnostic) {
-				diagnostic.RuleName = ruleName
-				if diagnostic.SourceFile == nil {
-					diagnostic.SourceFile = sourceFile
-				}
-
-				// Filtering here rather than after the walk is what keeps a suppressed finding from
-				// ever existing as a finding. The alternative — collect everything, drop some later —
-				// leaves a window where a caller can read the unfiltered slice and report a number the
-				// user will never see explained.
-				if timing != nil {
-					timing.Findings++
-				}
-
-				if directives.Suppresses(diagnostic.RuleName, diagnostic.Range.Pos()) {
-					return
-				}
-
-				report(diagnostic)
-			},
-			RecordNote: func(key string) {
-				if notes[ruleName] == nil {
-					notes[ruleName] = map[string]int{}
-				}
-				notes[ruleName][key]++
-			},
+			Report:      slot.report,
+			RecordNote:  slot.recordNote,
 		}
 
 		// Options are decoded to the type the rule declares rather than handed through as JSON. A
@@ -959,31 +1063,30 @@ func dispatchFile(
 		// Counted before Run rather than after, because the question this answers is whether anything
 		// ever handed this rule a file. A rule that panics or declines has still been offered one; a
 		// rule nobody wired never reaches this line at all.
-		offeredCounts[ruleName]++
+		offeredCounts[subject.Name]++
 
-		containment := &ruleContainment{ruleName: ruleName, fileName: sourceFile.FileName()}
-		containments = append(containments, containment)
+		slot.containment = ruleContainment{ruleName: subject.Name, fileName: sourceFile.FileName()}
 
 		// Branched rather than always passing a closure, which would allocate once per rule per file on
 		// every run to serve a flag most runs don't set.
 		var listeners rule.Listeners
 		if meter == nil {
-			listeners = containment.run(subject, context, ruleOptions[ruleName])
+			listeners = slot.containment.run(subject, context, ruleOptions[subject.Name])
 		} else {
-			meter.setup(timing, func() {
-				listeners = containment.run(subject, context, ruleOptions[ruleName])
+			meter.setup(slot.timing, func() {
+				listeners = slot.containment.run(subject, context, ruleOptions[subject.Name])
 			})
 		}
-		if containment.crash != nil {
+		if slot.containment.crash != nil {
 			// Offered and crashed, so it neither declined nor listened.
 			continue
 		}
 
 		if len(listeners) == 0 {
-			if timing != nil {
+			if slot.timing != nil {
 				// A rule that declined. Counted so that a rule doing expensive setup and then
 				// declining every file is visible as exactly that, rather than as a cheap rule.
-				timing.FilesDeclined++
+				slot.timing.FilesDeclined++
 			}
 			// The rule looked at the file and declined it. That is the cheapest and most valuable thing
 			// a rule can do, and it is counted rather than ignored so a rule that declines *everything*
@@ -991,18 +1094,21 @@ func dispatchFile(
 			continue
 		}
 
-		listeningCounts[ruleName]++
-		if timing != nil {
-			timing.FilesListened++
+		listeningCounts[subject.Name]++
+		if slot.timing != nil {
+			slot.timing.FilesListened++
 		}
 		for kind, listener := range listeners {
-			merged[kind] = append(merged[kind], containment.listener(meter.listener(timing, listener)))
+			if len(d.listeners[kind]) == 0 {
+				d.used = append(d.used, kind)
+			}
+			d.listeners[kind] = append(d.listeners[kind], listenerCall{listener: listener, slot: slot})
 			listened = true
 		}
 	}
 
 	if listened {
-		visitedNodes = walk(sourceFile.AsNode(), merged)
+		visitedNodes = d.walk(sourceFile.AsNode(), meter)
 	}
 
 	// The rules this run actually ran, so a directive naming only rules cohere has not ported can be
@@ -1027,13 +1133,44 @@ func dispatchFile(
 		}
 	}
 
-	for _, containment := range containments {
-		if containment.crash != nil {
-			ruleCrashes = append(ruleCrashes, *containment.crash)
+	for _, slot := range slots {
+		if slot.containment.crash != nil {
+			ruleCrashes = append(ruleCrashes, *slot.containment.crash)
 		}
 	}
 
-	return visitedNodes, tally(sourceFile.FileName(), directives, ranRule, resolution), notes, ruleCrashes
+	return visitedNodes, tally(sourceFile.FileName(), directives, ranRule, resolution), d.notes, ruleCrashes
+}
+
+// endFile empties the table the file filled and lets go of the file. Each emptied kind is cleared before it
+// is shortened, so the table keeps no listener, and through it no rule's state, from a file that is over.
+func (d *fileDispatcher) endFile() {
+	for _, kind := range d.used {
+		clear(d.listeners[kind])
+		d.listeners[kind] = d.listeners[kind][:0]
+	}
+	d.used = d.used[:0]
+	d.sourceFile, d.directives, d.notes, d.report = nil, nil, nil, nil
+}
+
+// walk is the package's walk over the dispatcher's table: every node once, each listener called through its
+// rule's slot.
+func (d *fileDispatcher) walk(node *ast.Node, meter *workerMeter) int {
+	if node == nil {
+		return 0
+	}
+
+	visited := 1
+	for _, call := range d.listeners[node.Kind] {
+		call.slot.hear(meter, call.listener, node)
+	}
+
+	node.ForEachChild(func(child *ast.Node) bool {
+		visited += d.walk(child, meter)
+		return false
+	})
+
+	return visited
 }
 
 // suppressionTally is what one file's directives did, summed across the run.
@@ -1193,7 +1330,12 @@ func (g *Graph) rulesFor(
 	unconfigured map[string]int,
 ) (*ruleSelection, configuration.Resolved) {
 	if g.LintConfig == nil {
-		return &ruleSelection{applicable: rules}, configuration.Resolved{}
+		selection, made := selections[noConfiguration{}]
+		if !made {
+			selection = &ruleSelection{applicable: rules}
+			selections[noConfiguration{}] = selection
+		}
+		return selection, configuration.Resolved{}
 	}
 
 	resolution := g.LintConfig.Resolve(fileName)
@@ -1222,6 +1364,9 @@ func (g *Graph) rulesFor(
 	return selection, resolution
 }
 
+// noConfiguration keys the one selection a walk with no configuration makes: every rule, with no options.
+type noConfiguration struct{}
+
 // ruleSelection is what one resolution decides about the rule set: the rules that apply, their decoded
 // options, and the rules left out and why.
 //
@@ -1241,6 +1386,10 @@ type ruleSelection struct {
 
 	// classes is the applicable rules' findings-cache classes by name, made on first use. See classNames.
 	classes *ruleClassNames
+
+	// slots is the worker's slot for each applicable rule, aligned with applicable, found on first use. See
+	// fileDispatcher.slotsFor.
+	slots []*ruleSlot
 }
 
 // ruleClassNames is the applicable rules' names in each findings-cache class. See CacheClasses and
