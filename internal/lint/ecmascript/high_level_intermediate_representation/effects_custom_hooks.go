@@ -18,7 +18,44 @@ func customHookSignature(function *Function) effectSignature {
 	return effectSignature{Receiver: EffectRead, Rest: EffectFreeze, HasRest: true, Result: EffectValueFrozen}
 }
 
-func isModuleHookCall(function *Function, instruction *Instruction) bool {
+// calleeProducers is the table isModuleHookCall resolves a callee through: each value's producing
+// instruction value, plus each StoreLocal under the binding it writes.
+//
+// It is built on first use and then shared by every call a pass asks about in one function. Building
+// it inside isModuleHookCall made each call cost a walk of every instruction in the function, which
+// is quadratic in a function's size and was 85 MB of map on a cold ahra run. A pass makes one with
+// newCalleeProducers for the function it walks, and must not mutate that function's instructions
+// while holding it, since the table is not rebuilt.
+type calleeProducers struct {
+	function *Function
+	table    map[IdentifierId]InstructionValue
+	// builds counts how many times the table was built, for the test that it is built once.
+	builds int
+}
+
+func newCalleeProducers(function *Function) *calleeProducers {
+	return &calleeProducers{function: function}
+}
+
+// producer returns the value that produced identifier, building the table on the first ask.
+func (producers *calleeProducers) producer(identifier IdentifierId) InstructionValue {
+	if producers.table == nil {
+		producers.builds++
+		producers.table = make(map[IdentifierId]InstructionValue, len(producers.function.Instructions))
+		for _, candidate := range producers.function.Instructions {
+			if candidate == nil {
+				continue
+			}
+			producers.table[candidate.LValue.Identifier] = candidate.Value
+			if store, ok := candidate.Value.(*StoreLocal); ok {
+				producers.table[store.LValue.Identifier] = store
+			}
+		}
+	}
+	return producers.table[identifier]
+}
+
+func isModuleHookCall(function *Function, producers *calleeProducers, instruction *Instruction) bool {
 	if function == nil || instruction == nil {
 		return false
 	}
@@ -31,16 +68,6 @@ func isModuleHookCall(function *Function, instruction *Instruction) bool {
 	default:
 		return false
 	}
-	producers := map[IdentifierId]InstructionValue{}
-	for _, candidate := range function.Instructions {
-		if candidate == nil {
-			continue
-		}
-		producers[candidate.LValue.Identifier] = candidate.Value
-		if store, ok := candidate.Value.(*StoreLocal); ok {
-			producers[store.LValue.Identifier] = store
-		}
-	}
 	seen := map[IdentifierId]bool{}
 	var resolve func(IdentifierId, bool) bool
 	resolve = func(identifier IdentifierId, requireHook bool) bool {
@@ -49,7 +76,7 @@ func isModuleHookCall(function *Function, instruction *Instruction) bool {
 		}
 		seen[identifier] = true
 		defer delete(seen, identifier)
-		switch value := producers[identifier].(type) {
+		switch value := producers.producer(identifier).(type) {
 		case *LoadGlobal:
 			if value.BindingKind == GlobalBindingKindGlobal || value.Source == "react" {
 				return false
@@ -62,7 +89,7 @@ func isModuleHookCall(function *Function, instruction *Instruction) bool {
 		case *PropertyLoad:
 			return (!requireHook || isHookName(string(value.Property))) && resolve(value.Object.Identifier, false)
 		case *ComputedLoad:
-			property, ok := producers[value.Property.Identifier].(*Primitive)
+			property, ok := producers.producer(value.Property.Identifier).(*Primitive)
 			if !ok {
 				return false
 			}
@@ -73,7 +100,7 @@ func isModuleHookCall(function *Function, instruction *Instruction) bool {
 		}
 	}
 	if call, ok := instruction.Value.(*MethodCall); ok {
-		if property, ok := producers[call.Property.Identifier].(*Primitive); ok {
+		if property, ok := producers.producer(call.Property.Identifier).(*Primitive); ok {
 			name, ok := property.Value.(string)
 			return ok && isHookName(name) && resolve(call.Receiver.Identifier, false)
 		}

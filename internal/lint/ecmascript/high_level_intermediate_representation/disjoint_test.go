@@ -426,7 +426,7 @@ export function plain() {
 			if _, ok := instruction.Value.(*Primitive); !ok {
 				continue
 			}
-			if mayAllocate(function, instruction) {
+			if mayAllocate(function, newCalleeProducers(function), instruction) {
 				t.Error("mayAllocate must be false for a Primitive; React returns false for it " +
 					"and a true here would union every constant in the function")
 			}
@@ -500,7 +500,7 @@ func TestDisjointMayAllocateMatchesReact(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			if got := mayAllocate(nil, &Instruction{Value: test.value}); got != test.want {
+			if got := mayAllocate(nil, newCalleeProducers(nil), &Instruction{Value: test.value}); got != test.want {
 				t.Errorf("mayAllocate(%s) = %v, want %v", test.name, got, test.want)
 			}
 		})
@@ -546,7 +546,7 @@ export function classify(list: number[]) {
 			continue
 		}
 		seen[name] = true
-		if got := mayAllocate(function, instruction); got != expected {
+		if got := mayAllocate(function, newCalleeProducers(function), instruction); got != expected {
 			t.Errorf("mayAllocate(%s) = %v, want %v", name, got, expected)
 		}
 	}
@@ -570,7 +570,7 @@ func TestDisjointDestructureAllocatesOnlyWithSpread(t *testing.T) {
 	plain := &Destructure{Pattern: &ObjectPattern{
 		Properties: []ObjectPatternProperty{{Key: "a", Value: &PlacePattern{Place: place}}},
 	}}
-	if mayAllocate(nil, &Instruction{Value: plain}) {
+	if mayAllocate(nil, newCalleeProducers(nil), &Instruction{Value: plain}) {
 		t.Error("a destructure with no rest element does not allocate")
 	}
 
@@ -578,12 +578,12 @@ func TestDisjointDestructureAllocatesOnlyWithSpread(t *testing.T) {
 		Properties: []ObjectPatternProperty{{Key: "a", Value: &PlacePattern{Place: place}}},
 		Rest:       &place,
 	}}
-	if !mayAllocate(nil, &Instruction{Value: spread}) {
+	if !mayAllocate(nil, newCalleeProducers(nil), &Instruction{Value: spread}) {
 		t.Error("a destructure with a rest element allocates the remainder object")
 	}
 
 	arraySpread := &Destructure{Pattern: &ArrayPattern{Rest: &place}}
-	if !mayAllocate(nil, &Instruction{Value: arraySpread}) {
+	if !mayAllocate(nil, newCalleeProducers(nil), &Instruction{Value: arraySpread}) {
 		t.Error("an array pattern with a rest element allocates too")
 	}
 
@@ -594,7 +594,7 @@ func TestDisjointDestructureAllocatesOnlyWithSpread(t *testing.T) {
 			Value: &ObjectPattern{Rest: &place},
 		}},
 	}}
-	if !mayAllocate(nil, &Instruction{Value: nested}) {
+	if !mayAllocate(nil, newCalleeProducers(nil), &Instruction{Value: nested}) {
 		t.Error("a rest element nested inside a pattern still allocates")
 	}
 }

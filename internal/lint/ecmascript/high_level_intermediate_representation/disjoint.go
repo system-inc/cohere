@@ -337,6 +337,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *MutableRang
 	// writes only when absent (`declareIdentifier`, line 32381); `DeclarationId` is this graph's
 	// counterpart and carries the same meaning, one entry per source-level binding.
 	declarations := map[DeclarationId]IdentifierId{}
+	producers := newCalleeProducers(function)
 	declareIdentifier := func(place Place) {
 		declaration := declarationOf(function, place.Identifier)
 		if _, present := declarations[declaration]; !present {
@@ -405,7 +406,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *MutableRang
 			var operands []IdentifierId
 
 			lvalueRange := ranges.Get(instruction.LValue.Identifier)
-			if lvalueRange.End > lvalueRange.Start+1 || mayAllocate(function, instruction) {
+			if lvalueRange.End > lvalueRange.Start+1 || mayAllocate(function, producers, instruction) {
 				operands = append(operands, instruction.LValue.Identifier)
 			}
 
@@ -555,7 +556,7 @@ func declarationOf(function *Function, id IdentifierId) DeclarationId {
 // ends in `assertExhaustive`, so an unlisted variant there is a build error; the equivalent
 // discipline here is that a reader can diff this switch against the bundle's line by line. The
 // default returns false, which is the safe answer for a variant nobody has classified.
-func mayAllocate(function *Function, instruction *Instruction) bool {
+func mayAllocate(function *Function, producers *calleeProducers, instruction *Instruction) bool {
 	if instruction == nil {
 		return false
 	}
@@ -578,7 +579,7 @@ func mayAllocate(function *Function, instruction *Instruction) bool {
 	// kinds come from the same signature lookup that drives aliasing effects; an unknown signature
 	// leaves the result non-primitive, which is upstream's conservative default too.
 	case *TaggedTemplateExpression, *CallExpression, *MethodCall:
-		return !callResultIsPrimitive(function, instruction)
+		return !callResultIsPrimitive(function, producers, instruction)
 
 	// Upstream returns true for all of these: each one constructs a value.
 	case *RegExpLiteral, *PropertyStore, *ComputedStore, *ArrayExpression, *JsxExpression,
@@ -594,7 +595,7 @@ func mayAllocate(function *Function, instruction *Instruction) bool {
 // callResultIsPrimitive projects the result kind from the call signature used by effect inference.
 // The lookup is deliberately shared: maintaining a second name table here would let scope
 // allocation disagree with the mutation model for the same callee.
-func callResultIsPrimitive(function *Function, instruction *Instruction) bool {
+func callResultIsPrimitive(function *Function, producers *calleeProducers, instruction *Instruction) bool {
 	var callee Place
 	switch value := instruction.Value.(type) {
 	case *CallExpression:
@@ -610,7 +611,7 @@ func callResultIsPrimitive(function *Function, instruction *Instruction) bool {
 	if name == "" {
 		name = taggedTemplateCalleeSyntaxName(instruction)
 	}
-	signature, known := lookupSignature(function, instruction, name)
+	signature, known := lookupSignature(function, producers, instruction, name)
 	return known && signature.Result == EffectValuePrimitive
 }
 

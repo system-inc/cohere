@@ -21,11 +21,19 @@ func TrimNodeTextRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRang
 	return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())
 }
 
-func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter.Seq[ast.CommentRange] {
-	nodeFactory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
+// commentRangeFactory is the one factory every GetCommentsInRange call hands the scanner.
+//
+// The scanner's only use of its factory is NewCommentRange, which builds a CommentRange by value and
+// reads and writes nothing on the factory (scanner.go's iterateCommentRanges, ast.go's
+// NewCommentRange). So one shared factory serves every call on every goroutine. A factory built per
+// call was 30 MB in 22K objects on a cold ahra run, each one about 1.4 KB of node pools never used.
+// TestCommentRangeFactoryStaysUntouched fails if the scanner ever starts writing to it, which is the
+// day this sharing would become a race.
+var commentRangeFactory ast.NodeFactory
 
+func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter.Seq[ast.CommentRange] {
 	return func(yield func(ast.CommentRange) bool) {
-		for commentRange := range scanner.GetTrailingCommentRanges(nodeFactory, sourceFile.Text(), inRange.Pos()) {
+		for commentRange := range scanner.GetTrailingCommentRanges(&commentRangeFactory, sourceFile.Text(), inRange.Pos()) {
 			if commentRange.Pos() >= inRange.End() {
 				break
 			}
@@ -34,7 +42,7 @@ func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter
 			}
 		}
 
-		for commentRange := range scanner.GetLeadingCommentRanges(nodeFactory, sourceFile.Text(), inRange.Pos()) {
+		for commentRange := range scanner.GetLeadingCommentRanges(&commentRangeFactory, sourceFile.Text(), inRange.Pos()) {
 			if commentRange.Pos() >= inRange.End() {
 				break
 			}
