@@ -89,3 +89,32 @@ func isWrittenAfterDeclaration(ctx rule.Context, symbol *ast.Symbol, declaration
 	ctx.SourceFile.AsNode().ForEachChild(visit)
 	return written
 }
+
+// IsConstantRegExpIn reports whether an expression's static value is a RegExp object rather than a
+// string: a regex literal, or a name whose constant binding (as ConstantStringIn counts one) was
+// initialized with one, followed through any number of such names. eslint-utils' getStaticValue answers
+// a RegExp there, which a rule that wants a pattern's text, not the String() of a RegExp, has to tell
+// apart from a string constant.
+func IsConstantRegExpIn(ctx rule.Context, expression *ast.Node) bool {
+	following := map[*ast.Symbol]bool{}
+	for expression != nil {
+		expression = ast.SkipParentheses(expression)
+		switch expression.Kind {
+		case ast.KindRegularExpressionLiteral:
+			return true
+		case ast.KindIdentifier:
+			if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+				return false
+			}
+			initializer, symbol := constantInitializer(ctx, expression)
+			if initializer == nil || following[symbol] {
+				return false
+			}
+			following[symbol] = true
+			expression = initializer
+		default:
+			return false
+		}
+	}
+	return false
+}

@@ -4,10 +4,9 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/literal"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -17,7 +16,7 @@ import (
 // literal; one who sees "surrogate pair" without the flag knows to add the flag. Collapsing them
 // into a single id would make the count assertable and the advice useless.
 var messageMisleadingSurrogatePair = rule.Message{
-	Id: "surrogatePairInCharacterClass",
+	Id: "surrogatePair",
 	Description: "This character class holds a surrogate pair spelled partly as a code point escape, " +
 		"so what looks like one astral character is two independent class members. The class matches " +
 		"either half on its own and never the character the author wrote, which is a match that " +
@@ -25,7 +24,7 @@ var messageMisleadingSurrogatePair = rule.Message{
 }
 
 var messageMisleadingSurrogatePairWithoutUnicodeFlag = rule.Message{
-	Id: "surrogatePairWithoutUnicodeFlagInCharacterClass",
+	Id: "surrogatePairWithoutUFlag",
 	Description: "This character class holds an astral character while the pattern has neither the " +
 		"u nor the v flag, so the engine reads it as its two UTF-16 halves and the class matches " +
 		"either half alone. `/[👍]/` matches the two lone surrogates that spell it and never the " +
@@ -33,7 +32,7 @@ var messageMisleadingSurrogatePairWithoutUnicodeFlag = rule.Message{
 }
 
 var messageMisleadingCombiningClass = rule.Message{
-	Id: "combiningClassInCharacterClass",
+	Id: "combiningClass",
 	Description: "This character class holds a base character followed by a combining mark, which " +
 		"renders as one glyph and is two code points. The class matches the base or the mark " +
 		"separately, so `/[Á]/` accepts a bare `A` and accepts a stray accent, and rejects the " +
@@ -41,21 +40,21 @@ var messageMisleadingCombiningClass = rule.Message{
 }
 
 var messageMisleadingEmojiModifier = rule.Message{
-	Id: "emojiModifierInCharacterClass",
+	Id: "emojiModifier",
 	Description: "This character class holds an emoji followed by a skin tone modifier, which is one " +
 		"glyph made of two code points. The class matches the unmodified emoji or the bare modifier, " +
 		"so it accepts inputs nobody meant to accept and rejects the modified emoji itself.",
 }
 
 var messageMisleadingRegionalIndicator = rule.Message{
-	Id: "regionalIndicatorInCharacterClass",
+	Id: "regionalIndicatorSymbol",
 	Description: "This character class holds a pair of regional indicator symbols, which render as " +
 		"one flag and are two code points. The class matches either letter alone, so a flag class " +
 		"built this way accepts every other flag that shares a letter with it.",
 }
 
 var messageMisleadingZeroWidthJoiner = rule.Message{
-	Id: "zeroWidthJoinerInCharacterClass",
+	Id: "zwj",
 	Description: "This character class holds characters spliced by a zero width joiner, which renders " +
 		"as one glyph and is three or more code points. The class matches each piece on its own, so " +
 		"a family emoji written this way matches the individual people in it and never the family.",
@@ -121,9 +120,21 @@ var messageMisleadingZeroWidthJoiner = rule.Message{
 // # The constructor half
 //
 // `new RegExp("[🎵]")` and `RegExp("[🎵]", "u")` are checked alongside literals, because the mistake
-// is identical and the constructor form is the one that survives the parser. Only a string or a
-// substitution-free template is read: an argument that is a variable could be anything at runtime,
-// and reporting it would flag correct code.
+// is identical and the constructor form is the one that survives the parser. The calls are found the
+// way ESLint 10.8.1 finds them, through the shelf's port of eslint-utils' ReferenceTracker, so a local
+// named RegExp is not the global and an alias or `globalThis.RegExp` is (#jjfa7qb).
+//
+// The pattern and the flags are read as ESLint reads them, through reference.ConstantStringIn: a
+// string, a substitution-free template, a concatenation of those, or a constant binding holding one.
+// A pattern that is not constant is not checked, and neither is one whose value is a RegExp object.
+// Flags that are present and not constant decline the call, since they could hold the `u` that makes
+// the class correct. A regex literal passed with flags is checked under the call's flags instead of its
+// own, and only there; passed alone it is left to the literal listener, under its own.
+//
+// A finding in a string or template literal points at the characters, through the cooked-to-raw
+// mapping below. A pattern that reached the call any other way, a name or a concatenation, has no
+// characters in the file to point at, so each kind of finding is reported once, at the argument, as
+// ESLint does.
 //
 // A pattern written as a string carries one more layer of escaping than a literal does, and that
 // layer is the rule's sharpest edge upstream. `new RegExp("[\\uD83D\\uDC4D]")` passes the regex
@@ -140,23 +151,33 @@ var messageMisleadingZeroWidthJoiner = rule.Message{
 // reading a value nobody writes is inert code wearing the shape of a feature. The default is
 // asserted by fixture rather than assumed, because a port with no option surface lands on one branch
 // or the other and the corpus alone cannot tell which.
-//
-// Upstream also declines to resolve a pattern held in a variable and declines a template with
-// substitutions. Both gaps are reproduced rather than improved on: a substituted template's text is
-// not known until it runs, and resolving a variable is a different rule's worth of machinery.
 var NoMisleadingCharacterClass = rule.Rule{
 	Name: "no-misleading-character-class",
 
-	// The string-literal type of a flags argument that is not itself a literal
+	// The tracker tells the global RegExp from a local one by where its symbol is declared, and a
+	// constant argument is followed to its binding the same way.
 	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
+
 	Run: func(ctx rule.Context, options any) rule.Listeners {
+		// The regex literals a RegExp call took with flags, so already checked under the call's.
+		// Filled from the file node, which the walk enters before any literal.
+		var checkedByACall map[*ast.Node]bool
 		return rule.Listeners{
+			ast.KindSourceFile: func(node *ast.Node) {
+				checkedByACall = map[*ast.Node]bool{}
+				// Every trace starts at a reference to RegExp, so a file that never spells it has
+				// nothing to follow, and the tracker's index is never built.
+				if ctx.TypeChecker == nil || !strings.Contains(ctx.SourceFile.Text(), "RegExp") {
+					return
+				}
+				tracker := reference.NewTracker(ctx.SourceFile, ctx.TypeChecker, nil)
+				for _, tracked := range tracker.GlobalReferences(regExpCallTraceMap) {
+					checkRegExpConstructorCall(ctx, tracked.Node, checkedByACall)
+				}
+			},
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
-				// A literal that is the pattern argument of a RegExp call is checked by the call,
-				// not here, because the call's flags argument replaces the literal's own. Checking
-				// it twice would report `RegExp(/[👍]/u, '')` once for a clean literal and once for
-				// the flagless call.
-				if regexLiteralIsRegExpArgument(node) {
+				if checkedByACall[node] {
 					return
 				}
 				text := node.Text()
@@ -169,67 +190,64 @@ var NoMisleadingCharacterClass = rule.Rule{
 					return unicodeFlagSuggestionForLiteral(node, text, flags)
 				})
 			},
-
-			ast.KindCallExpression: func(node *ast.Node) {
-				call := node.AsCallExpression()
-				checkRegExpConstructorCall(ctx, call.Expression, call.Arguments)
-			},
-			ast.KindNewExpression: func(node *ast.Node) {
-				expression := node.AsNewExpression()
-				checkRegExpConstructorCall(ctx, expression.Expression, expression.Arguments)
-			},
 		}
 	},
 }
 
-// checkRegExpConstructorCall checks a `RegExp(...)` or `new RegExp(...)` whose pattern is readable.
-//
-// The flags argument is consulted before the pattern because a flag decides what the pattern means:
-// under `u` an astral character is one class member and under no flag it is two, which is the
-// difference between a finding and a clean class. When the flags argument is present and is not a
-// literal the call is skipped entirely rather than guessed at, matching upstream: the argument may
-// well supply the `u` that makes the pattern correct.
-func checkRegExpConstructorCall(ctx rule.Context, callee *ast.Node, arguments *ast.NodeList) {
-	if !calleeIsRegExp(callee) {
+// checkRegExpConstructorCall checks a call or construction of RegExp, as ESLint's tracker loop does.
+func checkRegExpConstructorCall(ctx rule.Context, call *ast.Node, checkedByACall map[*ast.Node]bool) {
+	arguments := call.Arguments()
+	if len(arguments) == 0 {
 		return
 	}
-	if arguments == nil || len(arguments.Nodes) == 0 {
-		return
-	}
-
-	flags, flagsKnown := misleadingConstructorFlags(ctx, arguments)
-	if !flagsKnown {
-		return
+	patternNode := ast.SkipParentheses(arguments[0])
+	hasFlags := len(arguments) > 1
+	flags := ""
+	flagsKnown := true
+	if hasFlags {
+		flags, flagsKnown = reference.ConstantStringIn(ctx, arguments[1])
 	}
 
-	patternNode := ast.SkipParentheses(arguments.Nodes[0])
-	if patternNode == nil {
-		return
-	}
-
-	// A regex literal handed to the constructor contributes its pattern text, and the call's flags
-	// argument replaces the literal's own flags rather than merging with them. `RegExp(/[👍]/u, '')`
-	// is therefore a flagless pattern and reports, which is upstream's behavior and the reason the
-	// literal listener steps aside for this case.
+	// A regex literal handed over with flags is checked under them, and the literal listener steps
+	// aside for it, whether or not the flags can be read. Handed over alone, it is the literal
+	// listener's, under its own flags.
 	if patternNode.Kind == ast.KindRegularExpressionLiteral {
+		if !hasFlags {
+			return
+		}
+		checkedByACall[patternNode] = true
+		if !flagsKnown {
+			return
+		}
 		text := patternNode.Text()
-		pattern, ownFlags := regexsyntax.PatternAndFlags(text)
+		pattern, _ := regexsyntax.PatternAndFlags(text)
 		if pattern == "" {
 			return
 		}
-		if len(arguments.Nodes) < 2 {
-			flags = ownFlags
-		}
-		literalStart := patternNode.End() - len(text)
-		checkRegexPattern(ctx, pattern, literalStart+1, flags, nil)
+		checkRegexPattern(ctx, pattern, patternNode.End()-len(text)+1, flags, nil)
 		return
 	}
 
-	pattern, ok := regexConstructorPattern(patternNode)
-	if !ok {
+	if !flagsKnown || reference.IsConstantRegExpIn(ctx, patternNode) {
 		return
 	}
-	checkRegexPatternInStringLiteral(ctx, pattern, patternNode, flags)
+	pattern, isConstant := reference.ConstantStringIn(ctx, patternNode)
+	if !isConstant {
+		return
+	}
+	switch patternNode.Kind {
+	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
+		checkRegexPatternInStringLiteral(ctx, pattern, patternNode, flags)
+	default:
+		reported := map[string]bool{}
+		checkRegexPatternWithReporter(pattern, flags, func(finding pendingMisleadingFinding) {
+			if reported[finding.message.Id] {
+				return
+			}
+			reported[finding.message.Id] = true
+			ctx.ReportNode(patternNode, finding.message)
+		})
+	}
 }
 
 // checkRegexPatternInStringLiteral checks a pattern that reached the constructor as a string, where
@@ -320,158 +338,6 @@ func (collector *mappedFindingCollector) report(finding pendingMisleadingFinding
 			collector.bodyStart+collector.offsets[finding.start],
 			collector.bodyStart+collector.offsets[finding.end]),
 		finding.message)
-}
-
-// calleeIsRegExp reports whether a call's callee names the global RegExp.
-//
-// The member forms are accepted because upstream accepts them and they appear in its corpus:
-// `globalThis.RegExp`, `window.RegExp` and `global.RegExp` all reach the same constructor. What is
-// deliberately not done is checking whether the name is shadowed. Upstream consults the scope and
-// declines a locally bound `RegExp`; doing that here needs the binder, and the narrowing this rule
-// would gain is a call to a user function that happens to be named RegExp and happens to be passed a
-// pattern with a misleading class in it. The divergence is stated rather than hidden, and it can
-// only produce a finding on code that is confusing for a second reason.
-func calleeIsRegExp(callee *ast.Node) bool {
-	callee = ast.SkipParentheses(callee)
-	if callee == nil {
-		return false
-	}
-	if callee.Kind == ast.KindIdentifier {
-		return callee.AsIdentifier().Text == "RegExp"
-	}
-	if callee.Kind != ast.KindPropertyAccessExpression {
-		return false
-	}
-	access := callee.AsPropertyAccessExpression()
-	if access.Name() == nil || access.Name().Kind != ast.KindIdentifier {
-		return false
-	}
-	if access.Name().AsIdentifier().Text != "RegExp" {
-		return false
-	}
-	object := ast.SkipParentheses(access.Expression)
-	if object == nil || object.Kind != ast.KindIdentifier {
-		return false
-	}
-	switch object.AsIdentifier().Text {
-	case "globalThis", "window", "global":
-		return true
-	}
-	return false
-}
-
-// regexConstructorFlags returns the flags a constructor call passes, and whether they are knowable.
-//
-// A one-argument call passes no flags, which is the empty string and is knowable.
-//
-// The two unknowable shapes are treated differently, and the difference is upstream's rather than a
-// choice made here. A template with substitutions declines the whole call: its text is assembled at
-// run time and could contain a `u`, so nothing can be said. Any other non-literal argument, an
-// identifier most often, is read as no flags and the pattern is checked without one. Upstream's
-// corpus pins both sides: `new RegExp('[🇯🇵]', `${foo}`)` is a pass case and
-// `const flags = ""; var r = new RegExp("[👍]", flags)` is a fail case, and the only thing separating
-// them is which of the two shapes the argument has.
-//
-// That asymmetry is hard to defend on its own terms, since an identifier can hold `"u"` exactly as
-// easily as a template can produce it, and reading it as the empty string is a guess that reports on
-// code which may well be correct. It is reproduced rather than corrected because the corpus asserts
-// it in both directions, and a port that quietly picked the consistent reading would go silent on a
-// case upstream reports.
-func regexConstructorFlags(arguments *ast.NodeList) (string, bool) {
-	if len(arguments.Nodes) < 2 {
-		return "", true
-	}
-	flagsNode := ast.SkipParentheses(arguments.Nodes[1])
-	if flagsNode == nil {
-		return "", false
-	}
-	switch flagsNode.Kind {
-	case ast.KindStringLiteral:
-		return flagsNode.AsStringLiteral().Text, true
-	case ast.KindNoSubstitutionTemplateLiteral:
-		return flagsNode.Text(), true
-	case ast.KindTemplateExpression:
-		return "", false
-	}
-	return "", true
-}
-
-// misleadingConstructorFlags is the flags this rule checks a constructor call under, read as ESLint's
-// getStringIfConstant reads them. A literal is its text, as regexConstructorFlags reads it. Any other
-// argument is a value whose type is one string literal, `const flags = ""` for one, or else unknowable,
-// which declines the call, since it could hold a `u`. The checker answers which.
-//
-// regexConstructorFlags reads every other argument as no flags, which no-useless-backreference keeps,
-// since ESLint's version checks under `flags || ""`. Here that reading reported
-// `new RegExp("[👍]", flags)`, which ESLint's corpus pins as clean (#jjfa7qb), while
-// `const flags = ""; new RegExp("[👍]", flags)` still reports.
-func misleadingConstructorFlags(ctx rule.Context, arguments *ast.NodeList) (string, bool) {
-	if len(arguments.Nodes) < 2 {
-		return regexConstructorFlags(arguments)
-	}
-	flagsNode := ast.SkipParentheses(arguments.Nodes[1])
-	if flagsNode == nil {
-		return regexConstructorFlags(arguments)
-	}
-	switch flagsNode.Kind {
-	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression:
-		return regexConstructorFlags(arguments)
-	}
-	if ctx.TypeChecker == nil {
-		return "", false
-	}
-	flagsType := ctx.TypeChecker.GetTypeAtLocation(flagsNode)
-	if !type_checking.IsTypeFlagSet(flagsType, checker.TypeFlagsStringLiteral) {
-		return "", false
-	}
-	value, isString := flagsType.AsLiteralType().Value().(string)
-	return value, isString
-}
-
-// regexConstructorPattern returns the pattern text a constructor argument carries.
-//
-// The text returned is the cooked value, which is what the RegExp constructor actually receives.
-// That means `"\\u200D"` yields the seven characters the regex engine parses as an escape, and a
-// raw joiner yields the joiner itself. Both are correct inputs to the class scanner and it tells
-// them apart on its own. Where that text sits in the file is a separate question, answered by
-// checkRegexPatternInStringLiteral, because the two are not the same string.
-func regexConstructorPattern(node *ast.Node) (string, bool) {
-	switch node.Kind {
-	case ast.KindStringLiteral:
-		return node.AsStringLiteral().Text, true
-	case ast.KindNoSubstitutionTemplateLiteral:
-		return node.Text(), true
-	}
-	return "", false
-}
-
-// regexLiteralIsRegExpArgument reports whether a regex literal is the pattern argument of a RegExp
-// construction, in which case the construction checks it and this literal must not.
-func regexLiteralIsRegExpArgument(node *ast.Node) bool {
-	child := node
-	parent := node.Parent
-	for parent != nil {
-		switch parent.Kind {
-		case ast.KindParenthesizedExpression, ast.KindAsExpression,
-			ast.KindSatisfiesExpression, ast.KindNonNullExpression, ast.KindTypeAssertionExpression:
-			child = parent
-			parent = parent.Parent
-			continue
-		case ast.KindCallExpression:
-			call := parent.AsCallExpression()
-			return calleeIsRegExp(call.Expression) && firstArgumentIs(call.Arguments, child)
-		case ast.KindNewExpression:
-			expression := parent.AsNewExpression()
-			return calleeIsRegExp(expression.Expression) && firstArgumentIs(expression.Arguments, child)
-		}
-		return false
-	}
-	return false
-}
-
-// firstArgumentIs reports whether a node is the first argument of an argument list.
-func firstArgumentIs(arguments *ast.NodeList, node *ast.Node) bool {
-	return arguments != nil && len(arguments.Nodes) > 0 && arguments.Nodes[0] == node
 }
 
 // checkRegexPattern reports every misleading sequence in every character class of a pattern.
@@ -759,7 +625,7 @@ func unicodeFlagSuggestionForLiteral(node *ast.Node, text string, flags string) 
 	}
 	return []rule.Suggestion{{
 		Message: rule.Message{
-			Id: "addUnicodeFlag",
+			Id: "suggestUnicodeFlag",
 			Description: "Add the u flag so the class matches the character rather than its parts. " +
 				"The flag changes how the whole pattern parses, so this is offered rather than applied.",
 		},

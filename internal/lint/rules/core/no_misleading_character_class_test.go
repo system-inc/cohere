@@ -13,12 +13,12 @@ const misleadingCharacterClassFile = "/repository/source/Pattern.ts"
 // than as a wall of repeated identifiers. The rule reports six distinct ids and one input commonly
 // produces several, which is the whole reason the counts below are not all one.
 const (
-	withoutFlag = "surrogatePairWithoutUnicodeFlagInCharacterClass"
-	escapedPair = "surrogatePairInCharacterClass"
-	combining   = "combiningClassInCharacterClass"
-	emoji       = "emojiModifierInCharacterClass"
-	regional    = "regionalIndicatorInCharacterClass"
-	joiner      = "zeroWidthJoinerInCharacterClass"
+	withoutFlag = "surrogatePairWithoutUFlag"
+	escapedPair = "surrogatePair"
+	combining   = "combiningClass"
+	emoji       = "emojiModifier"
+	regional    = "regionalIndicatorSymbol"
+	joiner      = "zwj"
 )
 
 // The corpus is oxc's, copied rather than rewritten.
@@ -623,9 +623,10 @@ func TestNoMisleadingCharacterClassCoversOurOwnDecisions(t *testing.T) {
 			`var r = new someLibrary.RegExp("[Á]")`,
 		},
 		{
-			// A pattern argument that is not readable at lint time.
-			"a pattern held in a variable",
-			`const pattern = "[Á]"; var r = new RegExp(pattern)`,
+			// A pattern argument that is not readable at lint time. A constant binding is readable,
+			// as ESLint reads it, and reports at the argument; the table covers that.
+			"a pattern held in a parameter",
+			`function build(pattern: string) { return new RegExp(pattern) }`,
 		},
 		{
 			// A template with a substitution could be anything once it runs.

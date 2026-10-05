@@ -16,6 +16,11 @@ import (
 // than optional because `-trimpath` is a build-input change, not a link flag: turning it on
 // invalidated a fully warm 2.0 GB compile cache and cost 33s to repopulate. Flipping it per-run
 // would pay that repeatedly, so the flags are constant for every build this package performs.
+//
+// The builds share the Go cache every other `go` command on the machine uses rather than keeping one of
+// their own (#3kr3x59): the house sets GOFLAGS=-trimpath, so a member's `go build` and `go test` compile
+// the same packages the launcher does, and the launcher's builds reuse them. A private cache held 40 GB,
+// largely the same packages stored twice.
 var ReleaseBuildFlags = []string{"-trimpath", "-ldflags=-s -w"}
 
 // Paths locates the pieces of the cache relative to a module.
@@ -41,11 +46,6 @@ func DefaultPaths(moduleDirectory string) Paths {
 // BinaryDirectory holds the hash-named binaries.
 func (paths Paths) BinaryDirectory() string {
 	return filepath.Join(paths.CacheDirectory, "bin")
-}
-
-// GoCacheDirectory is the pinned GOCACHE.
-func (paths Paths) GoCacheDirectory() string {
-	return filepath.Join(paths.CacheDirectory, "gocache")
 }
 
 // BinaryPath is where the committed-tree binary with this hash lives.
@@ -159,17 +159,15 @@ func recordDevelopmentHash(paths Paths, hash string) error {
 	return nil
 }
 
-// build compiles the binary to binaryPath, with the cache pinned inside the module, stamped with the
-// formatter's identity as a committed build is, so a `--dev` run reads and keeps the same format record.
+// build compiles the binary to binaryPath, stamped with the formatter's identity as a committed build is, so
+// a `--dev` run reads and keeps the same format record. It builds through the Go cache every other `go`
+// command uses (see ReleaseBuildFlags).
 func build(paths Paths, packagePath string, binaryPath string, goVersion string) error {
 	if err := os.MkdirAll(paths.BinaryDirectory(), 0o755); err != nil {
 		return fmt.Errorf("creating the binary cache directory: %w", err)
 	}
-	if err := os.MkdirAll(paths.GoCacheDirectory(), 0o755); err != nil {
-		return fmt.Errorf("creating the Go build cache directory: %w", err)
-	}
 
-	formatter, err := FormatterIdentity(paths.ModuleDirectory, goVersion, []string{"GOCACHE=" + paths.GoCacheDirectory()})
+	formatter, err := FormatterIdentity(paths.ModuleDirectory, goVersion, nil)
 	if err != nil {
 		return err
 	}
@@ -192,9 +190,9 @@ func build(paths Paths, packagePath string, binaryPath string, goVersion string)
 	command := exec.Command("go", arguments...)
 	command.Dir = paths.ModuleDirectory
 	command.Env = append(os.Environ(),
-		"GOCACHE="+paths.GoCacheDirectory(),
 		// Nothing here needs cgo, and disabling it keeps the build from depending on a C toolchain
-		// that a fresh machine may not have.
+		// that a fresh machine may not have. It costs the shared cache little: only packages that use
+		// cgo compile differently, measured at 46 MB beside a plain build's 3.2 GB (#3kr3x59).
 		"CGO_ENABLED=0",
 	)
 	command.Stderr = os.Stderr
@@ -209,7 +207,5 @@ func build(paths Paths, packagePath string, binaryPath string, goVersion string)
 	if _, err := os.Stat(binaryPath); err != nil {
 		return fmt.Errorf("go build reported success but produced no binary at %s: %w", binaryPath, err)
 	}
-
-	boundGoCacheAfterBuild(paths)
 	return nil
 }

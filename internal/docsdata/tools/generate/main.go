@@ -116,8 +116,12 @@ func gather(scratch string, recapture bool) (docsdata.Inputs, error) {
 		return inputs, nil
 	}
 
+	// No -count=1, as no gate run passes it: Go keys a cached test result on the environment the test reads,
+	// and the harness reads COHERE_DOCS_CAPTURE, which names a fresh temporary directory every run. So each
+	// package that records misses the cache and reruns, and a package that never reads the variable records
+	// nothing and may stay cached.
 	captured := filepath.Join(scratch, "captured")
-	test := exec.Command("go", "test", "-count=1", capturedPackages)
+	test := exec.Command("go", "test", capturedPackages)
 	test.Env = append(os.Environ(), capture.Variable+"="+captured)
 	test.Stdout, test.Stderr = os.Stderr, os.Stderr
 	if err := test.Run(); err != nil {

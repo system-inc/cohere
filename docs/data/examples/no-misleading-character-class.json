@@ -9,7 +9,7 @@
                 "column": 3,
                 "endLine": 1,
                 "endColumn": 6,
-                "messageId": "combiningClassInCharacterClass",
+                "messageId": "combiningClass",
                 "message": "This character class holds a base character followed by a combining mark, which renders as one glyph and is two code points. The class matches the base or the mark separately, so `/[Á]/` accepts a bare `A` and accepts a stray accent, and rejects the accented letter it appears to name."
             }
         ]
@@ -19,12 +19,12 @@
         "source": "new RegExp()\n"
     },
     "assertedMessageIds": [
-        "combiningClassInCharacterClass",
-        "emojiModifierInCharacterClass",
-        "regionalIndicatorInCharacterClass",
-        "surrogatePairInCharacterClass",
-        "surrogatePairWithoutUnicodeFlagInCharacterClass",
-        "zeroWidthJoinerInCharacterClass"
+        "combiningClass",
+        "emojiModifier",
+        "regionalIndicatorSymbol",
+        "surrogatePair",
+        "surrogatePairWithoutUFlag",
+        "zwj"
     ],
     "assertsSuggestion": true
 }

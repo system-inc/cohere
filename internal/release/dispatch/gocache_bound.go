@@ -11,16 +11,9 @@ import (
 	"github.com/system-inc/cohere/internal/release/gocache"
 )
 
-// goCacheCap is the size the launcher's private Go build cache may reach before it is trimmed.
-//
-// Go trims its cache only of entries unused for five days, and nothing else bounds it. This one takes a
-// build from every commit and every `--dev` run of every member, and on 2026-10-03 it reached 310 GB and
-// filled the disk (#bdw0dhn). A cold build of cohere and its compiler fills a few GB, so the cap holds
-// several builds' worth. A variable so a test can cross it with a small file.
-var goCacheCap int64 = 32 << 30
-
 // defaultGoCacheCap is the size the default Go build cache, the one every plain `go build`, `go test` and
-// `go vet` uses, may reach before the launcher trims it (#3sgjy0h).
+// `go vet` uses, and the launcher's own builds too since #3kr3x59, may reach before the launcher trims it
+// (#3sgjy0h).
 //
 // Developing cohere fills it far faster than Go's five days. On 2026-10-03 the org filled it at about 25 GB
 // an hour, 223 GB in nine hours, when one cold `go test ./...` added 29 GB, 15 of them cohere
@@ -43,12 +36,8 @@ type GoCacheBound struct {
 	Trimmed  gocache.Trimmed
 }
 
-// goCacheCheckedPath is the file whose modification time says when the launcher's cache was last measured.
-func (paths Paths) goCacheCheckedPath() string {
-	return filepath.Join(paths.CacheDirectory, "gocache.checked")
-}
-
-// defaultGoCacheCheckedPath is the same for the default cache.
+// defaultGoCacheCheckedPath is the file whose modification time says when the default cache was last
+// measured.
 func (paths Paths) defaultGoCacheCheckedPath() string {
 	return filepath.Join(paths.CacheDirectory, "default-gocache.checked")
 }
@@ -66,17 +55,6 @@ func claimCheck(stampPath string, now time.Time) (bool, error) {
 		return false, fmt.Errorf("stamping the Go cache check: %w", err)
 	}
 	return true, nil
-}
-
-// BoundGoCache trims the launcher's Go build cache of its least recently used entries once it is larger
-// than goCacheCap, at most once per interval, and logs what it did in the prune log. It runs after each
-// build, the only time that cache grows.
-func BoundGoCache(paths Paths, now time.Time) (GoCacheBound, error) {
-	due, err := claimCheck(paths.goCacheCheckedPath(), now)
-	if err != nil || !due {
-		return GoCacheBound{}, err
-	}
-	return trimAndLog(paths, paths.GoCacheDirectory(), goCacheCap, now)
 }
 
 // ClaimDefaultGoCacheCheck reports whether the default cache is due a look, at most once per interval,
@@ -129,19 +107,4 @@ func trimAndLog(paths Paths, directory string, capBytes int64, now time.Time) (G
 		now.Format(time.RFC3339), directory, trimmed.Before, trimmed.After, capBytes,
 		trimmed.Removed, trimmed.InUse, gocache.InUseWindow)
 	return bound, err
-}
-
-// boundGoCacheAfterBuild runs BoundGoCache, noting what it trimmed for --verbose and saying why it could
-// not. It never fails the build that called it: the binary is already built, and a cache over its cap is
-// trimmed by the next build that can.
-func boundGoCacheAfterBuild(paths Paths) {
-	bound, err := BoundGoCache(paths, time.Now())
-	if err != nil {
-		Report.Fail("cohere: the Go build cache was not bounded: %v", err)
-		return
-	}
-	if bound.Trimmed.Removed > 0 {
-		Report.Note("cohere: trimmed the launcher's Go build cache from %.1f GiB to %.1f GiB, over its %d GiB cap",
-			float64(bound.Trimmed.Before)/(1<<30), float64(bound.Trimmed.After)/(1<<30), goCacheCap>>30)
-	}
 }

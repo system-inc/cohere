@@ -198,14 +198,10 @@ func main() {
 	gitCommand(t, superproject, "add", "go.mod", "go.work", "rules", "internal", "command")
 	gitCommand(t, superproject, "commit", "-q", "-m", "first")
 
+	// The builds use the toolchain's own Go cache, as the launcher's do, so the fixture does not compile
+	// the standard library cold for every test.
 	cache := filepath.Join(root, "cache")
-	// The Go build cache is shared with the toolchain's own, so the fixture does not compile the
-	// standard library cold for every test. It is content-addressed, so sharing it changes nothing.
-	goCache := strings.TrimSpace(goEnvironmentValue(t, "GOCACHE"))
 	if err := os.MkdirAll(cache, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(goCache, filepath.Join(cache, "gocache")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -241,15 +237,6 @@ func gitCommand(t *testing.T, directory string, arguments ...string) string {
 	return string(output)
 }
 
-func goEnvironmentValue(t *testing.T, name string) string {
-	t.Helper()
-	output, err := exec.Command("go", "env", name).Output()
-	if err != nil {
-		t.Fatalf("go env %s: %v", name, err)
-	}
-	return string(output)
-}
-
 func run(t *testing.T, binary string, arguments ...string) string {
 	t.Helper()
 	output, err := exec.Command(binary, arguments...).CombinedOutput()
@@ -257,4 +244,23 @@ func run(t *testing.T, binary string, arguments ...string) string {
 		t.Fatalf("running %s: %v\n%s", binary, err, output)
 	}
 	return string(output)
+}
+
+// A launcher build compiles through the Go cache the caller's own `go` commands use, the one cache on the
+// machine, and keeps none of its own (#3kr3x59). The caller's cache here is the test's, empty before the
+// build, so its filling is the build's.
+func TestALaunchedBuildUsesTheCallersGoCache(t *testing.T) {
+	fixture := newCommittedFixture(t)
+	shared := t.TempDir()
+	t.Setenv("GOCACHE", shared)
+	if _, _, built, err := ResolveCommitted(fixture.paths, "./command/cohere"); err != nil || !built {
+		t.Fatalf("building: built=%v, %v", built, err)
+	}
+	entries, err := os.ReadDir(shared)
+	if err != nil || len(entries) < 2 {
+		t.Fatalf("the caller's Go cache holds %d entries after a build, so the build compiled somewhere else: %v", len(entries), err)
+	}
+	if _, err := os.Stat(filepath.Join(fixture.paths.CacheDirectory, "gocache")); !os.IsNotExist(err) {
+		t.Fatalf("the launcher made a Go cache of its own: %v", err)
+	}
 }

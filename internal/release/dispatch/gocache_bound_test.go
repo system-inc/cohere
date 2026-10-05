@@ -8,62 +8,6 @@ import (
 	"time"
 )
 
-// The launcher's Go build cache is trimmed of its least recently used entries once it is over its cap,
-// measured at most once per interval, and left alone under it (#bdw0dhn, where it reached 310 GB and filled
-// the disk). The cache here is a directory in Go's layout, README included, with a cap small enough to
-// cross with one entry.
-func TestTheGoCacheIsTrimmedOverItsCapAndKeptUnderIt(t *testing.T) {
-	previous := goCacheCap
-	goCacheCap = 1 << 20
-	t.Cleanup(func() { goCacheCap = previous })
-
-	paths := Paths{ModuleDirectory: t.TempDir(), CacheDirectory: t.TempDir()}
-	writeFile(t, filepath.Join(paths.GoCacheDirectory(), "README"),
-		"This directory holds cached build artifacts from the Go build system.\n")
-	now := time.Now()
-	entry := func(name string, bytes int, used time.Time) string {
-		t.Helper()
-		path := filepath.Join(paths.GoCacheDirectory(), "ab", name)
-		writeFile(t, path, strings.Repeat("x", bytes))
-		if err := os.Chtimes(path, used, used); err != nil {
-			t.Fatal(err)
-		}
-		return path
-	}
-
-	recent := entry("00000000000000000000000000000000000000000000000000000000000000ab-d", 1024, now)
-	bound, err := BoundGoCache(paths, now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bound.Measured || bound.Trimmed.Removed != 0 {
-		t.Fatalf("a cache under its cap: %+v", bound)
-	}
-
-	old := entry("11111111111111111111111111111111111111111111111111111111111111ab-d", 2<<20, now.Add(-24*time.Hour))
-	if bound, err := BoundGoCache(paths, now.Add(time.Minute)); err != nil || bound.Measured {
-		t.Fatalf("measured again within the interval: %+v, %v", bound, err)
-	}
-
-	bound, err = BoundGoCache(paths, now.Add(goCacheCheckInterval+time.Minute))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bound.Measured || bound.Trimmed.Removed != 1 || bound.Trimmed.After > goCacheCap {
-		t.Fatalf("a cache over its cap: %+v", bound)
-	}
-	if _, err := os.Stat(old); !os.IsNotExist(err) {
-		t.Fatalf("the entry unused for a day survived the trim: %v", err)
-	}
-	if _, err := os.Stat(recent); err != nil {
-		t.Fatalf("the entry used just now was trimmed: %v", err)
-	}
-	log, err := os.ReadFile(paths.PruneLogPath())
-	if err != nil || !strings.Contains(string(log), "trimmed the Go build cache at "+paths.GoCacheDirectory()) {
-		t.Fatalf("the prune log does not say the cache was trimmed: %q, %v", log, err)
-	}
-}
-
 // The default cache is the one the caller's own `go` commands use, as the go command names it, and it is
 // trimmed to its own cap and claimed at most once per interval (#3sgjy0h). Positive control: an entry over
 // the cap and unused for a day is removed, from the directory `GOCACHE` names.
