@@ -68,9 +68,14 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(t *testing.T) {
 	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
 		t.Fatalf("building: %v\n%s", err, output)
 	}
-	// A go that takes two seconds to test anything, on the front of the path.
+	// A go that takes two seconds to test anything, on the front of the path. It leaves a mark as it starts,
+	// which only a run holding the slot reaches, so the second run starts once the first holds it. A fixed
+	// stagger instead lost the race under the house's load, where the second run's process could start
+	// first and take the slot.
 	bin := t.TempDir()
-	if err := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\nsleep 2\necho tested \"$@\"\n"), 0o755); err != nil {
+	started := filepath.Join(bin, "started")
+	script := "#!/bin/sh\ntouch '" + started + "'\nsleep 2\necho tested \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(bin, "go"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	home := t.TempDir()
@@ -84,7 +89,7 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(t *testing.T) {
 		return string(output), err
 	}
 
-	started := time.Now()
+	began := time.Now()
 	outputs := make([]string, 2)
 	var group sync.WaitGroup
 	for index := range outputs {
@@ -92,7 +97,13 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(t *testing.T) {
 		go func() {
 			defer group.Done()
 			if index == 1 {
-				time.Sleep(300 * time.Millisecond)
+				for _, err := os.Stat(started); err != nil; _, err = os.Stat(started) {
+					if time.Since(began) > time.Minute {
+						t.Errorf("the first run never started testing")
+						return
+					}
+					time.Sleep(10 * time.Millisecond)
+				}
 			}
 			output, err := run("./...")
 			if err != nil {
@@ -102,7 +113,7 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(t *testing.T) {
 		}()
 	}
 	group.Wait()
-	if elapsed := time.Since(started); elapsed < 4*time.Second {
+	if elapsed := time.Since(began); elapsed < 4*time.Second {
 		t.Errorf("two runs on one slot finished in %s, so they overlapped", elapsed)
 	}
 	if !strings.Contains(outputs[1], "waiting for a test slot") || !strings.Contains(outputs[1], "go test ./...") ||
