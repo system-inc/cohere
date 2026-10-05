@@ -176,8 +176,15 @@ func slotCount() (int, error) {
 
 // goTest runs go test with the caller's terminal and returns its exit code.
 func goTest(arguments []string) int {
+	environment, uncovered, err := testEnvironment()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+		return 2
+	}
 	command := exec.Command("go", append([]string{"test"}, arguments...)...)
+	command.Env = environment
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
+	defer printUncovered(os.Stderr, uncovered)
 	if err := command.Run(); err != nil {
 		if exited, ok := err.(*exec.ExitError); ok {
 			return exited.ExitCode()

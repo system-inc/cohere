@@ -144,7 +144,7 @@ func TestCompilerUpstreamNormalizesBothUrlShapes(t *testing.T) {
 	// local path both reach this function on a real machine, and neither should degrade.
 	for url, expected := range map[string]string{
 		"ssh://git@github.com/microsoft/TypeScript.git": "microsoft/TypeScript",
-		"/Users/someone/local/prettier":                 "local/prettier",
+		"/Users/someone/local/prettier":                 "local/prettier", // Not a machine path: a local path NormalizeUpstream trims, read by no test.
 	} {
 		if got := NormalizeUpstream(url); got != expected {
 			t.Errorf("%s normalized to %q, wanted %q", url, got, expected)

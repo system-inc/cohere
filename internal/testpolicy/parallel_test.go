@@ -2,8 +2,6 @@ package testpolicy
 
 import (
 	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -56,52 +54,12 @@ func TestSerialTestsFindsAPlantedSerialTest(t *testing.T) {
 // t.Parallel(), or the comment above it says why it cannot (#nxgt2ca).
 func TestEveryCohereTestRunsInParallel(t *testing.T) {
 	t.Parallel()
-	root, err := filepath.Abs(filepath.Join("..", ".."))
-	if err != nil {
-		t.Fatal(err)
-	}
 	var violations []Violation
-	files := 0
-	err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkError error) error {
-		if walkError != nil {
-			return walkError
-		}
-		if entry.IsDir() {
-			switch entry.Name() {
-			case "TypeScript", "testdata", "node_modules", ".cache", ".git", ".build":
-				return filepath.SkipDir
-			}
-			// A directory with a go.mod of its own is another module (the TypeScript shims), which this
-			// module's go test ./... never runs, so its tests are not this rule's to hold.
-			if path != root {
-				if _, err := os.Stat(filepath.Join(path, "go.mod")); err == nil {
-					return filepath.SkipDir
-				}
-			}
-			return nil
-		}
-		if !strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		source, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
+	root, files := eachTestFile(t, func(path string, source []byte) error {
 		found, err := SerialTests(path, source)
-		if err != nil {
-			return err
-		}
-		files++
 		violations = append(violations, found...)
-		return nil
+		return err
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// The control: a walk that read nothing would pass.
-	if files < 100 {
-		t.Fatalf("read only %d test files under %s", files, root)
-	}
 	if len(violations) == 0 {
 		return
 	}

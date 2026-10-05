@@ -122,8 +122,13 @@ func fastTest(arguments []string) int {
 	}
 	sort.Strings(selected)
 
+	environment, uncovered, err := testEnvironment()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+		return 2
+	}
 	command := exec.Command("go", append(append([]string{"test"}, arguments...), selected...)...)
-	command.Env = append(os.Environ(), fastTierVariable+"=1")
+	command.Env = append(environment, fastTierVariable+"=1")
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
 	code := 0
 	if err := command.Run(); err != nil {
@@ -143,6 +148,7 @@ func fastTest(arguments []string) int {
 		}
 		fmt.Fprintf(os.Stderr, "  %s (%.1fs alone): %s\n", what, entry.wallSeconds, entry.reason)
 	}
+	printUncovered(os.Stderr, uncovered)
 	fmt.Fprintln(os.Stderr, "fast tier: not the landing gate. Run cohere-dev test ./... through the lock before landing on main.")
 	return code
 }
