@@ -282,6 +282,10 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 		destructuredArrayIgnore, _ = regexp.Compile(settings.DestructuredArrayIgnorePattern)
 	}
 
+	// The bindings reported unused so far, in report order, which an import's removal reads. See
+	// importRemoval.
+	reportedUnused := map[*ast.Node]bool{}
+
 	for _, candidate := range candidates {
 		// The gates before the exemptions run in upstream's order, collectUnusedVariables', because
 		// reportUsedIgnorePattern makes the order visible: a name an earlier gate sets aside is never
@@ -347,15 +351,30 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 			)
 			continue
 		}
-		ctx.ReportNode(
-			unusedBindingReportNode(candidate, candidateWrites),
-			noUnusedVarsMessage(
-				name,
-				len(candidateWrites) != 0 || declaringNameIsInitialized(candidate.name),
-				nameMatchesIgnorePattern("_"+name, candidate.kind, settings) ||
-					(arrayElement && destructuredArrayIgnore.MatchString("_"+name)),
-			),
+		reportNode := unusedBindingReportNode(candidate, candidateWrites)
+		message := noUnusedVarsMessage(
+			name,
+			len(candidateWrites) != 0 || declaringNameIsInitialized(candidate.name),
+			nameMatchesIgnorePattern("_"+name, candidate.kind, settings) ||
+				(arrayElement && destructuredArrayIgnore.MatchString("_"+name)),
 		)
+		// Marked before the removal is computed, as upstream's report does: the removal asks whether
+		// every binding of the declaration has been reported yet, this one included.
+		reportedUnused[candidate.name] = true
+		if candidate.kind == bindingImport {
+			if removal, removalId, removable := importRemoval(ctx, candidate, symbol, reportedUnused); removable {
+				if settings.EnableAutofixRemoval.Imports {
+					ctx.ReportNodeWithFixes(reportNode, message, removal)
+				} else {
+					ctx.ReportNodeWithSuggestions(reportNode, message, rule.Suggestion{
+						Message: noUnusedVarsRemovalMessage(removalId, name),
+						Fixes:   []rule.Fix{removal},
+					})
+				}
+				continue
+			}
+		}
+		ctx.ReportNode(reportNode, message)
 	}
 }
 
@@ -808,12 +827,49 @@ func resolveIdentifierSymbols(ctx rule.Context, identifier *ast.Node) []*ast.Sym
 
 	if identifier.Parent != nil && identifier.Parent.Kind == ast.KindExportSpecifier &&
 		symbol.Flags&ast.SymbolFlagsAlias != 0 {
-		if aliased := ctx.TypeChecker.GetAliasedSymbol(symbol); aliased != nil && aliased != symbol {
-			return []*ast.Symbol{symbol, aliased}
+		symbols := []*ast.Symbol{symbol}
+		if aliased := resolvedAlias(ctx, symbol); aliased != nil && aliased != symbol {
+			symbols = append(symbols, aliased)
 		}
+		// The local binding the specifier names, looked up in its own scope without following the alias:
+		// `import { a } from 'missing'; export { a }` reads the import even when its module does not
+		// resolve and resolvedAlias has nothing to give.
+		if local := exportedLocalBinding(ctx, identifier); local != nil && !slices.Contains(symbols, local) {
+			symbols = append(symbols, local)
+		}
+		return symbols
 	}
 
 	return []*ast.Symbol{symbol}
+}
+
+// exportedLocalBinding is the binding in this file an `export { name }` with no module specifier names,
+// or nil for a re-export from another module, whose names are that module's.
+func exportedLocalBinding(ctx rule.Context, identifier *ast.Node) *ast.Symbol {
+	exportDeclaration := identifier.Parent.Parent.Parent
+	if exportDeclaration == nil || exportDeclaration.Kind != ast.KindExportDeclaration ||
+		exportDeclaration.AsExportDeclaration().ModuleSpecifier != nil {
+		return nil
+	}
+	return ctx.TypeChecker.ResolveName(identifier.Text(), identifier,
+		ast.SymbolFlagsValue|ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias, false)
+}
+
+// resolvedAlias is the declaration an import or export alias reaches, or nil when it reaches none.
+//
+// An alias whose module does not resolve resolves to the checker's one shared unknown symbol. Followed
+// as if it were a binding, every unresolved import in a file looks like the same symbol, so one
+// `export { Used }` of an unresolved import marked every other unresolved import as read, and
+// `import { Unused, Used } from 'missing'; export { Used }` reported nothing (#e1zk9s0, found by
+// typescript-eslint's fixer rows, which import from a module that does not exist). Asked through
+// IsUnknownSymbol rather than by reading the symbol's declarations, which would be a read of an
+// imported declaration and cost the rule its Shapes claim.
+func resolvedAlias(ctx rule.Context, symbol *ast.Symbol) *ast.Symbol {
+	aliased := ctx.TypeChecker.GetAliasedSymbol(symbol)
+	if aliased == nil || ctx.TypeChecker.IsUnknownSymbol(aliased) {
+		return nil
+	}
+	return aliased
 }
 
 // collectCandidateBindings gathers every binding this rule may judge in one file.
@@ -1191,7 +1247,7 @@ func isUsedBinding(ctx rule.Context, candidate candidateBinding, symbol *ast.Sym
 	// symbol it aliases lives in another file that this rule never reads.
 	if symbol.Flags&ast.SymbolFlagsAlias != 0 &&
 		candidate.declaration.Kind != ast.KindImportEqualsDeclaration {
-		if aliased := ctx.TypeChecker.GetAliasedSymbol(symbol); aliased != nil && reads[aliased] {
+		if aliased := resolvedAlias(ctx, symbol); aliased != nil && reads[aliased] {
 			return true
 		}
 	}
@@ -2239,8 +2295,9 @@ func nameMatchesIgnorePattern(name string, kind unusedBindingKind, settings NoUn
 // TestEveryOptionFieldARuleDecodesIsRead now fails on a field like that.
 //
 // `ignoreClassWithStaticInitBlock`, `ignoreUsingDeclarations` and `reportUsedIgnorePattern` are
-// typescript-eslint 8.71's and ESLint 10.8.1's core schema's too, ported against upstream's rows
-// (#e1zk9s0). Each defaults false, the zero value.
+// typescript-eslint 8.71's and ESLint 10.8.1's core schema's too, and `enableAutofixRemoval` is
+// typescript-eslint's alone, all ported against upstream's rows (#e1zk9s0). Each defaults to false,
+// the zero value.
 type NoUnusedVarsOptions struct {
 	// Vars is `all` or `local`. Default `all`. `local` skips a binding in the global scope, which
 	// only a script has; see isGlobalScopeBinding.
@@ -2275,6 +2332,16 @@ type NoUnusedVarsOptions struct {
 	// ReportUsedIgnorePattern reports `usedIgnoredVar` on a name an ignore pattern sets aside that is
 	// used, so the pattern cannot hide a name that lies about itself. See reportUsedIgnoredName.
 	ReportUsedIgnorePattern bool `json:"reportUsedIgnorePattern"`
+	// EnableAutofixRemoval is typescript-eslint's alone (core ESLint has no fixer here). Its one key,
+	// imports, makes the removal of an unused import a fix the edit engine applies; off, the default,
+	// the same removal is offered as a suggestion. See importRemoval.
+	EnableAutofixRemoval NoUnusedVarsAutofixRemoval `json:"enableAutofixRemoval"`
+}
+
+// NoUnusedVarsAutofixRemoval is enableAutofixRemoval's object. Decoded strictly like the rest, so a key
+// upstream's schema does not name is refused.
+type NoUnusedVarsAutofixRemoval struct {
+	Imports bool `json:"imports"`
 }
 
 // noUnusedVarsOptionFields is NoUnusedVarsOptions without its UnmarshalJSON, the shape the object

@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/tokens"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -70,13 +71,6 @@ func classifyConsistentTypeImportsSpecifiers(statement *ast.Node) consistentType
 	return classified
 }
 
-// consistentTypeImportsToken is one token of the declaration, comments and whitespace excluded.
-type consistentTypeImportsToken struct {
-	kind  ast.Kind
-	start int
-	end   int
-}
-
 // consistentTypeImportsFixer holds what every primitive edit is computed against.
 type consistentTypeImportsFixer struct {
 	sourceFile *ast.SourceFile
@@ -84,7 +78,7 @@ type consistentTypeImportsFixer struct {
 	statement  *ast.Node
 	start      int
 	end        int
-	tokens     []consistentTypeImportsToken
+	tokens     tokens.List
 	edits      []consistentTypeImportsEdit
 }
 
@@ -103,15 +97,7 @@ func newConsistentTypeImportsFixer(sourceFile *ast.SourceFile, statement *ast.No
 		statement:  statement,
 		start:      statementRange.Pos(),
 		end:        statementRange.End(),
-	}
-	tokenScanner := scanner.GetScannerForSourceFile(sourceFile, fixer.start)
-	for tokenScanner.Token() != ast.KindEndOfFile && tokenScanner.TokenStart() < fixer.end {
-		fixer.tokens = append(fixer.tokens, consistentTypeImportsToken{
-			kind:  tokenScanner.Token(),
-			start: tokenScanner.TokenStart(),
-			end:   tokenScanner.TokenEnd(),
-		})
-		tokenScanner.Scan()
+		tokens:     tokens.Of(sourceFile, statement),
 	}
 	return fixer
 }
@@ -125,36 +111,6 @@ func (fixer *consistentTypeImportsFixer) nodeRange(node *ast.Node) (int, int) {
 func (fixer *consistentTypeImportsFixer) nodeText(node *ast.Node) string {
 	start, end := fixer.nodeRange(node)
 	return fixer.text[start:end]
-}
-
-// tokenBefore is upstream's `getTokenBefore`: the last token ending at or before position.
-func (fixer *consistentTypeImportsFixer) tokenBefore(position int) (consistentTypeImportsToken, bool) {
-	for index := len(fixer.tokens) - 1; index >= 0; index-- {
-		if fixer.tokens[index].end <= position {
-			return fixer.tokens[index], true
-		}
-	}
-	return consistentTypeImportsToken{}, false
-}
-
-// tokenAfter is upstream's `getTokenAfter`: the first token starting at or after position.
-func (fixer *consistentTypeImportsFixer) tokenAfter(position int) (consistentTypeImportsToken, bool) {
-	for _, token := range fixer.tokens {
-		if token.start >= position {
-			return token, true
-		}
-	}
-	return consistentTypeImportsToken{}, false
-}
-
-// firstTokenBetween is upstream's `getFirstTokenBetween` for a token kind.
-func (fixer *consistentTypeImportsFixer) firstTokenBetween(from int, to int, kind ast.Kind) (consistentTypeImportsToken, bool) {
-	for _, token := range fixer.tokens {
-		if token.start >= from && token.end <= to && token.kind == kind {
-			return token, true
-		}
-	}
-	return consistentTypeImportsToken{}, false
 }
 
 // nextTokenOrComment is upstream's `getTokenAfter(..., { includeComments: true })`, as a position.
@@ -175,9 +131,9 @@ func (fixer *consistentTypeImportsFixer) replaceRange(start int, end int, text s
 }
 
 // importToken is the declaration's `import` keyword, which is its first token.
-func (fixer *consistentTypeImportsFixer) importToken() (consistentTypeImportsToken, bool) {
-	if len(fixer.tokens) == 0 || fixer.tokens[0].kind != ast.KindImportKeyword {
-		return consistentTypeImportsToken{}, false
+func (fixer *consistentTypeImportsFixer) importToken() (tokens.Token, bool) {
+	if len(fixer.tokens) == 0 || fixer.tokens[0].Kind != ast.KindImportKeyword {
+		return tokens.Token{}, false
 	}
 	return fixer.tokens[0], true
 }
@@ -328,11 +284,11 @@ func (fixer *consistentTypeImportsFixer) toTypeImportDeclaration(
 	if specifiers.namespaceSpecifier != nil && typeSpecifiers[specifiers.namespaceSpecifier] {
 		// import Def, * as Ns from 'foo'
 		namespaceStart, namespaceEnd := fixer.nodeRange(specifiers.namespaceSpecifier)
-		comma, found := fixer.tokenBefore(namespaceStart)
-		if !found || comma.kind != ast.KindCommaToken {
+		comma, found := fixer.tokens.Before(namespaceStart)
+		if !found || comma.Kind != ast.KindCommaToken {
 			return false
 		}
-		namespaceRemoval = &consistentTypeImportsEdit{start: comma.start, end: namespaceEnd}
+		namespaceRemoval = &consistentTypeImportsEdit{start: comma.Start, end: namespaceEnd}
 		fixer.insertBefore(fixer.start, "import type "+fixer.nodeText(specifiers.namespaceSpecifier)+
 			" from "+fixer.sourceText()+";\n")
 	}
@@ -341,16 +297,16 @@ func (fixer *consistentTypeImportsFixer) toTypeImportDeclaration(
 		if len(typeSpecifiers) == specifiers.total {
 			// import type Type from 'foo'
 			importToken, _ := fixer.importToken()
-			fixer.insertBefore(importToken.end, " type")
+			fixer.insertBefore(importToken.End, " type")
 		} else {
 			defaultStart, defaultEnd := fixer.nodeRange(specifiers.defaultSpecifier)
-			comma, found := fixer.tokenAfter(defaultEnd)
-			if !found || comma.kind != ast.KindCommaToken {
+			comma, found := fixer.tokens.After(defaultEnd)
+			if !found || comma.Kind != ast.KindCommaToken {
 				return false
 			}
-			defaultText := strings.TrimSpace(fixer.text[defaultStart:comma.start])
+			defaultText := strings.TrimSpace(fixer.text[defaultStart:comma.Start])
 			fixer.insertBefore(fixer.start, "import type "+defaultText+" from "+fixer.sourceText()+";\n")
-			fixer.removeRange(defaultStart, fixer.nextTokenOrComment(comma.end))
+			fixer.removeRange(defaultStart, fixer.nextTokenOrComment(comma.End))
 		}
 	}
 
@@ -373,20 +329,20 @@ func (fixer *consistentTypeImportsFixer) namedSpecifierFixes(
 	if len(subset) == len(all) {
 		// import DefType, {...} from 'foo'
 		firstStart, _ := fixer.nodeRange(subset[0])
-		openingBrace, found := fixer.tokenBefore(firstStart)
-		if !found || openingBrace.kind != ast.KindOpenBraceToken {
+		openingBrace, found := fixer.tokens.Before(firstStart)
+		if !found || openingBrace.Kind != ast.KindOpenBraceToken {
 			return "", nil, false
 		}
-		comma, found := fixer.tokenBefore(openingBrace.start)
-		if !found || comma.kind != ast.KindCommaToken {
+		comma, found := fixer.tokens.Before(openingBrace.Start)
+		if !found || comma.Kind != ast.KindCommaToken {
 			return "", nil, false
 		}
-		closingBrace, found := fixer.firstTokenBetween(openingBrace.end, fixer.end, ast.KindCloseBraceToken)
+		closingBrace, found := fixer.tokens.FirstBetween(openingBrace.End, fixer.end, ast.KindCloseBraceToken)
 		if !found {
 			return "", nil, false
 		}
-		return fixer.text[openingBrace.end:closingBrace.start],
-			[]consistentTypeImportsEdit{{start: comma.start, end: closingBrace.end}}, true
+		return fixer.text[openingBrace.End:closingBrace.Start],
+			[]consistentTypeImportsEdit{{start: comma.Start, end: closingBrace.End}}, true
 	}
 
 	groups := [][]*ast.Node{}
@@ -412,25 +368,25 @@ func (fixer *consistentTypeImportsFixer) namedSpecifierFixes(
 	for _, group := range groups {
 		removeStart, _ := fixer.nodeRange(group[0])
 		_, removeEnd := fixer.nodeRange(group[len(group)-1])
-		before, found := fixer.tokenBefore(removeStart)
+		before, found := fixer.tokens.Before(removeStart)
 		if !found {
 			return "", nil, false
 		}
-		textStart := before.end
-		if before.kind == ast.KindCommaToken {
-			removeStart = before.start
+		textStart := before.End
+		if before.Kind == ast.KindCommaToken {
+			removeStart = before.Start
 		} else {
-			removeStart = before.end
+			removeStart = before.End
 		}
-		after, found := fixer.tokenAfter(removeEnd)
+		after, found := fixer.tokens.After(removeEnd)
 		if !found {
 			return "", nil, false
 		}
-		textEnd := after.start
+		textEnd := after.Start
 		isFirst := all[0] == group[0]
 		isLast := all[len(all)-1] == group[len(group)-1]
-		if (isFirst || isLast) && after.kind == ast.KindCommaToken {
-			removeEnd = after.end
+		if (isFirst || isLast) && after.Kind == ast.KindCommaToken {
+			removeEnd = after.End
 		}
 		texts = append(texts, fixer.text[textStart:textEnd])
 		removals = append(removals, consistentTypeImportsEdit{start: removeStart, end: removeEnd})
@@ -459,24 +415,24 @@ func (fixer *consistentTypeImportsFixer) insertTypeKeywordInNamedSpecifierList(
 // so the result is never `import type { type T }`.
 func (fixer *consistentTypeImportsFixer) insertTypeSpecifierForImportDeclaration(isDefaultImport bool) bool {
 	importToken, _ := fixer.importToken()
-	fixer.insertBefore(importToken.end, " type")
+	fixer.insertBefore(importToken.End, " type")
 
 	moduleStart, _ := fixer.nodeRange(fixer.statement.AsImportDeclaration().ModuleSpecifier)
 	if isDefaultImport {
-		if openingBrace, found := fixer.firstTokenBetween(importToken.end, moduleStart, ast.KindOpenBraceToken); found {
+		if openingBrace, found := fixer.tokens.FirstBetween(importToken.End, moduleStart, ast.KindOpenBraceToken); found {
 			// import Foo, {} from 'foo'
-			comma, found := fixer.tokenBefore(openingBrace.start)
-			if !found || comma.kind != ast.KindCommaToken {
+			comma, found := fixer.tokens.Before(openingBrace.Start)
+			if !found || comma.Kind != ast.KindCommaToken {
 				return false
 			}
-			closingBrace, found := fixer.firstTokenBetween(openingBrace.end, moduleStart, ast.KindCloseBraceToken)
+			closingBrace, found := fixer.tokens.FirstBetween(openingBrace.End, moduleStart, ast.KindCloseBraceToken)
 			if !found {
 				return false
 			}
-			fixer.removeRange(comma.start, closingBrace.end)
+			fixer.removeRange(comma.Start, closingBrace.End)
 			specifiers := classifyConsistentTypeImportsSpecifiers(fixer.statement)
 			if specifiers.total > 1 {
-				fixer.insertBefore(fixer.end, "\nimport type"+fixer.text[comma.end:closingBrace.end]+
+				fixer.insertBefore(fixer.end, "\nimport type"+fixer.text[comma.End:closingBrace.End]+
 					" from "+fixer.sourceText()+";")
 			}
 		}
@@ -493,11 +449,11 @@ func (fixer *consistentTypeImportsFixer) insertTypeSpecifierForImportDeclaration
 // removeTypeKeywordOfSpecifier is upstream's `fixRemoveTypeSpecifierFromImportSpecifier`.
 func (fixer *consistentTypeImportsFixer) removeTypeKeywordOfSpecifier(specifier *ast.Node) {
 	start, end := fixer.nodeRange(specifier)
-	typeToken, found := fixer.firstTokenBetween(start, end, ast.KindTypeKeyword)
+	typeToken, found := fixer.tokens.FirstBetween(start, end, ast.KindTypeKeyword)
 	if !found {
 		return
 	}
-	fixer.removeRange(typeToken.start, fixer.nextTokenOrComment(typeToken.end))
+	fixer.removeRange(typeToken.Start, fixer.nextTokenOrComment(typeToken.End))
 }
 
 // consistentTypeImportsRemoveTypeFix is upstream's repair under `prefer: no-type-imports`: drop the
@@ -513,10 +469,10 @@ func consistentTypeImportsRemoveTypeFix(sourceFile *ast.SourceFile, statement *a
 	}
 	// import type Foo from 'foo'
 	//        ^^^^ remove
-	if len(fixer.tokens) < 2 || fixer.tokens[1].kind != ast.KindTypeKeyword {
+	if len(fixer.tokens) < 2 || fixer.tokens[1].Kind != ast.KindTypeKeyword {
 		return rule.Fix{}, false
 	}
 	typeToken := fixer.tokens[1]
-	fixer.removeRange(typeToken.start, fixer.nextTokenOrComment(typeToken.end))
+	fixer.removeRange(typeToken.Start, fixer.nextTokenOrComment(typeToken.End))
 	return fixer.compose()
 }
