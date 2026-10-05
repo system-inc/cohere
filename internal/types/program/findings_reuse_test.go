@@ -78,14 +78,14 @@ func TestAReplayingWalkReportsWhatAPlainWalkReports(t *testing.T) {
 		t.Fatalf("plain walk: %v", err)
 	}
 
-	recording := program.NewFindingsReuse(key, nil)
+	recording := program.NewFindingsReuse(key, nil, program.PathAnchor{})
 	graph.FindingsReuse = recording
 	if _, err := graph.Walk(ctx, files, rules); err != nil {
 		t.Fatalf("recording walk: %v", err)
 	}
 	recorded := recording.Recorded()
 
-	graph.FindingsReuse = program.NewFindingsReuse(key, recorded)
+	graph.FindingsReuse = program.NewFindingsReuse(key, recorded, program.PathAnchor{})
 	replayed, err := graph.Walk(ctx, files, rules)
 	if err != nil {
 		t.Fatalf("replaying walk: %v", err)
@@ -146,7 +146,7 @@ func TestAnEditedFileIsWalkedNotReplayed(t *testing.T) {
 	key := program.HashRuleSet([]string{"fixture"})
 
 	first := build()
-	recording := program.NewFindingsReuse(key, nil)
+	recording := program.NewFindingsReuse(key, nil, program.PathAnchor{})
 	first.FindingsReuse = recording
 	before, err := first.Walk(ctx, first.ProjectFiles(), rules)
 	if err != nil {
@@ -161,7 +161,7 @@ func TestAnEditedFileIsWalkedNotReplayed(t *testing.T) {
 		t.Fatal(err)
 	}
 	second := build()
-	second.FindingsReuse = program.NewFindingsReuse(key, recording.Recorded())
+	second.FindingsReuse = program.NewFindingsReuse(key, recording.Recorded(), program.PathAnchor{})
 	after, err := second.Walk(ctx, second.ProjectFiles(), rules)
 	if err != nil {
 		t.Fatal(err)
@@ -184,7 +184,7 @@ func TestAFindingsCacheUnderAnotherKeyServesNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	rules := findingsReuseRules(t)
-	recording := program.NewFindingsReuse(program.HashRuleSet([]string{"old"}), nil)
+	recording := program.NewFindingsReuse(program.HashRuleSet([]string{"old"}), nil, program.PathAnchor{})
 	graph.FindingsReuse = recording
 	if _, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules); err != nil {
 		t.Fatal(err)
@@ -192,7 +192,7 @@ func TestAFindingsCacheUnderAnotherKeyServesNothing(t *testing.T) {
 	if len(recording.Recorded().Entries) == 0 {
 		t.Fatal("nothing was recorded, so a miss below would prove nothing")
 	}
-	graph.FindingsReuse = program.NewFindingsReuse(program.HashRuleSet([]string{"new"}), recording.Recorded())
+	graph.FindingsReuse = program.NewFindingsReuse(program.HashRuleSet([]string{"new"}), recording.Recorded(), program.PathAnchor{})
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
 	if err != nil {
 		t.Fatal(err)
@@ -232,12 +232,12 @@ func TestAFileWithNothingLeftToWalkKeepsItsCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	recording := program.NewFindingsReuse(key, nil)
+	recording := program.NewFindingsReuse(key, nil, program.PathAnchor{})
 	graph.FindingsReuse = recording
 	if _, err := graph.Walk(ctx, files, pure); err != nil {
 		t.Fatal(err)
 	}
-	graph.FindingsReuse = program.NewFindingsReuse(key, recording.Recorded())
+	graph.FindingsReuse = program.NewFindingsReuse(key, recording.Recorded(), program.PathAnchor{})
 	replayed, err := graph.Walk(ctx, files, pure)
 	if err != nil {
 		t.Fatal(err)
@@ -309,7 +309,7 @@ func walkAndRecord(t *testing.T, root string, rules []rule.Rule, previous *progr
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
-	reuse := program.NewFindingsReuse(program.HashRuleSet([]string{"fixture"}), previous)
+	reuse := program.NewFindingsReuse(program.HashRuleSet([]string{"fixture"}), previous, program.PathAnchor{})
 	graph.FindingsReuse = reuse
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
 	if err != nil {
@@ -510,10 +510,10 @@ func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(t *testing.T) {
 		table := program.NewCacheTable()
 		table.Findings = cache
 		directory := t.TempDir()
-		if err := program.WriteCacheTable(directory, table, testIdentity, program.CacheTableSections{Findings: true}); err != nil {
+		if err := program.WriteCacheTable(directory, table, testIdentity, program.CacheTableSections{Findings: true}, program.PathAnchor{}); err != nil {
 			t.Fatalf("writing: %v", err)
 		}
-		read, err := program.ReadCacheTable(directory, testIdentity, program.CacheTableSections{Findings: true})
+		read, err := program.ReadCacheTable(directory, testIdentity, program.CacheTableSections{Findings: true}, program.PathAnchor{})
 		if err != nil {
 			t.Fatalf("reading: %v", err)
 		}

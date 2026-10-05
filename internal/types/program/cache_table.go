@@ -117,6 +117,10 @@ type CacheTableIdentity struct {
 // half is enforced by TestCacheTableShapeIsPinnedToItsVersion; the meaning half is the reason each
 // section also keeps its own version.
 //
+// 12: paths below the project root are stored relative to it, and every fingerprint hashes them that way, so
+// every spelling of the root reads one table; recorded runs and the findings section carry their key's parts,
+// so a miss can say which moved (#547dhjz).
+//
 // 11: findings entries carry their Adamic readiness record.
 //
 // 10: recorded runs carry the summary a replay renders its footer from.
@@ -137,7 +141,7 @@ type CacheTableIdentity struct {
 // design system's key.
 //
 // 2: findings entries carry shape-keyed rules and their fingerprint, and the table holds Signatures.
-const cacheTableVersion = 11
+const cacheTableVersion = 12
 
 // cacheTableMagic opens every file of the table, so a file that is not one is refused on its first field.
 const cacheTableMagic = "cohere cache table"
@@ -220,10 +224,11 @@ func cacheTableFile(section string) string {
 // on ahra 3,605 entries share 4 distinct rule lists and 24 listening lists, and writing each out in full
 // once made the file 53 MB.
 type lintCacheWire struct {
-	Version int
-	Key     [sha256.Size]byte
-	Lists   [][]string
-	Entries []lintCacheWireEntry
+	Version  int
+	Key      [sha256.Size]byte
+	KeyParts RunCacheKeyParts
+	Lists    [][]string
+	Entries  []lintCacheWireEntry
 
 	DesignSystem *DesignSystemKey
 }
@@ -375,7 +380,7 @@ func orUnknown(value string) string {
 // wire interns the findings cache's rule lists. It is stamped with this build's lintCacheVersion: a cache in
 // memory always means what this build means.
 func (c *LintCache) wire() *lintCacheWire {
-	wire := &lintCacheWire{Version: lintCacheVersion, Key: c.Key, DesignSystem: c.DesignSystem}
+	wire := &lintCacheWire{Version: lintCacheVersion, Key: c.Key, KeyParts: c.KeyParts, DesignSystem: c.DesignSystem}
 	// Interned by a cheap key, the length and the two ends, and confirmed by comparing names, never by joining
 	// a list into one string: ahra's entries hold about 18,000 lists of up to ~250 names, and joining each cost
 	// about 25ms of every recording run to find 31 distinct ones (#a66sfmh).
@@ -432,7 +437,8 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 	if wire.Version != lintCacheVersion {
 		return nil, nil
 	}
-	cache := &LintCache{Version: wire.Version, Key: wire.Key, Entries: make([]LintCacheEntry, 0, len(wire.Entries)), DesignSystem: wire.DesignSystem}
+	cache := &LintCache{Version: wire.Version, Key: wire.Key, KeyParts: wire.KeyParts, Entries: make([]LintCacheEntry, 0, len(wire.Entries)),
+		DesignSystem: wire.DesignSystem}
 	list := func(index int) ([]string, error) {
 		if index < 0 || index >= len(wire.Lists) {
 			return nil, fmt.Errorf("list %d of %d", index, len(wire.Lists))
@@ -478,13 +484,21 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 
 // ReadCacheTable loads the named sections of the table in directory. It always returns a table: every
 // section whose file is readable, the format record from another cohere commit, and nothing for the rest.
+// Every file path in it is as anchor spells it: the table stores paths below the project root relative to it,
+// so a run from another spelling of the root reads the same entries (#547dhjz; see PathAnchor).
 // The error says what was not kept. Nothing on disk at all wraps os.ErrNotExist, which is a first run and
 // nothing to report. Anything else wraps ErrCacheTableUnreadable or ErrCacheTablePartlyKept, which a
 // caller reports, because a cache that is silently thrown away every run is a saving that quietly never
 // appears.
 //
 // The single table.gob of earlier formats is removed here, unread.
-func ReadCacheTable(directory string, identity CacheTableIdentity, sections CacheTableSections) (*CacheTable, error) {
+func ReadCacheTable(directory string, identity CacheTableIdentity, sections CacheTableSections, anchor PathAnchor) (*CacheTable, error) {
+	table, err := readCacheTable(directory, identity, sections)
+	table.spell(anchor)
+	return table, err
+}
+
+func readCacheTable(directory string, identity CacheTableIdentity, sections CacheTableSections) (*CacheTable, error) {
 	os.Remove(filepath.Join(directory, legacyCacheTableFile))
 	table := NewCacheTable()
 	found := false
@@ -590,14 +604,16 @@ var beforeCacheTableRename func(temporaryName string)
 
 // WriteCacheTable writes the named sections of table into directory, each to its own file, and leaves every
 // other file as it is. A section named but nil in table is not written, so a run that has nothing to say
-// about a section never erases what another run left there.
+// about a section never erases what another run left there. Each file path is written anchored, below the
+// project root as a path from it; table itself is left as it is. See ReadCacheTable.
 //
 // Each file is written atomically: a temporary in the directory, then a rename. Two runs can share a tree,
 // and a reader must never see half a file. A run that returned to its caller early writes after the caller
 // has moved on, where nothing stops a kill landing mid-write; the rename is what keeps the old file whole if
 // one does (TestAWriterKilledBeforeItsRenameLeavesTheOldTable). Files are not atomic with each other, and
 // need not be: each carries its own proof, and the table's lock orders whole writes against reads.
-func WriteCacheTable(directory string, table *CacheTable, identity CacheTableIdentity, sections CacheTableSections) error {
+func WriteCacheTable(directory string, table *CacheTable, identity CacheTableIdentity, sections CacheTableSections, anchor PathAnchor) error {
+	table = table.anchored(anchor)
 	if err := os.MkdirAll(directory, 0o755); err != nil {
 		return fmt.Errorf("creating %s: %w", directory, err)
 	}
@@ -644,6 +660,77 @@ func WriteCacheTable(directory string, table *CacheTable, identity CacheTableIde
 		}
 	}
 	return nil
+}
+
+// anchored is a copy of the table with every file path it keys on anchored, for writing. A recorded run's
+// output is rendered for the run that replays it by the command (see recordedOutput there).
+func (table *CacheTable) anchored(anchor PathAnchor) *CacheTable {
+	return table.mapPaths(anchor.Stable)
+}
+
+// spell turns every anchored path in the table, as read, into this run's spelling.
+func (table *CacheTable) spell(anchor PathAnchor) {
+	*table = *table.mapPaths(anchor.Spelled)
+}
+
+// mapPaths is a copy of the table with path applied to every file path a section keys on: each recorded run's
+// inputs, each findings entry's, the shapes', the format record's and the types section's. Sections it does not
+// hold stay nil.
+func (table *CacheTable) mapPaths(path func(string) string) *CacheTable {
+	mapped := *table
+	if table.Runs != nil {
+		mapped.Runs = make(map[string]*RunCache, len(table.Runs))
+		for invocation, run := range table.Runs {
+			if run == nil {
+				mapped.Runs[invocation] = nil
+				continue
+			}
+			copied := *run
+			copied.Inputs = make([]RunCacheInput, len(run.Inputs))
+			for index, input := range run.Inputs {
+				input.Path = path(input.Path)
+				copied.Inputs[index] = input
+			}
+			mapped.Runs[invocation] = &copied
+		}
+	}
+	if table.Findings != nil {
+		findings := *table.Findings
+		findings.Entries = make([]LintCacheEntry, len(table.Findings.Entries))
+		for index, entry := range table.Findings.Entries {
+			entry.Path = path(entry.Path)
+			findings.Entries[index] = entry
+		}
+		findings.index = nil
+		mapped.Findings = &findings
+	}
+	if table.Signatures != nil {
+		mapped.Signatures = make(map[string]SignatureEntry, len(table.Signatures))
+		for name, entry := range table.Signatures {
+			mapped.Signatures[path(name)] = entry
+		}
+	}
+	if table.Formatted != nil {
+		formatted := *table.Formatted
+		if table.Formatted.Entries != nil {
+			formatted.Entries = make(map[string]FormatEntry, len(table.Formatted.Entries))
+			for name, entry := range table.Formatted.Entries {
+				formatted.Entries[path(name)] = entry
+			}
+		}
+		mapped.Formatted = &formatted
+	}
+	if table.Types != nil {
+		types := *table.Types
+		if table.Types.Entries != nil {
+			types.Entries = make(map[string]TypesEntry, len(table.Types.Entries))
+			for name, entry := range table.Types.Entries {
+				types.Entries[path(name)] = entry
+			}
+		}
+		mapped.Types = &types
+	}
+	return &mapped
 }
 
 // writeCacheTableFile writes one file through a temporary beside it and a rename.

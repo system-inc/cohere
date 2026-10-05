@@ -746,6 +746,9 @@ func writeLintReport(out io.Writer, report lintReport) {
 	// answered for, the nodes it walked, and the two gaps a green run must still name.
 	activeSummary.Rules = coverage.RulesRun
 	activeSummary.FilesCached = report.Result.FilesReplayed
+	// The --json summary's cache.filesReplayed said 0 on every run, since nothing set it, and read as a full
+	// check on runs that replayed 3,891 files (#547dhjz).
+	activeSummary.Cache.FilesReplayed = report.Result.FilesReplayed
 	activeSummary.FilesChecked = coverage.FilesWalked - report.Result.FilesReplayed
 	activeSummary.FilesInScope = coverage.FilesWalked
 	activeSummary.Nodes = coverage.NodesVisited

@@ -17,7 +17,7 @@ func adamicFixtureReuse(t *testing.T, entry LintCacheEntry) (*FindingsReuse, cac
 	key := HashRuleSet([]string{"fixture"})
 	keys := cacheKeys{contentHash: entry.ContentHash, pure: entry.Rules, typed: entry.TypedRules, typeFingerprint: entry.TypeFingerprint}
 	previous := &LintCache{Version: lintCacheVersion, Key: key, Entries: []LintCacheEntry{entry}}
-	return NewFindingsReuse(key, previous), keys
+	return NewFindingsReuse(key, previous, PathAnchor{}), keys
 }
 
 func adamicFixtureEntry(record *AdamicRecord) LintCacheEntry {

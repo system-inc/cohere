@@ -54,6 +54,10 @@ type Graph struct {
 	// ConfigFileName is the absolute path of the tsconfig that produced this graph.
 	ConfigFileName string
 
+	// Anchor is the directory the graph was built in, which every fingerprint names paths relative to, so
+	// that two spellings of one directory fingerprint every file alike (#547dhjz). See PathAnchor.
+	Anchor PathAnchor
+
 	// CompilerHost is the filesystem view the program was built through, kept because the
 	// incremental machinery needs the same one.
 	//
@@ -602,6 +606,7 @@ func buildOnce(options Options) (*Graph, error) {
 		Config:         config,
 		ConfigFileName: configFileName,
 		CompilerHost:   compilerHost,
+		Anchor:         NewPathAnchor(currentDirectory),
 	}, nil
 }
 

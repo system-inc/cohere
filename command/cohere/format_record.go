@@ -118,7 +118,7 @@ func formatRecordKey(root string) (string, error) {
 	if identity := release.Current().FormatterIdentity; identity != "" {
 		return "formatter " + identity, nil
 	}
-	return program.RunCacheKey(nil, root, "format-record")
+	return program.RunCacheKey(nil, program.NewPathAnchor(root).Resolved(), "format-record")
 }
 
 // unformatted returns the files whose current bytes are not on record as formatted under the options

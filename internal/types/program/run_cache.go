@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -60,6 +61,9 @@ type RunCache struct {
 	// identity, the working directory. Two runs that differ in any of those are different runs even
 	// over identical files, and must not replay each other.
 	Key string
+
+	// KeyParts is Key's parts, so a run under another key can say which part moved. See RunCacheKeyParts.
+	KeyParts RunCacheKeyParts
 
 	// Inputs is every file and directory the run depended on, with the signature it had.
 	Inputs []RunCacheInput
@@ -137,46 +141,96 @@ const runCacheVersion = 5
 // from an unexpected failure.
 var ErrRunCacheMiss = errors.New("run cache miss")
 
-// RunCacheKey hashes what identifies a run apart from its files.
-//
-// The binary is keyed by its path, size and modification time rather than by hashing its bytes. It is
-// about 70 MB, and reading it on every run would spend the budget this cache exists to save. A rebuilt
-// binary has a new modification time, which is all this needs: any change to the tool is a miss.
-//
-// facts is anything else the run's output depends on that is not a file the build reads: the project
-// root and config paths the command resolved, and results the command computes from sources the
-// build never sees, such as what git reports as changed. Order matters, and an empty fact still counts.
+// RunCacheKey hashes what identifies a run apart from its files. It is RunCacheKeyPartsOf's key.
 func RunCacheKey(arguments []string, workingDirectory string, facts ...string) (string, error) {
+	parts, err := RunCacheKeyPartsOf(arguments, workingDirectory, facts...)
+	if err != nil {
+		return "", err
+	}
+	return parts.Key(), nil
+}
+
+// RunCacheKeyParts is what identifies a run apart from its files, in four parts hashed apart, so a run that
+// misses can say which one moved rather than that something did (#547dhjz).
+type RunCacheKeyParts struct {
+	// Binary is the running binary: its resolved path, size and modification time, and the format and
+	// platform it reads. Keyed by path, size and time rather than by hashing its bytes: it is about 70 MB,
+	// reading it every run would spend the budget this cache exists to save, and a rebuilt binary has a
+	// new modification time, which is all this needs.
+	Binary string
+
+	// Directory is the working directory the caller resolved, the project root's target.
+	Directory string
+
+	// Arguments is the command line.
+	Arguments string
+
+	// Facts is anything else the run's output depends on that is not a file the build reads: config paths
+	// the command resolved, and results it computes from sources the build never sees. Order matters, and
+	// an empty fact still counts.
+	Facts string
+}
+
+// RunCacheKeyPartsOf hashes each part of a run's identity.
+func RunCacheKeyPartsOf(arguments []string, workingDirectory string, facts ...string) (RunCacheKeyParts, error) {
 	executable, err := os.Executable()
 	if err != nil {
-		return "", fmt.Errorf("locating the running binary: %w", err)
+		return RunCacheKeyParts{}, fmt.Errorf("locating the running binary: %w", err)
+	}
+	// Resolved, as the callers resolve the directory, so a binary reached through a link keys as itself (#547dhjz).
+	if resolved, err := filepath.EvalSymlinks(executable); err == nil {
+		executable = resolved
 	}
 	information, err := os.Stat(executable)
 	if err != nil {
-		return "", fmt.Errorf("reading the running binary: %w", err)
+		return RunCacheKeyParts{}, fmt.Errorf("reading the running binary: %w", err)
 	}
+	part := func(values ...string) string {
+		hash := sha256.New()
+		for _, value := range values {
+			hash.Write([]byte(value))
+			hash.Write([]byte{0})
+		}
+		return fmt.Sprintf("%x", hash.Sum(nil))
+	}
+	return RunCacheKeyParts{
+		Binary: part(fmt.Sprintf("version %d", runCacheVersion), executable, fmt.Sprintf("%d", information.Size()),
+			fmt.Sprintf("%d", information.ModTime().UnixNano()), runtime.GOOS, runtime.GOARCH),
+		Directory: part(workingDirectory),
+		Arguments: part(append([]string{fmt.Sprintf("%d", len(arguments))}, arguments...)...),
+		Facts:     part(append([]string{fmt.Sprintf("%d facts", len(facts))}, facts...)...),
+	}, nil
+}
 
-	hash := sha256.New()
-	write := func(value string) {
-		hash.Write([]byte(value))
-		hash.Write([]byte{0})
+// Key is the parts as one key.
+func (parts RunCacheKeyParts) Key() string {
+	sum := sha256.Sum256([]byte(parts.Binary + "\x00" + parts.Directory + "\x00" + parts.Arguments + "\x00" + parts.Facts))
+	return fmt.Sprintf("%x", sum)
+}
+
+// Changed says which parts differ from recorded, in words, or that the record kept no parts to compare, as
+// one written before they were kept.
+func (parts RunCacheKeyParts) Changed(recorded RunCacheKeyParts) string {
+	if recorded == (RunCacheKeyParts{}) {
+		return "it was recorded without its key's parts, so which one moved cannot be said"
 	}
-	write(fmt.Sprintf("version %d", runCacheVersion))
-	write(executable)
-	write(fmt.Sprintf("%d", information.Size()))
-	write(fmt.Sprintf("%d", information.ModTime().UnixNano()))
-	write(workingDirectory)
-	write(runtime.GOOS)
-	write(runtime.GOARCH)
-	write(fmt.Sprintf("%d", len(arguments)))
-	for _, argument := range arguments {
-		write(argument)
+	var changed []string
+	if parts.Binary != recorded.Binary {
+		changed = append(changed, "the cohere binary")
 	}
-	write(fmt.Sprintf("%d facts", len(facts)))
-	for _, fact := range facts {
-		write(fact)
+	if parts.Directory != recorded.Directory {
+		changed = append(changed, "the project root")
 	}
-	return fmt.Sprintf("%x", hash.Sum(nil)), nil
+	if parts.Arguments != recorded.Arguments {
+		changed = append(changed, "the arguments")
+	}
+	if parts.Facts != recorded.Facts {
+		changed = append(changed, "the configuration (the tsconfig or lint config, their extends chains, the rules, or the output's color)")
+	}
+	if len(changed) == 0 {
+		return "no part changed, though the key did"
+	}
+	return strings.Join(changed, " and ") + " changed"
 }
 
 // RecordRunCache captures a run that just finished.
@@ -364,26 +418,34 @@ func (c *RunCache) Check(key string) error {
 // ChangedInput reports the first recorded input whose signature no longer matches the disk, nil when every
 // one still does. It is Check without the key, so --cache-dump can say which input keeps a run from
 // replaying rather than leaving a miss silent (#r9jevk9).
+//
+// The input named is the earliest recorded one that moved, whichever worker found it, so a run that misses
+// says the same thing every time rather than the first thing a worker happened to reach (#547dhjz).
 func (c *RunCache) ChangedInput() error {
 	workers := min(runtime.NumCPU(), 8)
+	var mutex sync.Mutex
 	var mismatch error
-	var once sync.Once
+	earliest := len(c.Inputs)
 	var waitGroup sync.WaitGroup
-	next := make(chan RunCacheInput, 256)
+	next := make(chan int, 256)
 
 	for range workers {
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
-			for input := range next {
-				if err := input.stillMatches(); err != nil {
-					once.Do(func() { mismatch = err })
+			for index := range next {
+				if err := c.Inputs[index].stillMatches(); err != nil {
+					mutex.Lock()
+					if index < earliest {
+						earliest, mismatch = index, err
+					}
+					mutex.Unlock()
 				}
 			}
 		}()
 	}
-	for _, input := range c.Inputs {
-		next <- input
+	for index := range c.Inputs {
+		next <- index
 	}
 	close(next)
 	waitGroup.Wait()

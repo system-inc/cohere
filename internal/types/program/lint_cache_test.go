@@ -91,10 +91,10 @@ func roundTripLintCache(t *testing.T, cache *program.LintCache) *program.LintCac
 	table := program.NewCacheTable()
 	table.Findings = cache
 	directory := t.TempDir()
-	if err := program.WriteCacheTable(directory, table, testIdentity, program.CacheTableSections{Findings: true}); err != nil {
+	if err := program.WriteCacheTable(directory, table, testIdentity, program.CacheTableSections{Findings: true}, program.PathAnchor{}); err != nil {
 		t.Fatalf("writing: %v", err)
 	}
-	read, err := program.ReadCacheTable(directory, testIdentity, program.CacheTableSections{Findings: true})
+	read, err := program.ReadCacheTable(directory, testIdentity, program.CacheTableSections{Findings: true}, program.PathAnchor{})
 	if err != nil {
 		t.Fatalf("reading what we just wrote: %v", err)
 	}

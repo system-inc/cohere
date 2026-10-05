@@ -83,7 +83,9 @@
                     "properties": {
                         "replayed": { "type": "boolean", "description": "The run was answered whole from the run cache, and ran no phase." },
                         "filesReplayed": { "type": "integer", "description": "Files whose findings came from the cache in a run that computed the rest." },
-                        "off": { "type": "boolean", "description": "`--no-cache`: nothing read, nothing written." }
+                        "off": { "type": "boolean", "description": "`--no-cache`: nothing read, nothing written." },
+                        "missReason": { "type": "string", "description": "Why a run the cache could have answered whole was not: no run on record for these arguments, a key and which of its parts moved (the cohere binary, the project root, the arguments, the configuration), or the input that changed. Absent when it was answered whole or reads no cache." },
+                        "findingsMissReason": { "type": "string", "description": "Why files' findings were not replayed: none on record, a key and which of its parts moved, or how many files had no entry, changed bytes or rules, or were taken without measuring readiness. Absent when every file looked up was replayed." }
                     }
                 },
                 "typeErrors": { "type": "integer" },

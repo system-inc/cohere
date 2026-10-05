@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -165,6 +166,27 @@ type cacheUse struct {
 	FilesReplayed int `json:"filesReplayed"`
 	// Off is `--no-cache`: nothing read, nothing written.
 	Off bool `json:"off"`
+
+	// MissReason is why a run the cache could have answered whole was not, and FindingsMissReason why its
+	// files' findings were not replayed: nothing on record, a key whose named part moved, or files with no
+	// entry or with changed bytes. Empty when there is nothing to explain (#547dhjz).
+	MissReason         string `json:"missReason,omitempty"`
+	FindingsMissReason string `json:"findingsMissReason,omitempty"`
+}
+
+// missLine is the --verbose line that says why the cache did not answer, empty when there is nothing to say.
+func (cache cacheUse) missLine() string {
+	var parts []string
+	if cache.MissReason != "" {
+		parts = append(parts, "not replayed whole: "+cache.MissReason)
+	}
+	if cache.FindingsMissReason != "" {
+		parts = append(parts, "findings: "+cache.FindingsMissReason)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "cache: " + strings.Join(parts, "; ")
 }
 
 // runGaps is every way a run fell short of checking everything. Each is said in the footer even when

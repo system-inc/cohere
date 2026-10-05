@@ -28,7 +28,8 @@ type DesignSystemKey struct {
 }
 
 // DesignSystemKeyRead is one path and what was there: nothing, a directory with a listing, or a file with
-// bytes. Hash covers the listing or the bytes, and where a symbolic link led.
+// bytes. Hash covers the listing or the bytes, and where a symbolic link led. Path is anchored (PathAnchor), so
+// the fingerprint over it is one for every spelling of the project root (#547dhjz).
 type DesignSystemKeyRead struct {
 	Path      string
 	Present   bool
@@ -39,7 +40,7 @@ type DesignSystemKeyRead struct {
 // designSystemKeyFromReads keys the reads a load made. It declines, returning false, when any present path
 // moved between the load reading it and this hashing it: its bytes now might not be the bytes the rules saw,
 // and a key over the wrong bytes replays a finding against a stylesheet nobody read.
-func designSystemKeyFromReads(reads []rule.FileRead) (*DesignSystemKey, bool) {
+func designSystemKeyFromReads(reads []rule.FileRead, anchor PathAnchor) (*DesignSystemKey, bool) {
 	key := &DesignSystemKey{Reads: make([]DesignSystemKeyRead, 0, len(reads))}
 	for _, read := range reads {
 		if read.Present {
@@ -52,6 +53,7 @@ func designSystemKeyFromReads(reads []rule.FileRead) (*DesignSystemKey, bool) {
 		if err != nil || current.Present != read.Present {
 			return nil, false
 		}
+		current.Path = anchor.Stable(read.Path)
 		key.Reads = append(key.Reads, current)
 	}
 	key.Fingerprint = designSystemFingerprint(key.Reads)
@@ -64,14 +66,15 @@ func emptyDesignSystemKey() *DesignSystemKey {
 	return &DesignSystemKey{Fingerprint: designSystemFingerprint(nil)}
 }
 
-// stillHolds reports whether every path is as recorded. Anything unreadable is a no: a key that cannot be
-// checked is a miss, never a hit.
-func (key *DesignSystemKey) stillHolds() bool {
+// stillHolds reports whether every path is as recorded, each read where anchor spells it. Anything unreadable
+// is a no: a key that cannot be checked is a miss, never a hit.
+func (key *DesignSystemKey) stillHolds(anchor PathAnchor) bool {
 	if key == nil || key.Fingerprint == ([sha256.Size]byte{}) || key.Fingerprint != designSystemFingerprint(key.Reads) {
 		return false
 	}
 	for _, recorded := range key.Reads {
-		current, err := readDesignSystemPath(recorded.Path)
+		current, err := readDesignSystemPath(anchor.Spelled(recorded.Path))
+		current.Path = recorded.Path
 		if err != nil || current != recorded {
 			return false
 		}

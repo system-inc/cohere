@@ -44,7 +44,7 @@ func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(t *testing.T) {
 				time.Sleep(time.Minute)
 			}
 		}
-		WriteCacheTable(directory, tableSaying("new"), identity, sections)
+		WriteCacheTable(directory, tableSaying("new"), identity, sections, PathAnchor{})
 		return
 	}
 
@@ -53,7 +53,7 @@ func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(t *testing.T) {
 		// same time, would share the CPU with.
 		t.Run(fmt.Sprintf("killed at rename %d", stopAt), func(t *testing.T) {
 			directory := t.TempDir()
-			if err := WriteCacheTable(directory, tableSaying("old"), identity, sections); err != nil {
+			if err := WriteCacheTable(directory, tableSaying("old"), identity, sections, PathAnchor{}); err != nil {
 				t.Fatal(err)
 			}
 
@@ -84,7 +84,7 @@ func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(t *testing.T) {
 			writer.Process.Signal(syscall.SIGKILL)
 			writer.Wait()
 
-			read, err := ReadCacheTable(directory, identity, sections)
+			read, err := ReadCacheTable(directory, identity, sections, PathAnchor{})
 			if err != nil {
 				t.Fatalf("the table is unreadable after the writer died before a rename: %v", err)
 			}
@@ -103,10 +103,10 @@ func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(t *testing.T) {
 			}
 
 			// And the next run rebuilds cleanly over what the killed one left, its temporary included.
-			if err := WriteCacheTable(directory, tableSaying("rebuilt"), identity, sections); err != nil {
+			if err := WriteCacheTable(directory, tableSaying("rebuilt"), identity, sections, PathAnchor{}); err != nil {
 				t.Fatalf("the write after the kill failed: %v", err)
 			}
-			rebuilt, err := ReadCacheTable(directory, identity, sections)
+			rebuilt, err := ReadCacheTable(directory, identity, sections, PathAnchor{})
 			if err != nil || string(rebuilt.Runs["--no-fix"].Output) != "rebuilt" || rebuilt.Findings.Entries[0].Path != "/rebuilt.ts" {
 				t.Errorf("the table after the rebuild is not the rebuilt one: %v", err)
 			}

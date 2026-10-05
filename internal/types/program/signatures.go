@@ -425,7 +425,7 @@ func (g *Graph) SignatureFingerprints(signatures map[string]SignatureEntry) map[
 		// Where its imports resolve is part of what a file shows its importers; see TypeFingerprints.
 		shapes[sourceFile.Path()] = withResolutions(sha256.Sum256([]byte(shape)), resolutions[sourceFile.Path()])
 	}
-	components := fingerprintComponents(projectFiles, edges, shapes, global)
+	components := fingerprintComponents(g.Anchor, projectFiles, edges, shapes, global)
 
 	fingerprints := make(map[tspath.Path][sha256.Size]byte, len(projectFiles))
 	for _, sourceFile := range projectFiles {

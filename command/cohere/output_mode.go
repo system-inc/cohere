@@ -112,6 +112,13 @@ func writeRunEnd(report *pipelineReport, out io.Writer) {
 		summary.Total = time.Since(report.processStart)
 	}
 	summary.Cache.Off = report.cacheOff
+	if session := activeRunCache; session != nil {
+		summary.Cache.MissReason = session.missed
+		summary.Cache.FindingsMissReason = session.findingsMissed
+		if summary.Cache.FindingsMissReason == "" {
+			summary.Cache.FindingsMissReason = session.findings.Misses()
+		}
+	}
 	// Decided here, once the phases are known, and kept: a replay prints this count rather than judging the
 	// skips again against phases it did not run.
 	summary.Gaps.RulesSkippingEverything = summary.uncoveredSkips()
@@ -134,6 +141,9 @@ func writeRunEnd(report *pipelineReport, out io.Writer) {
 	switch activeOutput.Mode {
 	case outputVerbose:
 		report.Write(out)
+		if line := summary.Cache.missLine(); line != "" {
+			fmt.Fprintln(invocationOutput(out), line)
+		}
 		fmt.Fprintln(invocationOutput(out), footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}))
 	case outputJSON:
 		writeJSONLine(invocationOutput(out), summaryAsJSON(summary))

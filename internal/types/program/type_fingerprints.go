@@ -46,7 +46,7 @@ func (g *Graph) TypeFingerprints() map[tspath.Path][sha256.Size]byte {
 	for path, resolved := range resolutions {
 		members[path] = withResolutions(contents[path], resolved)
 	}
-	return fingerprintComponents(g.ProjectFiles(), edges, members, global)
+	return fingerprintComponents(g.Anchor, g.ProjectFiles(), edges, members, global)
 }
 
 // typeGraphParts is typeGraph's answer.
@@ -89,10 +89,15 @@ func (g *Graph) computeTypeGraph() ([sha256.Size]byte, map[tspath.Path][]tspath.
 			globalPaths = append(globalPaths, sourceFile.Path())
 		}
 	}
-	sort.Slice(globalPaths, func(first, second int) bool { return globalPaths[first] < globalPaths[second] })
+	// By the anchored path, in sort and in hash, so every spelling of the root hashes alike (#547dhjz).
+	stable := make(map[tspath.Path]string, len(globalPaths))
+	for _, path := range globalPaths {
+		stable[path] = g.Anchor.Stable(string(path))
+	}
+	sort.Slice(globalPaths, func(first, second int) bool { return stable[globalPaths[first]] < stable[globalPaths[second]] })
 	for _, path := range globalPaths {
 		sum := contents[path]
-		global.Write([]byte(path))
+		global.Write([]byte(stable[path]))
 		global.Write([]byte{0})
 		global.Write(sum[:])
 	}
@@ -129,7 +134,7 @@ func (g *Graph) resolutionSums(isProject map[tspath.Path]bool) map[tspath.Path][
 		for key, resolution := range resolutions {
 			target := ""
 			if resolution != nil {
-				target = resolution.ResolvedFileName
+				target = g.Anchor.Stable(resolution.ResolvedFileName)
 			}
 			entries[fromPath] = append(entries[fromPath], fmt.Sprintf("module\x00%s\x00%d\x00%s", key.Name, key.Mode, target))
 		}
@@ -141,7 +146,7 @@ func (g *Graph) resolutionSums(isProject map[tspath.Path]bool) map[tspath.Path][
 		for key, reference := range references {
 			target := ""
 			if reference != nil {
-				target = reference.ResolvedFileName
+				target = g.Anchor.Stable(reference.ResolvedFileName)
 			}
 			entries[fromPath] = append(entries[fromPath], fmt.Sprintf("type\x00%s\x00%d\x00%s", key.Name, key.Mode, target))
 		}
@@ -212,8 +217,8 @@ func hashContentsInParallel(files []*ast.SourceFile) (map[tspath.Path][sha256.Si
 // fingerprintComponents runs Tarjan's algorithm over the project's import graph. Tarjan emits each
 // strongly connected component after every component it reaches, so a component's hash can include its
 // dependencies' finished hashes in one pass. A component's hash covers the global component, its
-// members' paths and contents in order, and its dependencies' hashes in order; every member gets it.
-func fingerprintComponents(projectFiles []*ast.SourceFile, edges map[tspath.Path][]tspath.Path,
+// members' anchored paths and contents in order, and its dependencies' hashes in order; every member gets it.
+func fingerprintComponents(anchor PathAnchor, projectFiles []*ast.SourceFile, edges map[tspath.Path][]tspath.Path,
 	contents map[tspath.Path][sha256.Size]byte, global [sha256.Size]byte) map[tspath.Path][sha256.Size]byte {
 
 	index := 0
@@ -254,7 +259,12 @@ func fingerprintComponents(projectFiles []*ast.SourceFile, edges map[tspath.Path
 				break
 			}
 		}
-		sort.Slice(members, func(first, second int) bool { return members[first] < members[second] })
+		// By the anchored path, in sort and in hash, so every spelling of the root hashes alike (#547dhjz).
+		stableMembers := make(map[tspath.Path]string, len(members))
+		for _, member := range members {
+			stableMembers[member] = anchor.Stable(string(member))
+		}
+		sort.Slice(members, func(first, second int) bool { return stableMembers[members[first]] < stableMembers[members[second]] })
 
 		component := len(componentSums)
 		dependencies := map[int]bool{}
@@ -273,7 +283,7 @@ func fingerprintComponents(projectFiles []*ast.SourceFile, edges map[tspath.Path
 		hash.Write(global[:])
 		for _, member := range members {
 			sum := contents[member]
-			hash.Write([]byte(member))
+			hash.Write([]byte(stableMembers[member]))
 			hash.Write([]byte{0})
 			hash.Write(sum[:])
 		}
