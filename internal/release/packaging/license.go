@@ -32,26 +32,12 @@ const (
 // notices credit the code each package carries, and the licenses of what it is built on require that.
 var LegalFileNames = append(append([]string{}, LicenseFileNames...), NoticeFileName, ThirdPartyNoticesFileName)
 
-// copyrightHolderPlaceholder stands in LICENSE-MIT's copyright line until Kirk confirms the copyright
-// holder's legal name. A release refuses to stage while it is there, so it cannot be published by
-// accident, and a contributor's tests still pass meanwhile.
-const copyrightHolderPlaceholder = "[[COPYRIGHT HOLDER PENDING"
-
-// requireConfirmedCopyright refuses a release whose license still carries the placeholder copyright
-// holder. A license naming no one grants nothing clearly, and npm cannot take a published version back.
-// A dry run is let through, since nothing it stages is published, but the licenses must still be there.
-func requireConfirmedCopyright(moduleDirectory string, dryRun bool) error {
-	for _, name := range LicenseFileNames {
-		contents, err := os.ReadFile(filepath.Join(moduleDirectory, name))
-		if err != nil {
-			return fmt.Errorf("reading the license a release ships: %w", err)
-		}
-		if bytes.Contains(contents, []byte(copyrightHolderPlaceholder)) && !dryRun {
-			return fmt.Errorf("%s still names a placeholder as the copyright holder, so it is refused until the legal name is written in", name)
-		}
-	}
-	return nil
-}
+// CopyrightHolder is cohere's copyright holder, the legal name Kirk confirmed (#m5wmxnk), and
+// CopyrightLine is how LICENSE-MIT and NOTICE state it.
+const (
+	CopyrightHolder = "System, Inc."
+	CopyrightLine   = "Copyright (c) 2026 " + CopyrightHolder
+)
 
 // stageLicenses copies the licenses and notices into a package, refusing one that is missing or empty: a
 // package published without them carries a license field that points at nothing, or code it doesn't

@@ -36,7 +36,6 @@ func run() error {
 	signingIdentity := flag.String("signing-identity", "", "the macOS codesigning identity; unsigned when empty")
 	keychainProfile := flag.String("notary-profile", "", "the notarytool keychain profile; not notarized when empty")
 	swiftScratch := flag.String("swift-scratch", "", "where SwiftPM builds the Swift engine; the user cache directory when empty, never inside --output")
-	dryRun := flag.Bool("dry-run", false, "stage a release that will not be published, which may carry the placeholder copyright holder")
 	flag.Parse()
 
 	if *version == "" {
@@ -71,7 +70,6 @@ func run() error {
 		Signing:         signing,
 
 		SwiftScratchDirectory: *swiftScratch,
-		DryRun:                *dryRun,
 	})
 	if err != nil {
 		return err

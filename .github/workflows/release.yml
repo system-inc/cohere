@@ -207,20 +207,11 @@ jobs:
                       notary_profile="cohere-notary"
                   fi
 
-                  # A run that will not publish may stage with LICENSE-MIT's placeholder copyright holder,
-                  # so the packaging is proven before the legal name lands. A run that publishes may not,
-                  # and the release refuses it before building anything.
-                  dry_run=()
-                  if [ "${{ inputs.publish }}" != "true" ]; then
-                      dry_run=(--dry-run)
-                  fi
-
                   go run ./command/cohere-release \
                       --version "${{ inputs.version }}" \
                       --output dist \
                       --signing-identity "$MACOS_SIGNING_IDENTITY" \
-                      --notary-profile "$notary_profile" \
-                      "${dry_run[@]}"
+                      --notary-profile "$notary_profile"
 
             - name: Prove the binary this run produced actually runs
               # The build already checks that a file exists and is a plausible size. This checks
@@ -292,12 +283,7 @@ jobs:
             - name: Package the VS Code extension, versioned with this release
               # One .vsix for both registries, built beside the npm packages so it rides the same tar to
               # the publish job. The script stamps the version and checks the .vsix it made.
-              run: |
-                  dry_run=()
-                  if [ "${{ inputs.publish }}" != "true" ]; then
-                      dry_run=(--dry-run)
-                  fi
-                  bash .github/scripts/package-vscode-extension.sh "${{ inputs.version }}" dist "${dry_run[@]}"
+              run: bash .github/scripts/package-vscode-extension.sh "${{ inputs.version }}" dist
 
             - name: Attest every binary, the checksums and the extension
               # A build attestation per file, signed through Sigstore with this run's identity and stored on

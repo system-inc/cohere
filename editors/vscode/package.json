@@ -5,6 +5,7 @@
     "publisher": "system-inc",
     "version": "1.0.0",
     "license": "MIT OR Apache-2.0",
+    "author": "System, Inc.",
     "icon": "icon.png",
     "repository": {
         "type": "git",

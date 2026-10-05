@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
 // generatedBy heads both files, so nobody edits what the next generation overwrites.
@@ -29,7 +31,7 @@ func renderNotice(moduleDirectory string) ([]byte, error) {
 	}
 	microsoft = bytes.ReplaceAll(microsoft, []byte("\r\n"), []byte("\n"))
 	var builder strings.Builder
-	builder.WriteString("cohere\n\n")
+	builder.WriteString("cohere\n" + release.CopyrightLine + "\n\n")
 	builder.WriteString("cohere includes the TypeScript compiler (typescript-go), Copyright (c) Microsoft Corporation, licensed\n")
 	builder.WriteString("under the Apache License, Version 2.0. cohere builds a modified version of it, from the fork at\n")
 	builder.WriteString(compilerFork + ", which changes files of the original.\n\n")

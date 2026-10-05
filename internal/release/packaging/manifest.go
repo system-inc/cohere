@@ -72,6 +72,7 @@ func PlatformManifest(target Target, version string) ([]byte, error) {
 		"version":     version,
 		"description": fmt.Sprintf("The cohere binary for %s.", target),
 		"license":     LicenseExpression,
+		"author":      CopyrightHolder,
 		"repository":  map[string]string{"type": "git", "url": RepositoryURL},
 
 		"os":  []string{NpmOperatingSystem(target.GoOperatingSystem)},
@@ -109,6 +110,7 @@ func DispatcherManifest(version string) ([]byte, error) {
 		"version":     version,
 		"description": "Type-check, lint, fix, and format a TypeScript codebase in one process.",
 		"license":     LicenseExpression,
+		"author":      CopyrightHolder,
 		"repository":  map[string]string{"type": "git", "url": RepositoryURL},
 
 		"bin": map[string]string{
