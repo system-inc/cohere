@@ -105,8 +105,14 @@ func TestFooterGolden(t *testing.T) {
 		},
 		{
 			name:    "a gap, appended to a green run",
+			summary: func(summary *runSummary) { summary.Gaps.FormattingNotChecked = true },
+			want:    "✓ 💎 2.4s (480 rules • 3,926 checked) • 💅 formatting not checked",
+		},
+		{
+			// A crash is a gap the run cannot pass with: a verdict is missing, and it is cohere's bug (#v1ah2qq).
+			name:    "a crash, which fails the run",
 			summary: func(summary *runSummary) { summary.Gaps.CrashedFiles = 1 },
-			want:    "✓ 💎 2.4s (480 rules • 3,926 checked) • ⚠ 1 file crashed",
+			want:    "✗ ☠️ 2.4s (480 rules • 3,926 checked) • ⚠ 1 file crashed",
 		},
 		{
 			name:    "cold, with --phases",
@@ -262,7 +268,6 @@ var uncheckedConditions = []struct {
 	plant  func(summary *runSummary)
 	marker string
 }{
-	{name: "a file crashed", plant: func(summary *runSummary) { summary.Gaps.CrashedFiles = 1 }, marker: "⚠ 1 file crashed"},
 	{
 		name:   "a rule skipped every file",
 		plant:  func(summary *runSummary) { summary.Gaps.RulesSkippingEverything = 2 },
@@ -311,6 +316,34 @@ var uncheckedConditions = []struct {
 		plant:  func(summary *runSummary) { summary.Gaps.ModifiedBuild = true },
 		marker: "⚠ built from a modified tree",
 	},
+}
+
+// TestACrashFailsTheFooterAndKeepsItsMarker is the gap a run cannot pass with (#v1ah2qq): a file nothing
+// checked, or a rule's verdict on a file lost, because cohere crashed. The run fails, so the footer turns
+// red, and it still says what was lost.
+func TestACrashFailsTheFooterAndKeepsItsMarker(t *testing.T) {
+	t.Parallel()
+	for _, crash := range []struct {
+		name   string
+		plant  func(summary *runSummary)
+		marker string
+	}{
+		{"a file crashed", func(summary *runSummary) { summary.Gaps.CrashedFiles = 1 }, "⚠ 1 file crashed"},
+		{"a rule crashed", func(summary *runSummary) {
+			summary.Gaps.RuleCrashes = 1
+			summary.Gaps.Unread = "1 rule crash left a file's verdict missing"
+		}, "⚠ 1 rule crash left a file's verdict missing"},
+	} {
+		summary := cleanSummary()
+		crash.plant(&summary)
+		if !summary.failed() {
+			t.Errorf("%s and the run did not fail", crash.name)
+		}
+		got := footer(summary, plain, footerOptions{})
+		if !strings.HasPrefix(got, "✗ ☠️") || !strings.Contains(got, crash.marker) {
+			t.Errorf("%s: the footer is %q, want a failing verdict carrying %q", crash.name, got, crash.marker)
+		}
+	}
 }
 
 // TestFooterSaysWhatWasNotChecked plants each condition on a clean, green run and requires its marker,

@@ -5,6 +5,7 @@
     "oneOf": [
         { "$ref": "#/$defs/finding" },
         { "$ref": "#/$defs/changedFile" },
+        { "$ref": "#/$defs/crash" },
         { "$ref": "#/$defs/summary" }
     ],
     "$defs": {
@@ -33,6 +34,18 @@
                 "kind": { "enum": ["fixed", "formatted"] },
                 "path": { "type": "string" },
                 "rules": { "type": "array", "items": { "type": "string" }, "description": "The rules whose fixes were applied, for a fixed file." }
+            }
+        },
+        "crash": {
+            "description": "A rule that could not finish a file, or a file nothing could check, because cohere crashed. A bug in cohere, not in the code checked, and it fails the run.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "path", "cause"],
+            "properties": {
+                "kind": { "const": "crash" },
+                "path": { "type": "string" },
+                "rule": { "type": "string", "description": "The rule that crashed. Absent when the whole file was lost." },
+                "cause": { "type": "string", "description": "The panic, as cohere caught it." }
             }
         },
         "summary": {
@@ -86,10 +99,11 @@
                 "gaps": {
                     "type": "object",
                     "additionalProperties": false,
-                    "required": ["programFiles", "crashedFiles", "rulesSkippingEverything", "formattingNotChecked", "nothingToCheck", "modifiedBuild"],
+                    "required": ["programFiles", "crashedFiles", "ruleCrashes", "rulesSkippingEverything", "formattingNotChecked", "nothingToCheck", "modifiedBuild"],
                     "properties": {
                         "programFiles": { "type": "integer", "description": "The program's size when the run was narrowed to fewer of its files; zero otherwise." },
-                        "crashedFiles": { "type": "integer", "description": "Files a rule crashed on, whose findings are incomplete." },
+                        "crashedFiles": { "type": "integer", "description": "Files nothing could check, because cohere crashed on them. They fail the run." },
+                        "ruleCrashes": { "type": "integer", "description": "Rules that crashed on a file, each leaving its verdict there missing. They fail the run." },
                         "rulesSkippingEverything": { "type": "integer", "description": "Rules that declined every file they were offered." },
                         "formattingNotChecked": { "type": "boolean" },
                         "nothingToCheck": { "type": "boolean", "description": "The project had no files to check." },

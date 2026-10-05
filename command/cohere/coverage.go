@@ -618,7 +618,7 @@ func writeDeadSuppressions(out io.Writer, sites []program.DeadSuppression) {
 // writeCrashedNote names one file a rule could not finish. Printed in full in both modes and before the
 // details, because a file nothing checked needs action.
 func writeCrashedNote(out io.Writer, fileName string, cause any) {
-	fmt.Fprintf(out, "  crashed: %s could not be linted, so nothing in it was checked: %v\n", fileName, cause)
+	fmt.Fprintf(out, "  crashed: %s: %s\n", fileName, runCrash{Path: fileName, Cause: fmt.Sprint(cause)}.message())
 }
 
 // namedGapsSentence is what "this run did not check everything" says when every phase ran and a file
@@ -719,6 +719,9 @@ func writeLintReport(out io.Writer, report lintReport) {
 		printRuleDiagnostic(out, diagnostic, report.LintConfig)
 	}
 	coverage := report.Result.Coverage
+	for _, crash := range crashesFrom(coverage) {
+		printCrash(out, crash)
+	}
 	// The account below is `--verbose`'s; the footer carries what a reader needs of it in every view.
 	account := accountOutput(out)
 	fmt.Fprintf(accountOutput(invocationOutput(out)),
@@ -747,6 +750,7 @@ func writeLintReport(out io.Writer, report lintReport) {
 	activeSummary.Nodes = coverage.NodesVisited
 	activeSummary.Findings += len(report.Result.Diagnostics)
 	activeSummary.Gaps.CrashedFiles = len(summary.Crashes)
+	activeSummary.Gaps.RuleCrashes = len(summary.RuleCrashes)
 	activeSummary.Skips = rulesSkippingEveryFile(summary.Notes, coverage.RulesOffered)
 }
 
@@ -820,8 +824,7 @@ func writeCoverageNotes(out io.Writer, summary coverageSummary, details bool) {
 		writeCrashedNote(out, crash.File, crash.Cause)
 	}
 	for _, crash := range summary.RuleCrashes {
-		fmt.Fprintf(out, "  crashed: rule %s could not finish %s, so its verdict on that file is missing and the file's other rules ran: %s\n",
-			crash.Rule, crash.File, crash.Cause)
+		fmt.Fprintf(out, "  crashed: %s: %s\n", crash.File, runCrash{Path: crash.File, Rule: crash.Rule, Cause: crash.Cause}.message())
 	}
 	if details {
 		writeCoverageDetails(out, summary)

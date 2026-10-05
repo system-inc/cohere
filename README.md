@@ -178,6 +178,9 @@ A run prints three things, in order:
   the path, then the rules whose fixes it took, with a count past one. Past 20 files it says how many
   more, and `--verbose` lists them all.
 - **Its findings,** one per line, as `path:line:col severity rule message`.
+- **Any crash,** one per line, as `path crash rule message`: a rule cohere could not finish on a file, or
+  a file it could not check at all. That's a bug in cohere, not in your code, and it fails the run (see
+  [Reporting bugs](#reporting-bugs)).
 - **One footer line:** the verdict (✓ 💎 or ✗ ☠️), how long the run took, what it found, how many files
   it cohered, and in the parentheses how much it covered.
 
@@ -199,8 +202,9 @@ A count is exact, with its thousands grouped (`3,923`); `--json` gives the plain
 is left out, so a cold run shows no `cached` and a run with nothing changed no `checked`.
 
 Anything the run did not check is in the footer even when it passes, so a green line never hides a
-gap: `✓ 💎 2.4s (…) • ⚠ 1 file crashed`. The same goes for a phase that could not run, a rule that
-skipped every file, formatting not checked, and a run narrowed to some of the files.
+gap: `✓ 💎 2.4s (…) • 💅 formatting not checked`. The same goes for a phase that could not run, a rule
+that skipped every file, and a run narrowed to some of the files. A crash is in the footer too, and it
+never passes.
 
 On a terminal the verdict and time are bold, what was found is red, and the parentheses are dim. A
 pipe, a file or `NO_COLOR` gets no color codes at all.
@@ -225,7 +229,8 @@ widened to the whole tree, prints only there; one that names something left unch
 default footer says too.
 
 `--json` is for a program to read. It prints newline-delimited JSON, one object per line, each with a
-`kind`: a `finding` per finding, a `fixed` and a `formatted` per rewritten file, and a `summary` last.
+`kind`: a `finding` per finding, a `fixed` and a `formatted` per rewritten file, a `crash` per crash,
+and a `summary` last.
 The summary carries a `schemaVersion`, the verdict, the timings and counts, and `gaps`, everything the
 run did not check, which a program deciding whether to trust a passing run should read too.
 [schema/CohereOutput.schema.json](schema/CohereOutput.schema.json) describes every field. Read
@@ -236,7 +241,7 @@ run did not check, which a program deciding whether to trust a passing run shoul
 | Code | Meaning |
 | --- | --- |
 | `0` | no problems found |
-| `1` | it found problems, or cohere itself could not run, for example on a settings error |
+| `1` | it found problems, cohere crashed on a file, or cohere itself could not run, for example on a settings error |
 | `2` | the command line was wrong, such as an unknown flag |
 
 `1` covers both findings and failures, so in CI the output says which one it was.
@@ -317,6 +322,12 @@ gh attestation verify cohere-darwin-arm64/bin/cohere --repo system-inc/cohere
   and the VS Code extension are attested.
 
 The commands are written for a macOS or Linux shell.
+
+## Reporting bugs
+
+Report a bug at <https://github.com/system-inc/cohere/issues>. Include the output of `cohere --version`,
+the rule, the smallest code that shows it, and what cohere printed. A crash line already says most of
+that, so paste it whole.
 
 ## Contributing
 
