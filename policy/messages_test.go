@@ -97,15 +97,12 @@ func TestEachLanguageRendersItsOwnTermsAndValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	restore := UseMessages(catalog)
-	defer restore()
-
 	typeScript := MessageHandle{Rule: "base/consistency-no-thing", Id: "thing"}
-	if got, want := typeScript.Render(map[string]string{"kind": "class", "count": "3"}), "This is a class, which names 3 things."; got != want {
+	if got, want := catalog.Render(typeScript, map[string]string{"kind": "class", "count": "3"}), "This is a class, which names 3 things."; got != want {
 		t.Errorf("TypeScript renders %q, want %q", got, want)
 	}
 	swift := MessageHandle{Rule: "cohere-swift/consistency-no-thing", Id: "thing"}
-	if got, want := swift.Render(map[string]string{"count": "3"}), "This is an enum, which names 3 things."; got != want {
+	if got, want := catalog.Render(swift, map[string]string{"count": "3"}), "This is an enum, which names 3 things."; got != want {
 		t.Errorf("Swift renders %q, want %q", got, want)
 	}
 
@@ -120,7 +117,7 @@ func TestEachLanguageRendersItsOwnTermsAndValues(t *testing.T) {
 					t.Errorf("%s rendered", name)
 				}
 			}()
-			typeScript.Render(values)
+			catalog.Render(typeScript, values)
 		}()
 	}
 }
@@ -199,30 +196,27 @@ func TestPhrasesRenderTheSharedTextAndThePickedOption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	restore := UseMessages(catalog)
-	defer restore()
-
 	first := MessageHandle{Rule: "base/consistency-no-thing", Id: "first"}
 	second := MessageHandle{Rule: "base/consistency-no-thing", Id: "second"}
-	setter := first.Option("reason", "setter")
-	constructor := first.Option("reason", "constructor")
-	if got, want := first.Render(map[string]string{"name": "value"}, setter), "First, because it is a setter for value. Both say this."; got != want {
+	setter := catalog.Option(first, "reason", "setter")
+	constructor := catalog.Option(first, "reason", "constructor")
+	if got, want := catalog.Render(first, map[string]string{"name": "value"}, setter), "First, because it is a setter for value. Both say this."; got != want {
 		t.Errorf("the setter option renders %q, want %q", got, want)
 	}
-	if got, want := first.Render(nil, constructor), "First, because it is a constructor. Both say this."; got != want {
+	if got, want := catalog.Render(first, nil, constructor), "First, because it is a constructor. Both say this."; got != want {
 		t.Errorf("the constructor option renders %q, want %q", got, want)
 	}
-	if got, want := second.Render(nil), "Second. Both say this."; got != want {
+	if got, want := catalog.Render(second, nil), "Second. Both say this."; got != want {
 		t.Errorf("the shared phrase renders %q, want %q", got, want)
 	}
 
 	for name, render := range map[string]func(){
-		"no option":                           func() { first.Render(nil) },
-		"two options for one phrase":          func() { first.Render(nil, constructor, constructor) },
-		"another message's option":            func() { second.Render(nil, constructor) },
-		"the option's value missing":          func() { first.Render(nil, setter) },
-		"a value the picked option lacks":     func() { first.Render(map[string]string{"name": "value"}, constructor) },
-		"an option the catalog does not hold": func() { first.Option("reason", "getter") },
+		"no option":                           func() { catalog.Render(first, nil) },
+		"two options for one phrase":          func() { catalog.Render(first, nil, constructor, constructor) },
+		"another message's option":            func() { catalog.Render(second, nil, constructor) },
+		"the option's value missing":          func() { catalog.Render(first, nil, setter) },
+		"a value the picked option lacks":     func() { catalog.Render(first, map[string]string{"name": "value"}, constructor) },
+		"an option the catalog does not hold": func() { catalog.Option(first, "reason", "getter") },
 	} {
 		func() {
 			defer func() {
@@ -295,9 +289,6 @@ func TestAnOptionCanGiveItsTextByLanguage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an option with text by language is refused: %v", err)
 	}
-	restore := UseMessages(catalog)
-	defer restore()
-
 	typeScript := MessageHandle{Rule: "base/consistency-no-thing", Id: "lostUpdate"}
 	swift := MessageHandle{Rule: "cohere-swift/consistency-no-thing", Id: "lostUpdate"}
 	for _, rendered := range []struct {
@@ -312,7 +303,7 @@ func TestAnOptionCanGiveItsTextByLanguage(t *testing.T) {
 		{swift, "variable", map[string]string{"target": "total"}, "This write is computed from the property total."},
 		{typeScript, "storeEntry", map[string]string{"read": "cache.get(key)"}, "This write is computed from what cache.get(key) returned."},
 	} {
-		if got := rendered.handle.Render(rendered.values, rendered.handle.Option("source", rendered.option)); got != rendered.want {
+		if got := catalog.Render(rendered.handle, rendered.values, catalog.Option(rendered.handle, "source", rendered.option)); got != rendered.want {
 			t.Errorf("%s %s renders %q, want %q", rendered.handle.Rule, rendered.option, got, rendered.want)
 		}
 	}
@@ -322,7 +313,7 @@ func TestAnOptionCanGiveItsTextByLanguage(t *testing.T) {
 				t.Error("the Swift rule took a TypeScript-only option")
 			}
 		}()
-		swift.Option("source", "storeEntry")
+		catalog.Option(swift, "source", "storeEntry")
 	}()
 
 	for _, refused := range []struct {

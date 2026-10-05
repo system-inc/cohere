@@ -23,10 +23,18 @@ type Site struct {
 	Source *checker.Type
 	Target *checker.Type
 
-	// Fresh is a source nobody else holds: an object or array literal, written in place. Nothing can
-	// write into it through another name, so it is no hole at its own level (probe h11), and its parts
-	// are sites of their own (each property and element), so a rule judges its top and does not descend.
+	// Fresh is a source nobody else holds: an object or array literal, written in place, or a conditional
+	// choosing between them. Nothing can write into it through another name, so it is no hole at its own
+	// level (probe h11), and its parts are sites of their own (each property and element), so a rule judges
+	// its top and does not descend.
 	Fresh bool
+
+	// NewContainer is a source made by this expression whose parts were not: `new Map()`, `items.map(...)`,
+	// `Object.values(...)`. Nobody else holds the container, so its own slots are no hole, and what it holds
+	// may still be shared, so the walk goes on into it with the container's slots read-only. Measured on our
+	// four consumers, most of what invariant-mutable reported before this was an array a `.map` had just
+	// built, seen as a wider array (#drbrp8c).
+	NewContainer bool
 }
 
 // Listeners returns the listeners that find every site in a file and hand each to visit.
@@ -59,7 +67,8 @@ func Listeners(ctx rule.Context, visit func(Site)) rule.Listeners {
 		if source == nil || source == target {
 			return
 		}
-		visit(Site{Node: expression, Source: source, Target: target, Fresh: isFresh(expression)})
+		visit(Site{Node: expression, Source: source, Target: target, Fresh: isFresh(expression),
+			NewContainer: isNewContainer(expression)})
 	}
 	annotated := func(typeNode *ast.Node, expression *ast.Node) {
 		if typeNode == nil || expression == nil {
@@ -184,11 +193,65 @@ func offerUpcast(typeChecker *checker.Checker, node *ast.Node, offer func(*ast.N
 }
 
 // isFresh is an expression whose value is made right here: an object or array literal, parenthesized or
-// not. A call is never fresh, even one that returns a new array, because nothing in its type says so.
+// not, or a conditional whose branches each are one or are nothing (`undefined`, `null`).
 func isFresh(expression *ast.Node) bool {
-	switch ast.SkipParentheses(expression).Kind {
+	expression = ast.SkipParentheses(expression)
+	switch expression.Kind {
 	case ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression:
 		return true
+	case ast.KindConditionalExpression:
+		conditional := expression.AsConditionalExpression()
+		return isFreshOrNothing(conditional.WhenTrue) && isFreshOrNothing(conditional.WhenFalse)
+	}
+	return false
+}
+
+func isFreshOrNothing(expression *ast.Node) bool {
+	expression = ast.SkipParentheses(expression)
+	switch {
+	case expression.Kind == ast.KindNullKeyword:
+		return true
+	case expression.Kind == ast.KindIdentifier && expression.Text() == "undefined":
+		return true
+	}
+	return isFresh(expression)
+}
+
+// newArrayMethods are the library methods that return an array they just built, never the receiver or
+// anything else already held. `sort` and `reverse` return the receiver and are not here.
+var newArrayMethods = map[string]bool{
+	"map": true, "filter": true, "slice": true, "concat": true, "flat": true, "flatMap": true,
+	"toSorted": true, "toReversed": true, "toSpliced": true, "with": true,
+}
+
+// newArrayFunctions are the library calls on a global that return a container they just built.
+var newArrayFunctions = map[string]map[string]bool{
+	"Array":  {"from": true, "of": true},
+	"Object": {"keys": true, "values": true, "entries": true, "fromEntries": true},
+}
+
+// isNewContainer is an expression that builds a container its parts were not built with: a `new`, or a
+// call to a library method or function that returns a new array. Judged by name, so a user method named
+// `map` that returns something it holds would read as new; the names are the library's, and a project
+// that reuses them for a shared value is the rare case this accepts.
+func isNewContainer(expression *ast.Node) bool {
+	expression = ast.SkipParentheses(expression)
+	switch expression.Kind {
+	case ast.KindNewExpression:
+		return true
+	case ast.KindCallExpression:
+		callee := ast.SkipParentheses(expression.Expression())
+		if callee.Kind != ast.KindPropertyAccessExpression {
+			return false
+		}
+		access := callee.AsPropertyAccessExpression()
+		name := access.Name().Text()
+		if receiver := ast.SkipParentheses(access.Expression); receiver.Kind == ast.KindIdentifier {
+			if functions, isGlobal := newArrayFunctions[receiver.Text()]; isGlobal {
+				return functions[name]
+			}
+		}
+		return newArrayMethods[name]
 	}
 	return false
 }

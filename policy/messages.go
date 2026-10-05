@@ -503,7 +503,13 @@ func MessageOf(ruleName string, id string) MessageHandle {
 // Option is a rule's claim on one option of an object phrase this message uses, taken in a
 // package-level var like the handle. An option the catalog does not hold for this message panics.
 func (handle MessageHandle) Option(phrase string, name string) MessageOption {
-	template, found := currentMessages.Load().templates[handle.Rule][handle.Id]
+	return currentMessages.Load().Option(handle, phrase, name)
+}
+
+// Option is handle.Option against this catalog rather than the current one, so a test can claim an option
+// of a catalog it built without swapping the one every other test renders from.
+func (catalog *MessageCatalog) Option(handle MessageHandle, phrase string, name string) MessageOption {
+	template, found := catalog.templates[handle.Rule][handle.Id]
 	if _, held := template.options[phrase][name]; !found || !held {
 		panic(fmt.Sprintf("policy/messages: %s %q has no option %q of the phrase %q", handle.Rule, handle.Id, name, phrase))
 	}
@@ -519,7 +525,15 @@ func (handle MessageHandle) Option(phrase string, name string) MessageOption {
 // edit. A missing or extra option, or a value the text does not use or uses and was not given, panics:
 // a finding reading `{{constructor}}` or `<<reason>>` is the silent version.
 func (handle MessageHandle) Render(values map[string]string, options ...MessageOption) string {
-	template, found := currentMessages.Load().templates[handle.Rule][handle.Id]
+	return currentMessages.Load().Render(handle, values, options...)
+}
+
+// Render is handle.Render against this catalog rather than the current one. A test of the catalog itself
+// renders through this and swaps nothing, so it runs in parallel with every test that renders the real
+// messages: swapping the global under t.Parallel was a race, and one test read another's catalog
+// (#hzxspf5).
+func (catalog *MessageCatalog) Render(handle MessageHandle, values map[string]string, options ...MessageOption) string {
+	template, found := catalog.templates[handle.Rule][handle.Id]
 	if !found {
 		panic(fmt.Sprintf("policy/messages: %s has no message %q", handle.Rule, handle.Id))
 	}
@@ -551,8 +565,9 @@ func (handle MessageHandle) Render(values map[string]string, options ...MessageO
 }
 
 // UseMessages makes catalog the one handles render from until restore is called. It exists for the
-// test that edits an entry and expects the edit in a rule's finding; a test calling it must not run in
-// parallel with others that render.
+// test that edits an entry and expects the edit in a rule's finding, which renders inside the rule and so
+// cannot be handed a catalog; a test calling it must not run in parallel with others that render. A test
+// of the catalog itself renders through MessageCatalog.Render instead and swaps nothing.
 func UseMessages(catalog *MessageCatalog) (restore func()) {
 	previous := currentMessages.Swap(catalog)
 	return func() { currentMessages.Store(previous) }

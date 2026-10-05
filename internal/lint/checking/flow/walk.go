@@ -82,7 +82,7 @@ func Walk(typeChecker *checker.Checker, site Site, judge Judge) (Pair, bool) {
 		wrong, _ := judge(top)
 		return top, wrong
 	}
-	walker := walker{typeChecker: typeChecker, judge: judge, visited: map[[2]*checker.Type]bool{}}
+	walker := walker{typeChecker: typeChecker, judge: judge, visited: map[[2]*checker.Type]bool{}, newContainer: site.NewContainer}
 	return walker.relate(top, 0)
 }
 
@@ -90,6 +90,10 @@ type walker struct {
 	typeChecker *checker.Checker
 	judge       Judge
 	visited     map[[2]*checker.Type]bool
+
+	// newContainer is a site whose source container was just built: its own slots are read-only to the
+	// walk, since no other name can write into them. See Site.NewContainer.
+	newContainer bool
 }
 
 func (w walker) relate(pair Pair, depth int) (Pair, bool) {
@@ -109,9 +113,14 @@ func (w walker) relate(pair Pair, depth int) (Pair, bool) {
 	if !descend {
 		return Pair{}, false
 	}
+	// A union's members are paired as parts of the same slot, so the slot's own mutability was judged above,
+	// on the whole pair, and is not judged again member by member: a `Handler | null` slot is not a `null`
+	// slot a handler could be written into. Before this, every element seen as an `Element` reported its
+	// `onfullscreenchange` this way, on all four consumers (#drbrp8c). What lies inside each member keeps its
+	// own mutability.
 	if pair.Source.Flags()&checker.TypeFlagsUnion != 0 {
 		for _, member := range pair.Source.Types() {
-			if found, isWrong := w.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path, Mutable: pair.Mutable}, depth+1); isWrong {
+			if found, isWrong := w.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path}, depth+1); isWrong {
 				return found, true
 			}
 		}
@@ -124,7 +133,7 @@ func (w walker) relate(pair Pair, depth int) (Pair, bool) {
 			if !checker.Checker_isTypeAssignableTo(w.typeChecker, pair.Source, member) {
 				continue
 			}
-			found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path, Mutable: pair.Mutable}, depth+1)
+			found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path}, depth+1)
 			if !isWrong {
 				return Pair{}, false
 			}
@@ -140,6 +149,9 @@ func (w walker) relate(pair Pair, depth int) (Pair, bool) {
 // parts pairs the parts of two types that are not unions.
 func (w walker) parts(pair Pair, depth int) (Pair, bool) {
 	source, target := pair.Source, pair.Target
+	// The slots of a container the site just built are no one else's, so writing through the wider type
+	// reaches only this value. Its parts' own slots keep their mutability.
+	ownSlotsShared := !(w.newContainer && len(pair.Path) == 0)
 	into := func(kind StepKind, name string, index int) []Step {
 		path := make([]Step, len(pair.Path), len(pair.Path)+1)
 		copy(path, pair.Path)
@@ -156,7 +168,7 @@ func (w walker) parts(pair Pair, depth int) (Pair, bool) {
 
 	if checker.Checker_isArrayType(w.typeChecker, target) {
 		targetElement := w.typeArgument(target, 0)
-		mutable := !isNamed(target, "ReadonlyArray")
+		mutable := ownSlotsShared && !isNamed(target, "ReadonlyArray")
 		var pairs []Pair
 		switch {
 		case checker.Checker_isArrayType(w.typeChecker, source):
@@ -172,7 +184,7 @@ func (w walker) parts(pair Pair, depth int) (Pair, bool) {
 		if !checker.IsTupleType(source) {
 			return Pair{}, false
 		}
-		mutable := !target.TargetTupleType().IsReadonly()
+		mutable := ownSlotsShared && !target.TargetTupleType().IsReadonly()
 		sourceElements := checker.Checker_getTypeArguments(w.typeChecker, source)
 		targetElements := checker.Checker_getTypeArguments(w.typeChecker, target)
 		var pairs []Pair
@@ -190,7 +202,7 @@ func (w walker) parts(pair Pair, depth int) (Pair, bool) {
 		targetArguments := checker.Checker_getTypeArguments(w.typeChecker, target)
 		var pairs []Pair
 		for index := 0; index < len(sourceArguments) && index < len(targetArguments); index++ {
-			pairs = append(pairs, Pair{sourceArguments[index], targetArguments[index], into(StepTypeArgument, container, index), !readonly})
+			pairs = append(pairs, Pair{sourceArguments[index], targetArguments[index], into(StepTypeArgument, container, index), ownSlotsShared && !readonly})
 		}
 		return each(pairs)
 	}
@@ -209,7 +221,12 @@ func (w walker) parts(pair Pair, depth int) (Pair, bool) {
 		})
 		sourceParameters := checker.Signature_parameters(sourceSignature)
 		targetParameters := checker.Signature_parameters(targetSignature)
+		// Positional parameters pair by position, and the pairing stops at a rest parameter on either side,
+		// whose type is a tuple or array of everything after it rather than one parameter's type.
 		for index := 0; index < len(sourceParameters) && index < len(targetParameters); index++ {
+			if isRestParameter(sourceParameters[index]) || isRestParameter(targetParameters[index]) {
+				break
+			}
 			pairs = append(pairs, Pair{
 				checker.Checker_getTypeOfSymbol(w.typeChecker, targetParameters[index]),
 				checker.Checker_getTypeOfSymbol(w.typeChecker, sourceParameters[index]),
@@ -229,7 +246,7 @@ func (w walker) parts(pair Pair, depth int) (Pair, bool) {
 			checker.Checker_getTypeOfSymbol(w.typeChecker, sourceProperty),
 			checker.Checker_getTypeOfSymbol(w.typeChecker, property),
 			into(StepProperty, property.Name, -1),
-			!checker.Checker_isReadonlySymbol(w.typeChecker, property),
+			ownSlotsShared && !checker.Checker_isReadonlySymbol(w.typeChecker, property),
 		})
 	}
 	return each(pairs)
@@ -283,6 +300,18 @@ func declaredInDeclarationFile(symbol *ast.Symbol) bool {
 		}
 	}
 	return false
+}
+
+// isRestParameter is a parameter declared `...name`.
+func isRestParameter(parameter *ast.Symbol) bool {
+	declaration := parameter.ValueDeclaration
+	return declaration != nil && declaration.Kind == ast.KindParameter &&
+		declaration.AsParameterDeclaration().DotDotDotToken != nil
+}
+
+// IsArrayLike is an array or a tuple, read-only or not.
+func IsArrayLike(typeChecker *checker.Checker, t *checker.Type) bool {
+	return checker.Checker_isArrayType(typeChecker, t) || checker.IsTupleType(t)
 }
 
 // PathText is a path as a reader follows it from the whole value: `.pets[]`, `<Map value>`, `()`.

@@ -115,9 +115,7 @@ func TestOneEditReachesBothEngines(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	restore := UseMessages(catalog)
-	goText := MessageOf("base/consistency-no-bare-throw", "bareThrow").Render(map[string]string{"constructor": "Error"})
-	restore()
+	goText := catalog.Render(MessageHandle{Rule: "base/consistency-no-bare-throw", Id: "bareThrow"}, map[string]string{"constructor": "Error"})
 	if !strings.Contains(goText, changed) {
 		t.Errorf("the Go rule renders %q", goText)
 	}

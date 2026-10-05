@@ -158,6 +158,45 @@ func TestAListRuleReceivesEveryElement(t *testing.T) {
 	}
 }
 
+// TestANullIsRefusedBeforeAnyDecoderSeesIt pins the seam: the refusal happens here, for both
+// arities, so no decoder has to remember that Go reads a null as "leave the field alone". The
+// decoders below accept anything, which is what proves the refusal is the config layer's.
+func TestANullIsRefusedBeforeAnyDecoderSeesIt(t *testing.T) {
+	t.Parallel()
+	acceptAll := func(raw json.RawMessage) (any, error) { return string(raw), nil }
+	registry := OptionsRegistry{"single": {Decode: acceptAll}, "listed": {DecodeList: acceptAll}}
+
+	for _, testCase := range []struct {
+		rule     string
+		elements []string
+		want     string
+	}{
+		{"single", []string{`null`}, "element 1 is null"},
+		{"single", []string{`{"b": 1, "a": {"c": [0, null]}}`}, "element 1 at a.c.1 is null"},
+		{"listed", []string{`"always"`, `{"null": null}`}, "element 2 at null is null"},
+	} {
+		elements := make([]json.RawMessage, 0, len(testCase.elements))
+		for _, element := range testCase.elements {
+			elements = append(elements, json.RawMessage(element))
+		}
+		_, err := registry.Decode(testCase.rule, elements)
+		if err == nil {
+			t.Errorf("%s %v was accepted", testCase.rule, testCase.elements)
+			continue
+		}
+		for _, want := range []string{testCase.rule, testCase.want} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("%s %v: the refusal does not name %q: %v", testCase.rule, testCase.elements, want, err)
+			}
+		}
+	}
+
+	// The control: the string "null" and a key named null are values, not nulls, and pass through.
+	if _, err := registry.Decode("listed", []json.RawMessage{json.RawMessage(`"null"`), json.RawMessage(`{"null": "ignore"}`)}); err != nil {
+		t.Errorf("a string and a key spelled null were refused: %v", err)
+	}
+}
+
 // TestMalformedOptionsAreAnError guards against a rule silently receiving a zero struct because its
 // JSON did not parse.
 func TestMalformedOptionsAreAnError(t *testing.T) {

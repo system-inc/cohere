@@ -36,6 +36,8 @@ func TestNominalClassFiresOnEveryProvenHole(t *testing.T) {
 		"an argument":                   {shelters + `function house(shelter: AnimalShelter): void { shelter.admit({ name: 'Tom' }); } house(new DogShelter());`, "notAnInstance", "new DogShelter()"},
 		"a class in a property":         {shelters + `const dogs = { shelter: new DogShelter() }; const all: { readonly shelter: AnimalShelter } = dogs;`, "notAnInstance", "dogs"},
 		"an empty class takes anything": {`class Token {} const token: Token = 42;`, "notAnInstance", "42"},
+		// Strict on `any` too: a Box<any> seen as a Box<Dog> is the same hole the any opened, reported where it is used.
+		"an any type argument": {shelters + `declare const loose: Box<any>; const strict: Box<Dog> = loose;`, "typeArgumentsDiffer", "loose"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

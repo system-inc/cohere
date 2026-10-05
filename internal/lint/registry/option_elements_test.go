@@ -315,6 +315,62 @@ func TestAnElementTheRuleDoesNotTakeIsALoudError(t *testing.T) {
 	}
 }
 
+/*
+ * A null anywhere in a rule's options is refused, naming the element and the path to the null.
+ *
+ * Go's decoder reads a null as "leave the field alone", so before #pd2chkx `{"props": null}` loaded
+ * as no-self-assign's default and `{"allowConstructorFlags": null}` as no-invalid-regexp's, while
+ * ESLint's validator refuses both: no ported rule's upstream schema admits null. The rows span the
+ * three decoder shapes: one built on rule.UnmarshalOptions, one list rule that reads its elements
+ * with json.Unmarshal, and a null standing for a whole element.
+ */
+func TestANullInARulesOptionsIsRefused(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		rule, accepted, refused, mustName string
+	}{
+		{
+			rule:     "no-self-assign",
+			accepted: `["error", {"props": false}]`,
+			refused:  `["error", {"props": null}]`,
+			mustName: "element 1 at props is null",
+		},
+		{
+			rule:     "no-invalid-regexp",
+			accepted: `["error", {"allowConstructorFlags": ["u"]}]`,
+			refused:  `["error", {"allowConstructorFlags": ["u", null]}]`,
+			mustName: "element 1 at allowConstructorFlags.1 is null",
+		},
+		{
+			rule:     "eqeqeq",
+			accepted: `["error", "always", {"null": "ignore"}]`,
+			refused:  `["error", "always", {"null": null}]`,
+			mustName: "element 2 at null is null",
+		},
+		{
+			rule:     "eqeqeq",
+			accepted: `["error", "always"]`,
+			refused:  `["error", null]`,
+			mustName: "element 1 is null",
+		},
+	} {
+		if _, err := optionsThroughTheConfigLayer(t, testCase.rule, testCase.accepted); err != nil {
+			t.Errorf("%s refused %s, so the refusal below would not be about the null: %v", testCase.rule, testCase.accepted, err)
+		}
+		_, err := optionsThroughTheConfigLayer(t, testCase.rule, testCase.refused)
+		if err == nil {
+			t.Errorf("%s %s loaded, and the null would have read as the default", testCase.rule, testCase.refused)
+			continue
+		}
+		for _, want := range []string{testCase.rule, testCase.mustName} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("%s: the refusal does not name %q: %v", testCase.rule, want, err)
+			}
+		}
+	}
+}
+
 // optionsThroughTheConfigLayer writes one rule's config value to a CohereSettings.json, loads and
 // resolves it, and decodes the result through the registry exactly as the lint walk does.
 func optionsThroughTheConfigLayer(t *testing.T, ruleName string, value string) (any, error) {

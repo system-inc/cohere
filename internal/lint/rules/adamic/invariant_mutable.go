@@ -33,10 +33,17 @@ var invariantMutableText = policy.MessageOf("adamic/invariant-mutable", "mutable
  * # How
  *
  * flow.Listeners finds every place a value goes into a typed slot, and flow.Walk pairs the value's parts
- * with the slot's. At every pair the target marks mutable, the two types must be identical, by the
- * checker's own identity relation: mutual assignability is not enough, since `{ x }` and `{ x; y?: number }`
- * are mutually assignable and that is exactly no-optional-widening's hole. Identity also catches a literal
- * widened in a mutable slot (`{ kind: 'Circle' }` into `{ kind: string }`) and a mutable callback slot.
+ * with the slot's. At every pair the target marks mutable, whatever the wider type can write there must be
+ * something the original can read: the target's slot type must be assignable to the source's. tsc already
+ * proved the other direction when it accepted the site, so together the slot is invariant. That catches a
+ * literal widened in a mutable slot (`{ kind: 'Circle' }` into `{ kind: string }`) and a callback slot
+ * narrowed the wrong way, and leaves alone a slot whose two types differ only where writing back is safe, as
+ * a DOM event handler's `this` does on every element seen as `Element`.
+ *
+ * It began as identity, by the checker's identity relation, and the four consumers measured why not: an
+ * `HTMLElement` seen as an `Element` reported its event handler slots, which differ only in `this` and are
+ * safe to write back. `{ x }` against `{ x; y?: number }` is mutually assignable, and that hole is
+ * no-optional-widening's.
  *
  * A class instance is nominal-class's: it requires identical type arguments, which covers every mutable
  * part, so this rule does not descend into one and the two rules never report one hole twice.
@@ -63,7 +70,9 @@ var InvariantMutable = rule.Rule{
 				if !pair.Mutable {
 					return false, true
 				}
-				return !checker.Checker_isTypeIdenticalTo(typeChecker, pair.Source, pair.Target), true
+				// Writing through the wider type stores a target value where the original reads a source
+				// value, so every target value must be a source value too.
+				return !checker.Checker_isTypeAssignableTo(typeChecker, pair.Target, pair.Source), true
 			})
 			if !wrong {
 				return
