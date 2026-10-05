@@ -110,7 +110,8 @@
                         "formattingNotChecked": { "type": "boolean" },
                         "nothingToCheck": { "type": "boolean", "description": "The project had no files to check." },
                         "modifiedBuild": { "type": "boolean", "description": "The binary was built from a modified tree, so no commit reproduces these findings." },
-                        "unread": { "type": "string", "description": "Files the run could not check for any other reason, as the run said it." }
+                        "unread": { "type": "string", "description": "Files the run could not check for any other reason, as the run said it." },
+                        "adamicIgnored": { "type": "integer", "description": "Adamic .a files the program holds that git's ignore rules leave out of the format walk: type-checked and linted, never formatted. Absent when there are none." }
                     }
                 },
                 "adamic": {

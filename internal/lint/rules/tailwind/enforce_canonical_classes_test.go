@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -492,10 +493,9 @@ func TestCanonicalFixturesActuallyRan(t *testing.T) {
 	packageRoot := unknownFixturePackageRoot()
 	if packageRoot == "" {
 		t.Fatalf(
-			"no installed tailwindcss found from %s, so every fixture in this file skipped and the "+
-				"package still reported ok. Either the search root is wrong or this machine has no "+
-				"Tailwind to test against; both need a human, and neither should read as a pass",
-			unknownFixtureSearchRoot,
+			"the vendored tailwindcss at %s is missing, so every fixture in this file would skip and the "+
+				"package still report ok; restore it (internal/lint/rules/tailwind/vendored)",
+			vendored.TailwindPackageRoot(),
 		)
 	}
 

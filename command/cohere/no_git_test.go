@@ -116,7 +116,7 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 		output := stdout.String() + "\n--- stderr\n" + stderr.String()
 		code := 0
 		if exitError, isExit := err.(*exec.ExitError); isExit {
-			code = exitError.ExitCode()
+			code = childExitCode(t, exitError)
 		} else if err != nil {
 			t.Fatalf("running cohere: %v\n%s", err, output)
 		}

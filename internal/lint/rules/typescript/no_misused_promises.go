@@ -107,6 +107,7 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 	*options = NoMisusedPromisesOptions{ChecksSpreads: wire.ChecksSpreads}
 	// An object turns the check on, as upstream's truthy test reads it, and a missing flagUnions is
 	// "none", as upstream's normalizeFlagUnionsOption has it.
+	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 	conditionals := strings.TrimSpace(string(wire.ChecksConditionals))
 	switch {
 	case conditionals == "":
@@ -132,6 +133,7 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 	default:
 		return fmt.Errorf("checksConditionals takes a boolean or an object holding flagUnions, got %s", conditionals)
 	}
+	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 	trimmed := strings.TrimSpace(string(wire.ChecksVoidReturn))
 	switch {
 	case trimmed == "":

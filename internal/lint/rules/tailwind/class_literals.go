@@ -17,6 +17,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -668,9 +669,9 @@ func classLiteralFrom(literal *ast.Node, origin ClassLiteralOrigin) ClassLiteral
 // Fragments containing `${` are dropped rather than treated as classes. A literal that survived to
 // here with a hole in it is only partly known at lint time, and reporting on the visible half would
 // produce findings the author cannot act on.
-func SplitClasses(text string) []string {
+func SplitClasses(classString string) []string {
 	var classes []string
-	for _, field := range strings.Fields(text) {
+	for _, field := range text.WhitespaceFields(classString) {
 		if strings.Contains(field, "${") {
 			continue
 		}

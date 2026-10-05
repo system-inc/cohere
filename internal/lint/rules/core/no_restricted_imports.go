@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -602,7 +603,7 @@ func (c *noRestrictedImportsChecker) check(
 ) {
 	// Upstream trims the specifier before comparing, so `import x from ' fs '` is restricted by
 	// `fs`. The trim applies to both the path list and the pattern list.
-	source = strings.TrimSpace(source)
+	source = text.TrimWhitespace(source)
 
 	c.checkPaths(node, source, bindings, declarationIsTypeOnly)
 

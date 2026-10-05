@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
 type wave1Fixture struct {
@@ -202,7 +204,7 @@ func loadWave1DesignSystem(t *testing.T) *LoadedDesignSystem {
 	t.Helper()
 	system, err := LoadDesignSystem(LoadOptions{
 		EntryPoint:          "/Users/kirkouimet/Projects/ahra/app/_theme/styles/theme.css",
-		TailwindPackageRoot: "/Users/kirkouimet/Projects/ahra/node_modules/tailwindcss",
+		TailwindPackageRoot: vendored.TailwindPackageRoot(),
 	})
 	if err != nil {
 		t.Skipf("the ahra design system is not available here: %v", err)

@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -547,7 +548,7 @@ func preferExponentiationOperatorNeedsLeadingSemicolon(ctx rule.Context, node *a
 	// `foo;` or `if (foo) {}` no semicolon is added, while after `foo`, `foo()` or `var x = 1` one
 	// is. A statement at the top of a file has nothing to join at all.
 	start := rule.TokenRange(ctx.SourceFile, node).Pos()
-	preceding := strings.TrimSpace(ctx.SourceFile.Text()[:start])
+	preceding := text.TrimWhitespace(ctx.SourceFile.Text()[:start])
 	if preceding == "" {
 		return false
 	}

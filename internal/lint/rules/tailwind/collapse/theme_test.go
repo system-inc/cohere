@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
 // The fixture is the theme the shipped Tailwind 4.3.3 engine resolved for every stylesheet in the
@@ -106,10 +108,11 @@ type themeOptionFixture struct {
 // Both are 4.3.3, which is the point: the two repositories differ by their own `@theme` content on
 // an identical framework, so a table generated from either one is wrong for the other. That is the
 // defect this whole component exists to fix, and the corpus is what proves it is real rather than
-// theorized.
+// theorized. Both are the vendored snapshot of 4.3.3, which is that identical framework, on any machine
+// (#sycrdr6).
 var tailwindPackageRoots = map[string]string{
-	"ahra":              "/Users/kirkouimet/Projects/ahra/node_modules/.pnpm/tailwindcss@4.3.3/node_modules/tailwindcss",
-	"www-connected-app": "/Users/kirkouimet/Projects/connected/www-connected-app/node_modules/.pnpm/tailwindcss@4.3.3/node_modules/tailwindcss",
+	"ahra":              vendored.TailwindPackageRoot(),
+	"www-connected-app": vendored.TailwindPackageRoot(),
 }
 
 func loadThemeCorpus(t *testing.T) themeCorpus {

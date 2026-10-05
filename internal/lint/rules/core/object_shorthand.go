@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -664,13 +665,13 @@ func objectShorthandMethodToLongform(ctx rule.Context, member *ast.Node) ([]rule
 func objectShorthandFunctionToShorthand(ctx rule.Context, member *ast.Node,
 	assignment *ast.PropertyAssignment, value *ast.Node) (rule.Fix, bool) {
 
-	text := ctx.SourceFile.Text()
+	sourceText := ctx.SourceFile.Text()
 	key := assignment.Name()
 	if key == nil {
 		return rule.Fix{}, false
 	}
 	keyStart := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, key.Pos()).Pos()
-	keyText := text[keyStart:key.End()]
+	keyText := sourceText[keyStart:key.End()]
 
 	// A comment between the key and the value would be inside the replaced span, so upstream
 	// declines: `{ f: /* c */ function(){} }` is reported and not repaired.
@@ -680,7 +681,7 @@ func objectShorthandFunctionToShorthand(ctx rule.Context, member *ast.Node,
 	// also has to use the ORIGINAL initializer rather than the paren-unwrapped value, since
 	// unwrapping moves the start past a parenthesis the comment may sit behind.
 	valueStart := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, assignment.Initializer.Pos()).Pos()
-	if objectShorthandHasCommentBetween(text, key.End(), valueStart) {
+	if objectShorthandHasCommentBetween(sourceText, key.End(), valueStart) {
 		return rule.Fix{}, false
 	}
 
@@ -728,7 +729,7 @@ func objectShorthandFunctionToShorthand(ctx rule.Context, member *ast.Node,
 		// one corpus case whose four findings all lost their generics.
 		parameterStart = objectShorthandSignatureStart(ctx, value, parameterStart,
 			arrow.EqualsGreaterThanToken.Pos())
-		parameters := strings.TrimRight(text[parameterStart:arrow.EqualsGreaterThanToken.Pos()], " \t")
+		parameters := strings.TrimRight(sourceText[parameterStart:arrow.EqualsGreaterThanToken.Pos()], " \t")
 		if declared := value.Parameters(); len(declared) == 1 {
 			// A single parameter may be written without parentheses -- `foo => {}` -- and a
 			// method's list always has them. The test is whether a `(` appears before the
@@ -736,19 +737,19 @@ func objectShorthandFunctionToShorthand(ctx rule.Context, member *ast.Node,
 			parameterStartOffset := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, declared[0].Pos()).Pos()
 			hasParenthesis := false
 			for index := parameterStart; index < parameterStartOffset; index++ {
-				if text[index] == '(' {
+				if sourceText[index] == '(' {
 					hasParenthesis = true
 					break
 				}
 			}
 			if !hasParenthesis {
-				parameters = strings.TrimSpace(text[parameterStartOffset:arrow.EqualsGreaterThanToken.Pos()])
-				parameters = "(" + strings.TrimSpace(parameters) + ")"
+				parameters = text.TrimWhitespace(sourceText[parameterStartOffset:arrow.EqualsGreaterThanToken.Pos()])
+				parameters = "(" + text.TrimWhitespace(parameters) + ")"
 			}
 		}
-		separator := text[arrow.EqualsGreaterThanToken.End():bodyStart]
+		separator := sourceText[arrow.EqualsGreaterThanToken.End():bodyStart]
 		return rule.ReplaceRange(core.NewTextRange(keyStart, member.End()),
-			prefix+keyText+parameters+separator+text[bodyStart:value.End()]), true
+			prefix+keyText+parameters+separator+sourceText[bodyStart:value.End()]), true
 	}
 
 	// Everything from after the `function` keyword onward, which survives unchanged.
@@ -757,7 +758,7 @@ func objectShorthandFunctionToShorthand(ctx rule.Context, member *ast.Node,
 		return rule.Fix{}, false
 	}
 	return rule.ReplaceRange(core.NewTextRange(keyStart, member.End()),
-		prefix+keyText+text[tail:value.End()]), true
+		prefix+keyText+sourceText[tail:value.End()]), true
 }
 
 // objectShorthandParameterListStart finds the offset the converted method keeps from.

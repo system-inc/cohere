@@ -11,6 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/regexpattern"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -471,7 +472,7 @@ func sourceStartsWithHashbangBefore(source string, offset int) bool {
 	if firstNewline < 0 || offset <= firstNewline {
 		return false
 	}
-	return strings.TrimSpace(source[firstNewline+1:offset]) == ""
+	return text.TrimWhitespace(source[firstNewline+1:offset]) == ""
 }
 
 func isWordByteForRegexAdjacency(b byte) bool {

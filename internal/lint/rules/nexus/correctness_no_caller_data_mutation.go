@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -564,12 +565,12 @@ func correctnessNoCallerDataMutationTagsOf(file *ast.SourceFile, declaration *as
 // correctnessNoCallerDataMutationTagReason is the text a tag carries after its name, with the comment's
 // line-leading asterisks and the surrounding space removed. Empty for a bare tag.
 func correctnessNoCallerDataMutationTagReason(file *ast.SourceFile, tag *ast.Node) string {
-	text := file.Text()[tag.Pos():tag.End()]
-	_, reason, _ := strings.Cut(text, "@"+tag.TagName().Text())
-	reason = strings.TrimSuffix(strings.TrimSpace(reason), "*/")
+	tagSource := file.Text()[tag.Pos():tag.End()]
+	_, reason, _ := strings.Cut(tagSource, "@"+tag.TagName().Text())
+	reason = strings.TrimSuffix(text.TrimWhitespace(reason), "*/")
 	var words []string
 	for _, line := range strings.Split(reason, "\n") {
-		line = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "*"))
+		line = text.TrimWhitespace(strings.TrimLeft(text.TrimWhitespace(line), "*"))
 		if line != "" {
 			words = append(words, line)
 		}
@@ -581,7 +582,7 @@ func correctnessNoCallerDataMutationTagReason(file *ast.SourceFile, tag *ast.Nod
 // its first word, and the reason after it.
 func correctnessNoCallerDataMutationMutatesTagParts(file *ast.SourceFile, tag *ast.Node) (string, string) {
 	parameter, reason, _ := strings.Cut(correctnessNoCallerDataMutationTagReason(file, tag), " ")
-	return parameter, strings.TrimSpace(reason)
+	return parameter, text.TrimWhitespace(reason)
 }
 
 // correctnessNoCallerDataMutationParameterIndex is the position of the parameter a function names

@@ -255,7 +255,7 @@ func themeFingerprintOf(t *testing.T, files map[string]string) [sha256.Size]byte
 	var fingerprint [sha256.Size]byte
 	probe := BoundaryNoProjectThemeValue
 	probe.Run = func(ctx rule.Context, options any) rule.Listeners {
-		fingerprint = BoundaryNoProjectThemeValue.ProgramFingerprint(ctx.Program)
+		fingerprint = BoundaryNoProjectThemeValue.ProgramFingerprint(ctx.Program, options)
 		return nil
 	}
 	rule_testing.RunTypedFiles(t, probe, files, libraryFilePath)

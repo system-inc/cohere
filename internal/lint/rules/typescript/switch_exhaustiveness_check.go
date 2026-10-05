@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -419,7 +420,7 @@ func defaultCaseComment(ctx rule.Context, statement *ast.SwitchStatement, patter
 	if last.IsBlock {
 		value = strings.TrimSuffix(value, "*/")
 	}
-	if !pattern.MatchString(strings.TrimSpace(value)) {
+	if !pattern.MatchString(text.TrimWhitespace(value)) {
 		return nil
 	}
 	return last
