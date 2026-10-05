@@ -81,6 +81,12 @@ arrival order and names who holds them; `cohere-dev status` shows the pool and t
 110 to 180, made a 27s gate take 7 to 10 minutes, and failed tests on their deadlines. Inside a token's run
 nothing more is held back: its packages and `t.Parallel` tests use the whole share.
 
+The Go build cache is held under a cap, 40 GB unless `COHERE_DEV_CACHE_GB` says otherwise (#jc6ca7r).
+When a token's run ends, at most once every ten minutes for the machine, `cohere-dev` looks at the
+cache in the background, and when it is over the cap it takes every token, trims the least recently
+used entries to three quarters of the cap, and gives the tokens back. `cohere-dev status` shows the
+last look. Go alone keeps entries for five days, and the house refilled 200 GB in two and a half hours.
+
 A gate run never passes `-count=1`, and the wrapper refuses one for the whole module. Go's test cache
 skips every package whose inputs did not change, and after a one-file change `-count=1` cost 81% more
 CPU for the same verdict (1,180 against 2,136 core-seconds). A flaky test is fixed rather than re-run

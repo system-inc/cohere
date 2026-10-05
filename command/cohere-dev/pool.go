@@ -155,8 +155,11 @@ func withToken(what string, work func(environment []string) int) int {
 				if announced {
 					fmt.Fprintf(os.Stderr, "cohere-dev: took token %d after waiting %s\n", held.number, time.Since(waitingSince).Round(time.Second))
 				}
-				defer held.release()
-				return work(budgetEnvironment(os.Environ(), held.number, shape))
+				code := work(budgetEnvironment(os.Environ(), held.number, shape))
+				held.release()
+				// The run is over and its token free, so this is when the cache is looked at (cache.go).
+				startCacheTrim(directory)
+				return code
 			}
 		}
 		if !announced {
@@ -222,6 +225,7 @@ func status() int {
 		}
 		fmt.Printf("  token %d: %s\n", token, holder)
 	}
+	fmt.Println(cacheStatus(directory))
 	waiting := waiters(directory)
 	fmt.Printf("line: %d waiting\n", len(waiting))
 	for place, waiter := range waiting {

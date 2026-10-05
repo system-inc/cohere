@@ -5,11 +5,12 @@
 //	go run ./command/cohere-dev test --fast           the edit loop: all but the landing gate's own (fast.go)
 //	go run ./command/cohere-dev build|vet [packages]  go build or go vet
 //	go run ./command/cohere-dev exec -- <command>     any other heavy command: a bench, a cohere run, clang
-//	go run ./command/cohere-dev status                the pool: its tokens, their holders and the line
+//	go run ./command/cohere-dev status                the pool: its tokens, their holders, the line, the cache
 //
 // Every one of them takes a token from the machine's pool, in arrival order, and runs with Go held to the
 // token's share of the cores (pool.go). A dozen members each running go on all sixteen cores held the machine
-// at load 110 to 180, and made every run slower, not only later.
+// at load 110 to 180, and made every run slower, not only later. When a token's run ends, the Go build
+// cache is looked at, and trimmed under its cap with the pool held (cache.go).
 //
 // A whole-module run never passes -count=1. Go's test cache skips every package whose inputs did not
 // change, which on a one-file change is most of the module, and -count=1 throws that away. A flaky test
@@ -37,6 +38,8 @@ func main() {
 	switch os.Args[1] {
 	case "status":
 		os.Exit(status())
+	case trimCacheVerb:
+		os.Exit(trimCache())
 	case "test", "build", "vet", "exec":
 		os.Exit(run(os.Args[1], os.Args[2:]))
 	}

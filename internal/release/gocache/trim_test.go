@@ -45,7 +45,7 @@ func TestADirectoryWithoutGosReadmeIsRefused(t *testing.T) {
 	t.Parallel()
 	directory := t.TempDir()
 	file := put(t, directory, "ab/0000ab-d", 4096, time.Now().Add(-48*time.Hour))
-	if _, err := Trim(directory, Limit{Cap: 1, Target: 0}, time.Now()); err == nil || !strings.Contains(err.Error(), "refusing to trim") {
+	if _, err := Trim(directory, Limit{Cap: 1, Target: 0, Spare: InUseWindow}, time.Now()); err == nil || !strings.Contains(err.Error(), "refusing to trim") {
 		t.Fatalf("a directory with no README was trimmed: %v", err)
 	}
 	if !exists(file) {
@@ -67,7 +67,7 @@ func TestTheLeastRecentlyUsedEntriesGoFirstDownToTheTarget(t *testing.T) {
 	trimFile := put(t, directory, "trim.txt", 400, now.Add(-96*time.Hour))
 
 	// 1,600 bytes of entries against a cap of 1,000 and a target of 900: the two oldest go.
-	trimmed, err := Trim(directory, Limit{Cap: 1000, Target: 900}, now)
+	trimmed, err := Trim(directory, Limit{Cap: 1000, Target: 900, Spare: InUseWindow}, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestTheLeastRecentlyUsedEntriesGoFirstDownToTheTarget(t *testing.T) {
 	}
 
 	// Under its cap, nothing is touched.
-	trimmed, err = Trim(directory, Limit{Cap: 1000, Target: 0}, now)
+	trimmed, err = Trim(directory, Limit{Cap: 1000, Target: 0, Spare: InUseWindow}, now)
 	if err != nil || trimmed.Removed != 0 || trimmed.Before != 800 {
 		t.Fatalf("a cache under its cap was trimmed: %+v, %v", trimmed, err)
 	}
@@ -106,7 +106,7 @@ func TestEntriesInUseAreNeverRemoved(t *testing.T) {
 		put(t, directory, "03/03aa-a", 400, now),
 	}
 
-	trimmed, err := Trim(directory, Limit{Cap: 1000, Target: 100}, now)
+	trimmed, err := Trim(directory, Limit{Cap: 1000, Target: 100, Spare: InUseWindow}, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,6 +120,29 @@ func TestEntriesInUseAreNeverRemoved(t *testing.T) {
 		if !exists(path) {
 			t.Errorf("%s, used within the window, was removed", path)
 		}
+	}
+}
+
+// A trim that has kept every build out spares only its short window: the entries a build read half an hour
+// ago go when the cache is over its cap, and the last minutes' writes stay (#jc6ca7r).
+func TestAShortSpareWindowReachesRecentlyUsedEntries(t *testing.T) {
+	t.Parallel()
+	directory := newCache(t)
+	now := time.Now()
+	older := put(t, directory, "00/00aa-d", 400, now.Add(-30*time.Minute))
+	recent := put(t, directory, "01/01aa-d", 400, now.Add(-20*time.Minute))
+	justWritten := put(t, directory, "02/02aa-a", 400, now.Add(-2*time.Minute))
+
+	trimmed, err := Trim(directory, Limit{Cap: 1000, Target: 500, Spare: 10 * time.Minute}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if trimmed.Removed != 2 || trimmed.After != 400 || trimmed.InUse != 400 {
+		t.Fatalf("trimmed %+v, want the two entries older than the window removed, oldest first", trimmed)
+	}
+	if exists(older) || exists(recent) || !exists(justWritten) {
+		t.Errorf("after the trim: 30 minutes old %v, 20 minutes old %v, 2 minutes old %v; want only the last kept",
+			exists(older), exists(recent), exists(justWritten))
 	}
 }
 
@@ -139,7 +162,7 @@ func TestAnExecutableEntryIsRemovedByName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	trimmed, err := Trim(directory, Limit{Cap: 1000, Target: 0}, now)
+	trimmed, err := Trim(directory, Limit{Cap: 1000, Target: 0, Spare: InUseWindow}, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +204,7 @@ func TestTheGoCommandBuildsFromATrimmedCache(t *testing.T) {
 	build()
 
 	// A day from now nothing is in use, so a target of zero takes every entry.
-	trimmed, err := Trim(cache, Limit{Cap: 0, Target: 0}, time.Now().Add(24*time.Hour))
+	trimmed, err := Trim(cache, Limit{Cap: 0, Target: 0, Spare: InUseWindow}, time.Now().Add(24*time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
