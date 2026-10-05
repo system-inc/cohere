@@ -37,7 +37,12 @@ type Coverage struct {
 	// NodesVisited is how many AST nodes the traversal touched, across every file.
 	NodesVisited int
 
-	// RulesRun is how many rules were dispatched.
+	// RulesRun is how many rules ran: were offered at least one file, here or in a replayed verdict.
+	//
+	// Counted from what was offered rather than from the rules the walk was handed, which are every
+	// registered rule. A config that turns most of them off left the footer saying "484 rules" when 118
+	// ran (#v1ah2qq), the very gap between configured and checked this struct exists to show. A rule
+	// offered files that it declined still ran: it looked and had nothing to listen for.
 	RulesRun int
 
 	// RulesOffered counts, per rule name, how many files the rule was actually handed. A rule that
@@ -627,7 +632,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			FilesInProgram: len(g.Program.GetSourceFiles()),
 			FilesWalked:    len(files),
 			NodesVisited:   nodesVisited,
-			RulesRun:       len(rules),
+			RulesRun:       rulesOffered(offeredCounts),
 			RulesOffered:   offeredCounts,
 			RulesListening: listeningCounts,
 			RulesReporting: reportingCounts,
@@ -645,6 +650,17 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			RulesUnconfigured: unconfigured,
 		},
 	}, nil
+}
+
+// rulesOffered is how many rules were offered at least one file.
+func rulesOffered(offeredCounts map[string]int) int {
+	offered := 0
+	for _, count := range offeredCounts {
+		if count > 0 {
+			offered++
+		}
+	}
+	return offered
 }
 
 // ruleNameCatalog answers whether a rule name a suppression comment wrote exists anywhere cohere can
