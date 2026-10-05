@@ -740,6 +740,7 @@ func writeLintReport(out io.Writer, report lintReport) {
 	writeDepartures(account, report.LintConfig)
 	writeOverrideReasons(account, report.LintConfig)
 	writeCoverageNotes(account, summary, report.Details)
+	writeUnrunRuleReferences(account, coverage.UnrunRuleReferences)
 
 	// What the footer says of lint: the rules that ran, the files it checked fresh against those the cache
 	// answered for, the nodes it walked, and the two gaps a green run must still name.
@@ -752,6 +753,34 @@ func writeLintReport(out io.Writer, report lintReport) {
 	activeSummary.Gaps.CrashedFiles = len(summary.Crashes)
 	activeSummary.Gaps.RuleCrashes = len(summary.RuleCrashes)
 	activeSummary.Skips = rulesSkippingEveryFile(summary.Notes, coverage.RulesOffered)
+}
+
+// writeUnrunRuleReferences notes the rules disable comments named that cohere doesn't run, under
+// --verbose. They are real rules, a core rule cohere hasn't ported or another plugin's, so a directive
+// naming one is a note rather than a finding (#v1ah2qq): it silences nothing here, and a repository
+// written for ESLint carries many. Most named first, each with how many comments named it.
+func writeUnrunRuleReferences(out io.Writer, references map[string]int) {
+	if len(references) == 0 {
+		return
+	}
+	names := make([]string, 0, len(references))
+	total := 0
+	for name, count := range references {
+		names = append(names, name)
+		total += count
+	}
+	sort.Slice(names, func(first, second int) bool {
+		if references[names[first]] != references[names[second]] {
+			return references[names[first]] > references[names[second]]
+		}
+		return names[first] < names[second]
+	})
+	named := make([]string, 0, len(names))
+	for _, name := range names {
+		named = append(named, fmt.Sprintf("%s %d", name, references[name]))
+	}
+	fmt.Fprintf(out, "  directives: %s cohere doesn't run, which silences nothing here: %s\n",
+		counted(total, "disable comment names a rule", "disable comments name rules"), strings.Join(named, ", "))
 }
 
 // writeDepartures names every rule a config sets differently from a file it extends, with the reason it
