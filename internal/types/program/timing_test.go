@@ -10,6 +10,7 @@ import (
 
 // TestSortedPutsTheExpensiveRuleFirst is what makes an outlier obvious without arithmetic.
 func TestSortedPutsTheExpensiveRuleFirst(t *testing.T) {
+	t.Parallel()
 	timings := NewTimings([]string{"cheap", "expensive", "middling"})
 	timings.forRule("cheap").ListenerCPU = time.Millisecond
 	timings.forRule("expensive").ListenerCPU = 500 * time.Millisecond
@@ -34,6 +35,7 @@ func TestSortedPutsTheExpensiveRuleFirst(t *testing.T) {
 // means expensive work per node. The fixes have nothing in common, so a single total would hide
 // the more actionable of the two.
 func TestSetupAndListenerTimeStaySeparate(t *testing.T) {
+	t.Parallel()
 	timings := NewTimings([]string{"decides-slowly"})
 	timing := timings.forRule("decides-slowly")
 	timing.SetupCPU = 300 * time.Millisecond
@@ -58,6 +60,7 @@ func TestSetupAndListenerTimeStaySeparate(t *testing.T) {
 // number quietly wrong in a way no single-worker test could see. CPU is not merged: it comes from the
 // one profile of the whole walk.
 func TestMergeAccumulatesAcrossWorkers(t *testing.T) {
+	t.Parallel()
 	shared := NewTimings([]string{"a-rule"})
 
 	for worker := 0; worker < 4; worker++ {
@@ -79,6 +82,7 @@ func TestMergeAccumulatesAcrossWorkers(t *testing.T) {
 // TestMergePicksUpARuleTheRunAddedLate keeps a worker's rule from being dropped because the shared
 // collector was built without it.
 func TestMergePicksUpARuleTheRunAddedLate(t *testing.T) {
+	t.Parallel()
 	shared := NewTimings(nil)
 	local := NewTimings(nil)
 	local.forRule("late-rule").NodesOffered = 1
@@ -94,6 +98,7 @@ func TestMergePicksUpARuleTheRunAddedLate(t *testing.T) {
 // Every timing site is nil-checked so a run without --timing reads no clocks and allocates nothing.
 // If that ever stops being true, the instrument starts costing what it was designed not to.
 func TestNilCollectorIsInert(t *testing.T) {
+	t.Parallel()
 	var timings *Timings
 
 	timings.merge(NewTimings([]string{"anything"}))
@@ -115,7 +120,7 @@ func spinFor(t *testing.T, cpu time.Duration) {
 	t.Helper()
 	start, known := threadCPU()
 	if !known {
-		t.Fatal("this platform has no thread CPU clock, so the meter cannot be tested here")
+		t.Skip("this platform has no thread CPU clock, so --timing reports no CPU here and the meter has nothing to test")
 	}
 	for {
 		if now, _ := threadCPU(); now-start >= cpu {
@@ -136,7 +141,9 @@ func startTestMeter(t *testing.T) (*workerMeter, *Timings) {
 	timings := NewTimings(nil)
 	meter := startWorkerMeter(timings)
 	if meter == nil {
-		t.Fatalf("no meter started: %s", timings.Account.Unavailable)
+		// Only a platform without a thread CPU clock starts no meter, and there --timing says so rather than
+		// measuring; see cpu_clock_other.go.
+		t.Skipf("no meter on this platform: %s", timings.Account.Unavailable)
 	}
 	t.Cleanup(meter.finish)
 	return meter, timings
@@ -145,6 +152,7 @@ func startTestMeter(t *testing.T) (*workerMeter, *Timings) {
 // TestAMeteredCallIsBilledItsCPU covers the wrapper the whole table rests on. Five calls each spinning 2ms
 // of CPU are billed 10ms, and each call is counted as a node offered.
 func TestAMeteredCallIsBilledItsCPU(t *testing.T) {
+	t.Parallel()
 	meter, _ := startTestMeter(t)
 	timing := &RuleTiming{Name: "spins"}
 	wrapped := meter.listener(timing, func(node *ast.Node) { spinFor(t, 2*time.Millisecond) })
@@ -164,6 +172,7 @@ func TestAMeteredCallIsBilledItsCPU(t *testing.T) {
 // TestAWaitingCallCostsNothing is the property the wall clock lacked (#8qyzmxw). Five calls each sleeping
 // 5ms spend 25ms of wall time and almost no CPU, and they are billed the CPU.
 func TestAWaitingCallCostsNothing(t *testing.T) {
+	t.Parallel()
 	meter, _ := startTestMeter(t)
 	timing := &RuleTiming{Name: "sleeps"}
 	wrapped := meter.listener(timing, func(node *ast.Node) { time.Sleep(5 * time.Millisecond) })
@@ -177,13 +186,16 @@ func TestAWaitingCallCostsNothing(t *testing.T) {
 	if wall < 25*time.Millisecond {
 		t.Fatalf("the calls slept %v, under the 25ms planted, so they cannot show a wall clock's error", wall)
 	}
-	if timing.ListenerCPU > time.Millisecond {
+	// Relative to the sleep, so it holds at any load: a busy machine stretches the sleep and the few
+	// instructions around it alike. A wall clock bills all of it, about 100%.
+	if timing.ListenerCPU > wall/20 {
 		t.Fatalf("five calls that only slept were billed %v of CPU, having slept %v", timing.ListenerCPU, wall)
 	}
 }
 
 // TestSetupIsBilledApartFromListeners keeps the distinction that decides which fix a slow rule needs.
 func TestSetupIsBilledApartFromListeners(t *testing.T) {
+	t.Parallel()
 	meter, _ := startTestMeter(t)
 	timing := &RuleTiming{Name: "decides"}
 	meter.setup(timing, func() { spinFor(t, 3*time.Millisecond) })
@@ -205,6 +217,7 @@ func TestSetupIsBilledApartFromListeners(t *testing.T) {
 // the key up to its first colon, because the HIR cache keys per function node and once reported 11,150
 // rows of 0.00ms.
 func TestSharedFillIsBilledToTheDerivationNotTheRuleThatAsked(t *testing.T) {
+	t.Parallel()
 	meter, timings := startTestMeter(t)
 	cache := rule.NewFileCache()
 	meter.watchFills(cache)
@@ -240,6 +253,7 @@ func TestSharedFillIsBilledToTheDerivationNotTheRuleThatAsked(t *testing.T) {
 // containment and the walk goes on, so a frame that closed only on a normal return would leave every
 // later call nested inside the crashed one, billed against it.
 func TestARuleThatPanicsStillBalancesItsFrames(t *testing.T) {
+	t.Parallel()
 	meter, _ := startTestMeter(t)
 	timing := &RuleTiming{Name: "crashes"}
 	recovering := func(run func()) {
@@ -258,10 +272,11 @@ func TestARuleThatPanicsStillBalancesItsFrames(t *testing.T) {
 // TestTheWorkersCPUIsAccountedFor holds that the rows and the account add up to what the worker's thread
 // spent, so nothing the table prints is a residual it cannot name.
 func TestTheWorkersCPUIsAccountedFor(t *testing.T) {
+	t.Parallel()
 	timings := NewTimings(nil)
 	meter := startWorkerMeter(timings)
 	if meter == nil {
-		t.Fatalf("no meter started: %s", timings.Account.Unavailable)
+		t.Skipf("no meter on this platform: %s", timings.Account.Unavailable)
 	}
 	timing := timings.forRule("spins")
 	spinFor(t, 2*time.Millisecond)
@@ -284,6 +299,7 @@ func TestTheWorkersCPUIsAccountedFor(t *testing.T) {
 // TestTheMeterIsPassThroughWhenNotTiming proves the ordinary path costs nothing: no meter, the listener
 // itself rather than a wrapper, and a cache whose fills run as they always did.
 func TestTheMeterIsPassThroughWhenNotTiming(t *testing.T) {
+	t.Parallel()
 	meter := startWorkerMeter(nil)
 	if meter != nil {
 		t.Fatal("a walk without --timing started a meter")

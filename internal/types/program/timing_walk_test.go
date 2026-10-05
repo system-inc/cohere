@@ -1,13 +1,17 @@
+//go:build darwin || linux
+
 package program_test
 
 import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"sync/atomic"
-	"syscall"
 	"testing"
 	"time"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -28,14 +32,16 @@ func spin(iterations int) {
 	spinSink.Add(value)
 }
 
-// processCPU is the CPU this process has used, user and system, as the kernel counts it.
-func processCPU(t *testing.T) time.Duration {
-	t.Helper()
-	var usage syscall.Rusage
-	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &usage); err != nil {
-		t.Fatalf("reading process CPU: %v", err)
+// threadCPU is the calling thread's CPU, by the kernel's thread clock: the same clock the meter reads, read
+// here by the planted rule about itself, on its own thread at its own moment. It panics rather than taking
+// a *testing.T, because the planted rules call it from the walk's workers, where t.Fatal may not be
+// called; a rule's panic is contained and shows up below as a rule that ran on fewer files.
+func threadCPU() time.Duration {
+	var spec unix.Timespec
+	if err := unix.ClockGettime(unix.CLOCK_THREAD_CPUTIME_ID, &spec); err != nil {
+		panic(fmt.Sprintf("reading the thread CPU clock: %v", err))
 	}
-	return time.Duration(usage.Utime.Nano() + usage.Stime.Nano())
+	return time.Duration(spec.Nano())
 }
 
 // TestATimedWalkBillsCPUNotWaiting is the control the instrument is trusted on (#8qyzmxw).
@@ -43,34 +49,31 @@ func processCPU(t *testing.T) time.Duration {
 // The table it replaced charged each listener call its wall time, so a rule descheduled mid-call was
 // billed for the time it spent off the CPU, and the better-tailwindcss family read about 1.2s when its
 // real cost was about 0.05s. Two planted rules tell the two instruments apart. One sleeps in every file:
-// it waits and spends no CPU, so it must read near zero, where a wall clock bills it every millisecond
-// it slept. The other spins a fixed amount of work in every file: it must read the CPU that work costs,
-// calibrated here by the kernel's own count rather than by the instrument under test.
+// it waits and spends almost no CPU, so it must be billed a small fraction of its sleep, where a wall
+// clock bills all of it. The other spins a fixed amount of work in every file and measures its own CPU
+// as it goes: it must be billed what it measured.
 //
-// The sleeper's wall time is measured too, so the test proves it could have failed: a wall clock around
-// the same calls would have read that number.
+// Both bounds are relative, so they hold at any load (#8qyzmxw's flake: at load 111 the sleeper was
+// billed 2.39ms after sleeping 7.69s, past an absolute 2ms bound, at 0.03% of its sleep). And neither
+// reads process-wide CPU, which a parallel test beside this one would add to. Shown able to fail: with the
+// meter reading the wall clock in place of the thread clock, the sleeper is billed nearly all of its sleep.
 func TestATimedWalkBillsCPUNotWaiting(t *testing.T) {
+	t.Parallel()
 	const fileCount = 80
 	const sleepPerFile = 5 * time.Millisecond
 
-	// Calibrate one spin call to about 5ms of CPU, by the kernel's count.
+	// Size one spin call to about 5ms of CPU, on this thread's own clock.
+	runtime.LockOSThread()
 	iterations := 1_000_000
 	for {
-		before := processCPU(t)
-		for range 20 {
-			spin(iterations)
-		}
-		perCall := (processCPU(t) - before) / 20
-		if perCall >= 4*time.Millisecond {
+		before := threadCPU()
+		spin(iterations)
+		if threadCPU()-before >= 4*time.Millisecond {
 			break
 		}
 		iterations *= 2
 	}
-	before := processCPU(t)
-	for range fileCount {
-		spin(iterations)
-	}
-	expectedSpin := processCPU(t) - before
+	runtime.UnlockOSThread()
 
 	files := map[string]string{"tsconfig.json": minimalConfig}
 	for index := range fileCount {
@@ -82,7 +85,9 @@ func TestATimedWalkBillsCPUNotWaiting(t *testing.T) {
 		t.Fatalf("build: %v", err)
 	}
 
-	var sleptTotal atomic.Int64
+	// The walk locks each worker to its thread for the walk, so a listener's own reads of the thread
+	// clock are of the thread the meter reads.
+	var sleptTotal, spunTotal atomic.Int64
 	sleeper := rule.Rule{
 		Name: "planted-sleeper",
 		Run: func(ctx rule.Context, options any) rule.Listeners {
@@ -97,7 +102,9 @@ func TestATimedWalkBillsCPUNotWaiting(t *testing.T) {
 		Name: "planted-spinner",
 		Run: func(ctx rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+				start := threadCPU()
 				spin(iterations)
+				spunTotal.Add(int64(threadCPU() - start))
 			}}
 		},
 	}
@@ -127,17 +134,19 @@ func TestATimedWalkBillsCPUNotWaiting(t *testing.T) {
 			sleptWall, fileCount*sleepPerFile)
 	}
 
-	// The sleeper's CPU is the few instructions around each sleep: about 28µs per 50ms slept, measured on
-	// darwin/arm64, so under 2ms here against the 400ms a wall clock bills it.
-	if slept.TotalCPU() > 2*time.Millisecond {
+	// The sleeper's CPU is the few instructions around each sleep: about 28µs per 50ms slept on
+	// darwin/arm64, a twentieth of a percent. A twentieth of the sleep is a hundred times that, and a wall
+	// clock bills twenty times more again.
+	if slept.TotalCPU() > sleptWall/20 {
 		t.Fatalf("a rule that only sleeps was billed %v of CPU, having slept %v", slept.TotalCPU(), sleptWall)
 	}
 
-	// The spinner is measured by its thread's clock and the reference by the process's, which also counts
-	// the garbage collector and the runtime during calibration, so the two agree to within a fifth.
-	if got := spun.TotalCPU(); got < expectedSpin*4/5 || got > expectedSpin*6/5 {
-		t.Fatalf("a rule that spins %v of CPU (by the kernel's count) was billed %v", expectedSpin, got)
+	// The spinner's own reads bracket its work inside the meter's, so the meter bills it what it measured,
+	// less the calibrated cost of measuring a call, plus the few instructions between the two pairs of reads.
+	spunSelf := time.Duration(spunTotal.Load())
+	if got := spun.TotalCPU(); got < spunSelf*9/10 || got > spunSelf*11/10+2*time.Millisecond {
+		t.Fatalf("a rule that measured %v of its own CPU was billed %v", spunSelf, got)
 	}
-	t.Logf("spinner billed %v against %v by the kernel; sleeper billed %v after %v asleep",
-		spun.TotalCPU(), expectedSpin, slept.TotalCPU(), sleptWall)
+	t.Logf("spinner billed %v against %v it measured itself; sleeper billed %v after %v asleep",
+		spun.TotalCPU(), spunSelf, slept.TotalCPU(), sleptWall)
 }
