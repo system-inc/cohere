@@ -30,19 +30,53 @@ import "strings"
 // nobody excluded. The first failure is loud, the second is invisible, which is why the segment
 // boundary is enforced rather than assumed.
 func Match(pattern string, path string) bool {
-	for _, expanded := range expandBraces(pattern) {
-		if matchSegments(splitPath(expanded), splitPath(path)) {
+	return compileGlob(pattern).matches(splitPath(path))
+}
+
+// MatchAny reports whether any pattern matches, which is how a `files` list and an `ignorePatterns`
+// list are both evaluated. The path is split once, not once per pattern.
+func MatchAny(patterns []string, path string) bool {
+	segments := splitPath(path)
+	for _, pattern := range patterns {
+		if compileGlob(pattern).matches(segments) {
 			return true
 		}
 	}
 	return false
 }
 
-// MatchAny reports whether any pattern matches, which is how a `files` list and an `ignorePatterns`
-// list are both evaluated.
-func MatchAny(patterns []string, path string) bool {
+// glob is a pattern compiled once: each of its brace alternatives, already split into segments.
+//
+// Match expands the braces and splits both the pattern and the path on every call. Resolve asks every
+// ignore pattern and every override pattern about every file, so that was 484K objects on a cold ahra
+// run (#hsd2dfb). A Config compiles its patterns once (see Config.globs) and splits each path once, and
+// matching then allocates nothing. The matching itself is matchSegments either way, so the answer is
+// the same.
+type glob [][]string
+
+func compileGlob(pattern string) glob {
+	alternatives := expandBraces(pattern)
+	compiled := make(glob, len(alternatives))
+	for index, alternative := range alternatives {
+		compiled[index] = splitPath(alternative)
+	}
+	return compiled
+}
+
+// matches reports whether a path, already split by splitPath, matches any alternative.
+func (g glob) matches(segments []string) bool {
+	for _, alternative := range g {
+		if matchSegments(alternative, segments) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchesAny reports whether any of several compiled patterns matches a split path.
+func matchesAny(patterns []glob, segments []string) bool {
 	for _, pattern := range patterns {
-		if Match(pattern, path) {
+		if pattern.matches(segments) {
 			return true
 		}
 	}
