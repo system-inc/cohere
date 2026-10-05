@@ -45,6 +45,9 @@
 #                      (default modules/tasks/TasksSearchQuery.ts)
 #   --cohere PATH      the cohere launcher, or an engine binary, to run (default: `cohere` on PATH)
 #   --work DIR         where the copies live (default $TMPDIR/cohere-quiet-machine)
+#   --record           also write the run to bench/results as a record to commit
+#                      (internal/benchresults): the machine, the commits, every run and each mode's
+#                      numbers, refused when it disagrees with its own runs or the engine is dirty
 #
 # Exit status: 0 when every mode has a quiet number, 3 when some mode has none, 1 when it could not
 # measure at all, including a copy that changed under it or a cohere that changed between runs.
@@ -60,6 +63,7 @@ settle=0
 edit=modules/tasks/TasksSearchQuery.ts
 cohere=cohere
 work=${TMPDIR:-/tmp}/cohere-quiet-machine
+record=false
 
 while (( $# > 0 )); do
   case $1 in
@@ -70,6 +74,7 @@ while (( $# > 0 )); do
     --edit) edit=$2; shift 2 ;;
     --cohere) cohere=$2; shift 2 ;;
     --work) work=$2; shift 2 ;;
+    --record) record=true; shift ;;
     *) print -u2 "quiet_machine: unknown argument $1 (see the usage at the top of this script)"; exit 1 ;;
   esac
 done
@@ -178,4 +183,12 @@ for mode in cold warm edit; do
     printf '        loaded runs, not a quiet number: %s\n' "${(j:, :)loaded_runs}"
 done
 print "runs and logs: $logs"
+
+# The record is written from the same runs table the summary above printed, so the two cannot differ, and
+# a mode with no quiet run is recorded with no quiet number.
+if [[ $record == true ]]; then
+  (cd ${0:A:h:h} && go run ./internal/benchresults/tools/record -runs $runs_table -engine $engine \
+    -project ${project:t} -project-commit $project_commit -ceiling $ceiling -settle $settle -rounds $runs \
+    -edit $edit) || fail "could not record the run; its logs are in $logs"
+fi
 exit $outcome
