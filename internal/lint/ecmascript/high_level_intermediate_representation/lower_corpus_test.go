@@ -1,11 +1,17 @@
 package high_level_intermediate_representation
 
 import (
+	"bufio"
+	"bytes"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -63,16 +69,56 @@ const (
 func pinnedCorpusFiles(t *testing.T, count int) ([]string, map[string]string) {
 	t.Helper()
 
+	pinnedCorpus.Lock()
+	read := pinnedCorpus.byCount[count]
+	if read == nil {
+		read = &pinnedCorpusRead{}
+		pinnedCorpus.byCount[count] = read
+	}
+	pinnedCorpus.Unlock()
+
+	read.once.Do(func() { read.paths, read.contents, read.skip, read.failure = readPinnedCorpus(count) })
+	if read.skip != "" {
+		t.Skip(read.skip)
+	}
+	if read.failure != "" {
+		t.Fatal(read.failure)
+	}
+	return read.paths, read.contents
+}
+
+// pinnedCorpus is each count's read of the pinned corpus, made once per test binary. About thirty corpus
+// walks ask for it, and each used to list the commit and start a `git show` per file, about 10,000 git
+// processes in one package run (#nxgt2ca). The commit is pinned, so the files cannot change between
+// walks, and every caller only reads what it is handed.
+var pinnedCorpus = struct {
+	sync.Mutex
+	byCount map[int]*pinnedCorpusRead
+}{byCount: map[int]*pinnedCorpusRead{}}
+
+type pinnedCorpusRead struct {
+	once     sync.Once
+	paths    []string
+	contents map[string]string
+
+	// skip or failure, when set, is what every caller reports instead: a test cannot skip or fail
+	// another test, so the read records the outcome and each caller acts on it.
+	skip    string
+	failure string
+}
+
+// readPinnedCorpus lists the first count TypeScript paths at the pinned commit and reads them through
+// one `git cat-file --batch`.
+func readPinnedCorpus(count int) (paths []string, contents map[string]string, skip string, failure string) {
 	if _, err := os.Stat(structureRepository); err != nil {
-		t.Skipf("the corpus repository at %s is not present on this machine", structureRepository)
+		return nil, nil, fmt.Sprintf("the corpus repository at %s is not present on this machine", structureRepository), ""
 	}
 	listing, err := exec.Command("git", "-C", structureRepository, "ls-tree", "-r", "--name-only",
 		pinnedCorpusCommit, "--", "source").Output()
 	if err != nil {
-		t.Fatalf("listing %s at %s: %v; the repository is here and the pinned commit is not",
+		return nil, nil, "", fmt.Sprintf("listing %s at %s: %v; the repository is here and the pinned commit is not",
 			structureRepository, pinnedCorpusCommit, err)
 	}
-	var paths []string
 	for _, line := range strings.Split(string(listing), "\n") {
 		if strings.HasSuffix(line, ".ts") || strings.HasSuffix(line, ".tsx") {
 			paths = append(paths, line)
@@ -80,20 +126,40 @@ func pinnedCorpusFiles(t *testing.T, count int) ([]string, map[string]string) {
 	}
 	sort.Strings(paths)
 	if len(paths) < count {
-		t.Fatalf("the pinned corpus holds %d TypeScript files, want at least %d", len(paths), count)
+		return nil, nil, "", fmt.Sprintf("the pinned corpus holds %d TypeScript files, want at least %d", len(paths), count)
 	}
 	paths = paths[:count]
 
-	contents := make(map[string]string, len(paths))
+	var request strings.Builder
 	for _, path := range paths {
-		blob, err := exec.Command("git", "-C", structureRepository, "show",
-			pinnedCorpusCommit+":"+path).Output()
-		if err != nil {
-			t.Fatalf("reading %s at %s: %v", path, pinnedCorpusCommit, err)
-		}
-		contents[path] = string(blob)
+		request.WriteString(pinnedCorpusCommit + ":" + path + "\n")
 	}
-	return paths, contents
+	batch := exec.Command("git", "-C", structureRepository, "cat-file", "--batch")
+	batch.Stdin = strings.NewReader(request.String())
+	output, err := batch.Output()
+	if err != nil {
+		return nil, nil, "", fmt.Sprintf("reading the corpus at %s: %v", pinnedCorpusCommit, err)
+	}
+	// Each answer is "<object> blob <size>\n", the size in bytes of contents, then "\n".
+	contents = make(map[string]string, len(paths))
+	reader := bufio.NewReader(bytes.NewReader(output))
+	for _, path := range paths {
+		header, err := reader.ReadString('\n')
+		fields := strings.Fields(header)
+		if err != nil || len(fields) != 3 || fields[1] != "blob" {
+			return nil, nil, "", fmt.Sprintf("reading %s at %s: git answered %q", path, pinnedCorpusCommit, strings.TrimSpace(header))
+		}
+		size, err := strconv.Atoi(fields[2])
+		if err != nil {
+			return nil, nil, "", fmt.Sprintf("reading %s at %s: a size of %q", path, pinnedCorpusCommit, fields[2])
+		}
+		blob := make([]byte, size+1)
+		if _, err := io.ReadFull(reader, blob); err != nil || blob[size] != '\n' {
+			return nil, nil, "", fmt.Sprintf("reading %s at %s: the blob ended early", path, pinnedCorpusCommit)
+		}
+		contents[path] = string(blob[:size])
+	}
+	return paths, contents, "", ""
 }
 
 // TestLowerRealCodebase lowers every function in a real TypeScript tree and checks the invariants.
