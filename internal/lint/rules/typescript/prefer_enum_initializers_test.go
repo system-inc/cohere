@@ -74,6 +74,7 @@ func TestPreferEnumInitializersStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(preferEnumInitializersCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, PreferEnumInitializers,
 				preferEnumInitializersFile, sourceText))
 		})
@@ -168,6 +169,7 @@ func TestPreferEnumInitializersFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(preferEnumInitializersCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, PreferEnumInitializers, preferEnumInitializersFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
@@ -247,6 +249,7 @@ func TestPreferEnumInitializersStaysSilentOnShapesTheCorpusDoesNotWrite(t *testi
 	}
 	for index, testCase := range cases {
 		t.Run(preferEnumInitializersCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, PreferEnumInitializers,
 				preferEnumInitializersFile, testCase.sourceText))
 		})
@@ -455,6 +458,7 @@ func TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite(t *testing.T) 
 	}
 	for index, testCase := range cases {
 		t.Run(preferEnumInitializersCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, PreferEnumInitializers, preferEnumInitializersFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))

@@ -35,6 +35,7 @@ func TestNoUselessEmptyExportFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessEmptyExport, uselessEmptyExportFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "uselessEmptyExport")
 		})
@@ -81,6 +82,7 @@ func TestNoUselessEmptyExportStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoUselessEmptyExport, uselessEmptyExportFile, testCase.sourceText))
 		})
@@ -111,6 +113,7 @@ func TestNoUselessEmptyExportFiresOnFormsTheCorpusOmits(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoUselessEmptyExport, uselessEmptyExportFile, testCase.sourceText),
 				"uselessEmptyExport")
@@ -157,6 +160,7 @@ func TestNoUselessEmptyExportFixesWriteWhatTheyClaim(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t,
 				rule_testing.Run(t, NoUselessEmptyExport, uselessEmptyExportFile, testCase.sourceText),
 				testCase.wantSource)
@@ -183,6 +187,7 @@ func TestNoUselessEmptyExportPointsAtTheEmptyExport(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessEmptyExport, uselessEmptyExportFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -237,6 +242,7 @@ func TestNoUselessEmptyExportExemptsDeclarationFiles(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessEmptyExport,
 				"/repository/source/Thing.d.ts", testCase.sourceText))
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUselessEmptyExport,

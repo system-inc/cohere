@@ -33,6 +33,7 @@ func refusalOf(call func()) (refusal string) {
 // (#b8k3bp6). Each method is tried under a declaration of nothing and under one of its own kind only,
 // so a method checking the wrong kind, or none, fails here by name.
 func TestAProgramViewAdmitsExactlyTheDeclaredReads(t *testing.T) {
+	t.Parallel()
 	methods := []struct {
 		name string
 		read ProgramRead
@@ -52,6 +53,7 @@ func TestAProgramViewAdmitsExactlyTheDeclaredReads(t *testing.T) {
 	program := new(compiler.Program)
 	for _, method := range methods {
 		t.Run(method.name, func(t *testing.T) {
+			t.Parallel()
 			refused := refusalOf(func() { method.call(ViewProgram(program, nil, Rule{Name: "probe"})) })
 			if !strings.Contains(refused, "rule probe called Program."+method.name) || !strings.Contains(refused, programReadNames[method.read]) {
 				t.Errorf("an undeclared %s was not refused by name and kind: %q", method.name, refused)
@@ -69,6 +71,7 @@ func TestAProgramViewAdmitsExactlyTheDeclaredReads(t *testing.T) {
 // Resolving the linted file's own imports is a module-resolution read; resolving another file's is a
 // read of other files, which no per-file key covers.
 func TestResolvingAnotherFilesImportsIsAReadOfOtherFiles(t *testing.T) {
+	t.Parallel()
 	program := new(compiler.Program)
 	resolution := Rule{Name: "probe", ProgramReads: ReadsModuleResolution}
 	refused := refusalOf(func() { ViewProgram(program, nil, resolution).ResolveModule(fileNamed("other.ts"), nil) })
@@ -84,6 +87,7 @@ func TestResolvingAnotherFilesImportsIsAReadOfOtherFiles(t *testing.T) {
 // A program that could not be built is a nil Program, so the rules' `ctx.Program == nil` checks keep
 // meaning what they meant.
 func TestANilProgramViewsAsNil(t *testing.T) {
+	t.Parallel()
 	if ViewProgram(nil, nil, Rule{Name: "probe", ProgramReads: ReadsOtherFiles}) != nil {
 		t.Error("a nil program gave a non-nil view")
 	}

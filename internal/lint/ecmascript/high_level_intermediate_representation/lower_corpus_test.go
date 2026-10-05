@@ -162,6 +162,7 @@ func TestLowerRealCodebase(t *testing.T) {
 				name = "<anonymous>"
 			}
 			t.Run(filepath.Base(path)+"/"+name, func(t *testing.T) {
+				t.Parallel()
 				checkInvariants(t, function)
 			})
 

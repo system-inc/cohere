@@ -90,6 +90,7 @@ func TestReactComponentNoDestructuringFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactComponentNoDestructuring, componentDestructuringFile,
 				componentDestructuringDeclarations+testCase.sourceText), testCase.wantId)
 		})
@@ -169,6 +170,7 @@ func TestReactComponentNoDestructuringStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentNoDestructuring, testCase.fileName,
 				componentDestructuringDeclarations+testCase.sourceText))
 		})

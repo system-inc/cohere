@@ -143,6 +143,7 @@ func TestDisjointSetMatchesReact(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			set := &DisjointSet{}
 			for _, union := range test.unions {
 				set.Union(union)
@@ -498,6 +499,7 @@ func TestDisjointMayAllocateMatchesReact(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			if got := mayAllocate(nil, &Instruction{Value: test.value}); got != test.want {
 				t.Errorf("mayAllocate(%s) = %v, want %v", test.name, got, test.want)
 			}
@@ -659,6 +661,7 @@ func TestDisjointPhiUsesReactsTwoTermTest(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			got := test.phiRange.Start+1 != test.phiRange.End && test.phiRange.End > test.firstOrder
 			if got != test.want {
 				t.Errorf("React's two-term test on %+v with first order %d = %v, want %v",
@@ -851,6 +854,7 @@ export function gather(limit: number) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			function, ranges := rangesFor(t, test.source)
 			set := FindDisjointMutableValuesWithRanges(function, ranges)
 

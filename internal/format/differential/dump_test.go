@@ -35,6 +35,7 @@ import (
 // The candidate is always native. It reads the cache TestCorpora warms under the same identity, so a
 // dump costs the candidate's time once the corpus has been measured.
 func TestDumpDifferences(t *testing.T) {
+	t.Parallel()
 	roots, output := os.Getenv("COHERE_FORMAT_CORPORA"), os.Getenv("COHERE_FORMAT_DUMP")
 	if roots == "" || output == "" {
 		t.Skip("set COHERE_FORMAT_CORPORA and COHERE_FORMAT_DUMP to dump every difference")

@@ -16,6 +16,7 @@ import "testing"
 // parser branches on each: `v` enables nested classes and set operations, `u` changes what an
 // escape means. A parser that collapsed them would accept `v` syntax under `u`.
 func TestParseRegexFlagsReadsBothModeFlags(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		flags               string
 		unicode, unicodeSet bool
@@ -48,6 +49,7 @@ func TestParseRegexFlagsReadsBothModeFlags(t *testing.T) {
 // because the callers are asking whether an escape has digits after it, and `\x` with nothing
 // following is not a valid escape.
 func TestHexHelpers(t *testing.T) {
+	t.Parallel()
 	for _, b := range []byte{'0', '9', 'a', 'f', 'A', 'F'} {
 		if !IsHexDigit(b) {
 			t.Errorf("IsHexDigit(%q) = false, want true", b)
@@ -85,6 +87,7 @@ func TestHexHelpers(t *testing.T) {
 // TestPatternAndFlags pins the split on the last slash rather than the first, which is what makes
 // an escaped slash inside a pattern come apart correctly.
 func TestPatternAndFlags(t *testing.T) {
+	t.Parallel()
 	cases := []struct{ text, pattern, flags string }{
 		{`/a/`, "a", ""},
 		{`/a/g`, "a", "g"},

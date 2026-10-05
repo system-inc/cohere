@@ -52,6 +52,7 @@ func TestPaginationDecoratorFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, ConsistencyRequirePaginationArgumentName,
 				consistencyRequirePaginationArgumentNameFile, testCase.sourceText), "invalidName")
 		})
@@ -104,6 +105,7 @@ func TestPaginationDecoratorStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistencyRequirePaginationArgumentName,
 				consistencyRequirePaginationArgumentNameFile, testCase.sourceText))
 		})
@@ -134,6 +136,7 @@ func TestPaginationDecoratorPointsAtTheName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyRequirePaginationArgumentName, consistencyRequirePaginationArgumentNameFile,
 				testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "invalidName")
@@ -171,6 +174,7 @@ func TestPaginationDecoratorMatchesTheTypeSuffix(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, ConsistencyRequirePaginationArgumentName,
 				consistencyRequirePaginationArgumentNameFile, testCase.sourceText), testCase.messages...)
 		})
@@ -210,6 +214,7 @@ func TestPaginationDecoratorAnchorsTheNameSuffix(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, ConsistencyRequirePaginationArgumentName,
 				consistencyRequirePaginationArgumentNameFile, testCase.sourceText), testCase.messages...)
 		})
@@ -251,6 +256,7 @@ func TestPaginationDecoratorDeclinesAQualifiedTypeName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, ConsistencyRequirePaginationArgumentName,
 				consistencyRequirePaginationArgumentNameFile, testCase.sourceText), testCase.messages...)
 		})

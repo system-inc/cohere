@@ -41,6 +41,7 @@ func TestEffectHookSignaturesFollowImportOrigin(t *testing.T) {
 			{"unrelated", `import {%s as effect} from './unrelated';`, "effect", "", false},
 		} {
 			t.Run(hook+"/"+testCase.name, func(t *testing.T) {
+				t.Parallel()
 				prefix := strings.ReplaceAll(testCase.prefix, "%s", hook)
 				source := prefix + ` function Component(` + testCase.parameters + `) { return ` + testCase.callee + `(() => {}, []); }`
 				visited := 0
@@ -131,6 +132,7 @@ return <button ref={reference} onClick={callback}>{state}</button>;
 		{"missing dependency", strings.Replace(source, "setState(false)", "setState(value)", 1), 1},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			findings, lowered := findingsForSource(t, testCase.source)
 			if !lowered || len(findings) != testCase.findings {
 				t.Fatalf("lowered=%t findings=%v, want %d findings", lowered, findings, testCase.findings)
@@ -163,6 +165,7 @@ return <div onClick={callback}>{items.map(item => <span>{item}</span>)}</div>;
 		{"unpreserved dependency", `import {useMemo} from 'react'; function Component({propA}) {return useMemo(() => propA.x(), [propA.x]);}`, true},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			findings, markers := 0, 0
 			probe := rule.Rule{Name: "effect-hook-memoization", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
 				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {

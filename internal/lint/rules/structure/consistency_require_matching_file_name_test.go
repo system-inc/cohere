@@ -188,6 +188,7 @@ func TestReactComponentRequireMatchingFileNameFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, ConsistencyRequireMatchingFileName,
 					matchingFileNameDirectory+testCase.fileName, testCase.sourceText),
@@ -379,6 +380,7 @@ func TestReactComponentRequireMatchingFileNameStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, ConsistencyRequireMatchingFileName,
 					matchingFileNameDirectory+testCase.fileName, testCase.sourceText))
@@ -434,6 +436,7 @@ func TestReactComponentRequireMatchingFileNameSpanAndMessage(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyRequireMatchingFileName,
 				matchingFileNameDirectory+testCase.fileName, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "requireMatchingFileName")

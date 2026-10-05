@@ -146,6 +146,7 @@ var glueParseFixtures = []glueParseFixture{
 // corpus: an oracle that rejects everything would otherwise read as perfect agreement. The fixtures each
 // say which way the fork must go.
 func TestParseAgreesWithPrettierCssParser(t *testing.T) {
+	t.Parallel()
 	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	corpora := os.Getenv("COHERE_CSS_CORPORA")
 	if root == "" || corpora == "" {

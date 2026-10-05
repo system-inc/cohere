@@ -1576,6 +1576,7 @@ func TestLogicalAssignmentOperatorsStaysSilent(t *testing.T) {
 
 	for _, testCase := range logicalAssignmentCleanCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := runLogicalAssignment(t, struct {
 				source  string
 				options any
@@ -1592,6 +1593,7 @@ func TestLogicalAssignmentOperatorsFires(t *testing.T) {
 
 	for _, testCase := range logicalAssignmentReportingCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := runLogicalAssignment(t, struct {
 				source  string
 				options any
@@ -1616,6 +1618,7 @@ func TestLogicalAssignmentOperatorsFixes(t *testing.T) {
 			continue
 		}
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := runLogicalAssignment(t, struct {
 				source  string
 				options any
@@ -1650,6 +1653,7 @@ func TestLogicalAssignmentOperatorsSuggestions(t *testing.T) {
 			continue
 		}
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := runLogicalAssignment(t, struct {
 				source  string
 				options any
@@ -1729,6 +1733,7 @@ func TestLogicalAssignmentOperatorsDeclinesToRepair(t *testing.T) {
 			continue
 		}
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := runLogicalAssignment(t, struct {
 				source  string
 				options any
@@ -1779,6 +1784,7 @@ func TestLogicalAssignmentOperatorsSplitsFixesFromSuggestions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runLogicalAssignment(t, struct {
 				source  string
 				options any
@@ -1828,6 +1834,7 @@ func TestLogicalAssignmentOperatorsSpans(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runLogicalAssignment(t, struct {
 				source  string
 				options any
@@ -1879,6 +1886,7 @@ func TestLogicalAssignmentOperatorsMessages(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := runLogicalAssignment(t, struct {
 				source  string
 				options any
@@ -1923,6 +1931,7 @@ func TestLogicalAssignmentOperatorsSuggestionMessages(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := runLogicalAssignment(t, struct {
 				source  string
 				options any
@@ -1985,6 +1994,7 @@ func TestDecodeLogicalAssignmentOperatorsOptions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeLogicalAssignmentOperatorsOptions([]byte(testCase.raw))
 			if testCase.wantError {
 				if err == nil {
@@ -2113,6 +2123,7 @@ func TestLogicalAssignmentOperatorsTypeScriptShapes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runLogicalAssignment(t, struct {
 				source  string
 				options any
@@ -2147,6 +2158,7 @@ func TestLogicalAssignmentOperatorsNeverExpansionKeepsTheTargetText(t *testing.T
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "logical.ts",
 				testCase.source, logicalAssignmentNeverOptions())
 			if len(result.Diagnostics) != 1 {
@@ -2315,6 +2327,7 @@ func TestLogicalAssignmentOperatorsWrapsWhereUpstreamWraps(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runLogicalAssignment(t, struct {
 				source  string
 				options any
@@ -2418,6 +2431,7 @@ export function Defaults(properties: { label?: string }) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			off := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "Compiled.tsx", testCase.sourceText, compilerOff)
 			if len(off.Diagnostics) == 0 {
 				t.Fatalf("with the compiler off the rule must report here, or the row proves nothing")

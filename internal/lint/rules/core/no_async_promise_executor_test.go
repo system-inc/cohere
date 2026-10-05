@@ -32,6 +32,7 @@ func TestNoAsyncPromiseExecutorFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText),
 				"noAsyncPromiseExecutor")
@@ -58,6 +59,7 @@ func TestNoAsyncPromiseExecutorStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText))
 		})
@@ -98,6 +100,7 @@ func TestNoAsyncPromiseExecutorFiresOnCasesUpstreamDoesNotCover(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText),
 				"noAsyncPromiseExecutor")
@@ -157,6 +160,7 @@ func TestNoAsyncPromiseExecutorStaysSilentOnCasesUpstreamDoesNotCover(t *testing
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText))
 		})
@@ -195,6 +199,7 @@ func TestNoAsyncPromiseExecutorPointsAtTheKeyword(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != 1 {

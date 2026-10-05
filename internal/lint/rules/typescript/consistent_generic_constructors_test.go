@@ -115,6 +115,7 @@ func TestConsistentGenericConstructorsStaysSilent(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(consistentGenericConstructorsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t,
 				ConsistentGenericConstructors, consistentGenericConstructorsFile, testCase.sourceText,
 				consistentGenericConstructorsSettingsFor(t, testCase.wire)))
@@ -415,6 +416,7 @@ func TestConsistentGenericConstructorsFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(consistentGenericConstructorsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, ConsistentGenericConstructors,
 				consistentGenericConstructorsFile, testCase.sourceText,
 				consistentGenericConstructorsSettingsFor(t, testCase.wire))
@@ -502,6 +504,7 @@ func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.wire, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeConsistentGenericConstructorsOptions([]byte(testCase.wire))
 			if err != nil {
 				t.Fatalf("decoding %q: %v", testCase.wire, err)
@@ -546,6 +549,7 @@ func TestConsistentGenericConstructorsDecoderRefusesAValueUpstreamRefuses(t *tes
 		{wire: `[]`, named: "[]"},
 	} {
 		t.Run(testCase.wire, func(t *testing.T) {
+			t.Parallel()
 			_, err := DecodeConsistentGenericConstructorsOptions([]byte(testCase.wire))
 			if err == nil {
 				t.Fatalf("%s decoded, so the configured mode is silently not the one written", testCase.wire)

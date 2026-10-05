@@ -63,6 +63,7 @@ func TestNetworkNoInvalidateCacheLiteralKeyFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkNoInvalidateCacheLiteralKey, cacheFile,
 				cacheKeyDeclarations+testCase.sourceText), testCase.wantIds...)
 		})
@@ -99,6 +100,7 @@ func TestNetworkNoInvalidateCacheLiteralKeyStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkNoInvalidateCacheLiteralKey, cacheFile,
 				cacheKeyDeclarations+testCase.sourceText))
 		})

@@ -10,6 +10,7 @@ import (
 // TestParseTree checks one small tree field by field without node: types, fields, raws, and byte
 // offsets past non-ASCII text, with column left in UTF-16 units.
 func TestParseTree(t *testing.T) {
+	t.Parallel()
 	// U+00E9 is 2 bytes and 1 unit, the emoji 4 bytes and 2 units.
 	root, err := Parse("\xc3\xa9{b:c ! important}\n\xf0\x9f\x98\x80 {/* x */--d:{e}}")
 	if err != nil {
@@ -56,6 +57,7 @@ func TestParseTree(t *testing.T) {
 
 // TestParseByteOrderMark checks that offsets count from after the byte order mark, as postcss's do.
 func TestParseByteOrderMark(t *testing.T) {
+	t.Parallel()
 	root, err := Parse("\xef\xbb\xbfa{}")
 	if err != nil {
 		t.Fatal(err)
@@ -68,6 +70,7 @@ func TestParseByteOrderMark(t *testing.T) {
 
 // TestParseErrors checks that a refusal is marked as a syntax error and carries postcss's fields.
 func TestParseErrors(t *testing.T) {
+	t.Parallel()
 	for _, each := range []struct {
 		text      string
 		reason    string
@@ -96,6 +99,7 @@ func TestParseErrors(t *testing.T) {
 // TestParseNeverPanics parses every prefix of every fixture: each must parse or be refused with a
 // CssSyntaxError, never fail any other way.
 func TestParseNeverPanics(t *testing.T) {
+	t.Parallel()
 	for _, fixture := range parseFixtures {
 		for end := 0; end <= len(fixture.text); end++ {
 			_, err := Parse(fixture.text[:end])

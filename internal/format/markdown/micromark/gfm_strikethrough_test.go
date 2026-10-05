@@ -144,4 +144,7 @@ var gfmStrikethroughFixtures = []string{
 	"a\n~~~b~~~",
 }
 
-func TestGfmStrikethroughEvents(t *testing.T) { compareEvents(t, gfmStrikethroughFixtures) }
+func TestGfmStrikethroughEvents(t *testing.T) {
+	t.Parallel()
+	compareEvents(t, gfmStrikethroughFixtures)
+}

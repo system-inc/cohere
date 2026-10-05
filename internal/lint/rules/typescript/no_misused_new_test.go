@@ -89,6 +89,7 @@ func TestNoMisusedNewFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoMisusedNew, misusedNewFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
 		})
@@ -200,6 +201,7 @@ func TestNoMisusedNewStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoMisusedNew, misusedNewFile, testCase.sourceText))
 		})
 	}
@@ -234,6 +236,7 @@ func TestNoMisusedNewPointsAtTheRightToken(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoMisusedNew, misusedNewFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))

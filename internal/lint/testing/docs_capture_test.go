@@ -36,6 +36,7 @@ const captureProbeSource = "let a = 1;\n  debugger;\n"
 // a subprocess because capture.Directory reads the environment once per process, so only a process
 // started with COHERE_DOCS_CAPTURE set can show what the hook does with it.
 func TestDocsCaptureHelper(t *testing.T) {
+	t.Parallel()
 	switch os.Getenv(captureHelperCase) {
 	case "":
 		t.Skip("run by TestDocsCaptureRecordsOnlyAssertedCases")
@@ -51,6 +52,7 @@ func TestDocsCaptureHelper(t *testing.T) {
 // TestDocsCaptureRecordsOnlyAssertedCases: a passing assertion writes one record of what it asserted,
 // a failing one writes nothing, and with capture off no file is created.
 func TestDocsCaptureRecordsOnlyAssertedCases(t *testing.T) {
+	t.Parallel()
 	run := func(t *testing.T, helperCase string, captureOn bool) ([]capture.Record, string, error) {
 		t.Helper()
 		directory := t.TempDir()
@@ -89,6 +91,7 @@ func TestDocsCaptureRecordsOnlyAssertedCases(t *testing.T) {
 	}
 
 	t.Run("a passing ExpectFindings writes one record of the finding", func(t *testing.T) {
+		t.Parallel()
 		records, output, err := run(t, "Findings", true)
 		if err != nil {
 			t.Fatalf("the helper failed: %v\n%s", err, output)
@@ -110,6 +113,7 @@ func TestDocsCaptureRecordsOnlyAssertedCases(t *testing.T) {
 	})
 
 	t.Run("a passing ExpectClean writes a Clean record", func(t *testing.T) {
+		t.Parallel()
 		records, output, err := run(t, "Clean", true)
 		if err != nil {
 			t.Fatalf("the helper failed: %v\n%s", err, output)
@@ -120,6 +124,7 @@ func TestDocsCaptureRecordsOnlyAssertedCases(t *testing.T) {
 	})
 
 	t.Run("a failing ExpectFixedSource writes nothing", func(t *testing.T) {
+		t.Parallel()
 		records, output, err := run(t, "FixedMismatch", true)
 		if err == nil {
 			t.Fatalf("the helper passed, so the mismatch was never asserted:\n%s", output)
@@ -130,6 +135,7 @@ func TestDocsCaptureRecordsOnlyAssertedCases(t *testing.T) {
 	})
 
 	t.Run("with capture off nothing is written", func(t *testing.T) {
+		t.Parallel()
 		records, output, err := run(t, "Findings", false)
 		if err != nil {
 			t.Fatalf("the helper failed: %v\n%s", err, output)

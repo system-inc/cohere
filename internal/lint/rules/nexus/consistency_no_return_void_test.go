@@ -159,6 +159,7 @@ func TestConsistencyNoReturnVoidFixes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoReturnVoid, consistencyNoReturnVoidFile, testCase.source)
 			want := strings.Count(testCase.source, "return void")
 			wantIds := make([]string, 0, want)
@@ -204,6 +205,7 @@ func TestConsistencyNoReturnVoidReportsWithoutAFix(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoReturnVoid, consistencyNoReturnVoidFile, consistencyNoReturnVoidSource(testCase.lines...))
 			rule_testing.ExpectFindings(t, result, consistencyNoReturnVoidId)
 			if len(result.Diagnostics[0].Fixes) != 0 {
@@ -258,6 +260,7 @@ func TestConsistencyNoReturnVoidStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoReturnVoid, "/repository/source/ConsistencyNoReturnVoid.tsx", consistencyNoReturnVoidSource(testCase.lines...))
 			rule_testing.ExpectClean(t, result)
 		})

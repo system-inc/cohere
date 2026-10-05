@@ -17,6 +17,7 @@ import (
 // declaration, emitted one too many, or lost a `--tw-sort` changes the count or the order and fails
 // here, where a property-name comparison would see nothing.
 func TestMultiDeclarationEmittersAgreeWithTheMeasuredReading(t *testing.T) {
+	t.Parallel()
 	const sentinel = "zzsentinel"
 
 	var agreed int
@@ -70,6 +71,7 @@ func TestMultiDeclarationEmittersAgreeWithTheMeasuredReading(t *testing.T) {
 // their root, so a comparison that only visited the four divergent ones would still report a rate of
 // one and would miss an emitter that broke every agreeing literal.
 func TestMultiDeclarationLiteralsAgreeWithTheirMeasuredReading(t *testing.T) {
+	t.Parallel()
 	const sentinel = "zzsentinel"
 
 	var agreed, divergent int
@@ -120,6 +122,7 @@ func TestMultiDeclarationLiteralsAgreeWithTheirMeasuredReading(t *testing.T) {
 // a second copy of the same fact that nothing forces to stay in step. So an override that agrees
 // with its root's ordinary path is a defect rather than harmless duplication.
 func TestMultiDeclarationLiteralsAreOnlyListedWhenTheyDiffer(t *testing.T) {
+	t.Parallel()
 	const sentinel = "zzsentinel"
 
 	listed := 0
@@ -157,6 +160,7 @@ func TestMultiDeclarationLiteralsAreOnlyListedWhenTheyDiffer(t *testing.T) {
 // a declaration and removing the redirect produce different failures, and a test that only compared
 // counts would not tell them apart.
 func TestSortLatchIsObservableInTheMultiTable(t *testing.T) {
+	t.Parallel()
 	for _, root := range []string{"divide", "divide-x", "divide-y", "space-x", "space-y", "placeholder"} {
 		utility, known := FrameworkMultiDeclarationUtilities[root]
 		if !known {
@@ -202,6 +206,7 @@ func TestSortLatchIsObservableInTheMultiTable(t *testing.T) {
 // table could not express and the reason these roots carried a measured reading, so it is asserted
 // rather than left to the acceptance test to imply.
 func TestMultiDeclarationCountsExceedOrderWhereMeasured(t *testing.T) {
+	t.Parallel()
 	const sentinel = "zzsentinel"
 
 	measuredGap, emittedGap := 0, 0

@@ -134,4 +134,7 @@ var gfmFootnoteFixtures = []string{
 	"[^a]: 😀\n\n😀![^a]😀",
 }
 
-func TestGfmFootnoteEvents(t *testing.T) { compareEvents(t, gfmFootnoteFixtures) }
+func TestGfmFootnoteEvents(t *testing.T) {
+	t.Parallel()
+	compareEvents(t, gfmFootnoteFixtures)
+}

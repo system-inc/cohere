@@ -112,6 +112,7 @@ func TestNoRedeclareTypeAliasBelongsToNoMergeSet(t *testing.T) {
 		{"type then enum", "type X = 1;\nenum X { A }"},
 	} {
 		t.Run(testCase.label, func(t *testing.T) {
+			t.Parallel()
 			// Default options, which is what the live config gives this rule.
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, nil),

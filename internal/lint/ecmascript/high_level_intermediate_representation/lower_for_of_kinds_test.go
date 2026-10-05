@@ -35,6 +35,7 @@ func TestForOfHeaderScopeAlignment(t *testing.T) {
 	t.Parallel()
 	for _, location := range []string{"initializer", "test", "before", "after"} {
 		t.Run(location, func(t *testing.T) {
+			t.Parallel()
 			function := lowerTypedFunctions(t, "loop.ts", `function useRows(rows) {
 before();
 for (const row of rows) { row.read(); row.finish(); }
@@ -128,6 +129,7 @@ subscriber.handlers.current?.onResync?.(channel);
 }`},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function := lowerTypedFunctions(t, "dispatch.ts", testCase.source)[0]
 			Construct(function)
 			scopes := AssignReactiveScopes(function)

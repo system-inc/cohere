@@ -41,6 +41,7 @@ func TestNoCssTagsReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoCssTags, "Component.tsx", testCase.source)
 			rule_testing.ExpectFindings(t, result, messageNoCssTags.Id)
 		})
@@ -96,6 +97,7 @@ func TestNoCssTagsIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoCssTags, "Component.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})

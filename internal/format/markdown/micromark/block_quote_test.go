@@ -130,4 +130,7 @@ var blockQuoteFixtures = []string{
 	"> é\n> 𝔸\n𝔸",
 }
 
-func TestBlockQuoteEvents(t *testing.T) { compareEvents(t, blockQuoteFixtures) }
+func TestBlockQuoteEvents(t *testing.T) {
+	t.Parallel()
+	compareEvents(t, blockQuoteFixtures)
+}

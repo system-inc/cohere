@@ -182,6 +182,7 @@ func TestClassLiteralPropertyStyleStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(classLiteralPropertyStyleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle,
 				classLiteralPropertyStyleFile, testCase.sourceText,
 				decodeClassLiteralPropertyStyleOptions(t, testCase.configuration)))
@@ -368,6 +369,7 @@ func TestClassLiteralPropertyStyleFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(classLiteralPropertyStyleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle,
 				classLiteralPropertyStyleFile, testCase.sourceText,
 				decodeClassLiteralPropertyStyleOptions(t, testCase.configuration))
@@ -467,6 +469,7 @@ func TestClassLiteralPropertyStylePreservesTheReturnAnnotation(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(classLiteralPropertyStyleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle,
 				classLiteralPropertyStyleFile, testCase.sourceText,
 				decodeClassLiteralPropertyStyleOptions(t, "\"fields\""))
@@ -654,6 +657,7 @@ func TestClassLiteralPropertyStyleDiscriminatesOnCasesUpstreamDoesNotWrite(t *te
 	}
 	for index, testCase := range cases {
 		t.Run(classLiteralPropertyStyleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle,
 				classLiteralPropertyStyleFile, testCase.sourceText,
 				decodeClassLiteralPropertyStyleOptions(t, testCase.configuration))
@@ -685,6 +689,7 @@ func TestClassLiteralPropertyStyleKeepsWhatTheMemberCarries(t *testing.T) {
 	t.Parallel()
 
 	t.Run("a decorated field is offered nothing", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle, classLiteralPropertyStyleFile,
 			"declare const dec: any;\nclass C {\n  @dec\n  public static readonly foo = 'x';\n}\n",
 			decodeClassLiteralPropertyStyleOptions(t, "\"getters\""))
@@ -715,6 +720,7 @@ func TestClassLiteralPropertyStyleKeepsWhatTheMemberCarries(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle, classLiteralPropertyStyleFile,
 				testCase.sourceText, decodeClassLiteralPropertyStyleOptions(t, testCase.configuration))
 			if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 1 {
@@ -753,6 +759,7 @@ func TestClassLiteralPropertyStyleDecoderResolvesTheStyle(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(classLiteralPropertyStyleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeClassLiteralPropertyStyleOptions([]byte(testCase.configuration))
 			if err != nil {
 				t.Fatalf("decoding %s: %v", testCase.configuration, err)
@@ -808,6 +815,7 @@ func TestClassLiteralPropertyStyleSurvivesMalformedClassMembers(t *testing.T) {
 		"readonlyOnly": "class C { readonly }",
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle,
 				classLiteralPropertyStyleFile, sourceText,
 				decodeClassLiteralPropertyStyleOptions(t, "\"fields\""))
@@ -921,6 +929,7 @@ func TestClassLiteralPropertyStyleDeclinesAConversionThatCannotCompile(t *testin
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, ClassLiteralPropertyStyle, classLiteralPropertyStyleFile,
 				testCase.sourceText, decodeClassLiteralPropertyStyleOptions(t, testCase.configuration))
 			if len(testCase.wantIds) == 0 {

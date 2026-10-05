@@ -104,6 +104,7 @@ func TestSSAVerifierDetectsEachViolationClass(t *testing.T) {
 
 	// 1. Misplace a phi: move it from the join to a block that does not dominate its uses.
 	t.Run("phi moved off the join", func(t *testing.T) {
+		t.Parallel()
 		fn := build()
 		var moved *Phi
 		var from, to *BasicBlock
@@ -133,6 +134,7 @@ func TestSSAVerifierDetectsEachViolationClass(t *testing.T) {
 
 	// 2. Point a use at a value defined on a sibling branch.
 	t.Run("use reads a sibling branch definition", func(t *testing.T) {
+		t.Parallel()
 		fn := build()
 		var join *BasicBlock
 		for _, b := range fn.Blocks {
@@ -167,6 +169,7 @@ func TestSSAVerifierDetectsEachViolationClass(t *testing.T) {
 
 	// 3. Define one value twice.
 	t.Run("value defined twice", func(t *testing.T) {
+		t.Parallel()
 		fn := build()
 		var first, second *Instruction
 		for _, b := range fn.Blocks {
@@ -194,6 +197,7 @@ func TestSSAVerifierDetectsEachViolationClass(t *testing.T) {
 	// use, rewrite the FIRST instruction's value to a LoadLocal of the LAST instruction's result,
 	// which is unambiguously a backwards read inside one block.
 	t.Run("use before definition in the same block", func(t *testing.T) {
+		t.Parallel()
 		fn := build()
 		entry, _ := fn.Block(fn.Entry)
 		if len(entry.Instructions) < 3 {
@@ -236,6 +240,7 @@ func TestSSAAcrossEveryControlFlowConstruct(t *testing.T) {
 	}
 	for _, one := range cases {
 		t.Run(one.name, func(t *testing.T) {
+			t.Parallel()
 			fn := lowerTypedForSSA(t, one.code)
 			if fn == nil {
 				t.Fatal("did not lower")

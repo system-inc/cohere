@@ -69,6 +69,7 @@ func TestNoNonNullAssertedNullishCoalescingStaysSilentOnUpstreamPassCases(t *tes
 	}
 	for index, sourceText := range cases {
 		t.Run(noNonNullAssertedNullishCoalescingCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoNonNullAssertedNullishCoalescing,
 				noNonNullAssertedNullishCoalescingFile, sourceText))
 		})
@@ -174,6 +175,7 @@ func TestNoNonNullAssertedNullishCoalescingFiresOnUpstreamFailCases(t *testing.T
 	}
 	for index, testCase := range cases {
 		t.Run(noNonNullAssertedNullishCoalescingCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoNonNullAssertedNullishCoalescing,
 				noNonNullAssertedNullishCoalescingFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "noNonNullAssertedNullishCoalescing")
@@ -301,6 +303,7 @@ func TestNoNonNullAssertedNullishCoalescingStaysSilentOnShapesTheCorpusDoesNotWr
 	}
 	for index, testCase := range cases {
 		t.Run(noNonNullAssertedNullishCoalescingCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoNonNullAssertedNullishCoalescing,
 				noNonNullAssertedNullishCoalescingFile, testCase.sourceText))
 		})
@@ -367,6 +370,7 @@ func TestNoNonNullAssertedNullishCoalescingFiresOnShapesTheCorpusDoesNotWrite(t 
 	}
 	for index, testCase := range cases {
 		t.Run(noNonNullAssertedNullishCoalescingCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoNonNullAssertedNullishCoalescing,
 				noNonNullAssertedNullishCoalescingFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "noNonNullAssertedNullishCoalescing")

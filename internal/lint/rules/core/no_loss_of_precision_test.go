@@ -81,6 +81,7 @@ func TestNoLossOfPrecisionFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText),
 				"noLossOfPrecision")
@@ -198,6 +199,7 @@ func TestNoLossOfPrecisionStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText))
 		})
@@ -225,6 +227,7 @@ func TestNoLossOfPrecisionReadsRawSourceText(t *testing.T) {
 	}
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText),
 				"noLossOfPrecision")
@@ -259,6 +262,7 @@ func TestNoLossOfPrecisionReadsRawSourceText(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText))
 		})

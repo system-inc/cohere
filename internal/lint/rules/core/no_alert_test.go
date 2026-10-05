@@ -48,6 +48,7 @@ func TestNoAlertStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText))
 		})
 	}
@@ -84,6 +85,7 @@ func TestNoAlertFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText), "unexpected")
 		})
@@ -117,6 +119,7 @@ func TestNoAlertLeavesGlobalThisToScriptFiles(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText))
 		})
 	}
@@ -160,6 +163,7 @@ func TestNoAlertReportsGlobalThisAtOurTarget(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText), "unexpected")
 		})
@@ -189,6 +193,7 @@ func TestNoAlertNamesTheFunction(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -218,6 +223,7 @@ func TestNoAlertReportsTheWholeCall(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -245,16 +251,19 @@ func TestNoAlertHandlesShapesTheCorpusOmits(t *testing.T) {
 	t.Parallel()
 
 	t.Run("globalThis with an optional chain reports", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoAlert, alertFile,
 			"globalThis?.alert(foo)"), "unexpected")
 	})
 
 	t.Run("a computed access through a variable stays clean", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAlert, alertFile,
 			"declare const confirm: string;\nglobalThis[confirm]();\n"))
 	})
 
 	t.Run("a receiver that is not the global object stays clean", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAlert, alertFile,
 			"declare const foo: any;\nfoo.alert(foo);\n"))
 		// The control changes only the receiver.
@@ -307,6 +316,7 @@ func TestNoAlertSurvivesACalleeThatIsNotAMemberAccess(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoAlert, alertFile, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})

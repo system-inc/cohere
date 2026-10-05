@@ -11,6 +11,7 @@ import (
 // text's values and phrases in the order the sentence reads them, its terms in their Swift words, its
 // string phrase in place, and its object phrase an enum whose cases carry their own values.
 func TestSwiftMessagesTypeTheValuesAndTheOptions(t *testing.T) {
+	t.Parallel()
 	catalog, err := LoadMessages(fstest.MapFS{"consistency-no-thing.json": {Data: []byte(`{
   "rules": { "TypeScript": "base/consistency-no-thing", "Swift": "cohere-swift/consistency-no-thing" },
   "phrases": {
@@ -58,6 +59,7 @@ func TestSwiftMessagesTypeTheValuesAndTheOptions(t *testing.T) {
 // TestSwiftMessagesRefuseAValueWithTwoPlaces: a value in the text and in an option of the same message
 // would be two parameters for one name, so generation stops and names it.
 func TestSwiftMessagesRefuseAValueWithTwoPlaces(t *testing.T) {
+	t.Parallel()
 	catalog, err := LoadMessages(fstest.MapFS{"consistency-no-thing.json": {Data: []byte(`{
   "rules": { "Swift": "cohere-swift/consistency-no-thing" },
   "phrases": { "exitCount": { "one": "", "several": " of {{count}}" } },
@@ -74,6 +76,7 @@ func TestSwiftMessagesRefuseAValueWithTwoPlaces(t *testing.T) {
 // TestSwiftLiteralsOutrunTheText: a `"#` in the text stays text, a line break is the raw string's escape,
 // and a value interpolates through the same delimiter.
 func TestSwiftLiteralsOutrunTheText(t *testing.T) {
+	t.Parallel()
 	literal, err := swiftInterpolatedLiteral("a \"# b\n{{name}}")
 	if err != nil {
 		t.Fatal(err)
@@ -87,6 +90,7 @@ func TestSwiftLiteralsOutrunTheText(t *testing.T) {
 // Swift source generated from the same files. The Swift test theFindingIsTheCatalogsMessage closes the
 // chain from that source to the finding a user sees.
 func TestOneEditReachesBothEngines(t *testing.T) {
+	t.Parallel()
 	edited := fstest.MapFS{}
 	err := fs.WalkDir(MessageFiles(), ".", func(name string, entry fs.DirEntry, walkError error) error {
 		if walkError != nil || entry.IsDir() {
@@ -131,6 +135,7 @@ func TestOneEditReachesBothEngines(t *testing.T) {
 // TestALongSignatureTakesOneParameterToALine: past the house format's 120 columns, the signature breaks
 // as the format breaks it, so the formatter leaves the generated file as written.
 func TestALongSignatureTakesOneParameterToALine(t *testing.T) {
+	t.Parallel()
 	catalog, err := LoadMessages(fstest.MapFS{"consistency-no-thing.json": {Data: []byte(`{
   "rules": { "Swift": "cohere-swift/consistency-no-thing" },
   "messages": {
@@ -158,6 +163,7 @@ func TestALongSignatureTakesOneParameterToALine(t *testing.T) {
 // TestATwinWithNoSwiftMessageGetsNoType: a twin file whose messages are all TypeScript's names the Swift
 // rule, and generates nothing for it rather than an empty enum.
 func TestATwinWithNoSwiftMessageGetsNoType(t *testing.T) {
+	t.Parallel()
 	catalog, err := LoadMessages(fstest.MapFS{"consistency-no-thing.json": {Data: []byte(`{
   "rules": { "TypeScript": "nexus/consistency-no-thing", "Swift": "cohere-swift/consistency-no-thing" },
   "messages": { "thing": { "text": "A thing.", "languages": ["TypeScript"] } }

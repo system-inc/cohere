@@ -55,6 +55,7 @@ func TestReactComponentRequirePropertiesTypeSuffixFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix,
 				typeSuffixFile, testCase.sourceText), testCase.wantIds...)
 		})
@@ -136,6 +137,7 @@ func TestReactComponentRequirePropertiesTypeSuffixStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix,
 				testCase.fileName, testCase.sourceText))
 		})
@@ -228,6 +230,7 @@ func TestReactComponentRequirePropertiesTypeSuffixIsOrderIndependent(t *testing.
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix,
 				typeSuffixFile, testCase.sourceText)
 

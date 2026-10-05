@@ -163,6 +163,7 @@ func TestPreferObjectSpreadFires(t *testing.T) {
 
 	for _, testCase := range preferObjectSpreadFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			if testCase.ecmaVersionGated {
 				t.Skip("upstream runs this at the tester's default ecmaVersion 2018, where " +
 					"globalThis is not a known global; our program is ES2022 and the checker " +
@@ -202,6 +203,7 @@ func TestPreferObjectSpreadStaysSilent(t *testing.T) {
 
 	for _, testCase := range preferObjectSpreadCleanCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			if testCase.ecmaVersionGated {
 				t.Skip("upstream runs this at the tester's default ecmaVersion 2018, where " +
 					"globalThis is not a known global; our program is ES2022 and the checker " +
@@ -249,6 +251,7 @@ func TestPreferObjectSpreadAddedCases(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferObjectSpread, preferObjectSpreadFile,
 				testCase.source)
 			rule_testing.ExpectFindings(t, result, "useSpreadMessage")

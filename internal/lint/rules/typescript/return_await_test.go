@@ -252,6 +252,7 @@ func TestReturnAwaitStaysSilent(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(returnAwaitCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, ReturnAwait,
 				returnAwaitFile, testCase.sourceText,
 				returnAwaitOptionsFor(t, testCase.optionsJson)))
@@ -915,6 +916,7 @@ func TestReturnAwaitFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(returnAwaitCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, ReturnAwait, returnAwaitFile,
 				testCase.sourceText, returnAwaitOptionsFor(t, testCase.optionsJson))
 
@@ -1147,6 +1149,7 @@ func TestReturnAwaitFixes(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(returnAwaitCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, ReturnAwait, returnAwaitFile,
 				testCase.sourceText, returnAwaitOptionsFor(t, testCase.optionsJson))
 
@@ -1263,6 +1266,7 @@ func TestReturnAwaitOffersSuggestionsRatherThanFixes(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(returnAwaitCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, ReturnAwait, returnAwaitFile,
 				testCase.sourceText, returnAwaitOptionsFor(t, testCase.optionsJson))
 

@@ -28,6 +28,7 @@ return <div onClick={callback}/>;
 		{"previously called", strings.Replace(source, "const callback=", "coefficient(); const callback=", 1), 2},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			findings, lowered := findingsForSource(t, testCase.source)
 			if !lowered || len(findings) != testCase.findings {
 				t.Fatalf("lowered=%t findings=%v, want %d findings", lowered, findings, testCase.findings)
@@ -40,6 +41,7 @@ func TestPrimitivePropertyConstraintsFollowOperators(t *testing.T) {
 	t.Parallel()
 	for _, operator := range []string{"+", "-", "/", "%", "*", "**", "&", "|", ">>", "<<", "^", ">", "<", ">=", "<=", ">>>", "===", "!==", "==", "!="} {
 		t.Run(operator, func(t *testing.T) {
+			t.Parallel()
 			function, _ := rangesFor(t, "function ordinary() { const model=getModel(); const scalar=model.value; return scalar "+operator+" 2; }")
 			want := operator != ">>>" && operator != "===" && operator != "!==" && operator != "==" && operator != "!="
 			assertPrimitivePropertyRead(t, function, "value", want)
@@ -67,6 +69,7 @@ func TestPrimitivePropertyConstraintsRespectIdentity(t *testing.T) {
 		{"template does not constrain", "function ordinary() { const model=getModel(); return `${model.value}`; }", "value", false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, _ := rangesFor(t, testCase.source)
 			assertPrimitivePropertyRead(t, function, testCase.property, testCase.primitive)
 		})

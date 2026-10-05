@@ -175,6 +175,7 @@ func TestStrictFires(t *testing.T) {
 
 	for _, testCase := range strictFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runStrict(t, testCase), testCase.wantIds...)
 		})
 	}
@@ -185,6 +186,7 @@ func TestStrictStaysSilent(t *testing.T) {
 
 	for _, testCase := range strictSilentCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runStrict(t, testCase))
 		})
 	}
@@ -205,6 +207,7 @@ func TestStrictFixesTheSource(t *testing.T) {
 		}
 		applied++
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t, runStrict(t, testCase), testCase.wantFixedSource)
 		})
 	}
@@ -234,6 +237,7 @@ func TestStrictDeclinesToRepair(t *testing.T) {
 		}
 		declined++
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runStrict(t, testCase)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("wanted a finding")
@@ -294,6 +298,7 @@ func TestStrictReadsTypeScriptParameterLists(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runStrictIn(t, strictTypeScriptFile, testCase)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if testCase.wantFixedSource != "" {
@@ -318,6 +323,7 @@ func TestStrictReadsATypeScriptFileAsImpliedStrict(t *testing.T) {
 	// The #hks3djf shape, under every mode: nothing to ask for, because nothing is missing.
 	for _, mode := range []StrictMode{"", StrictSafe, StrictGlobal, StrictFunction, StrictNever} {
 		t.Run("a script under "+string(mode), func(t *testing.T) {
+			t.Parallel()
 			testCase := strictCase{sourceText: script}
 			if mode != "" {
 				testCase.options = StrictOptions{Mode: mode}
@@ -344,6 +350,7 @@ func TestStrictReadsATypeScriptFileAsImpliedStrict(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runStrictIn(t, strictTypeScriptFile, testCase)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			rule_testing.ExpectFixedSource(t, result, testCase.wantFixedSource)
@@ -353,6 +360,7 @@ func TestStrictReadsATypeScriptFileAsImpliedStrict(t *testing.T) {
 	// The control: the same script in a JavaScript file is run as written, so it still needs the
 	// directive. Without this a rule that read every file as implied would pass every row above.
 	t.Run("a JavaScript script is not implied", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, runStrict(t, strictCase{
 			sourceText: "function foo() { return 1; }\nfoo();"}), "function")
 	})
@@ -380,13 +388,16 @@ func TestStrictFollowsTheCompilersAlwaysStrict(t *testing.T) {
 	}
 
 	t.Run("strict on implies it", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTypedFiles(t, Strict, files, "Strict.ts"))
 	})
 	t.Run("strict off leaves a script sloppy", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunTypedFilesWithSetup(t, Strict, files,
 			"Strict.ts", withConfig(`"strict": false`)), "function")
 	})
 	t.Run("alwaysStrict on its own implies it", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTypedFilesWithSetup(t, Strict, files,
 			"Strict.ts", withConfig(`"strict": false, "alwaysStrict": true`)))
 	})
@@ -412,6 +423,7 @@ func TestStrictRepairPreservesTypeSyntax(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runStrictIn(t, strictTypeScriptFile, testCase)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			rule_testing.ExpectFixedSource(t, result, testCase.wantFixedSource)
@@ -433,6 +445,7 @@ func TestStrictCollapsesEveryModeInAModule(t *testing.T) {
 	source := "'use strict'; export const a = 1;"
 	for _, mode := range []StrictMode{StrictSafe, StrictGlobal, StrictFunction, StrictNever} {
 		t.Run(string(mode), func(t *testing.T) {
+			t.Parallel()
 			result := runStrict(t, strictCase{sourceText: source,
 				options: StrictOptions{Mode: mode}})
 			rule_testing.ExpectFindings(t, result, "module")
@@ -441,11 +454,13 @@ func TestStrictCollapsesEveryModeInAModule(t *testing.T) {
 	}
 	// And with no options at all, which is how the rule would be configured here.
 	t.Run("nil options", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.Run(t, Strict, strictFile, source), "module")
 	})
 	// The control: a module with no directive is clean, so the rows above are the directive
 	// rather than a rule that reports on every module.
 	t.Run("the control", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.Run(t, Strict, strictFile,
 			"export const a = 1;"))
 	})
@@ -508,6 +523,7 @@ func TestDecodeStrictOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("nil input selects Safe", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeStrictOptions(nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -518,12 +534,14 @@ func TestDecodeStrictOptions(t *testing.T) {
 	})
 
 	t.Run("upstream's lowercase spelling is rejected", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeStrictOptions([]byte(`{"mode":"never"}`)); err == nil {
 			t.Error("the lowercase spelling decoded; our modes are PascalCase")
 		}
 	})
 
 	t.Run("an unknown mode is rejected", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeStrictOptions([]byte(`{"mode":"Sometimes"}`)); err == nil {
 			t.Error("an unrecognized mode decoded")
 		}
@@ -565,6 +583,7 @@ func TestStrictStopsAtANonStrictDirective(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runStrict(t, testCase)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)

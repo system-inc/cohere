@@ -50,6 +50,7 @@ func TestNoUselessCallStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText))
 		})
@@ -97,6 +98,7 @@ func TestNoUselessCallFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText), "unnecessaryCall")
 		})
@@ -131,6 +133,7 @@ func TestNoUselessCallKeepsParenthesizedOptionalChainsDistinct(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText))
 		})
 	}
@@ -164,6 +167,7 @@ func TestNoUselessCallDeclinesAComputedAccess(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText))
 		})
 	}
@@ -202,6 +206,7 @@ func TestNoUselessCallDeclinesOtherMethods(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText))
 		})
 	}
@@ -229,6 +234,7 @@ func TestNoUselessCallNamesTheMethod(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))

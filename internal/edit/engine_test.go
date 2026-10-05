@@ -42,6 +42,7 @@ func proposeWhileContains(needle string, replacement string, ruleName string) Pr
 // A fix that produces invalid syntax must be refused and the text left exactly as it was. This is
 // the guard the whole package rests on.
 func TestFixProducingInvalidSyntaxIsRefused(t *testing.T) {
+	t.Parallel()
 	source := "function alpha() { return 1; }\n"
 
 	// Delete the closing brace: individually a legal-looking range replacement, and the result does
@@ -79,6 +80,7 @@ func TestFixProducingInvalidSyntaxIsRefused(t *testing.T) {
 // individually fine must not land either — writing a combination no rule proposed and nothing
 // verified is a worse guarantee than leaving the file alone.
 func TestAParseFailureDiscardsTheWholePass(t *testing.T) {
+	t.Parallel()
 	source := "const alpha = 1;\nfunction beta() { return 2; }\n"
 
 	closingBrace := strings.LastIndex(source, "}")
@@ -106,6 +108,7 @@ func TestAParseFailureDiscardsTheWholePass(t *testing.T) {
 // violation is the normal case, and one pass would leave the file half-fixed while reporting
 // success.
 func TestConvergenceTakesSeveralPasses(t *testing.T) {
+	t.Parallel()
 	// Each pass replaces one "old" with "new". Three of them means three productive passes plus the
 	// pass that finds nothing left.
 	source := "const a = 'old'; const b = 'old'; const c = 'old';\n"
@@ -132,6 +135,7 @@ func TestConvergenceTakesSeveralPasses(t *testing.T) {
 // Two rules that undo each other must terminate on the pass budget rather than spin forever, and
 // must say so. A tool whose premise is a quarter-second run cannot have an unbounded loop in it.
 func TestTwoRulesFightingTerminateOnTheBudget(t *testing.T) {
+	t.Parallel()
 	// One rule rewrites ping to pong; the other rewrites pong back to ping. Neither is wrong on its
 	// own and together they never settle.
 	propose := func(fileName string, text string) ([]Proposal, error) {
@@ -181,6 +185,7 @@ func TestTwoRulesFightingTerminateOnTheBudget(t *testing.T) {
 // the input did not, and pretending otherwise would let this package take the blame for damage it
 // did not do — or worse, hide damage it did.
 func TestAlreadyBrokenFileIsRefusedUpFront(t *testing.T) {
+	t.Parallel()
 	_, err := FixText("broken.ts", "function alpha() { return 1;\n", proposeOnce(), DefaultMaxPasses)
 	if err == nil {
 		t.Fatalf("expected an error for a file that does not parse to begin with")
@@ -198,6 +203,7 @@ func TestAlreadyBrokenFileIsRefusedUpFront(t *testing.T) {
 // which is the exact shape of a check that cannot fail. Picking a mode a temp file never has by
 // default is what makes the assertion mean something.
 func TestFixFileWritesAtomicallyAndKeepsMode(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	fileName := filepath.Join(directory, "target.ts")
 	source := "const a = 'old';\n"
@@ -254,6 +260,7 @@ func TestFixFileWritesAtomicallyAndKeepsMode(t *testing.T) {
 // modification time, which invalidates every downstream cache keyed on it and makes a run that
 // changed nothing look like a run that changed everything.
 func TestFixFileDoesNotTouchAnUnchangedFile(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	fileName := filepath.Join(directory, "clean.ts")
 
@@ -284,6 +291,7 @@ func TestFixFileDoesNotTouchAnUnchangedFile(t *testing.T) {
 
 // A refused fix must leave the file on disk untouched, not merely leave the in-memory text alone.
 func TestFixFileLeavesTheFileUntouchedOnRefusal(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	fileName := filepath.Join(directory, "guarded.ts")
 	source := "function alpha() { return 1; }\n"
@@ -313,6 +321,7 @@ func TestFixFileLeavesTheFileUntouchedOnRefusal(t *testing.T) {
 // A missing file is an error, not an empty string. An empty string parses, applies nothing, and
 // reports success, which is the shape of every silent-green failure this project has recorded.
 func TestMissingFileIsAnError(t *testing.T) {
+	t.Parallel()
 	_, err := FixFile(filepath.Join(t.TempDir(), "absent.ts"), proposeOnce(), DefaultMaxPasses)
 	if err == nil {
 		t.Fatalf("expected an error for a file that does not exist")
@@ -322,6 +331,7 @@ func TestMissingFileIsAnError(t *testing.T) {
 // The summary must distinguish a run that changed forty files from one that changed none, and must
 // say why fixes were refused rather than only how many.
 func TestSummaryReportsPopulationAndReasons(t *testing.T) {
+	t.Parallel()
 	summary := Summarize([]FileResult{
 		{FileName: "a.ts", Changed: true, Passes: 1, Applied: []Proposal{{RuleName: "r"}}},
 		{FileName: "b.ts", Changed: true, Passes: 3, Applied: []Proposal{{RuleName: "r"}, {RuleName: "r"}}},
@@ -372,6 +382,7 @@ func TestSummaryReportsPopulationAndReasons(t *testing.T) {
 // number under the wrong heading, which is the shape of an accurate answer to a question nobody
 // asked.
 func TestAFailedFileIsNotReportedAsNotConverged(t *testing.T) {
+	t.Parallel()
 	summary := Summarize([]FileResult{
 		{FileName: "unreadable.ts", Failed: true},
 		{FileName: "stubborn.ts", Passes: 10, Converged: false, Changed: true},
@@ -396,6 +407,7 @@ func TestAFailedFileIsNotReportedAsNotConverged(t *testing.T) {
 // A run that changed nothing must not print the same line as a run that changed everything. This is
 // the ambiguity that let the gate cohere replaces print green over zero files for days.
 func TestSummaryDistinguishesAnEmptyRun(t *testing.T) {
+	t.Parallel()
 	empty := Summarize(nil).String()
 	busy := Summarize([]FileResult{
 		{FileName: "a.ts", Changed: true, Passes: 1, Applied: []Proposal{{RuleName: "r"}}},
@@ -413,6 +425,7 @@ func TestSummaryDistinguishesAnEmptyRun(t *testing.T) {
 // one as the other invents syntax errors in a file that was fine — and the refusal guard would then
 // refuse every correct fix in every .tsx file, silently, forever.
 func TestTsxIsParsedAsTsx(t *testing.T) {
+	t.Parallel()
 	element := "const view = <div className=\"a\">text</div>;\n"
 
 	if parses, reason := Parses("component.tsx", element); !parses {

@@ -27,6 +27,7 @@ func TestConsistencyNoAmbiguousIdentifierFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoAmbiguousIdentifier, ambiguousFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -67,6 +68,7 @@ func TestConsistencyNoAmbiguousIdentifierStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoAmbiguousIdentifier, ambiguousFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -91,6 +93,7 @@ func TestConsistencyNoAmbiguousIdentifierInfersContext(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoAmbiguousIdentifier, ambiguousFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("expected a finding, got none")
@@ -151,6 +154,7 @@ func TestConsistencyNoAmbiguousIdentifierForeignNames(t *testing.T) {
 		{"an object literal key", "({ e: 1 });"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoAmbiguousIdentifier, "p.ts", testCase.sourceText)
 			for _, diagnostic := range result.Diagnostics {
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]

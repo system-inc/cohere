@@ -82,6 +82,7 @@ func frameworkVariantFixtureRegistry(t *testing.T, name string) ([]frameworkVari
 // sort key, and a renumbering that preserved relative sequence would even look right until it hit
 // the two shared orders.
 func TestFrameworkVariantTableMatchesTheEngine(t *testing.T) {
+	t.Parallel()
 	entries, _ := frameworkVariantFixtureRegistry(t, "framework-default")
 
 	if len(entries) == 0 {
@@ -126,6 +127,7 @@ func TestFrameworkVariantTableMatchesTheEngine(t *testing.T) {
 // `compare`'s root-name branch, where `2xl` precedes `sm` alphabetically. Every responsive class in
 // the tree would sort wrongly and nothing would be missing from the table a reader inspected.
 func TestFrameworkVariantComparisonGroupsMatchTheEngine(t *testing.T) {
+	t.Parallel()
 	entries, compareFnOrders := frameworkVariantFixtureRegistry(t, "framework-default")
 
 	if len(compareFnOrders) == 0 {
@@ -183,6 +185,7 @@ func TestFrameworkVariantComparisonGroupsMatchTheEngine(t *testing.T) {
 // and a shared number is the sole trigger for a comparison function. So the whole failure is
 // contained in this one count, which is why it is asserted directly rather than left implied.
 func TestFrameworkVariantTableHasSharedOrders(t *testing.T) {
+	t.Parallel()
 	byOrder := map[int][]string{}
 	for _, registration := range FrameworkVariantRegistrations {
 		byOrder[registration.Order] = append(byOrder[registration.Order], registration.Name)
@@ -226,6 +229,7 @@ func TestFrameworkVariantTableHasSharedOrders(t *testing.T) {
 // Both paths produce a registry holding every name. Only the replay produces one where `sm` and
 // `md` share a number, and that difference is invisible in any assertion about membership.
 func TestRegisterFrameworkVariantsPreservesSharedOrders(t *testing.T) {
+	t.Parallel()
 	replayed := NewVariantRegistry()
 	replayed.RegisterFrameworkVariants(FrameworkVariantRegistrations)
 
@@ -276,6 +280,7 @@ func TestRegisterFrameworkVariantsPreservesSharedOrders(t *testing.T) {
 // position they were never measured to share. The replay advances `lastOrder` for exactly this
 // reason, and nothing else in the package would notice if it stopped.
 func TestRegisterFrameworkVariantsLeavesRoomForCustomVariants(t *testing.T) {
+	t.Parallel()
 	registry := NewVariantRegistry()
 	registry.RegisterFrameworkVariants(FrameworkVariantRegistrations)
 
@@ -377,6 +382,7 @@ func frameworkVariantIndices(t *testing.T, system *LoadedDesignSystem, roots []s
 // `ParseCandidate`. So the count and the parse are asserted through a loaded system rather than
 // through the table.
 func TestLoadedDesignSystemRegistersTheFrameworkVariants(t *testing.T) {
+	t.Parallel()
 	entryPoint, packageRoot := frameworkVariantStylesheet(t, `@import "tailwindcss";
 @custom-variant dark (&:where(.dark *));
 `)
@@ -419,6 +425,7 @@ func TestLoadedDesignSystemRegistersTheFrameworkVariants(t *testing.T) {
 // reading a system that cannot parse would decline on every one of these and a differential would
 // score the silence as agreement.
 func TestLoadedDesignSystemParsesVariantBearingClasses(t *testing.T) {
+	t.Parallel()
 	entryPoint, packageRoot := frameworkVariantStylesheet(t, `@import "tailwindcss";
 @custom-variant dark (&:where(.dark *));
 `)
@@ -453,6 +460,7 @@ func TestLoadedDesignSystemParsesVariantBearingClasses(t *testing.T) {
 // registrations and without the comparisons produces exactly the reverse of what the engine does at
 // the low end.
 func TestFrameworkBreakpointsOrderByResolvedWidth(t *testing.T) {
+	t.Parallel()
 	entryPoint, packageRoot := frameworkVariantStylesheet(t, `@import "tailwindcss";`)
 
 	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
@@ -484,6 +492,7 @@ func TestFrameworkBreakpointsOrderByResolvedWidth(t *testing.T) {
 // A comparison closed over a hardcoded default scale passes every other test in this file and fails
 // only here, on the one case that is the whole reason the port exists.
 func TestBreakpointComparisonReadsTheLiveTheme(t *testing.T) {
+	t.Parallel()
 	entryPoint, packageRoot := frameworkVariantStylesheet(t, `@import "tailwindcss";
 @theme {
   --breakpoint-sm: 200rem;
@@ -516,6 +525,7 @@ func TestBreakpointComparisonReadsTheLiveTheme(t *testing.T) {
 // invisible on the default scales, where both namespaces happen to ascend in the same name order,
 // which is why this fixture gives the two namespaces opposite orderings.
 func TestContainerQueriesReadTheContainerNamespace(t *testing.T) {
+	t.Parallel()
 	entryPoint, packageRoot := frameworkVariantStylesheet(t, `@import "tailwindcss";
 @theme {
   --container-sm: 90rem;
@@ -563,6 +573,7 @@ func TestContainerQueriesReadTheContainerNamespace(t *testing.T) {
 // would break on the third. That is why the registration happens at load time from the live theme
 // rather than being folded into the generated table.
 func TestThemeDefinedBreakpointSortsAmongTheFrameworkOnes(t *testing.T) {
+	t.Parallel()
 	entryPoint, packageRoot := frameworkVariantStylesheet(t, `@import "tailwindcss";
 @theme {
   --breakpoint-tablet: 50rem;
@@ -613,6 +624,7 @@ func TestThemeDefinedBreakpointSortsAmongTheFrameworkOnes(t *testing.T) {
 // `@` root, so `@huge:` parses without `huge` ever being a registration, and registering one would
 // make the bare class `huge:flex` parse when the engine rejects it.
 func TestThemeContainerKeysRegisterNothing(t *testing.T) {
+	t.Parallel()
 	entryPoint, packageRoot := frameworkVariantStylesheet(t, `@import "tailwindcss";
 @theme {
   --container-huge: 200rem;
@@ -642,6 +654,7 @@ func TestThemeContainerKeysRegisterNothing(t *testing.T) {
 // contribution and it would make the registration count drift by one per redefined breakpoint. The
 // engine reports 88 for this stylesheet.
 func TestRedefiningAFrameworkBreakpointDoesNotRegisterAgain(t *testing.T) {
+	t.Parallel()
 	entryPoint, packageRoot := frameworkVariantStylesheet(t, `@import "tailwindcss";
 @theme {
   --breakpoint-sm: 200rem;
@@ -669,6 +682,7 @@ func TestRedefiningAFrameworkBreakpointDoesNotRegisterAgain(t *testing.T) {
 // is a state a caller can legitimately ask for and silently substituting 88 would make the loud
 // wrong answer quiet again.
 func TestExplicitFrameworkVariantsStillOverrideTheTable(t *testing.T) {
+	t.Parallel()
 	entryPoint, packageRoot := frameworkVariantStylesheet(t, `@import "tailwindcss";`)
 
 	explicit, err := LoadDesignSystem(LoadOptions{

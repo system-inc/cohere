@@ -66,6 +66,7 @@ func TestMaxClassesPerFileFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, MaxClassesPerFile, maxClassesPerFileFile,
 				testCase.sourceText, decodedMaxClassesPerFileOptions(t, testCase.options))
 			rule_testing.ExpectFindings(t, result, "maximumExceeded")
@@ -104,6 +105,7 @@ func TestMaxClassesPerFileStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, MaxClassesPerFile, maxClassesPerFileFile,
 				testCase.sourceText, decodedMaxClassesPerFileOptions(t, testCase.options))
 			rule_testing.ExpectClean(t, result)
@@ -140,6 +142,7 @@ func TestMaxClassesPerFileSpansTheProgramBody(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, MaxClassesPerFile, maxClassesPerFileFile,
 				testCase.sourceText, decodedMaxClassesPerFileOptions(t, testCase.options))
 			if len(result.Diagnostics) != 1 {
@@ -173,6 +176,7 @@ func TestMaxClassesPerFileCountsEveryClassInTheFile(t *testing.T) {
 		{"two expressions passed straight to a call", "f(class {});\nf(class {});"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, MaxClassesPerFile, maxClassesPerFileFile,
 				testCase.sourceText, decodedMaxClassesPerFileOptions(t, ""))
 			rule_testing.ExpectFindings(t, result, "maximumExceeded")
@@ -201,6 +205,7 @@ func TestDecodeMaxClassesPerFileOptions(t *testing.T) {
 	}
 
 	t.Run("empty input defaults to a maximum of one", func(t *testing.T) {
+		t.Parallel()
 		options := settingsFrom(t, "")
 		if options.Maximum == nil || *options.Maximum != 1 {
 			t.Fatalf("expected a maximum of 1, got %v", options.Maximum)
@@ -211,6 +216,7 @@ func TestDecodeMaxClassesPerFileOptions(t *testing.T) {
 	})
 
 	t.Run("a bare integer decodes", func(t *testing.T) {
+		t.Parallel()
 		// The shape a config writes as ["error", 2], which no struct field can read.
 		options := settingsFrom(t, "2")
 		if options.Maximum == nil || *options.Maximum != 2 {
@@ -219,6 +225,7 @@ func TestDecodeMaxClassesPerFileOptions(t *testing.T) {
 	})
 
 	t.Run("an object with no max keeps the default of one", func(t *testing.T) {
+		t.Parallel()
 		// Upstream writes `option.max || 1`. Measured against the installed build: both {} and
 		// {ignoreExpressions: true} leave the limit at one rather than at zero.
 		for _, raw := range []string{"{}", `{"ignoreExpressions": true}`} {
@@ -230,6 +237,7 @@ func TestDecodeMaxClassesPerFileOptions(t *testing.T) {
 	})
 
 	t.Run("a maximum below one is refused", func(t *testing.T) {
+		t.Parallel()
 		// Upstream's schema says minimum 1, and eslint rejects both spellings at configuration load
 		// rather than at lint time. Accepting them here would report every file holding a single
 		// class.
@@ -241,6 +249,7 @@ func TestDecodeMaxClassesPerFileOptions(t *testing.T) {
 	})
 
 	t.Run("nil options reach the rule as a maximum of one", func(t *testing.T) {
+		t.Parallel()
 		// Past the decoder rather than through it: what a bare "error" produces after the config
 		// layer has turned the decoder's error into nil. A zero read here reports the single-class
 		// file below, so this case distinguishes the fallback from its absence.
@@ -282,6 +291,7 @@ func TestMaxClassesPerFileDoesNotCountAClassDeclaredInsideAFunction(t *testing.T
 		{"two top-level classes after a function still report", "function f() { class C {} }\nclass A {}\nclass B {}", true},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, MaxClassesPerFile, maxClassesPerFileFile,
 				testCase.sourceText, decodedMaxClassesPerFileOptions(t, ""))
 			if testCase.reports {

@@ -377,6 +377,7 @@ func TestFreezeFollowsOnlySharedAssignIdentity(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function := NewFunction(nil, "f", FunctionKindOther)
 			block := function.NewBlock(BlockKindBlock)
 			function.Entry = block.Id
@@ -438,6 +439,7 @@ func TestFreezeTraversesPhiValuesAndFunctionCaptures(t *testing.T) {
 	t.Parallel()
 
 	t.Run("phi operands", func(t *testing.T) {
+		t.Parallel()
 		function := NewFunction(nil, "f", FunctionKindOther)
 		entry := function.NewBlock(BlockKindBlock)
 		consequent := function.NewBlock(BlockKindValue)
@@ -486,6 +488,7 @@ func TestFreezeTraversesPhiValuesAndFunctionCaptures(t *testing.T) {
 	})
 
 	t.Run("function captures through an alias", func(t *testing.T) {
+		t.Parallel()
 		function := NewFunction(nil, "f", FunctionKindOther)
 		block := function.NewBlock(BlockKindBlock)
 		function.Entry = block.Id

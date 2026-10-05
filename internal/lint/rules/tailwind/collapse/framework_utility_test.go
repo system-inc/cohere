@@ -37,6 +37,7 @@ type wave1Fixture struct {
 // nothing and is counted separately from one where both produced the same reading, because folding
 // silence into equality is how a table that stopped answering scores perfectly.
 func TestFrameworkFunctionalUtilitiesMatchTheEngine(t *testing.T) {
+	t.Parallel()
 	fixture := loadWave1Fixture(t, "wave1_fixtures.json")
 	system := loadWave1DesignSystem(t)
 
@@ -131,6 +132,7 @@ func TestFrameworkFunctionalUtilitiesMatchTheEngine(t *testing.T) {
 // which is why no probe value reached them and why they were invisible to a generator that only asks
 // what a root reads.
 func TestFrameworkFunctionalUtilitiesCoverTheUnprobableRoots(t *testing.T) {
+	t.Parallel()
 	// Seven of the eight. `mask-radial` is the exception and stays uncovered: it emits four
 	// declarations behind `--tw-*` custom properties, so it belongs to wave 2b rather than here, and
 	// naming it in this list would claim coverage this table does not have.
@@ -155,6 +157,7 @@ func TestFrameworkFunctionalUtilitiesCoverTheUnprobableRoots(t *testing.T) {
 // lookalike functions and a correction could reach eleven and miss the twelfth, which is the defect
 // class this whole port keeps finding.
 func TestFrameworkFunctionalUtilitiesShareOneBarePredicate(t *testing.T) {
+	t.Parallel()
 	shared := 0
 	for _, utility := range FrameworkFunctionalUtilities {
 		if utility.BareValue == BareValuePositiveInteger {
@@ -223,6 +226,7 @@ func loadWave1DesignSystem(t *testing.T) *LoadedDesignSystem {
 // of the lookup became load-bearing here. That is the moment to add a mutation covering it, not to
 // loosen this.
 func TestFrameworkStaticValuesDeclareTheirRootsProperty(t *testing.T) {
+	t.Parallel()
 	withStatics, diverging := 0, 0
 	for root, utility := range FrameworkFunctionalUtilities {
 		if len(utility.StaticValues) == 0 {
@@ -259,6 +263,7 @@ func TestFrameworkStaticValuesDeclareTheirRootsProperty(t *testing.T) {
 // The value matters even though the reading does not: it is what an arbitrary-value data-type
 // inference would read downstream, and it is what the engine emits.
 func TestFrameworkBareValueSuffixIsUnobservableInAReading(t *testing.T) {
+	t.Parallel()
 	theme := NewTheme()
 	cases := []struct {
 		root     string

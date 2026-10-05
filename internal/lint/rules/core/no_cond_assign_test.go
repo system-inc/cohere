@@ -41,6 +41,7 @@ func TestNoCondAssignFiresUnderExceptParens(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile, testCase.sourceText, exceptParensOptions)
 			rule_testing.ExpectFindings(t, result, "condAssign")
 		})
@@ -83,6 +84,7 @@ func TestNoCondAssignFiresUnderAlways(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile, testCase.sourceText, alwaysOptions)
 			rule_testing.ExpectFindings(t, result, "condAssign")
 		})
@@ -151,6 +153,7 @@ func TestNoCondAssignStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile, testCase.sourceText, testCase.options)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -162,6 +165,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
 	t.Parallel()
 
 	t.Run("no options at all falls back to except-parens", func(t *testing.T) {
+		t.Parallel()
 		// The registry hands a rule its decoded options, and a rule configured with a bare severity
 		// gets nothing at all. Upstream's corpus always supplies a mode, so nothing there pins what
 		// happens when the config says only `"error"`. The default has to be the permissive one, or
@@ -174,6 +178,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
 	})
 
 	t.Run("an unrecognized mode string is treated as the default", func(t *testing.T) {
+		t.Parallel()
 		// A typo in the config must not silently escalate to the strict mode. It relaxes to the
 		// documented default instead, which is the same direction the decoder fails in.
 		result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile, "if ((a = b));", NoCondAssignOptions("alwyas"))
@@ -181,6 +186,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
 	})
 
 	t.Run("logical assignment operators in a test position", func(t *testing.T) {
+		t.Parallel()
 		// `&&=` and `??=` are assignments the ES2021 grammar added, and a rule matching only `=`
 		// and the arithmetic compounds misses them. Upstream's corpus predates them.
 		for _, source := range []string{"if (a ||= b) { }", "if (a &&= b) { }", "if (a ??= b) { }"} {
@@ -190,6 +196,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
 	})
 
 	t.Run("a nested conditional reports each assignment once", func(t *testing.T) {
+		t.Parallel()
 		// Two assignments in one test position. A rule reporting per statement rather than per
 		// assignment finds one of these; a rule that walks ancestors without stopping finds one of
 		// them twice. This is the case that separates those two defects.
@@ -199,6 +206,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
 	})
 
 	t.Run("a for initializer is not the test, even when the test also assigns", func(t *testing.T) {
+		t.Parallel()
 		// Found by a surviving mutant. Dropping the start bound of the containment check turns the
 		// `for` initializer into a second finding, because the initializer ENDS before the test
 		// ends and so satisfies the end bound on its own.
@@ -217,6 +225,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
 	})
 
 	t.Run("a for initializer assigning into a parenthesized value", func(t *testing.T) {
+		t.Parallel()
 		// The same bound, reached a different way: here the initializer NESTS an assignment, so a
 		// rule missing the start bound reports two findings on a loop whose test assigns nothing.
 		result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile,
@@ -225,6 +234,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
 	})
 
 	t.Run("an else-if test is checked", func(t *testing.T) {
+		t.Parallel()
 		// The else branch of an if is another IfStatement, so this passes only if the listener sees
 		// nested statements rather than top-level ones.
 		result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile,
@@ -233,6 +243,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
 	})
 
 	t.Run("a getter body in a test position stops the ancestor walk", func(t *testing.T) {
+		t.Parallel()
 		// Found by a surviving mutant, and the only input that distinguishes the Block stop from
 		// nothing at all. An object literal sitting in an `if` test is truthy and its getter never
 		// runs during the test, so the assignment inside it is a body assignment.
@@ -246,6 +257,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
 	})
 
 	t.Run("an arrow with an expression body stops the ancestor walk", func(t *testing.T) {
+		t.Parallel()
 		// The one function form with no Block to stop at, which is why ArrowFunction is in the stop
 		// set and the four other function kinds are not.
 		result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile,
@@ -254,6 +266,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
 	})
 
 	t.Run("an object method body in a test position", func(t *testing.T) {
+		t.Parallel()
 		// Same shape as the getter, reached through an ordinary method. Stopped by the Block rather
 		// than by any method-specific case.
 		result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile,
@@ -262,6 +275,7 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
 	})
 
 	t.Run("a class body stops the ancestor walk", func(t *testing.T) {
+		t.Parallel()
 		// Upstream stops at Function, ArrowFunction, Program, and BlockStatement. A method body is
 		// a BlockStatement so it stops, but this pins that a whole class expression sitting in a
 		// test position does not leak its assignments into the condition.
@@ -300,6 +314,7 @@ func TestNoCondAssignReportsTheOperator(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))

@@ -74,6 +74,7 @@ func loadValueParserCorpus(t *testing.T) valueParserCorpus {
 // TestParseValueMatchesEngine is the whole point of this suite: every tree, for every shape,
 // compared node for node against what the shipped engine built.
 func TestParseValueMatchesEngine(t *testing.T) {
+	t.Parallel()
 	corpus := loadValueParserCorpus(t)
 
 	comparedValues := 0
@@ -116,6 +117,7 @@ func TestParseValueMatchesEngine(t *testing.T) {
 // no separator, quote, or paren and so reaches the buffer either way. That is an argument; this is
 // the measurement behind it.
 func TestParseValueMatchesEngineExhaustively(t *testing.T) {
+	t.Parallel()
 	corpus := loadValueParserCorpus(t)
 
 	disagreements := 0
@@ -151,6 +153,7 @@ func TestParseValueMatchesEngineExhaustively(t *testing.T) {
 // likely to erode silently: a corpus can lose every unbalanced case and still report several
 // hundred green comparisons. These are the branches whose absence would not otherwise be visible.
 func TestCorpusExercisesEveryBranch(t *testing.T) {
+	t.Parallel()
 	corpus := loadValueParserCorpus(t)
 
 	kinds := map[ValueNodeKind]int{}
@@ -189,6 +192,7 @@ func TestCorpusExercisesEveryBranch(t *testing.T) {
 // `foo\(bar)` parses to nothing at all, because the escaped paren never opened a function and the
 // close paren then discarded the entire buffer.
 func TestUnmatchedCloseParenDiscardsPendingText(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		input string
 		want  []ValueNode
@@ -219,6 +223,7 @@ func TestUnmatchedCloseParenDiscardsPendingText(t *testing.T) {
 // yields `undefined` there, and string concatenation stringifies it, so the word really does carry
 // the ten characters `\undefined`.
 func TestTrailingBackslashReadsPastTheEnd(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct{ input, want string }{
 		{`\`, `\undefined`},
 		{`a\`, `a\undefined`},
@@ -238,6 +243,7 @@ func TestTrailingBackslashReadsPastTheEnd(t *testing.T) {
 // inside an unclosed function ends up beside it. A port that flushed into the open function would
 // produce the tree a reader expects and disagree with the engine.
 func TestUnclosedFunctionKeepsRemainderAtTopLevel(t *testing.T) {
+	t.Parallel()
 	got := ParseValue("foo(bar")
 	want := []ValueNode{
 		{Kind: ValueNodeKindFunction, Value: "foo", Nodes: []ValueNode{}},
@@ -262,6 +268,7 @@ func TestUnclosedFunctionKeepsRemainderAtTopLevel(t *testing.T) {
 // slash carries meaning without spaces around it. It is a word, never a separator, so a caller
 // filtering separators still sees it.
 func TestSlashIsItsOwnWord(t *testing.T) {
+	t.Parallel()
 	got := ParseValue("theme(colors.red.500/10)")
 	if len(got) != 1 || got[0].Kind != ValueNodeKindFunction {
 		t.Fatalf("got %s", renderValueNodes(got))
@@ -279,6 +286,7 @@ func TestSlashIsItsOwnWord(t *testing.T) {
 // TestSeparatorRunsArePreservedVerbatim covers whitespace fidelity, which decides whether values
 // round-trip. A parser that normalised runs would agree on structure and disagree on every reprint.
 func TestSeparatorRunsArePreservedVerbatim(t *testing.T) {
+	t.Parallel()
 	for _, input := range []string{"a  b", "a, ,b", "foo(bar,  baz)", "a , b", "a\t\tb", "a,,b"} {
 		if printed := ValueToCss(ParseValue(input)); printed != input {
 			t.Errorf("round-trip of %q gave %q", input, printed)
@@ -295,6 +303,7 @@ func TestSeparatorRunsArePreservedVerbatim(t *testing.T) {
 // argument lists the @utility evaluator reads. The arguments are nodes, and the separator between
 // them is a node too, so a caller walking the list sees the same tree the engine does.
 func TestValueArgumentListsParseAsNodes(t *testing.T) {
+	t.Parallel()
 	got := ParseValue("--value(--percentage-*, [*])")
 	if len(got) != 1 || got[0].Kind != ValueNodeKindFunction || got[0].Value != "--value" {
 		t.Fatalf("got %s", renderValueNodes(got))
@@ -312,6 +321,7 @@ func TestValueArgumentListsParseAsNodes(t *testing.T) {
 // TestNestedFunctionsNestStructurally covers the case the top-level splitter in segment.go cannot
 // answer, and the reason this parser is not redundant with it.
 func TestNestedFunctionsNestStructurally(t *testing.T) {
+	t.Parallel()
 	got := ParseValue("calc(var(--a) * 2)")
 	if len(got) != 1 || got[0].Value != "calc" {
 		t.Fatalf("got %s", renderValueNodes(got))
@@ -337,6 +347,7 @@ func TestNestedFunctionsNestStructurally(t *testing.T) {
 // TestQuotedStringsHoldTheirContents covers the branch that keeps a quoted font name intact, and
 // the boundary where a quote stops protecting anything.
 func TestQuotedStringsHoldTheirContents(t *testing.T) {
+	t.Parallel()
 	got := ParseValue(`"Comic Sans, Bold", sans-serif`)
 	if len(got) != 3 || got[0].Value != `"Comic Sans, Bold"` {
 		t.Errorf("quoted family = %s", renderValueNodes(got))
@@ -398,6 +409,7 @@ func TestQuotedStringsHoldTheirContents(t *testing.T) {
 // TestCarriageReturnNewlineNormalises covers the first statement of the parser. A `\r\n` becomes a
 // one-character separator; a lone `\r` is not a separator at all and stays inside the word.
 func TestCarriageReturnNewlineNormalises(t *testing.T) {
+	t.Parallel()
 	got := ParseValue("a\r\nb")
 	if len(got) != 3 || got[1].Kind != ValueNodeKindSeparator || got[1].Value != "\n" {
 		t.Errorf("ParseValue(\"a\\r\\nb\") = %s", renderValueNodes(got))
@@ -412,6 +424,7 @@ func TestCarriageReturnNewlineNormalises(t *testing.T) {
 // TestParseValueAcceptsEveryInput covers totality. Real class strings contain arbitrary text, and
 // the parser must never panic on any of it.
 func TestParseValueAcceptsEveryInput(t *testing.T) {
+	t.Parallel()
 	corpus := loadValueParserCorpus(t)
 	for _, testCase := range corpus.Cases {
 		// Every prefix and suffix of every corpus value, which is a cheap way to reach truncations

@@ -116,6 +116,7 @@ func TestNoImplicitGlobalsFiresOnGlobalDeclarations(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			// The untyped harness, because a script is the only place these can fire.
 			result := rule_testing.RunWithOptions(t, NoImplicitGlobals, implicitGlobalsFile,
 				testCase.sourceText, implicitGlobalsOptions(t, testCase.lexicalBindings))
@@ -152,6 +153,7 @@ func TestNoImplicitGlobalsFiresOnLeaks(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runImplicitGlobalsAsAScript(t, implicitGlobalsScript, testCase.sourceText,
 				implicitGlobalsOptions(t, false))
 			rule_testing.ExpectFindings(t, result, testCase.messages...)
@@ -174,6 +176,7 @@ func TestNoImplicitGlobalsFiresFromBothHalves(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runImplicitGlobalsAsAScript(t, implicitGlobalsScript,
 				testCase.sourceText, implicitGlobalsOptions(t, true)), testCase.messages...)
 		})
@@ -251,6 +254,7 @@ func TestNoImplicitGlobalsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoImplicitGlobals,
 				implicitGlobalsFile, testCase.sourceText, implicitGlobalsOptions(t, testCase.lexicalBindings)))
 			rule_testing.ExpectClean(t, runImplicitGlobalsAsAScript(t, implicitGlobalsScript,
@@ -306,6 +310,7 @@ func TestNoImplicitGlobalsDeclinesReadonlyGlobals(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			var result rule_testing.Result
 			if testCase.typed {
 				result = runImplicitGlobalsAsAScript(t, implicitGlobalsScript, testCase.sourceText,
@@ -370,6 +375,7 @@ func TestNoImplicitGlobalsReadsWhatTheFileIs(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.file+": "+testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, run[testCase.file](t, testCase.sourceText), testCase.messages...)
 		})
 	}
@@ -403,6 +409,7 @@ func TestNoImplicitGlobalsIsSilentInStrictMode(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runImplicitGlobalsAsAScript(t, implicitGlobalsScript,
 				testCase.sourceText, implicitGlobalsOptions(t, false)), testCase.messages...)
 		})
@@ -419,6 +426,7 @@ func TestDecodeNoImplicitGlobalsOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("an absent option leaves lexical bindings off", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoImplicitGlobalsOptions(nil)
 		if err != nil {
 			t.Fatalf("the decoder refused an absent option: %v", err)
@@ -429,6 +437,7 @@ func TestDecodeNoImplicitGlobalsOptions(t *testing.T) {
 	})
 
 	t.Run("an empty object leaves it off", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoImplicitGlobalsOptions(json.RawMessage(`{}`))
 		if err != nil {
 			t.Fatalf("the decoder refused an empty object: %v", err)
@@ -439,6 +448,7 @@ func TestDecodeNoImplicitGlobalsOptions(t *testing.T) {
 	})
 
 	t.Run("an explicit true turns it on", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoImplicitGlobalsOptions(json.RawMessage(`{"lexicalBindings":true}`))
 		if err != nil {
 			t.Fatalf("the decoder refused an explicit true: %v", err)
@@ -449,6 +459,7 @@ func TestDecodeNoImplicitGlobalsOptions(t *testing.T) {
 	})
 
 	t.Run("a bare severity leaves the rule on its default", func(t *testing.T) {
+		t.Parallel()
 		// A rule configured as "error" is handed nil options, which arrives at Run as an untyped
 		// nil rather than as settings. Asserting through the rule covers the fallback inside Run,
 		// which no decoder test can reach: a global const must stay clean.

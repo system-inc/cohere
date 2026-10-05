@@ -28,6 +28,7 @@ func TestNoEmptyObjectTypeFiresOnInterfaces(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoEmptyObjectType, emptyObjectFile, testCase.sourceText),
 				"noEmptyInterface")
 		})
@@ -48,6 +49,7 @@ func TestNoEmptyObjectTypeFiresOnObjectTypes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoEmptyObjectType, emptyObjectFile, testCase.sourceText),
 				"noEmptyObjectType")
 		})
@@ -125,6 +127,7 @@ func TestNoEmptyObjectTypeStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoEmptyObjectType, emptyObjectFile, testCase.sourceText))
 		})
 	}

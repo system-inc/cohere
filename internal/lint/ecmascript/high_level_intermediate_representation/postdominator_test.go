@@ -119,6 +119,7 @@ func TestPostDominatorsMatchTheDefinition(t *testing.T) {
 
 	for _, shape := range postDominatorShapes {
 		t.Run(shape.name, func(t *testing.T) {
+			t.Parallel()
 			function := lowerSource(t, shape.code)
 			tree := computePostDominance(function)
 
@@ -178,6 +179,8 @@ func TestPostDominatorDefinitionCheckCanFail(t *testing.T) {
 	shapesWithContent := 0
 
 	for _, shape := range postDominatorShapes {
+		// Not parallel: its subtests add to totals the test checks after them, and a parallel subtest would run
+		// only after the test had returned, so the check would pass on nothing.
 		t.Run(shape.name, func(t *testing.T) {
 			function := lowerSource(t, shape.code)
 			pristine := computePostDominance(function)
@@ -273,6 +276,7 @@ func TestUnconditionalBlocksOnMeasuredShapes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function := lowerSource(t, testCase.code)
 			unconditional := UnconditionalBlocks(function)
 
@@ -320,6 +324,7 @@ func TestUnconditionalBlocksAlwaysContainsTheEntry(t *testing.T) {
 
 	for _, shape := range postDominatorShapes {
 		t.Run(shape.name, func(t *testing.T) {
+			t.Parallel()
 			function := lowerSource(t, shape.code)
 			unconditional := UnconditionalBlocks(function)
 			if !unconditional[function.Entry] {
@@ -336,6 +341,7 @@ func TestUnconditionalBlocksIsASubsetOfPostDominators(t *testing.T) {
 
 	for _, shape := range postDominatorShapes {
 		t.Run(shape.name, func(t *testing.T) {
+			t.Parallel()
 			function := lowerSource(t, shape.code)
 			tree := computePostDominance(function)
 			for id := range UnconditionalBlocks(function) {

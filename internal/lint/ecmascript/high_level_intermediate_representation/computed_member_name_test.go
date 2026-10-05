@@ -47,6 +47,7 @@ func TestLoweringAClassMemberWithAComputedName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/test.tsx",
 				Path:     "/test.tsx",

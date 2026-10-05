@@ -22,6 +22,7 @@ import (
 // submodule, so a fact they agree on may be a fact about the submodule, which is how five generated
 // tables carried one repository's tokens as framework facts for as long as they did.
 func TestTheUnseenRepositorysRootsAreAnswered(t *testing.T) {
+	t.Parallel()
 	system := unseenDesignSystem(t)
 
 	// The two `@utility` roots the file declares. Spelled with a value for the functional one,
@@ -51,6 +52,7 @@ func TestTheUnseenRepositorysRootsAreAnswered(t *testing.T) {
 // framework roots whose values this file's theme does not hold, and `--color-weird` is deliberately
 // a namespace no framework root consumes.
 func TestTheUnseenRepositorySeparatesClassesFromTypos(t *testing.T) {
+	t.Parallel()
 	system := unseenDesignSystem(t)
 
 	answers := map[string]bool{
@@ -98,6 +100,7 @@ func TestTheUnseenRepositorySeparatesClassesFromTypos(t *testing.T) {
 // Pinned because it is the difference between a known limit and a silent wrong answer, and because a
 // future change that made the table answer these would need to delete this deliberately.
 func TestTheUnseenRepositorysFunctionalRootIsDeclinedByTheTable(t *testing.T) {
+	t.Parallel()
 	system := unseenDesignSystem(t)
 	table := NewTable(system)
 
@@ -156,6 +159,7 @@ func unseenDesignSystem(t *testing.T) *LoadedDesignSystem {
 //
 // Asserted on the live system rather than a list, so a repository adding such a pair joins this test.
 func TestARootDeclaredBothWaysKeepsBothKinds(t *testing.T) {
+	t.Parallel()
 	system, _ := liveTableFor(t, corpusRepositories[0].entryPoint)
 	if system == nil {
 		t.Skip("no design system loaded")

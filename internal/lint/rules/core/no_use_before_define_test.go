@@ -1200,6 +1200,7 @@ func TestNoUseBeforeDefineFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runUseBeforeDefineCase(t, testCase)
 
 			expected := make([]string, testCase.findings)
@@ -2146,6 +2147,7 @@ func TestNoUseBeforeDefineStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runUseBeforeDefineCase(t, testCase)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -2175,6 +2177,7 @@ func TestNoUseBeforeDefineReportsTheUseNotTheDeclaration(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
@@ -2409,6 +2412,7 @@ func TestNoUseBeforeDefineSubstrateDivergences(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -2449,6 +2453,7 @@ func TestNoUseBeforeDefineMergedDeclarations(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source)
 			rule_testing.ExpectFindings(t, result, "usedBeforeDefined")
 
@@ -2479,6 +2484,7 @@ func TestNoUseBeforeDefineMergedDeclarations(t *testing.T) {
 		{"between class and namespace", "class Foo {} Foo; namespace Foo { export let x = 1; }"},
 	} {
 		t.Run(clean.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", clean.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -2531,6 +2537,7 @@ func TestNoUseBeforeDefineQualifiedNames(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
@@ -2573,6 +2580,7 @@ func TestNoUseBeforeDefineJsxAttributes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.tsx", testCase.source)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
@@ -2612,6 +2620,7 @@ func TestNoUseBeforeDefineShorthandProperties(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
@@ -2656,6 +2665,7 @@ func TestNoUseBeforeDefineDestructuringPropertyNames(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
@@ -2695,6 +2705,7 @@ func TestNoUseBeforeDefineObjectMethodParameters(t *testing.T) {
 		"class K { constructor(c) { this.c = c; } }",
 	} {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", source)
 			rule_testing.ExpectClean(t, result)
 		})

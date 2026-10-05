@@ -50,6 +50,7 @@ func TestBranchLocalHoistableFactsRespectDominatingReactiveScope(t *testing.T) {
 	for _, testCase := range testCases {
 		for _, enabled := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s/preservation=%t", testCase.name, enabled), func(t *testing.T) {
+				t.Parallel()
 				source, wantFindings := testCase.source, 0
 				if !enabled {
 					source = "// @enablePreserveExistingMemoizationGuarantees:false\n" + source

@@ -11,6 +11,7 @@ import (
 // The glob cases gitignore(5) and fnmatch(3) describe, one per rule, so a regression names the rule it
 // broke.
 func TestGlobFollowsTheDocumentedRules(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		pattern string
 		text    string
@@ -74,6 +75,7 @@ func TestGlobFollowsTheDocumentedRules(t *testing.T) {
 // WM_PATHNAME is how an anchored pattern matches a path, and without it how a base-name pattern
 // matches. The two case-folding ones do not apply, since this matcher is case sensitive by design.
 func TestGitWildmatchCorpus(t *testing.T) {
+	t.Parallel()
 	source := gitSource(t)
 	contents, err := os.ReadFile(filepath.Join(source, "t", "t3070-wildmatch.sh"))
 	if err != nil {

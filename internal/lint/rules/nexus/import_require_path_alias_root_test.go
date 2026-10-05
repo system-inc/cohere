@@ -68,6 +68,7 @@ func TestImportRequirePathAliasRootIsAnchored(t *testing.T) {
 	}
 	for _, testCase := range accepted {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := decodeRootForTest(t, testCase.root, base)
 			if err != nil {
 				t.Fatalf("refused: %v", err)
@@ -104,6 +105,7 @@ func TestImportRequirePathAliasRootIsAnchored(t *testing.T) {
 	}
 	for _, testCase := range refused {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := decodeRootForTest(t, testCase.root, testCase.base)
 			if err == nil {
 				t.Fatalf("accepted a root that cannot be determined: %q", decoded.RepositoryRoot)

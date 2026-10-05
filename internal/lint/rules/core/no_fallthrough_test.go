@@ -125,6 +125,7 @@ func TestNoFallthroughFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			var result rule_testing.Result
 			if testCase.options == nil {
 				result = rule_testing.Run(t, NoFallthrough, fallthroughFile, testCase.sourceText)
@@ -273,6 +274,7 @@ func TestNoFallthroughStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			var result rule_testing.Result
 			if testCase.options == nil {
 				result = rule_testing.Run(t, NoFallthrough, fallthroughFile, testCase.sourceText)
@@ -333,6 +335,7 @@ func TestNoFallthroughPointsAtTheClauseFallenInto(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			var result rule_testing.Result
 			if testCase.options == nil {
 				result = rule_testing.Run(t, NoFallthrough, fallthroughFile, testCase.sourceText)
@@ -359,6 +362,7 @@ func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
 	t.Parallel()
 
 	t.Run("a labeled break naming the switch leaves it", func(t *testing.T) {
+		t.Parallel()
 		// Upstream's corpus has no labeled break at all, and a port crediting only a bare `break`
 		// would report this. A labeled break jumps out of whatever it names, and in every case that
 		// is somewhere at or outside the switch, so the clause does not fall through either way.
@@ -367,6 +371,7 @@ func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
 	})
 
 	t.Run("a labeled break naming an inner loop does not leave the switch", func(t *testing.T) {
+		t.Parallel()
 		// The other half of the pair. `break inner` leaves the loop and lands back in the clause,
 		// so the clause still falls through. A port treating every labeled break as an exit stays
 		// silent here and nothing upstream would notice.
@@ -375,6 +380,7 @@ func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
 	})
 
 	t.Run("a continue with a label leaves the switch", func(t *testing.T) {
+		t.Parallel()
 		// `continue` can only target a loop, and no loop is inside this clause, so it necessarily
 		// leaves the switch. Upstream covers unlabeled continue only.
 		rule_testing.ExpectClean(t, rule_testing.Run(t, NoFallthrough, fallthroughFile,
@@ -382,6 +388,7 @@ func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
 	})
 
 	t.Run("a switch nested in a clause does not lend its break to the outer clause", func(t *testing.T) {
+		t.Parallel()
 		// The pair with upstream's nested-switch pass case, which is clean only because of its
 		// comment. Without the comment the outer clause falls through, and this pins that the inner
 		// break is not credited outward.
@@ -390,6 +397,7 @@ func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
 	})
 
 	t.Run("a return inside a nested function does not exit the clause", func(t *testing.T) {
+		t.Parallel()
 		// The walk has to stop at a function boundary. A return in an inner function returns from
 		// that function, and the clause carries straight on into the next one.
 		rule_testing.ExpectFindings(t, rule_testing.Run(t, NoFallthrough, fallthroughFile,
@@ -397,6 +405,7 @@ func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
 	})
 
 	t.Run("a comment pattern is matched case-insensitively", func(t *testing.T) {
+		t.Parallel()
 		// oxc compiles the configured pattern with `(?iu)` prepended, so a lower-case pattern
 		// matches an upper-case comment. Nothing in the corpus pairs a custom pattern with a
 		// differing case, so a port compiling the pattern verbatim passes all 56 pass cases.
@@ -406,6 +415,7 @@ func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
 	})
 
 	t.Run("an invalid comment pattern does not match everything", func(t *testing.T) {
+		t.Parallel()
 		// A pattern that fails to compile must not silently become "matches anything", which is
 		// what a port ignoring the compile error would produce: the rule would go quiet on every
 		// file the option touches. Falling back to the default set keeps the rule honest.
@@ -415,6 +425,7 @@ func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
 	})
 
 	t.Run("a directive is never a fallthrough comment, even under a matching pattern", func(t *testing.T) {
+		t.Parallel()
 		// oxc rejects a comment opening with `oxlint-` or `eslint-` before consulting the pattern,
 		// and the guard is only load-bearing when a pattern would otherwise match a directive. A
 		// mutation deleting it survived the whole corpus and the first version of this case, both
@@ -432,6 +443,7 @@ func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
 	})
 
 	t.Run("a clause whose only statement is a labeled block carries its comment", func(t *testing.T) {
+		t.Parallel()
 		// The in-block comment window is gated on the clause's only statement being a block. A
 		// labeled block is a LabeledStatement wrapping one, so the window does not apply and the
 		// comment has to be found by the ordinary between-clauses scan, which it is.
@@ -440,6 +452,7 @@ func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
 	})
 
 	t.Run("a suppression directive is not a fallthrough comment", func(t *testing.T) {
+		t.Parallel()
 		// Upstream lists this input as a *pass* case, and it is a pass case there because oxc's
 		// Tester runs the whole engine and the engine consumes the directive. Our
 		// `rule_testing.Run` walks one rule and applies no suppressions, so the finding is expected
@@ -453,6 +466,7 @@ func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
 	})
 
 	t.Run("declaring the rule needs no checker", func(t *testing.T) {
+		t.Parallel()
 		// The rule reads the statement tree only, so the untyped harness is enough. If a later
 		// change reaches for the checker without declaring it, the rule goes silent under
 		// `rule_testing.Run` and this case fails loudly rather than passing vacuously.

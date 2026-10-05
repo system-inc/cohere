@@ -114,6 +114,7 @@ var proseWrapFixtures = []string{
 }
 
 func TestProseWrapMatchesOracle(t *testing.T) {
+	t.Parallel()
 	oracle := newOptionsOracle(t)
 	inputs := append(append(append([]string{}, proseWrapFixtures...), formatFixtures...), suiteInputs(t)...)
 	texts, byteOrderMarks, trees := parseInputs(t, inputs)
@@ -169,6 +170,7 @@ func jsonTextToDoc(t *testing.T, oracle *optionsOracle, options formatoptions.Op
 // TestPrettierRcEmbedsJSON covers embed.js: a .prettierrc, .stylelintrc or .lintstagedrc that is JSON
 // prints as JSON, and one that is YAML falls back to the YAML printer; any other name never embeds.
 func TestPrettierRcEmbedsJSON(t *testing.T) {
+	t.Parallel()
 	oracle := newOptionsOracle(t)
 	inputs := []string{
 		`{"semi":false,"singleQuote":true}`, "{\n  \"a\": [1,2,3]\n}\n", "semi: false\nsingleQuote:   true\n",
@@ -211,6 +213,7 @@ func TestPrettierRcEmbedsJSON(t *testing.T) {
 // TestPrettierRcWithoutTextToDocPrintsYAML: with no textToDoc the embed fails, and the core prints the
 // file as YAML, as upstream does when the JSON format throws.
 func TestPrettierRcWithoutTextToDocPrintsYAML(t *testing.T) {
+	t.Parallel()
 	texts, _, trees := parseInputs(t, []string{`{"a":1}`})
 	actual, err := PrintFile(".prettierrc", trees[0].root, texts[0], formatoptions.Default(), nil)
 	if err != nil {

@@ -161,6 +161,7 @@ export function Widget() {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			var result rule_testing.Result
 			if testCase.withReact {
 				result = runReactHookAnyTypeWithReact(t, testCase.source)
@@ -315,6 +316,7 @@ export function Widget() {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			var result rule_testing.Result
 			if testCase.withReact {
 				result = runReactHookAnyTypeWithReact(t, testCase.source)
@@ -419,6 +421,7 @@ export function Widget() {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runReactHookAnyTypeWithoutReact(t, testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("diagnostics = %d, want 1", len(result.Diagnostics))
@@ -613,6 +616,7 @@ func TestReactHookAnyTypeJoinRendersEveryArity(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if got := reactHookNoAnyTypeJoin(testCase.names); got != testCase.want {
 				t.Errorf("reactHookNoAnyTypeJoin(%q) = %q, want %q", testCase.names, got, testCase.want)
 			}
@@ -661,6 +665,7 @@ func TestReactHookAnyTypeFlagReadAgreesWithTheCheckersOwnName(t *testing.T) {
 
 	for _, subject := range subjects {
 		t.Run(subject.name, func(t *testing.T) {
+			t.Parallel()
 			var gotName string
 			var gotAny bool
 			var visited int

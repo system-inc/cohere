@@ -54,6 +54,7 @@ func TestNoHtmlLinkForPagesReportsTheUpstreamCorpus(t *testing.T) {
 
 	for _, element := range upstreamFailCases {
 		t.Run(element, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(element))
 			rule_testing.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)
 		})
@@ -65,6 +66,7 @@ func TestNoHtmlLinkForPagesIsSilentOnTheUpstreamCorpus(t *testing.T) {
 
 	for _, element := range upstreamPassCases {
 		t.Run(element, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(element))
 			rule_testing.ExpectClean(t, result)
 		})
@@ -131,6 +133,7 @@ func TestNoHtmlLinkForPagesReportsCasesUpstreamDoesNotWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(testCase.element))
 			rule_testing.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)
 		})
@@ -203,6 +206,7 @@ func TestNoHtmlLinkForPagesIsSilentOnCasesUpstreamDoesNotWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(testCase.element))
 			rule_testing.ExpectClean(t, result)
 		})
@@ -234,6 +238,7 @@ func TestNoHtmlLinkForPagesPointsAtTheOpeningElement(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := htmlLinkSource(testCase.element)
 			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", source)
 			rule_testing.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)

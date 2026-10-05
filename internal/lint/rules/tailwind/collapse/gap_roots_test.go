@@ -109,6 +109,7 @@ var gapRootResolutionCases = map[string]bool{
 // and the expectations were measured through `candidatesToCss`, so an agreement is evidence rather
 // than a restatement. That is the same discipline the three emitter slices were held to.
 func TestGapRootDescriptionsResolveWhatTheEngineCompiles(t *testing.T) {
+	t.Parallel()
 	system, _ := liveTableFor(t, corpusRepositories[0].entryPoint)
 	if system == nil {
 		t.Skip("no design system loaded")
@@ -166,6 +167,7 @@ func compiledWord(compiles bool) string {
 // root with an emitter and no description cannot be asked whether its value resolves, and a
 // description with no emitter describes something this port does not otherwise know about.
 func TestEveryGapRootIsDescribed(t *testing.T) {
+	t.Parallel()
 	var missingDescription, missingEmitter []string
 
 	for root := range gapEmitters {
@@ -207,6 +209,7 @@ func TestEveryGapRootIsDescribed(t *testing.T) {
 // The population is every gap root with a colour arm rather than a list, so a root gaining one joins
 // this test.
 func TestArbitraryColorsWithAnAlphaResolveOnEveryColorRoot(t *testing.T) {
+	t.Parallel()
 	system, _ := liveTableFor(t, corpusRepositories[0].entryPoint)
 	if system == nil {
 		t.Skip("no design system loaded")

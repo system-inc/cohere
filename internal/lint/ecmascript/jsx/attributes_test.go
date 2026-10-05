@@ -53,6 +53,7 @@ func firstElement(t *testing.T, sourceText string) *ast.Node {
 // elements are written in. A helper that reads only one form is silent on the common case, which is
 // the failure that reads as a rule finding nothing.
 func TestElementPartsReadsBothOpeningForms(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -64,6 +65,7 @@ func TestElementPartsReadsBothOpeningForms(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			tagName, attributes := ElementParts(firstElement(t, testCase.sourceText))
 			if tagName == nil {
 				t.Fatal("want a tag name, got none")
@@ -81,6 +83,7 @@ func TestElementPartsReadsBothOpeningForms(t *testing.T) {
 // A node that is not a JSX element has no parts, and saying so is different from returning something
 // empty that a caller then reads as an element with no attributes.
 func TestElementPartsDeclinesEverythingElse(t *testing.T) {
+	t.Parallel()
 	tagName, attributes := ElementParts(firstElement(t, "export const A = <div />;\n").Parent)
 	if tagName != nil || attributes != nil {
 		t.Fatalf("want no parts for a non-element node, got tag=%v attributes=%v", tagName, attributes)
@@ -90,6 +93,7 @@ func TestElementPartsDeclinesEverythingElse(t *testing.T) {
 // The two matchers exist because upstream matches two ways and which one a rule uses is part of what
 // that rule decides. Unifying them would mean choosing for upstream in one direction or the other.
 func TestStringAttributeValueHonoursBothMatchers(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -105,6 +109,7 @@ func TestStringAttributeValueHonoursBothMatchers(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			_, attributes := ElementParts(firstElement(t, testCase.sourceText))
 			value, found := StringAttributeValue(attributes, testCase.attribute, testCase.matches)
 			if found != testCase.wantFound {
@@ -120,6 +125,7 @@ func TestStringAttributeValueHonoursBothMatchers(t *testing.T) {
 // The empty string is a real value and must not read as absence, which is why the second return
 // exists at all. A caller that collapsed them would treat `alt=""` as an element with no alt.
 func TestStringAttributeValueSeparatesEmptyFromAbsent(t *testing.T) {
+	t.Parallel()
 	_, attributes := ElementParts(firstElement(t, "export const A = <img alt='' />;\n"))
 	value, found := StringAttributeValue(attributes, "alt", MatchExactly)
 	if !found {
@@ -134,6 +140,7 @@ func TestStringAttributeValueSeparatesEmptyFromAbsent(t *testing.T) {
 // judgment rather than a simplification: a rule deciding from an attribute's text cannot decide
 // anything about a value it would have to evaluate.
 func TestStringAttributeValueDeclinesValuesItCannotRead(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -144,6 +151,7 @@ func TestStringAttributeValueDeclinesValuesItCannotRead(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			_, attributes := ElementParts(firstElement(t, testCase.sourceText))
 			name := "href"
 			if testCase.name == "a bare attribute with no initializer" {
@@ -159,6 +167,7 @@ func TestStringAttributeValueDeclinesValuesItCannotRead(t *testing.T) {
 // Presence is a different question from value, and it is the one some rules actually ask. Reading
 // the value here would make a bare `async`, the idiomatic spelling, look absent.
 func TestHasAttributeNamedAsksAboutPresence(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -178,6 +187,7 @@ func TestHasAttributeNamedAsksAboutPresence(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			_, attributes := ElementParts(firstElement(t, testCase.sourceText))
 			if got := HasAttributeNamed(attributes, testCase.attribute, testCase.matches); got != testCase.want {
 				t.Fatalf("want %v, got %v", testCase.want, got)
@@ -189,6 +199,7 @@ func TestHasAttributeNamedAsksAboutPresence(t *testing.T) {
 // A member-expression or namespaced tag is a component reference that never emits the HTML element,
 // so comparing text alone would flag code that renders nothing of the kind.
 func TestIsIntrinsicElementNamedRejectsComponentReferences(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -200,6 +211,7 @@ func TestIsIntrinsicElementNamedRejectsComponentReferences(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			tagName, _ := ElementParts(firstElement(t, testCase.sourceText))
 			if got := IsIntrinsicElementNamed(tagName, "link"); got != testCase.want {
 				t.Fatalf("want %v, got %v", testCase.want, got)
@@ -212,6 +224,7 @@ func TestIsIntrinsicElementNamedRejectsComponentReferences(t *testing.T) {
 // a bug in the rule, and a panic in a shared package takes the whole run down instead of that one
 // rule's finding.
 func TestHelpersSurviveNilInput(t *testing.T) {
+	t.Parallel()
 	if _, found := StringAttributeValue(nil, "rel", MatchExactly); found {
 		t.Fatal("want nil attributes to report nothing found")
 	}
@@ -227,6 +240,7 @@ func TestHelpersSurviveNilInput(t *testing.T) {
 // and it is what a rule reporting *on the attribute* needs: the element-level helpers answer about
 // the element and hand back no node to anchor a finding on.
 func TestAttributeNameReadsPlainIdentifiers(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -242,6 +256,7 @@ func TestAttributeNameReadsPlainIdentifiers(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			_, attributes := ElementParts(firstElement(t, testCase.sourceText))
 			properties := attributes.AsJsxAttributes().Properties
 			if properties == nil || len(properties.Nodes) == 0 {
@@ -260,7 +275,9 @@ func TestAttributeNameReadsPlainIdentifiers(t *testing.T) {
 
 // The three shapes that decline, each a real thing a rule meets rather than a defensive case.
 func TestAttributeNameDeclinesWhatHasNoPlainName(t *testing.T) {
+	t.Parallel()
 	t.Run("a spread carries no name", func(t *testing.T) {
+		t.Parallel()
 		_, attributes := ElementParts(firstElement(t, "export const A = <div {...properties} />;\n"))
 		nodes := attributes.AsJsxAttributes().Properties.Nodes
 		if _, named := AttributeName(nodes[0]); named {
@@ -272,6 +289,7 @@ func TestAttributeNameDeclinesWhatHasNoPlainName(t *testing.T) {
 	// JSXAttributeName::Identifier. Reading the local part instead would make `xlink:href` answer
 	// to a rule asking about `href`.
 	t.Run("a namespaced name declines", func(t *testing.T) {
+		t.Parallel()
 		_, attributes := ElementParts(firstElement(t, "export const A = <svg xlink:href='x' />;\n"))
 		nodes := attributes.AsJsxAttributes().Properties.Nodes
 		if _, named := AttributeName(nodes[0]); named {
@@ -280,6 +298,7 @@ func TestAttributeNameDeclinesWhatHasNoPlainName(t *testing.T) {
 	})
 
 	t.Run("a nil node declines", func(t *testing.T) {
+		t.Parallel()
 		if _, named := AttributeName(nil); named {
 			t.Fatal("want nil to decline")
 		}
@@ -290,6 +309,7 @@ func TestAttributeNameDeclinesWhatHasNoPlainName(t *testing.T) {
 // through AttributeName. This is the assertion that would catch someone "fixing" the helper to read
 // a namespaced local part.
 func TestNamespacedAttributesAreInvisibleToTheElementHelpers(t *testing.T) {
+	t.Parallel()
 	_, attributes := ElementParts(firstElement(t, "export const A = <svg xlink:href='x' />;\n"))
 	if HasAttributeNamed(attributes, "href", MatchExactly) {
 		t.Fatal("want a namespaced attribute not to answer to its local part")

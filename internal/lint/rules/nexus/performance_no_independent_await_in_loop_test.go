@@ -98,6 +98,7 @@ func TestPerformanceNoIndependentAwaitInLoopAhraShapes(t *testing.T) {
 
 	for name, wantCount := range performanceNoIndependentAwaitInLoopAhraShapes {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			source, err := os.ReadFile(filepath.Join(performanceNoIndependentAwaitInLoopTestdata, name))
 			if err != nil {
 				t.Fatal(err)
@@ -240,6 +241,7 @@ func TestPerformanceNoIndependentAwaitInLoopFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile,
 				performanceNoIndependentAwaitInLoopSource(testCase.lines...))
 			rule_testing.ExpectFindings(t, result, "independentAwaitInLoop")
@@ -481,6 +483,7 @@ func TestPerformanceNoIndependentAwaitInLoopStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile,
 				performanceNoIndependentAwaitInLoopSource(testCase.lines...))
 			rule_testing.ExpectClean(t, result)

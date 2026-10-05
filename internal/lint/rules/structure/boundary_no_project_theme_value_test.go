@@ -46,6 +46,7 @@ func TestBoundaryNoProjectThemeValueFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTypedFiles(t, BoundaryNoProjectThemeValue, map[string]string{
 				themeFilePath:   buttonThemeSource,
 				libraryFilePath: testCase.sourceText,
@@ -89,6 +90,7 @@ func TestBoundaryNoProjectThemeValueStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedFiles(t, BoundaryNoProjectThemeValue, map[string]string{
 				themeFilePath:     buttonThemeSource,
 				testCase.fileName: testCase.sourceText,
@@ -114,6 +116,7 @@ func TestBoundaryNoProjectThemeValueReadsTheProgramRatherThanTheFilesystem(t *te
 	const inMemoryTheme = "export interface CardVariantsInterface {\n    Flat: string;\n}\n"
 
 	t.Run("a value the in-memory theme defines", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTypedFiles(t, BoundaryNoProjectThemeValue, map[string]string{
 			inMemoryThemePath: inMemoryTheme,
 			libraryFilePath:   "export const a = <Card variant=\"Flat\" />;\n",
@@ -121,6 +124,7 @@ func TestBoundaryNoProjectThemeValueReadsTheProgramRatherThanTheFilesystem(t *te
 	})
 
 	t.Run("a value it does not define", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunTypedFiles(t, BoundaryNoProjectThemeValue, map[string]string{
 			inMemoryThemePath: inMemoryTheme,
 			libraryFilePath:   "export const a = <Card variant=\"Raised\" />;\n",
@@ -134,6 +138,7 @@ func TestBoundaryNoProjectThemeValueReadsTheProgramRatherThanTheFilesystem(t *te
 	// that read it would find "Raised" undefined and report, and a rule that correctly ignores it
 	// finds no theme for Card at all and declines.
 	t.Run("an unexported theme interface defines nothing", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTypedFiles(t, BoundaryNoProjectThemeValue, map[string]string{
 			"/repository/libraries/structure/source/components/cards/CardTheme.ts": "interface CardVariantsInterface {\n    Flat: string;\n}\nexport const unused = 1;\n",
 			libraryFilePath: "export const a = <Card variant=\"Raised\" />;\n",
@@ -148,6 +153,7 @@ func TestBoundaryNoProjectThemeValueReadsTheProgramRatherThanTheFilesystem(t *te
 	// executing the original's merge on both shapes rather than by reading it, because the reading
 	// admits two interpretations and only one of them is what `Object.assign` performs.
 	t.Run("two theme files sharing a prefix both contribute", func(t *testing.T) {
+		t.Parallel()
 		files := map[string]string{
 			"/repository/libraries/structure/source/components/calendars/CalendarTheme.ts":     "export interface CalendarVariantsInterface {\n    A: string;\n}\n",
 			"/repository/libraries/structure/source/components/time/calendar/CalendarTheme.ts": "export interface CalendarSizesInterface {\n    Base: string;\n}\n",
@@ -160,6 +166,7 @@ func TestBoundaryNoProjectThemeValueReadsTheProgramRatherThanTheFilesystem(t *te
 	// even if the whole Calendar entry were missing from the cache, because a rule that finds no
 	// theme declines silently. This is the half that tells a merge apart from a loss.
 	t.Run("both contributed suffixes are actually enforced", func(t *testing.T) {
+		t.Parallel()
 		for _, attribute := range []string{"variant=\"Nope\"", "size=\"Nope\""} {
 			files := map[string]string{
 				"/repository/libraries/structure/source/components/calendars/CalendarTheme.ts":     "export interface CalendarVariantsInterface {\n    A: string;\n}\n",
@@ -176,6 +183,7 @@ func TestBoundaryNoProjectThemeValueReadsTheProgramRatherThanTheFilesystem(t *te
 	// leading capital is what separates them. On the real tree that file exists and carries no theme
 	// interface, so this fixture is what keeps the distinction from being harmless-by-accident.
 	t.Run("a lowercase theme-suffixed file is not a theme", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTypedFiles(t, BoundaryNoProjectThemeValue, map[string]string{
 			"/repository/libraries/structure/source/theme/hooks/useTheme.ts": "export interface CardVariantsInterface {\n    Flat: string;\n}\n",
 			libraryFilePath: "export const a = <Card variant=\"Raised\" />;\n",
@@ -209,6 +217,7 @@ func TestBoundaryNoProjectThemeValueCachesPerProgram(t *testing.T) {
 	}
 
 	t.Run("the first program reports against its own theme", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t,
 			rule_testing.RunTypedFiles(t, BoundaryNoProjectThemeValue, firstProgram, libraryFilePath),
 			"forbiddenThemeValue")
@@ -217,6 +226,7 @@ func TestBoundaryNoProjectThemeValueCachesPerProgram(t *testing.T) {
 	// The miss. A stale cache keyed on nothing would answer with the first program's theme and
 	// report here, so this failing is what a key-less memo looks like.
 	t.Run("a second program is not answered from the first", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t,
 			rule_testing.RunTypedFiles(t, BoundaryNoProjectThemeValue, secondProgram, libraryFilePath))
 	})
@@ -225,6 +235,7 @@ func TestBoundaryNoProjectThemeValueCachesPerProgram(t *testing.T) {
 	// second's answer, which is the same bug in the other direction and is what a cache that
 	// replaces without comparing the key would do.
 	t.Run("returning to the first program reports again", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t,
 			rule_testing.RunTypedFiles(t, BoundaryNoProjectThemeValue, firstProgram, libraryFilePath),
 			"forbiddenThemeValue")

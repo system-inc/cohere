@@ -51,6 +51,7 @@ func TestNoFuncAssignFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText),
 				testCase.wantIds...)
@@ -88,6 +89,7 @@ func TestNoFuncAssignStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText))
 		})
@@ -132,6 +134,7 @@ func TestNoFuncAssignPointsAtTheWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("wanted %d findings, got %d", len(testCase.want), len(result.Diagnostics))
@@ -249,6 +252,7 @@ func TestNoFuncAssignCoversWriteShapesUpstreamNeverExercises(t *testing.T) {
 
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText),
 				testCase.wantIds...)
@@ -295,6 +299,7 @@ func TestNoFuncAssignCoversWriteShapesUpstreamNeverExercises(t *testing.T) {
 
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText))
 		})

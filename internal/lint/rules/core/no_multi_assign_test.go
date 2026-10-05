@@ -69,6 +69,7 @@ func TestNoMultiAssignFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "unexpectedChain"
@@ -110,6 +111,7 @@ func TestNoMultiAssignStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoMultiAssign,
 				multiAssignFile, testCase.sourceText, decodedMultiAssignOptions(t, testCase.options)))
 		})
@@ -159,6 +161,7 @@ func TestNoMultiAssignFiresOnCasesBeyondTheCorpus(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoMultiAssign,
 				multiAssignFile, testCase.sourceText, nil), "unexpectedChain")
 		})
@@ -189,6 +192,7 @@ func TestNoMultiAssignStaysSilentOnCasesBeyondTheCorpus(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoMultiAssign,
 				multiAssignFile, testCase.sourceText, nil))
 		})
@@ -216,6 +220,7 @@ func TestNoMultiAssignIgnoreNonDeclarationDropsOnlyTheBareChain(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoMultiAssign, multiAssignFile,
 				testCase.sourceText, decodedMultiAssignOptions(t, `{"ignoreNonDeclaration": false}`)), "unexpectedChain")
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoMultiAssign, multiAssignFile,
@@ -252,6 +257,7 @@ func TestNoMultiAssignSpansTheInnerAssignment(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoMultiAssign, multiAssignFile, testCase.sourceText, nil)
 			if len(result.Diagnostics) != len(testCase.wantReported) {
 				t.Fatalf("want %d findings, got %d", len(testCase.wantReported), len(result.Diagnostics))
@@ -289,6 +295,7 @@ func TestDecodeNoMultiAssignOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeNoMultiAssignOptions(json.RawMessage(testCase.raw))
 			if err != nil {
 				t.Fatalf("the decoder refused %q: %v", testCase.raw, err)
@@ -357,6 +364,7 @@ func TestNoMultiAssignStaysSilentOnAnAssignmentTargetTheParserRecovered(t *testi
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoMultiAssign,
 				multiAssignFile, testCase.sourceText, nil))
 		})

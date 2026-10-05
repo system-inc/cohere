@@ -53,6 +53,7 @@ func TestConditionalOptionalArgumentPreservesManualMemoization(t *testing.T) {
 	t.Parallel()
 
 	t.Run("matching dependency", func(t *testing.T) {
+		t.Parallel()
 		findings, lowered := findingsForSource(t, `
 			// @validatePreserveExistingMemoizationGuarantees
 			import {useMemo} from 'react';
@@ -77,6 +78,7 @@ func TestConditionalOptionalArgumentPreservesManualMemoization(t *testing.T) {
 	// was pruned, or validation stopped walking scope dependencies. Pair it with an upstream error
 	// shape through the same harness and require the scope-exit dependency finding specifically.
 	t.Run("property call control", func(t *testing.T) {
+		t.Parallel()
 		findings, lowered := findingsForSource(t, `
 			// @validatePreserveExistingMemoizationGuarantees @validateExhaustiveMemoizationDependencies:false
 			import {useMemo} from 'react';

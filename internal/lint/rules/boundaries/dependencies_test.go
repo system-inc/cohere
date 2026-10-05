@@ -396,6 +396,7 @@ func TestDependenciesRefusesWhatItDoesNotPort(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := decodeDependenciesOptions([]byte(testCase.raw), rule.OptionsBase{})
 			if err == nil {
 				t.Fatalf("expected a refusal mentioning %q, the options loaded", testCase.wantErr)

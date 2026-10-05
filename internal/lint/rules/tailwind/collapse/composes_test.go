@@ -13,6 +13,7 @@ import (
 // declaration text. `ComposesFor` performs the same comparison against the ported handle bodies, so
 // the two are independent measurements of one fact and are forced to agree here.
 func TestComposesForAgreesWithTheGeneratedTable(t *testing.T) {
+	t.Parallel()
 	var agreed, disagreed, unanswerable int
 	var disagreements []string
 
@@ -52,6 +53,7 @@ func TestComposesForAgreesWithTheGeneratedTable(t *testing.T) {
 // The controls are read out of the two emitter tables rather than hand-listed, so a root added
 // upstream joins the population instead of being missed by a list nobody updates.
 func TestComposesForRefusesRootsTheTableOmits(t *testing.T) {
+	t.Parallel()
 	var checked, wronglyComposing int
 	var wrong []string
 
@@ -110,6 +112,7 @@ func TestComposesForRefusesRootsTheTableOmits(t *testing.T) {
 // and `filter` writes the chain only when the class is the bare `filter`. Keying on the root's use
 // of the property fixed both.
 func TestComposesForAnswersGapRootsAndTheirControls(t *testing.T) {
+	t.Parallel()
 	var composingAnswered, composingAgreed int
 	var controlAnswered, controlWrong int
 	var wrong []string
@@ -197,6 +200,7 @@ var composingRootsTheGeneratorNeverReached = map[string]bool{
 // comparisons, 7 of which disagreed. Keeping this one honest means asserting its shape rather than
 // trusting its comments.
 func TestTheUnreachedMapHoldsOnlyMeasuredFindings(t *testing.T) {
+	t.Parallel()
 	if len(composingRootsTheGeneratorNeverReached) == 0 {
 		t.Fatal("the map is empty, so this test measured nothing")
 	}
@@ -328,6 +332,7 @@ var composingRootsTheGeneratorFound = map[string]bool{
 // what would notice if one started to; the alternative is a defect that surfaces as a wrong reading
 // somewhere else in the package, with nothing pointing back here.
 func TestAskingForAValueLeavesTheSentinelIntact(t *testing.T) {
+	t.Parallel()
 	var checked int
 	for root := range gapEmitters {
 		branch := UtilityBranch{HasValue: true, DataType: DataTypeLength}
@@ -384,6 +389,7 @@ var rootSelectorShapesTheGeneratorFound = map[string]string{
 
 // Every shape the generator measured is reproduced by reading the ported handle bodies.
 func TestSelectorShapesAgreeWithTheGeneratedTable(t *testing.T) {
+	t.Parallel()
 	var agreed int
 	for root, expected := range rootSelectorShapesTheGeneratorFound {
 		actual := SelectorShapeForRoot(root)
@@ -407,6 +413,7 @@ func TestSelectorShapesAgreeWithTheGeneratedTable(t *testing.T) {
 // about the other 234. The population is every root the emitters answer rather than a list, so a
 // root added upstream is checked rather than needing to be added here.
 func TestUnwrappedRootsReadAsABareClass(t *testing.T) {
+	t.Parallel()
 	var checked, wrong int
 	var wrongNames []string
 
@@ -455,6 +462,7 @@ func TestUnwrappedRootsReadAsABareClass(t *testing.T) {
 // producing, a rule going quiet rather than wrong. The placement counts caught it and no test did,
 // so this is that test.
 func TestWrappedRootsStillDeclareTheirProperties(t *testing.T) {
+	t.Parallel()
 	expected := map[string][]string{
 		"space-x":     {"margin-inline-start", "margin-inline-end"},
 		"space-y":     {"margin-block-start", "margin-block-end"},

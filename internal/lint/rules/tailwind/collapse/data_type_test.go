@@ -83,6 +83,7 @@ func loadDataTypeCorpus(t *testing.T) dataTypeCorpus {
 // TestInferDataTypeMatchesEngine is the whole point of this package's test suite: every answer, for
 // every shape, compared against what the shipped engine said.
 func TestInferDataTypeMatchesEngine(t *testing.T) {
+	t.Parallel()
 	corpus := loadDataTypeCorpus(t)
 
 	comparisons := 0
@@ -113,6 +114,7 @@ func TestInferDataTypeMatchesEngine(t *testing.T) {
 // TestExportedPredicatesMatchEngine covers IsLength and IsPositiveInteger directly, since callers
 // reach for them without going through a type list.
 func TestExportedPredicatesMatchEngine(t *testing.T) {
+	t.Parallel()
 	corpus := loadDataTypeCorpus(t)
 
 	for _, testCase := range corpus.Cases {
@@ -133,6 +135,7 @@ func TestExportedPredicatesMatchEngine(t *testing.T) {
 // permissive ones. `family-name` accepts nearly anything, and without the short-circuit every
 // `var()` value in the codebase would read as a font family.
 func TestVarShortCircuitBeatsEveryCheck(t *testing.T) {
+	t.Parallel()
 	permissive := []DataType{DataTypeFamilyName, DataTypeLineWidth, DataTypePosition, DataTypeBackgroundSize}
 
 	for _, value := range []string{"var(--a)", "var(--a, red)", "var(--a, 10px)", "var("} {
@@ -159,6 +162,7 @@ func TestVarShortCircuitBeatsEveryCheck(t *testing.T) {
 // first. A port with its own fixed precedence would pass one column of this table and fail the
 // other.
 func TestFirstMatchWinsIsTheCallersOrder(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		value  string
 		first  DataType
@@ -194,6 +198,7 @@ func TestFirstMatchWinsIsTheCallersOrder(t *testing.T) {
 // does not know declines rather than panicking. The generated descriptor tables carry type names
 // from Tailwind's source, so a version that adds one must degrade, not crash.
 func TestUnknownTypeMatchesNothing(t *testing.T) {
+	t.Parallel()
 	if got := InferDataType("10px", []DataType{"future-type"}); got != "" {
 		t.Errorf("InferDataType with unknown type = %q, want no type", got)
 	}
@@ -205,6 +210,7 @@ func TestUnknownTypeMatchesNothing(t *testing.T) {
 // TestAllDataTypesIsTheEnginesOrder guards the convenience list against drift, since first-match-wins
 // makes its order behavior rather than presentation.
 func TestAllDataTypesIsTheEnginesOrder(t *testing.T) {
+	t.Parallel()
 	corpus := loadDataTypeCorpus(t)
 	all := AllDataTypes()
 
@@ -238,6 +244,7 @@ func TestAllDataTypesIsTheEnginesOrder(t *testing.T) {
 // it — and a splitter verified only by the one consumer that cannot see its mistakes is verified
 // for that consumer alone.
 func TestSegmentMatchesEngine(t *testing.T) {
+	t.Parallel()
 	corpus := loadDataTypeCorpus(t)
 
 	comparisons := 0
@@ -282,6 +289,7 @@ func TestSegmentMatchesEngine(t *testing.T) {
 // predicate is called directly. It is called directly here, because "no caller can see it today" is
 // a fact about today's callers.
 func TestImageVarSkipIsUnreachableThroughInferDataType(t *testing.T) {
+	t.Parallel()
 	// Directly: a value of nothing but var() parts is not an image, because the skips never count.
 	for _, value := range []string{"var(--a)", "var(--a),var(--b)", "var(--a),var(--b),var(--c)"} {
 		if isImage(value) {

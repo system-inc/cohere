@@ -160,6 +160,12 @@ func longTarget(size int) string {
 	return string(target)
 }
 
-func TestWikiLinkEvents(t *testing.T) { compareEvents(t, wikiLinkFixtures) }
+func TestWikiLinkEvents(t *testing.T) {
+	t.Parallel()
+	compareEvents(t, wikiLinkFixtures)
+}
 
-func TestWikiLinkRefusalEvents(t *testing.T) { compareEvents(t, wikiLinkRefusalFixtures) }
+func TestWikiLinkRefusalEvents(t *testing.T) {
+	t.Parallel()
+	compareEvents(t, wikiLinkRefusalFixtures)
+}

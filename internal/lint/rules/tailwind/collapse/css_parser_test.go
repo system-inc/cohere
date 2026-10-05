@@ -182,6 +182,7 @@ func nodesFromFixture(fixtures []*cssFixtureNode) []*Node {
 // The count is printed on success rather than only on failure, because a suite that ran six cases
 // and a suite that ran ninety are indistinguishable from a green line.
 func TestParseCSSMatchesEngine(t *testing.T) {
+	t.Parallel()
 	corpus := loadCSSParserCorpus(t)
 
 	comparedNodes := 0
@@ -195,6 +196,7 @@ func TestParseCSSMatchesEngine(t *testing.T) {
 
 	for _, testCase := range corpus.Cases {
 		t.Run(testCase.Name, func(t *testing.T) {
+			t.Parallel()
 			parsed, err := ParseCSS(testCase.Input)
 			if err != nil {
 				t.Fatalf("ParseCSS returned %v; the engine parsed this input successfully", err)
@@ -224,10 +226,13 @@ func TestParseCSSMatchesEngine(t *testing.T) {
 // invented. Only the fact of rejection is asserted, not the message text, because the messages
 // carry a source location upstream that this port deliberately does not reproduce.
 func TestParseCSSRejectsWhatTheEngineRejects(t *testing.T) {
+	t.Parallel()
 	corpus := loadCSSParserCorpus(t)
 
 	rejected := 0
 	for _, testCase := range corpus.ErrorCases {
+		// Not parallel: its subtests add to totals the test checks after them, and a parallel subtest would run
+		// only after the test had returned, so the check would pass on nothing.
 		t.Run(testCase.Name, func(t *testing.T) {
 			if testCase.Message == nil {
 				t.Skipf("the engine accepted this input, so it pins nothing about rejection")
@@ -257,6 +262,7 @@ func TestParseCSSRejectsWhatTheEngineRejects(t *testing.T) {
 // interior whitespace, while an ordinary declaration's value is collapsed. A port that treats
 // `--foo` as an ordinary declaration passes every other test in this file.
 func TestParseCSSCustomPropertyWhitespaceIsRaw(t *testing.T) {
+	t.Parallel()
 	input := ":root {\n  --font-sans:\n        var(--f), -apple-system,\n        sans-serif;\n  font-family:\n        var(--f),\n        sans-serif;\n}"
 
 	nodes, err := ParseCSS(input)
@@ -287,6 +293,7 @@ func TestParseCSSCustomPropertyWhitespaceIsRaw(t *testing.T) {
 // The counts are the engine's, recorded at generation time, and are recomputed here from this
 // port's own trees. Asserting they agree is what makes "it parsed without erroring" mean something.
 func TestParseCSSReadsRealStylesheets(t *testing.T) {
+	t.Parallel()
 	corpus := loadCSSParserCorpus(t)
 
 	stylesheets, themeEntries, utilityBlocks, customVariants := 0, 0, 0, 0

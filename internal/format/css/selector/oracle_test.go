@@ -304,6 +304,7 @@ var selectorFixtures = []selectorFixture{
 // tenth of the corpus: an oracle that rejects everything would otherwise read as perfect agreement.
 // The inline fixtures each say which way the library must go.
 func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
+	t.Parallel()
 	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	corpora := os.Getenv("COHERE_CSS_CORPORA")
 	if root == "" || corpora == "" {
@@ -502,6 +503,7 @@ var randomSelectorPieces = []string{
 // fixed, so a failure reproduces. A selector Go refuses with ErrLoopsForever is not sent to the library,
 // which would hang on it; the run's deadline catches one Go wrongly lets through.
 func TestParseAgreesOnRandomSelectors(t *testing.T) {
+	t.Parallel()
 	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	if root == "" {
 		t.Skip("set COHERE_PRETTIER_ROOT to compare the parser against postcss-selector-parser on random selectors")

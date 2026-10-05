@@ -149,6 +149,7 @@ func TestMethodSignatureStyleStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(methodSignatureStyleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, MethodSignatureStyle,
 				methodSignatureStyleFile, testCase.sourceText,
 				decodeMethodSignatureStyleOptions(t, testCase.configuration)))
@@ -484,6 +485,7 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(methodSignatureStyleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, MethodSignatureStyle,
 				methodSignatureStyleFile, testCase.sourceText,
 				decodeMethodSignatureStyleOptions(t, testCase.configuration))
@@ -624,6 +626,7 @@ func TestMethodSignatureStylePreservesEverythingInsideTheSignature(t *testing.T)
 	}
 	for index, testCase := range cases {
 		t.Run(methodSignatureStyleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, MethodSignatureStyle,
 				methodSignatureStyleFile, testCase.sourceText,
 				decodeMethodSignatureStyleOptions(t, testCase.configuration))
@@ -715,6 +718,7 @@ func TestMethodSignatureStyleDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing
 	}
 	for index, testCase := range cases {
 		t.Run(methodSignatureStyleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, MethodSignatureStyle,
 				methodSignatureStyleFile, testCase.sourceText,
 				decodeMethodSignatureStyleOptions(t, testCase.configuration))
@@ -740,6 +744,7 @@ func TestMethodSignatureStyleDecoderResolvesTheStyle(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(methodSignatureStyleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeMethodSignatureStyleOptions([]byte(testCase.configuration))
 			if err != nil {
 				t.Fatalf("decoding %s: %v", testCase.configuration, err)
@@ -788,6 +793,7 @@ func TestMethodSignatureStyleSurvivesMalformedSignatures(t *testing.T) {
 		"halfGeneric": "interface I { m<T(a: T): T; }",
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.RunWithOptions(t, MethodSignatureStyle, methodSignatureStyleFile,
 				sourceText, decodeMethodSignatureStyleOptions(t, "\"property\""))
 			rule_testing.RunWithOptions(t, MethodSignatureStyle, methodSignatureStyleFile,

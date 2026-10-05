@@ -69,6 +69,7 @@ func TestNoLoneBlocksStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, sourceText))
 		})
 	}
@@ -116,6 +117,7 @@ func TestNoLoneBlocksFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, testCase.sourceText),
 				testCase.wantIds...)
@@ -162,6 +164,7 @@ func TestNoLoneBlocksExemptsTypeScriptBlockScopedDeclarations(t *testing.T) {
 		"{ namespace N {} }",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, sourceText))
 		})
 	}
@@ -191,6 +194,7 @@ func TestNoLoneBlocksDoesNotReportAStaticBlockBody(t *testing.T) {
 		"class C { static { if (foo) { block; } } }",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, sourceText))
 		})
 	}
@@ -244,6 +248,7 @@ func TestNoLoneBlocksMatchesTheInstalledBuild(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, testCase.sourceText),
 				testCase.wantIds...)
@@ -328,6 +333,7 @@ func TestNoLoneBlocksIdentityNotJustLength(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, testCase.sourceText),
 				testCase.wantIds...)

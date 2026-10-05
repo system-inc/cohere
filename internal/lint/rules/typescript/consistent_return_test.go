@@ -100,8 +100,10 @@ func runConsistentReturn(t *testing.T, testCase consistentReturnCase) rule_testi
 // Thirteen of these nineteen report under the bare core rule and are silent here, which is the whole
 // difference between the two rules. See the rule's doc comment for the measurement.
 func TestConsistentReturnStaysSilent(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range consistentReturnCleanCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runConsistentReturn(t, testCase))
 		})
 	}
@@ -109,8 +111,10 @@ func TestConsistentReturnStaysSilent(t *testing.T) {
 
 // TestConsistentReturnFires runs upstream's whole `invalid` list and asserts every span it states.
 func TestConsistentReturnFires(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range consistentReturnReportingCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runConsistentReturn(t, testCase)
 
 			// The message ids and the count through the harness, so the mechanical fixture-pair
@@ -561,6 +565,7 @@ function foo(flag: boolean) {
 // arrives whole. That is the fact being pinned, rather than assumed: if it were variadic there would
 // be a second shape to accept.
 func TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		raw      string
@@ -601,6 +606,7 @@ func TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers(t *testin
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeConsistentReturnOptions(json.RawMessage(testCase.raw))
 			if testCase.wantErr {
 				if err == nil {
@@ -628,6 +634,7 @@ func TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers(t *testin
 // A decoder that round-trips correctly and a rule that ignores what it decoded look identical from
 // the test above. One source, two configurations, opposite verdicts.
 func TestConsistentReturnOptionActuallyReachesTheRule(t *testing.T) {
+	t.Parallel()
 	const source = `
 function foo(flag: boolean) {
   if (flag) return undefined;
@@ -656,6 +663,7 @@ function foo(flag: boolean) {
 // the installed 8.67.0 extension rather than reasoned about, because every one of them is a place
 // where a locally sound argument gets the wrong answer.
 func TestConsistentReturnVoidSuppressionShapesTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		source  string
@@ -783,6 +791,7 @@ function foo(flag: boolean): undefined {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runConsistentReturn(t, consistentReturnCase{
 				source: testCase.source, optionsJson: testCase.options,
 			})
@@ -807,6 +816,7 @@ function foo(flag: boolean): undefined {
 // union carries the Union flag alone and no input separates the two spellings. The rule's doc
 // comment carries the measurement; there is no distinction here to pin.
 func TestConsistentReturnTypedUndefinedReadsTheArgumentsType(t *testing.T) {
+	t.Parallel()
 	const options = `{"treatUndefinedAsUnspecified": true}`
 
 	exactly := runConsistentReturn(t, consistentReturnCase{
@@ -850,6 +860,7 @@ function foo(flag: boolean) {
 // costs every rule in the package its verdict on that file. Each row here reaches the filter with
 // something other than an ordinary annotated function.
 func TestConsistentReturnDoesNotPanicOnShapesWithNoUsefulType(t *testing.T) {
+	t.Parallel()
 	sources := []string{
 		"declare function foo(flag: boolean): void;\n",
 		"function foo(flag: boolean): any { if (flag) return true; return; }\n",
@@ -863,6 +874,7 @@ func TestConsistentReturnDoesNotPanicOnShapesWithNoUsefulType(t *testing.T) {
 	}
 	for _, source := range sources {
 		t.Run(strings.TrimSpace(source), func(t *testing.T) {
+			t.Parallel()
 			// The assertion is that this returns at all. A panic in the rule surfaces as a failure
 			// here rather than as a silently lost file.
 			runConsistentReturn(t, consistentReturnCase{source: source})
@@ -892,6 +904,7 @@ func TestConsistentReturnDoesNotPanicOnShapesWithNoUsefulType(t *testing.T) {
 //
 // Every expectation here was taken by driving the installed 8.67.0 extension. All six report.
 func TestConsistentReturnPromiseVoidGuardsAreBothLoadBearing(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		source string
@@ -965,6 +978,7 @@ async function foo(flag: boolean): Weird {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runConsistentReturn(t, consistentReturnCase{source: testCase.source})
 			if len(result.Diagnostics) == 0 {
 				t.Errorf("expected a finding and got none. %s", testCase.reason)
@@ -991,6 +1005,7 @@ async function foo(flag: boolean): Weird {
 // core over this exact source. A post-filter cannot produce this: dropping the finding a suppressed
 // return generates still leaves it setting the expectation.
 func TestConsistentReturnSuppressingTheFirstReturnMovesTheExpectation(t *testing.T) {
+	t.Parallel()
 	result := runConsistentReturn(t, consistentReturnCase{
 		source: `
 class DeviceId {

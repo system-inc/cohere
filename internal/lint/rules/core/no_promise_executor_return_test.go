@@ -107,6 +107,7 @@ func TestNoPromiseExecutorReturnStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
 				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(t, testCase.options)))
 		})
@@ -191,6 +192,7 @@ func TestNoPromiseExecutorReturnFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
 				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(t, testCase.options))
 			rule_testing.ExpectFindings(t, result, "returnsValue")
@@ -239,6 +241,7 @@ func TestNoPromiseExecutorReturnSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
 				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(t, testCase.options))
 			if len(result.Diagnostics) != 1 {
@@ -288,6 +291,7 @@ func TestNoPromiseExecutorReturnCasesThisHarnessCannotExpress(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			// Not asserted clean, because the surface that makes them clean upstream is absent here.
 			// Asserted only to run, so a later crash on one of these shapes fails loudly.
 			rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn, promiseExecutorFile,
@@ -316,6 +320,7 @@ func TestDecodeNoPromiseExecutorReturnOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeNoPromiseExecutorReturnOptions(json.RawMessage(testCase.raw))
 			if err != nil {
 				t.Fatalf("the decoder refused %q: %v", testCase.raw, err)
@@ -359,6 +364,7 @@ func TestNoPromiseExecutorReturnRequiresTheTypedHarness(t *testing.T) {
 	}
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
 				promiseExecutorFile, sourceText, nil), "returnsValue")
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoPromiseExecutorReturn,
@@ -455,6 +461,7 @@ func TestNoPromiseExecutorReturnSuggestionOutputs(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText+"/"+testCase.wantId, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
 				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(t, testCase.options))
 			if len(result.Diagnostics) != 1 {
@@ -532,6 +539,7 @@ func TestNoPromiseExecutorReturnStaysSilentOnOtherGlobalConstructors(t *testing.
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
 				promiseExecutorFile, sourceText, nil))
 		})

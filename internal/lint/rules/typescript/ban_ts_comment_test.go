@@ -97,6 +97,7 @@ func TestBanTsCommentStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, BanTsComment,
 				banTsCommentFile, testCase.sourceText,
 				decodeBanTsCommentOptions(t, testCase.configuration)))
@@ -173,6 +174,7 @@ func TestBanTsCommentFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, decodeBanTsCommentOptions(t, testCase.configuration))
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -249,6 +251,7 @@ func TestBanTsCommentPointsAtTheCommentInterior(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, decodeBanTsCommentOptions(t, testCase.configuration))
 			if len(result.Diagnostics) != len(testCase.wantReported) {
@@ -299,6 +302,7 @@ func TestBanTsCommentRewritesEveryIgnoreInTheComment(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, nil)
 			rule_testing.ExpectFixedSource(t, result, testCase.wantSource)
@@ -328,6 +332,7 @@ func TestBanTsCommentOnlyIgnoreCarriesAFix(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, decodeBanTsCommentOptions(t, testCase.configuration))
 			if len(result.Diagnostics) != 1 {
@@ -374,6 +379,7 @@ func TestBanTsCommentReadsTheDirectivePrefixAlphabet(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, nil)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -404,6 +410,7 @@ func TestBanTsCommentExemptsPragmasForCheckAndNoCheckOnly(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, decodeBanTsCommentOptions(t, testCase.configuration))
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -429,6 +436,7 @@ func TestBanTsCommentMeasuresTheDescriptionInBytes(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, nil)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -503,6 +511,7 @@ func TestBanTsCommentDefaultsBindWithNoConfiguration(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, nil)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -578,6 +587,7 @@ func TestDecodeBanTsCommentOptionsReadsEveryShape(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeBanTsCommentOptions([]byte(testCase.configuration))
 			if err != nil {
 				t.Fatalf("could not decode %s: %v", testCase.configuration, err)
@@ -608,6 +618,7 @@ func TestBanTsCommentDeclinesJavaScriptFiles(t *testing.T) {
 		"/repository/source/Thing.mjs",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, BanTsComment, fileName, source, nil))
 		})
 	}
@@ -619,6 +630,7 @@ func TestBanTsCommentDeclinesJavaScriptFiles(t *testing.T) {
 		"/repository/source/Thing.cts",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, BanTsComment, fileName, source, nil)
 			rule_testing.ExpectFindings(t, result, "banTsCommentPreferExpectError")
 		})
@@ -681,6 +693,7 @@ func TestBanTsCommentMessageTextNamesTheDirective(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, decodeBanTsCommentOptions(t, testCase.configuration))
 			if len(result.Diagnostics) != 1 {
@@ -719,6 +732,7 @@ func TestBanTsCommentSurvivesAnUnterminatedBlockComment(t *testing.T) {
 
 	for _, sourceText := range []string{"/*", "/*/", "/**", "/*@ts-ignore", "//", "/*@ts-ignore\n"} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			// The assertion is that this returns at all. A finding would also be acceptable for
 			// some of these; a panic is not, and a panic is what the guards prevent.
 			_ = rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile, sourceText, nil)

@@ -92,6 +92,7 @@ func TestNoHandBuiltDeclaredErrorStaysSilent(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(consistencyNoHandBuiltDeclaredErrorCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistencyNoHandBuiltDeclaredError,
 				testCase.fileName, testCase.sourceText))
 		})
@@ -148,6 +149,7 @@ func TestNoHandBuiltDeclaredErrorFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(consistencyNoHandBuiltDeclaredErrorCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoHandBuiltDeclaredError, testCase.fileName,
 				testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "consistencyNoHandBuiltDeclaredError")

@@ -80,6 +80,7 @@ var proseWrapFixtures = []string{
 }
 
 func TestProseWrapFixturesMatchOracle(t *testing.T) {
+	t.Parallel()
 	oracle := newProseWrapOracle(t)
 	for _, proseWrap := range []string{"always", "never", "preserve"} {
 		for variantIndex, options := range formatVariants {

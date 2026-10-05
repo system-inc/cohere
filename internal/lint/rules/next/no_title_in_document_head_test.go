@@ -86,6 +86,7 @@ func TestNoTitleInDocumentHeadReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", testCase.source)
 			ids := make([]string, testCase.want)
 			for index := range ids {
@@ -214,6 +215,7 @@ func TestNoTitleInDocumentHeadIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})

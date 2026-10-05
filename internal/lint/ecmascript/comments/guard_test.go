@@ -11,6 +11,7 @@ import (
 // stops receiving a comment reports nothing for it while every fixture still passes. The comparison
 // has to be of the thing itself.
 func TestCommentGuardFindsTheSameComments(t *testing.T) {
+	t.Parallel()
 	files := realSourceFiles(t, 1200)
 
 	for _, file := range files {
@@ -40,6 +41,7 @@ func TestCommentGuardFindsTheSameComments(t *testing.T) {
 // no file happened to hold the multi-space form. Absence from a corpus is not absence in general, so
 // the separators and the near-miss shapes are written out by hand as well as measured.
 func TestCommentGuardHandlesEverySeparator(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -72,6 +74,7 @@ func TestCommentGuardHandlesEverySeparator(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			sourceFile := parseSourceForTest(t, testCase.sourceText)
 
 			guarded := All(sourceFile)
@@ -95,6 +98,7 @@ func TestCommentGuardHandlesEverySeparator(t *testing.T) {
 // A guard that never skips is pure overhead, and a guard that skips everything is a bug that the
 // differential test alone would not catch on a corpus with few comments.
 func TestCommentGuardActuallySkips(t *testing.T) {
+	t.Parallel()
 	// A run of whitespace with no slash cannot begin a comment.
 	if canBeginAt("const a = 1;    const b = 2;", 12) {
 		t.Fatalf("guard admits a position with no slash after it")

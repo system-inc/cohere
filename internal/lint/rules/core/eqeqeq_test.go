@@ -173,6 +173,7 @@ func TestEqeqeqFires(t *testing.T) {
 
 	for _, testCase := range eqeqeqFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runEqeqeq(t, testCase)
 			wantIds := make([]string, len(testCase.wantRepairs))
 			for index := range testCase.wantRepairs {
@@ -188,6 +189,7 @@ func TestEqeqeqStaysSilent(t *testing.T) {
 
 	for _, testCase := range eqeqeqSilentCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runEqeqeq(t, testCase))
 		})
 	}
@@ -205,6 +207,7 @@ func TestEqeqeqSplitsFixesFromSuggestions(t *testing.T) {
 	fixArm, suggestionArm := 0, 0
 	for _, testCase := range eqeqeqFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runEqeqeq(t, testCase)
 			if len(result.Diagnostics) != len(testCase.wantRepairs) {
 				t.Fatalf("wanted %d findings, got %d", len(testCase.wantRepairs),
@@ -265,6 +268,7 @@ func TestEqeqeqFixesTheSource(t *testing.T) {
 		}
 		applied++
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t, runEqeqeq(t, testCase), testCase.wantFixedSource)
 		})
 	}
@@ -288,6 +292,7 @@ func TestEqeqeqDeclinesToApplyASuggestion(t *testing.T) {
 		}
 		declined++
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runEqeqeq(t, testCase)
 			for index, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
@@ -344,6 +349,7 @@ func TestEqeqeqPreservesTypeSyntax(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runEqeqeq(t, eqeqeqCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(result.Diagnostics) != 1 {
@@ -391,6 +397,7 @@ func TestEqeqeqRepairSpansOnlyTheOperator(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runEqeqeq(t, eqeqeqCase{sourceText: testCase.sourceText})
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -425,6 +432,7 @@ func TestDecodeEqeqeqOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("nil input selects upstream's defaults", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeEqeqeqOptions(nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -436,6 +444,7 @@ func TestDecodeEqeqeqOptions(t *testing.T) {
 	})
 
 	t.Run("the second element is read: always plus null ignore", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeEqeqeqOptions([]byte(`["always", {"null": "ignore"}]`))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -447,6 +456,7 @@ func TestDecodeEqeqeqOptions(t *testing.T) {
 	})
 
 	t.Run("allow-null is always plus null ignore, as upstream reads it", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeEqeqeqOptions([]byte(`["allow-null"]`))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -458,18 +468,21 @@ func TestDecodeEqeqeqOptions(t *testing.T) {
 	})
 
 	t.Run("smart takes no second element, so one is refused rather than discarded", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeEqeqeqOptions([]byte(`["smart", {"null": "never"}]`)); err == nil {
 			t.Error("a null policy beside smart decoded, and the rule would never read it")
 		}
 	})
 
 	t.Run("a third element is refused", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeEqeqeqOptions([]byte(`["always", {"null": "ignore"}, "smart"]`)); err == nil {
 			t.Error("a third element decoded and would have been dropped")
 		}
 	})
 
 	t.Run("an unknown mode is rejected rather than disabling the rule", func(t *testing.T) {
+		t.Parallel()
 		// The Go constant's spelling, which is not upstream's.
 		if _, err := DecodeEqeqeqOptions([]byte(`["Always"]`)); err == nil {
 			t.Error("an unrecognized mode decoded; every arm here is selected by equality, so " +
@@ -478,18 +491,21 @@ func TestDecodeEqeqeqOptions(t *testing.T) {
 	})
 
 	t.Run("an unknown null policy is rejected", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeEqeqeqOptions([]byte(`["always", {"null": "sometimes"}]`)); err == nil {
 			t.Error("an unrecognized null policy decoded")
 		}
 	})
 
 	t.Run("an unknown key in the second element is rejected", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeEqeqeqOptions([]byte(`["always", {"nul": "ignore"}]`)); err == nil {
 			t.Error("a misspelled key decoded, so the null policy it carried would be ignored")
 		}
 	})
 
 	t.Run("the retired object spelling is rejected", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeEqeqeqOptions([]byte(`{"mode":"Smart","null":"Never"}`)); err == nil {
 			t.Error("the pre-list object spelling decoded, which the config layer never delivers")
 		}
@@ -551,6 +567,7 @@ func TestEqeqeqSeparatesBigIntAndSeesThroughParentheses(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runEqeqeq(t, eqeqeqCase{sourceText: testCase.sourceText})
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))

@@ -79,6 +79,7 @@ func TestNoRequireImportsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
 				testCase.sourceText, decodeRequireImportsOptions(t, testCase.options))
 			expected := make([]string, testCase.findings)
@@ -129,6 +130,7 @@ func TestNoRequireImportsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoRequireImports,
 				requireImportsFile, testCase.sourceText,
 				decodeRequireImportsOptions(t, testCase.options)))
@@ -186,6 +188,7 @@ func TestNoRequireImportsSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
 				testCase.sourceText, decodeRequireImportsOptions(t, testCase.options))
 			if len(result.Diagnostics) != len(testCase.reported) {
@@ -353,6 +356,7 @@ func TestNoRequireImportsMeasuredAgainstTheReleaseBinary(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
 				testCase.sourceText, decodeRequireImportsOptions(t, testCase.options))
 			if len(result.Diagnostics) != testCase.findings {
@@ -386,6 +390,7 @@ func TestDecodeNoRequireImportsOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("an absent allowAsImport is false", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoRequireImportsOptions(json.RawMessage(`{}`))
 		if err != nil {
 			t.Fatalf("decoding: %v", err)
@@ -400,6 +405,7 @@ func TestDecodeNoRequireImportsOptions(t *testing.T) {
 	})
 
 	t.Run("patterns compile", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoRequireImportsOptions(
 			json.RawMessage(`{ "allow": ["/package\\.json$", "^some-package$"] }`))
 		if err != nil {
@@ -418,6 +424,7 @@ func TestDecodeNoRequireImportsOptions(t *testing.T) {
 	})
 
 	t.Run("a pattern Go cannot compile is dropped rather than failing the run", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoRequireImportsOptions(
 			json.RawMessage(`{ "allow": ["(?<=x)y", "^ok$"] }`))
 		if err != nil {
@@ -474,6 +481,7 @@ func TestNoRequireImportsSurvivesMalformedImportEquals(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// The assertion is that this returns at all. A panic here fails the test by crashing it,
 			// which is the only signal available for this class of guard.
 			rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
@@ -578,6 +586,7 @@ func TestNoRequireImportsAcrossDeclarationOrderings(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedFiles(t, NoRequireImports, testCase.files, "Subject.ts")
 			if len(result.Diagnostics) != testCase.findings {
 				t.Fatalf("got %d findings, want %d (%s)",

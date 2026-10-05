@@ -195,4 +195,7 @@ var htmlFlowFixtures = []string{
 	"<!-- a -->\n***",
 }
 
-func TestHtmlFlowEvents(t *testing.T) { compareEvents(t, htmlFlowFixtures) }
+func TestHtmlFlowEvents(t *testing.T) {
+	t.Parallel()
+	compareEvents(t, htmlFlowFixtures)
+}

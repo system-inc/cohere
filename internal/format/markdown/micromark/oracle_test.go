@@ -165,12 +165,14 @@ func truncateInput(input string) string {
 
 // TestEventsMatchUpstream runs every fixture through both sides.
 func TestEventsMatchUpstream(t *testing.T) {
+	t.Parallel()
 	compareEvents(t, eventFixtures)
 }
 
 // TestEventOracleCanFail proves the comparison sees a difference: a fixture compared against the events
 // of a different input must fail.
 func TestEventOracleCanFail(t *testing.T) {
+	t.Parallel()
 	expected := upstreamEvents(t, []string{"*a*"})
 	if firstEventDifference(expected[0], portEvents("**a**")) == "" {
 		t.Fatal("the comparison found no difference between the events of *a* and **a**")
@@ -179,6 +181,7 @@ func TestEventOracleCanFail(t *testing.T) {
 
 // TestCorpusEventsMatchUpstream compares every markdown file under COHERE_MARKDOWN_CORPUS, a measuring run.
 func TestCorpusEventsMatchUpstream(t *testing.T) {
+	t.Parallel()
 	root := os.Getenv("COHERE_MARKDOWN_CORPUS")
 	if root == "" {
 		t.Skip("set COHERE_MARKDOWN_CORPUS to a directory to compare every .md file under it")

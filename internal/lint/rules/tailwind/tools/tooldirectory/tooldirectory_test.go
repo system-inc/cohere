@@ -12,6 +12,7 @@ import (
 // The trimmed form is written out rather than taken from runtime.Caller, so the test covers it on a
 // machine that builds without -trimpath too, and the caller's own form covers whichever this build has.
 func TestOfFindsTheSourceDirectoryFromEitherForm(t *testing.T) {
+	t.Parallel()
 	want, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -35,6 +36,7 @@ func TestOfFindsTheSourceDirectoryFromEitherForm(t *testing.T) {
 // A path naming a file that is not there is refused rather than answered with a directory nobody
 // chose, which is what filepath.Dir of a trimmed path used to be.
 func TestOfRefusesADirectoryWithoutTheFile(t *testing.T) {
+	t.Parallel()
 	if directory, err := Of(filepath.Join(t.TempDir(), "caller.go")); err == nil {
 		t.Errorf("a directory without the caller's file was accepted: %s", directory)
 	}

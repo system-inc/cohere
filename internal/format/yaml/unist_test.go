@@ -235,6 +235,7 @@ func normalizeInput(text string) (string, bool) {
 // TestLoaderConvertsOffsets checks the loader on astral and multi-byte text, since every position the
 // printer slices by goes through it.
 func TestLoaderConvertsOffsets(t *testing.T) {
+	t.Parallel()
 	text := "é: 🍐\n'中': \"x\"\n"
 	trees := parseTrees(t, []string{text})
 	if trees[0].err != "" {

@@ -38,6 +38,7 @@ func TestReactiveVisitorReachesEveryInstruction(t *testing.T) {
 		{name: "switch", source: `function f(a) { switch (a) { case 1: return 1; default: return 2; } }`},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, _ := rangesFor(t, testCase.source)
 			if function == nil {
 				t.Fatal("the source did not lower, so every assertion below would pass vacuously")

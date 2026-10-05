@@ -13,6 +13,7 @@ import (
 // one formatter. Formatting api-phi-health with ahra's options is the bug prettier.Resolving exists to
 // prevent, and the native engine must not reintroduce it at the switch.
 func TestResolvingFormatsEachFileWithItsOwnDirectorysOptions(t *testing.T) {
+	t.Parallel()
 	Register(".resolvingprobe", func(fileName string, text string, options formatoptions.Options) (string, error) {
 		return strconv.Itoa(options.PrintWidth), nil
 	})
@@ -54,6 +55,7 @@ func TestResolvingFormatsEachFileWithItsOwnDirectorysOptions(t *testing.T) {
 // TestResolvingOffersOnlyWhatAPrinterHandles: the walk counts a type with no printer as declined,
 // by extension, rather than offering it and failing on it or dropping it without a word.
 func TestResolvingOffersOnlyWhatAPrinterHandles(t *testing.T) {
+	t.Parallel()
 	Register(".offeredprobe", func(fileName string, text string, options formatoptions.Options) (string, error) {
 		return text, nil
 	})
@@ -85,6 +87,7 @@ func TestResolvingOffersOnlyWhatAPrinterHandles(t *testing.T) {
 // TestResolvingRefusesAConfigItCannotApplyAtConstruction: a bad config stops the run before any
 // phase works, not on the first file after fixes have begun.
 func TestResolvingRefusesAConfigItCannotApplyAtConstruction(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "package.json"), []byte(`{"prettier": "@company/prettier-config"}`), 0o644); err != nil {
 		t.Fatal(err)

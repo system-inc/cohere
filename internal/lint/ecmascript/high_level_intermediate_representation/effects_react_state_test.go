@@ -36,6 +36,7 @@ func TestStateEffectsFollowImportOrigin(t *testing.T) {
 		{"unresolved", "", "useState", false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			parameters := ""
 			if testCase.name == "local shadow" {
 				parameters = "useState: (value: unknown) => unknown"
@@ -125,6 +126,7 @@ return <div onClick={() => toggle('a')}>{canGo ? 'y' : 'n'}</div>;
 		{"unpreserved property call", `import {useMemo} from 'react'; function Component({propA}) { return useMemo(() => propA.x(), [propA.x]); }`, true},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			var findings, markers int
 			probe := rule.Rule{Name: "state-method-memoization", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
 				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/oracletest"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -176,11 +177,11 @@ func formatOptionSets() map[string]formatoptions.Options {
 }
 
 func TestFormatMatchesTheFork(t *testing.T) {
+	t.Parallel()
+	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
+	golden := oracletest.Open(t, t.Name())
 	for optionsName, options := range formatOptionSets() {
-		oracle, err := prettier.New(options)
-		if err != nil {
-			t.Fatal(err)
-		}
+		oracle := golden.Engine(options)
 		for _, testCase := range formatCases {
 			expected, err := oracle.Format("Probe.css", testCase.source)
 			if err != nil {
@@ -210,6 +211,7 @@ func TestFormatMatchesTheFork(t *testing.T) {
 
 // The option sets have to change the output somewhere, or running under them proves nothing.
 func TestOptionSetsChangeTheOutput(t *testing.T) {
+	t.Parallel()
 	for optionsName, options := range formatOptionSets() {
 		if optionsName == "defaults" {
 			continue
@@ -231,10 +233,9 @@ func TestOptionSetsChangeTheOutput(t *testing.T) {
 
 // What the fork refuses, Format refuses, as a syntax error.
 func TestFormatRefusesWhatTheForkRefuses(t *testing.T) {
-	oracle, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Parallel()
+	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
+	oracle := oracletest.Open(t, t.Name()).Engine(formatoptions.Default())
 	for _, source := range []string{"a { color: red;\n", "a { color: \"unclosed; }\n", "}\n"} {
 		if _, err := oracle.Format("Probe.css", source); err == nil {
 			t.Fatalf("the oracle accepted %q", source)
@@ -247,6 +248,7 @@ func TestFormatRefusesWhatTheForkRefuses(t *testing.T) {
 
 // PrintToDoc is the same doc without its trailing hardline, which an embedding printer lays out.
 func TestPrintToDocIsFormatWithoutTheTrailingHardline(t *testing.T) {
+	t.Parallel()
 	options := formatoptions.Default()
 	for _, testCase := range formatCases {
 		formatted, err := Format(testCase.source, options)
@@ -270,6 +272,7 @@ func TestPrintToDocIsFormatWithoutTheTrailingHardline(t *testing.T) {
 // with every line's indentation stripped: the files are already formatted, so only the stripped copy
 // makes the oracle rewrite anything.
 func TestCorpusMatchesTheFork(t *testing.T) {
+	t.Parallel()
 	roots := os.Getenv("COHERE_CSS_CORPUS")
 	if roots == "" {
 		t.Skip("COHERE_CSS_CORPUS is not set")
@@ -294,6 +297,8 @@ func TestCorpusMatchesTheFork(t *testing.T) {
 		t.Fatalf("no corpus files under %s", roots)
 	}
 	rewritten := 0
+	// The live oracle, not a golden (see oracletest): the corpus is the projects' own CSS as it stands
+	// today, which changes with every edit to them, so recorded answers would only ever be stale.
 	for optionsName, options := range formatOptionSets() {
 		oracle, err := prettier.New(options)
 		if err != nil {
@@ -344,6 +349,7 @@ func stripIndentation(source string) string {
 // skips otherwise. Two kinds of file are set aside by name, each for a stated reason, and must still
 // behave as described; everything else must match the fork byte for byte.
 func TestPrettierFixturesMatchTheFork(t *testing.T) {
+	t.Parallel()
 	root := os.Getenv("COHERE_PRETTIER_FORK")
 	if root == "" {
 		home, err := os.UserHomeDir()
@@ -364,11 +370,10 @@ func TestPrettierFixturesMatchTheFork(t *testing.T) {
 		return nil
 	})
 
+	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
+	golden := oracletest.Open(t, t.Name())
 	for optionsName, options := range formatOptionSets() {
-		oracle, err := prettier.New(options)
-		if err != nil {
-			t.Fatal(err)
-		}
+		oracle := golden.Engine(options)
 		compared, refusedByBoth := 0, 0
 		for _, file := range files {
 			source, err := os.ReadFile(file)
@@ -526,11 +531,11 @@ var scssFormatCases = []formatCase{
 }
 
 func TestFormatSCSSMatchesTheFork(t *testing.T) {
+	t.Parallel()
+	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
+	golden := oracletest.Open(t, t.Name())
 	for optionsName, options := range formatOptionSets() {
-		oracle, err := prettier.New(options)
-		if err != nil {
-			t.Fatal(err)
-		}
+		oracle := golden.Engine(options)
 		for _, testCase := range scssFormatCases {
 			expected, err := oracle.Format("Probe.scss", testCase.source)
 			if err != nil {
@@ -561,10 +566,9 @@ func TestFormatSCSSMatchesTheFork(t *testing.T) {
 // The scss parser is not the css one: the same text formats differently under each, so FormatSCSS is
 // not Format under another name. Each of these is printed differently by the fork as .css and as .scss.
 func TestFormatSCSSIsNotFormat(t *testing.T) {
-	oracle, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Parallel()
+	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
+	oracle := oracletest.Open(t, t.Name()).Engine(formatoptions.Default())
 	for _, source := range []string{
 		"a{\n// comment\ncolor:red;\n}",
 		"$map:(key1:value1,key2:value2);",
@@ -591,6 +595,7 @@ func TestFormatSCSSIsNotFormat(t *testing.T) {
 
 // PrintToDocSCSS is FormatSCSS's doc without its trailing hardline.
 func TestPrintToDocSCSSIsFormatSCSSWithoutTheTrailingHardline(t *testing.T) {
+	t.Parallel()
 	options := formatoptions.Default()
 	for _, testCase := range scssFormatCases {
 		formatted, err := FormatSCSS(testCase.source, options)
@@ -613,6 +618,7 @@ func TestPrintToDocSCSSIsFormatSCSSWithoutTheTrailingHardline(t *testing.T) {
 // when absent. Every file the fork formats must match byte for byte, and a file the fork refuses must be
 // refused here too. The one kind set aside is yaml front matter, which FormatSCSS refuses as Format does.
 func TestPrettierSCSSFixturesMatchTheFork(t *testing.T) {
+	t.Parallel()
 	root := os.Getenv("COHERE_PRETTIER_FORK")
 	if root == "" {
 		home, err := os.UserHomeDir()
@@ -633,11 +639,10 @@ func TestPrettierSCSSFixturesMatchTheFork(t *testing.T) {
 		return nil
 	})
 
+	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
+	golden := oracletest.Open(t, t.Name())
 	for optionsName, options := range formatOptionSets() {
-		oracle, err := prettier.New(options)
-		if err != nil {
-			t.Fatal(err)
-		}
+		oracle := golden.Engine(options)
 		compared, matched, rewritten, refusedByBoth, skipped := 0, 0, 0, 0, 0
 		for _, file := range files {
 			source, err := os.ReadFile(file)

@@ -35,6 +35,7 @@ func parseForComments(t *testing.T, sourceText string) *ast.SourceFile {
 // occupy, and the trailing case is the one that motivated this test, because it sits after the
 // last node in the tree.
 func TestAllCommentsSeesEveryPosition(t *testing.T) {
+	t.Parallel()
 	sourceText := strings.Join([]string{
 		"// leading file comment",
 		"/* leading block */",
@@ -92,6 +93,7 @@ func TestAllCommentsSeesEveryPosition(t *testing.T) {
 // range from a block to a call's argument list. A regression would take each of these silent
 // individually, so each is asserted individually.
 func TestAllCommentsSeesInsideEmptyDelimiters(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -130,6 +132,7 @@ func TestAllCommentsSeesInsideEmptyDelimiters(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			comments := All(parseForComments(t, testCase.sourceText))
 
 			gotTexts := make([]string, 0, len(comments))
@@ -156,6 +159,7 @@ func TestAllCommentsSeesInsideEmptyDelimiters(t *testing.T) {
 // a slash inside a string or a regex is never a position the scan is offered. Pinned so a later
 // cheapening cannot quietly reintroduce the text sweep.
 func TestAllCommentsInventsNothingFromSlashesInLiterals(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -171,6 +175,7 @@ func TestAllCommentsInventsNothingFromSlashesInLiterals(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			comments := All(parseForComments(t, testCase.sourceText))
 
 			gotTexts := make([]string, 0, len(comments))
@@ -193,6 +198,7 @@ func TestAllCommentsInventsNothingFromSlashesInLiterals(t *testing.T) {
 // position, and a node and its first child usually begin at the same place, so the same comment is
 // offered repeatedly. A rule fed duplicates reports one defect several times.
 func TestAllCommentsDeduplicates(t *testing.T) {
+	t.Parallel()
 	sourceText := "// once\nexport const value = { nested: { deeper: 1 } };\n"
 
 	comments := All(parseForComments(t, sourceText))
@@ -206,6 +212,7 @@ func TestAllCommentsDeduplicates(t *testing.T) {
 }
 
 func TestCommentClassification(t *testing.T) {
+	t.Parallel()
 	sourceText := "// line\n/* block */\n/** jsdoc */\nexport const value = 1;\n"
 
 	comments := All(parseForComments(t, sourceText))
@@ -225,6 +232,7 @@ func TestCommentClassification(t *testing.T) {
 }
 
 func TestCommentContentLines(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -246,6 +254,7 @@ func TestCommentContentLines(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			comments := All(parseForComments(t, testCase.sourceText))
 			if len(comments) == 0 {
 				t.Fatal("expected a comment")
@@ -265,6 +274,7 @@ func TestCommentContentLines(t *testing.T) {
 
 // TestLeadingRunFor covers the run-detection a rule reimplemented before this existed.
 func TestLeadingRunFor(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		name       string
 		sourceText string
@@ -317,6 +327,7 @@ func TestLeadingRunFor(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			got := leadingRunTextsFor(t, testCase.sourceText)
 			if len(got) != len(testCase.want) {
 				t.Fatalf("got %d comments %v, want %d %v",
@@ -356,6 +367,7 @@ func leadingRunTextsFor(t *testing.T, sourceText string) []string {
 // TestLeadingRunForDeclinesNil covers the guards a shared function needs: a rule-local version was
 // only ever handed a node from its own walk, and on a shelf any caller can pass anything.
 func TestLeadingRunForDeclinesNil(t *testing.T) {
+	t.Parallel()
 	sourceFile := parseForComments(t, "// a comment\nlet value = 1;")
 	if run := LeadingRunFor(rule.Context{SourceFile: sourceFile}, nil); run != nil {
 		t.Errorf("LeadingRunFor with a nil node returned %d comments", len(run))

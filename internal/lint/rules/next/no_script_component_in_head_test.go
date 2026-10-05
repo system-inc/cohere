@@ -87,6 +87,7 @@ func TestNoScriptComponentInHeadReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoScriptComponentInHead, "Component.tsx", testCase.source)
 			expected := make([]string, testCase.count)
 			for index := range expected {
@@ -193,6 +194,7 @@ func TestNoScriptComponentInHeadIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoScriptComponentInHead, "Component.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})

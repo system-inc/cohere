@@ -54,6 +54,7 @@ const fixtureRoot = "../testdata/fixtures"
 // comparison to verdict is closed, on real input, with a real type graph. Everything else in this
 // package is categorisation, and categorisation cannot tell you it is wired to anything.
 func TestGlobalsScoresAgainstReactsOwnGoldens(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("builds a TypeScript program per fixture")
 	}
@@ -125,6 +126,7 @@ func TestGlobalsScoresAgainstReactsOwnGoldens(t *testing.T) {
 // machinery a rule that reports nothing and requires the fixtures to fail, so pass and fail are
 // both shown to be reachable through the real path rather than through constructed doubles.
 func TestScoringHarnessCanFail(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("builds a TypeScript program per fixture")
 	}
@@ -170,6 +172,7 @@ func TestScoringHarnessCanFail(t *testing.T) {
 // to the rule the id belongs to. An entry that fails either half is a join made by resemblance, and
 // it would manufacture failures on fixtures the rule never had a chance at.
 func TestUpstreamMessageJoinIsNotByResemblance(t *testing.T) {
+	t.Parallel()
 	fixtures, err := react_conformance.Load(fixtureRoot)
 	if err != nil {
 		t.Fatalf("loading the corpus: %v", err)

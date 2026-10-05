@@ -141,6 +141,7 @@ func formatOptionSets() map[string]formatoptions.Options {
 }
 
 func TestFormatMatchesTheFork(t *testing.T) {
+	t.Parallel()
 	for optionsName, options := range formatOptionSets() {
 		oracle, err := prettier.New(options)
 		if err != nil {
@@ -173,6 +174,7 @@ func TestFormatMatchesTheFork(t *testing.T) {
 
 // The option sets have to change the output somewhere, or running under them proves nothing.
 func TestOptionSetsChangeTheOutput(t *testing.T) {
+	t.Parallel()
 	defaults, err := Format(formatCases[2].source, formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)
@@ -202,6 +204,7 @@ func TestOptionSetsChangeTheOutput(t *testing.T) {
 // What graphql-js refuses, both refuse: an empty selection set, an empty argument list, and a description
 // on a shorthand query.
 func TestFormatRefusesWhatTheForkRefuses(t *testing.T) {
+	t.Parallel()
 	oracle, err := prettier.New(formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)
@@ -218,6 +221,7 @@ func TestFormatRefusesWhatTheForkRefuses(t *testing.T) {
 
 // PrintToDoc is the same doc without its trailing hardline, which is what the TypeScript embed lays out.
 func TestPrintToDocIsFormatWithoutTheTrailingHardline(t *testing.T) {
+	t.Parallel()
 	options := formatoptions.Default()
 	for _, testCase := range formatCases {
 		formatted, err := Format(testCase.source, options)

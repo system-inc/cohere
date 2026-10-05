@@ -43,6 +43,7 @@ func TestReactComponentNoSeparateNamedExportFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactComponentNoSeparateNamedExport,
 				separateExportFile, testCase.sourceText), "noSeparateNamedExport")
 		})
@@ -163,6 +164,7 @@ func TestReactComponentNoSeparateNamedExportStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentNoSeparateNamedExport,
 				testCase.fileName, testCase.sourceText))
 		})
@@ -236,6 +238,7 @@ func TestReactComponentNoSeparateNamedExportFixMovesTheExportOntoTheDeclaration(
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ReactComponentNoSeparateNamedExport, separateExportFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "noSeparateNamedExport")
 			if len(result.Diagnostics[0].Fixes) != 1 {
@@ -280,6 +283,7 @@ func TestReactComponentNoSeparateNamedExportDeclinesWhereTheExportCannotMove(t *
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ReactComponentNoSeparateNamedExport, separateExportFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "noSeparateNamedExport")
 			diagnostic := result.Diagnostics[0]

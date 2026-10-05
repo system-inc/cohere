@@ -55,6 +55,7 @@ process.stdin.on("end", async () => {
 // if that count passes a tenth of the corpus: an oracle that rejects everything would otherwise read as
 // perfect agreement.
 func TestConvertAgreesWithPrettier(t *testing.T) {
+	t.Parallel()
 	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	corpora := os.Getenv("COHERE_ESTREE_CORPORA")
 	if root == "" || corpora == "" {

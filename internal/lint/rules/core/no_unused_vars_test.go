@@ -29,6 +29,7 @@ func TestNoUnusedVarsReportsAtTheBindingName(t *testing.T) {
 		{"destructured element", "const { plucked } = source;", "plucked"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want exactly 1 finding, got %d", len(result.Diagnostics))
@@ -185,6 +186,7 @@ func TestDecodeNoUnusedVarsOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("bare error supplies every default", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoUnusedVarsOptions(nil)
 		if err != nil {
 			t.Fatalf("decoding empty options failed: %v", err)
@@ -204,6 +206,7 @@ func TestDecodeNoUnusedVarsOptions(t *testing.T) {
 	})
 
 	t.Run("configured values override", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoUnusedVarsOptions(json.RawMessage(
 			`{"args":"none","varsIgnorePattern":"^ignore"}`))
 		if err != nil {
@@ -391,6 +394,7 @@ func TestNoUnusedVarsExportedContainerDoesNotExemptItsContents(t *testing.T) {
 		{"control, exported const", "export const value = 1;", 0},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
 			if len(result.Diagnostics) != testCase.want {
 				t.Errorf("want %d findings, got %d", testCase.want, len(result.Diagnostics))
@@ -430,6 +434,7 @@ func TestNoUnusedVarsDiscardedReads(t *testing.T) {
 			"let a; a = function(a = a) {}; a();", 0},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
 			if len(result.Diagnostics) != testCase.want {
 				t.Errorf("want %d findings, got %d", testCase.want, len(result.Diagnostics))
@@ -462,6 +467,7 @@ func TestNoUnusedVarsTypePositionsThatNameWithoutReading(t *testing.T) {
 			"export function f(a: unknown): a is string { return typeof a === 'string'; }", 0},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
 			if len(result.Diagnostics) != testCase.want {
 				t.Errorf("want %d findings, got %d", testCase.want, len(result.Diagnostics))
@@ -493,6 +499,7 @@ func TestNoUnusedVarsAmbientModuleExplicitExports(t *testing.T) {
 			"declare module 'bun:test' { type Matchers2<T> = {} }", 1},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
 			if len(result.Diagnostics) != testCase.want {
 				t.Errorf("want %d findings, got %d", testCase.want, len(result.Diagnostics))
@@ -584,6 +591,7 @@ func TestNoUnusedVarsReportsAValueUsedOnlyAsAType(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnusedVars, "/repository/source/TypeOnly.ts", testCase.source)
 			if len(testCase.ids) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -619,6 +627,7 @@ func TestNoUnusedVarsJudgesOverrideParametersAsTypeScriptEslintDoes(t *testing.T
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
 			var got []string
 			for _, diagnostic := range result.Diagnostics {
@@ -668,6 +677,7 @@ func TestNoUnusedVarsTreatsADecoratedClassOrParameterAsUsed(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := any(nil)
 			if strings.Contains(testCase.name, "args all") {
 				options = NoUnusedVarsOptions{Args: "all"}

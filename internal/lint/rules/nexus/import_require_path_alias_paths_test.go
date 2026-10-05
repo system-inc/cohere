@@ -195,6 +195,7 @@ func TestImportRequirePathAliasLeavesOutPathsThatNameNoDirectory(t *testing.T) {
 		{"a wildcard that is not a directory", "import { Legacy } from '../../../legacy/Legacy';\n"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedFilesWithOptionsFor(t, ImportRequirePathAlias,
 				fixture(testCase.source), derivedImporter, derivedOptions()))
 		})

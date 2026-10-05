@@ -54,6 +54,7 @@ func collect(t *testing.T, sourceText string) []string {
 // All three shapes, which is the whole contract. A rule seeing only the static form guards nothing,
 // because the dynamic and require forms are what routes around it.
 func TestSourceVisitorsSeeEveryShape(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -69,6 +70,7 @@ func TestSourceVisitorsSeeEveryShape(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			sources := collect(t, testCase.sourceText)
 			if len(sources) != 1 {
 				t.Fatalf("want one specifier, got %d: %v", len(sources), sources)
@@ -82,6 +84,7 @@ func TestSourceVisitorsSeeEveryShape(t *testing.T) {
 
 // A file mixing the shapes reports all of them, which is what a boundary rule actually meets.
 func TestSourceVisitorsSeeAllShapesInOneFile(t *testing.T) {
+	t.Parallel()
 	sources := collect(t, "import A from 'a';\nconst b = require('b');\nexport async function run() {\n    await import('c');\n}\n")
 	if len(sources) != 3 {
 		t.Fatalf("want three specifiers, got %d: %v", len(sources), sources)
@@ -92,6 +95,7 @@ func TestSourceVisitorsSeeAllShapesInOneFile(t *testing.T) {
 // than guessed at. Reporting a computed specifier would mean reporting on a value the rule has not
 // actually seen.
 func TestSourceVisitorsDeclineNonLiteralSpecifiers(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -103,6 +107,7 @@ func TestSourceVisitorsDeclineNonLiteralSpecifiers(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if sources := collect(t, testCase.sourceText); len(sources) != 0 {
 				t.Fatalf("want nothing reported, got %v", sources)
 			}
@@ -113,6 +118,7 @@ func TestSourceVisitorsDeclineNonLiteralSpecifiers(t *testing.T) {
 // The node handed to report differs by shape on purpose: a static import blames the declaration,
 // while a dynamic or require call blames the call, since that is the expression a reader changes.
 func TestSourceVisitorsBlameTheRightNode(t *testing.T) {
+	t.Parallel()
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/repository/source/Thing.ts",
 		Path:     tspath.Path("/repository/source/Thing.ts"),
@@ -138,6 +144,7 @@ func TestSourceVisitorsBlameTheRightNode(t *testing.T) {
 // statement, because a range starting before the specifier lands on a line a suppression comment
 // cannot reach.
 func TestSpecifierNodeReturnsTheSpecifier(t *testing.T) {
+	t.Parallel()
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/repository/source/Thing.ts",
 		Path:     tspath.Path("/repository/source/Thing.ts"),
@@ -156,6 +163,7 @@ func TestSpecifierNodeReturnsTheSpecifier(t *testing.T) {
 // A nil node answers rather than panics. A panic in a shared package takes the whole run down
 // instead of one rule's finding.
 func TestHelpersSurviveNilInput(t *testing.T) {
+	t.Parallel()
 	if _, ok := CallExpressionSource(nil); ok {
 		t.Fatal("want a nil call to report nothing")
 	}
@@ -169,6 +177,7 @@ func TestHelpersSurviveNilInput(t *testing.T) {
 // TestHasPathSegment covers the question three rules were answering separately, two of them on the
 // forward slash alone.
 func TestHasPathSegment(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		name    string
 		path    string
@@ -190,6 +199,7 @@ func TestHasPathSegment(t *testing.T) {
 		{"an empty segment", "/a/b/Thing.ts", "", false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if got := HasPathSegment(testCase.path, testCase.segment); got != testCase.want {
 				t.Errorf("HasPathSegment(%q, %q) = %v, want %v",
 					testCase.path, testCase.segment, got, testCase.want)

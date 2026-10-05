@@ -128,6 +128,7 @@ func TestNoWarningCommentsFires(t *testing.T) {
 
 	for _, testCase := range noWarningCommentsFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runNoWarningComments(t, testCase), testCase.wantIds...)
 		})
 	}
@@ -138,6 +139,7 @@ func TestNoWarningCommentsStaysSilent(t *testing.T) {
 
 	for _, testCase := range noWarningCommentsSilentCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runNoWarningComments(t, testCase))
 		})
 	}
@@ -155,6 +157,7 @@ func TestNoWarningCommentsNamesTheMatchedTerm(t *testing.T) {
 
 	for _, testCase := range noWarningCommentsFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runNoWarningComments(t, testCase)
 			if len(result.Diagnostics) != len(testCase.wantTerms) {
 				t.Fatalf("wanted %d findings, got %d", len(testCase.wantTerms),
@@ -216,6 +219,7 @@ func TestNoWarningCommentsTruncatesOnAWordBoundary(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runNoWarningComments(t, noWarningCommentsCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(result.Diagnostics) == 0 {
@@ -272,6 +276,7 @@ func TestNoWarningCommentsUsesAsciiWordBoundaries(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runNoWarningComments(t, testCase)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -310,6 +315,7 @@ func TestNoWarningCommentsReadsTheCommentValue(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText+" "+fmtOptions(testCase.options), func(t *testing.T) {
+			t.Parallel()
 			result := runNoWarningComments(t, testCase)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -356,6 +362,7 @@ func TestNoWarningCommentsExemptsItsOwnDirective(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runNoWarningComments(t, testCase)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -375,6 +382,7 @@ func TestDecodeNoWarningCommentsOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("nil input yields the defaults", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoWarningCommentsOptions(nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -387,24 +395,28 @@ func TestDecodeNoWarningCommentsOptions(t *testing.T) {
 	})
 
 	t.Run("upstream's lowercase location is rejected", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeNoWarningCommentsOptions([]byte(`{"location":"anywhere"}`)); err == nil {
 			t.Error("the lowercase spelling decoded; our locations are PascalCase")
 		}
 	})
 
 	t.Run("an unknown location is rejected", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeNoWarningCommentsOptions([]byte(`{"location":"Middle"}`)); err == nil {
 			t.Error("an unrecognized location decoded")
 		}
 	})
 
 	t.Run("a multi-character decoration is rejected", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeNoWarningCommentsOptions([]byte(`{"decoration":["**"]}`)); err == nil {
 			t.Error("a two-character decoration decoded, which would widen the class")
 		}
 	})
 
 	t.Run("a whitespace decoration is rejected", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeNoWarningCommentsOptions([]byte(`{"decoration":[" "]}`)); err == nil {
 			t.Error("a whitespace decoration decoded")
 		}

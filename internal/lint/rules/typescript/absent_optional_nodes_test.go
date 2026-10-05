@@ -92,6 +92,7 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 	for _, currentRule := range rules {
 		for index, source := range sources {
 			t.Run(fmt.Sprintf("%s/shape-%d", currentRule.Name, index), func(t *testing.T) {
+				t.Parallel()
 				// A panic fails the test. The assertion is only that this returns at all, so
 				// findings are deliberately not checked: what each rule concludes about these
 				// shapes belongs in its own pair, and asserting it here would make this guard fail

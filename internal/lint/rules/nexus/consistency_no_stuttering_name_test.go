@@ -28,6 +28,7 @@ func TestConsistencyNoStutteringNameFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoStutteringName, stutterFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "stutteringName")
 		})
@@ -56,6 +57,7 @@ func TestConsistencyNoStutteringNameStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoStutteringName, stutterFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})

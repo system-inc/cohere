@@ -178,6 +178,7 @@ var parseFixtures = []parseFixture{
 // the corpus: an oracle that rejects everything would otherwise read as perfect agreement. The inline
 // fixtures each say which way graphql-js must go.
 func TestParseAgreesWithGraphqlJs(t *testing.T) {
+	t.Parallel()
 	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	corpora := os.Getenv("COHERE_GRAPHQL_CORPORA")
 	if root == "" || corpora == "" {

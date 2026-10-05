@@ -48,6 +48,7 @@ func TestNoUnsafeNegationFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
 					testCase.options), "unexpected")
@@ -100,6 +101,7 @@ func TestNoUnsafeNegationStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
 					testCase.options))
@@ -146,6 +148,7 @@ func TestNoUnsafeNegationDeclinesOtherOperatorsAndOtherUnaries(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
 					testCase.options))
@@ -197,6 +200,7 @@ func TestNoUnsafeNegationPointsAtTheNegatedOperand(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {
@@ -263,6 +267,7 @@ func TestNoUnsafeNegationSuggestsBothRewrites(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {
@@ -333,6 +338,7 @@ func TestNoUnsafeNegationNamesTheOperator(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.want, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {

@@ -127,6 +127,7 @@ func TestConsistentIndexedObjectStyleStaysSilentOnUpstreamPassCases(t *testing.T
 	}
 	for index, testCase := range cases {
 		t.Run(consistentIndexedObjectStyleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, ConsistentIndexedObjectStyle,
 				consistentIndexedObjectStyleFile, testCase.sourceText,
 				consistentIndexedObjectStyleOptionsFor(t, testCase.optionsJson)))
@@ -638,6 +639,7 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(consistentIndexedObjectStyleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, ConsistentIndexedObjectStyle,
 				consistentIndexedObjectStyleFile, testCase.sourceText,
 				consistentIndexedObjectStyleOptionsFor(t, testCase.optionsJson))
@@ -757,6 +759,7 @@ func TestConsistentIndexedObjectStyleCarriesTheInterfaceModifiers(t *testing.T) 
 
 	for index, testCase := range cases {
 		t.Run(consistentIndexedObjectStyleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, ConsistentIndexedObjectStyle,
 				consistentIndexedObjectStyleFile, testCase.sourceText,
 				DefaultConsistentIndexedObjectStyleSettings())
@@ -810,6 +813,7 @@ func TestDecodeConsistentIndexedObjectStyleOptions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeConsistentIndexedObjectStyleOptions(json.RawMessage(testCase.raw))
 			if err != nil {
 				t.Fatalf("decoding %q: %v", testCase.raw, err)
@@ -865,6 +869,7 @@ func TestDecodeConsistentIndexedObjectStyleOptionsRefusesAValueUpstreamRefuses(t
 		{raw: `["record"]`, named: "record"},
 	} {
 		t.Run(testCase.raw, func(t *testing.T) {
+			t.Parallel()
 			_, err := DecodeConsistentIndexedObjectStyleOptions(json.RawMessage(testCase.raw))
 			if err == nil {
 				t.Fatalf("%s decoded, so the configured mode is silently not the one written", testCase.raw)

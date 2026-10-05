@@ -69,6 +69,7 @@ var htmlTextOverrideFixtures = []string{
 }
 
 func TestHtmlTextOverrideEvents(t *testing.T) {
+	t.Parallel()
 	compareEvents(t, htmlTextOverrideFixtures)
 	compareEvents(t, htmlTextFixtures)
 }
@@ -77,6 +78,7 @@ func TestHtmlTextOverrideEvents(t *testing.T) {
 // mergeConstructs puts every construct not marked "after" before the existing ones, so `add: "before"`
 // holds the copy ahead of the defaults.
 func TestHtmlTextOverrideOrder(t *testing.T) {
+	t.Parallel()
 	constructs := MarkdownConstructs().Text.ByCode[CodeLessThan]
 	want := []*Construct{htmlTextOverride, autolink, htmlText}
 	if len(constructs) != len(want) {

@@ -104,6 +104,7 @@ func gateForFixture(fixture gateFixture) *Gate {
 // broken gate looks correct, so the corpus has to carry known-collapsing cases and this has to
 // confirm they are there.
 func TestCorpusDiscriminates(t *testing.T) {
+	t.Parallel()
 	corpus := loadFixtures(t)
 
 	collapsing := 0
@@ -132,6 +133,7 @@ func TestCorpusDiscriminates(t *testing.T) {
 // failure here is the silent kind: the rule keeps running, the tree keeps looking clean, and a real
 // finding stops being reported.
 func TestGateNeverLosesACollapse(t *testing.T) {
+	t.Parallel()
 	corpus := loadFixtures(t)
 
 	checked := 0
@@ -159,6 +161,7 @@ func TestGateNeverLosesACollapse(t *testing.T) {
 // what a future change breaks first, so they are asserted directly against what the JavaScript gate
 // computed on the same classes.
 func TestGateMatchesRecordedBucketKeys(t *testing.T) {
+	t.Parallel()
 	corpus := loadFixtures(t)
 
 	compared := 0
@@ -185,6 +188,7 @@ func TestGateMatchesRecordedBucketKeys(t *testing.T) {
 // This asserts the silent fixtures are actually skipped, so a regression toward always-ask shows up
 // as a failure rather than as a slow run nobody notices.
 func TestGateSkipsWhatItCan(t *testing.T) {
+	t.Parallel()
 	corpus := loadFixtures(t)
 
 	skipped := 0
@@ -218,6 +222,7 @@ func TestGateSkipsWhatItCan(t *testing.T) {
 // A guard that has never returned a positive has not been shown to work, so these deliberately
 // broken gates are run against the same fixtures and required to fail.
 func TestKnownWrongGatesLoseFindings(t *testing.T) {
+	t.Parallel()
 	corpus := loadFixtures(t)
 
 	testCases := []struct {
@@ -250,6 +255,7 @@ func TestKnownWrongGatesLoseFindings(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			lost := brokenGateLosses(corpus, testCase.key)
 
 			if len(lost) == 0 {
@@ -370,6 +376,7 @@ func contains(values []string, want string) bool {
 // every unreadable class under one empty key would make them send each other to the engine forever,
 // and grouping them with a real class would let one suppress a question about the other.
 func TestUnparseableClassesNeverGroup(t *testing.T) {
+	t.Parallel()
 	parser := recordedParser{
 		candidates: map[string][]Candidate{
 			"mystery-one": {},
@@ -396,6 +403,7 @@ func TestUnparseableClassesNeverGroup(t *testing.T) {
 // says so, every later literal containing it must reach the engine, including ones where no two
 // classes share a bucket.
 func TestRecordedSingleRewriteForcesAnEngineCall(t *testing.T) {
+	t.Parallel()
 	parser := recordedParser{
 		candidates: map[string][]Candidate{
 			"z-[1]": {{Kind: CandidateKindFunctional, Root: "z", Value: Value{Kind: ValueKindArbitrary, Value: "1"}}},
@@ -428,6 +436,7 @@ func TestRecordedSingleRewriteForcesAnEngineCall(t *testing.T) {
 // `flex flex` is a different rule's finding. If the gate treated the repeat as two classes sharing a
 // bucket, every duplicate in the tree would buy an engine call and report nothing.
 func TestDuplicateClassesDoNotFakeACollapse(t *testing.T) {
+	t.Parallel()
 	parser := recordedParser{
 		candidates: map[string][]Candidate{
 			"flex": {{Kind: CandidateKindStatic, Root: "flex"}},

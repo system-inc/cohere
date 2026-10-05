@@ -11,6 +11,7 @@ import (
 // Enables are the half most likely to be dropped, because the index does not otherwise keep them,
 // and ESLint 10.8.1 reports an unknown name in `eslint-enable` exactly as it does in a disable.
 func TestRuleReferencesNameEveryRuleEveryDirectiveWrote(t *testing.T) {
+	t.Parallel()
 	lines := []string{
 		"// eslint-disable-next-line no-unused-var -- why",
 		"const a = 1; // eslint-disable-line no-consol, no-console",

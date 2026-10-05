@@ -96,6 +96,7 @@ func TestNoImportAssignFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoImportAssign, importAssignFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantSpans))
@@ -189,6 +190,7 @@ func TestNoImportAssignStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoImportAssign, importAssignFile, sourceText))
 		})
@@ -303,6 +305,7 @@ func TestNoImportAssignFiresOnCasesUpstreamOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoImportAssign, importAssignFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantSpans))
@@ -386,6 +389,7 @@ func TestNoImportAssignStaysSilentOnCasesUpstreamOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoImportAssign, importAssignFile, testCase.sourceText))
 		})

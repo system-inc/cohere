@@ -33,6 +33,7 @@ type strictOptions struct {
 // a different case from its tag, are refused rather than dropped. The baseline case comes first, so
 // a refusal below cannot be explained by the decoder refusing everything.
 func TestUnmarshalOptionsRefusesWhatUpstreamRefuses(t *testing.T) {
+	t.Parallel()
 	var decoded strictOptions
 	valid := `{"shared": true, "enforceForTSTypes": true, "paths": [{"pattern": "x"}], "ignore": ["a"], "custom": {"Anything": 1}}`
 	if err := UnmarshalOptions([]byte(valid), &decoded); err != nil {
@@ -56,6 +57,7 @@ func TestUnmarshalOptionsRefusesWhatUpstreamRefuses(t *testing.T) {
 	}
 	for _, testCase := range refused {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			var target strictOptions
 			err := UnmarshalOptions([]byte(testCase.raw), &target)
 			if err == nil || !strings.Contains(err.Error(), testCase.mention) {
@@ -82,6 +84,7 @@ func TestUnmarshalOptionsRefusesWhatUpstreamRefuses(t *testing.T) {
 // TestDecodeOptionsIntoIsStrict pins that the decoder 112 rules register through uses the strict
 // path, so a refusal reaches the config layer with the type named.
 func TestDecodeOptionsIntoIsStrict(t *testing.T) {
+	t.Parallel()
 	decode := DecodeOptionsInto[strictOptions]()
 	if _, err := decode([]byte(`{"enforceForTSTypes": true}`)); err != nil {
 		t.Fatalf("baseline: %v", err)

@@ -137,7 +137,10 @@ var gfmTableFixtures = []string{
 	"|a|b|\r\n|:-|-:|\r\n\r\n|c|",
 }
 
-func TestGfmTableEvents(t *testing.T) { compareEvents(t, gfmTableFixtures) }
+func TestGfmTableEvents(t *testing.T) {
+	t.Parallel()
+	compareEvents(t, gfmTableFixtures)
+}
 
 // gfmTableAlignOracleScript is the event oracle's script, describing only each table's `_align`, which the
 // event descriptions leave out and mdast-util-gfm-table reads.
@@ -147,6 +150,7 @@ var gfmTableAlignOracleScript = strings.Replace(oracleScript,
 
 // TestGfmTableAlignMatchesUpstream compares every fixture's table alignments with upstream's `_align`.
 func TestGfmTableAlignMatchesUpstream(t *testing.T) {
+	t.Parallel()
 	if !strings.Contains(gfmTableAlignOracleScript, "_align") {
 		t.Fatal("the align oracle script no longer matches the event oracle's")
 	}

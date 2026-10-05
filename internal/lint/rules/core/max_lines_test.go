@@ -45,6 +45,7 @@ func TestMaxLinesCountsLinesAsAnEditorShowsThem(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, MaxLines, maxLinesFile, testCase.source, atLimit)
 			if testCase.findings == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -77,12 +78,14 @@ func TestMaxLinesOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("the default is 300", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.Run(t, MaxLines, maxLinesFile, maxLinesSource(300, "\n", true)))
 		rule_testing.ExpectFindings(t, rule_testing.Run(t, MaxLines, maxLinesFile, maxLinesSource(301, "\n", true)), "exceed")
 	})
 
 	blankLines := "first;\n\n   \nsecond;\n"
 	t.Run("blank lines count unless skipped", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, MaxLines, maxLinesFile, blankLines,
 			MaxLinesOptions{Maximum: 2}), "exceed")
 		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, MaxLines, maxLinesFile, blankLines,
@@ -93,6 +96,7 @@ func TestMaxLinesOptions(t *testing.T) {
 	// one more inside it), and two lines where code shares a line with a comment, which still count.
 	commentLines := "// only a comment\n/*\n inside\n*/\nconst kept = 1; // trailing\n/* leading */ const also = 2;\n"
 	t.Run("comment-only lines count unless skipped", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, MaxLines, maxLinesFile, commentLines,
 			MaxLinesOptions{Maximum: 2}), "exceed")
 		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, MaxLines, maxLinesFile, commentLines,

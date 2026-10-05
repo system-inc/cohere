@@ -100,6 +100,7 @@ func TestAbbreviationGateCoversTheArmsThatWereLost(t *testing.T) {
 	}
 	for _, name := range cases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			if _, reported := vocabulary.find(name); !reported {
 				t.Fatalf("the vocabulary does not report %q, so it proves nothing", name)
 			}

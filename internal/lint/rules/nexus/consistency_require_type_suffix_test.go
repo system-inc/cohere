@@ -28,6 +28,7 @@ func TestConsistencyRequireTypeSuffixFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyRequireTypeSuffix, suffixFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
@@ -66,6 +67,7 @@ func TestConsistencyRequireTypeSuffixStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyRequireTypeSuffix, suffixFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})

@@ -34,6 +34,7 @@ func TestPreferRestParamsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, PreferRestParams, preferRestParamsFile, testCase.sourceText),
 				"preferRestParams")
@@ -67,6 +68,7 @@ func TestPreferRestParamsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, PreferRestParams, preferRestParamsFile, testCase.sourceText))
 		})
@@ -100,6 +102,7 @@ func TestPreferRestParamsPointsAtTheIdentifier(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferRestParams, preferRestParamsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted exactly one finding to check the span of, got %d", len(result.Diagnostics))
@@ -190,6 +193,7 @@ func TestPreferRestParamsResolvesShadowsWherverTheyAreDeclared(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, PreferRestParams, preferRestParamsFile, testCase.sourceText))
 		})
@@ -210,6 +214,7 @@ func TestPreferRestParamsResolvesShadowsWherverTheyAreDeclared(t *testing.T) {
 	}
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, PreferRestParams, preferRestParamsFile, testCase.sourceText),
 				"preferRestParams")

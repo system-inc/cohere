@@ -54,6 +54,7 @@ func TestNoSelfAssignFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// Spelled as an explicit list rather than a count, so this reads as ExpectFindings
 			// like every other rule's pair. The count form was equivalent and TestEveryRuleShips-
 			// AFixturePair could not see it: the guard looks for a call to ExpectFindings, and a
@@ -128,6 +129,7 @@ func TestNoSelfAssignStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoSelfAssign, selfAssignFile,
 				selfAssignDeclarations+testCase.sourceText))
 		})

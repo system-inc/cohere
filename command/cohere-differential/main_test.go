@@ -19,6 +19,7 @@ import (
 // which means a check that cannot reject is worse than no check: it adds the appearance of a
 // guarantee to a run that has none.
 func TestAControlWhereItsRuleCannotFireIsRefused(t *testing.T) {
+	t.Parallel()
 	lintConfig := configFrom(t, map[string]any{
 		"rules":          map[string]any{"nexus/consistency-no-enum": "error"},
 		"ignorePatterns": []string{"ignored-here/**"},
@@ -63,6 +64,7 @@ func TestAControlWhereItsRuleCannotFireIsRefused(t *testing.T) {
 // enabled at the base level, the path is not ignored, and the control would still be silent because
 // an override turned that rule off for exactly that directory.
 func TestAnOverrideThatScopesTheRuleOffIsCaught(t *testing.T) {
+	t.Parallel()
 	lintConfig := configFrom(t, map[string]any{
 		"rules": map[string]any{"nexus/consistency-no-enum": "error"},
 		"overrides": []any{map[string]any{
@@ -94,6 +96,7 @@ func TestAnOverrideThatScopesTheRuleOffIsCaught(t *testing.T) {
 // guard would block every run, which is a failure that at least announces itself. Tested anyway
 // because the opposite fix, dropping the check, is the tempting one.
 func TestABareRuleNameFindsItsPluginPrefixedConfigKey(t *testing.T) {
+	t.Parallel()
 	lintConfig := configFrom(t, map[string]any{
 		"rules": map[string]any{"nexus/consistency-no-enum": "error"},
 	})

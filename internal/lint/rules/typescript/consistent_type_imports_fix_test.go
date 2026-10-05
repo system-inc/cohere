@@ -86,6 +86,7 @@ func TestConsistentTypeImportsFixMatchesUpstream(t *testing.T) {
 	for _, testCase := range consistentTypeImportsUpstreamFixes {
 		ran++
 		t.Run(strings.ReplaceAll(strings.TrimSpace(strings.SplitN(strings.TrimSpace(testCase.code), "\n", 2)[0]), "/", "_"), func(t *testing.T) {
+			t.Parallel()
 			_, fixed, count := runConsistentTypeImportsFix(t, testCase.options, testCase.code)
 			want := strings.TrimSpace(testCase.upstream) + "\n"
 			if divergence, recorded := consistentTypeImportsFixDivergences[testCase.index]; recorded {
@@ -248,6 +249,7 @@ func TestConsistentTypeImportsFixCases(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			original, fixed, _ := runConsistentTypeImportsFix(t, testCase.options, testCase.code)
 			settings := DefaultConsistentTypeImportsOptions()
 			if testCase.options != "" {

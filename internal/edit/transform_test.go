@@ -14,6 +14,7 @@ import (
 // The order is the whole point of the seam: fixes are semantic and change what the correct
 // formatting is, so a transform that ran first would be formatting text that is about to change.
 func TestTransformRunsAfterFixesAndSeesTheFixedText(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	fileName := filepath.Join(directory, "ordered.ts")
 
@@ -51,6 +52,7 @@ func TestTransformRunsAfterFixesAndSeesTheFixedText(t *testing.T) {
 // A transform whose output does not parse is refused, and the fixes that already converged still
 // land. A broken formatter must not be able to block every correctness fix in the tree.
 func TestATransformProducingInvalidSyntaxIsRefused(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	fileName := filepath.Join(directory, "guarded.ts")
 
@@ -94,6 +96,7 @@ func TestATransformProducingInvalidSyntaxIsRefused(t *testing.T) {
 // A transform that errors is reported, and the fixes still land. The formatter being broken says
 // nothing about whether the fixes were correct — they already converged and already passed the guard.
 func TestATransformThatErrorsDoesNotBlockFixes(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	fileName := filepath.Join(directory, "erroring.ts")
 
@@ -135,6 +138,7 @@ func TestATransformThatErrorsDoesNotBlockFixes(t *testing.T) {
 // A transform must run even when no fix landed. A file can be correctly written and badly
 // formatted, and a formatter that only ran on files with findings would never touch most of a tree.
 func TestTransformRunsWhenNoFixLanded(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	fileName := filepath.Join(directory, "onlyformat.ts")
 
@@ -166,6 +170,7 @@ func TestTransformRunsWhenNoFixLanded(t *testing.T) {
 // Touching a file that needed nothing moves its modification time and invalidates every downstream
 // cache keyed on it.
 func TestAnIdentityTransformDoesNotTouchTheFile(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	fileName := filepath.Join(directory, "already.ts")
 
@@ -207,6 +212,7 @@ func TestAnIdentityTransformDoesNotTouchTheFile(t *testing.T) {
 // The control below is a deliberately non-idempotent transform, so this fixture has been shown to
 // fail rather than only to pass.
 func TestTransformIdempotenceIsCheckable(t *testing.T) {
+	t.Parallel()
 	source := "const a = 1;\n"
 
 	stable := func(_ string, text string) (string, error) {
@@ -245,6 +251,7 @@ func TestTransformIdempotenceIsCheckable(t *testing.T) {
 // FixFile and FixAndTransformFile with a nil transform must behave identically. FixFile is the
 // common path and a nil transform must not become a special case that drifts from it.
 func TestFixFileIsFixAndTransformWithNoTransform(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 
 	withFixFile := filepath.Join(directory, "a.ts")
@@ -276,6 +283,7 @@ func TestFixFileIsFixAndTransformWithNoTransform(t *testing.T) {
 
 // The summary counts reformatted files separately from rewritten ones.
 func TestSummaryCountsReformattedFiles(t *testing.T) {
+	t.Parallel()
 	summary := Summarize([]FileResult{
 		{FileName: "a.ts", Changed: true, Transformed: true, Passes: 1},
 		{FileName: "b.ts", Changed: true, Passes: 1, Applied: []Proposal{{RuleName: "r"}}},
@@ -297,6 +305,7 @@ func TestSummaryCountsReformattedFiles(t *testing.T) {
 // skipped file the same way it reports a file that was already correctly formatted. Those mean
 // opposite things — one says the formatter never looked, the other says it looked and approved.
 func TestATransformCanSkipAFileAndTheSkipIsRecorded(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	fileName := filepath.Join(directory, "notes.ts")
 	source := "const a = 1;\n"
@@ -347,6 +356,7 @@ func TestATransformCanSkipAFileAndTheSkipIsRecorded(t *testing.T) {
 // A skip must not be confused with a failure. The two send a reader somewhere different: a failure
 // says the formatter broke, a skip says it chose not to look.
 func TestASkipIsNotAFailure(t *testing.T) {
+	t.Parallel()
 	skipped := Summarize([]FileResult{
 		{FileName: "a.ts", TransformSkipped: true, TransformSkipReason: "markdown"},
 	})
@@ -372,6 +382,7 @@ func TestASkipIsNotAFailure(t *testing.T) {
 // already correctly formatted. This is the whole reason the skip channel exists rather than a
 // transform returning its input unchanged.
 func TestSkippedFilesAreNotReportedAsAlreadyFormatted(t *testing.T) {
+	t.Parallel()
 	skippedEverything := Summarize([]FileResult{
 		{FileName: "a.ts", TransformSkipped: true, TransformSkipReason: "markdown doubles a standalone tilde"},
 		{FileName: "b.ts", TransformSkipped: true, TransformSkipReason: "markdown doubles a standalone tilde"},
@@ -399,6 +410,7 @@ func TestSkippedFilesAreNotReportedAsAlreadyFormatted(t *testing.T) {
 // A skip with no reason is still recorded. A transform that declines without saying why is worse
 // than one that explains itself, but silently dropping the skip would be worse than both.
 func TestASkipWithNoReasonIsStillCounted(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	fileName := filepath.Join(directory, "bare.ts")
 
@@ -439,6 +451,7 @@ func TestASkipWithNoReasonIsStillCounted(t *testing.T) {
 // the thing being protected is what a person reads, and a change that alters that should have to be
 // stated rather than absorbed.
 func TestTheWholeSummaryLineReadsCorrectly(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		name    string
 		results []FileResult
@@ -472,6 +485,7 @@ func TestTheWholeSummaryLineReadsCorrectly(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			got := Summarize(testCase.results).String()
 			if got != testCase.want {
 				t.Fatalf("the summary line reads wrong:\n  want %q\n  got  %q", testCase.want, got)
@@ -484,6 +498,7 @@ func TestTheWholeSummaryLineReadsCorrectly(t *testing.T) {
 // `--no-fix` reports, so a result that differed from the writing run's would report a tree as clean
 // that `--fix` then rewrites.
 func TestCheckFileComputesTheWriteAndLeavesTheFile(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	original := "const a = 'old';\n"
 	checked := filepath.Join(directory, "checked.ts")
@@ -536,6 +551,7 @@ func TestCheckFileComputesTheWriteAndLeavesTheFile(t *testing.T) {
 // nexus/consistency-no-multiline-arrow-function does. Formatted once and left, the file would fail
 // the next run's check; re-linting what was printed fixes it, and the fixed text is formatted again.
 func TestAFixThePrintedTextTriggersLandsInTheSameRun(t *testing.T) {
+	t.Parallel()
 	breakArrow := func(_ string, text string) (string, error) {
 		return strings.ReplaceAll(text, "() => { run(); }", "() => {\n    run();\n}"), nil
 	}
@@ -559,6 +575,7 @@ func TestAFixThePrintedTextTriggersLandsInTheSameRun(t *testing.T) {
 // is left exactly as it was found and reported as not converged, naming the rule and the formatter,
 // rather than written half-settled.
 func TestFixAndFormatThatUndoEachOtherAreBounded(t *testing.T) {
+	t.Parallel()
 	toSingle := func(_ string, text string) (string, error) {
 		return strings.ReplaceAll(text, `"a"`, `'a'`), nil
 	}
@@ -585,6 +602,7 @@ func TestFixAndFormatThatUndoEachOtherAreBounded(t *testing.T) {
 // printer changed has no rules, and re-linting it handed it to the TypeScript parser, which panicked
 // on the first `.md` a writing run formatted.
 func TestAFormattedNonTypeScriptFileIsNotLintedAgain(t *testing.T) {
+	t.Parallel()
 	calls := 0
 	propose := func(string, string) ([]Proposal, error) {
 		calls++

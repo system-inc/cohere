@@ -40,6 +40,7 @@ type wave3Fixture struct {
 // function of its type, this is where it shows up, and the answer then is a new table rather than a
 // wider descriptor.
 func TestWave3RootsAreAlreadyAnsweredByTheDescriptorTable(t *testing.T) {
+	t.Parallel()
 	fixture := loadWave3Fixture(t, "wave3_fixtures.json")
 	system := loadWave1DesignSystem(t)
 	table := NewTable(system)
@@ -109,6 +110,7 @@ func TestWave3RootsAreAlreadyAnsweredByTheDescriptorTable(t *testing.T) {
 // is what expresses that. Asserted on the pairs rather than on the count, because a count keeps
 // passing while the pairs underneath it change.
 func TestWave3ValueDependentRootsReadByType(t *testing.T) {
+	t.Parallel()
 	system := loadWave1DesignSystem(t)
 	table := NewTable(system)
 
@@ -179,6 +181,7 @@ func loadWave3Fixture(t *testing.T, name string) wave3Fixture {
 // test is what turns that from a silent behaviour change into a failure. It fails when the corpus
 // gains an ambiguous key, which is the moment the mutation becomes possible and is owed.
 func TestNamespacePrecedenceIsUnobservableInThisCorpus(t *testing.T) {
+	t.Parallel()
 	system := loadWave1DesignSystem(t)
 	table := NewTable(system)
 

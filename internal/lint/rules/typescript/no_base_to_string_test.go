@@ -296,6 +296,7 @@ func TestNoBaseToStringStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noBaseToStringCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runNoBaseToString(t, testCase.sourceText, testCase.options))
 		})
 	}
@@ -983,6 +984,7 @@ func TestNoBaseToStringFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noBaseToStringCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := runNoBaseToString(t, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -1054,6 +1056,7 @@ func TestNoBaseToStringOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoBaseToString(t, testCase.sourceText, "")
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantIds) {
@@ -1104,6 +1107,7 @@ func TestNoBaseToStringDecoderKeepsTheBuiltinIgnoredNames(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.raw, func(t *testing.T) {
+			t.Parallel()
 			decoded := decodeNoBaseToStringOptionsForTest(t, testCase.raw)
 			settings, isSettings := decoded.(NoBaseToStringOptions)
 			if !isSettings {

@@ -27,6 +27,7 @@ func TestConsistencyNoShoutingFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "shoutingInComment")
 		})
@@ -60,6 +61,7 @@ func TestConsistencyNoShoutingStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -94,6 +96,7 @@ func TestConsistencyNoShoutingKnowsTheAcronymsTheReviewFound(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -127,6 +130,7 @@ func TestConsistencyNoShoutingKnowsTheAcronymsTheReviewFound(t *testing.T) {
 	}
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "shoutingInComment")
 			if description := result.Diagnostics[0].Message.Description; !strings.Contains(description, `"`+testCase.token+`"`) {
@@ -154,6 +158,7 @@ func TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -180,6 +185,7 @@ func TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase(t *testing.T) {
 	}
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "shoutingInComment")
 			if description := result.Diagnostics[0].Message.Description; !strings.Contains(description, `"`+testCase.token+`"`) {
@@ -206,6 +212,7 @@ func TestConsistencyNoShoutingMasksAnIndentedCodeBlock(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -222,6 +229,7 @@ func TestConsistencyNoShoutingMasksAnIndentedCodeBlock(t *testing.T) {
 	}
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "shoutingInComment")
 			if description := result.Diagnostics[0].Message.Description; !strings.Contains(description, `"`+testCase.token+`"`) {
@@ -250,6 +258,7 @@ func TestConsistencyNoShoutingMasksADoubleQuoteThatWraps(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -269,6 +278,7 @@ func TestConsistencyNoShoutingMasksADoubleQuoteThatWraps(t *testing.T) {
 	}
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "shoutingInComment")
 			if description := result.Diagnostics[0].Message.Description; !strings.Contains(description, `"`+testCase.token+`"`) {

@@ -45,6 +45,7 @@ func (e engineImplementation) Analyze(fixture react_conformance.Fixture) (react_
 // see, and a failure count alone is satisfied by one that is broken; requiring BOTH to be non-zero,
 // plus the partition check, is what makes the number a measurement.
 func TestAggregateWithTheRuleEngineWired(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("builds a TypeScript program per fixture")
 	}

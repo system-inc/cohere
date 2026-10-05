@@ -198,6 +198,7 @@ func TestNoUnsafeAssignmentStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noUnsafeAssignmentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeAssignment,
 				noUnsafeAssignmentFileFor(testCase.isJsx), testCase.sourceText))
 		})
@@ -617,6 +618,7 @@ func TestNoUnsafeAssignmentFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noUnsafeAssignmentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnsafeAssignment,
 				noUnsafeAssignmentFileFor(testCase.isJsx), testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -727,6 +729,7 @@ func TestNoUnsafeAssignmentDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T
 	}
 	for index, testCase := range cases {
 		t.Run(noUnsafeAssignmentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnsafeAssignment,
 				noUnsafeAssignmentFileFor(false), testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -776,6 +779,7 @@ func TestNoUnsafeAssignmentSurvivesShapesTheParserRecoversFrom(t *testing.T) {
 		"deepNesting":        "declare const a: [[[any]]];\nconst [[[x]]] = a;",
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.RunTyped(t, NoUnsafeAssignment,
 				noUnsafeAssignmentFileFor(false), sourceText)
 		})

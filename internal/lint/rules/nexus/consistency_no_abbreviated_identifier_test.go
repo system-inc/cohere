@@ -144,6 +144,7 @@ func TestConsistencyNoAbbreviatedIdentifierFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -237,6 +238,7 @@ func TestConsistencyNoAbbreviatedIdentifierStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -341,6 +343,7 @@ func TestConsistencyNoAbbreviatedIdentifierFrameworkExemptions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ConsistencyNoAbbreviatedIdentifier,
 				testCase.fileName, testCase.sourceText, options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -388,6 +391,7 @@ func TestConsistencyNoAbbreviatedIdentifierNamesTheReplacement(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("expected a finding for %q", testCase.sourceText)
@@ -497,6 +501,7 @@ func TestConsistencyNoAbbreviatedIdentifierReportsAtTheIdentifier(t *testing.T) 
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, "/repository/source/Thing.ts", testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("expected a finding, got none")
@@ -553,6 +558,7 @@ func TestConsistencyNoAbbreviatedIdentifierJudgesTypeMemberKeys(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -575,6 +581,7 @@ func TestConsistencyNoAbbreviatedIdentifierStillSkipsTheRestOfTheForeignFamily(t
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -601,6 +608,7 @@ func TestConsistencyNoAbbreviatedIdentifierSkipsNamesTheCodeOnlyReads(t *testing
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText))
 		})
 	}
@@ -615,6 +623,7 @@ func TestConsistencyNoAbbreviatedIdentifierSkipsNamesTheCodeOnlyReads(t *testing
 	}
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("expected a finding, got none")
@@ -664,6 +673,7 @@ func TestConsistencyNoAbbreviatedIdentifierLeavesNextRouteContractsAlone(t *test
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, testCase.fileName, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)

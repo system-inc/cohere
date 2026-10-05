@@ -6,6 +6,7 @@ import "testing"
 // the reason this package exists. Each row records which upstream spellings would have said what,
 // so a reader can see the drift this replaced rather than take the collapse on faith.
 func TestIsDocumentFile(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		filePath string
@@ -40,6 +41,7 @@ func TestIsDocumentFile(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if got := IsDocumentFile(testCase.filePath); got != testCase.want {
 				t.Fatalf("%q: want %v, got %v", testCase.filePath, testCase.want, got)
 			}
@@ -50,6 +52,7 @@ func TestIsDocumentFile(t *testing.T) {
 // Every upstream predicate handles both separators, so a path in the Windows shape must answer the
 // same as its POSIX twin. A port handling one would be silent on half the platforms upstream lints.
 func TestIsDocumentFileHandlesBothSeparators(t *testing.T) {
+	t.Parallel()
 	pairs := [][2]string{
 		{"pages/_document.tsx", `pages\_document.tsx`},
 		{"src/pages/_document.tsx", `src\pages\_document.tsx`},
@@ -69,6 +72,7 @@ func TestIsDocumentFileHandlesBothSeparators(t *testing.T) {
 // than tightened, and the case that shows it is asserted so nobody "fixes" it later without seeing
 // what they are changing.
 func TestIsInApplicationDirectory(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		filePath string
@@ -92,6 +96,7 @@ func TestIsInApplicationDirectory(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if got := IsInApplicationDirectory(testCase.filePath); got != testCase.want {
 				t.Fatalf("%q: want %v, got %v", testCase.filePath, testCase.want, got)
 			}
@@ -104,6 +109,7 @@ func TestIsInApplicationDirectory(t *testing.T) {
 // a predicate that answered otherwise would put a false-positive surface under every rule that
 // gates this way.
 func TestOurOwnPagesConventionIsNotADocument(t *testing.T) {
+	t.Parallel()
 	for _, filePath := range []string{
 		"libraries/structure/source/modules/account/pages/AccountPage.tsx",
 		"libraries/structure/source/modules/account/pages/index.tsx",
@@ -120,6 +126,7 @@ func TestOurOwnPagesConventionIsNotADocument(t *testing.T) {
 // disagree are the reason both exist, and each was confirmed against the release oxlint binary
 // rather than modelled from the Rust.
 func TestIsDocumentPage(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		filePath string
@@ -168,6 +175,7 @@ func TestIsDocumentPage(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if got := IsDocumentPage(testCase.filePath); got != testCase.want {
 				t.Fatalf("%q: want %v, got %v", testCase.filePath, testCase.want, got)
 			}
@@ -179,6 +187,7 @@ func TestIsDocumentPage(t *testing.T) {
 // corpus. Asserted rather than left to the doc comments, so a later tidy-up that collapses them
 // fails loudly instead of silently changing which files a rule runs on.
 func TestTheTwoDocumentPredicatesDisagreeOnPurpose(t *testing.T) {
+	t.Parallel()
 	disagreements := []struct {
 		filePath     string
 		wantPage     bool
@@ -208,6 +217,7 @@ func TestTheTwoDocumentPredicatesDisagreeOnPurpose(t *testing.T) {
 // reason this is a segment test, and each was pinned against the release oxlint binary rather than
 // reasoned about. ESLint would answer the opposite on all four.
 func TestIsInPagesDirectory(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		filePath string
@@ -251,6 +261,7 @@ func TestIsInPagesDirectory(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if got := IsInPagesDirectory(testCase.filePath); got != testCase.want {
 				t.Fatalf("%q: want %v, got %v", testCase.filePath, testCase.want, got)
 			}
@@ -264,6 +275,7 @@ func TestIsInPagesDirectory(t *testing.T) {
 // backslash path whose verdict on a non-Windows host is an accident of PathBuf rather than a
 // decision.
 func TestIsInPagesDirectoryHandlesBothSeparators(t *testing.T) {
+	t.Parallel()
 	pairs := [][2]string{
 		{"pages/index.tsx", `pages\index.tsx`},
 		{"pages/api/user.ts", `pages\api\user.ts`},

@@ -84,6 +84,7 @@ func TestNetworkRequireHookVariablesTypeFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkRequireHookVariablesType, variablesFile,
 				variablesDeclarations+testCase.sourceText), testCase.wantIds...)
 		})
@@ -200,6 +201,7 @@ func TestNetworkRequireHookVariablesTypeStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkRequireHookVariablesType, variablesFile,
 				variablesDeclarations+testCase.sourceText))
 		})

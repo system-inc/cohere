@@ -128,6 +128,7 @@ func TestNoConstAssignFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoConstAssign, constAssignFile, testCase.sourceText),
 				testCase.wantIds...)
@@ -212,6 +213,7 @@ func TestNoConstAssignStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoConstAssign, constAssignFile, testCase.sourceText))
 		})
@@ -267,6 +269,7 @@ func TestNoConstAssignPointsAtTheWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoConstAssign, constAssignFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.want),

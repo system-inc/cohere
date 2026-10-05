@@ -54,6 +54,7 @@ func TestTripleSlashReferenceStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(testCase.configuration, func(t *testing.T) {
+			t.Parallel()
 			_ = index
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, TripleSlashReference,
 				tripleSlashFile, testCase.sourceText,
@@ -82,6 +83,7 @@ func TestTripleSlashReferenceFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.configuration, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
 				testCase.sourceText, decodeTripleSlashOptions(t, testCase.configuration))
 			expected := make([]string, testCase.count)
@@ -124,6 +126,7 @@ func TestTripleSlashReferenceFiresOnCasesUpstreamDoesNotCover(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
 				testCase.sourceText, decodeTripleSlashOptions(t, testCase.configuration))
 			expected := make([]string, testCase.count)
@@ -177,6 +180,7 @@ func TestTripleSlashReferenceStaysSilentOnCasesUpstreamDoesNotCover(t *testing.T
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, TripleSlashReference,
 				tripleSlashFile, testCase.sourceText,
 				decodeTripleSlashOptions(t, testCase.configuration)))
@@ -206,6 +210,7 @@ func TestTripleSlashReferencePointsAtTheDirective(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
 				testCase.sourceText, decodeTripleSlashOptions(t, testCase.configuration))
 			if len(result.Diagnostics) != 1 {
@@ -246,6 +251,7 @@ func TestTripleSlashReferenceNamesTheModuleInItsMessage(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
 				testCase.sourceText, decodeTripleSlashOptions(t, testCase.configuration))
 			if len(result.Diagnostics) != 1 {
@@ -297,6 +303,7 @@ func TestTripleSlashReferenceKeepsTheLastOfTwoIdenticalDirectives(t *testing.T) 
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
 				testCase.sourceText, decodeTripleSlashOptions(t, "{}"))
 			if len(result.Diagnostics) != 1 {
@@ -415,6 +422,7 @@ func TestDecodeTripleSlashReferenceOptions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeTripleSlashReferenceOptions([]byte(testCase.configuration))
 			if err != nil {
 				t.Fatalf("could not decode: %v", err)
@@ -458,6 +466,7 @@ func TestTripleSlashReferenceUsesDefaultsWhenTheConfigNamesNoOptions(t *testing.
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// path defaults to never, so this must report.
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
@@ -537,6 +546,7 @@ func TestTripleSlashReferenceRefusesOptionsOfTheWrongType(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			defer func() {
 				if recover() == nil {
 					t.Fatal("expected options of the wrong type to panic rather than default")

@@ -60,6 +60,7 @@ func TestNoThrowLiteralStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile, testCase.sourceText))
 		})
@@ -93,6 +94,7 @@ func TestNoThrowLiteralFiresObject(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile, testCase.sourceText), "object")
 		})
@@ -115,6 +117,7 @@ func TestNoThrowLiteralFiresUndef(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile, testCase.sourceText), "undef")
 		})
@@ -135,21 +138,25 @@ func TestNoThrowLiteralHandlesShapesTheCorpusOmits(t *testing.T) {
 	t.Parallel()
 
 	t.Run("?? yields either operand, so an Error on the left is clean", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile,
 			"declare const foo: unknown;\nthrow new Error() ?? 'literal';\n"))
 	})
 
 	t.Run("?? with literals on both sides reports", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile,
 			"declare const foo: unknown;\nthrow 'a' ?? 'b';\n"), "object")
 	})
 
 	t.Run("??= yields either operand", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile,
 			"declare let foo: unknown;\nthrow foo ??= 'literal';\n"))
 	})
 
 	t.Run("a throw with no argument does not crash", func(t *testing.T) {
+		t.Parallel()
 		// Reporting or not is beside the point; not panicking is the assertion. The parser recovers
 		// from this and hands back a ThrowStatement whose Expression is nil.
 		rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile, "function f() { throw; }")

@@ -58,6 +58,7 @@ func TestNoUnusedLabelsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "unusedLabel"
@@ -101,6 +102,7 @@ func TestNoUnusedLabelsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText))
 		})
 	}
@@ -133,6 +135,7 @@ func TestNoUnusedLabelsPointsAtTheLabelOnly(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.reported) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.reported), len(result.Diagnostics))
@@ -195,6 +198,7 @@ func TestNoUnusedLabelsFixRemovesTheLabel(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t,
 				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
 		})
@@ -239,6 +243,7 @@ func TestNoUnusedLabelsDeclinesUnsafeFixes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("expected the label to still be reported, got no findings")
@@ -292,6 +297,7 @@ func TestNoUnusedLabelsDeclinesFixesInEveryDirectivePosition(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("expected the label to still be reported, got no findings")
@@ -331,6 +337,7 @@ func TestNoUnusedLabelsFixesOuterLabelsOverADirective(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t,
 				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
 		})
@@ -368,6 +375,7 @@ func TestNoUnusedLabelsFixesAStringOutsideDirectivePosition(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t,
 				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
 		})
@@ -406,6 +414,7 @@ func TestNoUnusedLabelsFixesDespiteACommentOutsideTheSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t,
 				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
 		})
@@ -470,6 +479,7 @@ func TestNoUnusedLabelsDoesNotLetAJumpEscapeItsFunction(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "unusedLabel")
 
@@ -537,6 +547,7 @@ func TestNoUnusedLabelsFixesWhenThePrecedingTokenTerminates(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t,
 				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
 		})

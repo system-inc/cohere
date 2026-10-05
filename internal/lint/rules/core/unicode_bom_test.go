@@ -64,6 +64,7 @@ func TestUnicodeBomFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, UnicodeBom, unicodeBomFile, testCase.sourceText,
 				decodedUnicodeBomOptions(t, testCase.options))
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
@@ -89,6 +90,7 @@ func TestUnicodeBomStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, UnicodeBom, unicodeBomFile, testCase.sourceText,
 				decodedUnicodeBomOptions(t, testCase.options))
 			rule_testing.ExpectClean(t, result)
@@ -115,6 +117,7 @@ func TestUnicodeBomReportsAtPositionZero(t *testing.T) {
 		{"the present mark under never", "\ufeff var a = 123;", "\"never\""},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, UnicodeBom, unicodeBomFile, testCase.sourceText,
 				decodedUnicodeBomOptions(t, testCase.options))
 			if len(result.Diagnostics) != 1 {
@@ -168,6 +171,7 @@ func TestDecodeUnicodeBomOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("empty input defaults to never", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeUnicodeBomOptions(nil)
 		if err != nil {
 			t.Fatalf("empty input should decode, got %v", err)
@@ -182,6 +186,7 @@ func TestDecodeUnicodeBomOptions(t *testing.T) {
 	})
 
 	t.Run("always decodes", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeUnicodeBomOptions(json.RawMessage(`"always"`))
 		if err != nil {
 			t.Fatalf("expected always to decode, got %v", err)
@@ -193,6 +198,7 @@ func TestDecodeUnicodeBomOptions(t *testing.T) {
 	})
 
 	t.Run("an unknown setting is an error naming the value", func(t *testing.T) {
+		t.Parallel()
 		_, err := DecodeUnicodeBomOptions(json.RawMessage(`"alway"`))
 		if err == nil {
 			t.Fatalf("expected an error for an unrecognised setting")
@@ -203,6 +209,7 @@ func TestDecodeUnicodeBomOptions(t *testing.T) {
 	})
 
 	t.Run("the wrong wire shape is an error", func(t *testing.T) {
+		t.Parallel()
 		// Upstream's own spelling is `["always"]`. cohere strips the tuple, so an array arriving
 		// here means the config layer's contract changed, and that should fail loudly rather than
 		// quietly enforcing the default.
@@ -212,6 +219,7 @@ func TestDecodeUnicodeBomOptions(t *testing.T) {
 	})
 
 	t.Run("nil options reach the rule as never", func(t *testing.T) {
+		t.Parallel()
 		// Past the decoder rather than through it: this is what a bare `"error"` produces after the
 		// config layer has turned the decoder's error into nil.
 		result := rule_testing.RunWithOptions(t, UnicodeBom, unicodeBomFile, "\ufeff var a = 123;", nil)
@@ -245,6 +253,7 @@ func TestUnicodeBomOnAnEmptyFile(t *testing.T) {
 	t.Parallel()
 
 	t.Run("always", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(t, UnicodeBom, unicodeBomFile, "",
 			decodedUnicodeBomOptions(t, "\"always\""))
 		rule_testing.ExpectFindings(t, result, "expected")
@@ -252,6 +261,7 @@ func TestUnicodeBomOnAnEmptyFile(t *testing.T) {
 	})
 
 	t.Run("never", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(t, UnicodeBom, unicodeBomFile, "",
 			decodedUnicodeBomOptions(t, "\"never\""))
 		rule_testing.ExpectClean(t, result)

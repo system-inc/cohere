@@ -45,6 +45,7 @@ func TestNoUnsafeUnaryMinusStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeUnaryMinus,
 				noUnsafeUnaryMinusFile, testCase.sourceText))
 		})
@@ -74,6 +75,7 @@ func TestNoUnsafeUnaryMinusFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnsafeUnaryMinus,
 				noUnsafeUnaryMinusFile, testCase.sourceText), "unaryMinus")
 		})
@@ -135,6 +137,7 @@ func TestNoUnsafeUnaryMinusTypeBoundary(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -192,6 +195,7 @@ func TestNoUnsafeUnaryMinusSpansAndText(t *testing.T) {
 	t.Parallel()
 
 	t.Run("the finding spans the whole unary expression, not the operand", func(t *testing.T) {
+		t.Parallel()
 		source := "declare const a: string;\nconst negated = -a;"
 		result := rule_testing.RunTyped(t, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
 		if len(result.Diagnostics) != 1 {
@@ -211,6 +215,7 @@ func TestNoUnsafeUnaryMinusSpansAndText(t *testing.T) {
 	})
 
 	t.Run("the span includes parentheses around the operand", func(t *testing.T) {
+		t.Parallel()
 		// Our parser keeps the parenthesized expression as a real node and upstream's does too, so
 		// the operand is the ParenthesizedExpression and the report covers it. Measured against
 		// `@typescript-eslint`, which spans `-(a)` here as well. This is written down because the
@@ -227,6 +232,7 @@ func TestNoUnsafeUnaryMinusSpansAndText(t *testing.T) {
 	})
 
 	t.Run("a parenthesized whole expression reports the inner span", func(t *testing.T) {
+		t.Parallel()
 		source := "declare const a: string;\nconst negated = (-a);"
 		result := rule_testing.RunTyped(t, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
 		if len(result.Diagnostics) != 1 {
@@ -239,6 +245,7 @@ func TestNoUnsafeUnaryMinusSpansAndText(t *testing.T) {
 	})
 
 	t.Run("the message names the offending union part rather than the whole type", func(t *testing.T) {
+		t.Parallel()
 		// This is the measured divergence from `@typescript-eslint`, which renders
 		// "is string | number instead" for the same input because it passes the WHOLE argument type
 		// to typeToString while tsgolint passes the loop's current part. tsgolint wins because
@@ -254,6 +261,7 @@ func TestNoUnsafeUnaryMinusSpansAndText(t *testing.T) {
 	})
 
 	t.Run("a boolean renders as false because boolean is the union false or true", func(t *testing.T) {
+		t.Parallel()
 		// Nothing about this input looks like a union, and this row was not predicted from reading
 		// either implementation. `@typescript-eslint` renders "is boolean instead" here. It is the
 		// clearest evidence that the union walk is what produces the text, and no fixture asserting
@@ -269,6 +277,7 @@ func TestNoUnsafeUnaryMinusSpansAndText(t *testing.T) {
 	})
 
 	t.Run("each unsafe expression reports separately", func(t *testing.T) {
+		t.Parallel()
 		// The rule `break`s within one expression's union walk, so at most one finding per
 		// expression, but two expressions produce two findings at two different offsets. Without
 		// the offset comparison a rule reporting the same node twice would pass this.

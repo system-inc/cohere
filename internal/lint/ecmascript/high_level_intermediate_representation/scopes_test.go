@@ -80,6 +80,7 @@ func TestScopeHullMatchesReact(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// Build a function whose identifiers carry exactly these ranges, and a set unioning
 			// them into one class. Synthetic rather than lowered, because the point is to pin the
 			// merge arithmetic against React's, and a lowered input cannot be made to produce an

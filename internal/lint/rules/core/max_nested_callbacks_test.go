@@ -54,6 +54,7 @@ func TestMaxNestedCallbacksStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, MaxNestedCallbacks,
 				"file.ts", testCase.source, decodeMaxNestedCallbacksForTest(t, testCase.optionsJson)))
 		})
@@ -216,6 +217,7 @@ func TestMaxNestedCallbacksFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, MaxNestedCallbacks, "file.ts",
 				testCase.source, decodeMaxNestedCallbacksForTest(t, testCase.optionsJson))
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -275,6 +277,7 @@ func TestDecodeMaxNestedCallbacksOptions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeMaxNestedCallbacksOptions([]byte(testCase.optionsJson))
 			if err != nil {
 				t.Fatalf("decoding %q: %v", testCase.optionsJson, err)
@@ -362,6 +365,7 @@ func TestMaxNestedCallbacksDirectCalleeIsNotACallback(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunWithOptions(t, MaxNestedCallbacks, "file.ts", testCase.source, zero))
 		})
@@ -370,6 +374,7 @@ func TestMaxNestedCallbacksDirectCalleeIsNotACallback(t *testing.T) {
 	// The callee is still not counted while its own argument is, so this reports exactly once and
 	// points at the argument. A rule counting the callee would report twice.
 	t.Run("theArgumentOfADirectCalleeStillCounts", func(t *testing.T) {
+		t.Parallel()
 		source := "!function(){}(function(){});"
 		result := rule_testing.RunWithOptions(t, MaxNestedCallbacks, "file.ts", source, zero)
 		if len(result.Diagnostics) != 1 {

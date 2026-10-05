@@ -212,6 +212,7 @@ func TestNoConfusingVoidExpressionFires(t *testing.T) {
 
 	for _, testCase := range noConfusingVoidExpressionFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := runNoConfusingVoidExpressionCase(t, testCase)
 			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
 
@@ -248,6 +249,7 @@ func TestNoConfusingVoidExpressionStaysSilent(t *testing.T) {
 
 	for _, testCase := range noConfusingVoidExpressionCleanCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runNoConfusingVoidExpressionCase(t, testCase))
 		})
 	}
@@ -297,6 +299,7 @@ func TestNoConfusingVoidExpressionJudgesVoidNotUndefined(t *testing.T) {
 		{name: "RandomSleep.test.ts:250, awaiting Promise<void>", source: "async function f() { const result = await randomSleep(100, 200); }", messageIds: []string{"invalidVoidExpr"}},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoConfusingVoidExpression,
 				noConfusingVoidExpressionFile,
 				noConfusingVoidExpressionAmbientGlobals+declarations+testCase.source, nil)
@@ -339,6 +342,7 @@ func TestNoConfusingVoidExpressionDeclinesToRepairOverAComment(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoConfusingVoidExpression,
 				noConfusingVoidExpressionFile,
 				noConfusingVoidExpressionAmbientGlobals+testCase.source, nil)
@@ -390,6 +394,7 @@ func TestNoConfusingVoidExpressionVoidReturningIsVoidNotVoidLike(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoConfusingVoidExpression,
 				noConfusingVoidExpressionFile,
 				noConfusingVoidExpressionAmbientGlobals+testCase.source,

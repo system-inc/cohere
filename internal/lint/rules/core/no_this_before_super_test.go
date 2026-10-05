@@ -105,6 +105,7 @@ func TestNoThisBeforeSuperFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText),
 				"thisBeforeSuper")
@@ -219,6 +220,7 @@ func TestNoThisBeforeSuperStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText))
 		})
@@ -262,6 +264,7 @@ func TestNoThisBeforeSuperReportsAtTheConstructor(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
@@ -438,6 +441,7 @@ func TestNoThisBeforeSuperFiresOnCasesUpstreamOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText),
 				"thisBeforeSuper")
@@ -540,6 +544,7 @@ func TestNoThisBeforeSuperStaysSilentOnCasesUpstreamOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText))
 		})
@@ -563,6 +568,7 @@ func TestNoThisBeforeSuperKeepsTheCallAcrossElselessIfs(t *testing.T) {
 	}
 	for _, blocks := range []int{1, 2, 6} {
 		t.Run(fmt.Sprintf("super first, then %d else-less ifs", blocks), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, constructor(blocks)))
 		})
 	}
@@ -575,6 +581,7 @@ func TestNoThisBeforeSuperKeepsTheCallAcrossElselessIfs(t *testing.T) {
 	}
 	for _, testCase := range reporting {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText), "thisBeforeSuper")
 		})
 	}

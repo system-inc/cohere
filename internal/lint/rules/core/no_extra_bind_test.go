@@ -116,6 +116,7 @@ func TestNoExtraBindFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoExtraBind, extraBindFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "unexpected")
 
@@ -215,6 +216,7 @@ func TestNoExtraBindStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExtraBind, extraBindFile, testCase.sourceText))
 		})
 	}
@@ -241,6 +243,7 @@ func TestNoExtraBindRepairKeepsWhatSitsBetweenTheTwoSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoExtraBind, extraBindFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "unexpected")
 			rule_testing.ExpectFixedSource(t, result, testCase.fixedSource)

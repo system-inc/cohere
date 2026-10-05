@@ -341,6 +341,7 @@ func TestPhiNonMutabilityControlsUnknownCallScopes(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, ranges := rangesFor(t, testCase.source)
 			call, phi := unknownCallAndArgumentPhi(t, function, "opaque")
 			set := FindDisjointMutableValuesWithRanges(function, ranges)
@@ -433,6 +434,7 @@ func TestMutatingMethodReceiverSurvivesArgumentControlFlow(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, ranges := rangesFor(t, testCase.source)
 			var call *Instruction
 			var method *MethodCall
@@ -596,6 +598,7 @@ func TestAliasingRefinementMatchesAbstractKinds(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function := NewFunction(nil, "helper", FunctionKindOther)
 			block := function.NewBlock(BlockKindBlock)
 			function.Entry = block.Id

@@ -183,6 +183,7 @@ func TestNoImpliedEvalFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := runImpliedEvalWithGlobals(t, testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.ids...)
 		})
@@ -258,6 +259,7 @@ func TestNoImpliedEvalStaysSilentWithGlobalsDeclared(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := runImpliedEvalWithGlobals(t, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -317,6 +319,7 @@ func TestNoImpliedEvalStaysSilentWithoutGlobalsDeclared(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := runImpliedEvalWithoutGlobals(t, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -361,6 +364,7 @@ func TestNoImpliedEvalDivergesFromUpstreamOnStaticValues(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := runImpliedEvalWithGlobals(t, testCase.source)
 			rule_testing.ExpectClean(t, result)
 			if len(testCase.upstreamIds) == 0 {
@@ -420,6 +424,7 @@ func TestNoImpliedEvalReportsGlobalThisUpstreamGatesByEcmaVersion(t *testing.T) 
 
 	for _, testCase := range cases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := runImpliedEvalWithGlobals(t, testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.ids...)
 			if testCase.upstreamEcmaVersion == "" {
@@ -470,6 +475,7 @@ declare var top: ImpliedEvalOrdinaryObject;
 	}
 	for _, source := range silent {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedFiles(t, NoImpliedEval, map[string]string{
 				"globals.d.ts": nonCandidateGlobals,
 				"subject.ts":   source,
@@ -481,6 +487,7 @@ declare var top: ImpliedEvalOrdinaryObject;
 	// The control for the four cases above: the same shape with a candidate receiver reports, so
 	// their silence is the name check rather than the program being wrong or the rule being inert.
 	t.Run("control: a candidate receiver in the same program reports", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTypedFiles(t, NoImpliedEval, map[string]string{
 			"globals.d.ts": nonCandidateGlobals + impliedEvalAmbientGlobals,
 			"subject.ts":   "window.setTimeout('x = 1;')",
@@ -516,6 +523,7 @@ func TestNoImpliedEvalDeclinesAVariableBracketKey(t *testing.T) {
 	}
 	for _, source := range silent {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			result := runImpliedEvalWithGlobals(t, source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -524,6 +532,7 @@ func TestNoImpliedEvalDeclinesAVariableBracketKey(t *testing.T) {
 	// The control: the same receiver and the same property, spelled as a string, reports. Without
 	// this the four cases above would pass equally well against a rule that had gone inert.
 	t.Run("control: the same property as a string key reports", func(t *testing.T) {
+		t.Parallel()
 		result := runImpliedEvalWithGlobals(t, "window['setTimeout']('x = 1;')")
 		rule_testing.ExpectFindings(t, result, "impliedEval")
 	})
@@ -577,6 +586,7 @@ declare var self: ImpliedEvalChainObject;
 	}
 	for _, source := range silent {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, run(t, source))
 		})
 	}
@@ -588,6 +598,7 @@ declare var self: ImpliedEvalChainObject;
 		"self.self.setInterval('x = 1;')",
 	} {
 		t.Run("control: "+source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, run(t, source), "impliedEval")
 		})
 	}
@@ -625,6 +636,7 @@ func TestNoImpliedEvalReadsThroughParenthesesOnTheArgument(t *testing.T) {
 	}
 	for _, source := range firing {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			result := runImpliedEvalWithGlobals(t, source)
 			rule_testing.ExpectFindings(t, result, "impliedEval")
 		})
@@ -637,6 +649,7 @@ func TestNoImpliedEvalReadsThroughParenthesesOnTheArgument(t *testing.T) {
 		"setTimeout((function() {}))",
 	} {
 		t.Run("control: "+source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runImpliedEvalWithGlobals(t, source))
 		})
 	}
@@ -670,6 +683,7 @@ func TestNoImpliedEvalReadsThroughParenthesesOnTheReceiver(t *testing.T) {
 	}
 	for _, source := range firing {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			result := runImpliedEvalWithGlobals(t, source)
 			rule_testing.ExpectFindings(t, result, "impliedEval")
 		})
@@ -679,6 +693,7 @@ func TestNoImpliedEvalReadsThroughParenthesesOnTheReceiver(t *testing.T) {
 	// the cases above are the unwrap reaching a candidate rather than parentheses being waved
 	// through.
 	t.Run("control: a parenthesized non-candidate receiver stays silent", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, runImpliedEvalWithGlobals(t, "(foo).setTimeout('x = 1;')"))
 	})
 }
@@ -737,6 +752,7 @@ func TestNoImpliedEvalDoesNotCrashOnACallWithNoArguments(t *testing.T) {
 	}
 	for _, source := range sources {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			// Not asserting the verdict, only that the rule survives the shape. A panic here takes
 			// every rule's verdict on the file, not just this one's.
 			runImpliedEvalWithGlobals(t, source)
@@ -781,6 +797,7 @@ func TestNoImpliedEvalReportsTheWholeCallAndSaysWhy(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := runImpliedEvalWithGlobals(t, testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))

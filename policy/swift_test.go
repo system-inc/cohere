@@ -12,6 +12,7 @@ import (
 // files as they stand, so a word added to a policy file and not regenerated fails here as well as in the
 // Swift tests.
 func TestSwiftFilesAreCurrent(t *testing.T) {
+	t.Parallel()
 	files, err := SwiftFiles()
 	if err != nil {
 		t.Fatal(err)
@@ -34,6 +35,7 @@ func TestSwiftFilesAreCurrent(t *testing.T) {
 // TestAbbreviationsFileHandsOutACopy writes into what AbbreviationsFile returns and asks again. Handing
 // out the embedded slice itself would let one caller change the words every later caller reads.
 func TestAbbreviationsFileHandsOutACopy(t *testing.T) {
+	t.Parallel()
 	handedOut := AbbreviationsFile()
 	if len(handedOut) == 0 || !bytes.Equal(handedOut, abbreviationsFile) {
 		t.Fatalf("AbbreviationsFile is not the embedded file (%d bytes, embedded %d)", len(handedOut), len(abbreviationsFile))
@@ -47,6 +49,7 @@ func TestAbbreviationsFileHandsOutACopy(t *testing.T) {
 // TestSwiftSourceOutrunsTheText: the raw string's delimiter has more `#` than any run in the text, so a
 // `"""#` or a `\#` in a policy file stays text instead of ending the string or starting an escape.
 func TestSwiftSourceOutrunsTheText(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		text      string
 		delimiter string
@@ -71,6 +74,7 @@ func TestSwiftSourceOutrunsTheText(t *testing.T) {
 // TestSwiftSourceIndentsTheLinesItCarries: each line of text sits at the closing delimiter's indentation,
 // which Swift strips, and an empty line stays empty, so the string is the text and the file is formatted.
 func TestSwiftSourceIndentsTheLinesItCarries(t *testing.T) {
+	t.Parallel()
 	source, err := swiftSource("Test.json", "PolicyTest", []byte("{\n\n    \"a\": 1\n}\n"))
 	if err != nil {
 		t.Fatal(err)
@@ -85,6 +89,7 @@ func TestSwiftSourceIndentsTheLinesItCarries(t *testing.T) {
 // TestSwiftSourceRefusesACarriageReturn: a Swift multi-line string reads a carriage return as a line feed,
 // so the compiled-in text would differ from the file.
 func TestSwiftSourceRefusesACarriageReturn(t *testing.T) {
+	t.Parallel()
 	if _, err := swiftSource("Test.json", "PolicyTest", []byte("{}\r\n")); err == nil {
 		t.Error("a file with a carriage return was generated")
 	}

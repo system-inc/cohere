@@ -15,6 +15,7 @@ import (
 // module and asked the go command for its cache. The run itself fails afterwards, having no commit to
 // build, which the trim never waits on.
 func TestARunStartsTheDefaultGoCacheTrim(t *testing.T) {
+	t.Parallel()
 	binaries := t.TempDir()
 	dispatcher := filepath.Join(binaries, "cohere-dispatch")
 	if combined, err := exec.Command("go", "build", "-o", dispatcher, ".").CombinedOutput(); err != nil {

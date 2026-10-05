@@ -59,6 +59,7 @@ func TestNoPrototypeBuiltinsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText),
 				"noPrototypeBuiltins")
@@ -119,6 +120,7 @@ func TestNoPrototypeBuiltinsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText))
 		})
@@ -147,6 +149,7 @@ func TestNoPrototypeBuiltinsHandlesTypeScriptReceivers(t *testing.T) {
 
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText),
 				"noPrototypeBuiltins")
@@ -157,6 +160,7 @@ func TestNoPrototypeBuiltinsHandlesTypeScriptReceivers(t *testing.T) {
 	// receiver, and defining `hasOwnProperty` on your own class is how you would legitimately
 	// provide it. Nothing in the imported corpus covers a class body.
 	t.Run("a class declaring the method itself", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile,
 			"class C { hasOwnProperty(key: string) { return false; } }"))
 	})
@@ -164,6 +168,7 @@ func TestNoPrototypeBuiltinsHandlesTypeScriptReceivers(t *testing.T) {
 	// Two receivers in one file report twice. Nothing upstream carries more than one finding per
 	// input, so the rule's per-call behavior is otherwise unmeasured.
 	t.Run("two calls in one file report twice", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile,
 			"foo.hasOwnProperty('a');\nbar.isPrototypeOf(baz);\n"),
 			"noPrototypeBuiltins", "noPrototypeBuiltins")
@@ -207,6 +212,7 @@ func TestNoPrototypeBuiltinsPointsAtTheMemberExpression(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))

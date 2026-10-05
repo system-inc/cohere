@@ -40,6 +40,7 @@ func expectSame(t *testing.T, label string, got []string, want []string) {
 // ordering, and the loser is reported with the winner named — a refusal nobody can attribute is
 // not actionable.
 func TestOverlappingFixesDoNotBothApply(t *testing.T) {
+	t.Parallel()
 	plan := Resolve([]Proposal{
 		proposal("rule-a", 10, 20, "AAA"),
 		proposal("rule-b", 15, 25, "BBB"),
@@ -62,6 +63,7 @@ func TestOverlappingFixesDoNotBothApply(t *testing.T) {
 // changes with map iteration order produces a file that differs run to run, which is worse than
 // either outcome it is choosing between.
 func TestOverlapResolutionIsOrderIndependent(t *testing.T) {
+	t.Parallel()
 	forward := Resolve([]Proposal{
 		proposal("rule-a", 10, 20, "AAA"),
 		proposal("rule-b", 15, 25, "BBB"),
@@ -78,6 +80,7 @@ func TestOverlapResolutionIsOrderIndependent(t *testing.T) {
 // A fix fully containing another is still an overlap. This is the case a naive "do the ranges share
 // a byte" check gets right and a naive "do they start in the same place" check gets wrong.
 func TestNestedFixesDoNotBothApply(t *testing.T) {
+	t.Parallel()
 	plan := Resolve([]Proposal{
 		proposal("outer", 10, 40, "OUTER"),
 		proposal("inner", 20, 25, "INNER"),
@@ -92,6 +95,7 @@ func TestNestedFixesDoNotBothApply(t *testing.T) {
 // Adjacent fixes are not overlapping and both must land, or the engine would refuse most of the
 // real work: two rules fixing consecutive tokens is the common case, not the exception.
 func TestAdjacentFixesBothApply(t *testing.T) {
+	t.Parallel()
 	plan := Resolve([]Proposal{
 		proposal("rule-a", 10, 20, "AAA"),
 		proposal("rule-b", 20, 30, "BBB"),
@@ -106,6 +110,7 @@ func TestAdjacentFixesBothApply(t *testing.T) {
 // Two insertions at the same point are an overlap even though neither consumes a byte. Which one
 // goes first is unresolvable and the interleaving is invisible in a diff, so the second is refused.
 func TestTwoInsertionsAtOnePointDoNotBothApply(t *testing.T) {
+	t.Parallel()
 	plan := Resolve([]Proposal{
 		proposal("rule-a", 10, 10, "AAA"),
 		proposal("rule-b", 10, 10, "BBB"),
@@ -138,6 +143,7 @@ func TestTwoInsertionsAtOnePointDoNotBothApply(t *testing.T) {
 // whether or not trivia is trimmed, because trimming only ever moves a start rightward and never
 // moves an end. The assertion below is on that invariant rather than on any particular parse.
 func TestTrimmingAStartCannotDissolveARealOverlap(t *testing.T) {
+	t.Parallel()
 	// Two fixes whose token spans genuinely intersect.
 	untrimmed := Resolve([]Proposal{
 		proposal("rule-a", 10, 25, "AAA"),
@@ -165,6 +171,7 @@ func TestTrimmingAStartCannotDissolveARealOverlap(t *testing.T) {
 // to back would place the second and third edits wrong by the length delta of everything before
 // them, and the failure is silent — the file still parses, it just says something else.
 func TestThreeFixesKeepTheirOffsets(t *testing.T) {
+	t.Parallel()
 	source := "const alpha = 1; const beta = 2; const gamma = 3;"
 	//         0123456789...
 	//         alpha at 6..11, beta at 23..27, gamma at 39..44
@@ -195,6 +202,7 @@ func TestThreeFixesKeepTheirOffsets(t *testing.T) {
 // A range that points outside the text is refused rather than applied. A rule computing against a
 // stale parse produces exactly this, and slicing on it would panic or silently truncate the file.
 func TestOutOfBoundsRangeIsRefused(t *testing.T) {
+	t.Parallel()
 	source := "const a = 1;"
 
 	rewritten, validated := applyToText(source, Plan{Applied: []Proposal{
@@ -214,6 +222,7 @@ func TestOutOfBoundsRangeIsRefused(t *testing.T) {
 
 // An inverted range is refused for the same reason, and would slice-panic if it were not.
 func TestInvertedRangeIsRefused(t *testing.T) {
+	t.Parallel()
 	source := "const a = 1;"
 
 	_, validated := applyToText(source, Plan{Applied: []Proposal{
@@ -229,6 +238,7 @@ func TestInvertedRangeIsRefused(t *testing.T) {
 // that changed nothing report as a run that changed something, and would keep the convergence loop
 // spinning on a rule that proposes it every pass.
 func TestNoOpFixIsRefused(t *testing.T) {
+	t.Parallel()
 	source := "const a = 1;"
 
 	rewritten, validated := applyToText(source, Plan{Applied: []Proposal{
@@ -250,6 +260,7 @@ func TestNoOpFixIsRefused(t *testing.T) {
 // code means and needs a human to agree, so a fixer that applied them unattended would be changing
 // behavior nobody chose.
 func TestProposalsFromIgnoresSuggestions(t *testing.T) {
+	t.Parallel()
 	diagnostics := []rule.Diagnostic{{
 		RuleName: "rule-a",
 		Fixes:    []rule.Fix{{Range: core.NewTextRange(0, 1), Text: "x"}},

@@ -150,6 +150,7 @@ func TestConstructorSuperFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				testCase.messageId)
@@ -279,6 +280,7 @@ func TestConstructorSuperStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText))
 		})
@@ -331,6 +333,7 @@ func TestConstructorSuperPointsAtTheRightNode(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("expected %d findings, got %d: %v",
@@ -439,6 +442,7 @@ func TestConstructorSuperRendersItsMessages(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected 1 finding, got %d: %v",
@@ -484,6 +488,7 @@ func TestConstructorSuperClassifiesUnconstructableExtends(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				"badSuper")
@@ -517,6 +522,7 @@ func TestConstructorSuperAcceptsConstructableExtendsOurCodeWrites(t *testing.T) 
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText))
 		})
@@ -575,6 +581,7 @@ func TestConstructorSuperIgnoresCallsInNestedEvaluationContexts(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				"missingAll")
@@ -618,6 +625,7 @@ func TestConstructorSuperHandlesBaseAndNullExtendsSeparately(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -714,6 +722,7 @@ func TestConstructorSuperAcceptsAMixedShortCircuit(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText))
 		})
@@ -766,6 +775,7 @@ func TestConstructorSuperTreatsLoopBodiesAsOneIteration(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				testCase.wantIds...)
@@ -815,6 +825,7 @@ func TestConstructorSuperReportsEveryBadCall(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				"badSuper", "badSuper")
@@ -849,6 +860,7 @@ func TestConstructorSuperRequiresARealValueFromAnExtendsNullConstructor(t *testi
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				"missingAll")

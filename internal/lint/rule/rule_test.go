@@ -9,10 +9,12 @@ import (
 // The fix helpers are pure range arithmetic, and getting one off by a byte silently corrupts source
 // rather than failing loudly. These pin the arithmetic so a refactor cannot quietly move it.
 func TestFixHelperRanges(t *testing.T) {
+	t.Parallel()
 	// A node spanning bytes [10, 20).
 	span := core.NewTextRange(10, 20)
 
 	t.Run("ReplaceRange keeps the span and carries the text", func(t *testing.T) {
+		t.Parallel()
 		fix := ReplaceRange(span, "replacement")
 		if fix.Range.Pos() != 10 || fix.Range.End() != 20 {
 			t.Fatalf("expected [10,20), got [%d,%d)", fix.Range.Pos(), fix.Range.End())
@@ -23,6 +25,7 @@ func TestFixHelperRanges(t *testing.T) {
 	})
 
 	t.Run("a deletion is an empty replacement", func(t *testing.T) {
+		t.Parallel()
 		fix := ReplaceRange(span, "")
 		if fix.Text != "" {
 			t.Fatalf("expected empty text for a deletion, got %q", fix.Text)
@@ -33,6 +36,7 @@ func TestFixHelperRanges(t *testing.T) {
 	})
 
 	t.Run("an insertion point is empty, so it overwrites nothing", func(t *testing.T) {
+		t.Parallel()
 		// This is the property that matters: an insertion must be a zero-width range. A range of
 		// any width would replace the bytes it covers, which is how an "insert" silently becomes a
 		// deletion of whatever it was inserted next to.
@@ -57,6 +61,7 @@ func TestFixHelperRanges(t *testing.T) {
 // A rule that returns no listeners has declined the file, and that must be distinguishable from a
 // rule that listened and found nothing. The first costs nothing; the second walked the tree.
 func TestRuleMayDeclineAFile(t *testing.T) {
+	t.Parallel()
 	declining := Rule{
 		Name: "declines-everything",
 		Run: func(ctx Context, options any) Listeners {
@@ -76,6 +81,7 @@ func TestRuleMayDeclineAFile(t *testing.T) {
 // wrong thing to make a rule author do: every hand-rolled Diagnostic is a place the Range can be
 // built from `Loc` instead of `TokenRange` without anything downstream noticing.
 func TestReportRangeWithSuggestionsCarriesBoth(t *testing.T) {
+	t.Parallel()
 	reported := []Diagnostic{}
 	context := Context{Report: func(diagnostic Diagnostic) {
 		reported = append(reported, diagnostic)
@@ -105,6 +111,7 @@ func TestReportRangeWithSuggestionsCarriesBoth(t *testing.T) {
 // second. A helper that quietly populated Fixes would make every suggestion an automatic rewrite,
 // which is the one distinction this whole API exists to hold.
 func TestReportRangeWithSuggestionsProposesNoFixes(t *testing.T) {
+	t.Parallel()
 	reported := []Diagnostic{}
 	context := Context{Report: func(diagnostic Diagnostic) {
 		reported = append(reported, diagnostic)

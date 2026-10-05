@@ -62,6 +62,7 @@ func outline(node *estree.Node) string {
 }
 
 func TestParseShapes(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		text string
@@ -127,6 +128,7 @@ func TestParseShapes(t *testing.T) {
 }
 
 func TestParseStringValues(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		text string
@@ -156,6 +158,7 @@ func TestParseStringValues(t *testing.T) {
 }
 
 func TestParseComments(t *testing.T) {
+	t.Parallel()
 	text := "# one 😀\n{ a # two\n}\n#"
 	_, comments, err := Parse(text)
 	if err != nil {
@@ -172,6 +175,7 @@ func TestParseComments(t *testing.T) {
 }
 
 func TestParseErrors(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		text string
 		want string

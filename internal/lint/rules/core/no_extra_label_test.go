@@ -48,6 +48,7 @@ func TestNoExtraLabelFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoExtraLabel, extraLabelFile, testCase.sourceText), "unexpected")
 		})
@@ -88,6 +89,7 @@ func TestNoExtraLabelStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoExtraLabel, extraLabelFile, testCase.sourceText))
 		})
@@ -127,6 +129,7 @@ func TestNoExtraLabelFixes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t,
 				rule_testing.Run(t, NoExtraLabel, extraLabelFile, testCase.sourceText), testCase.wantSource)
 		})
@@ -154,6 +157,7 @@ func TestNoExtraLabelDeclinesToFixOverAComment(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoExtraLabel, extraLabelFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "unexpected")
 			// The decline is asserted as the ABSENCE of a proposal rather than through
@@ -231,6 +235,7 @@ func TestNoExtraLabelStopsAtALabeledBlockOfTheSameName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "unexpected"

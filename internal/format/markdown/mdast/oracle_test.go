@@ -281,6 +281,7 @@ var treeFixtures = []string{
 }
 
 func TestTreesMatchUpstream(t *testing.T) {
+	t.Parallel()
 	oracle := newTreeOracle(t)
 	for _, text := range treeFixtures {
 		if difference := compareTree(oracle, text); difference != "" {
@@ -291,6 +292,7 @@ func TestTreesMatchUpstream(t *testing.T) {
 
 // TestTreeOracleCanFail: the comparison must see a wrong node and a wrong offset.
 func TestTreeOracleCanFail(t *testing.T) {
+	t.Parallel()
 	oracle := newTreeOracle(t)
 	expected, err := oracle.parse("*a*")
 	if err != nil {
@@ -307,6 +309,7 @@ func TestTreeOracleCanFail(t *testing.T) {
 
 // TestCorpusTreesMatchUpstream compares every .md file under COHERE_MARKDOWN_CORPUS.
 func TestCorpusTreesMatchUpstream(t *testing.T) {
+	t.Parallel()
 	root := os.Getenv("COHERE_MARKDOWN_CORPUS")
 	if root == "" {
 		t.Skip("set COHERE_MARKDOWN_CORPUS to a directory to compare every .md file under it")

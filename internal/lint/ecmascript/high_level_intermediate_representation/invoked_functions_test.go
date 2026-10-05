@@ -136,6 +136,7 @@ func TestAssumedInvokedFunctionsRecognisesEachCallShape(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, invoked := invokedFor(t, testCase.source)
 			if len(function.Functions) == 0 {
 				t.Fatal("the fixture lowered no nested function, so nothing here could be invoked")

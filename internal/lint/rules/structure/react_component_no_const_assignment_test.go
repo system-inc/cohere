@@ -50,6 +50,7 @@ func TestReactComponentNoConstAssignmentFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ReactComponentNoConstAssignment, constAssignmentFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
@@ -90,6 +91,7 @@ func TestReactComponentNoConstAssignmentStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, ReactComponentNoConstAssignment, testCase.fileName, testCase.sourceText))
 		})

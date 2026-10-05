@@ -26,6 +26,7 @@ return <div onClick={callback}/>;
 		{"no later call", strings.Replace(source, "consume(item);", "", 1), 0},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			findings, lowered := findingsForSource(t, testCase.source)
 			if !lowered || len(findings) != testCase.findings {
 				t.Fatalf("lowered=%t findings=%v, want %d findings", lowered, findings, testCase.findings)
@@ -44,6 +45,7 @@ func TestComputedLoadCopiesReceiverKind(t *testing.T) {
 		{"ordinary", EffectValueMutable},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, effects := effectsFor(t, "function "+testCase.name+"(items, key) { return items[key]; }")
 			state, _ := buildAliasingGraph(function, effects)
 			matched := 0

@@ -479,6 +479,7 @@ func (source classOrderCorruptedSource) Reading(className string) (Reading, bool
 
 // TestClassOrderDifferential is the Tier 2 run: every class, both design systems, end to end.
 func TestClassOrderDifferential(t *testing.T) {
+	t.Parallel()
 	fixture := classOrderLoadFixture(t)
 
 	systems := make([]SystemCases, 0, len(fixture.Systems))
@@ -819,6 +820,7 @@ func classOrderSystemNamed(fixture *classOrderFixture, name string) *classOrderS
 // repository: `max-w-screen` is advertised by www-connected-app's registry and not by ahra's, so
 // demanding it fire on ahra would fail the suite for being correct.
 func TestClassOrderAcknowledgementsAreStillEarned(t *testing.T) {
+	t.Parallel()
 	fixture := classOrderLoadFixture(t)
 
 	exercised := map[string]int{}

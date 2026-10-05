@@ -70,6 +70,7 @@ func TestReactHookNoDestructuringFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactHookNoDestructuring, hookDestructuringFile,
 				hookDestructuringDeclarations+testCase.sourceText), "noDestructuringInHook")
 		})
@@ -141,6 +142,7 @@ func TestReactHookNoDestructuringStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactHookNoDestructuring, hookDestructuringFile,
 				hookDestructuringDeclarations+testCase.sourceText))
 		})

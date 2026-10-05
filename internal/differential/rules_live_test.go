@@ -15,6 +15,7 @@ import (
 //
 //	COHERE_BINARY=/tmp/cohere-head COHERE_TREE=~/Projects/ahra go test -run TestCompiledRulesAgainstARealBinary ./internal/differential/
 func TestCompiledRulesAgainstARealBinary(t *testing.T) {
+	t.Parallel()
 	binary := os.Getenv("COHERE_BINARY")
 	tree := os.Getenv("COHERE_TREE")
 	explainFile := os.Getenv("COHERE_EXPLAIN_FILE")

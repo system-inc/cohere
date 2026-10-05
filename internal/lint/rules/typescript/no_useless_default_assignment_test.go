@@ -107,6 +107,7 @@ func TestNoUselessDefaultAssignmentStaysSilent(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(noUselessDefaultAssignmentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoUselessDefaultAssignment,
 				noUselessDefaultAssignmentFile, sourceText,
 				noUselessDefaultAssignmentOptionsFor(t, "")))
@@ -324,6 +325,7 @@ func TestNoUselessDefaultAssignmentFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noUselessDefaultAssignmentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoUselessDefaultAssignment,
 				noUselessDefaultAssignmentFile, testCase.sourceText,
 				noUselessDefaultAssignmentOptionsFor(t, testCase.optionsJson))

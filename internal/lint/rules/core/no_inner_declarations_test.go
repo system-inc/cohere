@@ -89,6 +89,7 @@ func TestNoInnerDeclarationsStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInnerDeclarations,
 				"file.ts", testCase.source, decodeNoInnerDeclarationsForTest(t, testCase.optionsJson)))
 		})
@@ -137,6 +138,7 @@ func TestNoInnerDeclarationsFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoInnerDeclarations, "file.ts",
 				testCase.source, decodeNoInnerDeclarationsForTest(t, testCase.optionsJson))
 			if len(result.Diagnostics) != len(testCase.want) {
@@ -172,6 +174,7 @@ func TestNoInnerDeclarationsSpan(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoInnerDeclarations, "file.ts",
 				testCase.source, decodeNoInnerDeclarationsForTest(t, testCase.optionsJson))
 			if len(result.Diagnostics) != 1 {
@@ -205,6 +208,7 @@ func TestDecodeNoInnerDeclarationsOptions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeNoInnerDeclarationsOptions([]byte(testCase.optionsJson))
 			if err != nil {
 				t.Fatalf("decoding %q: %v", testCase.optionsJson, err)
@@ -314,6 +318,7 @@ func TestNoInnerDeclarationsStrictness(t *testing.T) {
 	}
 	for _, testCase := range exempt {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInnerDeclarations,
 				"file.ts", testCase.source, decodeNoInnerDeclarationsForTest(t, allow)))
 		})
@@ -342,6 +347,7 @@ func TestNoInnerDeclarationsStrictness(t *testing.T) {
 	}
 	for _, testCase := range reports {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoInnerDeclarations,
 				"file.ts", testCase.source, decodeNoInnerDeclarationsForTest(t, allow)),
 				"moveDeclToRoot")

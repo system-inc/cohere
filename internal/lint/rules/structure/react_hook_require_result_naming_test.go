@@ -56,6 +56,7 @@ func TestReactHookRequireResultNamingFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactHookRequireResultNaming, resultNamingFile,
 				resultNamingDeclarations+testCase.sourceText), testCase.wantId)
 		})
@@ -145,6 +146,7 @@ func TestReactHookRequireResultNamingStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactHookRequireResultNaming, testCase.fileName,
 				resultNamingDeclarations+testCase.sourceText))
 		})

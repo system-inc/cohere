@@ -91,6 +91,7 @@ func TestNoImpliedEvalStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, testCase.sourceText))
 		})
 	}
@@ -139,6 +140,7 @@ func TestNoImpliedEvalFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.expectedIds...)
 		})
@@ -165,6 +167,7 @@ func TestNoImpliedEvalExemptsAShadowingDeclarationFromAnotherFile(t *testing.T) 
 	const subject = "\nimport { Function } from './class';\nnew Function('foo');\n    "
 
 	t.Run("a locally declared Function shadows the constructor", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTypedFiles(t, NoImpliedEval, map[string]string{
 			"class.ts":        shadowed,
 			noImpliedEvalFile: subject,
@@ -172,6 +175,7 @@ func TestNoImpliedEvalExemptsAShadowingDeclarationFromAnotherFile(t *testing.T) 
 	})
 
 	t.Run("control: the real constructor still reports", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunTypedFiles(t, NoImpliedEval, map[string]string{
 			"class.ts":        unrelated,
 			noImpliedEvalFile: "new Function('foo');",
@@ -204,6 +208,7 @@ func TestNoImpliedEvalRecognizesTheCalleeByNameRatherThanByResolution(t *testing
 	}
 	for _, testCase := range reporting {
 		t.Run("reports/"+testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, testCase.sourceText), "noImpliedEvalError")
 		})
 	}
@@ -227,6 +232,7 @@ func TestNoImpliedEvalRecognizesTheCalleeByNameRatherThanByResolution(t *testing
 	}
 	for _, testCase := range silent {
 		t.Run("silent/"+testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, testCase.sourceText))
 		})
 	}
@@ -255,6 +261,7 @@ func TestNoImpliedEvalTestsForANonFunctionRatherThanForAString(t *testing.T) {
 	}
 	for _, testCase := range reporting {
 		t.Run("reports/"+testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, testCase.sourceText), "noImpliedEvalError")
 		})
 	}
@@ -271,6 +278,7 @@ func TestNoImpliedEvalTestsForANonFunctionRatherThanForAString(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run("silent/"+testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, testCase.sourceText))
 		})
 	}
@@ -305,11 +313,13 @@ func TestNoImpliedEvalDoesNotSkipParenthesesOnTheCallee(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run("silent/"+testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, testCase.sourceText))
 		})
 	}
 
 	t.Run("control: the same calls without parentheses report", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile,
 			"declare const window: any;\nwindow.setTimeout('x=1', 0);"), "noImpliedEvalError")
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile,
@@ -317,6 +327,7 @@ func TestNoImpliedEvalDoesNotSkipParenthesesOnTheCallee(t *testing.T) {
 	})
 
 	t.Run("the ARGUMENT is judged through its parentheses", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile,
 			"setTimeout(('x=1'), 0);"), "noImpliedEvalError")
 		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile,
@@ -343,6 +354,7 @@ func TestNoImpliedEvalPointsAtTheRightNodeAndCarriesTheRightText(t *testing.T) {
 	t.Parallel()
 
 	t.Run("the eval-like arm points at the HANDLER", func(t *testing.T) {
+		t.Parallel()
 		const sourceText = "declare const window: any;\nwindow.setTimeout('x = 1', 0);"
 		result := rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, sourceText)
 		if len(result.Diagnostics) != 1 {
@@ -362,6 +374,7 @@ func TestNoImpliedEvalPointsAtTheRightNodeAndCarriesTheRightText(t *testing.T) {
 	})
 
 	t.Run("the constructor arm points at the WHOLE call", func(t *testing.T) {
+		t.Parallel()
 		const sourceText = "new Function('a', 'return a');"
 		result := rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, sourceText)
 		if len(result.Diagnostics) != 1 {
@@ -384,6 +397,7 @@ func TestNoImpliedEvalPointsAtTheRightNodeAndCarriesTheRightText(t *testing.T) {
 	// newline and the indentation. Both anchors are checked because the adapter trims all three
 	// of its node-report forms and a regression could restore any one of them.
 	t.Run("leading trivia is not carried into either span", func(t *testing.T) {
+		t.Parallel()
 		const sourceText = "function outer() {\n    setTimeout('x = 1', 0);\n    new Function('a');\n}"
 		result := rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, sourceText)
 		if len(result.Diagnostics) != 2 {

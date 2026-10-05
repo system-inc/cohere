@@ -112,6 +112,7 @@ func TestVerifyOptionalParityFires(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := verifyDecoratorPreamble + testCase.source
 			result := rule_testing.RunTyped(t, CorrectnessRequireVerifyOptionalParity, correctnessRequireVerifyOptionalParityFile, source)
 			rule_testing.ExpectFindings(t, result, testCase.messageId)
@@ -217,6 +218,7 @@ func TestVerifyOptionalParityStaysSilent(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, CorrectnessRequireVerifyOptionalParity,
 				correctnessRequireVerifyOptionalParityFile, verifyDecoratorPreamble+testCase.source))
 		})

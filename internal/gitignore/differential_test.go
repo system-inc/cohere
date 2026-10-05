@@ -22,6 +22,7 @@ import (
 // a walk meets it. git runs under sandbox-exec, with no network and no writes outside a temporary
 // directory, and the sandbox is shown to hold before git reads anything.
 func TestTheMatcherAgreesWithGitOnRealTrees(t *testing.T) {
+	t.Parallel()
 	trees := os.Getenv("COHERE_GITIGNORE_TREES")
 	if trees == "" {
 		t.Skip("COHERE_GITIGNORE_TREES names no trees to compare")
@@ -55,6 +56,7 @@ func TestTheMatcherAgreesWithGitOnRealTrees(t *testing.T) {
 // patterns drawn from every construct gitignore(5) describes, so the matcher meets combinations no real
 // tree holds. COHERE_GITIGNORE_GENERATED is how many trees, COHERE_GITIGNORE_SEED fixes the sequence.
 func TestTheMatcherAgreesWithGitOnGeneratedTrees(t *testing.T) {
+	t.Parallel()
 	count, _ := strconv.Atoi(os.Getenv("COHERE_GITIGNORE_GENERATED"))
 	if count <= 0 {
 		t.Skip("COHERE_GITIGNORE_GENERATED asks for no generated trees")

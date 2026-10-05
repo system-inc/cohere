@@ -220,6 +220,7 @@ func TestUnboundMethodStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(unboundMethodCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runUnboundMethod(t, testCase.sourceText, testCase.options))
 		})
 	}
@@ -633,6 +634,7 @@ func TestUnboundMethodFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(unboundMethodCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := runUnboundMethod(t, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -692,6 +694,7 @@ func TestUnboundMethodResolvesAcrossAModuleBoundary(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedFiles(t, UnboundMethod, map[string]string{
 				unboundMethodFile: testCase.sourceText,
 				moduleFileName:    moduleSource,
@@ -849,6 +852,7 @@ func TestUnboundMethodSeesThroughWrappersUpstreamsParserRemoves(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runUnboundMethod(t, testCase.sourceText, "")
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -937,6 +941,7 @@ func TestUnboundMethodOnThisAnnotationsAndRepeatedConstituents(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runUnboundMethod(t, testCase.sourceText, "")
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -1003,6 +1008,7 @@ func TestUnboundMethodStopsAtTheFirstReportingPropertyName(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runUnboundMethod(t, testCase.sourceText, "")
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -1073,6 +1079,7 @@ func TestUnboundMethodRendersUpstreamsMessageText(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runUnboundMethod(t, testCase.sourceText, "")
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))

@@ -83,6 +83,7 @@ func TestNoExtraneousClassStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noExtraneousClassCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runNoExtraneousClass(t, testCase.sourceText, testCase.options))
 		})
 	}
@@ -184,6 +185,7 @@ func TestNoExtraneousClassFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noExtraneousClassCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := runNoExtraneousClass(t, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -386,6 +388,7 @@ func TestNoExtraneousClassOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoExtraneousClass(t, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -435,6 +438,7 @@ func TestNoExtraneousClassDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFalse(t *
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.raw, func(t *testing.T) {
+			t.Parallel()
 			decoded := decodeNoExtraneousClassOptionsForTest(t, testCase.raw)
 			settings, isSettings := decoded.(NoExtraneousClassOptions)
 			if !isSettings {
@@ -493,6 +497,7 @@ func TestNoExtraneousClassRendersUpstreamsMessageText(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.wantId, func(t *testing.T) {
+			t.Parallel()
 			result := runNoExtraneousClass(t, testCase.sourceText, "")
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -570,6 +575,7 @@ func TestNoExtraneousClassOnIllegalStaticAbstractMembers(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoExtraneousClass(t, testCase.sourceText, "")
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -639,6 +645,7 @@ func TestNoExtraneousClassSeparatesADecoratorFromOtherModifiers(t *testing.T) {
 	const options = `{"allowWithDecorator": true}`
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoExtraneousClass(t, testCase.sourceText, options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -682,6 +689,7 @@ func TestNoExtraneousClassExemptsALoadBearingEmptyClass(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtraneousClass, noExtraneousClassFile, testCase.source, nil))
 		})
 	}
@@ -707,6 +715,7 @@ func TestNoExtraneousClassExemptsALoadBearingEmptyClass(t *testing.T) {
 	}
 	for _, testCase := range reported {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoExtraneousClass, noExtraneousClassFile, testCase.source, nil), "empty")
 		})
 	}

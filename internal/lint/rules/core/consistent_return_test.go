@@ -105,6 +105,7 @@ func TestConsistentReturnFires(t *testing.T) {
 
 	for _, testCase := range consistentReturnFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ConsistentReturn, consistentReturnFile,
 				testCase.source, decodeConsistentReturnOptionsForTest(t, testCase.optionsJson))
 
@@ -170,6 +171,7 @@ func TestConsistentReturnStaysSilent(t *testing.T) {
 
 	for _, testCase := range consistentReturnCleanCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, ConsistentReturn,
 				consistentReturnFile, testCase.source,
 				decodeConsistentReturnOptionsForTest(t, testCase.optionsJson)))
@@ -386,6 +388,7 @@ func TestConsistentReturnAddedCases(t *testing.T) {
 
 	for _, testCase := range consistentReturnAddedCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ConsistentReturn, consistentReturnFile,
 				testCase.source, decodeConsistentReturnOptionsForTest(t, testCase.optionsJson))
 
@@ -421,6 +424,7 @@ func TestConsistentReturnDecoderRoundTrip(t *testing.T) {
 		{"an explicit true", `{"treatUndefinedAsUnspecified":true}`, true},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeConsistentReturnOptions(json.RawMessage(testCase.optionsJson))
 			if err != nil {
 				t.Fatalf("decoding %q: %v", testCase.optionsJson, err)
@@ -464,6 +468,7 @@ func TestConsistentReturnSpanPointsAtTheKeyNotTheFirstToken(t *testing.T) {
 		{"var o = { async foo() { if (a) return true; } };", "foo"},
 	} {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistentReturn, consistentReturnFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, "missingReturn")
 			reported := testCase.source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]

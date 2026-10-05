@@ -13,6 +13,7 @@ import (
 // pinned assertions are then written from. A run that named no fixtures would be the tell that the
 // selection is empty rather than the rules being perfect.
 func TestWiredRulesAgainstReactsOwnGoldens(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("builds a TypeScript program per fixture")
 	}

@@ -25,6 +25,7 @@ func TestNoUselessCatchReportsBareRethrows(t *testing.T) {
 		{"nested inside another try", `try { try { foo(); } catch (err) { throw err; } } catch (outer) { log(outer); }`, "unnecessaryCatch"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessCatch, "file.ts", testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
@@ -54,6 +55,7 @@ func TestNoUselessCatchAcceptsClausesThatDoWork(t *testing.T) {
 		{"a throw elsewhere in the function", `function f() { throw error; }`},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessCatch, "file.ts", testCase.source))
 		})
 	}

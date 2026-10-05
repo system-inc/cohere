@@ -120,4 +120,7 @@ var gfmTaskListItemFixtures = []string{
 	"foo\n[x] bar",
 }
 
-func TestGfmTaskListItemEvents(t *testing.T) { compareEvents(t, gfmTaskListItemFixtures) }
+func TestGfmTaskListItemEvents(t *testing.T) {
+	t.Parallel()
+	compareEvents(t, gfmTaskListItemFixtures)
+}

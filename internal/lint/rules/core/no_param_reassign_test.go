@@ -93,6 +93,7 @@ func TestNoParamReassignFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText+" "+testCase.messageId, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
 				testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.messageId)
@@ -202,6 +203,7 @@ func TestNoParamReassignStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
 				paramReassignFile, testCase.sourceText, testCase.options))
 		})
@@ -240,12 +242,14 @@ func TestNoParamReassignStopsAtAConciseArrowBody(t *testing.T) {
 	}
 	for _, testCase := range reporting {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
 				paramReassignFile, testCase.sourceText, testCase.options), testCase.messageId)
 		})
 	}
 
 	t.Run("a concise arrow that merely reads", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
 			"const f = (a) => a.b;", decodedParamOptions(t, `{"props": true}`)))
 	})
@@ -266,6 +270,7 @@ func TestNoParamReassignStopsAtAConciseArrowBody(t *testing.T) {
 	}
 	for _, sourceText := range silentAcrossAFunctionBoundary {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
 				paramReassignFile, sourceText, decodedParamOptions(t, `{"props": true}`)))
 		})
@@ -290,6 +295,7 @@ func TestNoParamReassignSeesPostfixUpdates(t *testing.T) {
 	}
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
 				paramReassignFile, sourceText, decodedParamOptions(t, `{"props": true}`)),
 				"assignmentToFunctionParamProp")
@@ -320,6 +326,7 @@ func TestNoParamReassignSeesIntoParameterDefaults(t *testing.T) {
 	}
 	for _, testCase := range reporting {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
 				paramReassignFile, testCase.sourceText, testCase.options), testCase.messageId)
 		})
@@ -339,6 +346,7 @@ func TestNoParamReassignSeesIntoParameterDefaults(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
 				paramReassignFile, testCase.sourceText, testCase.options))
 		})
@@ -373,6 +381,7 @@ func TestNoParamReassignReachesIntoClassBodies(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
 				testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.messageId)
@@ -414,6 +423,7 @@ func TestNoParamReassignAttributesAShadowedWriteToOneFunction(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
 				testCase.sourceText, nil)
 			rule_testing.ExpectFindings(t, result, "assignmentToFunctionParam")
@@ -447,16 +457,19 @@ func TestNoParamReassignOptions(t *testing.T) {
 	propertyWrite := "function foo(a) { a.b = 0; }"
 
 	t.Run("nil options, the shape the live config produces", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
 			paramReassignFile, propertyWrite, nil))
 	})
 
 	t.Run("a zero-value struct declines property writes", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
 			paramReassignFile, propertyWrite, NoParamReassignOptions{}))
 	})
 
 	t.Run("empty input decodes without erroring", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoParamReassignOptions(nil)
 		if err != nil {
 			t.Fatalf("decoding empty input: %v", err)
@@ -471,12 +484,14 @@ func TestNoParamReassignOptions(t *testing.T) {
 	})
 
 	t.Run("malformed input is an error", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeNoParamReassignOptions([]byte("[")); err == nil {
 			t.Error("malformed options decoded without an error")
 		}
 	})
 
 	t.Run("an uncompilable pattern is dropped rather than fatal", func(t *testing.T) {
+		t.Parallel()
 		// A divergence, stated at the rule and pinned here. Upstream builds a RegExp at every call
 		// and a bad pattern throws, taking the run down; this drops it, so the name stops being
 		// excused and the rule reports MORE. That is the visible direction rather than the one that
@@ -489,6 +504,7 @@ func TestNoParamReassignOptions(t *testing.T) {
 	})
 
 	t.Run("a pattern Go accepts and JavaScript does not is still a pattern", func(t *testing.T) {
+		t.Parallel()
 		// The two dialects are not the same. Upstream compiles with the Unicode flag and this
 		// compiles with RE2, which has no backreferences and no lookaround, so a pattern using
 		// either is dropped here and honoured there. No corpus case uses one, and the divergence is
@@ -501,6 +517,7 @@ func TestNoParamReassignOptions(t *testing.T) {
 	})
 
 	t.Run("both lists apply together", func(t *testing.T) {
+		t.Parallel()
 		// Upstream's last valid case pairs a literal name with a pattern; this is the same pairing
 		// asserted from the other side, with each list excusing a different parameter and a third
 		// parameter matching neither and reporting.

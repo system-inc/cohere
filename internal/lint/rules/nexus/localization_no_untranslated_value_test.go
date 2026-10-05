@@ -173,6 +173,7 @@ func TestLocalizationNoUntranslatedValueFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runOnTranslations(t, map[string]string{
 				"translations/en.ts": englishTranslations,
 				"translations/es.ts": testCase.spanish,
@@ -210,6 +211,7 @@ func TestLocalizationNoUntranslatedValueStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runOnTranslations(t, map[string]string{
 				"translations/en.ts": englishTranslations,
 				"translations/es.ts": testCase.spanish,
@@ -248,6 +250,7 @@ func TestLocalizationNoUntranslatedValueDeclinesFilesThatAreNotLocaleData(t *tes
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			files := map[string]string{
 				"translations/en.ts":         englishTranslations,
 				"translations-archive/en.ts": englishTranslations,

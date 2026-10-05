@@ -113,6 +113,7 @@ func (one descriptorFixtureCase) parsed() *ParsedCandidate {
 }
 
 func TestDescriptorLookupMatchesEngine(t *testing.T) {
+	t.Parallel()
 	fixtures := loadDescriptorFixtures(t)
 	table := testTable(t)
 
@@ -218,6 +219,7 @@ func countPerDeclaration(table *Table) int {
 // TestDescriptorLookupCoversEveryRoot asserts the table answers for every root the engine has,
 // rather than for the ones the corpus happened to reach.
 func TestDescriptorLookupCoversEveryRoot(t *testing.T) {
+	t.Parallel()
 	fixtures := loadDescriptorFixtures(t)
 	table := testTable(t)
 
@@ -250,6 +252,7 @@ func TestDescriptorLookupCoversEveryRoot(t *testing.T) {
 // decline is real, because a lookup that answered them plausibly would be wrong in exactly the place
 // the model knows it cannot answer, and nothing else in the suite would notice.
 func TestPerDeclarationRootsDecline(t *testing.T) {
+	t.Parallel()
 	table := testTable(t)
 
 	perDeclaration := 0
@@ -277,6 +280,7 @@ func TestPerDeclarationRootsDecline(t *testing.T) {
 // only checks membership. `bg` is the canary: it puts `position` before `length`, so `bg-[3px]` is a
 // position. If this assertion ever fails because the table changed, the readings changed with it.
 func TestTypeListOrderIsCarriedNotSorted(t *testing.T) {
+	t.Parallel()
 	table := testTable(t)
 
 	descriptor, found := table.Descriptors["bg"]
@@ -318,6 +322,7 @@ func TestTypeListOrderIsCarriedNotSorted(t *testing.T) {
 // Inferring before consulting the theme reads `font-bold` as a font family, and eight registry
 // classes separate the two orderings. This asserts the theme wins.
 func TestBareValueResolvesBeforeInference(t *testing.T) {
+	t.Parallel()
 	table := testTable(t)
 
 	descriptor, found := table.Descriptors["font"]
@@ -355,6 +360,7 @@ func TestBareValueResolvesBeforeInference(t *testing.T) {
 // `/50` does, and both differ from no modifier at all. A port that treated the modifier as one bit
 // would pass every test written against `/50` alone.
 func TestModifierIsThreeStates(t *testing.T) {
+	t.Parallel()
 	if axis := ModifierAxisFor(nil); axis != ModifierAbsent {
 		t.Errorf("no modifier classified as %v", axis)
 	}

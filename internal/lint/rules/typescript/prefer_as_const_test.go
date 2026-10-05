@@ -42,6 +42,7 @@ func TestPreferAsConstFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "preferAsConst")
 		})
@@ -90,6 +91,7 @@ func TestPreferAsConstFixesWriteWhatTheyClaim(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t,
 				rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText),
 				testCase.wantSource)
@@ -121,6 +123,7 @@ func TestPreferAsConstReportsTheDestructuringCaseWithoutARepair(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "preferAsConst")
 			if len(result.Diagnostics[0].Fixes) != 0 {
@@ -161,6 +164,7 @@ func TestPreferAsConstPointsAtTheLiteralType(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "preferAsConst")
 			finding := result.Diagnostics[0]
@@ -250,6 +254,7 @@ func TestPreferAsConstStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText))
 		})
 	}
@@ -278,6 +283,7 @@ func TestPreferAsConstMatchesNumericValuesNotSpellings(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText),
 				"preferAsConst")

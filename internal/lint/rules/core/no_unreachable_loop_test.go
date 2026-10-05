@@ -31,6 +31,7 @@ func TestNoUnreachableLoopFires(t *testing.T) {
 
 	for _, testCase := range unreachableLoopFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "invalid"
@@ -51,6 +52,7 @@ func TestNoUnreachableLoopStaysSilent(t *testing.T) {
 
 	for _, source := range unreachableLoopCleanCases {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, source))
 		})
@@ -72,6 +74,7 @@ func TestNoUnreachableLoopOptions(t *testing.T) {
 
 	for _, testCase := range unreachableLoopOptionCases {
 		t.Run(testCase.source+" "+testCase.options, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := decode([]byte(testCase.options))
 			if err != nil {
 				t.Fatalf("decoding %s: %v", testCase.options, err)
@@ -156,6 +159,7 @@ func TestNoUnreachableLoopSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, testCase.source)
 			if len(result.Diagnostics) != len(testCase.reports) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.reports), len(result.Diagnostics))
@@ -277,6 +281,7 @@ func TestNoUnreachableLoopInNonFunctionRoots(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, "invalid")
 			got := testCase.source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]

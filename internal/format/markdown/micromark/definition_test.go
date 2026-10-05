@@ -195,8 +195,17 @@ var definitionReferenceFixtures = []string{
 	"> [a]: b\n\n[a]",
 }
 
-func TestDefinitionEvents(t *testing.T) { compareEvents(t, definitionFixtures) }
+func TestDefinitionEvents(t *testing.T) {
+	t.Parallel()
+	compareEvents(t, definitionFixtures)
+}
 
-func TestDefinitionFailureEvents(t *testing.T) { compareEvents(t, definitionFailureFixtures) }
+func TestDefinitionFailureEvents(t *testing.T) {
+	t.Parallel()
+	compareEvents(t, definitionFailureFixtures)
+}
 
-func TestDefinitionReferenceEvents(t *testing.T) { compareEvents(t, definitionReferenceFixtures) }
+func TestDefinitionReferenceEvents(t *testing.T) {
+	t.Parallel()
+	compareEvents(t, definitionReferenceFixtures)
+}

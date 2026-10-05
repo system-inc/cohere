@@ -66,6 +66,7 @@ func TestOptionalLoadsProveNothingAboutTheirObject(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			deps, ok := inferredDependencyStrings(t, testCase.source)
 			if !ok {
 				t.Fatal("the fixture did not lower, so this test asserts nothing")

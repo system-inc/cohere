@@ -139,11 +139,13 @@ func generatedInputs(count int) []string {
 }
 
 func TestParseMatchesUpstream(t *testing.T) {
+	t.Parallel()
 	failures, errored := compareAll(t, "fixture", nil, fixtures, 40)
 	t.Logf("%d of %d fixtures match upstream (%d of them errors)", len(fixtures)-failures, len(fixtures), errored)
 }
 
 func TestGeneratedParseMatchesUpstream(t *testing.T) {
+	t.Parallel()
 	count := 20000
 	if testing.Short() {
 		count = 2000
@@ -155,6 +157,7 @@ func TestGeneratedParseMatchesUpstream(t *testing.T) {
 // TestOracleCanFail proves the comparison sees a difference: the port's tree for one text against
 // upstream's for another, where the trees differ in a single position, value, comment slot or error.
 func TestOracleCanFail(t *testing.T) {
+	t.Parallel()
 	cases := []struct{ mine, theirs string }{
 		{"a:  b", "a: b"},         // a position
 		{"a: c", "a: b"},          // a value
@@ -189,6 +192,7 @@ process.stdout.write(JSON.stringify(inputs));
 // TestYamlTestSuiteParseMatchesUpstream compares every input of the yaml-test-suite in the fork, and each
 // case's canonical dump.
 func TestYamlTestSuiteParseMatchesUpstream(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("node"); err != nil {
 		t.Skip("node is not installed")
 	}
@@ -218,6 +222,7 @@ const corpusSizeLimit = 1 << 20
 // YAML front matter value of every .md file there, enumerated as the printer's corpus test enumerates
 // them: through the engine's ignore layers, into nested repositories. A measuring run.
 func TestCorpusParseMatchesUpstream(t *testing.T) {
+	t.Parallel()
 	roots := os.Getenv("COHERE_YAML_CORPUS")
 	if roots == "" {
 		t.Skip("set COHERE_YAML_CORPUS to measure; this is a measuring run, not a unit test")
@@ -310,6 +315,7 @@ func TestCorpusParseMatchesUpstream(t *testing.T) {
 // comparison reports each corruption: every field the comparison reads, positions, identities and
 // parents, and null told apart from an empty array.
 func TestComparisonSeesEveryField(t *testing.T) {
+	t.Parallel()
 	text := "%YAML 1.2 # d\n---\n- &a !t |2- # i\n   x\n- *a # t\n- ? k\n  : v\n  # e\n# l\n- [b, {c: d}]\n"
 	expected := oracleParse(t, []string{text})[0]
 	if expected.Error != nil {

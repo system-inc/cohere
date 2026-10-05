@@ -162,6 +162,7 @@ func TestNoUselessComputedKeyFires(t *testing.T) {
 
 	for _, testCase := range noUselessComputedKeyFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoUselessComputedKey, uselessComputedKeyFile,
 				testCase.source, decodeUselessComputedKeyOptionsForTest(t, testCase.optionsJson))
 
@@ -210,6 +211,7 @@ func TestNoUselessComputedKeyStaysSilent(t *testing.T) {
 
 	for _, testCase := range noUselessComputedKeyCleanCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUselessComputedKey,
 				uselessComputedKeyFile, testCase.source,
 				decodeUselessComputedKeyOptionsForTest(t, testCase.optionsJson)))
@@ -404,6 +406,7 @@ func TestNoUselessComputedKeyAddedCases(t *testing.T) {
 
 	for _, testCase := range noUselessComputedKeyAddedCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoUselessComputedKey, uselessComputedKeyFile,
 				testCase.source, decodeUselessComputedKeyOptionsForTest(t, testCase.optionsJson))
 
@@ -488,6 +491,7 @@ func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(t *testing.T
 		{"an explicit false", `{"enforceForClassMembers":false}`, false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			var settings NoUselessComputedKeySettings
 			if testCase.optionsJson == "" {
 				settings = DefaultNoUselessComputedKeySettings()
@@ -536,6 +540,7 @@ func TestNoUselessComputedKeyDeclinesToRepairARecoveredParse(t *testing.T) {
 		"({ ['x': 0 });",
 	} {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessComputedKey, uselessComputedKeyFile, source)
 			rule_testing.ExpectFindings(t, result, "unnecessarilyComputedProperty")
 			for i, diagnostic := range result.Diagnostics {

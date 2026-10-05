@@ -490,6 +490,7 @@ func TestNoExtraBooleanCastFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
 					testCase.sourceText, testCase.options), testCase.messageIds...)
@@ -567,6 +568,7 @@ func TestNoExtraBooleanCastStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
 					testCase.sourceText, testCase.options))
@@ -795,6 +797,7 @@ func TestNoExtraBooleanCastFixesBooleanCalls(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t,
 				rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
 					testCase.sourceText, testCase.options), testCase.wantSource)
@@ -1007,6 +1010,7 @@ func TestNoExtraBooleanCastSuggestsTheRightRepairs(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
 				testCase.sourceText, testCase.options)
 			if got := applyEveryRepair(testCase.sourceText, result); got != testCase.wantSource {
@@ -1108,6 +1112,7 @@ func TestNoExtraBooleanCastReportsTheRightSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -1175,6 +1180,7 @@ func TestNoExtraBooleanCastDeclinesToRepairMultipleArguments(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoExtraBooleanCast, extraBooleanCastFile, sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -1214,6 +1220,7 @@ func TestNoExtraBooleanCastAcceptsTheDeprecatedOptionSpelling(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := rule.DecodeOptionsInto[NoExtraBooleanCastOptions]()([]byte(testCase.rawJSON))
 			if err != nil {
 				t.Fatalf("decoding %s: %v", testCase.rawJSON, err)

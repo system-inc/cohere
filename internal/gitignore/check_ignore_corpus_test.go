@@ -24,6 +24,7 @@ import (
 // whitespace through `ls-files -X`, links, oversized files). Those behaviors are held by this package's own
 // tests and by the differential against git.
 func TestGitCheckIgnoreCorpus(t *testing.T) {
+	t.Parallel()
 	source := gitSource(t)
 	contents, err := os.ReadFile(filepath.Join(source, "t", "t0008-ignores.sh"))
 	if err != nil {

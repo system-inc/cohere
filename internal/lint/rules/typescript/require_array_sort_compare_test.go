@@ -136,6 +136,7 @@ func TestRequireArraySortCompareStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(requireArraySortCompareCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, RequireArraySortCompare,
 				requireArraySortCompareFile, testCase.sourceText,
 				requireArraySortCompareOptionsFor(t, testCase.optionsJson)))
@@ -253,6 +254,7 @@ func TestRequireArraySortCompareFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(requireArraySortCompareCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, RequireArraySortCompare,
 				requireArraySortCompareFile, testCase.sourceText,
 				requireArraySortCompareOptionsFor(t, testCase.optionsJson))
@@ -304,6 +306,7 @@ func TestDecodeRequireArraySortCompareOptionsKeepsTheDefaultWhenTheKeyIsAbsent(t
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeRequireArraySortCompareOptions(json.RawMessage(testCase.raw))
 			if err != nil {
 				t.Fatalf("decoding %s: %v", testCase.raw, err)
@@ -435,6 +438,7 @@ func TestRequireArraySortCompareStaysSilentOnShapesTheCorpusDoesNotWrite(t *test
 	}
 	for index, testCase := range cases {
 		t.Run(requireArraySortCompareCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, RequireArraySortCompare,
 				requireArraySortCompareFile, testCase.sourceText,
 				DefaultRequireArraySortCompareSettings()))
@@ -507,6 +511,7 @@ func TestRequireArraySortCompareFiresOnShapesTheCorpusDoesNotWrite(t *testing.T)
 	}
 	for index, testCase := range cases {
 		t.Run(requireArraySortCompareCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, RequireArraySortCompare,
 				requireArraySortCompareFile, testCase.sourceText,
 				DefaultRequireArraySortCompareSettings())

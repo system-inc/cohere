@@ -54,6 +54,7 @@ func TestVarsOnTopStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, VarsOnTop, "file.ts", testCase.source))
 		})
 	}
@@ -97,6 +98,7 @@ func TestVarsOnTopFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VarsOnTop, "file.ts", testCase.source)
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
@@ -124,6 +126,7 @@ func TestVarsOnTopSpanAndMessage(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, VarsOnTop, "file.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))

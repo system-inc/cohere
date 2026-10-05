@@ -77,6 +77,7 @@ func TestNoForInArrayFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoForInArray,
 				noForInArrayFile, testCase.sourceText), "forInViolation")
 		})
@@ -103,6 +104,7 @@ func TestNoForInArrayStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoForInArray,
 				noForInArrayFile, testCase.sourceText))
 		})
@@ -146,6 +148,7 @@ func TestNoForInArrayNeedsBothHalvesOfThePredicate(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoForInArray,
 				noForInArrayFile, testCase.sourceText))
 		})
@@ -170,6 +173,7 @@ func TestNoForInArrayDomCollections(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedFiles(t, NoForInArray, map[string]string{
 				"ForIn.ts":      testCase.sourceText,
 				"DomGlobals.ts": domGlobals,
@@ -222,6 +226,7 @@ func TestNoForInArrayReportsTheLoopHead(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// The harness trims the source, so offsets are against the trimmed text.
 			sourceText := strings.TrimSpace(testCase.sourceText)
 			result := rule_testing.RunTyped(t, NoForInArray, noForInArrayFile, sourceText)

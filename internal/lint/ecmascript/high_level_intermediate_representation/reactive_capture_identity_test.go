@@ -25,6 +25,7 @@ return () => (argument: number) => [reactiveValue, stableValue, argument];
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function := lowerTypedFunctions(t, "captures.tsx", testCase.source)[0]
 			Construct(function)
 			InferReactive(function, nil)

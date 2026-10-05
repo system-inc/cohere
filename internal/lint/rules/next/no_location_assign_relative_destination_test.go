@@ -73,6 +73,7 @@ func TestNoLocationAssignRelativeDestinationFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoLocationAssignRelativeDestination,
 				locationAssignFile, testCase.sourceText), "noLocationAssign")
 		})
@@ -153,6 +154,7 @@ func TestNoLocationAssignRelativeDestinationStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoLocationAssignRelativeDestination,
 				locationAssignFile, testCase.sourceText))
 		})
@@ -206,6 +208,7 @@ func TestNoLocationAssignRelativeDestinationPointsAtTheNavigation(t *testing.T) 
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoLocationAssignRelativeDestination,
 				locationAssignFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {

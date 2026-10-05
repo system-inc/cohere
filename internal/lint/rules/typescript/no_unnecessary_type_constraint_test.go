@@ -49,6 +49,7 @@ func TestNoUnnecessaryTypeConstraintFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
@@ -97,6 +98,7 @@ func TestNoUnnecessaryTypeConstraintStaysSilent(t *testing.T) {
 	}
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, sourceText))
 		})
 	}
@@ -167,6 +169,7 @@ func TestNoUnnecessaryTypeConstraintSuggestionsWriteWhatTheyClaim(t *testing.T) 
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText+" in "+testCase.fileName, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnnecessaryTypeConstraint, testCase.fileName, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("wanted at least one diagnostic to carry a suggestion, got none")
@@ -220,6 +223,7 @@ func TestNoUnnecessaryTypeConstraintPointsAtTheParameterName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				t.Fatalf("wanted %d diagnostics, got %d", len(testCase.wantTexts), len(result.Diagnostics))

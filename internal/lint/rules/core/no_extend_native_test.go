@@ -55,6 +55,7 @@ func TestNoExtendNativeFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.builtins) {
@@ -113,6 +114,7 @@ func TestNoExtendNativeStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtendNative,
 				extendNativeFile, testCase.sourceText, testCase.options))
 		})
@@ -141,6 +143,7 @@ func TestNoExtendNativeReportsTheWholeExtension(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
 				testCase.sourceText, nil)
 			if len(result.Diagnostics) != 1 {
@@ -180,6 +183,7 @@ func TestNoExtendNativeDeclinesShapesTheCorpusOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtendNative,
 				extendNativeFile, testCase.sourceText, nil))
 		})
@@ -274,6 +278,7 @@ func TestNoExtendNativeDeclinesReadingAPrototypeProperty(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtendNative,
 				extendNativeFile, testCase.sourceText, nil))
 		})
@@ -307,6 +312,7 @@ func TestNoExtendNativeDeclinesADefineCallOnAnotherReceiver(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtendNative,
 				extendNativeFile, testCase.sourceText, nil))
 		})
@@ -338,6 +344,7 @@ func TestNoExtendNativeReadsATemplateSubscript(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
 				testCase.sourceText, nil)
 			if len(result.Diagnostics) != 1 {

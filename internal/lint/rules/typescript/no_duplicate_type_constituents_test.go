@@ -91,6 +91,7 @@ func TestNoDuplicateTypeConstituentsStaysSilentOnUpstreamPassCases(t *testing.T)
 	}
 	for index, testCase := range cases {
 		t.Run(noDuplicateTypeConstituentsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoDuplicateTypeConstituents,
 				noDuplicateTypeConstituentsFile, testCase.sourceText,
 				noDuplicateTypeConstituentsOptionsFor(t, testCase.optionsJson)))
@@ -518,6 +519,7 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noDuplicateTypeConstituentsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoDuplicateTypeConstituents,
 				noDuplicateTypeConstituentsFile, testCase.sourceText,
 				noDuplicateTypeConstituentsOptionsFor(t, testCase.optionsJson))
@@ -591,6 +593,7 @@ func TestNoDuplicateTypeConstituentsStaysSilentOnTypeScriptShapes(t *testing.T) 
 	}
 	for index, testCase := range cases {
 		t.Run(noDuplicateTypeConstituentsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoDuplicateTypeConstituents,
 				noDuplicateTypeConstituentsFile, testCase.sourceText,
 				DefaultNoDuplicateTypeConstituentsSettings()))
@@ -722,6 +725,7 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noDuplicateTypeConstituentsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoDuplicateTypeConstituents,
 				noDuplicateTypeConstituentsFile, testCase.sourceText,
 				DefaultNoDuplicateTypeConstituentsSettings())
@@ -772,6 +776,7 @@ func TestDecodeNoDuplicateTypeConstituentsOptions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeNoDuplicateTypeConstituentsOptions(json.RawMessage(testCase.raw))
 			if err != nil {
 				t.Fatalf("decoding %s: %v", testCase.raw, err)

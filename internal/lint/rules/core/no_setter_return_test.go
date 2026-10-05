@@ -71,6 +71,7 @@ func TestNoSetterReturnFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "noSetterReturn"
@@ -212,6 +213,7 @@ func TestNoSetterReturnStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoSetterReturn, setterReturnFile, sourceText))
 		})
@@ -247,6 +249,7 @@ func TestNoSetterReturnSpansTheWholeStatement(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoSetterReturn, setterReturnFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("wanted %d diagnostics, got %d",

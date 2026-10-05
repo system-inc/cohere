@@ -50,6 +50,7 @@ func TestNoUnsafeOptionalChainingFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
 					testCase.sourceText), "unsafeOptionalChain")
@@ -78,6 +79,7 @@ func TestNoUnsafeOptionalChainingReportsPerChain(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
 					testCase.sourceText), "unsafeOptionalChain", "unsafeOptionalChain")
@@ -174,6 +176,7 @@ func TestNoUnsafeOptionalChainingStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
 					testCase.sourceText))
@@ -252,6 +255,7 @@ func TestNoUnsafeOptionalChainingReportsTheChainSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
@@ -346,6 +350,7 @@ func TestNoUnsafeOptionalChainingCoversEveryUnsafeContext(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// Every case runs with the option on, which changes nothing for the usage cases
 			// (their contexts are unsafe regardless) and enables the arithmetic ones.
 			result := rule_testing.RunWithOptions(t, NoUnsafeOptionalChaining,
@@ -388,6 +393,7 @@ func TestNoUnsafeOptionalChainingDeclinesSafeContextsUnderTheOption(t *testing.T
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnsafeOptionalChaining,
 				unsafeOptionalChainingFile, testCase.sourceText,
 				NoUnsafeOptionalChainingOptions{DisallowArithmeticOperators: true}))

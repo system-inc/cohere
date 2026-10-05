@@ -91,6 +91,7 @@ func TestPreferObjectHasOwnStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts", testCase.source))
 		})
@@ -146,6 +147,7 @@ func TestPreferObjectHasOwnFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts", testCase.source)
 			rule_testing.ExpectFindings(t, result, "useHasOwn")
 			if testCase.wantFixed == preferObjectHasOwnDeclinesToFix {
@@ -179,6 +181,7 @@ func TestPreferObjectHasOwnSpan(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
@@ -218,6 +221,7 @@ func TestPreferObjectHasOwnScopeGuard(t *testing.T) {
 	}
 	for _, testCase := range shadowed {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts", testCase.source))
 		})
@@ -226,6 +230,7 @@ func TestPreferObjectHasOwnScopeGuard(t *testing.T) {
 	// A control, so the four clean verdicts above mean something. The same call with no shadow
 	// reports, which is the only thing that separates a working guard from a dead rule.
 	t.Run("controlWithNoShadowReports", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts",
 			"Object.prototype.hasOwnProperty.call(obj, prop);"), "useHasOwn")
 	})
@@ -290,6 +295,7 @@ func TestPreferObjectHasOwnRequiresTheNameObject(t *testing.T) {
 	}
 	for _, testCase := range otherGlobals {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts", testCase.source))
 		})
@@ -297,6 +303,7 @@ func TestPreferObjectHasOwnRequiresTheNameObject(t *testing.T) {
 
 	// A control, because three clean verdicts prove nothing on their own.
 	t.Run("controlObjectStillReports", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts",
 			"Object.hasOwnProperty.call(obj, prop);"), "useHasOwn")
 	})
@@ -305,6 +312,7 @@ func TestPreferObjectHasOwnRequiresTheNameObject(t *testing.T) {
 	// probe written for this measurement. The rule's length guard is what keeps that a decline
 	// rather than a panic, and no upstream case reaches it.
 	t.Run("globalThisHasNoDeclarationsAndDoesNotPanic", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts",
 			"globalThis.hasOwnProperty.call(obj, prop);"))
 	})

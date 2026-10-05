@@ -78,6 +78,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(parameterPropertyCaseName(testCase.number), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.sourceText))
 		})
@@ -118,6 +119,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(parameterPropertyCaseName(testCase.number), func(t *testing.T) {
+			t.Parallel()
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "unnecessaryAssign"
@@ -168,6 +170,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentSuggestsTheRepair(t *testing.T)
 
 	for _, testCase := range cases {
 		t.Run(parameterPropertyCaseName(testCase.number), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.before)
 			got := applyEveryParameterPropertySuggestion(t, testCase.before, result)
@@ -297,6 +300,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
@@ -382,6 +386,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentMeasuredAgainstUpstream(t *test
 
 	for _, testCase := range reporting {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.sourceText),
 				"unnecessaryAssign")
@@ -450,6 +455,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentMeasuredAgainstUpstream(t *test
 
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.sourceText))
 		})

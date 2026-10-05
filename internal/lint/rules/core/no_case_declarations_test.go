@@ -29,6 +29,7 @@ func TestNoCaseDeclarationsReportsLexicalDeclarations(t *testing.T) {
 		{"multiple declarators in one statement is one statement", `switch (a) { case 1: let x = 1, y = 2; break; }`, 1},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoCaseDeclarations, "file.ts", testCase.source)
 			wantIds := make([]string, testCase.want)
 			for index := range wantIds {
@@ -64,6 +65,7 @@ func TestNoCaseDeclarationsAcceptsScopedAndHoistedDeclarations(t *testing.T) {
 		{"declaration outside the switch", `const outside = 1; switch (a) { case 1: break; }`},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoCaseDeclarations, "file.ts", testCase.source))
 		})
 	}

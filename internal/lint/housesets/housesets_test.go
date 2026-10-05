@@ -35,6 +35,7 @@ func buildProject(t *testing.T, files map[string]string) (string, *program.Graph
 }
 
 func TestReactIsDetectedFromImportsAndJsxNotFromPackageJson(t *testing.T) {
+	t.Parallel()
 	root, graph := buildProject(t, map[string]string{
 		// react is a dependency, and that alone applies nothing.
 		"package.json":             `{"dependencies": {"react": "19.2.0", "next": "16.0.0"}, "scripts": {"react": "echo react"}}`,
@@ -62,6 +63,7 @@ func TestReactIsDetectedFromImportsAndJsxNotFromPackageJson(t *testing.T) {
 }
 
 func TestNextIsDetectedFromImportsAndItsOwnFilesOnlyInANextProgram(t *testing.T) {
+	t.Parallel()
 	files := map[string]string{
 		"app/layout.tsx":                 "import type { Metadata } from 'next';\nexport const metadata: Metadata = {};\n",
 		"app/page.tsx":                   "export default function Page() { return <main />; }\n",
@@ -96,6 +98,7 @@ func TestNextIsDetectedFromImportsAndItsOwnFilesOnlyInANextProgram(t *testing.T)
 }
 
 func TestTailwindIsDetectedFromTheStylesheetAndSkippedByNameWithoutOne(t *testing.T) {
+	t.Parallel()
 	root, graph := buildProject(t, map[string]string{
 		"index.ts":        "export const x = 1;\n",
 		"app/globals.css": "@import \"tailwindcss\";\n",

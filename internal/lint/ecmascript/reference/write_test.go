@@ -49,6 +49,7 @@ func expectOne(t *testing.T, source string, want bool) {
 // TestPlainWrites covers the shapes ast.IsWriteAccess already gets right, so a regression in the
 // pass-through arms shows up as one of these flipping rather than as silence.
 func TestPlainWrites(t *testing.T) {
+	t.Parallel()
 	for _, source := range []string{
 		"a = 1;",
 		"a += 1;",
@@ -75,6 +76,7 @@ func TestPlainWrites(t *testing.T) {
 // the unguarded climb honest: each one walks through a pass-through wrapper and must still answer
 // false, because the climb ends at something that is not an assignment.
 func TestReads(t *testing.T) {
+	t.Parallel()
 	for _, source := range []string{
 		"foo(a);",
 		"b = a;",
@@ -118,6 +120,7 @@ func TestReads(t *testing.T) {
 // this independently and each wrote its own workaround; this is what the shared version has to get
 // right for all of them.
 func TestRestElementsInAssignmentTargets(t *testing.T) {
+	t.Parallel()
 	for _, source := range []string{
 		"[...a] = xs;",
 		"({...a} = o);",
@@ -149,6 +152,7 @@ func TestRestElementsInAssignmentTargets(t *testing.T) {
 //
 // The shared version takes no-class-assign's answer, which is the union and the correct one.
 func TestParenthesizedRestTargets(t *testing.T) {
+	t.Parallel()
 	expectOne(t, "[...(a)] = xs;", true)
 	expectOne(t, "({...(a)} = o);", true)
 	// A parenthesis further up the chain, which no implementation got wrong but which the
@@ -160,6 +164,7 @@ func TestParenthesizedRestTargets(t *testing.T) {
 // spread in a value position walks the same wrappers and must still answer false, because the climb
 // reaches a call or a declaration rather than an assignment operator.
 func TestSpreadOutsideAnAssignmentStaysARead(t *testing.T) {
+	t.Parallel()
 	for _, source := range []string{
 		"foo(...[...a]);",
 		"const xs2 = [b, ...a];",
@@ -174,6 +179,7 @@ func TestSpreadOutsideAnAssignmentStaysARead(t *testing.T) {
 // TestNilIsNotAWrite covers the guard a shared function needs and a rule-local one did not: inside
 // a rule the identifier always came from a walk, and on a shelf any caller can pass anything.
 func TestNilIsNotAWrite(t *testing.T) {
+	t.Parallel()
 	if reference.WritesToBinding(nil) {
 		t.Error("WritesToBinding(nil) = true, want false")
 	}
@@ -190,6 +196,7 @@ func TestNilIsNotAWrite(t *testing.T) {
 // Verified with node: `let a = "ORIGINAL"; ({ files = a } = {})` leaves a untouched. It is also
 // upstream's own clean case for no-const-assign.
 func TestShorthandPropertyPositions(t *testing.T) {
+	t.Parallel()
 	// Name() position: the binding is what gets written.
 	expectOne(t, "({a} = o);", true)
 	// ObjectAssignmentInitializer position: the binding supplies a default and is only read.
@@ -208,6 +215,7 @@ func TestShorthandPropertyPositions(t *testing.T) {
 // TestDefaultValuesInOtherPatterns covers the same read-not-write question in the array and nested
 // forms, so the discrimination is not pinned only to the object shorthand.
 func TestDefaultValuesInOtherPatterns(t *testing.T) {
+	t.Parallel()
 	// An array element default. `a` supplies the fallback and is read.
 	expectOne(t, "[b = a] = xs;", false)
 	// A property-value default.
@@ -221,6 +229,7 @@ func TestDefaultValuesInOtherPatterns(t *testing.T) {
 
 // TestIsUpdateOperator covers the two operators that write back and a sample of those that do not.
 func TestIsUpdateOperator(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		operator ast.Kind
 		want     bool
@@ -255,6 +264,7 @@ func TestIsUpdateOperator(t *testing.T) {
 // The assertion is deliberately on the SHIM's answer rather than on ours. Asserting our answer would
 // pass either way and prove nothing about why the wrapper exists.
 func TestShelfAccessorStillDeclinesRestElements(t *testing.T) {
+	t.Parallel()
 	for _, source := range []string{
 		"[...a] = xs;",
 		"({...a} = o);",

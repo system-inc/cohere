@@ -98,6 +98,7 @@ func TestNoArrayConstructorFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, testCase.sourceText),
 				testCase.wantIds...)
@@ -176,6 +177,7 @@ func TestNoArrayConstructorStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, testCase.sourceText))
 		})
@@ -206,6 +208,7 @@ func TestNoArrayConstructorDeclinesOtherConstructors(t *testing.T) {
 		"new ArrayLike();",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, sourceText))
 		})
@@ -223,6 +226,7 @@ func TestNoArrayConstructorDeclinesBareOptionalCalls(t *testing.T) {
 
 	for _, sourceText := range []string{"Array?.();", "Array?.(1, 2);", "Array?.(...args);"} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, sourceText))
 		})
@@ -243,6 +247,7 @@ func TestNoArrayConstructorDeclinesAShadowedArray(t *testing.T) {
 		"import { Array } from './Shim';\nexport const a = new Array(1, 2);\n",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, sourceText))
 		})
@@ -311,6 +316,7 @@ func TestNoArrayConstructorSuggestsAnArrayLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -365,6 +371,7 @@ func TestNoArrayConstructorKeepsCommentsAmongArguments(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))

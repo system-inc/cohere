@@ -46,10 +46,12 @@ type preferNullishCoalescingReplayedCase struct {
 // carries comments out of the block. An id and a count see none of that, so each row pins the
 // spanned text and the whole file after the suggestion.
 func TestPreferNullishCoalescingTernaryAndIfFire(t *testing.T) {
+	t.Parallel()
 	cases := append(append([]preferNullishCoalescingReplayedCase(nil),
 		preferNullishCoalescingTernaryAndIfCases...), preferNullishCoalescingBeyondTheCorpusCases...)
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runPreferNullishCoalescing(t, preferNullishCoalescingCase{
 				source: testCase.source, optionsJson: testCase.optionsJson,
 			})
@@ -117,6 +119,7 @@ var preferNullishCoalescingBeyondTheCorpusCases = []preferNullishCoalescingRepla
 // strict `=== null || === null` row is the loose join's own control: the same shape read strict, on
 // a type that also holds undefined, is not fixable. All four replayed silent on the installed build.
 func TestPreferNullishCoalescingTernaryAndIfStaySilentBeyondTheCorpus(t *testing.T) {
+	t.Parallel()
 	for _, source := range []string{
 		"declare let x: string | null | undefined;\ndeclare const y: string;\nconst r = x === null || x === null ? y : x;\n",
 		"declare let x: string | null;\ndeclare const y: string;\nconst r = x !== x ? x : y;\n",
@@ -124,6 +127,7 @@ func TestPreferNullishCoalescingTernaryAndIfStaySilentBeyondTheCorpus(t *testing
 		"declare let x: string | null;\ndeclare const y: string;\nif (x === x) x = y;\n",
 	} {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runPreferNullishCoalescing(t, preferNullishCoalescingCase{source: source}))
 		})
 	}
@@ -132,6 +136,7 @@ func TestPreferNullishCoalescingTernaryAndIfStaySilentBeyondTheCorpus(t *testing
 // TestPreferNullishCoalescingTernaryAndIfMessages pins the two new renderings whole, since the
 // replay table asserts ids and the message text is ours past upstream's first sentence.
 func TestPreferNullishCoalescingTernaryAndIfMessages(t *testing.T) {
+	t.Parallel()
 	ternary := runPreferNullishCoalescing(t, preferNullishCoalescingCase{
 		source: "declare const a: string | null;\nconst x = a !== null ? a : 'b';\n",
 	})
@@ -2164,6 +2169,7 @@ func TestPreferNullishCoalescingIfIsSilentInsideReactCompiledFunctions(t *testin
 
 	for _, testCase := range preferNullishCoalescingCompiledRows {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			off := rule_testing.RunTypedWithOptions(t, PreferNullishCoalescing, "Compiled.tsx", testCase.sourceText, compilerOff)
 			rule_testing.ExpectFindings(t, off, "preferNullishOverAssignment")
 			on := rule_testing.RunTypedWithOptions(t, PreferNullishCoalescing, "Compiled.tsx", testCase.sourceText, compilerOn)

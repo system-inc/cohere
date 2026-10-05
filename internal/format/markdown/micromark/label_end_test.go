@@ -151,4 +151,7 @@ var labelEndFixtures = []string{
 	"[a\n\nb](c)",
 }
 
-func TestLabelEndEvents(t *testing.T) { compareEvents(t, labelEndFixtures) }
+func TestLabelEndEvents(t *testing.T) {
+	t.Parallel()
+	compareEvents(t, labelEndFixtures)
+}

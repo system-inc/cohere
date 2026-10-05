@@ -40,6 +40,7 @@ func valueChain(declaration *estree.Node) []*estree.Node {
 }
 
 func TestParseGlueTypesAndOffsets(t *testing.T) {
+	t.Parallel()
 	text := "a { b: x --c }"
 	root := mustParse(t, text)
 	if !root.Is("css-root") || locStart(root) != 0 || locEnd(root) != len(text) {
@@ -75,6 +76,7 @@ func TestParseGlueTypesAndOffsets(t *testing.T) {
 }
 
 func TestParseGlueOffsetsAreBytes(t *testing.T) {
+	t.Parallel()
 	// "\xc3\xa9" is one UTF-16 unit and two bytes, "\xf0\x9f\x98\x80" two units and four bytes.
 	text := "/* \xf0\x9f\x98\x80 */\na { b: \"\xc3\xa9\" c }\n.\xc3\xa9 { d: e }"
 	root := mustParse(t, text)
@@ -93,6 +95,7 @@ func TestParseGlueOffsetsAreBytes(t *testing.T) {
 }
 
 func TestParseGlueUrlArgumentsAreAString(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, "a { b: url( x.png ) }")
 	function := valueChain(firstDeclaration(t, root))[2]
 	if !function.Is("value-func") || function.String("value") != "url" {
@@ -105,6 +108,7 @@ func TestParseGlueUrlArgumentsAreAString(t *testing.T) {
 }
 
 func TestParseGlueCustomPropertyBlock(t *testing.T) {
+	t.Parallel()
 	text := ":root { --x: { a: b } }"
 	declaration := firstDeclaration(t, mustParse(t, text))
 	value := declaration.Child("value")
@@ -118,6 +122,7 @@ func TestParseGlueCustomPropertyBlock(t *testing.T) {
 }
 
 func TestParseGlueFrontMatter(t *testing.T) {
+	t.Parallel()
 	text := "---\ntitle: x\n---\na { b: c }"
 	root := mustParse(t, text)
 	frontMatter := root.Child("frontMatter")
@@ -130,6 +135,7 @@ func TestParseGlueFrontMatter(t *testing.T) {
 }
 
 func TestParseGlueErrors(t *testing.T) {
+	t.Parallel()
 	if _, err := parse("a {"); err == nil || !printing.IsSyntax(err) {
 		t.Errorf("an unclosed block: want a syntax error, got %v", err)
 	}
@@ -143,6 +149,7 @@ func TestParseGlueErrors(t *testing.T) {
 }
 
 func TestParseGlueVisitorKeys(t *testing.T) {
+	t.Parallel()
 	if keys := visitorKeys(estree.New("css-root", 0, 0)); !slices.Equal(keys, []string{"frontMatter", "nodes"}) {
 		t.Errorf("css-root: %v", keys)
 	}

@@ -72,6 +72,7 @@ func TestUseUnknownInCatchCallbackVariableStaysSilent(t *testing.T) {
 		{"upstream valid 30", "\ntype InvalidHandler = (arg: any) => void;\nPromise.resolve().catch(<InvalidHandler>(\n  function (err /* awkward spot for comment */) {\n    throw err;\n  }\n));\n    "}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -119,6 +120,7 @@ func TestUseUnknownInCatchCallbackVariableFires(t *testing.T) {
 		{"upstream invalid 25", "\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && (err => {})) || (err => {}),\n);\n      ", []string{"useUnknown", "useUnknown", "useUnknown"}}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -172,6 +174,7 @@ func TestUseUnknownInCatchCallbackVariableSuggestions(t *testing.T) {
 		{"upstream invalid 25", "\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && (err => {})) || (err => {}),\n);\n      ", "addUnknownTypeAnnotationSuggestion", "\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && (err => {})) || ((err: unknown) => {}),\n);\n      "}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("want at least one finding, got none")
@@ -227,11 +230,13 @@ func TestUseUnknownInCatchCallbackVariableComputedKeyDivergence(t *testing.T) {
 	t.Parallel()
 
 	t.Run("a let-bound key is silent here and reports upstream", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, "\nlet method = 'catch';\nPromise.resolve()[method]((error: Error) => {});\n      ")
 		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("a const-bound key reports, which a string-literal test would miss", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile,
 			"\nconst method = 'catch';\nPromise.resolve()[method]((error: Error) => {});\n      ")
 		rule_testing.ExpectFindings(t, result, "useUnknown")
@@ -282,11 +287,13 @@ func TestUseUnknownInCatchCallbackVariableThisParameter(t *testing.T) {
 	}
 
 	t.Run("a this parameter alone is clean, so this is no checker parameter", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile,
 			"interface W {\n  z: number;\n}\ndeclare const p: Promise<void>;\np.catch(function (this: W) {});"))
 	})
 
 	t.Run("an unknown err is clean, so the decision reads err rather than this", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile,
 			"interface W {\n  z: number;\n}\ndeclare const p: Promise<void>;\np.catch(function (this: W, err: unknown) {});"))
 	})
@@ -358,6 +365,7 @@ func TestUseUnknownInCatchCallbackVariableMessages(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
@@ -405,6 +413,7 @@ func TestUseUnknownInCatchCallbackVariableParentheses(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("want a finding: a parenthesis is invisible to upstream and must be here too")
@@ -474,6 +483,7 @@ func TestUseUnknownInCatchCallbackVariableSurvivesMalformedCalls(t *testing.T) {
 
 	for index, source := range sources {
 		t.Run(fmt.Sprintf("shape-%d", index), func(t *testing.T) {
+			t.Parallel()
 			// A panic fails the test. The assertion is only that this returns at all: what the rule
 			// concludes about a malformed shape belongs in its own fixture, and asserting it here
 			// would make this guard fail for reasons that are not crashes.

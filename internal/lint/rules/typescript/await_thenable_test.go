@@ -79,6 +79,7 @@ func TestAwaitThenableFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, AwaitThenable,
 				awaitThenableFile, testCase.sourceText), testCase.wantIds...)
 		})
@@ -131,6 +132,7 @@ func TestAwaitThenableStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, AwaitThenable,
 				awaitThenableFile, testCase.sourceText))
 		})
@@ -161,6 +163,7 @@ func TestAwaitThenableDisposable(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedFiles(t, AwaitThenable, map[string]string{
 				"Globals.ts": disposeGlobals,
 				"Await.ts":   testCase.sourceText,
@@ -186,6 +189,7 @@ func TestAwaitThenableSpans(t *testing.T) {
 	t.Parallel()
 
 	t.Run("the await arm spans the whole await expression", func(t *testing.T) {
+		t.Parallel()
 		source := "async function f() {\n  await 0;\n}"
 		result := rule_testing.RunTyped(t, AwaitThenable, awaitThenableFile, source)
 		if len(result.Diagnostics) != 1 {
@@ -205,6 +209,7 @@ func TestAwaitThenableSpans(t *testing.T) {
 	})
 
 	t.Run("the for await arm spans the loop head", func(t *testing.T) {
+		t.Parallel()
 		source := "function* g() {\n  yield 1;\n}\nasync function f() {\n  for await (const value of g()) {\n    console.log(value);\n  }\n}"
 		result := rule_testing.RunTyped(t, AwaitThenable, awaitThenableFile, source)
 		if len(result.Diagnostics) != 1 {
@@ -226,6 +231,7 @@ func TestAwaitThenableSpans(t *testing.T) {
 	})
 
 	t.Run("the await using arm points at each initializer", func(t *testing.T) {
+		t.Parallel()
 		source := "declare const disposable: Disposable;\ndeclare const asyncDisposable: AsyncDisposable;\nasync function foo() {\n  await using a = disposable,\n    b = asyncDisposable,\n    c = disposable;\n}"
 		result := rule_testing.RunTypedFiles(t, AwaitThenable, map[string]string{
 			"Globals.ts": disposeGlobals,
@@ -290,6 +296,7 @@ func TestAwaitThenableSuggestions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, AwaitThenable, awaitThenableFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want one finding, got %d", len(result.Diagnostics))

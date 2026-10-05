@@ -57,6 +57,7 @@ func declarationsProbe(t *testing.T) (shared *ast.Symbol, first *ast.SourceFile,
 // DeclarationsIn keeps exactly the declarations in the file it is handed, from either side of a merge,
 // so a rule reading through it cannot reach another file's declaration.
 func TestDeclarationsInKeepsOnlyTheFilesOwn(t *testing.T) {
+	t.Parallel()
 	shared, first, second, global := declarationsProbe(t)
 	for _, sourceFile := range []*ast.SourceFile{first, second} {
 		own := rule.DeclarationsIn(sourceFile, shared)
@@ -74,6 +75,7 @@ func TestDeclarationsInKeepsOnlyTheFilesOwn(t *testing.T) {
 
 // IsDeclaredOnlyInDeclarationFiles tells a lib global from a binding a source file declares.
 func TestIsDeclaredOnlyInDeclarationFilesTellsALibGlobalFromASourceBinding(t *testing.T) {
+	t.Parallel()
 	shared, _, _, global := declarationsProbe(t)
 	if !rule.IsDeclaredOnlyInDeclarationFiles(global) {
 		t.Error("parseInt, declared only in the lib, was not recognised as a global")

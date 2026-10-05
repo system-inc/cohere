@@ -165,6 +165,7 @@ func TestConsistencyOrganizeImportsClassification(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.importLine+" -> "+testCase.group, func(t *testing.T) {
+			t.Parallel()
 			source := strings.Join([]string{
 				"// Dependencies - " + testCase.group,
 				testCase.importLine,

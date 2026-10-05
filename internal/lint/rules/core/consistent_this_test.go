@@ -65,6 +65,7 @@ func TestConsistentThisFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ConsistentThis, consistentThisFile,
 				testCase.sourceText, consistentThisOptions(t, testCase.aliases...))
 			rule_testing.ExpectFindings(t, result, testCase.messages...)
@@ -103,6 +104,7 @@ func TestConsistentThisStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, ConsistentThis,
 				consistentThisFile, testCase.sourceText, consistentThisOptions(t, testCase.aliases...)))
 		})
@@ -151,6 +153,7 @@ func TestConsistentThisScopeModel(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ConsistentThis, consistentThisFile,
 				testCase.sourceText, consistentThisOptions(t, "self"))
 			rule_testing.ExpectFindings(t, result, testCase.messages...)
@@ -185,6 +188,7 @@ func TestConsistentThisOtherDeclarationForms(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ConsistentThis, consistentThisFile,
 				testCase.sourceText, consistentThisOptions(t, "self"))
 			rule_testing.ExpectFindings(t, result, testCase.messages...)
@@ -202,6 +206,7 @@ func TestDecodeConsistentThisOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("an absent option is the alias that", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeConsistentThisOptions(nil)
 		if err != nil {
 			t.Fatalf("the decoder refused an absent option: %v", err)
@@ -216,6 +221,7 @@ func TestDecodeConsistentThisOptions(t *testing.T) {
 	})
 
 	t.Run("a bare severity leaves the rule on its default", func(t *testing.T) {
+		t.Parallel()
 		// A rule configured as "error" is handed nil options, which arrives at Run as an untyped
 		// nil rather than as settings. Asserting through the rule rather than the decoder is what
 		// covers the fallback inside Run, which no decoder test can reach.
@@ -226,6 +232,7 @@ func TestDecodeConsistentThisOptions(t *testing.T) {
 	})
 
 	t.Run("one element is one alias", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeConsistentThisOptions(json.RawMessage(`["self"]`))
 		if err != nil {
 			t.Fatalf("the decoder refused one alias: %v", err)
@@ -237,6 +244,7 @@ func TestDecodeConsistentThisOptions(t *testing.T) {
 	})
 
 	t.Run("every element is an alias, upstream's variadic spelling", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeConsistentThisOptions(json.RawMessage(`["self","vm"]`))
 		if err != nil {
 			t.Fatalf("the decoder refused two aliases: %v", err)
@@ -248,12 +256,14 @@ func TestDecodeConsistentThisOptions(t *testing.T) {
 	})
 
 	t.Run("the nested-array workaround is refused rather than read", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeConsistentThisOptions(json.RawMessage(`[["self","vm"]]`)); err == nil {
 			t.Error("an element that is not a string decoded; upstream's schema refuses it")
 		}
 	})
 
 	t.Run("an empty name is refused", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeConsistentThisOptions(json.RawMessage(`[""]`)); err == nil {
 			t.Error("expected the decoder to refuse an empty alias")
 		}
@@ -263,6 +273,7 @@ func TestDecodeConsistentThisOptions(t *testing.T) {
 	})
 
 	t.Run("an empty list falls back to the default", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeConsistentThisOptions(json.RawMessage(`[]`))
 		if err != nil {
 			t.Fatalf("the decoder refused an empty list: %v", err)
@@ -337,6 +348,7 @@ func TestConsistentThisTreatsAnArrowAsNeitherScopeNorTransparent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ConsistentThis, consistentThisFile,
 				testCase.sourceText, consistentThisOptions(t, "self"))
 			rule_testing.ExpectFindings(t, result, testCase.messages...)
@@ -367,6 +379,7 @@ func TestConsistentThisJudgesAFunctionExpressionAsItsOwnScope(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ConsistentThis, consistentThisFile,
 				testCase.sourceText, consistentThisOptions(t, "self"))
 			rule_testing.ExpectFindings(t, result, testCase.messages...)

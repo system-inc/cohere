@@ -42,6 +42,7 @@ func exists(path string) bool {
 
 // A directory that does not say it is a Go build cache is never trimmed, however large.
 func TestADirectoryWithoutGosReadmeIsRefused(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	file := put(t, directory, "ab/0000ab-d", 4096, time.Now().Add(-48*time.Hour))
 	if _, err := Trim(directory, Limit{Cap: 1, Target: 0}, time.Now()); err == nil || !strings.Contains(err.Error(), "refusing to trim") {
@@ -55,6 +56,7 @@ func TestADirectoryWithoutGosReadmeIsRefused(t *testing.T) {
 // Over its cap, a cache loses its least recently used entries until it is at its target, and keeps the
 // rest, everything that is not an entry, and what is used now.
 func TestTheLeastRecentlyUsedEntriesGoFirstDownToTheTarget(t *testing.T) {
+	t.Parallel()
 	directory := newCache(t)
 	now := time.Now()
 	oldest := put(t, directory, "00/00aa-d", 400, now.Add(-72*time.Hour))
@@ -94,6 +96,7 @@ func TestTheLeastRecentlyUsedEntriesGoFirstDownToTheTarget(t *testing.T) {
 // even with the cache over its cap and nothing else to take. The #3sgjy0h gate removed young entries to
 // hold a burst under the cap, and a live `go test` failed with "could not import ... no such file".
 func TestEntriesInUseAreNeverRemoved(t *testing.T) {
+	t.Parallel()
 	directory := newCache(t)
 	now := time.Now()
 	stale := put(t, directory, "00/00aa-d", 400, now.Add(-InUseWindow-time.Minute))
@@ -123,6 +126,7 @@ func TestEntriesInUseAreNeverRemoved(t *testing.T) {
 // An executable entry is a directory holding the binary. It is measured whole and removed file by file,
 // and one holding anything but plain files is left alone.
 func TestAnExecutableEntryIsRemovedByName(t *testing.T) {
+	t.Parallel()
 	directory := newCache(t)
 	now := time.Now()
 	old := now.Add(-48 * time.Hour)
@@ -153,6 +157,7 @@ func TestAnExecutableEntryIsRemovedByName(t *testing.T) {
 // Positive control on a real cache: the go command fills it, a trim to nothing removes every entry, and
 // the go command opens the trimmed cache and builds again with no error.
 func TestTheGoCommandBuildsFromATrimmedCache(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("no go command")
 	}

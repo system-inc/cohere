@@ -38,6 +38,7 @@ func TestBanTslintCommentStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(banTslintCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, BanTslintComment,
 				banTslintCommentFile, sourceText))
 		})
@@ -114,6 +115,7 @@ func TestBanTslintCommentFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTslintCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, BanTslintComment, banTslintCommentFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "commentDetected")
 
@@ -219,6 +221,7 @@ func TestBanTslintCommentDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) 
 	}
 	for index, testCase := range cases {
 		t.Run(banTslintCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, BanTslintComment, banTslintCommentFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -252,6 +255,7 @@ func TestBanTslintCommentRendersTheCommentUpstreamRenders(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTslintCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, BanTslintComment, banTslintCommentFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "commentDetected")
 			want := messageBanTslintComment(testCase.wantText).Description
@@ -308,6 +312,7 @@ func TestBanTslintCommentFixDeclinesToDeleteCode(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTslintCommentCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, BanTslintComment, banTslintCommentFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "commentDetected")
 			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
@@ -332,6 +337,7 @@ func TestBanTslintCommentHasNoFileGate(t *testing.T) {
 		"/repository/source/Thing.jsx",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, BanTslintComment,
 				fileName, "// tslint:disable"), "commentDetected")
 		})
@@ -356,6 +362,7 @@ func TestBanTslintCommentSurvivesAnUnterminatedBlockComment(t *testing.T) {
 
 	for _, sourceText := range []string{"/*", "/*/", "/**", "/* tslint:disable"} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.Run(t, BanTslintComment, banTslintCommentFile, sourceText)
 		})
 	}

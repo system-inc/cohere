@@ -42,6 +42,7 @@ func TestNoNewFuncFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText),
 				"noFunctionConstructor")
@@ -79,6 +80,7 @@ func TestNoNewFuncStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
 		})
@@ -112,6 +114,7 @@ func TestNoNewFuncReportsTheInvokingExpression(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -148,6 +151,7 @@ func TestNoNewFuncFiresOnShapesTheCorpusOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText),
 				"noFunctionConstructor")
@@ -173,6 +177,7 @@ func TestNoNewFuncDeclinesShapesTheCorpusOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
 		})
@@ -239,6 +244,7 @@ func TestNoNewFuncDeclinesAShadowReachedThroughAMethod(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
 		})
@@ -267,6 +273,7 @@ func TestNoNewFuncReadsATemplateMethodName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText),
 				"noFunctionConstructor")
@@ -286,6 +293,7 @@ func TestNoNewFuncDeclinesANumericMethodSubscript(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
 		})
@@ -318,6 +326,7 @@ func TestNoNewFuncSurvivesANonIdentifierReceiver(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// Reaching this assertion at all is most of the test: without the guard the call above
 			// panics inside the walk and the failure is a stack trace rather than a diagnostic count.
 			rule_testing.ExpectClean(t,

@@ -18,6 +18,7 @@ func TestNoShadowFires(t *testing.T) {
 
 	for _, testCase := range noShadowFiresCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoShadow, "file.ts", testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.messages...)
 		})
@@ -34,6 +35,7 @@ func TestNoShadowStaysSilent(t *testing.T) {
 
 	for _, testCase := range noShadowSilentCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoShadow, "file.ts", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -187,6 +189,7 @@ func TestNoShadowHandlesShapesTheCorpusDoesNotWrite(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoShadow, "file.ts", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -196,6 +199,7 @@ func TestNoShadowHandlesShapesTheCorpusDoesNotWrite(t *testing.T) {
 	// and the case is clean, so a wrapped call must still REPORT. If this went silent the unwrap
 	// would be over-reaching rather than correct.
 	t.Run("parenthesized wrapped call still reports", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, NoShadow, "file.ts", "var a = (wrap(function a() {}));\n")
 		rule_testing.ExpectFindings(t, result, "noShadow")
 	})
@@ -211,6 +215,7 @@ func TestNoShadowInferTypeParameters(t *testing.T) {
 	t.Parallel()
 
 	t.Run("infer over infer is clean", func(t *testing.T) {
+		t.Parallel()
 		source := "export type A<F> = F extends (a: Array<infer T>) => any\n" +
 			"  ? T[]\n" +
 			"  : F extends (...a: infer T) => any\n" +
@@ -222,11 +227,13 @@ func TestNoShadowInferTypeParameters(t *testing.T) {
 	// The two boundary cases. Both REPORT on the installed rule, and both would go silent under a
 	// blanket infer exemption.
 	t.Run("infer over an outer type alias reports", func(t *testing.T) {
+		t.Parallel()
 		source := "type T = string;\nexport type A<F> = F extends (a: infer T) => any ? T : never;\n"
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source), "noShadow")
 	})
 
 	t.Run("infer over an outer type parameter reports", func(t *testing.T) {
+		t.Parallel()
 		source := "export type A<T> = T extends (a: infer T) => any ? T : never;\n"
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source), "noShadow")
 	})
@@ -234,6 +241,7 @@ func TestNoShadowInferTypeParameters(t *testing.T) {
 	// Clean, but for the type-versus-value reason rather than for the infer one. Recorded so a
 	// later reader does not attribute it to this exemption.
 	t.Run("infer over an outer value is clean", func(t *testing.T) {
+		t.Parallel()
 		source := "const T = 1;\nexport type A<F> = F extends (a: infer T) => any ? T : never;\n"
 		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source))
 	})
@@ -280,6 +288,7 @@ func TestNoShadowFunctionTypeParameterNames(t *testing.T) {
 	}
 	for _, testCase := range clean {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoShadow, "file.ts", testCase.source))
 		})
 	}
@@ -287,6 +296,7 @@ func TestNoShadowFunctionTypeParameterNames(t *testing.T) {
 	// The control that makes the five above mean something: the same outer value shadowed by a
 	// REAL parameter reports, so the exemption is about type position rather than about the name.
 	t.Run("control: a real function parameter reports", func(t *testing.T) {
+		t.Parallel()
 		source := "const cb = 1;\nfunction foo(cb: number) {}\n"
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source), "noShadow")
 	})
@@ -306,11 +316,13 @@ func TestNoShadowSiblingExpressionNames(t *testing.T) {
 	t.Parallel()
 
 	t.Run("two sibling function expressions of one name are clean", func(t *testing.T) {
+		t.Parallel()
 		source := "var b = function a() {};\nvar c = function a() {};\n"
 		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source))
 	})
 
 	t.Run("two sibling class expressions of one name are clean", func(t *testing.T) {
+		t.Parallel()
 		source := "var b = class a {};\nvar c = class a {};\n"
 		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source))
 	})
@@ -318,11 +330,13 @@ func TestNoShadowSiblingExpressionNames(t *testing.T) {
 	// The controls. Each reports upstream, so the exemption above is about sibling position rather
 	// than about expression names being exempt.
 	t.Run("control: expression name over a preceding declaration reports", func(t *testing.T) {
+		t.Parallel()
 		source := "function a() {}\nvar b = function a() {};\n"
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source), "noShadow")
 	})
 
 	t.Run("control: expression name over a following declaration reports", func(t *testing.T) {
+		t.Parallel()
 		source := "var b = function a() {};\nfunction a() {}\n"
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source), "noShadow")
 	})
@@ -341,6 +355,7 @@ func TestNoShadowInterfaceTypeParameters(t *testing.T) {
 	t.Parallel()
 
 	t.Run("interface type parameter over an outer type reports", func(t *testing.T) {
+		t.Parallel()
 		source := "type T = 1;\ninterface I<T> {\n  x: T;\n}\n"
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source), "noShadow")
 	})
@@ -348,6 +363,7 @@ func TestNoShadowInterfaceTypeParameters(t *testing.T) {
 	// The control that pins the comparison: the type alias form reports too, and it reaches the
 	// answer through the locals table rather than through the shape collection above.
 	t.Run("type alias type parameter over an outer type reports", func(t *testing.T) {
+		t.Parallel()
 		source := "type T = 1;\ntype A<T> = T;\n"
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source), "noShadow")
 	})
@@ -357,6 +373,7 @@ func TestNoShadowInterfaceTypeParameters(t *testing.T) {
 	// cost every rule in the package its verdict on that file. The assertion is that a binding
 	// nested INSIDE the interface's members is still reached, which a bare early return would lose.
 	t.Run("plain interface does not abandon the subtree", func(t *testing.T) {
+		t.Parallel()
 		source := "type T = 1;\ninterface Plain {\n  x: number;\n}\nfunction f<T>(a: T) {}\n"
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source), "noShadow")
 	})
@@ -389,6 +406,7 @@ func TestNoShadowTemporalDeadZone(t *testing.T) {
 	}
 	for _, testCase := range reports {
 		t.Run(testCase.name+" reports", func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoShadow, "file.ts", testCase.source), "noShadow")
 		})
@@ -406,6 +424,7 @@ func TestNoShadowTemporalDeadZone(t *testing.T) {
 	}
 	for _, testCase := range clean {
 		t.Run(testCase.name+" is clean", func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoShadow, "file.ts", testCase.source))
 		})
 	}

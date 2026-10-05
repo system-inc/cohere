@@ -46,6 +46,7 @@ var widthCases = []string{
 // curated cases and, when COHERE_FORMAT_CORPORA is also set, every distinct line containing a
 // non-ASCII byte in those repositories, which is the population that actually reaches the printer.
 func TestStringWidthAgreesWithUpstream(t *testing.T) {
+	t.Parallel()
 	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	if root == "" {
 		t.Skip("set COHERE_PRETTIER_ROOT to the Prettier fork to measure against upstream")
@@ -86,6 +87,7 @@ func TestStringWidthAgreesWithUpstream(t *testing.T) {
 
 // TestWidthControlCanFail proves the comparison above can disagree, so its agreement means something.
 func TestWidthControlCanFail(t *testing.T) {
+	t.Parallel()
 	if StringWidth("中") != 2 || StringWidth("a") != 1 || StringWidth("😀") != 2 || StringWidth("é") != 1 {
 		t.Fatalf("basic widths wrong: 中=%d a=%d 😀=%d e+combining=%d",
 			StringWidth("中"), StringWidth("a"), StringWidth("😀"), StringWidth("é"))

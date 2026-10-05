@@ -121,6 +121,7 @@ func TestVerifyArrayParityFires(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := verifyArrayDecoratorPreamble + testCase.source
 			result := rule_testing.RunTyped(t, CorrectnessRequireVerifyArrayParity, correctnessRequireVerifyArrayParityFile, source)
 			rule_testing.ExpectFindings(t, result, "missingArrayRule")
@@ -221,6 +222,7 @@ func TestVerifyArrayParityStaysSilent(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, CorrectnessRequireVerifyArrayParity,
 				correctnessRequireVerifyArrayParityFile, verifyArrayDecoratorPreamble+testCase.source))
 		})

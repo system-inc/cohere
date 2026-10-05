@@ -84,6 +84,7 @@ func TestNoThisAliasFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoThisAlias, thisAliasFile, testCase.sourceText,
 				decodeThisAliasOptionsForTest(t, testCase.configuration))
 			rule_testing.ExpectFindings(t, result, testCase.expected...)
@@ -141,6 +142,7 @@ func TestNoThisAliasStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoThisAlias, thisAliasFile,
 				testCase.sourceText, decodeThisAliasOptionsForTest(t, testCase.configuration)))
 		})
@@ -202,6 +204,7 @@ func TestNoThisAliasPointsAtTheAliasItself(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoThisAlias, thisAliasFile, testCase.sourceText,
 				decodeThisAliasOptionsForTest(t, testCase.configuration))
 			if len(result.Diagnostics) != 1 {
@@ -272,6 +275,7 @@ func TestNoThisAliasDecodeMapsUpstreamSpellings(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeNoThisAliasOptions(json.RawMessage(testCase.configuration))
 			if err != nil {
 				t.Fatalf("decoding: %v", err)

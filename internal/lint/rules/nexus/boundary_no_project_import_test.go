@@ -30,6 +30,7 @@ func TestBoundaryNoProjectImportFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, BoundaryNoProjectImport, baseLibraryFile, testCase.source, baseLibraryOptions)
 			rule_testing.ExpectFindings(t, result, "forbiddenProjectImport")
 		})
@@ -58,6 +59,7 @@ func TestBoundaryNoProjectImportStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, BoundaryNoProjectImport, testCase.fileName, testCase.source, testCase.options)
 			rule_testing.ExpectClean(t, result)
 		})

@@ -61,6 +61,7 @@ func TestImportRequireModuleAliasFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ImportRequireModuleAlias, moduleAliasFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -139,6 +140,7 @@ func TestImportRequireModuleAliasStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ImportRequireModuleAlias, moduleAliasFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -175,6 +177,7 @@ func TestImportRequireModuleAliasReadsOptions(t *testing.T) {
 	}
 
 	t.Run("an added package is pinned", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(
 			t, ImportRequireModuleAlias, moduleAliasFile, "import lodash from 'lodash';\n", options,
 		)
@@ -182,6 +185,7 @@ func TestImportRequireModuleAliasReadsOptions(t *testing.T) {
 	})
 
 	t.Run("an added package under its pinned name is clean", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(
 			t, ImportRequireModuleAlias, moduleAliasFile, "import Lodash from 'lodash';\n", options,
 		)
@@ -192,6 +196,7 @@ func TestImportRequireModuleAliasReadsOptions(t *testing.T) {
 	// style were left genuinely unset this case would pass silently, which is the drift the default
 	// exists to stop.
 	t.Run("an added package with no style still requires the default form", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(
 			t, ImportRequireModuleAlias, moduleAliasFile, "import * as Lodash from 'lodash';\n", options,
 		)
@@ -201,6 +206,7 @@ func TestImportRequireModuleAliasReadsOptions(t *testing.T) {
 	// The override direction is the half a merge in the wrong order would break: react now wants the
 	// namespace form, so the built-in default entry must lose.
 	t.Run("a re-stated default is overridden", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(
 			t, ImportRequireModuleAlias, moduleAliasFile, "import React from 'react';\n", options,
 		)
@@ -208,6 +214,7 @@ func TestImportRequireModuleAliasReadsOptions(t *testing.T) {
 	})
 
 	t.Run("the overridden form is clean", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(
 			t, ImportRequireModuleAlias, moduleAliasFile, "import * as React from 'react';\n", options,
 		)
@@ -218,6 +225,7 @@ func TestImportRequireModuleAliasReadsOptions(t *testing.T) {
 	// declines every file without its options, it is not Required in the registry. This is the
 	// fixture that says so.
 	t.Run("the built-in defaults apply with no options at all", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.Run(t, ImportRequireModuleAlias, moduleAliasFile, "import ts from 'typescript';\n")
 		rule_testing.ExpectFindings(t, result, "requireNamespaceStyle")
 	})

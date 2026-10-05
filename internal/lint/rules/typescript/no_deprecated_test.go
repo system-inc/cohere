@@ -3676,18 +3676,21 @@ func TestNoDeprecatedFiresAndStaysQuiet(t *testing.T) {
 		"declare function b(): void;\n"
 
 	t.Run("fires on a use of the deprecated declaration", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, NoDeprecated, "/repository/source/Subject.ts",
 			source+"a();\n")
 		rule_testing.ExpectFindings(t, result, "deprecatedWithReason")
 	})
 
 	t.Run("stays quiet on a use of the undeprecated one", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, NoDeprecated, "/repository/source/Subject.ts",
 			source+"b();\n")
 		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("stays quiet on the declaration itself", func(t *testing.T) {
+		t.Parallel()
 		// The declaration site is not a use, so a rule keyed on the tag rather than on the
 		// reference would report here and this is what catches it.
 		result := rule_testing.RunTyped(t, NoDeprecated, "/repository/source/Subject.ts", source)
@@ -3695,6 +3698,7 @@ func TestNoDeprecatedFiresAndStaysQuiet(t *testing.T) {
 	})
 
 	t.Run("declines a file with no type checker", func(t *testing.T) {
+		t.Parallel()
 		// NeedsTypeChecker keeps this unreachable through registration, but the harness path and
 		// the registry's crash corpus both build a Context by hand. The rule panicked on exactly
 		// this before the guard in Run was written, so the decline is pinned here.

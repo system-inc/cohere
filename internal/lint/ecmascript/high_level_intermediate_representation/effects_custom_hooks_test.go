@@ -30,6 +30,7 @@ func TestCustomHookEffectsFollowModuleBindings(t *testing.T) {
 		{"disabled", "// @enableAssumeHooksFollowRulesOfReact:false\nimport {useData} from './hooks';", "useData", "", false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			alias := ""
 			if testCase.name == "local alias" {
 				alias = "const getData = useData;"
@@ -98,6 +99,7 @@ return <div onClick={callback}/>;
 		{"no later mutation", strings.ReplaceAll(source, "mutate(value);", ""), false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			findings, lowered := findingsForSource(t, testCase.source)
 			if !lowered || (len(findings) != 0) != testCase.fires {
 				t.Fatalf("lowered=%t findings=%v; want fires=%t", lowered, findings, testCase.fires)

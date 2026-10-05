@@ -13,6 +13,7 @@ var errHeld = errors.New("the destination is held open")
 // A rename refused while the destination is held succeeds once it is let go, and one refused for any
 // other reason fails at once. Windows refuses the way the fake below does; nothing else does.
 func TestARenameRefusedWhileHeldIsRetriedUntilItIsLetGo(t *testing.T) {
+	t.Parallel()
 	refusals := 3
 	rename := func(string, string) error {
 		if refusals > 0 {
@@ -42,6 +43,7 @@ func TestARenameRefusedWhileHeldIsRetriedUntilItIsLetGo(t *testing.T) {
 
 // A destination held for good fails after the bound with the refusal itself, rather than waiting forever.
 func TestARenameHeldForGoodFailsAfterTheBound(t *testing.T) {
+	t.Parallel()
 	slept := time.Duration(0)
 	err := replacing(func(string, string) error { return errHeld }, func(error) bool { return true },
 		func(pause time.Duration) { slept += pause }, "from", "to")
@@ -56,6 +58,7 @@ func TestARenameHeldForGoodFailsAfterTheBound(t *testing.T) {
 // File replaces a file, on every platform, including one another handle in this process has open: on
 // Windows that is the refusal it retries through, released here partway into the bound.
 func TestFileReplacesAFileHeldOpenBriefly(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	destination := filepath.Join(directory, "table.gob")
 	source := filepath.Join(directory, ".table-new")

@@ -26,6 +26,7 @@ func TestNetworkNoDirectFetchFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkNoDirectFetch, networkFile, testCase.sourceText),
 				"noDirectFetch")
 		})
@@ -33,6 +34,7 @@ func TestNetworkNoDirectFetchFires(t *testing.T) {
 
 	// NetworkService is exempt by where it lives, so a file elsewhere named after it is not.
 	t.Run("in a file merely named after NetworkService", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkNoDirectFetch, "/repository/app/_services/MyNetworkService.ts",
 			"export async function load(url: string) {\n    return fetch(url);\n}\n"), "noDirectFetch")
 	})
@@ -78,6 +80,7 @@ func TestNetworkNoDirectFetchStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkNoDirectFetch, testCase.fileName, testCase.sourceText))
 		})
 	}

@@ -25,6 +25,7 @@ func loadMinimalMessages(text string) (*MessageCatalog, error) {
 // TestTheMessageLoaderRefusesWhatWouldReadAsSomethingElse: the minimal file loads, and each one-place
 // change that would misread does not.
 func TestTheMessageLoaderRefusesWhatWouldReadAsSomethingElse(t *testing.T) {
+	t.Parallel()
 	if _, err := loadMinimalMessages(minimalMessages); err != nil {
 		t.Fatalf("the minimal file is refused (%v), so no refusal below would mean anything", err)
 	}
@@ -65,6 +66,7 @@ func TestTheMessageLoaderRefusesWhatWouldReadAsSomethingElse(t *testing.T) {
 
 // A lone house rule has no twin to differ from, so a term on one is refused, and without terms it loads.
 func TestALoneRuleCarriesNoTerms(t *testing.T) {
+	t.Parallel()
 	lone := `{"rules": {"TypeScript": "base/consistency-no-thing"}, "messages": {"thing": {"text": "This is %s."}}}`
 	if _, err := loadMinimalMessages(strings.Replace(lone, "%s", "a thing", 1)); err != nil {
 		t.Fatalf("a lone rule with no terms is refused: %v", err)
@@ -77,6 +79,7 @@ func TestALoneRuleCarriesNoTerms(t *testing.T) {
 
 // A rule named by two files is refused, wherever the second one is.
 func TestARuleNamedByTwoFilesIsRefused(t *testing.T) {
+	t.Parallel()
 	second := strings.Replace(minimalMessages, `"base/consistency-no-thing"`, `"base/consistency-no-other"`, 1)
 	_, err := LoadMessages(fstest.MapFS{
 		"consistency-no-thing.json": {Data: []byte(minimalMessages)},
@@ -89,6 +92,7 @@ func TestARuleNamedByTwoFilesIsRefused(t *testing.T) {
 
 // Each language's text resolves its own terms, and Render puts in exactly the values that text uses.
 func TestEachLanguageRendersItsOwnTermsAndValues(t *testing.T) {
+	t.Parallel()
 	catalog, err := loadMinimalMessages(minimalMessages)
 	if err != nil {
 		t.Fatal(err)
@@ -123,6 +127,7 @@ func TestEachLanguageRendersItsOwnTermsAndValues(t *testing.T) {
 
 // MessageOf refuses a message the catalog does not hold, when the rule's package initializes.
 func TestMessageOfRefusesAMissingMessage(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if recover() == nil {
 			t.Error("a handle on a missing message was taken")
@@ -133,6 +138,7 @@ func TestMessageOfRefusesAMissingMessage(t *testing.T) {
 
 // The embedded catalog loaded at init, and holds the bare-throw pair for both languages.
 func TestTheEmbeddedCatalogHoldsBothTwins(t *testing.T) {
+	t.Parallel()
 	for _, language := range []string{MessageLanguageTypeScript, MessageLanguageSwift} {
 		if len(Messages.MessagesFor(language)) == 0 {
 			t.Errorf("no %s messages in the embedded catalog", language)
@@ -156,6 +162,7 @@ const minimalPhrases = `{
 // TestThePhraseLoaderRefusesWhatWouldReadAsSomethingElse: the file with phrases loads, and each one-place
 // change that would misread does not.
 func TestThePhraseLoaderRefusesWhatWouldReadAsSomethingElse(t *testing.T) {
+	t.Parallel()
 	if _, err := loadMinimalMessages(minimalPhrases); err != nil {
 		t.Fatalf("the minimal file is refused (%v), so no refusal below would mean anything", err)
 	}
@@ -187,6 +194,7 @@ func TestThePhraseLoaderRefusesWhatWouldReadAsSomethingElse(t *testing.T) {
 // A string phrase is put in at load, and an object phrase is the option the rule picks, with that
 // option's values, and nothing else.
 func TestPhrasesRenderTheSharedTextAndThePickedOption(t *testing.T) {
+	t.Parallel()
 	catalog, err := loadMinimalMessages(minimalPhrases)
 	if err != nil {
 		t.Fatal(err)
@@ -229,6 +237,7 @@ func TestPhrasesRenderTheSharedTextAndThePickedOption(t *testing.T) {
 
 // A twin file can hold a message only one engine renders, named by its languages.
 func TestAMessageCanBeRenderedInOneLanguageOfATwinFile(t *testing.T) {
+	t.Parallel()
 	withOneLanguage := strings.Replace(minimalMessages, `"messages": {`, `"messages": {
     "onlyHere": { "text": "Only TypeScript says {{this}}.", "languages": ["TypeScript"] },`, 1)
 	catalog, err := loadMinimalMessages(withOneLanguage)
@@ -281,6 +290,7 @@ const optionsByLanguage = `{
 // An option's text may be given by language, as a term's is. Each language renders its own, and an
 // option with no text for a language does not reach it, so that language's rule cannot pick it.
 func TestAnOptionCanGiveItsTextByLanguage(t *testing.T) {
+	t.Parallel()
 	catalog, err := loadMinimalMessages(optionsByLanguage)
 	if err != nil {
 		t.Fatalf("an option with text by language is refused: %v", err)

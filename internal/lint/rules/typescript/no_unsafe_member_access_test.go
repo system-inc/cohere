@@ -117,6 +117,7 @@ func TestNoUnsafeMemberAccessStaysSilent(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noUnsafeMemberAccessCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoUnsafeMemberAccess,
 				noUnsafeMemberAccessFile, testCase.sourceText,
 				noUnsafeMemberAccessDecoded(t, testCase.optionsJson)))
@@ -444,6 +445,7 @@ func TestNoUnsafeMemberAccessFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noUnsafeMemberAccessCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoUnsafeMemberAccess,
 				noUnsafeMemberAccessFile, testCase.sourceText,
 				noUnsafeMemberAccessDecoded(t, testCase.optionsJson))

@@ -549,6 +549,7 @@ func TestConsistentTypeImportsStaysSilent(t *testing.T) {
 
 	for index, testCase := range consistentTypeImportsCleanCases {
 		t.Run(fmt.Sprintf("case%02d", index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source,
 				decodeConsistentTypeImportsFixtureOptions(t, testCase.options))
@@ -564,6 +565,7 @@ func TestConsistentTypeImportsFires(t *testing.T) {
 
 	for index, testCase := range consistentTypeImportsReportingCases {
 		t.Run(fmt.Sprintf("case%02d", index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source,
 				decodeConsistentTypeImportsFixtureOptions(t, testCase.options))
@@ -804,6 +806,7 @@ func TestConsistentTypeImportsMeasuredCases(t *testing.T) {
 
 	for _, testCase := range consistentTypeImportsMeasuredCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source,
 				decodeConsistentTypeImportsFixtureOptions(t, testCase.options))
@@ -863,6 +866,7 @@ func TestConsistentTypeImportsPointsAtTheRightNode(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source,
 				decodeConsistentTypeImportsFixtureOptions(t, testCase.options))
@@ -914,6 +918,7 @@ func TestConsistentTypeImportsRendersTheNameList(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source,
 				DefaultConsistentTypeImportsOptions())
@@ -980,6 +985,7 @@ func TestConsistentTypeImportsRequiresTheTypedHarness(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			typed := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source, testCase.options)
 			rule_testing.ExpectFindings(t, typed, testCase.typed...)
@@ -1158,6 +1164,7 @@ func TestConsistentTypeImportsReadsTheJsxFactoryFromTheProgram(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedFilesWithSetupAndOptions(t, ConsistentTypeImports,
 				map[string]string{"/repository/source/Factory.tsx": testCase.source}, "/repository/source/Factory.tsx",
 				DefaultConsistentTypeImportsOptions(), withFactory)

@@ -150,6 +150,7 @@ func TestNoUselessEscapeFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "noUselessEscape"
@@ -392,6 +393,7 @@ func TestNoUselessEscapeStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunWithOptions(t, NoUselessEscape, uselessEscapeFile,
 					testCase.sourceText, testCase.options))
@@ -482,6 +484,7 @@ func TestNoUselessEscapeRepairsSource(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t,
 				rule_testing.Run(t, NoUselessEscape, uselessEscapeFile, testCase.sourceText),
 				testCase.wantSource)

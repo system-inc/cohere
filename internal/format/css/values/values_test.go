@@ -28,6 +28,7 @@ func sourceColumn(node *estree.Node, edge string) any {
 // TestParseShapes checks, without node, the fields the oracle found that are easiest to get wrong:
 // the shapes Prettier's printer and loc.js lean on, and upstream's quirks.
 func TestParseShapes(t *testing.T) {
+	t.Parallel()
 	nodes := parseNodes(t, "-5px --foo calc(1px + 2px) #fff \"a\" /* c */")
 	types := []string{"number", "word", "func", "word", "string", "comment"}
 	if len(nodes) != len(types) {
@@ -96,6 +97,7 @@ func TestParseShapes(t *testing.T) {
 }
 
 func TestParseRefusals(t *testing.T) {
+	t.Parallel()
 	for text, want := range map[string]string{
 		"a(b":   "ParserError: Expected closing parenthesis at line: 1, column 2",
 		"a) b":  "ParserError: Expected opening parenthesis at line: 1, column 2",

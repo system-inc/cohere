@@ -78,6 +78,7 @@ func TestReactHookRequireEffectCommentFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactHookRequireEffectComment, effectCommentFile,
 				effectCommentDeclarations+testCase.sourceText), "missingEffectComment")
 		})
@@ -176,6 +177,7 @@ func TestReactHookRequireEffectCommentStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactHookRequireEffectComment, testCase.fileName,
 				effectCommentDeclarations+testCase.sourceText))
 		})

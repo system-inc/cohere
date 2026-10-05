@@ -57,6 +57,7 @@ func TestPreferIncludesStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(preferIncludesCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferIncludes,
 				preferIncludesFile, sourceText))
 		})
@@ -261,6 +262,7 @@ func TestPreferIncludesFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(preferIncludesCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferIncludes, preferIncludesFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 
@@ -401,6 +403,7 @@ func TestPreferIncludesReadsAPatternTheShelfCannot(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(preferIncludesCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferIncludes, preferIncludesFile, testCase.sourceText)
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
@@ -496,6 +499,7 @@ func TestPreferIncludesDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(preferIncludesCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferIncludes, preferIncludesFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})

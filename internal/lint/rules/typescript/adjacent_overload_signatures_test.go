@@ -69,6 +69,7 @@ func TestAdjacentOverloadSignaturesStaysSilentOnUpstreamPassCases(t *testing.T) 
 	}
 	for index, sourceText := range cases {
 		t.Run(adjacentOverloadSignaturesCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, AdjacentOverloadSignatures,
 				adjacentOverloadSignaturesFile, sourceText))
 		})
@@ -267,6 +268,7 @@ func TestAdjacentOverloadSignaturesFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(adjacentOverloadSignaturesCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, AdjacentOverloadSignatures,
 				adjacentOverloadSignaturesFile, testCase.sourceText)
 
@@ -484,6 +486,7 @@ func TestAdjacentOverloadSignaturesDiscriminatesOnCasesUpstreamDoesNotWrite(t *t
 	}
 	for index, testCase := range cases {
 		t.Run(adjacentOverloadSignaturesCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, AdjacentOverloadSignatures,
 				adjacentOverloadSignaturesFile, testCase.sourceText)
 			wantIds := make([]string, testCase.wantCount)
@@ -566,6 +569,7 @@ func TestAdjacentOverloadSignaturesNamesTheMemberUpstreamNames(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(adjacentOverloadSignaturesCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, AdjacentOverloadSignatures,
 				adjacentOverloadSignaturesFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "adjacentSignature")
@@ -602,6 +606,7 @@ func TestAdjacentOverloadSignaturesSurvivesContainersWithNoMemberList(t *testing
 		"objectType":   "const o: { foo(): void; bar(): void } = { foo() {}, bar() {} };",
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.Run(t, AdjacentOverloadSignatures,
 				adjacentOverloadSignaturesFile, sourceText)
 		})

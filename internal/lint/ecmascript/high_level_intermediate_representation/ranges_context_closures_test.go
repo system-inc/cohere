@@ -25,6 +25,7 @@ return <div onClick={callback}>{props.flag ? (()=>{consume(item);return null;})(
 		{"missing dependency", strings.Replace(source, "[value]);", "[]);", 1), 1},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			findings, lowered := findingsForSource(t, testCase.source)
 			if !lowered || len(findings) != testCase.findings {
 				t.Fatalf("lowered=%t findings=%v, want %d findings", lowered, findings, testCase.findings)
@@ -50,6 +51,7 @@ func TestMixedCaptureClosureRefinementRetainsEffectGuards(t *testing.T) {
 		{"constructor", "return new Factory(item);", false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, effects := effectsFor(t, "function Component(props) { const item=props.item??{}; return ()=>{"+testCase.body+"}; }")
 			state, _ := buildAliasingGraph(function, effects)
 			closures := 0

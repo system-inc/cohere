@@ -86,6 +86,7 @@ func TestNoUnusedPrivateClassMembersStaysSilent(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(noUnusedPrivateClassMembersCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnusedPrivateClassMembers,
 				noUnusedPrivateClassMembersFile, sourceText))
 		})
@@ -554,6 +555,7 @@ func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noUnusedPrivateClassMembersCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnusedPrivateClassMembers,
 				noUnusedPrivateClassMembersFile, testCase.sourceText)
 
@@ -632,6 +634,7 @@ func TestNoUnusedPrivateClassMembersDivergesOnReceiverReach(t *testing.T) {
 	)
 	for index, sourceText := range cases {
 		t.Run(noUnusedPrivateClassMembersCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnusedPrivateClassMembers,
 				noUnusedPrivateClassMembersFile, sourceText))
 		})
@@ -666,6 +669,7 @@ func TestNoUnusedPrivateClassMembersDivergesOnDeclareField(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(noUnusedPrivateClassMembersCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnusedPrivateClassMembers,
 				noUnusedPrivateClassMembersFile, sourceText))
 		})

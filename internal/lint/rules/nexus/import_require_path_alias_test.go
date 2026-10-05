@@ -38,6 +38,7 @@ func TestImportRequirePathAliasFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ImportRequirePathAlias, testCase.fileName, testCase.sourceText, pathAliasOptions)
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
@@ -78,6 +79,7 @@ func TestImportRequirePathAliasStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ImportRequirePathAlias, testCase.fileName, testCase.sourceText, testCase.options)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -170,6 +172,7 @@ func TestImportRequirePathAliasNormalizesConfiguredDirectories(t *testing.T) {
 
 	for _, spelling := range []string{"app", "./app", "app/"} {
 		t.Run(spelling, func(t *testing.T) {
+			t.Parallel()
 			options := ImportRequirePathAliasOptions{
 				RepositoryRoot: "/repository",
 				Aliases:        []PathAlias{{Directory: spelling, Alias: "@app"}},

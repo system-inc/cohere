@@ -110,6 +110,7 @@ func TestInlineRemovesTheCallAndEveryReturnOfTheInlinedBody(t *testing.T) {
 		{"multiple returns", multipleReturnIifeSource},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, inlined := inlinedFixture(t, testCase.source, false)
 			if function == nil {
 				t.Fatal("the fixture did not lower")
@@ -225,6 +226,7 @@ func TestInlineDefinesTheCallResultOnEveryPathToTheContinuation(t *testing.T) {
 		{"multiple returns", multipleReturnIifeSource},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, inlined := inlinedFixture(t, testCase.source, false)
 			if function == nil || inlined != 1 {
 				t.Fatalf("the fixture spliced %d calls, want 1", inlined)
@@ -415,6 +417,7 @@ func TestInlineDeclinesTheCasesItCannotExpress(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, inlined := inlinedFixture(t, testCase.source, false)
 			if function == nil {
 				t.Skip("the fixture did not lower")

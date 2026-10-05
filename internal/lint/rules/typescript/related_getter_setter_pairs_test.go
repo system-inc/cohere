@@ -44,6 +44,7 @@ func TestRelatedGetterSetterPairsStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText))
 		})
@@ -73,6 +74,7 @@ func TestRelatedGetterSetterPairsFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText), "mismatch")
 		})
@@ -111,6 +113,7 @@ func TestRelatedGetterSetterPairsSpans(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
@@ -180,6 +183,7 @@ func TestRelatedGetterSetterPairsFiresOnMeasuredShapes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText), "mismatch")
 		})
@@ -242,6 +246,7 @@ func TestRelatedGetterSetterPairsStaysSilentOnMeasuredShapes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText))
 		})
@@ -271,6 +276,7 @@ func TestRelatedGetterSetterPairsSpansOnMeasuredShapes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
@@ -308,6 +314,7 @@ func TestRelatedGetterSetterPairsReportsInSourceOrder(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {

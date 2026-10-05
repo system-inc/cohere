@@ -10,6 +10,7 @@ import (
 // false` (checked in the installed typescript-eslint), so ESLint refuses the key, and a config that
 // loads clean while an option does nothing is the silent drop #4n972g9 closed.
 func TestOptionDecodersRefuseAnUnknownKey(t *testing.T) {
+	t.Parallel()
 	decoders := map[string]func([]byte) (any, error){
 		"no-meaningless-void-operator": DecodeNoMeaninglessVoidOperatorOptions,
 		"require-array-sort-compare":   DecodeRequireArraySortCompareOptions,
@@ -17,6 +18,7 @@ func TestOptionDecodersRefuseAnUnknownKey(t *testing.T) {
 	}
 	for name, decode := range decoders {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			if _, err := decode([]byte(`{}`)); err != nil {
 				t.Fatalf("baseline: an empty options object was refused: %v", err)
 			}

@@ -20,6 +20,7 @@ import (
 // fixes rewrite a file. Only what the caller does not wait for moves: the engine's cache write, which this
 // also waits for and reads back (#zqsdzbq, early return).
 func TestReturningEarlyChangesNothingTheCallerSees(t *testing.T) {
+	t.Parallel()
 	dispatcher, engine := buildDispatcherAndEngine(t)
 	scenarios := []struct {
 		name      string
@@ -37,6 +38,7 @@ func TestReturningEarlyChangesNothingTheCallerSees(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
+			t.Parallel()
 			type outcome struct {
 				stdout, stderr string
 				code           int
@@ -153,6 +155,7 @@ func earlyReturnCommand(dispatcher string, engine string, root string, arguments
 // dispatcher returns it must be whole: a gzip stream that reads to its end. Stopped after the verdict, it
 // could be read half-written, or empty, with a failure to close it swallowed.
 func TestAProfiledRunIsWholeWhenTheCallerHasItsAnswer(t *testing.T) {
+	t.Parallel()
 	dispatcher, engine := buildDispatcherAndEngine(t)
 	for round := range 5 {
 		root := writeEarlyReturnProject(t, map[string]string{"Clean.ts": "export const clean = 1;\n"})
@@ -212,6 +215,7 @@ func writeRepositoryProject(t *testing.T) string {
 // Whether the second run then replays is deliberately not asserted: the run cache records the project's
 // ancestor directories, and the shared temporary directory above a test's moves under other processes.
 func TestARunWaitsForAWriterStillHoldingTheTable(t *testing.T) {
+	t.Parallel()
 	dispatcher, engine := buildDispatcherAndEngine(t)
 	root := writeRepositoryProject(t)
 	if output, err := earlyReturnCommand(dispatcher, engine, root, "--no-fix").CombinedOutput(); err != nil {

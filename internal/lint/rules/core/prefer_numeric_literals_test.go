@@ -58,6 +58,7 @@ func TestPreferNumericLiteralsStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts", testCase.source))
 		})
@@ -137,6 +138,7 @@ func TestPreferNumericLiteralsFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts", testCase.source)
 			rule_testing.ExpectFindings(t, result, "useLiteral")
 			if testCase.wantFixed == preferNumericLiteralsDeclinesToFix {
@@ -176,6 +178,7 @@ func TestPreferNumericLiteralsSpanAndMessage(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
@@ -234,6 +237,7 @@ func TestPreferNumericLiteralsValueComparison(t *testing.T) {
 	}
 	for _, testCase := range fixed {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts", testCase.source)
 			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed+"\n")
 		})
@@ -258,6 +262,7 @@ func TestPreferNumericLiteralsValueComparison(t *testing.T) {
 	}
 	for _, testCase := range declined {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
@@ -298,6 +303,7 @@ func TestPreferNumericLiteralsArgumentCountAndCalleeName(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts", testCase.source))
 		})
@@ -305,10 +311,12 @@ func TestPreferNumericLiteralsArgumentCountAndCalleeName(t *testing.T) {
 
 	// Controls, so seven clean verdicts mean something.
 	t.Run("controlTwoArgumentsReports", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts",
 			"parseInt('11', 2);"), "useLiteral")
 	})
 	t.Run("controlNumberParseIntReports", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferNumericLiterals, "file.ts",
 			"Number.parseInt('11', 2);"), "useLiteral")
 	})

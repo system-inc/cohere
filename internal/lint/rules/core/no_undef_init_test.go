@@ -42,6 +42,7 @@ func TestNoUndefInitStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText))
 		})
@@ -80,6 +81,7 @@ func TestNoUndefInitFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText),
 				"unnecessaryUndefinedInit")
@@ -114,6 +116,7 @@ func TestNoUndefInitKeepsTheTypeAnnotation(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t,
 				rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText),
 				strings.TrimSpace(testCase.wantSource)+"\n")
@@ -147,6 +150,7 @@ func TestNoUndefInitFixes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			// The harness writes each fixture as `TrimSpace(source)+"\n"`, so the file on disk
 			// carries a trailing newline the upstream `output` string does not. Transforming the
 			// expectation the same way the harness transforms the input is the honest fix; padding
@@ -191,6 +195,7 @@ func TestNoUndefInitDeclinesToFix(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -244,6 +249,7 @@ func TestNoUndefInitReportsTheWholeDeclarator(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -282,6 +288,7 @@ func TestNoUndefInitDeclinesAShadowedUndefined(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText))
 		})
 	}

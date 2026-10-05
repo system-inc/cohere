@@ -14,6 +14,7 @@ import (
 // (src/main/multiparser.js), and the JavaScript printer reads it to drop the semicolon after the only
 // JSX element in a markdown code block (semicolon/semicolon.js).
 func TestEmbeddedCodeMatchesTheFork(t *testing.T) {
+	t.Parallel()
 	source := "# Probe\n\n" +
 		"```tsx\n<Component   label=\"one\" onChange={(value) => setValue(value)} />\n```\n\n" +
 		"```jsx\n<div className='x'>{ value }</div>\n```\n\n" +
@@ -112,6 +113,7 @@ const empty = css` + "`" + `  ` + "`" + `;
 // templates formatted through the native scss parser and CSS printer, against the fork, at two widths.
 // With the embed not recognizing styled templates, they print as written, and this fails.
 func TestCssTemplatesMatchTheFork(t *testing.T) {
+	t.Parallel()
 	for _, width := range []int{120, 80} {
 		options := formatoptions.Default()
 		options.PrintWidth = width
@@ -143,6 +145,7 @@ func TestCssTemplatesMatchTheFork(t *testing.T) {
 // /* GraphQL */ template, formatted through the native GraphQL printer, against the fork. With the
 // embed not recognizing these templates, they print as written, and this fails.
 func TestGraphqlTemplatesMatchTheFork(t *testing.T) {
+	t.Parallel()
 	for _, width := range []int{120, 80} {
 		options := formatoptions.Default()
 		options.PrintWidth = width

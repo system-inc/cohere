@@ -36,6 +36,7 @@ func TestGuardForInStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, GuardForIn, guardForInFile, sourceText))
 		})
 	}
@@ -61,6 +62,7 @@ func TestGuardForInFires(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, GuardForIn, guardForInFile, sourceText), "wrap")
 		})
@@ -180,6 +182,7 @@ func TestGuardForInMatchesTheInstalledBuild(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, GuardForIn, guardForInFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantFindings {
 				t.Fatalf("got %d findings, wanted %d (measured on eslint 10.8.1)",

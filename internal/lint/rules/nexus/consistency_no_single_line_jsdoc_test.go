@@ -28,6 +28,7 @@ func TestConsistencyNoSingleLineJsDocFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "useSimpleComment")
 		})
@@ -61,6 +62,7 @@ func TestConsistencyNoSingleLineJsDocStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -101,6 +103,7 @@ func TestConsistencyNoSingleLineJsDocWithholdsUnsafeFixes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "useSimpleComment")
 			if len(result.Diagnostics[0].Fixes) != 0 {

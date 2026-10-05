@@ -12,6 +12,7 @@ import (
 // stopped being answered hide behind 868 that still are, and a row silently dropped is the failure
 // this whole port is guarded against.
 func TestFrameworkStaticsReproduceTheBaseTable(t *testing.T) {
+	t.Parallel()
 	var missing, disagreeing []string
 
 	for name, expected := range baseStatics {
@@ -55,6 +56,7 @@ func TestFrameworkStaticsReproduceTheBaseTable(t *testing.T) {
 // Asserting them by name rather than by count is deliberate: a count keeps passing while the set
 // underneath it changes, and the point is which classes were missing.
 func TestFrameworkStaticsCoverTheDeprecatedRegistrations(t *testing.T) {
+	t.Parallel()
 	deprecated := map[string]Reading{
 		"bg-gradient-to-r":  {Order: []int{199, 200}, Count: 2},
 		"bg-gradient-to-br": {Order: []int{199, 200}, Count: 2},
@@ -87,6 +89,7 @@ func TestFrameworkStaticsCoverTheDeprecatedRegistrations(t *testing.T) {
 // them would be one repository's tokens shipped as framework facts, which is the exact defect this
 // whole port exists to remove, so it is asserted rather than left to the generator's refusal.
 func TestFrameworkStaticsExcludeRepositoryUtilities(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"markdown-content", "typing-dots", "synthetic-static"} {
 		if _, found := FrameworkStaticDeclarations[name]; found {
 			t.Errorf("%q is a repository utility and must not be in the framework table", name)
@@ -101,6 +104,7 @@ func TestFrameworkStaticsExcludeRepositoryUtilities(t *testing.T) {
 // undercount, and count is half the sort key, so the distinction is asserted on the real walk rather
 // than trusted from the struct definition.
 func TestFrameworkStaticDeclarationsCountsAbsentValues(t *testing.T) {
+	t.Parallel()
 	present := PropertySort(nodesFromStaticDeclarations([]StaticDeclaration{
 		{Property: "--tw-probe", Value: "", ValuePresent: true},
 	}))

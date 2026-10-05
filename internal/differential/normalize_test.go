@@ -22,6 +22,7 @@ import (
 // The distinguishing shape is the second segment: a message id is camelCase and therefore never
 // hyphenated, so a hyphen after the slash means the config's `plugin/rule-name` form.
 func TestNormalizeRuleName(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name  string
 		raw   string
@@ -50,6 +51,7 @@ func TestNormalizeRuleName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			got := differential.NormalizeRuleName(testCase.raw)
 			if got != testCase.want {
 				message := "normalizing %q gave %q, wanted %q"

@@ -42,6 +42,7 @@ func TestNoAsyncClientComponentFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoAsyncClientComponent, asyncClientComponentFile,
 					testCase.sourceText), "noAsyncClientComponent")
@@ -75,6 +76,7 @@ func TestNoAsyncClientComponentStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
 				asyncClientComponentFile, testCase.sourceText))
 		})
@@ -106,6 +108,7 @@ func TestNoAsyncClientComponentRequiresTheProloguePosition(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
 				asyncClientComponentFile, testCase.sourceText))
 		})
@@ -132,6 +135,7 @@ func TestNoAsyncClientComponentReadsTheDirectiveValue(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
 				asyncClientComponentFile, testCase.sourceText), "noAsyncClientComponent")
 		})
@@ -165,6 +169,7 @@ func TestNoAsyncClientComponentDeclinesParenthesizedForms(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
 				asyncClientComponentFile, testCase.sourceText))
 		})
@@ -218,6 +223,7 @@ func TestNoAsyncClientComponentDeclinesNearMisses(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
 				asyncClientComponentFile, testCase.sourceText))
 		})
@@ -244,6 +250,7 @@ func TestNoAsyncClientComponentReportsShapesTheCorpusOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
 				asyncClientComponentFile, testCase.sourceText), "noAsyncClientComponent")
 		})
@@ -291,6 +298,7 @@ func TestNoAsyncClientComponentReportsWhenTheAsyncDeclarationIsFirst(t *testing.
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
 				asyncClientComponentFile, testCase.sourceText), "noAsyncClientComponent")
 		})
@@ -311,6 +319,7 @@ func TestNoAsyncClientComponentDeclinesWhenTheMergedDeclarationIsFirst(t *testin
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
 				asyncClientComponentFile, testCase.sourceText))
 		})
@@ -403,6 +412,7 @@ func TestNoAsyncClientComponentPointsAtTheIdentifier(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoAsyncClientComponent, asyncClientComponentFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != 1 {

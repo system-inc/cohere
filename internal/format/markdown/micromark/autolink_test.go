@@ -141,4 +141,7 @@ var autolinkFixtures = []string{
 	"***\n<ab:c>",
 }
 
-func TestAutolinkEvents(t *testing.T) { compareEvents(t, autolinkFixtures) }
+func TestAutolinkEvents(t *testing.T) {
+	t.Parallel()
+	compareEvents(t, autolinkFixtures)
+}

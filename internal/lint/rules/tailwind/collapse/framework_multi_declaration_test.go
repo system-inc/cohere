@@ -29,9 +29,13 @@ type wave2bFixture struct {
 // Scored as a lattice for the same reason wave 1 is: mutual silence is counted apart from agreement,
 // because a table that stopped answering scores perfectly on any comparison that folds the two.
 func TestFrameworkMultiDeclarationUtilitiesMatchTheEngine(t *testing.T) {
+	t.Parallel()
 	system := loadWave1DesignSystem(t)
 	for _, name := range []string{"wave2b_fixtures.json", "wave2c_fixtures.json", "wave4_fixtures.json", "wave5_fixtures.json"} {
-		t.Run(name, func(t *testing.T) { runMultiDeclarationComparison(t, loadWave2bFixture(t, name), system) })
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			runMultiDeclarationComparison(t, loadWave2bFixture(t, name), system)
+		})
 	}
 }
 
@@ -115,6 +119,7 @@ func runMultiDeclarationComparison(t *testing.T, fixture wave2bFixture, system *
 // are structurally invisible. `grayscale` reading two declarations rather than fifteen is the proof,
 // and it is asserted because the whole table's counts rest on it.
 func TestFrameworkMultiDeclarationWrapperContributesNothing(t *testing.T) {
+	t.Parallel()
 	grayscale, known := FrameworkMultiDeclarationUtilities["grayscale"]
 	if !known {
 		t.Fatal("grayscale is not in the table")
@@ -141,6 +146,7 @@ func TestFrameworkMultiDeclarationWrapperContributesNothing(t *testing.T) {
 // resolution, so a repository declaring `--ease-initial` cannot shadow it, which is what the engine
 // does.
 func TestFrameworkMultiDeclarationLiteralReadingsBeatTheTheme(t *testing.T) {
+	t.Parallel()
 	utility, known := FrameworkMultiDeclarationUtilities["ease"]
 	if !known {
 		t.Fatal("ease is not in the table")

@@ -37,6 +37,7 @@ func expectMapping(t *testing.T, raw string, cooked string, want []int) {
 // the raw text. The slice carries one extra entry so the end offset of the last character is
 // addressable.
 func TestIdentityMapping(t *testing.T) {
+	t.Parallel()
 	expectMapping(t, "abc", "abc", []int{0, 1, 2, 3})
 	expectMapping(t, "", "", []int{0})
 }
@@ -45,6 +46,7 @@ func TestIdentityMapping(t *testing.T) {
 // cooked byte an escape produced points back at the escape's first byte, so a span starting inside a
 // decoded escape starts at the backslash.
 func TestEscapesCollapse(t *testing.T) {
+	t.Parallel()
 	// `\n` is two raw bytes producing one cooked byte.
 	expectMapping(t, `a\nb`, "a\nb", []int{0, 1, 3, 4})
 	// `\x41` is four raw bytes producing one cooked `A`.
@@ -57,6 +59,7 @@ func TestEscapesCollapse(t *testing.T) {
 // character carries its own UTF-8 width, and taking one byte while comparing against a multi-byte
 // cooked rune desynced the walk on texts that actually agreed.
 func TestMultiByteRunes(t *testing.T) {
+	t.Parallel()
 	// A two-byte rune, raw and cooked alike.
 	expectMapping(t, "á", "á", []int{0, 0, 2})
 	// A backslash before a multi-byte character escapes that one character. `\👍` is five raw bytes
@@ -79,6 +82,7 @@ func TestMultiByteRunes(t *testing.T) {
 // with raw still to go. A terminal check requiring both to finish rejects the exact case the
 // misleading-character-class rule exists for.
 func TestSurrogatePairSpendsMoreRawThanCooked(t *testing.T) {
+	t.Parallel()
 	if got := literal.CookedToRaw(`👍`, "👍"); got == nil {
 		t.Error("a surrogate pair was refused; cooked finishing before raw is legitimate here")
 	}
@@ -92,6 +96,7 @@ func TestSurrogatePairSpendsMoreRawThanCooked(t *testing.T) {
 // offset past the run was wrong. Found by the second caller probing this against its own corpus
 // before building on it, which is the argument for the function having a home of its own.
 func TestLineContinuationIsRefused(t *testing.T) {
+	t.Parallel()
 	// `a  b\<newline>` cooks to `a  b`, leaving a raw tail that produced nothing.
 	expectMapping(t, "a  b\\\n", "a  b", nil)
 	expectMapping(t, "a  b\\\r\n", "a  b", nil)
@@ -103,6 +108,7 @@ func TestLineContinuationIsRefused(t *testing.T) {
 // with the raw text returns nil rather than a wrong answer, because a finding at a guessed span
 // points somewhere real and wrong, which is worse than no finding.
 func TestDisagreementIsRefused(t *testing.T) {
+	t.Parallel()
 	expectMapping(t, "abc", "xyz", nil)
 	expectMapping(t, "ab", "abcdef", nil)
 }
@@ -110,6 +116,7 @@ func TestDisagreementIsRefused(t *testing.T) {
 // TestLegacyOctalEscapes covers a shape upstream's corpus uses deliberately: a variation selector
 // whose `0` is spelled `\60` so the escape only appears after the string is cooked.
 func TestLegacyOctalEscapes(t *testing.T) {
+	t.Parallel()
 	// `\101` is four raw bytes producing one cooked `A`.
 	expectMapping(t, `\101b`, "Ab", []int{0, 4, 5})
 	// A leading digit above three caps the run at two digits, so `\41` is three raw bytes.

@@ -27,6 +27,7 @@ func TestIsStrictCompilerOptionEnabledFollowsTheCompiler(t *testing.T) {
 		{"an explicit false wins with strict unset", core.TSUnknown, core.TSFalse, false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			options := &core.CompilerOptions{Strict: testCase.strict}
 			if got := IsStrictCompilerOptionEnabled(options, testCase.option); got != testCase.want {
 				t.Errorf("resolved to %v, want %v", got, testCase.want)

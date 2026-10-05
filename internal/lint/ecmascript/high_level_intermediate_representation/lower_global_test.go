@@ -28,6 +28,7 @@ func TestGlobalLoadsRetainBindingProvenance(t *testing.T) {
 		{"shadowed import", `import {value} from './library';`, "value: number", GlobalBindingKindGlobal, "", "", 0},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			visited, loads := 0, 0
 			probe := rule.Rule{Name: "global-load-provenance", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
 				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {

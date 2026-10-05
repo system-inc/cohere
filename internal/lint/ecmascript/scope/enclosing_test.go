@@ -60,6 +60,7 @@ func expectEnclosing(t *testing.T, source string, want ast.Kind) {
 // The last three are where the four lifted implementations disagreed: an accessor and a constructor
 // introduce a scope exactly as a method does, and the narrowest set answered nil for all three.
 func TestEnclosingFunctionLikeCoversEveryFunctionScope(t *testing.T) {
+	t.Parallel()
 	expectEnclosing(t, "function f() { marker; }", ast.KindFunctionDeclaration)
 	expectEnclosing(t, "const g = function () { marker; };", ast.KindFunctionExpression)
 	expectEnclosing(t, "const g = () => { marker; };", ast.KindArrowFunction)
@@ -71,6 +72,7 @@ func TestEnclosingFunctionLikeCoversEveryFunctionScope(t *testing.T) {
 
 // TestEnclosingFunctionLikeStopsAtTheNearest pins that the walk does not skip past an inner scope.
 func TestEnclosingFunctionLikeStopsAtTheNearest(t *testing.T) {
+	t.Parallel()
 	expectEnclosing(t, "class C { get p() { const f = () => { marker; }; return 1; } }", ast.KindArrowFunction)
 	expectEnclosing(t, "function outer() { function inner() { marker; } }", ast.KindFunctionDeclaration)
 }
@@ -83,6 +85,7 @@ func TestEnclosingFunctionLikeStopsAtTheNearest(t *testing.T) {
 // binder gives a fresh start node. Merging the two would give this one the wrong answer at module
 // scope, where nil is correct.
 func TestEnclosingFunctionLikeAnswersNilOutsideAFunction(t *testing.T) {
+	t.Parallel()
 	expectEnclosing(t, "marker;", ast.KindUnknown)
 	expectEnclosing(t, "class C { static { marker; } }", ast.KindUnknown)
 	expectEnclosing(t, "class C { p = marker; }", ast.KindUnknown)
@@ -91,6 +94,7 @@ func TestEnclosingFunctionLikeAnswersNilOutsideAFunction(t *testing.T) {
 
 // TestNameOf covers the names a function-like node is known by, including the borrowed ones.
 func TestNameOf(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		source string
 		want   string
@@ -131,6 +135,7 @@ func TestNameOf(t *testing.T) {
 // The nearest function is usually the anonymous callback passed to a hook, so a caller that stopped
 // there would answer "" everywhere it is meant to fire. This continues outward until it finds a name.
 func TestEnclosingNamedFunctionWalksPastAnonymousOnes(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		source string
 		want   string
@@ -163,6 +168,7 @@ func TestEnclosingNamedFunctionWalksPastAnonymousOnes(t *testing.T) {
 // TestBodyOf covers the body accessor, which answers for accessors and constructors where NameOf
 // does not.
 func TestBodyOf(t *testing.T) {
+	t.Parallel()
 	for _, source := range []string{
 		"function f() { marker; }",
 		"const g = function () { marker; };",
@@ -185,6 +191,7 @@ func TestBodyOf(t *testing.T) {
 // TestNilGuards covers what a shared function needs and a rule-local one did not: inside a rule the
 // node always came from a walk, and on a shelf any caller can pass anything.
 func TestNilGuards(t *testing.T) {
+	t.Parallel()
 	if scope.EnclosingFunctionLike(nil) != nil {
 		t.Error("EnclosingFunctionLike(nil) answered non-nil")
 	}

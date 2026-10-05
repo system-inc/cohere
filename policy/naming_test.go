@@ -12,6 +12,7 @@ const minimalRuleNaming = `{"about": "a", "verbs": [{"name": "no", "definition":
 // TestTheLoaderRefusesWhatWouldReadAsSomethingElse: the minimal file loads, and each one-place change that
 // would misread does not.
 func TestTheLoaderRefusesWhatWouldReadAsSomethingElse(t *testing.T) {
+	t.Parallel()
 	if _, err := loadRuleNaming([]byte(minimalRuleNaming)); err != nil {
 		t.Fatalf("the minimal file is refused (%v), so no refusal below would mean anything", err)
 	}
@@ -40,6 +41,7 @@ func TestTheLoaderRefusesWhatWouldReadAsSomethingElse(t *testing.T) {
 // TestParseHouseRuleNameSplitsTheThreeParts: names that fit split into category, verb and object, those
 // that don't are refused, each for its own reason.
 func TestParseHouseRuleNameSplitsTheThreeParts(t *testing.T) {
+	t.Parallel()
 	for leaf, want := range map[string]HouseRuleName{
 		"consistency-no-print":                    {"consistency", "no", "print"},
 		"react-hook-no-any-type":                  {"react-hook", "no", "any-type"},
@@ -68,6 +70,7 @@ func TestParseHouseRuleNameSplitsTheThreeParts(t *testing.T) {
 // reads as `react-hook`. In file order it would read as `react` and fail on the verb `hook`, so the case
 // tells longest-first from file order, which a list with no shared prefix cannot.
 func TestALongerCategoryWinsOverItsPrefix(t *testing.T) {
+	t.Parallel()
 	naming := RuleNaming{
 		Verbs:      []RuleNamingWord{{Name: "no", Definition: "d"}},
 		Categories: []RuleNamingWord{{Name: "react", Definition: "d"}, {Name: "react-hook", Definition: "d"}},

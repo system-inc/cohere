@@ -97,6 +97,7 @@ func findTailwindPackageRootForTest(start string) string {
 // this constructor is that its checked-in half was measured to be a fact about the framework. The
 // engine is the only thing that can refuse it.
 func TestLiveTableAgreesWithTheEngineOverTheFixtureCorpus(t *testing.T) {
+	t.Parallel()
 	fixtures := loadDescriptorFixtures(t)
 	_, live := liveTableFor(t, corpusRepositories[0].entryPoint)
 
@@ -168,8 +169,10 @@ func TestLiveTableAgreesWithTheEngineOverTheFixtureCorpus(t *testing.T) {
 // the tokens the repository added, which is the failure the port exists to remove and the one no
 // aggregate agreement number would surface.
 func TestLiveTableCarriesTheRepositoryTheme(t *testing.T) {
+	t.Parallel()
 	for _, repository := range corpusRepositories {
 		t.Run(repository.name, func(t *testing.T) {
+			t.Parallel()
 			system, table := liveTableFor(t, repository.entryPoint)
 
 			if len(table.Namespaces) == 0 {
@@ -243,6 +246,7 @@ func TestLiveTableCarriesTheRepositoryTheme(t *testing.T) {
 // one of the framework's, or the file is carrying one repository's tokens under a name that says
 // otherwise, which is the exact bug descriptor.go's comment on Table refuses.
 func TestLiveTableBaseHalfCarriesNoRepositoryTokens(t *testing.T) {
+	t.Parallel()
 	checked := 0
 	for root, descriptor := range baseDescriptors {
 		for _, axis := range []AxisReadings{descriptor.Absent, descriptor.Alpha, descriptor.Themed} {
@@ -272,6 +276,7 @@ func TestLiveTableBaseHalfCarriesNoRepositoryTokens(t *testing.T) {
 //
 // Without this, "the evaluator picks it up" is a claim in a comment. A comment cannot fail.
 func TestLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(t *testing.T) {
+	t.Parallel()
 	fixtures := loadDescriptorFixtures(t)
 	measured := testTable(t)
 	system, live := liveTableFor(t, corpusRepositories[0].entryPoint)
@@ -323,6 +328,7 @@ func TestLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(t *testing.T) {
 // A bare framework table would answer every class confidently and be wrong on every repository
 // token. Nil forces the caller to decline instead.
 func TestLiveTableIsNilWithoutADesignSystem(t *testing.T) {
+	t.Parallel()
 	if table := NewTable(nil); table != nil {
 		t.Fatalf("NewTable(nil) returned a table; a caller with no design system must decline rather than read a framework-only one")
 	}

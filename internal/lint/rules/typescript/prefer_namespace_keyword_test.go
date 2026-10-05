@@ -30,6 +30,7 @@ func TestPreferNamespaceKeywordFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
@@ -85,6 +86,7 @@ func TestPreferNamespaceKeywordStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -132,6 +134,7 @@ func TestPreferNamespaceKeywordFixesWriteWhatTheyClaim(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
 			rule_testing.ExpectFixedSource(t, result, testCase.wantSource)
 		})
@@ -168,6 +171,7 @@ func TestPreferNamespaceKeywordReportsTheRightSpanAndText(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantSpans))

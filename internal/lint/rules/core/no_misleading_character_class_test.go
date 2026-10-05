@@ -166,6 +166,7 @@ func TestNoMisleadingCharacterClassFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
@@ -234,6 +235,7 @@ func TestNoMisleadingCharacterClassStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile, testCase))
 		})
@@ -275,6 +277,7 @@ func TestNoMisleadingCharacterClassTakesTheAllowEscapeDefault(t *testing.T) {
 
 	for _, testCase := range cleanOnlyWithTheOption {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
@@ -299,6 +302,7 @@ func TestNoMisleadingCharacterClassTakesTheAllowEscapeDefault(t *testing.T) {
 
 	for _, testCase := range reportedEitherWay {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
@@ -319,6 +323,7 @@ func TestNoMisleadingCharacterClassIsCleanHereRegardlessOfTheOption(t *testing.T
 		"/[�d83d\\udc4d]/u // U+D83D + Backslash + \"udc4d\"",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile, sourceText))
 		})
@@ -366,6 +371,7 @@ func TestNoMisleadingCharacterClassPointsAtTheOffendingPair(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -406,6 +412,7 @@ func TestNoMisleadingCharacterClassSuggestsTheUnicodeFlag(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
@@ -458,6 +465,7 @@ func TestNoMisleadingCharacterClassNeverProposesAnAutomaticFix(t *testing.T) {
 		"var r = /[👍]{/",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 				sourceText)
 			if len(result.Diagnostics) == 0 {
@@ -480,6 +488,7 @@ func TestNoMisleadingCharacterClassDoesNotSuggestAFlagThatIsAlreadyThere(t *test
 
 	for _, sourceText := range []string{"var r = /[Á]/u", "var r = /[Á]/v"} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 				sourceText)
 			if len(result.Diagnostics) != 1 {
@@ -589,6 +598,7 @@ func TestNoMisleadingCharacterClassCoversOurOwnDecisions(t *testing.T) {
 
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
@@ -701,6 +711,7 @@ func TestNoMisleadingCharacterClassCoversOurOwnDecisions(t *testing.T) {
 
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText))

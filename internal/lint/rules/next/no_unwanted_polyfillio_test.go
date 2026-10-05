@@ -110,6 +110,7 @@ func TestNoUnwantedPolyfillioReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.want...)
 		})
@@ -246,6 +247,7 @@ func TestNoUnwantedPolyfillioIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -337,6 +339,7 @@ func TestNoUnwantedPolyfillioNamesTheFeaturesItFound(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -374,6 +377,7 @@ func TestNoUnwantedPolyfillioUsesStableMessageIds(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))

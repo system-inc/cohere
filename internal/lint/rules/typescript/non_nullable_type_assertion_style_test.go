@@ -64,6 +64,7 @@ func TestNonNullableTypeAssertionStyleStaysSilentOnUpstreamPassCases(t *testing.
 	}
 	for index, sourceText := range cases {
 		t.Run(nonNullableTypeAssertionStyleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NonNullableTypeAssertionStyle,
 				nonNullableTypeAssertionStyleFile, sourceText))
 		})
@@ -137,6 +138,7 @@ func TestNonNullableTypeAssertionStyleFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(nonNullableTypeAssertionStyleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NonNullableTypeAssertionStyle,
 				nonNullableTypeAssertionStyleFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "preferNonNullAssertion")
@@ -253,6 +255,7 @@ func TestNonNullableTypeAssertionStyleOnShapesUpstreamsCorpusDoesNotWrite(t *tes
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NonNullableTypeAssertionStyle,
 				nonNullableTypeAssertionStyleFile, testCase.sourceText)
 			if testCase.wantSpan == "" {
@@ -398,6 +401,7 @@ func TestNonNullableTypeAssertionStyleOnTypeParametersAndPartialUnions(t *testin
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NonNullableTypeAssertionStyle,
 				nonNullableTypeAssertionStyleFile, testCase.sourceText)
 			if testCase.wantSpan == "" {
@@ -537,6 +541,7 @@ func TestNonNullableTypeAssertionStyleOnNullishFlagsAndUnionAssertions(t *testin
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NonNullableTypeAssertionStyle,
 				nonNullableTypeAssertionStyleFile, testCase.sourceText)
 			if testCase.wantSpan == "" {

@@ -308,6 +308,7 @@ func attachedSummary(root *toyNode) [][]any {
 
 // TestCoreAgreesWithUpstream is the differential. Off unless COHERE_PRETTIER_ROOT names the fork.
 func TestCoreAgreesWithUpstream(t *testing.T) {
+	t.Parallel()
 	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	if root == "" {
 		t.Skip("set COHERE_PRETTIER_ROOT to the Prettier fork to measure against upstream")

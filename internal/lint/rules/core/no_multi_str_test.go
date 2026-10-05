@@ -40,6 +40,7 @@ func TestNoMultiStrFires(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoMultiStr, multiStrFile, sourceText), "multilineString")
 		})
@@ -57,11 +58,13 @@ func TestNoMultiStrStaysSilent(t *testing.T) {
 	t.Parallel()
 
 	t.Run("a string on one line", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t,
 			rule_testing.Run(t, NoMultiStr, multiStrFile, "var a = 'Line 1 Line 2';"))
 	})
 
 	t.Run("a JSX element whose text spans lines", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t,
 			rule_testing.Run(t, NoMultiStr, multiStrJsxFile, "var a = <div>\n<h1>Wat</h1>\n</div>;"))
 	})
@@ -111,6 +114,7 @@ func TestNoMultiStrJsxExemption(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoMultiStr, multiStrJsxFile, testCase.sourceText)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(t, result, "multilineString")
@@ -147,6 +151,7 @@ func TestNoMultiStrDistinguishesEscapesFromContinuations(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoMultiStr, multiStrFile, testCase.sourceText)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(t, result, "multilineString")
@@ -178,6 +183,7 @@ func TestNoMultiStrDeclinesOtherLiteralKinds(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoMultiStr, multiStrFile, testCase.sourceText))
 		})
 	}
@@ -209,6 +215,7 @@ func TestNoMultiStrReportsTheWholeLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoMultiStr, multiStrFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))

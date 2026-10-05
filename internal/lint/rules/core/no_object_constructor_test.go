@@ -89,6 +89,7 @@ func TestNoObjectConstructorFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(strings.Join(strings.Fields(testCase.sourceText), " "), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
@@ -148,6 +149,7 @@ func TestNoObjectConstructorStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoObjectConstructor,
 				objectConstructorFile, testCase.sourceText))
 		})
@@ -240,6 +242,7 @@ func TestNoObjectConstructorReportsTheWholeCall(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != 1 {

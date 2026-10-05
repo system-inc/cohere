@@ -16,6 +16,7 @@ import (
 // never loaded as independent of every stylesheet. When this was one slot, a second program took it and the
 // first then read as never loaded (#35nqkwc, @system_cohere_lint's review).
 func TestDesignSystemReadsAreKeptPerProgram(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	theme := filepath.Join(directory, "theme.css")
 	if err := os.WriteFile(theme, []byte("@theme {}\n"), 0o644); err != nil {
@@ -48,6 +49,7 @@ func TestDesignSystemReadsAreKeptPerProgram(t *testing.T) {
 // An entry does not keep its program alive, and an entry whose program is gone is swept on the next
 // registration, so a test process that builds thousands of programs does not hold them all.
 func TestDesignSystemReadsDoNotHoldTheirProgram(t *testing.T) {
+	t.Parallel()
 	gone := weak.Make(func() *compiler.Program {
 		program := &compiler.Program{}
 		recordDesignSystemFS(program, NewRecordingFS(osvfs.FS()))

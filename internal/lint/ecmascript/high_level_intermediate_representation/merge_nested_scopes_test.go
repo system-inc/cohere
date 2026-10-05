@@ -22,6 +22,7 @@ func TestNestedScopeMergeMatchesEnclosingDependencies(t *testing.T) {
 		{name: "different optionality", outer: []ReactiveScopeDependency{{Identifier: input, Path: []DependencyPathEntry{{Property: "value"}}}}, inner: []ReactiveScopeDependency{{Identifier: input, Path: []DependencyPathEntry{{Property: "value", Optional: true}}}}},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function := NewFunction(nil, "helper", FunctionKindOther)
 			function.NewIdentifier("condition", nil, 0)
 			function.NewIdentifier("input", nil, 1)
@@ -80,6 +81,7 @@ func TestManualMemoizationChecksNestedScopeAfterDependencyPruning(t *testing.T) 
 		{"missing dependency", "props", "props.theme", "", true},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			source := `import {useCallback} from 'react'; function Component(` + testCase.parameters + `) {
 const theme=mergeTheme(` + testCase.arguments + `);
 const enabled=theme.enabled===true;

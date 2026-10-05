@@ -100,6 +100,7 @@ func TestNoOctalEscapeFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "octalEscapeSequence")
 
@@ -181,6 +182,7 @@ func TestNoOctalEscapeStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoOctalEscape, octalEscapeFile, sourceText))
 		})
 	}
@@ -224,6 +226,7 @@ func TestNoOctalEscapeProductionWidths(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "octalEscapeSequence")
 			wantPrefix := "Do not use the octal escape `\\" + testCase.wantSequence + "`."
@@ -259,6 +262,7 @@ func TestNoOctalEscapeReportsTheWholeLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
@@ -297,6 +301,7 @@ func TestNoOctalEscapeReportsOncePerLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantFindings {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantFindings)
@@ -330,6 +335,7 @@ func TestNoOctalEscapeDeclinesOtherLiteralKinds(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText))
 		})
 	}

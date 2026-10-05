@@ -35,6 +35,7 @@ func TestBuildReactiveFunctionShapes(t *testing.T) {
 			source: `function f(a) { const x = a && a.b; return x; }`},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, _ := rangesFor(t, testCase.source)
 			if function == nil {
 				t.Fatal("the source did not lower to a function, so every assertion below would " +
@@ -104,6 +105,7 @@ func TestBuildReactiveFunctionOptionalValue(t *testing.T) {
 		{name: "nested links", source: `function f(a) { return a?.b?.c; }`, want: 2},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, _ := rangesFor(t, testCase.source)
 			if function == nil {
 				t.Fatal("source did not lower")
@@ -187,6 +189,7 @@ func TestBuildReactiveFunctionTernaryValue(t *testing.T) {
 		{name: "nested conditional", source: `function f(a, b, c, d, e) { return a ? (b ? c : d) : e; }`, want: 2},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, _ := rangesFor(t, testCase.source)
 			if function == nil {
 				t.Fatal("source did not lower")

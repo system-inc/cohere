@@ -42,6 +42,7 @@ func expectFirst(t *testing.T, source string, want bool) {
 
 // TestForeignPositions covers every position a name can occupy that this file did not choose.
 func TestForeignPositions(t *testing.T) {
+	t.Parallel()
 	for _, source := range []string{
 		"declare const thing: any; thing.name;",
 		"({ name: 1 });",
@@ -78,6 +79,7 @@ func TestForeignPositions(t *testing.T) {
 
 // TestOwnedPositions covers the positions this file does choose, which must stay judged.
 func TestOwnedPositions(t *testing.T) {
+	t.Parallel()
 	for _, source := range []string{
 		"const name = 1;",
 		"declare function f(name: string): void;",
@@ -97,6 +99,7 @@ func TestOwnedPositions(t *testing.T) {
 // property declaration that no member check protects. A class once declared `maximumBackoff` while
 // reading `this.maximumBackoff`, which is the measured defect this answer prevents.
 func TestPropertyReadOffThisIsOwned(t *testing.T) {
+	t.Parallel()
 	got := answersFor(t, "class C { name = 1; m() { return this.name; } }", "name")
 	if len(got) != 2 {
 		t.Fatalf("expected the declaration and the read, got %d occurrences", len(got))
@@ -117,6 +120,7 @@ func TestPropertyReadOffThisIsOwned(t *testing.T) {
 // tag and an attribute are plain identifiers, and reproducing only the written-down exemptions cost
 // 3,081 false findings on a real tree.
 func TestJsxNamesAreForeign(t *testing.T) {
+	t.Parallel()
 	for _, source := range []string{
 		"const x = <name />;",
 		"const x = <name></name>;",
@@ -136,6 +140,7 @@ func TestJsxNamesAreForeign(t *testing.T) {
 
 // TestNilIsNotForeign covers the guard a shared function needs and a rule-local one did not.
 func TestNilIsNotForeign(t *testing.T) {
+	t.Parallel()
 	if binding.IsForeignName(nil) {
 		t.Error("IsForeignName(nil) = true, want false")
 	}

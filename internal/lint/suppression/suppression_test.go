@@ -8,6 +8,7 @@ import (
 // TestNextLineSuppressesTheLineBelow covers 372 of the 387 suppressions in the codebase this was
 // built against. If only one form works, it has to be this one.
 func TestNextLineSuppressesTheLineBelow(t *testing.T) {
+	t.Parallel()
 	source := strings.Join([]string{
 		"const before = 1;",
 		"// eslint-disable-next-line nexus/consistency-no-enum -- the fixture has to be a real enum.",
@@ -31,6 +32,7 @@ func TestNextLineSuppressesTheLineBelow(t *testing.T) {
 // TestUnsuppressedFires is the half a violation-only corpus never has. A suppression index that
 // returned true for everything would pass every test above this one.
 func TestUnsuppressedFires(t *testing.T) {
+	t.Parallel()
 	index := Build("enum Reported {}\n")
 
 	if index.Suppresses("nexus/consistency-no-enum", 0) {
@@ -42,6 +44,7 @@ func TestUnsuppressedFires(t *testing.T) {
 // directive that silenced every rule regardless of the name written would look correct on every
 // single-rule fixture.
 func TestDirectiveNamingAnotherRuleDoesNotSilenceThisOne(t *testing.T) {
+	t.Parallel()
 	source := strings.Join([]string{
 		"// eslint-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire contract.",
 		"enum Reported {}",
@@ -58,6 +61,7 @@ func TestDirectiveNamingAnotherRuleDoesNotSilenceThisOne(t *testing.T) {
 }
 
 func TestSameLineSuppressesItsOwnLine(t *testing.T) {
+	t.Parallel()
 	source := strings.Join([]string{
 		"const first = 1;",
 		"const value = 2; // eslint-disable-line nexus/consistency-no-ambiguous-identifier",
@@ -77,6 +81,7 @@ func TestSameLineSuppressesItsOwnLine(t *testing.T) {
 // directive that covered the whole file regardless of position would silence findings written above
 // the decision to suppress them.
 func TestFileScopeCoversFromItsOwnLineDown(t *testing.T) {
+	t.Parallel()
 	source := strings.Join([]string{
 		"enum Above {}",
 		"/* eslint-disable nexus/consistency-no-enum */",
@@ -102,6 +107,7 @@ func TestFileScopeCoversFromItsOwnLineDown(t *testing.T) {
 // next-line directives as a file-level disable, silencing the rest of each file with no output
 // saying so.
 func TestScopeSuffixesAreMatchedLongestFirst(t *testing.T) {
+	t.Parallel()
 	source := strings.Join([]string{
 		"// eslint-disable-next-line nexus/consistency-no-enum -- one line only.",
 		"enum Suppressed {}",
@@ -119,6 +125,7 @@ func TestScopeSuffixesAreMatchedLongestFirst(t *testing.T) {
 }
 
 func TestCommaSeparatedRuleListsAreHonored(t *testing.T) {
+	t.Parallel()
 	// The real line, from libraries/structure/GlobalDeclarations.d.ts:13.
 	source := strings.Join([]string{
 		"// eslint-disable-next-line nexus/consistency-require-type-suffix, nexus/consistency-no-abbreviated-identifier",
@@ -140,6 +147,7 @@ func TestCommaSeparatedRuleListsAreHonored(t *testing.T) {
 }
 
 func TestDirectiveWithNoRuleNameCoversEveryRule(t *testing.T) {
+	t.Parallel()
 	source := strings.Join([]string{
 		"// eslint-disable-next-line",
 		"enum Suppressed {}",
@@ -153,6 +161,7 @@ func TestDirectiveWithNoRuleNameCoversEveryRule(t *testing.T) {
 }
 
 func TestReasonIsParsedAndItsAbsenceIsVisible(t *testing.T) {
+	t.Parallel()
 	source := strings.Join([]string{
 		"// eslint-disable-next-line nexus/consistency-no-enum -- EnumLike describes a real enum.",
 		"enum WithReason {}",
@@ -182,6 +191,7 @@ func TestReasonIsParsedAndItsAbsenceIsVisible(t *testing.T) {
 // rules state no reason, and refusing to honor them would turn one missing convention into hundreds
 // of unrelated failures.
 func TestSuppressionStillAppliesWithoutAReason(t *testing.T) {
+	t.Parallel()
 	source := strings.Join([]string{
 		"// eslint-disable-next-line nexus/consistency-no-enum",
 		"enum Suppressed {}",
@@ -195,6 +205,7 @@ func TestSuppressionStillAppliesWithoutAReason(t *testing.T) {
 // TestAppliedCountSeparatesSilencedFromAbsent is what makes the coverage line honest. A run that
 // suppressed forty findings and a run that found none print the same green otherwise.
 func TestAppliedCountSeparatesSilencedFromAbsent(t *testing.T) {
+	t.Parallel()
 	source := strings.Join([]string{
 		"// eslint-disable-next-line nexus/consistency-no-enum -- deliberate.",
 		"enum Suppressed {}",
@@ -216,6 +227,7 @@ func TestAppliedCountSeparatesSilencedFromAbsent(t *testing.T) {
 // TestCommentTextInsideStringsIsNotADirective is the scanner's real job. A scan that read string
 // contents would invent suppressions out of test data and documentation.
 func TestCommentTextInsideStringsIsNotADirective(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"double quotes": "const sample = \"// eslint-disable-next-line nexus/consistency-no-enum\";\nenum Reported {}",
 		"single quotes": "const sample = '// eslint-disable-next-line nexus/consistency-no-enum';\nenum Reported {}",
@@ -225,6 +237,7 @@ func TestCommentTextInsideStringsIsNotADirective(t *testing.T) {
 
 	for name, source := range cases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			index := Build(source)
 			if directives := index.Directives(); len(directives) != 0 {
 				t.Fatalf("found a directive inside a literal: %+v", directives)
@@ -236,6 +249,7 @@ func TestCommentTextInsideStringsIsNotADirective(t *testing.T) {
 // TestDivisionIsNotARegularExpression guards the other side of the same scan. Reading `a / b` as a
 // pattern would swallow source up to the next slash, hiding every directive in between.
 func TestDivisionIsNotARegularExpression(t *testing.T) {
+	t.Parallel()
 	source := strings.Join([]string{
 		"const ratio = width / height;",
 		"const other = total / count;",
@@ -254,6 +268,7 @@ func TestDivisionIsNotARegularExpression(t *testing.T) {
 }
 
 func TestJsxCommentFormIsHonored(t *testing.T) {
+	t.Parallel()
 	// The shape 14 next/no-img-element suppressions take in .tsx files.
 	source := strings.Join([]string{
 		"const element = (",
@@ -279,6 +294,7 @@ func TestJsxCommentFormIsHonored(t *testing.T) {
 }
 
 func TestBlockCommentNextLineFormIsHonored(t *testing.T) {
+	t.Parallel()
 	source := strings.Join([]string{
 		"/* eslint-disable-next-line @next/next/no-img-element -- served-route bytes */",
 		"const element = 1;",
@@ -298,6 +314,7 @@ func TestBlockCommentNextLineFormIsHonored(t *testing.T) {
 // TestNearMissesAreNotDirectives keeps the parser from claiming comments that merely talk about
 // suppression. Documentation mentioning the syntax is common and must not become a suppression.
 func TestNearMissesAreNotDirectives(t *testing.T) {
+	t.Parallel()
 	sources := []string{
 		"// eslint-disable-nonsense nexus/consistency-no-enum\nenum Reported {}",
 		"// prettier-ignore\nenum Reported {}",
@@ -313,6 +330,7 @@ func TestNearMissesAreNotDirectives(t *testing.T) {
 }
 
 func TestStackedDirectivesBothApply(t *testing.T) {
+	t.Parallel()
 	source := strings.Join([]string{
 		"// eslint-disable-next-line nexus/consistency-no-enum -- first.",
 		"// eslint-disable-next-line nexus/consistency-no-abbreviated-identifier -- second.",
@@ -334,6 +352,7 @@ func TestStackedDirectivesBothApply(t *testing.T) {
 }
 
 func TestEmptyFileHasNoDirectives(t *testing.T) {
+	t.Parallel()
 	index := Build("")
 
 	if len(index.Directives()) != 0 {
@@ -345,6 +364,7 @@ func TestEmptyFileHasNoDirectives(t *testing.T) {
 }
 
 func TestUnterminatedBlockCommentDoesNotHang(t *testing.T) {
+	t.Parallel()
 	index := Build("/* eslint-disable nexus/consistency-no-enum\nenum Thing {}")
 
 	if len(index.Directives()) != 1 {
@@ -353,6 +373,7 @@ func TestUnterminatedBlockCommentDoesNotHang(t *testing.T) {
 }
 
 func TestOxlintAndVerifySpellingsAreAccepted(t *testing.T) {
+	t.Parallel()
 	for _, tool := range []string{"eslint", "oxlint", "cohere"} {
 		source := "// " + tool + "-disable-next-line nexus/consistency-no-enum -- accepted.\nenum Thing {}"
 		if !Build(source).Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 1)) {
@@ -362,6 +383,7 @@ func TestOxlintAndVerifySpellingsAreAccepted(t *testing.T) {
 }
 
 func TestLineOfHandlesBoundaries(t *testing.T) {
+	t.Parallel()
 	source := "a\nb\nc"
 
 	index := Build(source)
@@ -402,8 +424,10 @@ func offsetOfLine(source string, line int) int {
 // property that keeps this from becoming four code paths that drift. Asserted here rather than
 // stated, since nothing downstream of parsing knows which spelling it read.
 func TestEveryHonoredSpellingSuppresses(t *testing.T) {
+	t.Parallel()
 	for _, directive := range []string{"cohere-disable", "verify-disable", "eslint-disable", "oxlint-disable"} {
 		t.Run(directive, func(t *testing.T) {
+			t.Parallel()
 			source := strings.Join([]string{
 				"const before = 1;",
 				"// " + directive + "-next-line nexus/consistency-no-enum -- the fixture has to be a real enum.",
@@ -432,8 +456,10 @@ func TestEveryHonoredSpellingSuppresses(t *testing.T) {
 // one and forgotten in the other. That would leave a block that opens and never closes, which reads
 // as a working suppression while silencing the rest of the file.
 func TestEveryHonoredSpellingClosesItsBlock(t *testing.T) {
+	t.Parallel()
 	for _, directive := range []string{"cohere", "cohere", "eslint", "oxlint"} {
 		t.Run(directive, func(t *testing.T) {
+			t.Parallel()
 			source := strings.Join([]string{
 				"/* " + directive + "-disable nexus/consistency-no-enum */",
 				"enum Suppressed {}",
@@ -461,6 +487,7 @@ func TestEveryHonoredSpellingClosesItsBlock(t *testing.T) {
 // Each case pairs the line form, which must change nothing, with the block form, which must still
 // work, so the test cannot pass by breaking file scope altogether.
 func TestALineCommentFileDisableSuppressesNothing(t *testing.T) {
+	t.Parallel()
 	prose := strings.Join([]string{
 		"// eslint-disable + generated banner keep the linter and future readers out.",
 		"enum Reported {}",
@@ -500,6 +527,7 @@ func TestALineCommentFileDisableSuppressesNothing(t *testing.T) {
 // Each case puts something inside `${...}` and then, on later lines, a block enable and a next-line
 // disable, so a scan that loses sync anywhere inside the interpolation loses both.
 func TestAnInterpolationIsLexedAsCode(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"a regex holding a quote":    "    return `\"${key.replace(/\"/g, '\"\"')}\"`;",
 		"an object literal's braces": "    return `${ {width: 1}.width } and ${ {a: {b: 2}}.a.b }`;",
@@ -510,6 +538,7 @@ func TestAnInterpolationIsLexedAsCode(t *testing.T) {
 
 	for name, line := range cases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			source := strings.Join([]string{
 				"/* eslint-disable nexus/consistency-no-enum -- the block under test */",
 				"function quote(key: string): string {",
@@ -539,6 +568,7 @@ func TestAnInterpolationIsLexedAsCode(t *testing.T) {
 // A directive's text inside a string in an interpolation is still a string. Lexing the body as code
 // must not turn its literals into comments.
 func TestCommentTextInsideAnInterpolatedStringIsNotADirective(t *testing.T) {
+	t.Parallel()
 	source := "const sample = `${'// eslint-disable-next-line nexus/consistency-no-enum'}`;\nenum Reported {}"
 	if directives := Build(source).Directives(); len(directives) != 0 {
 		t.Fatalf("found a directive inside a string inside an interpolation: %+v", directives)
@@ -550,6 +580,7 @@ func TestCommentTextInsideAnInterpolatedStringIsNotADirective(t *testing.T) {
 // rest as template text and resynchronizes by the end of the line, so a later directive alone cannot
 // tell the two apart, and an earlier fixture built only that way let the brace count be deleted.
 func TestAnInterpolationClosesOnItsOwnBrace(t *testing.T) {
+	t.Parallel()
 	source := strings.Join([]string{
 		"const label = `${ {width: 1}.width /* eslint-disable-next-line nexus/consistency-no-enum -- inside the interpolation */ }`;",
 		"enum Suppressed {}",

@@ -69,6 +69,7 @@ func TestCompareManualMemoDependenciesAsymmetry(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if got := CompareManualMemoDependencies(testCase.inferred, testCase.source); got != testCase.want {
 				t.Errorf("got %v, want %v", got, testCase.want)
 			}

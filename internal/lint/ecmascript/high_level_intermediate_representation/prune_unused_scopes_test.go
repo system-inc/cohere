@@ -119,6 +119,7 @@ func TestPruneUnusedScopesKeepsScopesWithOwnDeclarations(t *testing.T) {
 		{name: "origin unknown keeps the scope", originKnown: false, wantPruned: false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			dependencies := &ScopeDependencies{
 				declarations: map[ScopeId][]IdentifierId{1: {7}},
 			}

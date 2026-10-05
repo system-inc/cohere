@@ -10,6 +10,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestIterateRegexCharacterClasses_Basic(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		pattern string
 		flags   RegexFlags
@@ -40,6 +41,7 @@ func TestIterateRegexCharacterClasses_Basic(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.pattern, func(t *testing.T) {
+			t.Parallel()
 			var got [][2]int
 			ok := IterateRegexCharacterClasses(c.pattern, c.flags, func(s, e int) {
 				got = append(got, [2]int{s, e})
@@ -55,6 +57,7 @@ func TestIterateRegexCharacterClasses_Basic(t *testing.T) {
 }
 
 func TestIterateRegexCharacterClasses_EscapedBracketsInVFlag(t *testing.T) {
+	t.Parallel()
 	// v flag + `\]` inside nested class: the escape must not close the outer
 	// class prematurely.
 	var got [][2]int
@@ -71,6 +74,7 @@ func TestIterateRegexCharacterClasses_EscapedBracketsInVFlag(t *testing.T) {
 }
 
 func TestIterateRegexCharacterClasses_DeepNesting(t *testing.T) {
+	t.Parallel()
 	// Five levels of nesting under v flag.
 	var got [][2]int
 	ok := IterateRegexCharacterClasses(`[[[[[x]]]]]`, RegexFlags{UnicodeSets: true}, func(s, e int) {
@@ -87,6 +91,7 @@ func TestIterateRegexCharacterClasses_DeepNesting(t *testing.T) {
 }
 
 func TestIterateRegexCharacterClasses_QBraceContainsBracket(t *testing.T) {
+	t.Parallel()
 	// `\q{ab|c]d}` inside v class — the `]` inside `\q{}` is literal and
 	// must NOT close the outer class.
 	var got [][2]int
@@ -103,6 +108,7 @@ func TestIterateRegexCharacterClasses_QBraceContainsBracket(t *testing.T) {
 }
 
 func TestIterateRegexCharacterClasses_PropertyEscapeContainsBracket(t *testing.T) {
+	t.Parallel()
 	// `\p{...}` can't contain `]` in practice (property names don't), but
 	// exercise the general skip behavior with an adjacent class.
 	var got [][2]int
@@ -119,6 +125,7 @@ func TestIterateRegexCharacterClasses_PropertyEscapeContainsBracket(t *testing.T
 }
 
 func TestParseRegexCharacterClass_SetDifferenceWithClass(t *testing.T) {
+	t.Parallel()
 	els := parseClass(t, `[a--[b]]`, RegexFlags{UnicodeSets: true})
 	// Elements: 'a', breaker(--), breaker(nested [b])
 	if len(els) != 3 {
@@ -136,6 +143,7 @@ func TestParseRegexCharacterClass_SetDifferenceWithClass(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_MultipleRangesAndSets(t *testing.T) {
+	t.Parallel()
 	// `[\dA-Z\sa-z]` — alternating sets and ranges.
 	els := parseClass(t, `[\dA-Z\sa-z]`, RegexFlags{})
 	wantKinds := []RegexCharElementKind{
@@ -155,6 +163,7 @@ func TestParseRegexCharacterClass_MultipleRangesAndSets(t *testing.T) {
 }
 
 func TestIterateRegexCharacterClasses_VFlagNested(t *testing.T) {
+	t.Parallel()
 	// v-flag enables nested classes; we expect the callback to fire for
 	// EACH nesting level (innermost first thanks to recursion).
 	cases := []struct {
@@ -174,6 +183,7 @@ func TestIterateRegexCharacterClasses_VFlagNested(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.pattern, func(t *testing.T) {
+			t.Parallel()
 			var got [][2]int
 			ok := IterateRegexCharacterClasses(c.pattern, RegexFlags{UnicodeSets: true}, func(s, e int) {
 				got = append(got, [2]int{s, e})
@@ -189,6 +199,7 @@ func TestIterateRegexCharacterClasses_VFlagNested(t *testing.T) {
 }
 
 func TestIterateRegexCharacterClasses_EscapeBoundaries(t *testing.T) {
+	t.Parallel()
 	// Escapes that span > 2 bytes must be skipped correctly so subsequent
 	// `[` is recognized.
 	cases := []struct {
@@ -213,6 +224,7 @@ func TestIterateRegexCharacterClasses_EscapeBoundaries(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.pattern, func(t *testing.T) {
+			t.Parallel()
 			var got [][2]int
 			ok := IterateRegexCharacterClasses(c.pattern, c.flags, func(s, e int) {
 				got = append(got, [2]int{s, e})
@@ -228,6 +240,7 @@ func TestIterateRegexCharacterClasses_EscapeBoundaries(t *testing.T) {
 }
 
 func TestIterateRegexCharacterClasses_Malformed(t *testing.T) {
+	t.Parallel()
 	// Unterminated class at EOF
 	for _, p := range []string{"[abc", "[", `[\`, `\`} {
 		ok := IterateRegexCharacterClasses(p, RegexFlags{}, func(s, e int) {})
@@ -251,6 +264,7 @@ func parseClass(t *testing.T, pattern string, flags RegexFlags) []RegexCharEleme
 }
 
 func TestParseRegexCharacterClass_BasicChars(t *testing.T) {
+	t.Parallel()
 	els := parseClass(t, "[abc]", RegexFlags{})
 	if len(els) != 3 {
 		t.Fatalf("len=%d, want 3", len(els))
@@ -263,6 +277,7 @@ func TestParseRegexCharacterClass_BasicChars(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_Negated(t *testing.T) {
+	t.Parallel()
 	// `[^abc]` — the `^` is consumed but does not appear as an element.
 	els := parseClass(t, "[^abc]", RegexFlags{})
 	if len(els) != 3 {
@@ -274,6 +289,7 @@ func TestParseRegexCharacterClass_Negated(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_Empty(t *testing.T) {
+	t.Parallel()
 	els := parseClass(t, "[]", RegexFlags{})
 	if len(els) != 0 {
 		t.Errorf("got %v, want empty", els)
@@ -281,6 +297,7 @@ func TestParseRegexCharacterClass_Empty(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_Range(t *testing.T) {
+	t.Parallel()
 	els := parseClass(t, "[a-z]", RegexFlags{})
 	if len(els) != 1 {
 		t.Fatalf("len=%d, want 1", len(els))
@@ -295,6 +312,7 @@ func TestParseRegexCharacterClass_Range(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_RangeWithEscape(t *testing.T) {
+	t.Parallel()
 	// `[\u0041-\u005A]` — range from A to Z via \uHHHH
 	els := parseClass(t, `[\u0041-\u005A]`, RegexFlags{})
 	if len(els) != 1 {
@@ -306,6 +324,7 @@ func TestParseRegexCharacterClass_RangeWithEscape(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_DashAtBoundary(t *testing.T) {
+	t.Parallel()
 	// `[-a]` — leading `-` is literal
 	els := parseClass(t, "[-a]", RegexFlags{})
 	if len(els) != 2 || els[0].Value != '-' || els[1].Value != 'a' {
@@ -319,6 +338,7 @@ func TestParseRegexCharacterClass_DashAtBoundary(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_HexEscapes(t *testing.T) {
+	t.Parallel()
 	els := parseClass(t, `[\x41\u0042\cI\n\t\\]`, RegexFlags{})
 	wants := []uint32{0x41, 0x42, 0x09, '\n', '\t', '\\'}
 	if len(els) != len(wants) {
@@ -332,6 +352,7 @@ func TestParseRegexCharacterClass_HexEscapes(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_UBraceUnderUFlag(t *testing.T) {
+	t.Parallel()
 	els := parseClass(t, `[\u{41}\u{1F44D}]`, RegexFlags{Unicode: true})
 	if len(els) != 2 {
 		t.Fatalf("len=%d, want 2", len(els))
@@ -345,6 +366,7 @@ func TestParseRegexCharacterClass_UBraceUnderUFlag(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_UBraceUnderNonUFlag(t *testing.T) {
+	t.Parallel()
 	// Non-u mode: `\u{41}` is treated as identity `u` then literal `{41}`.
 	els := parseClass(t, `[\u{41}]`, RegexFlags{})
 	if len(els) < 4 {
@@ -356,6 +378,7 @@ func TestParseRegexCharacterClass_UBraceUnderNonUFlag(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_SurrogatePairCollapse(t *testing.T) {
+	t.Parallel()
 	// Under u/v flag, `\uD83D\uDC4D` collapses to one element with astral value.
 	els := parseClass(t, `[\uD83D\uDC4D]`, RegexFlags{Unicode: true})
 	if len(els) != 1 {
@@ -376,6 +399,7 @@ func TestParseRegexCharacterClass_SurrogatePairCollapse(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_CharacterSetBreaker(t *testing.T) {
+	t.Parallel()
 	els := parseClass(t, `[a\db]`, RegexFlags{})
 	wantKinds := []RegexCharElementKind{
 		RegexCharSingle, RegexCharBreaker, RegexCharSingle,
@@ -391,6 +415,7 @@ func TestParseRegexCharacterClass_CharacterSetBreaker(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_PropertyEscape(t *testing.T) {
+	t.Parallel()
 	els := parseClass(t, `[\p{Letter}a]`, RegexFlags{Unicode: true})
 	if len(els) != 2 || els[0].Kind != RegexCharBreaker || els[1].Value != 'a' {
 		t.Errorf("got %+v", els)
@@ -401,6 +426,7 @@ func TestParseRegexCharacterClass_PropertyEscape(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_QuotedDisjunction(t *testing.T) {
+	t.Parallel()
 	els := parseClass(t, `[\q{abc}]`, RegexFlags{UnicodeSets: true})
 	if len(els) != 1 || els[0].Kind != RegexCharBreaker {
 		t.Errorf("got %+v", els)
@@ -408,6 +434,7 @@ func TestParseRegexCharacterClass_QuotedDisjunction(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_VFlagSetOperator(t *testing.T) {
+	t.Parallel()
 	els := parseClass(t, `[a--b]`, RegexFlags{UnicodeSets: true})
 	wantKinds := []RegexCharElementKind{
 		RegexCharSingle, RegexCharBreaker, RegexCharSingle,
@@ -428,6 +455,7 @@ func TestParseRegexCharacterClass_VFlagSetOperator(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_VFlagNestedAsBreaker(t *testing.T) {
+	t.Parallel()
 	// `[a[b]c]` under v flag: nested `[b]` appears as a breaker
 	els := parseClass(t, "[a[b]c]", RegexFlags{UnicodeSets: true})
 	if len(els) != 3 {
@@ -439,6 +467,7 @@ func TestParseRegexCharacterClass_VFlagNestedAsBreaker(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_BackspaceBInClass(t *testing.T) {
+	t.Parallel()
 	// Inside class, `\b` is U+0008.
 	els := parseClass(t, `[\b]`, RegexFlags{})
 	if len(els) != 1 || els[0].Value != 0x08 {
@@ -447,6 +476,7 @@ func TestParseRegexCharacterClass_BackspaceBInClass(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_RawAstral(t *testing.T) {
+	t.Parallel()
 	// Raw 👍 in a class. Under non-u, this is a single-element single-rune
 	// pattern (4 UTF-8 bytes); the regex engine in JS would see it as 2
 	// surrogate code units, but we leave that responsibility to the caller
@@ -462,6 +492,7 @@ func TestParseRegexCharacterClass_RawAstral(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_Position(t *testing.T) {
+	t.Parallel()
 	// Cohere Start/End are byte offsets within the original pattern.
 	els, end, ok := ParseRegexCharacterClass("foo[ab]bar", 3, RegexFlags{})
 	if !ok {
@@ -482,6 +513,7 @@ func TestParseRegexCharacterClass_Position(t *testing.T) {
 }
 
 func TestParseRegexCharacterClassWithEnd(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		name    string
 		pattern string
@@ -498,6 +530,7 @@ func TestParseRegexCharacterClassWithEnd(t *testing.T) {
 		{name: "unicode sets nested", pattern: `[[a-z]--[\q{x|y}]]`, flags: RegexFlags{UnicodeSets: true}},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			assertKnownEndParserParity(t, testCase.pattern, testCase.flags)
 		})
 	}
@@ -578,6 +611,7 @@ func assertKnownEndParserParity(t *testing.T, pattern string, flags RegexFlags) 
 }
 
 func TestParseRegexCharacterClass_RangeWithDashChain(t *testing.T) {
+	t.Parallel()
 	// `[a-b-c]` — `a-b` range, then `-`, then `c`
 	els := parseClass(t, "[a-b-c]", RegexFlags{})
 	if len(els) != 3 {

@@ -698,6 +698,7 @@ switch (value) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(
 				t, SwitchExhaustivenessCheck, switchExhaustivenessFile, testCase.sourceText, testCase.options,
 			))
@@ -1356,6 +1357,7 @@ switch (value) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(
 				t, SwitchExhaustivenessCheck, switchExhaustivenessFile, testCase.sourceText, testCase.options,
 			), testCase.wantIds...)
@@ -1800,6 +1802,7 @@ func TestSwitchExhaustivenessCheckNamesTheMissingBranches(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, SwitchExhaustivenessCheck, switchExhaustivenessFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, "switchIsNotExhaustive")
 			want := "Switch is not exhaustive. Cases not matched: " + testCase.want

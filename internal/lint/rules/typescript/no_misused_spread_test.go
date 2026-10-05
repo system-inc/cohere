@@ -80,6 +80,7 @@ func TestNoMisusedSpreadStaysSilent(t *testing.T) {
 		{"upstream valid 39", "file.ts", "\nconst a = {\n  ...class A {\n    static value = 1;\n  },\n};\n      ", NoMisusedSpreadOptions{AllowInline: []string{"A"}}}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -176,6 +177,7 @@ func TestNoMisusedSpreadFires(t *testing.T) {
 		{"upstream invalid 90", "file.tsx", "\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ", nil, []string{"noPromiseSpreadInObject"}}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -226,11 +228,13 @@ func TestNoMisusedSpreadLeavesStringSpreadAlone(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil))
 		})
 	}
 
 	t.Run("control: an array spread into an object in the same harness still reports", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
 			"declare const s: string;\nconst x = [...s];\nconst o = { ...[...s] };", nil), "noArraySpreadInObject")
 	})
@@ -282,6 +286,7 @@ func TestNoMisusedSpreadSuggestions(t *testing.T) {
 		{"upstream invalid 90", "file.tsx", "\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ", nil, "addAwait", "\nconst promise = new Promise(() => {});\n\nconst o = <div {...await promise} />;\n      "}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("want at least one finding, got none")
@@ -344,6 +349,7 @@ func TestNoMisusedSpreadSpans(t *testing.T) {
 		{"upstream invalid 90", "file.tsx", "\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ", []string{"{...promise}"}}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, testCase.fileName, testCase.sourceText, nil)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
@@ -387,12 +393,14 @@ func TestNoMisusedSpreadCaseThatCannotBeExpressedHere(t *testing.T) {
 	t.Parallel()
 
 	t.Run("the same iterable shape without an ambient module reports", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
 			"type CustomIterable = {\n  [Symbol.iterator]: () => string;\n};\ndeclare const iterator: CustomIterable;\nconst a = { ...iterator };", nil)
 		rule_testing.ExpectFindings(t, result, "noIterableSpreadInObject")
 	})
 
 	t.Run("an allow specifier naming that type silences it", func(t *testing.T) {
+		t.Parallel()
 		// The other half of what case 61 was testing, expressed with a `from: file` specifier, which
 		// needs no package resolution.
 		result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
@@ -453,6 +461,7 @@ func TestNoMisusedSpreadCascadeOrdering(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
@@ -506,6 +515,7 @@ func TestNoMisusedSpreadSurvivesMalformedSpreads(t *testing.T) {
 
 	for index, source := range sources {
 		t.Run(fmt.Sprintf("shape-%d", index), func(t *testing.T) {
+			t.Parallel()
 			// A panic fails the test. Findings are deliberately unasserted.
 			rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, source, nil)
 		})
@@ -532,6 +542,7 @@ func TestNoMisusedSpreadDecoder(t *testing.T) {
 	}
 
 	t.Run("an empty object allows nothing", func(t *testing.T) {
+		t.Parallel()
 		got := decode(t, `{}`)
 		if len(got.Allow) != 0 || len(got.AllowInline) != 0 {
 			t.Errorf("got %+v, want an empty allow list", got)
@@ -539,6 +550,7 @@ func TestNoMisusedSpreadDecoder(t *testing.T) {
 	})
 
 	t.Run("a bare string becomes an inline specifier", func(t *testing.T) {
+		t.Parallel()
 		got := decode(t, `{"allow": ["Map"]}`)
 		if len(got.AllowInline) != 1 || got.AllowInline[0] != "Map" {
 			t.Errorf("got %+v, want one inline specifier naming Map", got)
@@ -546,6 +558,7 @@ func TestNoMisusedSpreadDecoder(t *testing.T) {
 	})
 
 	t.Run("a specifier object with a string name becomes a one-element name list", func(t *testing.T) {
+		t.Parallel()
 		got := decode(t, `{"allow": [{"from": "lib", "name": "Map"}]}`)
 		if len(got.Allow) != 1 || len(got.Allow[0].Name) != 1 || got.Allow[0].Name[0] != "Map" {
 			t.Fatalf("got %+v, want one specifier naming Map", got)
@@ -556,6 +569,7 @@ func TestNoMisusedSpreadDecoder(t *testing.T) {
 	})
 
 	t.Run("the decoded allow list reaches the rule and changes its verdict", func(t *testing.T) {
+		t.Parallel()
 		// Byte-identical source, opposite verdicts, separated only by what came off the wire. The
 		// subject is upstream valid 38's class instance, which an inline specifier names by type, with
 		// a method added: a fields-only class is exempt without any allow list, so it could not show
@@ -617,6 +631,7 @@ func TestNoMisusedSpreadMapSuggestionKeepsExistingParentheses(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
 			rule_testing.ExpectFindings(t, result, "noMapSpreadInObject")
 
@@ -658,6 +673,7 @@ func TestNoMisusedSpreadMergedClassDeclarations(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
 			rule_testing.ExpectFindings(t, result, "noClassInstanceSpreadInObject")
 		})
@@ -697,6 +713,7 @@ func TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil))
 		})
 	}
@@ -723,6 +740,7 @@ func TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete(t *testing.T) {
 	}
 	for _, testCase := range reported {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
@@ -750,6 +768,7 @@ func TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete(t *testing.T) {
 	}
 	for _, testCase := range files {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			sources := map[string]string{"Subject.ts": subject}
 			for name, text := range testCase.decorator {
 				sources[name] = text

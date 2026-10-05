@@ -95,6 +95,7 @@ func exportOriginAnswers(t *testing.T, files map[string]string) (exports map[str
 // ExportNameIn follows each way a callee can come from React to the export it names, and answers nothing
 // for what does not come from React.
 func TestExportNameInFollowsReExportsToTheExport(t *testing.T) {
+	t.Parallel()
 	exports, _ := exportOriginAnswers(t, exportOriginFiles)
 	want := map[string]string{
 		"useLocalState":        "useState",
@@ -128,6 +129,7 @@ func TestExportNameInFollowsReExportsToTheExport(t *testing.T) {
 // that names a different React export, moves none of them. Editing export syntax does move one, so the
 // comparison is not blind.
 func TestExportNameInReadsOnlyTheShapesOfOtherFiles(t *testing.T) {
+	t.Parallel()
 	before, _ := exportOriginAnswers(t, exportOriginFiles)
 
 	rewritten := map[string]string{}
@@ -170,6 +172,7 @@ func TestExportNameInReadsOnlyTheShapesOfOtherFiles(t *testing.T) {
 // ImportBindingOf says how each name is bound in main.ts: imported and from where, declared there, or a
 // global.
 func TestImportBindingOfReadsTheFilesOwnBinding(t *testing.T) {
+	t.Parallel()
 	_, bindings := exportOriginAnswers(t, exportOriginFiles)
 	want := map[string]rule.ImportBinding{
 		"useLocalState": {Kind: rule.ImportBindingSpecifier, Source: "./star", Imported: "useLocalState"},

@@ -101,6 +101,7 @@ func TestGraphQlOperationContextMatchesReturnStaysSilent(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(graphQlOperationContextCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, GraphQlOperationContextMatchesReturn,
 				graphQlOperationContextFile, graphQlOperationContextPreamble+sourceText))
 		})
@@ -195,6 +196,7 @@ func TestGraphQlOperationContextMatchesReturnFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(graphQlOperationContextCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			sourceText := graphQlOperationContextPreamble + testCase.sourceText
 			result := rule_testing.RunTyped(t, GraphQlOperationContextMatchesReturn,
 				graphQlOperationContextFile, sourceText)

@@ -63,6 +63,7 @@ func TestNoUselessReturnStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessReturn, "file.ts", testCase.source))
 		})
 	}
@@ -119,6 +120,7 @@ func TestNoUselessReturnFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessReturn, "file.ts", testCase.source)
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
@@ -158,6 +160,7 @@ func TestNoUselessReturnSpanAndMessage(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessReturn, "file.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
@@ -204,6 +207,7 @@ func TestNoUselessReturnComments(t *testing.T) {
 	}
 	for _, testCase := range declines {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessReturn, "file.ts", testCase.source)
 			rule_testing.ExpectFindings(t, result, "unnecessaryReturn")
 			if len(result.Diagnostics[0].Fixes) != 0 {
@@ -227,6 +231,7 @@ func TestNoUselessReturnComments(t *testing.T) {
 	}
 	for _, testCase := range repairs {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessReturn, "file.ts", testCase.source)
 			rule_testing.ExpectFindings(t, result, "unnecessaryReturn")
 			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
@@ -285,6 +290,7 @@ func TestNoUselessReturnTypeScriptShapes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// Typed because an annotated function is exactly where the rule asks the checker
 			// whether the compiler needs the return. See TestNoUselessReturnKeepsAReturnTheCompilerRequires.
 			// The typed harness writes the fixture with a trailing newline, which the repair keeps.
@@ -377,6 +383,7 @@ func TestNoUselessReturnTryBoundary(t *testing.T) {
 	}
 	for _, testCase := range clean {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessReturn, "file.ts", testCase.source))
 		})
 	}
@@ -391,6 +398,7 @@ func TestNoUselessReturnTryBoundary(t *testing.T) {
 	}
 	for _, testCase := range reports {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoUselessReturn, "file.ts", testCase.source), "unnecessaryReturn")
 		})

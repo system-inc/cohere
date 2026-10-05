@@ -18,6 +18,7 @@ import (
 // default message SURVIVED the whole suite: nothing could see the join's behaviour on an id outside
 // the table, in either direction.
 func TestUnjoinedMessageIdsAreEnumerated(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("builds a TypeScript program per fixture")
 	}

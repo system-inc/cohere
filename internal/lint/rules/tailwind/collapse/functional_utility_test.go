@@ -49,6 +49,7 @@ func loadFunctionalFixture(t *testing.T, name string) functionalFixture {
 // likely to be dropped in a port: upstream spells it three separate times and each one guards a
 // different branch.
 func TestFunctionalResolutionRejectsWhatTheEngineRejects(t *testing.T) {
+	t.Parallel()
 	fixture := loadFunctionalFixture(t, "functional_fixtures.json")
 
 	if fixture.RejectedCount < 4 {
@@ -134,6 +135,7 @@ func rejectedNonIntegerFraction() (ParsedCandidate, *FunctionalUtilityDescriptio
 // `grow-2/3` from reading as `grow` carrying a stray modifier. Dropping the test leaves those
 // classes resolving to something, which sorts, so it would not surface as an error anywhere.
 func TestFunctionalResolutionModifierCancelsBareValue(t *testing.T) {
+	t.Parallel()
 	theme := NewTheme()
 	description := &FunctionalUtilityDescription{
 		HandleBareValue: func(value *ParsedValue) (string, bool) { return value.Value, true },
@@ -163,6 +165,7 @@ func TestFunctionalResolutionModifierCancelsBareValue(t *testing.T) {
 // would pass every assertion in this package while disagreeing with the engine anywhere the text
 // reaches a data-type inference.
 func TestFunctionalResolutionNegatesThroughMathOperatorSpacing(t *testing.T) {
+	t.Parallel()
 	theme := NewTheme()
 	description := &FunctionalUtilityDescription{
 		HandleBareValue: func(value *ParsedValue) (string, bool) { return value.Value, true },
@@ -188,6 +191,7 @@ func TestFunctionalResolutionNegatesThroughMathOperatorSpacing(t *testing.T) {
 // port emitting `calc(1/2 * 100%)` would be the same CSS and a different string, in a value that
 // reaches `inferDataType` downstream.
 func TestFunctionalResolutionFractionMatchesTheEngineExactly(t *testing.T) {
+	t.Parallel()
 	theme := NewTheme()
 	description := &FunctionalUtilityDescription{SupportsFractions: true, ThemeKeys: []string{"--width"}}
 	candidate := ParsedCandidate{
@@ -218,6 +222,7 @@ func TestFunctionalResolutionFractionMatchesTheEngineExactly(t *testing.T) {
 // A candidate with no value and a modifier, and an arbitrary value with a modifier, both produce
 // nothing. Measured: `bg/50` and `w-[3px]/50` compile to no CSS.
 func TestFunctionalResolutionValuelessModifierProducesNothing(t *testing.T) {
+	t.Parallel()
 	theme := NewTheme()
 	theme.Add("--radius", "0.25rem", 0)
 	description := &FunctionalUtilityDescription{
@@ -249,6 +254,7 @@ func TestFunctionalResolutionValuelessModifierProducesNothing(t *testing.T) {
 // the theme is branch 3 and staticValues is branch 5. Getting this backwards is invisible on every
 // name that is only one of the two, which is nearly all of them.
 func TestFunctionalResolutionThemeBeforeStaticValues(t *testing.T) {
+	t.Parallel()
 	theme := NewTheme()
 	theme.Add("--width-full", "60rem", 0)
 
@@ -285,6 +291,7 @@ func TestFunctionalResolutionThemeBeforeStaticValues(t *testing.T) {
 // true. It is the only disagreement in this corpus, which is exactly why it needs to be here: a port
 // that dropped the round-trip would pass every other case in this test.
 func TestIsPositiveIntegerMatchesTheEngineIncludingPrecision(t *testing.T) {
+	t.Parallel()
 	cases := map[string]bool{
 		"0": true, "1": true, "10": true,
 		"007": false, "1.0": false, "1e3": false, " 1": false, "": false,

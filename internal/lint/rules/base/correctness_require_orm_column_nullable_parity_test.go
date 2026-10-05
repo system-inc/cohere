@@ -51,6 +51,7 @@ func TestOrmColumnNullableParityStaysSilent(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(correctnessRequireOrmColumnNullableParityCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, CorrectnessRequireOrmColumnNullableParity, correctnessRequireOrmColumnNullableParityFile, sourceText))
 		})
 	}
@@ -90,6 +91,7 @@ func TestOrmColumnNullableParityFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(correctnessRequireOrmColumnNullableParityCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, CorrectnessRequireOrmColumnNullableParity, correctnessRequireOrmColumnNullableParityFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))

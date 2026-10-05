@@ -644,6 +644,7 @@ func TestCorrectnessNoProcessExitAfterOutputReadsOneCallee(t *testing.T) {
 	}
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			exit := "process.exit(0)"
 			if strings.Contains(strings.Join(testCase.lines, "\n"), "process.exit(1)") {
 				exit = "process.exit(1)"
@@ -697,6 +698,7 @@ func TestCorrectnessNoProcessExitAfterOutputReadsOneCallee(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			correctnessNoProcessExitAfterOutputExpect(t,
 				correctnessNoProcessExitAfterOutputRunWithHelpers(t, correctnessNoProcessExitAfterOutputSource(testCase.lines...)),
 				testCase.want)

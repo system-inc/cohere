@@ -436,6 +436,7 @@ func TestArrayTypeStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, ArrayType,
 				arrayTypeFile, testCase.sourceText,
 				decodeArrayTypeOptions(t, testCase.configuration)))
@@ -1161,6 +1162,7 @@ func TestArrayTypeFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
 				testCase.sourceText, decodeArrayTypeOptions(t, testCase.configuration))
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -1320,6 +1322,7 @@ func TestArrayTypeRendersTheMessageUpstreamRenders(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
 				testCase.sourceText, decodeArrayTypeOptions(t, testCase.configuration))
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
@@ -1362,6 +1365,7 @@ func TestArrayTypeDeclinesAHeritageClause(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
 				testCase.sourceText, decodeArrayTypeOptions(t, "{\"default\": \"array\"}"))
 			wantIds := make([]string, testCase.wantCount)
@@ -1398,6 +1402,7 @@ func TestArrayTypeDeclinesAGenericWithTheWrongArgumentCount(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
 				testCase.sourceText, decodeArrayTypeOptions(t, "{\"default\": \"array\"}"))
 			wantIds := make([]string, testCase.wantCount)
@@ -1461,6 +1466,7 @@ func TestArrayTypeWrapsAReadonlyRewriteOnlyWhenItHasTo(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
 				testCase.sourceText, decodeArrayTypeOptions(t, "{\"default\": \"array\"}"))
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
@@ -1532,6 +1538,7 @@ func TestArrayTypeJudgesSimplicityTheWayUpstreamDoes(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
 				testCase.sourceText, decodeArrayTypeOptions(t, testCase.configuration))
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -1597,6 +1604,7 @@ func TestArrayTypeReadsOnlyTheReadonlyOperator(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
 				testCase.sourceText, decodeArrayTypeOptions(t, testCase.configuration))
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -1785,6 +1793,7 @@ func TestArrayTypeDeclinesAShadowedName(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
 				testCase.sourceText, decodeArrayTypeOptions(t, "{\"default\": \"array\"}"))
 			wantIds := make([]string, testCase.wantCount)
@@ -1818,6 +1827,7 @@ func TestArrayTypeDecoderResolvesBothAxes(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeArrayTypeOptions([]byte(testCase.configuration))
 			if err != nil {
 				t.Fatalf("decoding %s: %v", testCase.configuration, err)
@@ -1878,6 +1888,7 @@ func TestArrayTypeSurvivesMalformedTypes(t *testing.T) {
 		"onlyReadonly":    "type T = readonly;",
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile, sourceText,
 				decodeArrayTypeOptions(t, "{\"default\": \"generic\"}"))
 		})

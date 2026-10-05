@@ -219,6 +219,7 @@ func TestYodaFires(t *testing.T) {
 
 	for _, testCase := range yodaFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, Yoda, yodaFile, testCase.source,
 				decodeYodaOptionsForTest(t, testCase.optionsJson))
 
@@ -264,6 +265,7 @@ func TestYodaStaysSilent(t *testing.T) {
 
 	for _, testCase := range yodaCleanCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, Yoda, yodaFile,
 				testCase.source, decodeYodaOptionsForTest(t, testCase.optionsJson)))
 		})
@@ -362,6 +364,7 @@ func TestYodaTypeScriptOperandsSurviveTheFix(t *testing.T) {
 
 	for _, testCase := range yodaTypeScriptCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, Yoda, yodaFile, testCase.source,
 				decodeYodaOptionsForTest(t, testCase.optionsJson))
 			rule_testing.ExpectFindings(t, result, "expected")
@@ -397,6 +400,7 @@ func TestYodaRangeTestRequiresLessThanOperators(t *testing.T) {
 		"if (0 < x && x > 1) {}",
 	} {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunWithOptions(t, Yoda, yodaFile, source, options), "expected")
 		})

@@ -84,6 +84,7 @@ func TestNoArrayDeleteStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoArrayDelete, noArrayDeleteFile, testCase.sourceText))
 		})
 	}
@@ -162,6 +163,7 @@ func TestNoArrayDeleteFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoArrayDelete, noArrayDeleteFile, testCase.sourceText), "noArrayDelete")
 		})
 	}
@@ -219,6 +221,7 @@ func TestNoArrayDeleteSuggestions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoArrayDelete, noArrayDeleteFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
@@ -335,6 +338,7 @@ func TestNoArrayDeleteSpans(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoArrayDelete, noArrayDeleteFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want one finding, got %d", len(result.Diagnostics))

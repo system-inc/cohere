@@ -90,6 +90,7 @@ func TestComputeMemoizedRespectsTheLevels(t *testing.T) {
 		{name: "never is not held", level: MemoizationNever, want: false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			graph := NewMemoizationGraph()
 			graph.Record(1, MemoizationMemoized, []DeclarationId{2})
 			graph.Record(2, testCase.level, nil)
@@ -231,6 +232,7 @@ func TestRecordJoinsRatherThanAssigns(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			graph := NewMemoizationGraph()
 			graph.Record(1, MemoizationConditional, []DeclarationId{2})
 			for _, level := range testCase.levels {

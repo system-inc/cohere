@@ -190,6 +190,7 @@ func TestConsistentTypeExportsStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(consistentTypeExportsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedFilesWithOptions(t,
 				ConsistentTypeExports, consistentTypeExportsFixtureFiles(testCase.sourceText),
 				consistentTypeExportsFile,
@@ -395,6 +396,7 @@ func TestConsistentTypeExportsFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(consistentTypeExportsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedFilesWithOptions(t, ConsistentTypeExports,
 				consistentTypeExportsFixtureFiles(testCase.sourceText),
 				consistentTypeExportsFile,
@@ -476,6 +478,7 @@ func TestConsistentTypeExportsSplitKeepsWhatTheSpecifierCarries(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(consistentTypeExportsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedFilesWithOptions(t, ConsistentTypeExports,
 				consistentTypeExportsFixtureFiles(testCase.sourceText),
 				consistentTypeExportsFile, nil)
@@ -594,6 +597,7 @@ func TestConsistentTypeExportsDiscriminatesOnCasesUpstreamDoesNotWrite(t *testin
 	}
 	for index, testCase := range cases {
 		t.Run(consistentTypeExportsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedFilesWithOptions(t, ConsistentTypeExports,
 				consistentTypeExportsFixtureFiles(testCase.sourceText),
 				consistentTypeExportsFile,
@@ -631,6 +635,7 @@ func TestConsistentTypeExportsNamesTheExportsUpstreamNames(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(consistentTypeExportsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedFilesWithOptions(t, ConsistentTypeExports,
 				consistentTypeExportsFixtureFiles(testCase.sourceText),
 				consistentTypeExportsFile, nil)
@@ -665,6 +670,7 @@ func TestConsistentTypeExportsDecoderResolvesTheOption(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(consistentTypeExportsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeConsistentTypeExportsOptions([]byte(testCase.configuration))
 			if err != nil {
 				t.Fatalf("decoding %s: %v", testCase.configuration, err)

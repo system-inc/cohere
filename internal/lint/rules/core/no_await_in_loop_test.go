@@ -48,6 +48,7 @@ func TestNoAwaitInLoopFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "unexpectedAwait")
 		})
@@ -85,6 +86,7 @@ func TestNoAwaitInLoopStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -121,6 +123,7 @@ func TestNoAwaitInLoopSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
@@ -203,6 +206,7 @@ func TestNoAwaitInLoopBoundariesBeyondUpstreamsThree(t *testing.T) {
 		{"an await in a static block, which is illegal and recovered", "async function f(){ while (true) { class C { static { foo(await bar); } } } }"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -236,6 +240,7 @@ func TestNoAwaitInLoopLoopPositions(t *testing.T) {
 		{"do-while body is re-entered", "async function f(){ do { await bar; } while (baz); }", true},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
 			if testCase.wantReport {
 				rule_testing.ExpectFindings(t, result, "unexpectedAwait")

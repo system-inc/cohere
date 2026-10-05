@@ -82,6 +82,7 @@ func TestNoGlobalAssignFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, testCase.sourceText),
 				testCase.wantIds...)
@@ -144,6 +145,7 @@ func TestNoGlobalAssignStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, testCase.sourceText))
 		})
@@ -159,12 +161,14 @@ func TestNoGlobalAssignExceptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("a listed name is not reported", func(t *testing.T) {
+		t.Parallel()
 		// Upstream pass case 3, verbatim source and options.
 		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoGlobalAssign, globalAssignFile,
 			"Object = 0;", NoGlobalAssignOptions{Exceptions: []string{"Object"}}))
 	})
 
 	t.Run("an unlisted name is still reported", func(t *testing.T) {
+		t.Parallel()
 		// The other half of the option, which upstream does not test: an exceptions list must
 		// exempt the names in it and nothing else. Without this, an option handler that exempts
 		// everything once any name is listed passes upstream's only case.
@@ -173,11 +177,13 @@ func TestNoGlobalAssignExceptions(t *testing.T) {
 	})
 
 	t.Run("an empty exceptions list exempts nothing", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoGlobalAssign, globalAssignFile,
 			"Object = 0;", NoGlobalAssignOptions{Exceptions: []string{}}), "noGlobalAssign")
 	})
 
 	t.Run("several listed names are all exempt", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoGlobalAssign, globalAssignFile,
 			"({Object = 0, String = 0} = {});",
 			NoGlobalAssignOptions{Exceptions: []string{"Object", "String"}}))
@@ -215,6 +221,7 @@ func TestNoGlobalAssignPointsAtTheWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("wanted %d findings, got %d", len(testCase.want), len(result.Diagnostics))
@@ -309,6 +316,7 @@ func TestNoGlobalAssignBoundary(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, testCase.sourceText))
 		})

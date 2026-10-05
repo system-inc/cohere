@@ -25,6 +25,7 @@ func firstImport(t *testing.T, sourceText string) *ast.Node {
 // checks one field pins half the forms while looking complete. That mistake was made and corrected
 // once in this tree already.
 func TestBindingsOfSeesAllThreeKinds(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name          string
 		sourceText    string
@@ -43,6 +44,7 @@ func TestBindingsOfSeesAllThreeKinds(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			bindings := BindingsOf(firstImport(t, testCase.sourceText))
 			if (bindings.Default != nil) != testCase.wantDefault {
 				t.Fatalf("default: want %v, got %v", testCase.wantDefault, bindings.Default != nil)
@@ -61,6 +63,7 @@ func TestBindingsOfSeesAllThreeKinds(t *testing.T) {
 // deliberately so: oxc never resolves the module at all and string-matches the element name, so it
 // fires on any local component sharing that name.
 func TestLocalNameOfDefaultImport(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -79,6 +82,7 @@ func TestLocalNameOfDefaultImport(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			got, found := LocalNameOfDefaultImport(firstImport(t, testCase.sourceText), testCase.specifier)
 			if found != testCase.wantFound {
 				t.Fatalf("found: want %v, got %v", testCase.wantFound, found)
@@ -93,6 +97,7 @@ func TestLocalNameOfDefaultImport(t *testing.T) {
 // A non-import node and a nil answer rather than panic, since a rule reaching a shared helper with a
 // node it did not check is a bug in the rule and should not take the run down.
 func TestBindingHelpersSurviveWrongInput(t *testing.T) {
+	t.Parallel()
 	if bindings := BindingsOf(nil); bindings.Default != nil || bindings.Namespace != nil || bindings.Named != nil {
 		t.Fatal("want nil to answer with empty bindings")
 	}
@@ -112,6 +117,7 @@ func TestBindingHelpersSurviveWrongInput(t *testing.T) {
 // local name instead of the imported one passes every corpus case and fails only in a real codebase.
 // That asymmetry is why the alias case leads here.
 func TestLocalNameOfNamedImportSeesThroughAnAlias(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -186,6 +192,7 @@ func TestLocalNameOfNamedImportSeesThroughAnAlias(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			found := LocalNameOfNamedImport(
 				firstImport(t, testCase.sourceText), testCase.specifier, testCase.imported)
 
@@ -210,6 +217,7 @@ func TestLocalNameOfNamedImportSeesThroughAnAlias(t *testing.T) {
 // A rule reaches these off a listener that fires for one kind, so the nil and wrong-kind paths are
 // unreachable from correct callers and are exactly the ones a refactor breaks silently.
 func TestNamedImportHelpersSurviveWrongInput(t *testing.T) {
+	t.Parallel()
 	if local := LocalNameOfNamedImport(nil, "m", "X"); local != nil {
 		t.Fatalf("a nil node answered %v", local)
 	}

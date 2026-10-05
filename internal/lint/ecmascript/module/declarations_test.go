@@ -31,6 +31,7 @@ func withSourceFile(t *testing.T, source string, ask func(sourceFile *ast.Source
 
 // TestEveryTypeDeclarationKindCounts covers the four kinds that introduce a type name.
 func TestEveryTypeDeclarationKindCounts(t *testing.T) {
+	t.Parallel()
 	for _, source := range []string{
 		"interface Thing { a: string }",
 		"type Thing = string;",
@@ -50,6 +51,7 @@ func TestEveryTypeDeclarationKindCounts(t *testing.T) {
 // TestValueDeclarationsDoNotCount pins the other direction. Neither shadows a type in a type
 // position, so a file containing one is still linted.
 func TestValueDeclarationsDoNotCount(t *testing.T) {
+	t.Parallel()
 	for _, source := range []string{
 		"const Thing = 1;",
 		"function Thing() {}",
@@ -69,6 +71,7 @@ func TestValueDeclarationsDoNotCount(t *testing.T) {
 // top-level statements alone reports it as a violation. That shipped in this tree before the corpus
 // was read.
 func TestNestedDeclarationsCount(t *testing.T) {
+	t.Parallel()
 	for _, source := range []string{
 		"{ type Thing = string; }",
 		"function outer() { interface Thing { a: string } }",
@@ -86,6 +89,7 @@ func TestNestedDeclarationsCount(t *testing.T) {
 // TestDeclaredTypeNamesAnswersForEveryName covers the multi-name form, which walks once rather than
 // once per name.
 func TestDeclaredTypeNamesAnswersForEveryName(t *testing.T) {
+	t.Parallel()
 	const source = "type Alpha = string; interface Beta { a: string } enum Gamma { A }"
 	withSourceFile(t, source, func(sourceFile *ast.SourceFile) {
 		got := module.DeclaredTypeNames(sourceFile, map[string]bool{
@@ -105,6 +109,7 @@ func TestDeclaredTypeNamesAnswersForEveryName(t *testing.T) {
 // TestAllDeclaredTypeNamesCollects covers the collecting form, for a caller refusing to rename onto
 // a name already taken.
 func TestAllDeclaredTypeNamesCollects(t *testing.T) {
+	t.Parallel()
 	withSourceFile(t, "type Alpha = string; class Beta {}", func(sourceFile *ast.SourceFile) {
 		got := module.AllDeclaredTypeNames(sourceFile)
 		if !got["Alpha"] || !got["Beta"] {
@@ -115,6 +120,7 @@ func TestAllDeclaredTypeNamesCollects(t *testing.T) {
 
 // TestNilSourceFile covers the guard a shared function needs and a rule-local one did not.
 func TestNilSourceFile(t *testing.T) {
+	t.Parallel()
 	if module.DeclaresTypeNamed(nil, "Thing") {
 		t.Error("DeclaresTypeNamed(nil) = true")
 	}

@@ -47,6 +47,7 @@ func TestStableHookPositionsAreExemptedFromReactivity(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			reactive := reactivityByName(t, testCase.source)
 			if len(reactive) == 0 {
 				t.Fatal("no identifier was named in the reactivity map, so this asserts nothing; " +

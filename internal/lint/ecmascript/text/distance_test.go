@@ -6,6 +6,7 @@ import "testing"
 // helper rather than for any rule. `sitting`/`kitten` is the textbook Levenshtein case and pins the
 // three-operation recurrence: one substitution, one substitution, one insertion.
 func TestMinimumEditDistanceMatchesUpstream(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		first  string
 		second string
@@ -32,6 +33,7 @@ func TestMinimumEditDistanceMatchesUpstream(t *testing.T) {
 // on the wrong axis produces a function that is right in one direction and wrong in the other, and
 // every caller here happens to pass its arguments the same way round.
 func TestMinimumEditDistanceIsSymmetric(t *testing.T) {
+	t.Parallel()
 	pairs := [][2]string{
 		{"getStaticProps", "getStaticPropss"},
 		{"getServerSideProps", "getServurSideProps"},
@@ -51,6 +53,7 @@ func TestMinimumEditDistanceIsSymmetric(t *testing.T) {
 // Damerau, it is the one a reader is most likely to "fix", and it decides whether `getSatticProps`
 // reports. Upstream does not report it.
 func TestMinimumEditDistanceChargesTwoForATransposition(t *testing.T) {
+	t.Parallel()
 	if got := MinimumEditDistance("getSatticProps", "getStaticProps"); got != 2 {
 		t.Fatalf("a transposition measured %d, want 2 (Damerau would say 1)", got)
 	}
@@ -60,6 +63,7 @@ func TestMinimumEditDistanceChargesTwoForATransposition(t *testing.T) {
 // measure 2 instead of 1. No caller currently passes non-ASCII, which is exactly why an unasserted
 // rune walk would rot without anyone noticing.
 func TestMinimumEditDistanceCountsRunesNotBytes(t *testing.T) {
+	t.Parallel()
 	if got := MinimumEditDistance("café", "cafe"); got != 1 {
 		t.Fatalf("one accented substitution measured %d, want 1", got)
 	}
@@ -72,6 +76,7 @@ func TestMinimumEditDistanceCountsRunesNotBytes(t *testing.T) {
 // case-only substitution and this charges 1, which is the whole reason this function exists rather
 // than a call into the shim.
 func TestMinimumEditDistanceTreatsCaseAsAFullEdit(t *testing.T) {
+	t.Parallel()
 	if got := MinimumEditDistance("getStaticpaths", "getStaticPaths"); got != 1 {
 		t.Fatalf("one case change measured %d, want 1", got)
 	}
@@ -79,6 +84,7 @@ func TestMinimumEditDistanceTreatsCaseAsAFullEdit(t *testing.T) {
 
 // Verbatim from oxc's `test_best_match`.
 func TestBestMatchMatchesUpstream(t *testing.T) {
+	t.Parallel()
 	candidates := []string{"apple", "banana", "cherry"}
 
 	if _, ok := BestMatch("apple", candidates, 2); ok {
@@ -101,6 +107,7 @@ func TestBestMatchMatchesUpstream(t *testing.T) {
 // The tie-break: first in slice order wins. Unreachable at the threshold the only caller uses, and
 // asserted anyway because it is the behaviour a reader would otherwise have to derive from the loop.
 func TestBestMatchKeepsTheFirstCandidateOnATie(t *testing.T) {
+	t.Parallel()
 	if got, _ := BestMatch("bat", []string{"cat", "hat"}, 1); got != "cat" {
 		t.Fatalf("tie resolved to %q, want the first candidate", got)
 	}
@@ -112,6 +119,7 @@ func TestBestMatchKeepsTheFirstCandidateOnATie(t *testing.T) {
 // A nearer candidate beats a further one regardless of order, so the tie-break above is genuinely a
 // tie-break rather than a first-wins search.
 func TestBestMatchPrefersTheNearestCandidate(t *testing.T) {
+	t.Parallel()
 	if got, _ := BestMatch("bats", []string{"bat", "batsy"}, 1); got != "bat" {
 		t.Fatalf("got %q; both are within threshold and both are distance 1", got)
 	}
@@ -123,6 +131,7 @@ func TestBestMatchPrefersTheNearestCandidate(t *testing.T) {
 // The exact-match decline short-circuits rather than skipping the candidate. `car` is exact and
 // `care` is one away, so a skip-this-one implementation would answer `care`.
 func TestBestMatchExactMatchShortCircuitsTheWholeSearch(t *testing.T) {
+	t.Parallel()
 	if got, ok := BestMatch("car", []string{"car", "care"}, 1); ok {
 		t.Fatalf("got %q; an exact match must end the search rather than skip one candidate", got)
 	}
@@ -131,6 +140,7 @@ func TestBestMatchExactMatchShortCircuitsTheWholeSearch(t *testing.T) {
 // The length prefilter must never change an answer, only skip work. A candidate whose length is
 // within threshold has to survive it.
 func TestBestMatchLengthPrefilterDoesNotHideACandidate(t *testing.T) {
+	t.Parallel()
 	if got, ok := BestMatch("getStaticPropss", []string{"getStaticProps"}, 1); !ok || got != "getStaticProps" {
 		t.Fatalf("BestMatch = %q/%v; one insertion is within both the prefilter and the threshold", got, ok)
 	}

@@ -33,6 +33,7 @@ func writeTree(t *testing.T, files map[string]string) string {
 // This is the whole point of the change. The pipeline's universe was the type graph, so a .css in a
 // TypeScript project was not declined, it was absent, and absence and agreement print the same.
 func TestEnumerateOffersEveryLanguage(t *testing.T) {
+	t.Parallel()
 	root := writeTree(t, map[string]string{
 		"a.ts":      "export const a = 1;\n",
 		"b.tsx":     "export const b = <div />;\n",
@@ -69,6 +70,7 @@ func TestEnumerateOffersEveryLanguage(t *testing.T) {
 // enumeration and a vacuous one look identical from the outside, so the report has to say what it
 // refused and why, or the coverage line inherits the same blindness it was built to destroy.
 func TestEnumerateNamesWhatItDeclined(t *testing.T) {
+	t.Parallel()
 	root := writeTree(t, map[string]string{
 		"a.ts":      "export const a = 1;\n",
 		"tool.go":   "package tool\n",
@@ -110,6 +112,7 @@ func TestEnumerateNamesWhatItDeclined(t *testing.T) {
 // a line into a submodule; the change was correct and still unrequested, which is the worst shape
 // for a surprise because it survives review.
 func TestEnumerateRefusesNestedRepositories(t *testing.T) {
+	t.Parallel()
 	root := writeTree(t, map[string]string{
 		"a.ts":             "export const a = 1;\n",
 		"vendor/.git/HEAD": "ref: refs/heads/main\n",
@@ -139,6 +142,7 @@ func TestEnumerateRefusesNestedRepositories(t *testing.T) {
 // layer or skipped as a nested repository. A directory missing from it is a change nothing would see;
 // one too many is only a wasted stat.
 func TestEnumerateNamesTheDirectoriesItEntered(t *testing.T) {
+	t.Parallel()
 	root := settingsTree(t, `["pnpm-lock.yaml"]`, `["archived/**"]`, map[string]string{
 		".gitignore":       "dist/\n",
 		"a.ts":             "export const a = 1;\n",
@@ -187,6 +191,7 @@ func settingsTree(t *testing.T, house string, ignorePatterns string, files map[s
 // Counted separately because a layer that silently fails to load removes nothing, and a slightly
 // smaller total is not a detectable signal. A zero next to a layer name is.
 func TestEnumerateAppliesEveryIgnoreLayer(t *testing.T) {
+	t.Parallel()
 	root := settingsTree(t, `["pnpm-lock.yaml"]`, `["archived/**"]`, map[string]string{
 		".gitignore":      "built.ts\n",
 		"a.ts":            "export const a = 1;\n",
@@ -221,6 +226,7 @@ func TestEnumerateAppliesEveryIgnoreLayer(t *testing.T) {
 // walk root is refused, naming the file and saying to delete it, rather than kept as a list that looks
 // like it still skips something. With a chain and without one, since the file is read nowhere either way.
 func TestALeftoverPrettierignoreIsRefused(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		name string
 		root func() string
@@ -233,6 +239,7 @@ func TestALeftoverPrettierignoreIsRefused(t *testing.T) {
 		}},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			root := testCase.root()
 			_, err := Enumerate(root, handlesEveryLanguage)
 			if !errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
@@ -257,11 +264,13 @@ func TestALeftoverPrettierignoreIsRefused(t *testing.T) {
 // files no repository formats. An outsider's block without an `ignore`, and a root with no settings at
 // all, both skip pnpm-lock.yaml by the house list, beside .gitignore.
 func TestEveryWalkHasAHouseList(t *testing.T) {
+	t.Parallel()
 	for name, root := range map[string]string{
 		"an outsider's block without ignore": settingsTree(t, "", `[]`, map[string]string{".gitignore": "built.ts\n", "a.ts": "export const a = 1;\n", "built.ts": "export const built = 1;\n", "pnpm-lock.yaml": "lockfileVersion: 1\n"}),
 		"no settings at all":                 writeTree(t, map[string]string{".gitignore": "built.ts\n", "a.ts": "export const a = 1;\n", "built.ts": "export const built = 1;\n", "pnpm-lock.yaml": "lockfileVersion: 1\n"}),
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			enumeration, err := Enumerate(root, handlesEveryLanguage)
 			if err != nil {
 				t.Fatal(err)
@@ -282,6 +291,7 @@ func TestEveryWalkHasAHouseList(t *testing.T) {
 // file's directory even when the walk starts below it, and a glob prunes a directory only when it
 // takes everything under it. `**/*.code.js` must not prune a directory that happens to match it.
 func TestIgnorePatternsReadAsLintReadsThem(t *testing.T) {
+	t.Parallel()
 	root := settingsTree(t, `[]`, `["source/generated/**", "**/*.code.js"]`, map[string]string{
 		"source/a.ts":                "export const a = 1;\n",
 		"source/generated/schema.ts": "export const schema = 1;\n",
@@ -322,6 +332,7 @@ func handlesEveryLanguage(path string) bool {
 // cannot tell the outermost from the nearest; and outside the root, and in the root's own repository,
 // it names nothing.
 func TestNestedRepositoryContainingNamesTheOutermostBelowTheRoot(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	for _, directory := range []string{
 		filepath.Join(root, ".git"),
@@ -366,6 +377,7 @@ func TestNestedRepositoryContainingNamesTheOutermostBelowTheRoot(t *testing.T) {
 // matcher slash paths on every platform. This holds the nested cases, so the Windows leg runs it where
 // the separator differs.
 func TestIgnorePatternsCoverNestedPaths(t *testing.T) {
+	t.Parallel()
 	root := writeTree(t, map[string]string{
 		".gitignore":                   "dist\n.next/\nmodules/*/data/\nsrc/*.gen.ts\n*.log\n",
 		"kept.ts":                      "export const kept = 1;\n",
@@ -401,6 +413,7 @@ func TestIgnorePatternsCoverNestedPaths(t *testing.T) {
 // reads only .gitignore, and checks a directory for a repository before pruning it, so a gitignored
 // repository is found too; a gitignored plain directory is not descended.
 func TestNestedRepositoriesAreFoundUnderAPathTheProjectNeverFormats(t *testing.T) {
+	t.Parallel()
 	root := settingsTree(t, `["pnpm-lock.yaml"]`, `["projects/**"]`, map[string]string{
 		".gitignore":                      "projects/ignored-repo/\nprojects/scratch/\n",
 		"a.ts":                            "export const a = 1;\n",
@@ -434,6 +447,7 @@ func TestNestedRepositoriesAreFoundUnderAPathTheProjectNeverFormats(t *testing.T
 // takes its host's options, but not its host's ignorePatterns, which describe the host's tree. Walked as
 // its own corpus, projects/listed must offer its files although the host lists projects/**.
 func TestANestedRepositoryDoesNotInheritItsHostsIgnorePatterns(t *testing.T) {
+	t.Parallel()
 	root := settingsTree(t, `["pnpm-lock.yaml"]`, `["projects/**"]`, map[string]string{
 		"projects/listed/.git/HEAD":      "ref: refs/heads/main\n",
 		"projects/listed/b.ts":           "export const b = 1;\n",
@@ -468,6 +482,7 @@ func survivorsOf(root string, enumeration Enumeration) map[string]bool {
 // directory, negation, and info/exclude, all counted under the one git layer (#ndtgy1w). A file below an
 // excluded directory stays out whatever a deeper negation says, as git never looks inside the directory.
 func TestTheWalkReadsGitsIgnoreRulesAsGitDoes(t *testing.T) {
+	t.Parallel()
 	root := settingsTree(t, `[]`, `[]`, map[string]string{
 		".git/info/exclude":   "local.ts\n",
 		".gitignore":          "*.gen.ts\n!keep.gen.ts\nvendor/\n",
@@ -505,6 +520,7 @@ func TestTheWalkReadsGitsIgnoreRulesAsGitDoes(t *testing.T) {
 // (#z661dek): the .gitignore of the root and of every directory entered, present or not, and info/exclude
 // when .git is a directory, present or not. A pruned directory's .gitignore is never read, so not listed.
 func TestIgnoreFilesNamesEveryFileTheWalkReadOrLookedFor(t *testing.T) {
+	t.Parallel()
 	root := settingsTree(t, `[]`, `[]`, map[string]string{
 		".git/HEAD":         "ref: refs/heads/main\n",
 		".gitignore":        "pruned/\n",
@@ -538,6 +554,7 @@ func TestIgnoreFilesNamesEveryFileTheWalkReadOrLookedFor(t *testing.T) {
 // TestTheHouseListReadsAsIgnoreFileLines: the format block's `ignore` is read with git's syntax relative to
 // the walk root, negation and anchoring included, and counted as its own layer.
 func TestTheHouseListReadsAsIgnoreFileLines(t *testing.T) {
+	t.Parallel()
 	root := settingsTree(t, `["*.json", "!keep.json", "/top.ts"]`, `[]`, map[string]string{
 		"a.json":     "{}\n",
 		"keep.json":  "{}\n",

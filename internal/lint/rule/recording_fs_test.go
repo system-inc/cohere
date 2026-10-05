@@ -13,6 +13,7 @@ import (
 // The absences are the half a cache most easily forgets: a design system that looked for an entry
 // point and missed it changes when that file is created (#pyhm2t2).
 func TestARecordingFileSystemNotesEveryPathAndRefusesWrites(t *testing.T) {
+	t.Parallel()
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

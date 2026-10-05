@@ -29,6 +29,7 @@ func TestNoNewFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoNew, newFile, testCase.sourceText), "noNewStatement")
 		})
@@ -48,6 +49,7 @@ func TestNoNewStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoNew, newFile, testCase.sourceText))
 		})
 	}
@@ -88,6 +90,7 @@ func TestNoNewFiresOnShapesTheCorpusOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoNew, newFile, testCase.sourceText), "noNewStatement")
 		})
@@ -117,6 +120,7 @@ func TestNoNewDeclinesShapesTheCorpusOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoNew, newFile, testCase.sourceText))
 		})
 	}
@@ -148,6 +152,7 @@ func TestNoNewReportsTheWholeStatement(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoNew, newFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))

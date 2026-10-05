@@ -248,6 +248,7 @@ var parseFixtures = []parseFixture{
 // A corpus file postcss cannot parse is counted, and the test fails if that count passes a tenth of the
 // corpus: an oracle that rejects everything would otherwise read as perfect agreement.
 func TestParseAgreesWithPostcss(t *testing.T) {
+	t.Parallel()
 	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	corpora := os.Getenv("COHERE_CSS_CORPORA")
 	if root == "" || corpora == "" {

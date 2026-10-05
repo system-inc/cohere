@@ -41,6 +41,7 @@ func TestNoUselessConcatFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessConcat, noUselessConcatFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantOperatorStart))
@@ -113,6 +114,7 @@ func TestNoUselessConcatStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessConcat, noUselessConcatFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -142,6 +144,7 @@ func TestNoUselessConcatSkipsParentheses(t *testing.T) {
 		{"deeply nested parentheses", "((('a'))) + 'b'"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessConcat, noUselessConcatFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "unexpectedConcat")
 		})
@@ -167,6 +170,7 @@ func TestNoUselessConcatTemplatesWithSubstitutions(t *testing.T) {
 		{"two substituted templates", "`a${x}` + `${y}b`"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessConcat, noUselessConcatFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "unexpectedConcat")
 		})
@@ -198,6 +202,7 @@ func TestNoUselessConcatSameLine(t *testing.T) {
 		{"multiline templates on both sides", "`a\nb` + `c\nd`", true},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessConcat, noUselessConcatFile, testCase.sourceText)
 			if testCase.wantReport {
 				rule_testing.ExpectFindings(t, result, "unexpectedConcat")
@@ -254,6 +259,7 @@ func TestNoUselessConcatOtherOperators(t *testing.T) {
 		"'a' , 'b'",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessConcat, noUselessConcatFile, sourceText)
 			rule_testing.ExpectClean(t, result)
 		})

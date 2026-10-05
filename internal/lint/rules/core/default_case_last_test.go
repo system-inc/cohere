@@ -52,6 +52,7 @@ func TestDefaultCaseLastStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, DefaultCaseLast, defaultCaseLastFile, testCase.sourceText))
 		})
@@ -83,6 +84,7 @@ func TestDefaultCaseLastFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, DefaultCaseLast, defaultCaseLastFile, testCase.sourceText), "notLast")
 		})
@@ -115,6 +117,7 @@ func TestDefaultCaseLastReportsTheDefaultClause(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, DefaultCaseLast, defaultCaseLastFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))

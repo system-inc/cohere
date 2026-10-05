@@ -326,6 +326,7 @@ func TestAlignMinimisesWithoutAGuard(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, scopes := build(testCase.start)
 			aligned := AlignReactiveScopesToBlockScopes(function, scopes)
 			if got := aligned.RangeOf(1); got != testCase.want {

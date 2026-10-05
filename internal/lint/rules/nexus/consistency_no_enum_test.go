@@ -18,6 +18,7 @@ func TestConsistencyNoEnumFires(t *testing.T) {
 	}
 	for name, source := range cases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoEnum, "probe.ts", source)
 			rule_testing.ExpectFindings(t, result, "noEnum")
 		})
@@ -37,6 +38,7 @@ func TestConsistencyNoEnumStaysSilent(t *testing.T) {
 	}
 	for name, source := range cases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoEnum, "probe.ts", source)
 			rule_testing.ExpectClean(t, result)
 		})

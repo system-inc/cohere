@@ -202,6 +202,7 @@ func TestNoUselessAssignmentFires(t *testing.T) {
 	for index := range noUselessAssignmentUpstreamFail {
 		entry := noUselessAssignmentUpstreamFail[index]
 		t.Run(fmt.Sprintf("upstream fail %d", index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, entry.source)
 			wantIds := make([]string, entry.count)
 			for position := range wantIds {
@@ -223,6 +224,7 @@ func TestNoUselessAssignmentStaysSilent(t *testing.T) {
 
 	for index, source := range noUselessAssignmentUpstreamPass {
 		t.Run(fmt.Sprintf("upstream pass %d", index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, source))
 		})
@@ -267,6 +269,7 @@ func TestNoUselessAssignmentPointsAtTheIdentifier(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantText) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantText))
@@ -337,6 +340,7 @@ func TestNoUselessAssignmentBoundary(t *testing.T) {
 
 	for _, entry := range recovered {
 		t.Run(entry.name, func(t *testing.T) {
+			t.Parallel()
 			imported := noUselessAssignmentUpstreamFail[entry.index]
 			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, imported.source)
 			if len(result.Diagnostics) != imported.count {
@@ -430,6 +434,7 @@ func TestNoUselessAssignmentConditionalWritesDoNotKill(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
@@ -518,6 +523,7 @@ func TestNoUselessAssignmentSelfReferentialWritesStayLive(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
@@ -573,6 +579,7 @@ func TestNoUselessAssignmentShorthandPropertyIsARead(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
@@ -613,6 +620,7 @@ func TestNoUselessAssignmentSwitchFlow(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)

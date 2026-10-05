@@ -91,6 +91,7 @@ func TestPreferPromiseRejectErrorsStaysSilent(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(fmt.Sprintf("upstream valid %d", index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, sourceText))
 		})
 	}
@@ -187,6 +188,7 @@ func TestPreferPromiseRejectErrorsFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(fmt.Sprintf("upstream invalid %d", index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
@@ -226,6 +228,7 @@ func TestPreferPromiseRejectErrorsWithOptions(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(fmt.Sprintf("upstream option case %d", index), func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodePreferPromiseRejectErrorsOptions(json.RawMessage(testCase.optionsJson))
 			if err != nil {
 				t.Fatalf("decoding %s: %v", testCase.optionsJson, err)
@@ -271,6 +274,7 @@ func TestPreferPromiseRejectErrorsAcrossFiles(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(fmt.Sprintf("upstream module case %d", index), func(t *testing.T) {
+			t.Parallel()
 			files := map[string]string{
 				"/repository/source/Rejections.ts": testCase.sourceText,
 				"/repository/source/errors.ts":     preferPromiseRejectErrorsErrorsModule,
@@ -348,6 +352,7 @@ func TestPreferPromiseRejectErrorsSpans(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(fmt.Sprintf("span %d", index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
@@ -402,6 +407,7 @@ func TestPreferPromiseRejectErrorsExecutorReferenceScan(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
@@ -431,6 +437,7 @@ func TestPreferPromiseRejectErrorsExecutorShape(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
@@ -460,6 +467,7 @@ func TestPreferPromiseRejectErrorsStaticReceiver(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
@@ -491,6 +499,7 @@ func TestPreferPromiseRejectErrorsDefaultsAreOff(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// nil options, exactly as a rule configured as bare "error" receives.
 			result := rule_testing.RunTypedWithOptions(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText, nil)
 			rule_testing.ExpectFindings(t, result, "rejectAnError")

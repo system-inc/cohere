@@ -34,6 +34,7 @@ func built(t *testing.T) map[string][]byte {
 // A rule renamed, a key added to the loader, a format option added: each changes Build's output, and the
 // committed files must follow.
 func TestTheCommittedFilesAreCurrent(t *testing.T) {
+	t.Parallel()
 	for path, contents := range built(t) {
 		committed, err := os.ReadFile(filepath.Join(moduleRoot(t), path))
 		if err != nil {
@@ -85,6 +86,7 @@ var keyFixtures = map[string]map[string]string{
 // our tiers, and in a chain extending a cohere:system-inc set the formatter refuses it, which a schema
 // cannot see, so the description says so.
 func TestTheSchemaHasExactlyTheKeysTheLoaderAccepts(t *testing.T) {
+	t.Parallel()
 	files := built(t)
 	nexusKeys, err := SchemaKeys(files[NexusSchemaPath])
 	if err != nil {
@@ -138,6 +140,7 @@ func TestTheSchemaHasExactlyTheKeysTheLoaderAccepts(t *testing.T) {
 // lists, and rawConfig and rawOverride are what it decodes; the schema reads the types, so the lists must
 // name the same keys.
 func TestTheLoaderTablesAgreeWithItsTypes(t *testing.T) {
+	t.Parallel()
 	var decoded []string
 	for _, key := range configuration.TopLevelKeys() {
 		if key.Field != nil {
@@ -161,6 +164,7 @@ func TestTheLoaderTablesAgreeWithItsTypes(t *testing.T) {
 // TestTheOverrideSchemaHasExactlyTheKeysTheLoaderAccepts: each override key the schema names loads, and
 // one it lacks is refused.
 func TestTheOverrideSchemaHasExactlyTheKeysTheLoaderAccepts(t *testing.T) {
+	t.Parallel()
 	var schema struct {
 		Defs struct {
 			Override struct {
@@ -197,6 +201,7 @@ func TestTheOverrideSchemaHasExactlyTheKeysTheLoaderAccepts(t *testing.T) {
 // TestTheFormatSchemaHasExactlyTheKeysTheFormatterAccepts: every format option the Nexus schema names
 // resolves in a Nexus tier, and one it lacks is refused.
 func TestTheFormatSchemaHasExactlyTheKeysTheFormatterAccepts(t *testing.T) {
+	t.Parallel()
 	var schema struct {
 		Properties map[string]struct {
 			Properties map[string]struct {
@@ -240,6 +245,7 @@ func TestTheFormatSchemaHasExactlyTheKeysTheFormatterAccepts(t *testing.T) {
 // TestTheRulesAreTheRegistrys: the schema offers exactly the registered rule names, so a rename under
 // the registry reaches editors at the next generation rather than never.
 func TestTheRulesAreTheRegistrys(t *testing.T) {
+	t.Parallel()
 	var schema struct {
 		Defs struct {
 			Rules struct {
@@ -265,6 +271,7 @@ func TestTheRulesAreTheRegistrys(t *testing.T) {
 // TestTheSeveritiesAreTheLoaders: each spelling the schema allows is one parseSeverity accepts, in any
 // case, and a spelling outside them is refused.
 func TestTheSeveritiesAreTheLoaders(t *testing.T) {
+	t.Parallel()
 	for _, spelling := range configuration.SeveritySpellings {
 		for _, variant := range []string{spelling, strings.ToUpper(spelling), strings.ToUpper(spelling[:1]) + spelling[1:]} {
 			if err := configuration.ParseSeverity(variant); err != nil {
@@ -281,6 +288,7 @@ func TestTheSeveritiesAreTheLoaders(t *testing.T) {
 
 // TestEveryExampleIsJSON: the reference's examples are copied into real files, so each must parse.
 func TestEveryExampleIsJSON(t *testing.T) {
+	t.Parallel()
 	for _, key := range configuration.TopLevelKeys() {
 		example, present := examples[key.Name]
 		if !present {
@@ -298,6 +306,7 @@ func TestEveryExampleIsJSON(t *testing.T) {
 
 // TestEveryDescriptionNamesAKeyThatExists: prose for a key the loader no longer accepts is refused too.
 func TestEveryDescriptionNamesAKeyThatExists(t *testing.T) {
+	t.Parallel()
 	accepted := map[string]bool{}
 	for _, key := range configuration.TopLevelKeys() {
 		accepted[key.Name] = true
@@ -334,6 +343,7 @@ func TestEveryDescriptionNamesAKeyThatExists(t *testing.T) {
 // keys the project schema allows, except the Nexus tier's set, which holds the format block and fits the
 // Nexus schema.
 func TestEveryCarriedSetFitsTheSchema(t *testing.T) {
+	t.Parallel()
 	files := built(t)
 	nexusKeys, _ := SchemaKeys(files[NexusSchemaPath])
 	projectKeys, _ := SchemaKeys(files[ProjectSchemaPath])
@@ -371,6 +381,7 @@ func TestEveryCarriedSetFitsTheSchema(t *testing.T) {
 // TestTheDocumentedSetupsWork: the reference opens with two setups, the carried set alone and a tier of
 // one's own. Both must load and say how to format, or the first thing a reader copies fails.
 func TestTheDocumentedSetupsWork(t *testing.T) {
+	t.Parallel()
 	for name, files := range map[string]map[string]string{
 		"the carried set": {
 			"CohereSettings.json": `{"extends": "` + formatoptions.NexusTierSetName + `", "rules": {"no-debugger": "error"}, "ignorePatterns": ["dist/**"]}`,

@@ -33,6 +33,7 @@ func project(t *testing.T, root string, block string) {
 // TestResolveFindsTheNearestSettingsAbove pins inheritance: a nested library with no settings of its
 // own formats with its containing repository's options, as libraries/structure does inside ahra.
 func TestResolveFindsTheNearestSettingsAbove(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	project(t, root, `{"tabWidth": 4, "printWidth": 120, "singleQuote": true, "bracketSameLine": true}`)
 	writeFile(t, filepath.Join(root, "libraries", "structure", "package.json"), `{"name": "structure"}`)
@@ -52,6 +53,7 @@ func TestResolveFindsTheNearestSettingsAbove(t *testing.T) {
 // TestTheHouseBlockResolvesThroughTheTiers is every repository's real chain: the project extends a
 // Structure (or Base) tier, which extends the Nexus tier, and only the Nexus tier holds the block.
 func TestTheHouseBlockResolvesThroughTheTiers(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "nexus", NexusTierFileName), `{"rules": {}, "format": `+houseBlock+`}`)
 	writeFile(t, filepath.Join(root, "structure", "StructureCohereSettings.json"), `{"extends": "../nexus/`+NexusTierFileName+`", "rules": {}}`)
@@ -79,6 +81,7 @@ func TestTheHouseBlockResolvesThroughTheTiers(t *testing.T) {
 // in the project's own file or in a base of it. The Nexus tier itself is the set cohere carries, which
 // always has its block.
 func TestOurTiersRefuseAFormatBlockOutsideTheNexusTier(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		name    string
 		files   map[string]string
@@ -89,6 +92,7 @@ func TestOurTiersRefuseAFormatBlockOutsideTheNexusTier(t *testing.T) {
 		{"a base between the project and the set", map[string]string{SettingsFileName: `{"extends": "./shared/Shared.json"}`, "shared/Shared.json": `{"extends": "cohere:system-inc/structure", "format": {"printWidth": 100}}`}, filepath.Join("shared", "Shared.json")},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			root := t.TempDir()
 			for file, contents := range testCase.files {
 				writeFile(t, filepath.Join(root, file), contents)
@@ -118,6 +122,7 @@ func TestOurTiersRefuseAFormatBlockOutsideTheNexusTier(t *testing.T) {
 // project's own files that never says how to format all format the house way, with the house ignore
 // list declared, as cohere:typescript carries them (#bfxz13m).
 func TestZeroConfigIsTheHouseFormat(t *testing.T) {
+	t.Parallel()
 	house, err := houseResolution()
 	if err != nil {
 		t.Fatal(err)
@@ -132,6 +137,7 @@ func TestZeroConfigIsTheHouseFormat(t *testing.T) {
 		"a cohere set that is not ours":      {SettingsFileName: `{"extends": "cohere:react"}`},
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			root := t.TempDir()
 			for file, contents := range files {
 				writeFile(t, filepath.Join(root, file), contents)
@@ -154,6 +160,7 @@ func TestZeroConfigIsTheHouseFormat(t *testing.T) {
 // decides, over Prettier's defaults rather than over the house, so `{}` is exactly Prettier's defaults.
 // The most derived file with a block wins, and its `ignore` replaces the house list only when it has one.
 func TestAnOutsidersOwnBlockIsAppliedOverPrettiersDefaults(t *testing.T) {
+	t.Parallel()
 	house, err := houseResolution()
 	if err != nil {
 		t.Fatal(err)
@@ -170,6 +177,7 @@ func TestAnOutsidersOwnBlockIsAppliedOverPrettiersDefaults(t *testing.T) {
 		{"the project's block over its base's", map[string]string{SettingsFileName: `{"extends": "./base/Base.json", "format": {"tabWidth": 8}}`, "base/Base.json": `{"format": {"semi": false}}`}, func(options *Options) { options.TabWidth = 8 }, strings.Join(house.HouseIgnore, ",")},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			root := t.TempDir()
 			for file, contents := range testCase.files {
 				writeFile(t, filepath.Join(root, file), contents)
@@ -190,6 +198,7 @@ func TestAnOutsidersOwnBlockIsAppliedOverPrettiersDefaults(t *testing.T) {
 	}
 
 	t.Run("an unknown option in an outsider's block", func(t *testing.T) {
+		t.Parallel()
 		root := t.TempDir()
 		settings := filepath.Join(root, SettingsFileName)
 		writeFile(t, settings, `{"format": {"quoteProps": "consistent"}}`)
@@ -202,7 +211,9 @@ func TestAnOutsidersOwnBlockIsAppliedOverPrettiersDefaults(t *testing.T) {
 // TestAChainRefusesWhatOneFileWouldBeRefusedFor: a bad key in the Nexus tier is refused naming the
 // tier, which is the file to change, and a missing base is refused.
 func TestAChainRefusesWhatOneFileWouldBeRefusedFor(t *testing.T) {
+	t.Parallel()
 	t.Run("an unknown option in the Nexus tier", func(t *testing.T) {
+		t.Parallel()
 		root := t.TempDir()
 		nexusTier := filepath.Join(root, "tiers", NexusTierFileName)
 		writeFile(t, nexusTier, `{"format": {"quoteProps": "consistent"}}`)
@@ -214,6 +225,7 @@ func TestAChainRefusesWhatOneFileWouldBeRefusedFor(t *testing.T) {
 	})
 
 	t.Run("a base that is missing", func(t *testing.T) {
+		t.Parallel()
 		root := t.TempDir()
 		writeFile(t, filepath.Join(root, SettingsFileName), `{"extends": "./tiers/`+NexusTierFileName+`"}`)
 		if resolution, err := Resolve(root); err == nil {
@@ -227,6 +239,7 @@ func TestAChainRefusesWhatOneFileWouldBeRefusedFor(t *testing.T) {
 // since nothing would notice the day it stopped agreeing. ahra's move was the last one the tolerance
 // served (#dv5ng7g).
 func TestALeftoverIsRefusedEvenWhenItAgrees(t *testing.T) {
+	t.Parallel()
 	for name, leftover := range map[string]struct{ file, contents string }{
 		"package.json, the house options":        {"package.json", `{"name": "x", "prettier": {"tabWidth": 4, "singleQuote": true, "printWidth": 120}}`},
 		"package.json, with the Tailwind plugin": {"package.json", `{"name": "x", "prettier": {"plugins": ["prettier-plugin-tailwindcss"], "tabWidth": 4, "singleQuote": true, "printWidth": 120, "tailwindFunctions": ["mergeClassNames"]}}`},
@@ -234,6 +247,7 @@ func TestALeftoverIsRefusedEvenWhenItAgrees(t *testing.T) {
 		"package.json, an empty prettier key":    {"package.json", `{"name": "x", "prettier": {}}`},
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			root := t.TempDir()
 			project(t, root, `{"tabWidth": 4, "singleQuote": true, "printWidth": 120}`)
 			writeFile(t, filepath.Join(root, leftover.file), leftover.contents)
@@ -251,6 +265,7 @@ func TestALeftoverIsRefusedEvenWhenItAgrees(t *testing.T) {
 // TestALeftoverBelowTheSettingsIsRefused: the walk up refuses old config in every directory it passes,
 // not only beside the settings, so a package in a workspace cannot keep its own.
 func TestALeftoverBelowTheSettingsIsRefused(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	project(t, root, houseBlock)
 	writeFile(t, filepath.Join(root, "packages", "inner", "package.json"), `{"name": "inner", "prettier": {"printWidth": 120}}`)
@@ -262,6 +277,7 @@ func TestALeftoverBelowTheSettingsIsRefused(t *testing.T) {
 // TestNothingConfiguredIsTheHouseNotPrettier: a tree with no settings anywhere above it is zero config,
 // which formats the house way, not with Prettier's defaults.
 func TestNothingConfiguredIsTheHouseNotPrettier(t *testing.T) {
+	t.Parallel()
 	resolution, err := Resolve(t.TempDir())
 	if err != nil {
 		t.Skipf("something above the temp directory configures formatting (%v), so this machine cannot test the empty case", err)
@@ -277,6 +293,7 @@ func TestNothingConfiguredIsTheHouseNotPrettier(t *testing.T) {
 // TestResolveRefusesEveryOptionNobodyChose covers each refusal, because each one replaces a format run
 // with options nobody chose: Prettier's width 80 where the repository meant 120.
 func TestResolveRefusesEveryOptionNobodyChose(t *testing.T) {
+	t.Parallel()
 	extendsNexus := `{"extends": "./` + NexusTierFileName + `"}`
 	for name, testCase := range map[string]struct {
 		files    map[string]string
@@ -291,6 +308,7 @@ func TestResolveRefusesEveryOptionNobodyChose(t *testing.T) {
 		"javascript config":          {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {}}`, "prettier.config.js": `module.exports = {}`}, leftover: true},
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			root := t.TempDir()
 			for file, contents := range testCase.files {
 				writeFile(t, filepath.Join(root, file), contents)
@@ -308,6 +326,7 @@ func TestResolveRefusesEveryOptionNobodyChose(t *testing.T) {
 
 // TestALeftoverIsNamedWithItsFile: a refusal a reader can act on says which file to change.
 func TestALeftoverIsNamedWithItsFile(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	project(t, root, `{"tabWidth": 4}`)
 	writeFile(t, filepath.Join(root, "package.json"), `{"name": "x", "prettier": {"tabWidth": 2}}`)
@@ -320,6 +339,7 @@ func TestALeftoverIsNamedWithItsFile(t *testing.T) {
 // TestAPackageJSONWithoutPrettierIsNotALeftover: almost every repository has a package.json, and only
 // its "prettier" key is old config.
 func TestAPackageJSONWithoutPrettierIsNotALeftover(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	project(t, root, `{"printWidth": 120}`)
 	writeFile(t, filepath.Join(root, "package.json"), `{"name": "x", "devDependencies": {}}`)
@@ -336,6 +356,7 @@ func TestAPackageJSONWithoutPrettierIsNotALeftover(t *testing.T) {
 // option. It is read beside the options, declared only when written, and a value that is not a list of
 // patterns is refused naming the Nexus tier.
 func TestTheHouseIgnoreListRidesInTheFormatBlock(t *testing.T) {
+	t.Parallel()
 	declared := t.TempDir()
 	project(t, declared, `{"tabWidth": 4, "ignore": ["pnpm-lock.yaml", "*.sqlite"]}`)
 	resolution, err := Resolve(declared)
@@ -368,6 +389,7 @@ func TestTheHouseIgnoreListRidesInTheFormatBlock(t *testing.T) {
 // TestIgnorePatternsResolveWithTheOptions: the walk takes the chain's ignorePatterns from the same
 // resolution as its options, base first, so it reads the list lint reads.
 func TestIgnorePatternsResolveWithTheOptions(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "nexus", NexusTierFileName), `{"rules": {}, "ignorePatterns": ["**/generated/**"], "format": `+houseBlock+`}`)
 	writeFile(t, filepath.Join(root, SettingsFileName), `{"extends": "./nexus/`+NexusTierFileName+`", "rules": {}, "ignorePatterns": ["data/**"]}`)
@@ -384,6 +406,7 @@ func TestIgnorePatternsResolveWithTheOptions(t *testing.T) {
 // went and whose options never arrived, formatting at width 80 with nothing said. Settings that say
 // nothing about formatting format the house way, and old config with no settings above it is refused.
 func TestADroppedKeyCanNeverReachPrettiersDefaults(t *testing.T) {
+	t.Parallel()
 	withoutBlock := t.TempDir()
 	writeFile(t, filepath.Join(withoutBlock, SettingsFileName), `{"rules": {"no-debugger": "error"}}`)
 	writeFile(t, filepath.Join(withoutBlock, "package.json"), `{"name": "x"}`)
@@ -433,6 +456,7 @@ func resolveUnremembered(directory string) (Resolution, error) {
 // directory afresh, and on 2026-10-04 ahra's 90,798 directories, www's 1,075 and api's 835 took 317s,
 // all identical, 437 of them refusals.
 func TestAResolverAnswersAsResolveDidOnOurTrees(t *testing.T) {
+	t.Parallel()
 	trees := filepath.SplitList(os.Getenv("COHERE_RESOLVE_TREES"))
 	if len(trees) == 0 {
 		t.Skip("COHERE_RESOLVE_TREES names no tree")
@@ -440,6 +464,7 @@ func TestAResolverAnswersAsResolveDidOnOurTrees(t *testing.T) {
 	skipped := map[string]bool{".git": true, "node_modules": true, ".cache": true, ".next": true, "data": true, "dist": true}
 	for _, root := range trees {
 		t.Run(root, func(t *testing.T) {
+			t.Parallel()
 			resolver := NewResolver()
 			directories, refusals := 0, 0
 			walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
@@ -479,6 +504,7 @@ func TestAResolverAnswersAsResolveDidOnOurTrees(t *testing.T) {
 // did, so a later run sees an edit to the Nexus tier and to the project's own `extends`, even one that
 // leaves the file's size unchanged.
 func TestAnEditAnywhereInTheChainIsSeen(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	nexusTier := filepath.Join(root, "nexus", NexusTierFileName)
 	writeFile(t, nexusTier, `{"format": {"printWidth": 120}}`)
@@ -512,6 +538,7 @@ func TestAnEditAnywhereInTheChainIsSeen(t *testing.T) {
 // TestARememberedParentDoesNotAnswerForAChildWithLeftoverConfig: a Resolver that already knows a
 // directory's options still walks a child that holds old Prettier config, and refuses it.
 func TestARememberedParentDoesNotAnswerForAChildWithLeftoverConfig(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	project(t, root, houseBlock)
 	writeFile(t, filepath.Join(root, "packages", "inner", ".prettierrc"), `{"printWidth": 120}`)

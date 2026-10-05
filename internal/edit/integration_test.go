@@ -77,6 +77,7 @@ func walkForRules(node *ast.Node, listeners rule.Listeners) {
 // A real rule's fix must land at the right bytes and produce a file that still parses. This is the
 // end-to-end proof: the rule computes ranges against a real parse, and the engine applies them.
 func TestARealRuleFixLandsCorrectly(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	fileName := filepath.Join(directory, "imports.ts")
 	source := "import * as NodeFileSystem from 'fs';\n" +
@@ -130,6 +131,7 @@ func TestARealRuleFixLandsCorrectly(t *testing.T) {
 // A rule whose fix does not actually silence its own finding would loop to the pass ceiling, and
 // that is worth catching here rather than discovering it on a whole tree.
 func TestARealRuleConvergesInTwoPasses(t *testing.T) {
+	t.Parallel()
 	source := "import * as NodeFileSystem from 'fs';\n"
 
 	result, err := FixText("imports.ts", source, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
@@ -167,6 +169,7 @@ func TestARealRuleConvergesInTwoPasses(t *testing.T) {
 // Fixed in internal/rule/rule.go, which now trims through `TokenRange`. The three shapes below are
 // the ones measured as broken before the fix.
 func TestReplaceNodeMustNotEatLeadingTrivia(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -189,6 +192,7 @@ func TestReplaceNodeMustNotEatLeadingTrivia(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := FixText("imports.ts", testCase.source, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -204,6 +208,7 @@ func TestReplaceNodeMustNotEatLeadingTrivia(t *testing.T) {
 // deliberately — the namespace case in this very rule declines to fix because rewriting the import
 // without re-rooting its references through scope would leave the file uncompilable.
 func TestAFindingWithNoFixChangesNothing(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	fileName := filepath.Join(directory, "named.ts")
 	// A named import of a builtin: reported, and deliberately not fixed.
@@ -257,6 +262,7 @@ var breakingRule = rule.Rule{
 }
 
 func TestARuleProposingBrokenSyntaxIsRefused(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	fileName := filepath.Join(directory, "probe.ts")
 	source := "export function alpha() { return 1; }\n"
@@ -340,6 +346,7 @@ var nonSilencingRule = rule.Rule{
 // passes of this rule produce `{ { { ... } } }`, which parses and is nobody's code. Parsing and
 // being finished are different properties, and only the first one was ever checked.
 func TestAFileThatDoesNotConvergeIsNotWritten(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	fileName := filepath.Join(directory, "switch.ts")
 	source := "switch (x) {\n\tcase 1:\n\t\tconst a = 1;\n\t\tbreak;\n}\n"
@@ -379,6 +386,7 @@ func TestAFileThatDoesNotConvergeIsNotWritten(t *testing.T) {
 //
 // A reader handed a filename goes and reads code that is not the problem. The rule is the defect.
 func TestNonConvergenceNamesTheRule(t *testing.T) {
+	t.Parallel()
 	source := "switch (x) {\n\tcase 1:\n\t\tconst a = 1;\n\t\tbreak;\n}\n"
 
 	result, err := FixText("switch.ts", source, proposeFromRules(nonSilencingRule), DefaultMaxPasses)
@@ -444,6 +452,7 @@ var siblingOverlapRule = rule.Rule{
 // guard has no reason to fire. That combination is the reason the multi-fix hazard is worth a
 // warning rather than a shrug: the failure is silent by construction.
 func TestSiblingFixesFromOneDiagnosticHalfApply(t *testing.T) {
+	t.Parallel()
 	source := "const a = \"xy\";\n"
 
 	result, err := FixText("p.ts", source, proposeFromRules(siblingOverlapRule), DefaultMaxPasses)

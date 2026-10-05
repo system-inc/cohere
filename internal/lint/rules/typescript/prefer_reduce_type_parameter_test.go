@@ -83,6 +83,7 @@ func TestPreferReduceTypeParameterStaysSilent(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(preferReduceTypeParameterCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedFiles(t, PreferReduceTypeParameter,
 				preferReduceTypeParameterFilesFor(sourceText), preferReduceTypeParameterFile))
 		})
@@ -248,6 +249,7 @@ func TestPreferReduceTypeParameterFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(preferReduceTypeParameterCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedFiles(t, PreferReduceTypeParameter,
 				preferReduceTypeParameterFilesFor(testCase.sourceText), preferReduceTypeParameterFile)
 

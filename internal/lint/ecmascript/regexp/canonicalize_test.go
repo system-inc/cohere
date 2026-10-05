@@ -10,6 +10,7 @@ import (
 // readings are tested together because the whole point of the flag is that they
 // disagree.
 func TestCanonicalize(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		left  rune
@@ -43,6 +44,7 @@ func TestCanonicalize(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			for _, mode := range []struct {
 				unicodeMode bool
 				want        bool
@@ -60,6 +62,7 @@ func TestCanonicalize(t *testing.T) {
 }
 
 func TestCaseEquivalents(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		r           rune
@@ -85,6 +88,7 @@ func TestCaseEquivalents(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			got := CaseEquivalents(test.r, test.unicodeMode)
 			if !slices.Equal(got, test.want) {
 				t.Errorf("CaseEquivalents(%U, %v) = %U, want %U", test.r, test.unicodeMode, got, test.want)
@@ -97,6 +101,7 @@ func TestCaseEquivalents(t *testing.T) {
 // member of every group has to look the group back up, and canonicalize onto
 // the same character as the rest of it.
 func TestCaseEquivalenceGroupsAgree(t *testing.T) {
+	t.Parallel()
 	for _, unicodeMode := range []bool{false, true} {
 		groups := CaseEquivalenceGroups(unicodeMode)
 		if len(groups) == 0 {
@@ -129,6 +134,7 @@ func TestCaseEquivalenceGroupsAgree(t *testing.T) {
 // which is checked too, because the delta must not reach further than
 // JavaScript does.
 func TestCanonicalizeUnicode17(t *testing.T) {
+	t.Parallel()
 	for _, pair := range unicode17Pairs {
 		lower, upper := pair[0], pair[1]
 		group := []rune{min(lower, upper), max(lower, upper)}

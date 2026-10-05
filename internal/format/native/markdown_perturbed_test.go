@@ -184,6 +184,7 @@ func standInEmbeds(options formatoptions.Options, engine *prettier.Engine, fellB
 }
 
 func TestPerturbedMarkdownCorpus(t *testing.T) {
+	t.Parallel()
 	roots := os.Getenv("COHERE_MARKDOWN_PERTURB_CORPORA")
 	if roots == "" {
 		t.Skip("set COHERE_MARKDOWN_PERTURB_CORPORA to measure; this is a measuring run, not a unit test")

@@ -119,6 +119,7 @@ func TestConsistencyRequireConstantCasingFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyRequireConstantCasing, testCase.fileName, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
@@ -302,6 +303,7 @@ func TestConsistencyRequireConstantCasingStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyRequireConstantCasing, testCase.fileName, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -344,6 +346,7 @@ func TestConsistencyRequireConstantCasingSuggestionsAreAccepted(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
@@ -398,6 +401,7 @@ func TestConsistencyRequireConstantCasingSuggestionText(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
@@ -724,6 +728,7 @@ func TestConsistencyRequireConstantCasingRenamesAFileLocalConstant(t *testing.T)
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
 			rule_testing.ExpectFixedSource(t, result, testCase.wantSource)
@@ -777,6 +782,7 @@ func TestConsistencyRequireConstantCasingWithholdsAnUnsafeRename(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			for _, diagnostic := range result.Diagnostics {
@@ -828,6 +834,7 @@ func TestConsistencyRequireConstantCasingTellsAnUnimportedExportToDropTheExport(
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			files := map[string]string{subject: subjectText}
 			if testCase.consumer != "" {
 				files["source/Consumer.ts"] = testCase.consumer
@@ -907,6 +914,7 @@ func TestConsistencyRequireConstantCasingCountsALocalExportClause(t *testing.T) 
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing, map[string]string{
 				"source/Thing.ts": testCase.sourceText,
 				"source/Other.ts": "export const first = 1;\nexport const OrderColumns = [2];\n",
@@ -959,6 +967,7 @@ func TestConsistencyRequireConstantCasingLeavesNextRouteContractsAlone(t *testin
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyRequireConstantCasing, testCase.fileName, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -991,9 +1000,11 @@ func TestConsistencyRequireConstantCasingExemptsAClassExtendingAContainer(t *tes
 		{"a class extending nothing", "class NetworkService {}\nexport const NetworkServiceSingleton = new NetworkService();\n", []string{"requireCamelCaseInstance"}},
 	} {
 		t.Run("untyped, "+testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText), testCase.wantIds...)
 		})
 		t.Run("typed, "+testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -1008,6 +1019,7 @@ func TestConsistencyRequireConstantCasingExemptsAClassExtendingAContainer(t *tes
 		{"an imported class extending a class of ours", "export class Service {}\nexport class TypedDocumentString<TResult, TVariables> extends Service {}\n", []string{"requireCamelCaseInstance"}},
 	} {
 		t.Run("imported, "+testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing, map[string]string{
 				"source/Documents.ts":  testCase.library,
 				"source/Operations.ts": "import { TypedDocumentString } from './Documents';\nexport const AccountDocument = new TypedDocumentString<1, 2>('query { a }');\nexport function use(): unknown { return AccountDocument; }\n",

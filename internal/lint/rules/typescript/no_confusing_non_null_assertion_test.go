@@ -64,6 +64,7 @@ func TestNoConfusingNonNullAssertionStaysSilent(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(noConfusingNonNullAssertionCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoConfusingNonNullAssertion,
 				noConfusingNonNullAssertionFile, sourceText))
 		})
@@ -241,6 +242,7 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noConfusingNonNullAssertionCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoConfusingNonNullAssertion,
 				noConfusingNonNullAssertionFile, testCase.sourceText)
 

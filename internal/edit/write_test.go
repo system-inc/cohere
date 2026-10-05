@@ -21,6 +21,7 @@ import (
 // Confirmed to fail: replacing WriteAtomically's body with os.WriteFile makes this test report
 // torn reads. That mutation passes every other test in this package, which is why this one exists.
 func TestConcurrentReadersNeverSeeAPartialFile(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	fileName := filepath.Join(directory, "contended.ts")
 
@@ -122,6 +123,7 @@ func itoa(value int) string {
 // rename across filesystems is not atomic — it degrades to copy-and-delete — so a temp file on
 // another device silently removes the guarantee this function exists to provide.
 func TestTemporaryFileIsCreatedBesideTheTarget(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 	nested := filepath.Join(directory, "nested")
 	if err := os.Mkdir(nested, 0o755); err != nil {
@@ -202,6 +204,7 @@ func keysOf(set map[string]bool) []string {
 
 // A write into a directory that does not exist must fail loudly rather than silently doing nothing.
 func TestWriteIntoAMissingDirectoryFails(t *testing.T) {
+	t.Parallel()
 	missing := filepath.Join(t.TempDir(), "absent", "target.ts")
 	if err := WriteAtomically(missing, "const a = 1;\n"); err == nil {
 		t.Fatalf("expected an error writing into a directory that does not exist")
@@ -220,6 +223,7 @@ func TestWriteIntoAMissingDirectoryFails(t *testing.T) {
 // reaching this package was TypeScript by construction, so the guard's scope was adequate by
 // accident, in exactly the way the type graph was an adequate format universe by accident.
 func TestTheParseGuardOnlyJudgesTypeScript(t *testing.T) {
+	t.Parallel()
 	// Real content in each language, none of which is valid TypeScript.
 	for _, testCase := range []struct{ fileName, text string }{
 		{"styles.css", ".foo{color:red;background:blue}\n"},
@@ -238,6 +242,7 @@ func TestTheParseGuardOnlyJudgesTypeScript(t *testing.T) {
 // This is the half that makes the change safe rather than merely permissive: a broken .ts is still
 // refused, so the discipline that lets autofix write to source at all is intact.
 func TestTheParseGuardStillFiresOnTypeScript(t *testing.T) {
+	t.Parallel()
 	for _, fileName := range []string{"a.ts", "b.tsx", "c.js", "d.jsx", "e.mjs", "f.cjs", "g.mts", "h.cts"} {
 		if parses, _ := Parses(fileName, "export function alpha( {\n"); parses {
 			t.Fatalf("%s: a broken file was accepted, so the guard is off for a language it owns", fileName)
@@ -248,6 +253,7 @@ func TestTheParseGuardStillFiresOnTypeScript(t *testing.T) {
 // TypeScriptParsable must discriminate, not merely answer. A predicate that said yes to everything
 // would restore the bug; one that said no to everything would disable the guard entirely.
 func TestTypeScriptParsableDiscriminates(t *testing.T) {
+	t.Parallel()
 	for _, fileName := range []string{"a.ts", "b.tsx", "c.js", "d.mjs"} {
 		if !TypeScriptParsable(fileName) {
 			t.Fatalf("%s is TypeScript-family and was not recognized", fileName)

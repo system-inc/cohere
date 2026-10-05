@@ -249,6 +249,7 @@ line"`},
 // count passes a tenth of the corpus values: an oracle that rejects everything would otherwise read as
 // perfect agreement.
 func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
+	t.Parallel()
 	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	corpora := os.Getenv("COHERE_CSS_CORPORA")
 	if root == "" || corpora == "" {

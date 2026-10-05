@@ -40,6 +40,7 @@ func TestNoNonNullAssertionFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
@@ -82,6 +83,7 @@ func TestNoNonNullAssertionStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText))
 		})
 	}
@@ -111,6 +113,7 @@ func TestNoNonNullAssertionSuggestions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
@@ -155,6 +158,7 @@ func TestNoNonNullAssertionWithholdsSuggestionsThatWouldNotParse(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("want a finding, got none")
@@ -194,6 +198,7 @@ func TestNoNonNullAssertionWithholdsSuggestionsOutsideTheObjectPosition(t *testi
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("want a finding, got none")

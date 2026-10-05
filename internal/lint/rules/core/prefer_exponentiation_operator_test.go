@@ -212,6 +212,7 @@ func TestPreferExponentiationOperatorFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferExponentiationOperator,
 				preferExponentiationOperatorFile, testCase.name)
 			wantIds := make([]string, testCase.wantCount)
@@ -279,6 +280,7 @@ func TestPreferExponentiationOperatorStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferExponentiationOperator,
 				preferExponentiationOperatorFile, sourceText)
 			rule_testing.ExpectClean(t, result)
@@ -306,6 +308,7 @@ func TestPreferExponentiationOperatorTypeScriptShapes(t *testing.T) {
 		{"Math.pow(a, b) as any", "(a**b) as any"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferExponentiationOperator,
 				preferExponentiationOperatorFile, testCase.name)
 			rule_testing.ExpectFindings(t, result, "useExponentiation")
@@ -343,6 +346,7 @@ func TestPreferExponentiationOperatorAliasDivergence(t *testing.T) {
 		"const p = Math.pow; p(a, b);",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferExponentiationOperator,
 				preferExponentiationOperatorFile, sourceText)
 			rule_testing.ExpectClean(t, result)
@@ -370,6 +374,7 @@ func TestPreferExponentiationOperatorObjectAliasDiverges(t *testing.T) {
 		"var M = Math; M.pow(a, b);",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, PreferExponentiationOperator,
 				preferExponentiationOperatorFile, sourceText)
 			rule_testing.ExpectClean(t, result)

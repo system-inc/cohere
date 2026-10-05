@@ -121,6 +121,7 @@ func TestRequireAtomicUpdatesSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, RequireAtomicUpdates, "span.ts", testCase.source)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("reported %d findings, want %d: %v",
@@ -152,6 +153,7 @@ func TestRequireAtomicUpdatesMessageText(t *testing.T) {
 	t.Parallel()
 
 	t.Run("variable arm names the binding", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "text.ts",
 			`let counter; async function x() { counter += await amount; }`)
 		if len(result.Diagnostics) != 1 {
@@ -168,6 +170,7 @@ func TestRequireAtomicUpdatesMessageText(t *testing.T) {
 	})
 
 	t.Run("property arm names the target text and the object", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "text.ts",
 			`const holder = []; async function x() { holder[key].slot += await result; }`)
 		if len(result.Diagnostics) != 1 {
@@ -181,6 +184,7 @@ func TestRequireAtomicUpdatesMessageText(t *testing.T) {
 	})
 
 	t.Run("message ids are the two upstream names", func(t *testing.T) {
+		t.Parallel()
 		if messageRequireAtomicUpdatesVariable.Id != "nonAtomicUpdate" {
 			t.Errorf("variable arm id is %q", messageRequireAtomicUpdatesVariable.Id)
 		}
@@ -202,6 +206,7 @@ func TestRequireAtomicUpdatesOptionsDecode(t *testing.T) {
 	decode := rule.DecodeOptionsInto[RequireAtomicUpdatesOptions]()
 
 	t.Run("allowProperties true suppresses only the property arm", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := decode(json.RawMessage(`{"allowProperties": true}`))
 		if err != nil {
 			t.Fatalf("decode: %v", err)
@@ -222,6 +227,7 @@ func TestRequireAtomicUpdatesOptionsDecode(t *testing.T) {
 	})
 
 	t.Run("allowProperties false keeps both arms", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := decode(json.RawMessage(`{"allowProperties": false}`))
 		if err != nil {
 			t.Fatalf("decode: %v", err)
@@ -232,6 +238,7 @@ func TestRequireAtomicUpdatesOptionsDecode(t *testing.T) {
 	})
 
 	t.Run("nil options bypass the decoder and keep both arms", func(t *testing.T) {
+		t.Parallel()
 		// This is the shape a bare `"error"` produces. It reaches the rule without ever passing
 		// through the decoder above, so no fixture routed through `decode` can see it.
 		property := `async function a(foo) { if (foo.bar) { foo.bar = await something; } }`
@@ -240,6 +247,7 @@ func TestRequireAtomicUpdatesOptionsDecode(t *testing.T) {
 	})
 
 	t.Run("an empty object decodes to the permissive-off default", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := decode(json.RawMessage(`{}`))
 		if err != nil {
 			t.Fatalf("decode: %v", err)
@@ -354,6 +362,7 @@ func TestRequireAtomicUpdatesEscapeTable(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, RequireAtomicUpdates, "escape.ts", testCase.source)
 			if len(testCase.want) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -384,6 +393,7 @@ func TestRequireAtomicUpdatesResolutionDivergence(t *testing.T) {
 	t.Parallel()
 
 	t.Run("a resolvable binding is judged", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "divergence.ts",
 			`let holder: any; async function f() { const q = holder.a; try { const r = await run(); holder.b = r; } catch (e) { holder.b = 1; } }`)
 		if len(result.Diagnostics) == 0 {
@@ -397,6 +407,7 @@ func TestRequireAtomicUpdatesResolutionDivergence(t *testing.T) {
 	})
 
 	t.Run("an unresolvable name is skipped", func(t *testing.T) {
+		t.Parallel()
 		// The control. Same shape, and nothing declares the binding, so the checker gives no symbol
 		// and the reference is skipped exactly as upstream skips an unresolved one.
 		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "divergence.ts",
@@ -488,6 +499,7 @@ func TestRequireAtomicUpdatesFinallyReportsOnce(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, RequireAtomicUpdates, "finally.ts", testCase.source)
 			if len(testCase.want) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -533,6 +545,7 @@ declare function use(value: unknown): void;
 `
 
 	t.Run("both linters report when the try block ends at the await", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "catch.ts", declarations+
 			`async function f(entry: any) { if (entry.status !== 1) return;
     try { await a(); entry.position = await b(); } catch (error) { entry.error = 1; } }`)
@@ -540,6 +553,7 @@ declare function use(value: unknown): void;
 	})
 
 	t.Run("a read at the end of the try does not refresh the catch", func(t *testing.T) {
+		t.Parallel()
 		// ESLint reports only `entry.position` here. Cohere reports both, because the fork to the
 		// handler is a real successor edge and the read on the normal path is not on it.
 		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "catch.ts", declarations+
@@ -562,6 +576,7 @@ declare function use(value: unknown): void;
 	})
 
 	t.Run("a guard read is still what makes the object outdated", func(t *testing.T) {
+		t.Parallel()
 		// The control for the whole test. With no read before the suspension there is nothing stale,
 		// and both linters are silent, which is what keeps the two rows above from passing on a rule
 		// that reports every property write in a catch.
@@ -595,6 +610,7 @@ func TestRequireAtomicUpdatesRestoreInFinallyIsJudged(t *testing.T) {
 	t.Parallel()
 
 	t.Run("restoring a local object's property is judged", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "restore.ts",
 			`declare function callback(): Promise<void>;
 const holder = { slot: 0 };
@@ -607,6 +623,7 @@ async function withRestore() {
 	})
 
 	t.Run("restoring through an ambient declaration is judged the same way", func(t *testing.T) {
+		t.Parallel()
 		// The binding is declared rather than local, which is the only thing that changes. Both
 		// report here, so the shape is not what separates cohere from ESLint on the real tree.
 		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "restore.ts",
@@ -621,6 +638,7 @@ async function withRestore() {
 	})
 
 	t.Run("with no read before the suspension there is nothing stale", func(t *testing.T) {
+		t.Parallel()
 		// The control. Without the saved read there is no pre-suspension value for the restore to be
 		// built from, and this is silent, which keeps the two rows above from passing on a rule that
 		// reports every property write in a finally.

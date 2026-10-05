@@ -49,6 +49,7 @@ func TestConsistencyNoMultilineArrowFunctionFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -86,6 +87,7 @@ func TestConsistencyNoMultilineArrowFunctionStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -107,6 +109,7 @@ func TestConsistencyNoMultilineArrowFunctionReportsEachArrowOnce(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
@@ -211,6 +214,7 @@ func TestConsistencyNoMultilineArrowFunctionFixes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, testCase.fileName, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected one finding, got %v", result.MessageIds())
@@ -243,6 +247,7 @@ func TestConsistencyNoMultilineArrowFunctionDeclinesAFixThatRebinds(t *testing.T
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
 			if len(result.Diagnostics[0].Fixes) != 0 {
@@ -275,6 +280,7 @@ func TestConsistencyNoMultilineArrowFunctionFixesWhatOnlyLooksInherited(t *testi
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
 			rule_testing.ExpectFixedSource(t, result, testCase.wantSource)
 		})

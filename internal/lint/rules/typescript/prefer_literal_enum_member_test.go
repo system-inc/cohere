@@ -59,6 +59,7 @@ func TestPreferLiteralEnumMemberStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(preferLiteralEnumMemberCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, PreferLiteralEnumMember,
 				preferLiteralEnumMemberFile, sourceText))
 		})
@@ -92,6 +93,7 @@ func TestPreferLiteralEnumMemberStaysSilentWhenBitwiseExpressionsAreAllowed(t *t
 	}
 	for index, sourceText := range cases {
 		t.Run(preferLiteralEnumMemberCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, PreferLiteralEnumMember,
 				preferLiteralEnumMemberFile, sourceText, decodePreferLiteralEnumMemberOptionsForTest(t, `{"allowBitwiseExpressions": true}`)))
 		})
@@ -177,6 +179,7 @@ func TestPreferLiteralEnumMemberFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(preferLiteralEnumMemberCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, PreferLiteralEnumMember,
 				preferLiteralEnumMemberFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -223,6 +226,7 @@ func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreAllowed(t *testing
 	}
 	for index, testCase := range cases {
 		t.Run(preferLiteralEnumMemberCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, PreferLiteralEnumMember,
 				preferLiteralEnumMemberFile, testCase.sourceText, decodePreferLiteralEnumMemberOptionsForTest(t, `{"allowBitwiseExpressions": true}`))
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -263,6 +267,7 @@ func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreExplicitlyDisallow
 	}
 	for index, testCase := range cases {
 		t.Run(preferLiteralEnumMemberCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, PreferLiteralEnumMember,
 				preferLiteralEnumMemberFile, testCase.sourceText, decodePreferLiteralEnumMemberOptionsForTest(t, `{"allowBitwiseExpressions": false}`))
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -477,6 +482,7 @@ func TestPreferLiteralEnumMemberOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			var result rule_testing.Result
 			if testCase.options == "" {
 				result = rule_testing.Run(t, PreferLiteralEnumMember,
@@ -524,6 +530,7 @@ func TestPreferLiteralEnumMemberDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFal
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.raw, func(t *testing.T) {
+			t.Parallel()
 			decoded := decodePreferLiteralEnumMemberOptionsForTest(t, testCase.raw)
 			settings, isSettings := decoded.(PreferLiteralEnumMemberOptions)
 			if !isSettings {
@@ -588,6 +595,7 @@ func TestPreferLiteralEnumMemberRendersUpstreamsMessageText(t *testing.T) {
 	const sourceText = "enum Foo {\n  A = 2 + 2,\n}\n"
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			var result rule_testing.Result
 			if testCase.options == "" {
 				result = rule_testing.Run(t, PreferLiteralEnumMember,

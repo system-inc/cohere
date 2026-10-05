@@ -160,6 +160,7 @@ func TestNoUselessRenameFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "unnecessarilyRenamed"
@@ -246,6 +247,7 @@ func TestNoUselessRenameStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUselessRename,
 				uselessRenameFile, testCase.sourceText, uselessRenameOptions(t,
 					testCase.ignoreDestructuring, testCase.ignoreImport, testCase.ignoreExport)))
@@ -360,6 +362,7 @@ func TestNoUselessRenameFixes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t, rule_testing.RunWithOptions(t, NoUselessRename,
 				uselessRenameFile, testCase.sourceText, uselessRenameOptions(t,
 					testCase.ignoreDestructuring, testCase.ignoreImport, testCase.ignoreExport)),
@@ -413,6 +416,7 @@ func TestNoUselessRenameDeclinesToFix(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoUselessRename, uselessRenameFile,
 				testCase.sourceText, uselessRenameOptions(t, testCase.ignoreDestructuring,
 					testCase.ignoreImport, testCase.ignoreExport))
@@ -486,6 +490,7 @@ func TestNoUselessRenamePointsAtTheWholeRename(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoUselessRename, uselessRenameFile,
 				testCase.sourceText, uselessRenameOptions(t, false, false, false))
 			rule_testing.ExpectFindings(t, result, "unnecessarilyRenamed")
@@ -529,6 +534,7 @@ func TestNoUselessRenameKeepsTheLocalNameAtBothSites(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t, rule_testing.RunWithOptions(t, NoUselessRename,
 				uselessRenameFile, testCase.sourceText,
 				uselessRenameOptions(t, false, false, false)), testCase.wantSource)
@@ -546,6 +552,7 @@ func TestNoUselessRenameCountsOnlyContainedComments(t *testing.T) {
 	t.Parallel()
 
 	t.Run("a comment before the specifier still fixes", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFixedSource(t, rule_testing.RunWithOptions(t, NoUselessRename,
 			uselessRenameFile, "import {/* comment */foo as foo} from 'foo';",
 			uselessRenameOptions(t, false, false, false)),
@@ -553,6 +560,7 @@ func TestNoUselessRenameCountsOnlyContainedComments(t *testing.T) {
 	})
 
 	t.Run("a comment inside the discarded half withholds the repair", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunWithOptions(t, NoUselessRename, uselessRenameFile,
 			"({foo/**/ : foo} = {});", uselessRenameOptions(t, false, false, false))
 		rule_testing.ExpectFindings(t, result, "unnecessarilyRenamed")
@@ -572,6 +580,7 @@ func TestDecodeNoUselessRenameOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("an absent option leaves all three off", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoUselessRenameOptions(nil)
 		if err != nil {
 			t.Fatalf("the decoder refused an absent option: %v", err)
@@ -583,6 +592,7 @@ func TestDecodeNoUselessRenameOptions(t *testing.T) {
 	})
 
 	t.Run("each option is read independently", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoUselessRenameOptions(
 			json.RawMessage(`{"ignoreImport":true}`))
 		if err != nil {
@@ -595,6 +605,7 @@ func TestDecodeNoUselessRenameOptions(t *testing.T) {
 	})
 
 	t.Run("a bare severity leaves the rule on its defaults", func(t *testing.T) {
+		t.Parallel()
 		// A rule configured as "error" is handed nil options, which arrives at Run as an untyped
 		// nil rather than as settings. Asserting through the rule covers the fallback inside Run,
 		// which no decoder test can reach.
@@ -633,6 +644,7 @@ func TestNoUselessRenameIgnoresAnOrdinaryObjectLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoUselessRename,
 				uselessRenameFile, testCase.sourceText,
 				uselessRenameOptions(t, false, false, false)), testCase.messages...)

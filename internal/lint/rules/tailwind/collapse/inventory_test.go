@@ -101,6 +101,7 @@ import (
 // test: the collapse families assert their shorthand structure, the descriptor rows are compared
 // class for class by the differential, and the upstream diff catches Tailwind's own data moving.
 func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
+	t.Parallel()
 	upstream := map[string]int{
 		"PropertyOrder":                 len(PropertyOrder),
 		"FrameworkVariantRegistrations": len(FrameworkVariantRegistrations),

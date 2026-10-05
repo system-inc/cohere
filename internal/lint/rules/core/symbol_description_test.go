@@ -28,6 +28,7 @@ func TestSymbolDescriptionFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, SymbolDescription, symbolDescriptionFile, testCase.sourceText), "expected")
 		})
@@ -57,6 +58,7 @@ func TestSymbolDescriptionStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, SymbolDescription, symbolDescriptionFile, testCase.sourceText))
 		})
 	}
@@ -86,6 +88,7 @@ func TestSymbolDescriptionFiresOnCasesBeyondTheCorpus(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "expected"
@@ -123,6 +126,7 @@ func TestSymbolDescriptionStaysSilentOnCasesBeyondTheCorpus(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, SymbolDescription, symbolDescriptionFile, testCase.sourceText))
 		})
 	}
@@ -147,6 +151,7 @@ func TestSymbolDescriptionSpansTheCall(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, SymbolDescription, symbolDescriptionFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
@@ -218,6 +223,7 @@ func TestSymbolDescriptionStaysSilentOnOtherGlobals(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, SymbolDescription, symbolDescriptionFile, testCase.sourceText))
 		})
 	}

@@ -166,6 +166,7 @@ var gapCellsMeasuredElsewhere = map[string]string{
 // TestGapRootPropertyNamesAgreeWithTheTable compares the names, which the reading cannot separate
 // for two properties `PropertyOrder` does not know.
 func TestGapRootEmittersAgreeWithTheirMeasuredReadings(t *testing.T) {
+	t.Parallel()
 	var agreed, compared int
 	var disagreements, unported []string
 
@@ -250,6 +251,7 @@ func TestGapRootEmittersAgreeWithTheirMeasuredReadings(t *testing.T) {
 // wrote a body for, where the acceptance test above would report it as unported and could be read as
 // a smaller population rather than as a gap.
 func TestEveryGapRootHasAnEmitter(t *testing.T) {
+	t.Parallel()
 	var missing []string
 	for _, root := range gapRoots {
 		if _, ported := gapEmitters[root]; !ported {
@@ -286,6 +288,7 @@ func TestEveryGapRootHasAnEmitter(t *testing.T) {
 // A root whose arms returned the same property list would have made the old comparison AGREE, which
 // is the direction that reads as success, so this is the check that carried the weight.
 func TestGapRootPropertyNamesAreDistinctPerArm(t *testing.T) {
+	t.Parallel()
 	// The roots that branch colour against not-colour. Each must declare different properties on the
 	// two arms, or a width and a colour of the same root would read as conflicting.
 	var distinct, identical int
@@ -329,6 +332,7 @@ func TestGapRootPropertyNamesAreDistinctPerArm(t *testing.T) {
 // Both tables are deleted. This asserts the two registrations still answer separately, which is what
 // makes the patch unnecessary rather than merely absent.
 func TestObjectRootAndItsStaticsDeclareDifferentProperties(t *testing.T) {
+	t.Parallel()
 	utility, known := FrameworkFunctionalUtilities["object"]
 	if !known {
 		t.Fatal("object is not in FrameworkFunctionalUtilities")
@@ -361,6 +365,7 @@ func TestObjectRootAndItsStaticsDeclareDifferentProperties(t *testing.T) {
 // The emitter returning nil is therefore correct rather than unported, and this test is what keeps
 // that distinction from being read as a gap.
 func TestBlockAndInlineHaveNoFunctionalRegistration(t *testing.T) {
+	t.Parallel()
 	for _, root := range []string{"block", "inline"} {
 		emitted := EmitGapRoot(root, UtilityBranch{HasValue: true})
 		if len(emitted) != 0 {
@@ -398,6 +403,7 @@ func TestBlockAndInlineHaveNoFunctionalRegistration(t *testing.T) {
 // `UtilityBranch` and not a `ResolvedUtilityValue`: resolution consumes the modifier and reports
 // nothing about it, so on a resolved value alone this branch is unreachable.
 func TestShadowFamilyAlphaDeclarationDecidesTheCount(t *testing.T) {
+	t.Parallel()
 	for _, root := range []string{"shadow", "inset-shadow", "drop-shadow", "text-shadow"} {
 		unmodified := PropertySort(EmitGapRoot(root, UtilityBranch{HasValue: true}))
 		modified := PropertySort(EmitGapRoot(root, UtilityBranch{HasValue: true, HasModifier: true}))
@@ -423,6 +429,7 @@ func TestShadowFamilyAlphaDeclarationDecidesTheCount(t *testing.T) {
 // Without this the `IsArbitrary` field could be deleted and every type-keyed comparison above would
 // still pass, since the type maps are probed with arbitrary branches throughout.
 func TestGapRootArbitraryAndNamedCanDiffer(t *testing.T) {
+	t.Parallel()
 	arbitrary := PropertySort(EmitGapRoot("scale", UtilityBranch{HasValue: true, IsArbitrary: true}))
 	named := PropertySort(EmitGapRoot("scale", UtilityBranch{HasValue: true}))
 
@@ -467,6 +474,7 @@ func joinStrings(values []string) string {
 // under a comment saying they could not be compared. Requiring every key to name one cell of one of
 // the three collided roots makes that mistake unrepresentable rather than merely discouraged.
 func TestGapRootExemptionsAreExactlyTheStaticCollision(t *testing.T) {
+	t.Parallel()
 	if len(gapCellsMeasuredElsewhere) != 9 {
 		t.Errorf("gapCellsMeasuredElsewhere holds %d exemptions and this test was written against 9; "+
 			"an exemption is the one way a cell stops being compared without failing, so growing the map "+

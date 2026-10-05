@@ -79,6 +79,7 @@ func corpus(t *testing.T) (string, []string) {
 //
 // The rewrite subset must be non-empty, or a 100% there is a perfect score over nothing.
 func TestOracleAgainstItselfReadsComplete(t *testing.T) {
+	t.Parallel()
 	root, files := corpus(t)
 	report, err := Compare(root, files, factory(trimmingOracle{}), factory(trimmingOracle{}), 3, nil)
 	if err != nil {
@@ -99,6 +100,7 @@ func TestOracleAgainstItselfReadsComplete(t *testing.T) {
 // files are already formatted. On the rewrite subset it must score exactly zero, and the two files it
 // failed must be the two the oracle rewrites.
 func TestUnchangedCandidateIsCaughtOnRewrites(t *testing.T) {
+	t.Parallel()
 	root, files := corpus(t)
 	report, err := Compare(root, files, factory(trimmingOracle{}), factory(unchanged{}), 3, nil)
 	if err != nil {
@@ -121,6 +123,7 @@ func TestUnchangedCandidateIsCaughtOnRewrites(t *testing.T) {
 
 // TestRefusalNeverCountsAsMatch pins the starting point: no native printer reads 0%, not 100% of nothing.
 func TestRefusalNeverCountsAsMatch(t *testing.T) {
+	t.Parallel()
 	root, files := corpus(t)
 	report, err := Compare(root, files, factory(trimmingOracle{}), factory(refuser{}), 3, nil)
 	if err != nil {
@@ -139,6 +142,7 @@ func TestRefusalNeverCountsAsMatch(t *testing.T) {
 // also not vanish: the summary names it, because a silently shrinking denominator is how a corpus
 // measures less than it claims.
 func TestOracleFailureLeavesTheDenominatorButIsNamed(t *testing.T) {
+	t.Parallel()
 	root, files := corpus(t)
 	report, err := Compare(root, files, factory(trimmingOracle{}), factory(trimmingOracle{}), 3, nil)
 	if err != nil {
@@ -155,6 +159,7 @@ func TestOracleFailureLeavesTheDenominatorButIsNamed(t *testing.T) {
 
 // TestCacheServesTheSameAnswerAndKeysOnIdentity proves the cache saves work and cannot serve a stale oracle.
 func TestCacheServesTheSameAnswerAndKeysOnIdentity(t *testing.T) {
+	t.Parallel()
 	root, files := corpus(t)
 	directory := t.TempDir()
 	calls := &atomic.Int64{}
@@ -188,6 +193,7 @@ func TestCacheServesTheSameAnswerAndKeysOnIdentity(t *testing.T) {
 
 // TestFirstDifferenceQuotesWhitespace pins why both lines are quoted: a trailing space must be visible.
 func TestFirstDifferenceQuotesWhitespace(t *testing.T) {
+	t.Parallel()
 	got := FirstDifference("a\nb\n", "a\nb \n")
 	if !strings.Contains(got, `"b"`) || !strings.Contains(got, `"b "`) || !strings.Contains(got, "line 2") {
 		t.Fatalf("FirstDifference = %q", got)

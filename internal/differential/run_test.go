@@ -15,6 +15,7 @@ import (
 // can fail. A checkControls that returned Detected unconditionally would satisfy every happy-path
 // test ever written against it and would silently bless a completely blind harness.
 func TestAControlTheComparisonMissedIsReportedMissed(t *testing.T) {
+	t.Parallel()
 	planted := []Control{{
 		Name:         "cohere-only",
 		RelativePath: "control/Planted.ts",
@@ -51,6 +52,7 @@ func TestAControlTheComparisonMissedIsReportedMissed(t *testing.T) {
 // matches — and the harness has proven the opposite of what it set out to prove, because the
 // direction is the whole claim.
 func TestAControlOnTheWrongSideIsNotDetected(t *testing.T) {
+	t.Parallel()
 	planted := []Control{{
 		Name:         "cohere-only",
 		RelativePath: "control/Planted.ts",
@@ -77,6 +79,7 @@ func TestAControlOnTheWrongSideIsNotDetected(t *testing.T) {
 // incomplete run look complete, which is the vacuous pass this package exists to prevent,
 // reintroduced by the file that reports the evidence.
 func TestAbsentCoverageReadsAsZeroRatherThanAGuess(t *testing.T) {
+	t.Parallel()
 	filesWalked, rulesRun := cohereCoverageFrom([]string{
 		"graph built in 1.642s — 9973 files in the program, 3407 of them ours",
 		"  note: rule consistency-no-utils-folder listened to no files",
@@ -99,6 +102,7 @@ func TestAbsentCoverageReadsAsZeroRatherThanAGuess(t *testing.T) {
 // On a tree several authors are working in, overwriting somebody's file to run a self-test would be
 // a worse defect than the one being looked for.
 func TestPlantingRefusesToOverwriteAnExistingFile(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	existing := filepath.Join(root, "Occupied.ts")
 	if err := os.WriteFile(existing, []byte("export const mine = 1;\n"), 0o644); err != nil {
@@ -125,6 +129,7 @@ func TestPlantingRefusesToOverwriteAnExistingFile(t *testing.T) {
 
 // A planted control must exist during the run and be gone afterward.
 func TestPlantedControlsAreWrittenThenRemoved(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	control := Control{
 		Name:         "cohere-only",
@@ -161,6 +166,7 @@ func TestPlantedControlsAreWrittenThenRemoved(t *testing.T) {
 //
 // A process that never started produces empty stdout, which is byte-identical to a clean run.
 func TestAGateThatCannotRunIsAnErrorNotSilence(t *testing.T) {
+	t.Parallel()
 	output, err := runGate(context.Background(), GateCommand{
 		Name:      "missing",
 		Program:   filepath.Join(t.TempDir(), "no-such-binary"),
@@ -176,6 +182,7 @@ func TestAGateThatCannotRunIsAnErrorNotSilence(t *testing.T) {
 
 // A gate exiting non-zero is normal: that is what a gate with findings does.
 func TestANonZeroExitIsNotAFailure(t *testing.T) {
+	t.Parallel()
 	output, err := runGate(context.Background(), GateCommand{
 		Name:      "finds-something",
 		Program:   "/bin/sh",
@@ -197,6 +204,7 @@ func TestANonZeroExitIsNotAFailure(t *testing.T) {
 // not lint. One side means the plant landed but one gate's parse or normalization dropped it, which
 // is the silent total-mismatch bug this control exists to catch.
 func TestASharedControlNeedsBothGatesToReportIt(t *testing.T) {
+	t.Parallel()
 	control := Control{
 		Name:           "shared-enum",
 		RelativePath:   "control/Planted.ts",
@@ -239,6 +247,7 @@ func TestASharedControlNeedsBothGatesToReportIt(t *testing.T) {
 // survive. Letting it count would turn the weaker proof into the stronger claim silently, which is
 // the same class of defect as every other guard in this package.
 func TestASharedControlDoesNotProveDirection(t *testing.T) {
+	t.Parallel()
 	provenance := Provenance{
 		CohereFilesLinted: 3407,
 		GateFilesLinted:   3407,
@@ -263,6 +272,7 @@ func TestASharedControlDoesNotProveDirection(t *testing.T) {
 // people work in, and it shows up in their `git status` as an unexplained empty directory. An
 // earlier run of this harness did exactly that and somebody else found the leftover.
 func TestCleanupRemovesTheDirectoriesItCreated(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	control := Control{
 		Name:         "nested",
@@ -302,6 +312,7 @@ func TestCleanupRemovesTheDirectoriesItCreated(t *testing.T) {
 // is the one that matters on a shared worktree: if a sibling's file landed in that directory while
 // the gates ran, removing it would destroy their work.
 func TestCleanupLeavesDirectoriesItDidNotCreate(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	preexisting := filepath.Join(root, "code-quality")
 	if err := os.MkdirAll(preexisting, 0o755); err != nil {
@@ -342,6 +353,7 @@ func TestCleanupLeavesDirectoriesItDidNotCreate(t *testing.T) {
 // the crash as findings would hand an empty finding list to the comparison, and an empty list on
 // one side makes every finding on the other look one-sided while the report stays well-formed.
 func TestAGateThatFailedWithNoOutputIsNotAnEmptyResult(t *testing.T) {
+	t.Parallel()
 	_, err := runGate(context.Background(), GateCommand{
 		Name:      "crashes",
 		Program:   "/bin/sh",
@@ -384,6 +396,7 @@ func TestAGateThatFailedWithNoOutputIsNotAnEmptyResult(t *testing.T) {
 
 // A gate that could not be launched surfaces its stderr too.
 func TestAGateThatCannotLaunchSurfacesWhatItSaid(t *testing.T) {
+	t.Parallel()
 	_, err := runGate(context.Background(), GateCommand{
 		Name:      "missing",
 		Program:   filepath.Join(t.TempDir(), "no-such-binary"),
@@ -399,6 +412,7 @@ func TestAGateThatCannotLaunchSurfacesWhatItSaid(t *testing.T) {
 
 // stderrTail keeps the end of a long stderr and stays silent when there was none.
 func TestStderrTailReportsOnlyWhatThereIs(t *testing.T) {
+	t.Parallel()
 	if tail := stderrTail("   \n  \n"); tail != "" {
 		t.Fatalf("a quiet gate must add nothing to the error, got %q", tail)
 	}
@@ -424,6 +438,7 @@ func TestStderrTailReportsOnlyWhatThereIs(t *testing.T) {
 // would inflate the number of controls reported as firing and make a run look better proven than it
 // is, which is this package's own failure mode: a control that always passes is not a control.
 func TestASupportFileIsNotCountedAsAControl(t *testing.T) {
+	t.Parallel()
 	planted := []Control{
 		{Name: "real", RelativePath: "a.ts", Rule: "consistency-no-enum", ExpectedSide: SideCohere},
 		{Name: "support", RelativePath: "target/b.ts", ExpectsNothing: true},
@@ -466,6 +481,7 @@ func TestASupportFileIsNotCountedAsAControl(t *testing.T) {
 // first implementation did exactly that, and two binaries eleven commits apart both rendered
 // identically while producing different results.
 func TestTheCapturedVersionDistinguishesTwoBuilds(t *testing.T) {
+	t.Parallel()
 	older := versionLineFrom("cohere dev\n  platform:       darwin/arm64\n  typescript-go:  unknown (built from cohere bd344fc70555)\n")
 	newer := versionLineFrom("cohere dev\n  platform:       darwin/arm64\n  compiler:       unknown (built from cohere 107d82cf8568)\n")
 
@@ -497,6 +513,7 @@ func TestTheCapturedVersionDistinguishesTwoBuilds(t *testing.T) {
 // The number in that summary is what a reader trusts, and overstating it by the harness's own
 // perturbation is how a tree with a real gap of zero gets reported as having one.
 func TestAnyFindingInAPlantedFileIsPlanted(t *testing.T) {
+	t.Parallel()
 	planted := []Control{
 		{Name: "declared", RelativePath: "control/Planted.ts", Rule: "consistency-no-enum", ExpectedSide: SideCohere},
 		{Name: "support", RelativePath: "control/Target.ts", ExpectsNothing: true},
@@ -540,6 +557,7 @@ func TestAnyFindingInAPlantedFileIsPlanted(t *testing.T) {
 // mean the harness could never agree with itself: the very run that demonstrates the instrument
 // works would fail on the evidence that it does.
 func TestAPlantedBothActiveDifferenceDoesNotBlockAgreement(t *testing.T) {
+	t.Parallel()
 	report := Compare(Inputs{
 		CohereFindings:   []Finding{{File: "control/Planted.ts", Line: 3, Rule: "consistency-no-enum", Side: SideCohere}},
 		CoherePopulation: Population{Findings: 1, FilesWalked: 3407, Rules: 23},
@@ -573,6 +591,7 @@ func TestAPlantedBothActiveDifferenceDoesNotBlockAgreement(t *testing.T) {
 // Pinned as a property rather than left to the totals, because the totals agreed while the reason
 // did not, and a test that only checks the total would agree with them.
 func TestControlMatchesNeedsBothTheRuleAndThePath(t *testing.T) {
+	t.Parallel()
 	control := Control{
 		Name:         "gate-only",
 		RelativePath: "control/PlantedOrder.ts",
@@ -603,6 +622,7 @@ func TestControlMatchesNeedsBothTheRuleAndThePath(t *testing.T) {
 // file would not exist otherwise. Conflating them in either direction is a defect, and both
 // directions have now been written by mistake, so both are pinned.
 func TestTheTwoMatchersAnswerDifferentQuestions(t *testing.T) {
+	t.Parallel()
 	control := Control{
 		Name:         "gate-only",
 		RelativePath: "control/PlantedOrder.ts",
@@ -634,6 +654,7 @@ func TestTheTwoMatchersAnswerDifferentQuestions(t *testing.T) {
 // wrong about what they said it measured, with this note one command away from every invocation
 // they made. A disclosure that has to be sought is a disclosure that gets skipped.
 func TestALocalBuildCarriesItsOwnDisclaimer(t *testing.T) {
+	t.Parallel()
 	local := versionLineFrom(
 		"cohere dev\n" +
 			"  platform:       darwin/arm64\n" +
@@ -677,6 +698,7 @@ func TestALocalBuildCarriesItsOwnDisclaimer(t *testing.T) {
 // rule list. A short list is the dangerous failure: every missing name becomes a rule the harness
 // believes cohere lacks, which turns real disagreements into excused coverage gaps.
 func TestTheRulesContractIsBareNamesOnly(t *testing.T) {
+	t.Parallel()
 	bare := "consistency-no-enum\nreact-component-no-multiple-primary\n"
 	names, err := namesFromRuleLines(bare)
 	if err != nil {

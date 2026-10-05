@@ -46,6 +46,7 @@ func TestReactComponentRequirePropertiesParameterFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactComponentRequirePropertiesParameter,
 				propertiesParameterFile, testCase.sourceText), "usePropertiesNotProps")
 		})
@@ -122,6 +123,7 @@ func TestReactComponentRequirePropertiesParameterStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentRequirePropertiesParameter,
 				testCase.fileName, testCase.sourceText))
 		})

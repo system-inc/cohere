@@ -139,6 +139,7 @@ func TestNoPageCustomFontFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoPageCustomFont, testCase.fileName, testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.want...)
 		})
@@ -306,6 +307,7 @@ func TestNoPageCustomFontStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoPageCustomFont, testCase.fileName, testCase.source))
 		})

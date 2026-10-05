@@ -405,6 +405,7 @@ func variantFromFixture(t *testing.T, fixture fixtureVariantNode) ParsedVariant 
 // The counts are printed on success rather than only on failure, because a suite that ran six cases
 // and a suite that ran five thousand are indistinguishable from a green line.
 func TestParseCandidateMatchesEngine(t *testing.T) {
+	t.Parallel()
 	corpus := loadCandidateCorpus(t)
 	designSystem := newFixtureDesignSystem(corpus)
 
@@ -495,6 +496,7 @@ func TestParseCandidateMatchesEngine(t *testing.T) {
 //
 // A check that has never returned a positive has not been shown to be able to.
 func TestParseCandidateOrderIsCompared(t *testing.T) {
+	t.Parallel()
 	corpus := loadCandidateCorpus(t)
 	designSystem := newFixtureDesignSystem(corpus)
 
@@ -536,6 +538,7 @@ func TestParseCandidateOrderIsCompared(t *testing.T) {
 // The suite above would catch this too, as one failure among five thousand. This one names it, so a
 // regression reports `border-b` rather than reporting a diff someone has to read to understand.
 func TestBorderBReadsBothWaysInOrder(t *testing.T) {
+	t.Parallel()
 	corpus := loadCandidateCorpus(t)
 	designSystem := newFixtureDesignSystem(corpus)
 
@@ -559,6 +562,7 @@ func TestBorderBReadsBothWaysInOrder(t *testing.T) {
 // arbitrary child variant's compounding is not: it is derived from the selector text, so the
 // derivation is ported and has to be measured like everything else.
 func TestCompoundsForSelectorsMatchesEngine(t *testing.T) {
+	t.Parallel()
 	corpus := loadCandidateCorpus(t)
 	designSystem := newFixtureDesignSystem(corpus)
 
@@ -590,6 +594,7 @@ func TestCompoundsForSelectorsMatchesEngine(t *testing.T) {
 // deduplicated, that choice would silently start reading a different candidate, which is the same
 // class of silent wrong answer the whole component is built to prevent.
 func TestGateCandidatesPreservesOrder(t *testing.T) {
+	t.Parallel()
 	corpus := loadCandidateCorpus(t)
 	designSystem := newFixtureDesignSystem(corpus)
 
@@ -633,6 +638,7 @@ func TestGateCandidatesPreservesOrder(t *testing.T) {
 // produce different CSS. A bucketing view is allowed to lose information; it is not allowed to lose
 // this.
 func TestGateCandidatesSeparatesWhatMustNotMerge(t *testing.T) {
+	t.Parallel()
 	corpus := loadCandidateCorpus(t)
 	designSystem := newFixtureDesignSystem(corpus)
 
@@ -690,6 +696,7 @@ func TestGateCandidatesSeparatesWhatMustNotMerge(t *testing.T) {
 // The corpus test covers these cases too, as two rows among five thousand. This one names the
 // contract, so a regression reports what broke rather than a diff someone has to interpret.
 func TestArbitraryTypehintIsSplitFromTheValue(t *testing.T) {
+	t.Parallel()
 	corpus := loadCandidateCorpus(t)
 	designSystem := newFixtureDesignSystem(corpus)
 

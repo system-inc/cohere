@@ -22,6 +22,7 @@ import (
 // The production path uses `rule.Cached` against a live `FileCache`; what is asserted here is the
 // contract both sides rely on, which is that a second ask does not recompute.
 func TestForFileComputesOncePerFile(t *testing.T) {
+	t.Parallel()
 	fileCache := rule.NewFileCache()
 
 	computations := 0
@@ -47,6 +48,7 @@ func TestForFileComputesOncePerFile(t *testing.T) {
 // `comments.All` load-bearing rather than cosmetic: a stale key naming the old home would have
 // meant two packages each paying for the same scan.
 func TestDifferentKeysDoNotShareAnEntry(t *testing.T) {
+	t.Parallel()
 	fileCache := rule.NewFileCache()
 
 	computations := 0
@@ -67,6 +69,7 @@ func TestDifferentKeysDoNotShareAnEntry(t *testing.T) {
 // working and simply recomputes. Asserted because the alternative is a panic in a shared package,
 // which takes the whole run down rather than one rule's finding.
 func TestForFileSurvivesANilCache(t *testing.T) {
+	t.Parallel()
 	computations := 0
 	compute := func() []Comment {
 		computations++

@@ -55,6 +55,7 @@ func TestNoMixedEnumsStaysSilent(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(fmt.Sprintf("upstream valid %d", index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText))
 		})
 	}
@@ -90,6 +91,7 @@ func TestNoMixedEnumsFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(fmt.Sprintf("upstream invalid %d", index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
@@ -118,6 +120,7 @@ func TestNoMixedEnumsAcrossFiles(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			files := map[string]string{
 				"/repository/source/Enums.ts":            testCase.sourceText,
 				"/repository/source/mixed-enums-decl.ts": mixedEnumsDeclarationSource,
@@ -157,6 +160,7 @@ func TestNoMixedEnumsSpans(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(fmt.Sprintf("span %d", index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
@@ -242,6 +246,7 @@ func TestNoMixedEnumsParentheses(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
@@ -289,6 +294,7 @@ func TestNoMixedEnumsUnknownAborts(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
@@ -370,6 +376,7 @@ func TestNoMixedEnumsNamespaceMerging(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
@@ -405,6 +412,7 @@ func TestNoMixedEnumsConstAndAmbientEnums(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "mixed")
 		})
@@ -435,6 +443,7 @@ func TestNoMixedEnumsTemplateLiteralsAreStrings(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
@@ -462,6 +471,7 @@ func TestNoMixedEnumsCheckerArm(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
@@ -489,6 +499,7 @@ func TestNoMixedEnumsNullAborts(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
@@ -524,6 +535,7 @@ func TestNoMixedEnumsUnknownFirstMemberSilencesEverything(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {

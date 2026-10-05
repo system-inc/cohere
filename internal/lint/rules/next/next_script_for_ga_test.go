@@ -58,6 +58,7 @@ func TestNextScriptForGaReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
 			rule_testing.ExpectFindings(t, result, "nextScriptForGa")
 		})
@@ -97,6 +98,7 @@ func TestNextScriptForGaIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -167,6 +169,7 @@ func TestNextScriptForGaReportsTheMeasuredEdgeCases(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
 			rule_testing.ExpectFindings(t, result, "nextScriptForGa")
 		})
@@ -275,6 +278,7 @@ func TestNextScriptForGaIsSilentOnTheMeasuredEdgeCases(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -325,6 +329,7 @@ func TestNextScriptForGaPointsAtTheTagName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
 			rule_testing.ExpectFindings(t, result, "nextScriptForGa")
 
@@ -399,6 +404,7 @@ func TestNextScriptForGaSurvivesPropertyShapesItCannotConvert(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// The assertion that matters is that Run returns at all. The verdicts are recorded
 			// alongside because upstream is silent on the two that supply no readable value and
 			// reports on the two where a real __html key survives an unconvertible property in
@@ -448,6 +454,7 @@ func TestNextScriptForGaAnswersFromTheFirstDangerouslySetInnerHtml(t *testing.T)
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})

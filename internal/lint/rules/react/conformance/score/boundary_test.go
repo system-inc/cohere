@@ -18,6 +18,7 @@ import (
 // If cohere ever grows a type-provider channel and these start reporting, this fails and the
 // divergence entries have to be revisited deliberately.
 func TestConfigFixturesNeedAModuleTypeProvider(t *testing.T) {
+	t.Parallel()
 	fixtures, err := react_conformance.Load(fixtureRoot)
 	if err != nil {
 		t.Fatalf("loading the corpus: %v", err)
@@ -56,6 +57,7 @@ func TestConfigFixturesNeedAModuleTypeProvider(t *testing.T) {
 // (`eslint-plugin-react-hooks/cjs/eslint-plugin-react-hooks.development.js`), not inferred from the
 // corpus, because inferring "this flag must be off" from "upstream reported something" is circular.
 func TestOptInPragmaFixturesAreEnumerated(t *testing.T) {
+	t.Parallel()
 	fixtures, err := react_conformance.Load(fixtureRoot)
 	if err != nil {
 		t.Fatalf("loading the corpus: %v", err)

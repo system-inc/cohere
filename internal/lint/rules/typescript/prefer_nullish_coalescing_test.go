@@ -15,6 +15,7 @@ import (
 // TRUE, so a port assuming Go's zero value reports on every `if (a || b)` in the tree. That is the
 // second non-zero default found in two batches, and both were invisible from the shape of the code.
 func TestPreferNullishCoalescingDefaultsMatchUpstream(t *testing.T) {
+	t.Parallel()
 	decoded, err := DecodePreferNullishCoalescingOptions(nil)
 	if err != nil {
 		t.Fatalf("the decoder refused absent options: %v", err)
@@ -48,6 +49,7 @@ func TestPreferNullishCoalescingDefaultsMatchUpstream(t *testing.T) {
 // form from both ends, and `false` is REFUSED BY THE SCHEMA rather than meaning "ignore nothing" —
 // the row a decoder would most naturally get wrong by accepting it and doing something reasonable.
 func TestPreferNullishCoalescingIgnorePrimitivesBothSpellings(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		raw     string
@@ -97,6 +99,7 @@ func TestPreferNullishCoalescingIgnorePrimitivesBothSpellings(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodePreferNullishCoalescingOptions(json.RawMessage(testCase.raw))
 			if testCase.wantErr {
 				if err == nil {
@@ -121,6 +124,7 @@ func TestPreferNullishCoalescingIgnorePrimitivesBothSpellings(t *testing.T) {
 // rather than assumed, because a fixture hands the decoder bytes the test built and only bytes the
 // config layer sliced reveal a mismatch.
 func TestPreferNullishCoalescingDecoderAcceptsTheShapesTheConfigLayerDelivers(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		raw     string
@@ -162,6 +166,7 @@ func TestPreferNullishCoalescingDecoderAcceptsTheShapesTheConfigLayerDelivers(t 
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodePreferNullishCoalescingOptions(json.RawMessage(testCase.raw))
 			if testCase.wantErr {
 				if err == nil {
@@ -218,8 +223,10 @@ func runPreferNullishCoalescing(t *testing.T, testCase preferNullishCoalescingCa
 // All 275, across every reporting path: a valid case is a false positive this rule must not
 // produce, whichever path would have produced it.
 func TestPreferNullishCoalescingStaysSilent(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range preferNullishCoalescingCleanCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runPreferNullishCoalescing(t, testCase))
 		})
 	}
@@ -227,8 +234,10 @@ func TestPreferNullishCoalescingStaysSilent(t *testing.T) {
 
 // TestPreferNullishCoalescingFires runs every invalid case whose findings are all preferNullishOverOr.
 func TestPreferNullishCoalescingFires(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range preferNullishCoalescingOrCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runPreferNullishCoalescing(t, testCase)
 			wantIds := make([]string, 0, testCase.findings)
 			for range testCase.findings {
@@ -2228,6 +2237,7 @@ type preferNullishCoalescingRendering struct {
 // Every expectation below was measured by driving the installed 8.67.0 build and reading the
 // message and suggestion text, not the id.
 func TestPreferNullishCoalescingRenderings(t *testing.T) {
+	t.Parallel()
 	const orMessage = "Prefer using nullish coalescing operator (`??`) instead of a logical or " +
 		"(`||`), as it is a safer operator."
 	const assignMessage = "Prefer using nullish coalescing operator (`??=`) instead of a logical " +
@@ -2307,6 +2317,7 @@ func TestPreferNullishCoalescingRenderings(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runPreferNullishCoalescing(t, preferNullishCoalescingCase{
 				source: testCase.source, optionsJson: testCase.options,
 			})
@@ -2390,6 +2401,7 @@ func asTheTypedPreferNullishHarnessWroteIt(text string) string {
 //
 // All 275 of upstream's valid cases run against every path.
 func TestPreferNullishCoalescingArmCoverage(t *testing.T) {
+	t.Parallel()
 	if len(preferNullishCoalescingOrCases) != 123 {
 		t.Errorf("expected upstream's 123 preferNullishOverOr cases, have %d",
 			len(preferNullishCoalescingOrCases))

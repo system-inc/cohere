@@ -11,6 +11,7 @@ import (
 
 // Each kind of change is named under its own heading, with the smallest version it allows.
 func TestDiffSetNamesEachKindOfChange(t *testing.T) {
+	t.Parallel()
 	before := []byte(`{
 		"format": {"printWidth": 120},
 		"rules": {
@@ -57,6 +58,7 @@ func TestDiffSetNamesEachKindOfChange(t *testing.T) {
 // What can only relax a set is a patch; each way a set can fail a project that passed is at least a
 // minor, and a removed set, which breaks every configuration extending it, is a major.
 func TestEachChangeAllowsTheSmallestVersionThePolicySays(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		name   string
 		before []byte
@@ -85,6 +87,7 @@ func TestEachChangeAllowsTheSmallestVersionThePolicySays(t *testing.T) {
 }
 
 func TestASeverityThatIsNotOneIsRefused(t *testing.T) {
+	t.Parallel()
 	if _, err := DiffSet([]byte(`{"rules":{"a":"error"}}`), []byte(`{"rules":{"a":"fatal"}}`)); err == nil {
 		t.Fatal("a severity of \"fatal\" was read as one")
 	}
@@ -92,6 +95,7 @@ func TestASeverityThatIsNotOneIsRefused(t *testing.T) {
 
 // A version moves at least as far as the change allows, and always forward.
 func TestRequireBump(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		previous, next string
 		bump           Bump
@@ -118,6 +122,7 @@ func TestRequireBump(t *testing.T) {
 }
 
 func TestRenderNamesEverySetThatChanged(t *testing.T) {
+	t.Parallel()
 	changed, bump, err := Diff(
 		map[string][]byte{"typescript": []byte(`{"rules":{"a":"error"}}`), "react": []byte(`{"rules":{"b":"error"}}`)},
 		map[string][]byte{"typescript": []byte(`{"rules":{"a":"error","c":"error"}}`), "react": []byte(`{"rules":{"b":"error"}}`)},
@@ -138,6 +143,7 @@ func TestRenderNamesEverySetThatChanged(t *testing.T) {
 // The sets read from a commit are the sets the working tree holds when nothing is uncommitted: the same
 // names and the same bytes, so a diff between HEAD and the tree is empty.
 func TestSetsAtACommitMatchTheTree(t *testing.T) {
+	t.Parallel()
 	module, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatal(err)

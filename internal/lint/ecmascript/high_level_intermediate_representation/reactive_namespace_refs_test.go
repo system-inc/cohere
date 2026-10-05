@@ -48,6 +48,7 @@ return reference; }`,
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			reactivity := reactivityByName(t, testCase.source)
 			actual, found := reactivity["reference"]
 			if !found {
@@ -104,6 +105,7 @@ return <button onClick={callback}>{values.length}{busy}</button>;
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			var visited, findings, markers int
 			probe := rule.Rule{
 				Name:             "namespace-ref-memoization",
@@ -174,6 +176,7 @@ return [value, update]; }`,
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			reactivity := reactivityByName(t, testCase.source)
 			for name, expected := range map[string]bool{"value": true, "update": false} {
 				actual, found := reactivity[name]

@@ -31,6 +31,7 @@ func TestNoIteratorFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoIterator, iteratorFile, testCase.sourceText), "noIterator")
 		})
@@ -58,6 +59,7 @@ func TestNoIteratorStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoIterator, iteratorFile, testCase.sourceText))
 		})
 	}
@@ -100,6 +102,7 @@ func TestNoIteratorSuggestsTheRightSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoIterator, iteratorFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))

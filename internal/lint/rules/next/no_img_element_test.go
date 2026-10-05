@@ -56,6 +56,7 @@ export const MyComponent = () => <img src={somePicture.src} alt='foo' />;`,
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoImgElement, "Component.tsx", testCase.source)
 			rule_testing.ExpectFindings(t, result, messageNoImgElement.Id)
 			if result.Diagnostics[0].Message.Id != "noImgElement" {
@@ -128,6 +129,7 @@ export class MyComponent {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoImgElement, "Component.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})

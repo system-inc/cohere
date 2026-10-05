@@ -133,6 +133,7 @@ func TestNoGlobalContainer(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, BoundaryNoGlobalContainer, boundaryNoGlobalContainerFile, testCase.sourceText)
 			// A row expecting nothing goes through ExpectClean rather than through ExpectFindings
 			// with an empty list. The two are the same assertion to a reader and not to the

@@ -70,6 +70,7 @@ func TestAbbreviationVocabularyCarriesEveryWordInOrder(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.form, func(t *testing.T) {
+			t.Parallel()
 			if !slices.Equal(testCase.got, testCase.want) {
 				t.Errorf("%d entries %v, want %d %v", len(testCase.got), testCase.got, len(testCase.want), testCase.want)
 			}
@@ -151,6 +152,7 @@ func TestAbbreviationVocabularyRefusesAMalformedFile(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if _, err := loadAbbreviationVocabulary([]byte(testCase.file)); err == nil {
 				t.Errorf("the loader accepted it")
 			}
@@ -187,6 +189,7 @@ func TestAbbreviationVocabularyOrderIsObservableWhereItMatters(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			finding, found := vocabulary.find(testCase.name)
 			if !found || finding.message.Id != testCase.wantId {
 				t.Fatalf("got %+v, want %s", finding, testCase.wantId)

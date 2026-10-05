@@ -28,6 +28,7 @@ func TestNoUnsafeDeclarationMergingFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText), "unsafeMerging")
 		})
@@ -60,6 +61,7 @@ func TestNoUnsafeDeclarationMergingStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText))
 		})
@@ -95,6 +97,7 @@ func TestNoUnsafeDeclarationMergingCountsFindingsPerDeclaration(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText), testCase.want...)
 		})
@@ -124,6 +127,7 @@ func TestNoUnsafeDeclarationMergingGoesSilentWhenAThirdKindIsFirst(t *testing.T)
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText))
 		})
@@ -155,6 +159,7 @@ func TestNoUnsafeDeclarationMergingStaysSilentOnUnpairedKinds(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText))
 		})
@@ -184,6 +189,7 @@ func TestNoUnsafeDeclarationMergingPointsAtTheName(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantReported) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantReported))
@@ -231,6 +237,7 @@ func TestNoUnsafeDeclarationMergingPointsAtTheFirstDeclaration(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
@@ -303,14 +310,17 @@ func TestNoUnsafeDeclarationMergingHandlesAnAnonymousClass(t *testing.T) {
 	t.Parallel()
 
 	t.Run("an anonymous default export beside an interface", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 			unsafeDeclarationMergingFile, "interface Foo {}\nexport default class {}\n"))
 	})
 	t.Run("an anonymous default export alone", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 			unsafeDeclarationMergingFile, "export default class {}\n"))
 	})
 	t.Run("a named default export beside an interface", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 			unsafeDeclarationMergingFile, "interface Foo {}\nexport default class Foo {}\n"), "unsafeMerging")
 	})
@@ -348,6 +358,7 @@ func TestNoUnsafeDeclarationMergingSeesThroughAnExport(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText), "unsafeMerging")
 		})

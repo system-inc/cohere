@@ -86,6 +86,7 @@ func TestNoShadowRestrictedNamesFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "shadowingRestrictedName"
@@ -136,6 +137,7 @@ func TestNoShadowRestrictedNamesStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText))
 		})
@@ -161,6 +163,7 @@ func TestNoShadowRestrictedNamesRespectsAllowGlobalThis(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoShadowRestrictedNames,
 				shadowRestrictedNamesFile, testCase.sourceText,
 				NoShadowRestrictedNamesOptions{AllowGlobalThis: true}))
@@ -207,6 +210,7 @@ func TestNoShadowRestrictedNamesPointsAtTheName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoShadowRestrictedNames,
 				shadowRestrictedNamesFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
@@ -271,6 +275,7 @@ func TestNoShadowRestrictedNamesCarveOutBoundary(t *testing.T) {
 
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "shadowingRestrictedName"
@@ -317,6 +322,7 @@ func TestNoShadowRestrictedNamesCarveOutBoundary(t *testing.T) {
 
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText))
 		})

@@ -125,6 +125,7 @@ func TestGroupedAccessorPairsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, GroupedAccessorPairs,
 				groupedAccessorPairsFile, testCase.sourceText, decodedGroupedAccessorPairsOptions(t, testCase.options)))
 		})
@@ -202,6 +203,7 @@ func TestGroupedAccessorPairsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, GroupedAccessorPairs,
 				groupedAccessorPairsFile, testCase.sourceText, decodedGroupedAccessorPairsOptions(t, testCase.options)),
 				testCase.wantIds...)
@@ -286,6 +288,7 @@ func TestGroupedAccessorPairsSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, GroupedAccessorPairs, groupedAccessorPairsFile,
 				testCase.sourceText, decodedGroupedAccessorPairsOptions(t, testCase.options))
 			if testCase.index >= len(result.Diagnostics) {
@@ -339,6 +342,7 @@ func TestGroupedAccessorPairsTypeMembersAreNotChecked(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			// Clean under this port AND clean upstream without the option, which is the default.
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, GroupedAccessorPairs,
 				groupedAccessorPairsFile, sourceText, nil))
@@ -366,6 +370,7 @@ func TestDecodeGroupedAccessorPairsOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeGroupedAccessorPairsOptions(json.RawMessage(testCase.raw))
 			if err != nil {
 				t.Fatalf("the decoder refused %q: %v", testCase.raw, err)
@@ -400,6 +405,7 @@ func TestDecodeGroupedAccessorPairsOptionsRefusesAValueOutsideTheEnum(t *testing
 		`["getBeforeSet", {"enforceForTSTypes": false}, "anyOrder"]`,
 	} {
 		t.Run(raw, func(t *testing.T) {
+			t.Parallel()
 			if _, err := DecodeGroupedAccessorPairsOptions(json.RawMessage(raw)); err == nil {
 				t.Errorf("the decoder accepted %s, which is outside upstream's enum", raw)
 			}
@@ -511,6 +517,7 @@ func TestGroupedAccessorPairsMessageText(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, GroupedAccessorPairs, groupedAccessorPairsFile,
 				testCase.sourceText, decodedGroupedAccessorPairsOptions(t, testCase.options))
 			if testCase.index >= len(result.Diagnostics) {
@@ -557,6 +564,7 @@ func TestGroupedAccessorPairsComputedKeysDoNotPairWithStaticOnes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, GroupedAccessorPairs, groupedAccessorPairsFile,
 				testCase.sourceText, nil)
 			if testCase.wantIds == nil {

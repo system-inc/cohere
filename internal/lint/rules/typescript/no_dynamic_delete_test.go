@@ -43,6 +43,7 @@ func TestNoDynamicDeleteStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(noDynamicDeleteCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDynamicDelete,
 				noDynamicDeleteFile, sourceText))
 		})
@@ -108,6 +109,7 @@ func TestNoDynamicDeleteFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noDynamicDeleteCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDynamicDelete, noDynamicDeleteFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "dynamicDelete")
 
@@ -187,6 +189,7 @@ func TestNoDynamicDeleteStaysSilentOnShapesTheCorpusDoesNotWrite(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noDynamicDeleteCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDynamicDelete,
 				noDynamicDeleteFile, testCase.sourceText))
 		})
@@ -273,6 +276,7 @@ func TestNoDynamicDeleteFiresOnShapesTheCorpusDoesNotWrite(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noDynamicDeleteCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDynamicDelete, noDynamicDeleteFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "dynamicDelete")
 

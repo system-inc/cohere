@@ -43,6 +43,7 @@ func TestNoDivRegexStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDivRegex, divRegexFile, sourceText))
 		})
 	}
@@ -98,6 +99,7 @@ func TestNoDivRegexIsPositionalNotSemantic(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDivRegex, divRegexFile, testCase.sourceText)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(t, result, "unexpected")
@@ -130,6 +132,7 @@ func TestNoDivRegexDeclinesTheConstructor(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDivRegex, divRegexFile, testCase.sourceText))
 		})
 	}
@@ -165,6 +168,7 @@ func TestNoDivRegexReportsTheWholeLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDivRegex, divRegexFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
@@ -211,6 +215,7 @@ func TestNoDivRegexRepairsExactlyTheEqualsSign(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t,
 				rule_testing.Run(t, NoDivRegex, divRegexFile, testCase.sourceText), testCase.wantSource)
 		})
@@ -283,6 +288,7 @@ func TestNoDivRegexSurvivesATruncatedLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// A panic here is the defect under test, so it is allowed to fail the test rather than
 			// being recovered: an unrecovered panic in a rule takes the whole run down in
 			// production, and the test should say so in the same voice.

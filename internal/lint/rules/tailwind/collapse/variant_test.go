@@ -207,6 +207,7 @@ func variantOrderRegistryFrom(t *testing.T, fixture *variantOrderRegistryFixture
 // twenty thousand look the same as a green line, and this component's whole claim is about a
 // population rather than about a handful of cases.
 func TestVariantOrderMatchesTheEngine(t *testing.T) {
+	t.Parallel()
 	corpus := loadVariantOrderCorpus(t)
 
 	comparedVariantOrders := 0
@@ -473,6 +474,7 @@ func checkVariantOrderClassOrder(t *testing.T, name string, registry *VariantReg
 // Measured on the engine: `group-hover:disabled:` carries bits 0 and 2, mask 5. `dark:` carries bit
 // 3, mask 8. The stacked class sorts first, and the depth-first rule puts it second.
 func TestVariantBitmaskIsNotDepthFirst(t *testing.T) {
+	t.Parallel()
 	corpus := loadVariantOrderCorpus(t)
 
 	var probe *variantOrderCase
@@ -557,6 +559,7 @@ func TestVariantBitmaskIsNotDepthFirst(t *testing.T) {
 // So a nonzero count here is correct and expected forever. A zero would mean the corpus lost its
 // stacked-variant cases, which is what the assertion at the bottom exists to catch.
 func TestDepthFirstDisagreesWithTheEngineOnTheCorpus(t *testing.T) {
+	t.Parallel()
 	corpus := loadVariantOrderCorpus(t)
 
 	comparedPairs := 0
@@ -669,6 +672,7 @@ func TestDepthFirstDisagreesWithTheEngineOnTheCorpus(t *testing.T) {
 // pass every test built from a default theme and diverge on any repository that redefines a
 // breakpoint, which is the per-repository failure this whole port exists to remove.
 func TestRegistrationOrderIsSharedWithinAGroup(t *testing.T) {
+	t.Parallel()
 	corpus := loadVariantOrderCorpus(t)
 
 	var framework *variantOrderRegistryFixture
@@ -737,6 +741,7 @@ func TestRegistrationOrderIsSharedWithinAGroup(t *testing.T) {
 // variant registries are therefore identical to the framework's, which is a real finding rather
 // than a missing measurement: for ordering purposes an overriding custom variant is invisible.
 func TestCustomVariantOverridingAFrameworkNameKeepsItsOrder(t *testing.T) {
+	t.Parallel()
 	corpus := loadVariantOrderCorpus(t)
 
 	registries := map[string]*variantOrderRegistryFixture{}
@@ -832,6 +837,7 @@ func TestCustomVariantOverridingAFrameworkNameKeepsItsOrder(t *testing.T) {
 // Without this, every other assertion here would still pass against a port that memoized one
 // global order and got lucky on a corpus.
 func TestVariantOrderIsRunScoped(t *testing.T) {
+	t.Parallel()
 	corpus := loadVariantOrderCorpus(t)
 
 	indicesByCase := map[string]int{}
@@ -906,6 +912,7 @@ func TestVariantOrderIsRunScoped(t *testing.T) {
 // receive five distinct indices. A tie needs two variants that compare equal all the way down,
 // which is what a group whose comparison function returns zero produces.
 func TestTiedVariantsShareAnIndex(t *testing.T) {
+	t.Parallel()
 	registry := NewVariantRegistry()
 	// A comparison function that ties every member, which is what a real tie looks like. Upstream
 	// reaches this state through `compareBreakpointVariants` when two breakpoints resolve to the
@@ -959,6 +966,7 @@ func TestTiedVariantsShareAnIndex(t *testing.T) {
 // registration would push every overridden framework variant to the end of the sort, which is a
 // reordering of the whole class list for a stylesheet that only meant to restyle one variant.
 func TestReRegisteringAVariantKeepsItsOrder(t *testing.T) {
+	t.Parallel()
 	registry := NewVariantRegistry()
 	registry.Register("first", ParsedVariantKindStatic)
 	registry.Register("second", ParsedVariantKindStatic)
@@ -1008,6 +1016,7 @@ func TestReRegisteringAVariantKeepsItsOrder(t *testing.T) {
 // through `2xl` five distinct indices despite one shared order, because `compare` continues to the
 // root name when no comparison function is registered.
 func TestSharedRegistrationOrderStillSeparatesByRoot(t *testing.T) {
+	t.Parallel()
 	registry := NewVariantRegistry()
 	registry.Group(func() {
 		registry.Register("alpha", ParsedVariantKindStatic)
@@ -1037,6 +1046,7 @@ func TestSharedRegistrationOrderStillSeparatesByRoot(t *testing.T) {
 // `40rem` and `1024px` bucket as `rem` and `px` and sort alphabetically. And a value that parses to
 // no number falls back to a string comparison, which is upstream's `Number.isNaN` branch.
 func TestCompareBreakpointsBucketsByUnit(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name      string
 		left      string
@@ -1069,6 +1079,7 @@ func TestCompareBreakpointsBucketsByUnit(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			order := CompareBreakpoints(testCase.left, testCase.right, testCase.ascending)
 			if order == 0 {
 				t.Fatalf("%q and %q tied, which the engine does not do for distinct values", testCase.left, testCase.right)
@@ -1096,6 +1107,7 @@ func TestCompareBreakpointsBucketsByUnit(t *testing.T) {
 // would shift past the word width, which in Go silently yields zero rather than trapping, so the
 // class would carry no bit at all and sort as though it had no variants.
 func TestBitmaskExceedsSixtyFourBits(t *testing.T) {
+	t.Parallel()
 	registry := NewVariantRegistry()
 	var variants []ParsedVariant
 	for index := 0; index < 100; index++ {
@@ -1127,6 +1139,7 @@ func TestBitmaskExceedsSixtyFourBits(t *testing.T) {
 // A fixture that regenerated to zero repository class lists would leave every differential passing
 // vacuously and every logged percentage a percentage of nothing.
 func TestCorpusHoldsRealClassLists(t *testing.T) {
+	t.Parallel()
 	corpus := loadVariantOrderCorpus(t)
 
 	classListsByRepository := map[string]int{}

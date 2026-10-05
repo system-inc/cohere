@@ -26,6 +26,7 @@ func parseSource(t *testing.T, sourceText string) *ast.SourceFile {
 // directive, and oxc is silent on all three. That is the defect this function exists to prevent, so
 // it is asserted here rather than only through a rule fixture.
 func TestHasFileDirective(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -48,6 +49,7 @@ func TestHasFileDirective(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			got := HasFileDirective(parseSource(t, testCase.sourceText), "use client")
 			if got != testCase.want {
 				t.Errorf("HasFileDirective = %v, want %v", got, testCase.want)
@@ -58,6 +60,7 @@ func TestHasFileDirective(t *testing.T) {
 
 // A nil source file answers false rather than panicking, since a rule may run before a parse.
 func TestHasFileDirectiveToleratesNil(t *testing.T) {
+	t.Parallel()
 	if HasFileDirective(nil, "use client") {
 		t.Error("a nil source file must answer false")
 	}
@@ -65,6 +68,7 @@ func TestHasFileDirectiveToleratesNil(t *testing.T) {
 
 // The directive argument is honoured rather than hardcoded, so `use server` works too.
 func TestHasFileDirectiveReadsTheGivenDirective(t *testing.T) {
+	t.Parallel()
 	sourceFile := parseSource(t, "\"use server\"\nexport const x = 1\n")
 	if !HasFileDirective(sourceFile, "use server") {
 		t.Error("use server must be found when asked for")

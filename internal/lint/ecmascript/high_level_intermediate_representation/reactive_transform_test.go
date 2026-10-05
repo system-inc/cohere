@@ -50,6 +50,7 @@ func TestReactiveTransformRemovesAndReplaces(t *testing.T) {
 	source := `function f(a) { const x = a + 1; const y = x + 2; return y; }`
 
 	t.Run("remove drops the statement", func(t *testing.T) {
+		t.Parallel()
 		function, _ := rangesFor(t, source)
 		tree, _ := BuildReactiveFunction(function)
 		before := countStatements(tree.Body)
@@ -76,6 +77,7 @@ func TestReactiveTransformRemovesAndReplaces(t *testing.T) {
 	})
 
 	t.Run("replace-many splices", func(t *testing.T) {
+		t.Parallel()
 		function, _ := rangesFor(t, source)
 		tree, _ := BuildReactiveFunction(function)
 		before := countStatements(tree.Body)
@@ -100,6 +102,7 @@ func TestReactiveTransformRemovesAndReplaces(t *testing.T) {
 	})
 
 	t.Run("replace-many with nothing removes", func(t *testing.T) {
+		t.Parallel()
 		function, _ := rangesFor(t, source)
 		tree, _ := BuildReactiveFunction(function)
 		before := countStatements(tree.Body)
@@ -139,6 +142,7 @@ func TestReactiveTransformRewritesNestedBlocks(t *testing.T) {
 		{name: "switch arms", source: `function f(a) { switch (a) { case 1: { const x = 1; return x; } default: return 2; } }`},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, _ := rangesFor(t, testCase.source)
 			tree, _ := BuildReactiveFunction(function)
 			if tree == nil {

@@ -228,6 +228,7 @@ func yamlCorpora(t *testing.T, roots string) []yamlCorpus {
 }
 
 func TestCorpusFormatMatchesOracle(t *testing.T) {
+	t.Parallel()
 	roots := os.Getenv("COHERE_YAML_CORPUS")
 	if roots == "" {
 		t.Skip("set COHERE_YAML_CORPUS to measure; this is a measuring run, not a unit test")

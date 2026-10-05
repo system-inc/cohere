@@ -627,6 +627,7 @@ func TestNoEmptyFunctionStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText+"|"+testCase.options, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoEmptyFunction,
 				emptyFunctionFile, testCase.sourceText, decodedEmptyFunctionOptions(t, testCase.options)))
 		})
@@ -2392,6 +2393,7 @@ func TestNoEmptyFunctionFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText+"|"+testCase.options, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoEmptyFunction, emptyFunctionFile,
 				testCase.sourceText, decodedEmptyFunctionOptions(t, testCase.options))
 			rule_testing.ExpectFindings(t, result, "unexpected")
@@ -2471,6 +2473,7 @@ func TestNoEmptyFunctionSpansTheBody(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoEmptyFunction, emptyFunctionFile,
 				testCase.sourceText, nil)
 			if len(result.Diagnostics) != 1 {
@@ -2504,6 +2507,7 @@ func TestDecodeNoEmptyFunctionOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeNoEmptyFunctionOptions(json.RawMessage(testCase.raw))
 			if err != nil {
 				t.Fatalf("the decoder refused %q: %v", testCase.raw, err)
@@ -2536,6 +2540,7 @@ func TestDecodeNoEmptyFunctionOptionsRefusesAnUnknownKind(t *testing.T) {
 		`{"allow": ["Functions"]}`,
 	} {
 		t.Run(raw, func(t *testing.T) {
+			t.Parallel()
 			if _, err := DecodeNoEmptyFunctionOptions(json.RawMessage(raw)); err == nil {
 				t.Errorf("the decoder accepted %s, which is outside upstream's enum", raw)
 			}

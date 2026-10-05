@@ -604,6 +604,7 @@ func TestNoUnnecessaryTypeParametersStaysSilent(t *testing.T) {
 
 	for _, testCase := range noUnnecessaryTypeParametersValidCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -617,6 +618,7 @@ func TestNoUnnecessaryTypeParametersFires(t *testing.T) {
 
 	for _, testCase := range noUnnecessaryTypeParametersInvalidCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.ids...)
 		})
@@ -678,6 +680,7 @@ function inferredMappedReturnType<T extends string>(x: T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			// Upstream is SILENT on each of these. This port reports once. Asserting the divergence
 			// rather than the upstream verdict means closing the gap makes this test fail loudly,
@@ -781,6 +784,7 @@ func TestNoUnnecessaryTypeParametersReportsAtTheTypeParameter(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
@@ -897,6 +901,7 @@ func TestNoUnnecessaryTypeParametersArrayCarveOut(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			if len(result.Diagnostics) != testCase.wantFindings {
 				t.Fatalf("expected %d findings, got %d", testCase.wantFindings, len(result.Diagnostics))
@@ -962,6 +967,7 @@ func TestNoUnnecessaryTypeParametersConstraintRecursion(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
@@ -1005,6 +1011,7 @@ func TestNoUnnecessaryTypeParametersIndexSignaturesCountTwice(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -1058,6 +1065,7 @@ type Equal<X, Y> =
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -1075,6 +1083,7 @@ type Equal<X, Y> =
 	}
 	for _, testCase := range reporting {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.ids...)
 		})
@@ -1134,6 +1143,7 @@ declare function f<T extends (A extends B ? C : D)>(): T | null;
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -1168,6 +1178,7 @@ declare function f<T extends (A extends B ? C : D)>(): T | null;
 	}
 	for _, testCase := range reporting {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.ids...)
 		})
@@ -1195,6 +1206,7 @@ func TestNoUnnecessaryTypeParametersPhantomBrands(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -1210,6 +1222,7 @@ func TestNoUnnecessaryTypeParametersPhantomBrands(t *testing.T) {
 	}
 	for _, testCase := range reporting {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.ids...)
 		})

@@ -141,6 +141,7 @@ func TestNoElseReturnFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "unexpected"
@@ -177,6 +178,7 @@ func TestNoElseReturnStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoElseReturn,
 				elseReturnFile, testCase.sourceText, elseReturnOptions(t, testCase.allowElseIf)))
 		})
@@ -235,6 +237,7 @@ func TestNoElseReturnFixes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFixedSource(t, rule_testing.RunTypedWithOptions(t, NoElseReturn,
 				elseReturnFile, testCase.sourceText, elseReturnOptions(t, testCase.allowElseIf)),
 				trailingNewlineOn(testCase.wantSource))
@@ -317,6 +320,7 @@ func TestNoElseReturnDeclinesToFix(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoElseReturn, elseReturnFile,
 				testCase.sourceText, elseReturnOptions(t, testCase.allowElseIf))
 			expected := make([]string, testCase.findings)
@@ -362,6 +366,7 @@ func TestNoElseReturnDivergesOnScopeDepth(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoElseReturn, elseReturnFile,
 				testCase.sourceText, elseReturnOptions(t, nil))
 			rule_testing.ExpectFindings(t, result, "unexpected")
@@ -419,6 +424,7 @@ func TestNoElseReturnFixPreservesTypeScript(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoElseReturn, elseReturnFile,
 				testCase.sourceText, elseReturnOptions(t, nil))
 			rule_testing.ExpectFindings(t, result, "unexpected")
@@ -485,6 +491,7 @@ func TestDecodeNoElseReturnOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("an absent option allows else if", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoElseReturnOptions(nil)
 		if err != nil {
 			t.Fatalf("the decoder refused an absent option: %v", err)
@@ -495,6 +502,7 @@ func TestDecodeNoElseReturnOptions(t *testing.T) {
 	})
 
 	t.Run("an empty object keeps the default", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoElseReturnOptions(json.RawMessage(`{}`))
 		if err != nil {
 			t.Fatalf("the decoder refused an empty object: %v", err)
@@ -505,6 +513,7 @@ func TestDecodeNoElseReturnOptions(t *testing.T) {
 	})
 
 	t.Run("an explicit false is distinguishable from absent", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoElseReturnOptions(json.RawMessage(`{"allowElseIf":false}`))
 		if err != nil {
 			t.Fatalf("the decoder refused an explicit false: %v", err)
@@ -515,6 +524,7 @@ func TestDecodeNoElseReturnOptions(t *testing.T) {
 	})
 
 	t.Run("a bare severity leaves the rule allowing else if", func(t *testing.T) {
+		t.Parallel()
 		// A rule configured as "error" is handed nil options, which arrives at Run as an untyped
 		// nil rather than as settings. This covers the fallback inside Run, which no decoder test
 		// can reach, and it is the case the config actually uses.
@@ -556,6 +566,7 @@ func TestNoElseReturnLooksAtTheLastStatementOnly(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "unexpected"

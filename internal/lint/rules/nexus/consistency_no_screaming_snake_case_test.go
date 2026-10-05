@@ -32,6 +32,7 @@ func TestConsistencyNoScreamingSnakeCaseFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
@@ -65,6 +66,7 @@ func TestConsistencyNoScreamingSnakeCaseStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})

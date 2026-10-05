@@ -26,6 +26,7 @@ func mustParse(t *testing.T, text string) *estree.Node {
 }
 
 func TestParseTailwindEscapedClass(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, ".hover\\:bg-red:hover")
 	selectors := root.List("nodes")
 	if len(selectors) != 1 || !selectors[0].Is("selector") {
@@ -48,6 +49,7 @@ func TestParseTailwindEscapedClass(t *testing.T) {
 }
 
 func TestParseAttribute(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, "[ns|data-x='b' i]")
 	attribute := root.List("nodes")[0].List("nodes")[0]
 	if !attribute.Is("attribute") {
@@ -77,6 +79,7 @@ func TestParseAttribute(t *testing.T) {
 }
 
 func TestParseCombinatorAndSpaces(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, " a  >\tb , c")
 	selectors := root.List("nodes")
 	if len(selectors) != 2 {
@@ -105,6 +108,7 @@ func TestParseCombinatorAndSpaces(t *testing.T) {
 }
 
 func TestParsePseudoWithSelectors(t *testing.T) {
+	t.Parallel()
 	root := mustParse(t, ":nth-child(2n + 1 of .x)")
 	pseudo := root.List("nodes")[0].List("nodes")[0]
 	if !pseudo.Is("pseudo") || pseudo.String("value") != ":nth-child" {
@@ -129,6 +133,7 @@ func TestParsePseudoWithSelectors(t *testing.T) {
 }
 
 func TestParseOffsetsAreBytes(t *testing.T) {
+	t.Parallel()
 	// ".e-acute > .u-umlaut": the second class starts at UTF-16 index 5 and byte 6. Columns stay UTF-16.
 	root := mustParse(t, ".\xc3\xa9 > .\xc3\xbc")
 	nodes := root.List("nodes")[0].List("nodes")
@@ -147,6 +152,7 @@ func TestParseOffsetsAreBytes(t *testing.T) {
 }
 
 func TestParseRefusals(t *testing.T) {
+	t.Parallel()
 	refusals := map[string]string{
 		"\"unclosed":  "Unclosed quote",
 		"a /* x":      "Unclosed comment",
@@ -179,6 +185,7 @@ func TestParseRefusals(t *testing.T) {
 // TestParseNeverPanics feeds random fragments through Parse: every outcome must be a tree or a syntax
 // error, never a Go panic turned into a plain error.
 func TestParseNeverPanics(t *testing.T) {
+	t.Parallel()
 	random := rand.New(rand.NewPCG(5, 7))
 	pieces := []string{"a", ".", "#", ":", "(", ")", "[", "]", "=", "|", "*", "&", ",", " ", ">", "\\", "'", "\"", "/*", "*/", "@", ";", "i", "\xf0\x9f\x98\x80", "#{"}
 	for range 20000 {

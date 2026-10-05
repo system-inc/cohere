@@ -25,6 +25,7 @@ func TestNoExAssignFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoExAssign, exAssignFile, testCase.sourceText),
 				"unexpectedExceptionAssignment")
 		})
@@ -53,6 +54,7 @@ func TestNoExAssignStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExAssign, exAssignFile, testCase.sourceText))
 		})
 	}
@@ -82,6 +84,7 @@ func TestNoExAssignSeesUpdateExpressions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoExAssign, exAssignFile, testCase.sourceText),
 				"unexpectedExceptionAssignment")

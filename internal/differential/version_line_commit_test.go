@@ -12,6 +12,7 @@ import (
 // The text below is what the global cohere printed on 2026-10-02 at 7b434bb4105b, verbatim apart from
 // the patch line.
 func TestACommittedBuildIsIdentifiedByItsCommitLine(t *testing.T) {
+	t.Parallel()
 	committed := versionLineFrom(
 		"cohere dev\n" +
 			"  platform:       darwin/arm64\n" +

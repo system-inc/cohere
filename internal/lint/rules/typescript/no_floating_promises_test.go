@@ -172,6 +172,7 @@ func TestNoFloatingPromisesStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoFloatingPromises(t, testCase.sourceText, testCase.options)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -287,6 +288,7 @@ func TestNoFloatingPromisesFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoFloatingPromises(t, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -383,6 +385,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoFloatingPromises(t, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.suggestions) {
 				t.Fatalf("want %d findings, got %d", len(testCase.suggestions), len(result.Diagnostics))
@@ -451,6 +454,7 @@ func TestNoFloatingPromisesMeasuredParentheses(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoFloatingPromises(t, prelude+"async function wrapper() {\n  "+testCase.body+"\n}\n", nil)
 			if testCase.wantIds == nil {
 				rule_testing.ExpectClean(t, result)
@@ -614,6 +618,7 @@ func TestNoFloatingPromisesThenableNeedsTwoFunctionParameters(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoFloatingPromises(t, testCase.sourceText,
 				NoFloatingPromisesOptions{CheckThenables: type_checking.Ref(true)})
 			if testCase.wantIds == nil {
@@ -689,6 +694,7 @@ func TestDecodeNoFloatingPromisesOptions(t *testing.T) {
 	}
 
 	t.Run("an empty object leaves every pointer nil so the rule's own defaults apply", func(t *testing.T) {
+		t.Parallel()
 		options := decode(t, `{}`)
 		if options.IgnoreVoid != nil || options.IgnoreIIFE != nil || options.CheckThenables != nil {
 			t.Errorf("an empty object should leave the three booleans nil, got %v %v %v",
@@ -697,6 +703,7 @@ func TestDecodeNoFloatingPromisesOptions(t *testing.T) {
 	})
 
 	t.Run("an explicit false is not the same as absent", func(t *testing.T) {
+		t.Parallel()
 		options := decode(t, `{"ignoreVoid": false}`)
 		if options.IgnoreVoid == nil {
 			t.Fatal("an explicit ignoreVoid should decode to a non-nil pointer")
@@ -707,6 +714,7 @@ func TestDecodeNoFloatingPromisesOptions(t *testing.T) {
 	})
 
 	t.Run("a bare string specifier lands in the inline list", func(t *testing.T) {
+		t.Parallel()
 		options := decode(t, `{"allowForKnownSafePromises": ["SafePromise"]}`)
 		if len(options.AllowForKnownSafePromises) != 0 {
 			t.Errorf("a bare string should not become a structured specifier, got %v", options.AllowForKnownSafePromises)
@@ -717,6 +725,7 @@ func TestDecodeNoFloatingPromisesOptions(t *testing.T) {
 	})
 
 	t.Run("from is translated from its string spelling to the enum", func(t *testing.T) {
+		t.Parallel()
 		options := decode(t, `{"allowForKnownSafePromises":[{"from":"lib","name":"PromiseLike"}]}`)
 		if len(options.AllowForKnownSafePromises) != 1 {
 			t.Fatalf("want one specifier, got %d", len(options.AllowForKnownSafePromises))
@@ -732,6 +741,7 @@ func TestDecodeNoFloatingPromisesOptions(t *testing.T) {
 	})
 
 	t.Run("an unrecognized from is dropped rather than silently meaning file", func(t *testing.T) {
+		t.Parallel()
 		// `file` is the zero value of the enum, so a decoder that merely failed to set From would
 		// turn a typo into a file specifier. This asserts the specifier is skipped instead.
 		options := decode(t, `{"allowForKnownSafeCalls":[{"from":"module","name":"it"}]}`)
@@ -741,6 +751,7 @@ func TestDecodeNoFloatingPromisesOptions(t *testing.T) {
 	})
 
 	t.Run("both wire forms coexist in one array", func(t *testing.T) {
+		t.Parallel()
 		options := decode(t, `{"allowForKnownSafeCalls":["it",{"from":"package","name":["it","test"],"package":"node:test"}]}`)
 		if len(options.AllowForKnownSafeCallsInline) != 1 || options.AllowForKnownSafeCallsInline[0] != "it" {
 			t.Errorf("the inline list reads %v, want [it]", options.AllowForKnownSafeCallsInline)
@@ -758,6 +769,7 @@ func TestDecodeNoFloatingPromisesOptions(t *testing.T) {
 	})
 
 	t.Run("a decoded allowlist actually reaches the rule", func(t *testing.T) {
+		t.Parallel()
 		// The decoder can be right and the wiring still wrong, so one end-to-end row runs a real
 		// input through the decoded options rather than through a struct built here.
 		source := "type SafePromise = Promise<number> & { __linterBrands?: string };\ndeclare const p: SafePromise;\np;\n"

@@ -76,6 +76,7 @@ func TestNoInvalidThisFires(t *testing.T) {
 
 	for index, testCase := range cases {
 		t.Run(strings.TrimSpace(firstLineOf(testCase.source)), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 				testCase.source, testCase.settings)
 			expected := make([]string, testCase.findings)
@@ -146,6 +147,7 @@ func TestNoInvalidThisStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(strings.TrimSpace(firstLineOf(testCase.source)), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 				testCase.source, testCase.settings))
 		})
@@ -215,6 +217,7 @@ func TestNoInvalidThisJsDocAttachment(t *testing.T) {
 
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 				testCase.source, DefaultNoInvalidThisSettings()))
 		})
@@ -251,6 +254,7 @@ func TestNoInvalidThisJsDocAttachment(t *testing.T) {
 
 	for _, testCase := range reports {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 				testCase.source, DefaultNoInvalidThisSettings())
 			expected := make([]string, testCase.findings)
@@ -300,6 +304,7 @@ func TestNoInvalidThisSeesThroughParentheses(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 				testCase.source, DefaultNoInvalidThisSettings()))
 		})
@@ -328,6 +333,7 @@ func TestDecodeNoInvalidThisOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeNoInvalidThisOptions([]byte(testCase.raw))
 			if err != nil {
 				t.Fatalf("decode returned %v", err)
@@ -347,6 +353,7 @@ func TestDecodeNoInvalidThisOptions(t *testing.T) {
 	// The fallback has to produce the documented default rather than the zero value, and a rule
 	// that got this wrong would report every capitalized constructor function in the tree.
 	t.Run("nil options fall back to the default", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 			"function Foo() {\n  this.x = 1;\n}", nil))
 	})
@@ -462,6 +469,7 @@ func TestNoInvalidThisNullishReceiversDoNotBind(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 				testCase.source, DefaultNoInvalidThisSettings())
 			expected := make([]string, testCase.findings)
@@ -559,6 +567,7 @@ func TestNoInvalidThisBindingShapesBeyondTheCorpus(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 				testCase.source, DefaultNoInvalidThisSettings())
 			expected := make([]string, testCase.findings)

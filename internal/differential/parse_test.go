@@ -23,6 +23,7 @@ const ahraTreeRoot = "/Users/kirkouimet/Projects/ahra"
 // TestParsesRealVerifyOutput uses cohere's own stdout, coverage lines and all, so the summary
 // lines have to be recognized as summaries rather than counted as unparsed findings.
 func TestParsesRealVerifyOutput(test *testing.T) {
+	test.Parallel()
 	output := `graph built in 1.752s — 9973 files in the program, 3407 of them ours
 /Users/kirkouimet/Projects/ahra/modules/mcp/McpApi.ts:240:16 - Identifier "params" should not be abbreviated. Use "parameters" or a more descriptive name. [consistency-no-abbreviated-identifier/noParams]
 lint: 1 findings — 22 rules over 3407 files, 2098253 nodes visited, in 1.036s
@@ -56,6 +57,7 @@ lint: 1 findings — 22 rules over 3407 files, 2098253 nodes visited, in 1.036s
 // TestParsesRealGateOutput uses the gate's own stdout. The parenthesized route-group directories
 // are real in this tree and are the shape most likely to break a naive split on punctuation.
 func TestParsesRealGateOutput(test *testing.T) {
+	test.Parallel()
 	output := `app/(os-layout)/finance/_components/FinanceLedgerTable.tsx:49:5: error structure(react-component-no-multiple-primary): File contains a component with 108 lines.
 libraries/structure/source/components/files/FileCarousel.tsx:36:8: error structure(react-component-no-multiple-primary): File contains a component with 184 lines.`
 
@@ -85,6 +87,7 @@ libraries/structure/source/components/files/FileCarousel.tsx:36:8: error structu
 // and one finding becomes two one-sided differences — which is exactly what a total mismatch looks
 // like, and it looks like working output.
 func TestTheTwoGatesAgreeOnOneFindingAfterParsing(test *testing.T) {
+	test.Parallel()
 	cohereResult, err := ParseCohere(
 		`/Users/kirkouimet/Projects/ahra/app/Component.tsx:198:1 - File contains a component with 96 lines. [react-component-no-multiple-primary/tooMany]`,
 		ahraTreeRoot,
@@ -125,6 +128,7 @@ func TestTheTwoGatesAgreeOnOneFindingAfterParsing(test *testing.T) {
 // TestUnparsedLinesAreSurfacedNotDropped is this layer's own vacuity guard. A format change that
 // silently stops matching must not present as a clean run.
 func TestUnparsedLinesAreSurfacedNotDropped(test *testing.T) {
+	test.Parallel()
 	result, err := ParseCohere("this line is neither a finding nor a summary", "")
 	if err != nil {
 		test.Fatalf("unexpected error: %v", err)
@@ -156,6 +160,7 @@ func TestUnparsedLinesAreSurfacedNotDropped(test *testing.T) {
 // a new plugin needs no edit: rule names are hyphenated and message ids are camelCase, so the
 // segment containing a hyphen is the rule name. The assertions below now pin the fixed behavior.
 func TestPluginSlashRuleNamesSurviveNormalization(test *testing.T) {
+	test.Parallel()
 	// The forms that actually appear in gate and cohere output today, which must keep working.
 	fromOutput := map[string]string{
 		"structure(react-component-no-multiple-primary)": "react-component-no-multiple-primary",

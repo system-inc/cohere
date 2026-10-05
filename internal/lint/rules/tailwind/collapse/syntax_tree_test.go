@@ -127,6 +127,7 @@ func loadASTCorpus(t *testing.T) astCorpus {
 // TestPropertySortMatchesEngine is the main claim: for every compiled tree the engine built, the Go
 // PropertySort produces the reading the engine produced.
 func TestPropertySortMatchesEngine(t *testing.T) {
+	t.Parallel()
 	corpus := loadASTCorpus(t)
 
 	withAtRoot := 0
@@ -172,6 +173,7 @@ func TestPropertySortMatchesEngine(t *testing.T) {
 // what a queue-shaped traversal sees, so a depth-first port fails here even where its readings
 // happen to agree.
 func TestPropertySortIsBreadthFirst(t *testing.T) {
+	t.Parallel()
 	corpus := loadASTCorpus(t)
 	if len(corpus.TraversalCases) == 0 {
 		t.Fatal("fixture carries no traversal-divergence cases, so breadth-first is not actually pinned")
@@ -209,6 +211,7 @@ func TestPropertySortIsBreadthFirst(t *testing.T) {
 // larger. It is named explicitly rather than left to the corpus because it is the measurement the
 // scope decision rests on, and a scope decision with no test is a comment.
 func TestShadowArbitraryVariableReading(t *testing.T) {
+	t.Parallel()
 	corpus := loadASTCorpus(t)
 
 	found := false
@@ -244,6 +247,7 @@ func TestShadowArbitraryVariableReading(t *testing.T) {
 // erase. Upstream the field is `string | undefined`: an absent value is skipped entirely, an empty
 // one counts, because `--tw-foo:;` is valid CSS.
 func TestPropertySortSkipsAbsentValuesButCountsEmptyOnes(t *testing.T) {
+	t.Parallel()
 	absent := &Node{Kind: KindDeclaration, Property: "color", Value: "", ValuePresent: false}
 	empty := &Node{Kind: KindDeclaration, Property: "color", Value: "", ValuePresent: true}
 
@@ -258,6 +262,7 @@ func TestPropertySortSkipsAbsentValuesButCountsEmptyOnes(t *testing.T) {
 // TestPropertySortDoesNotDescendIntoWrappers states the structural rule directly, on a minimal tree
 // rather than on a compiled utility, so the reason is visible without reading generated CSS.
 func TestPropertySortDoesNotDescendIntoWrappers(t *testing.T) {
+	t.Parallel()
 	buried := Declaration("display", "flex")
 
 	for _, wrapper := range []struct {
@@ -287,6 +292,7 @@ func TestPropertySortDoesNotDescendIntoWrappers(t *testing.T) {
 
 // TestPropertySortTwSortLatch states the three behaviors of the --tw-sort override in isolation.
 func TestPropertySortTwSortLatch(t *testing.T) {
+	t.Parallel()
 	rowGap, ok := PropertyOrder["row-gap"]
 	if !ok {
 		t.Fatal("row-gap is missing from PropertyOrder")
@@ -297,6 +303,7 @@ func TestPropertySortTwSortLatch(t *testing.T) {
 	}
 
 	t.Run("latches and suppresses later positions", func(t *testing.T) {
+		t.Parallel()
 		got := PropertySort([]*Node{
 			Declaration("--tw-sort", "row-gap"),
 			Declaration("display", "flex"),
@@ -310,6 +317,7 @@ func TestPropertySortTwSortLatch(t *testing.T) {
 	})
 
 	t.Run("positions before the latch still count", func(t *testing.T) {
+		t.Parallel()
 		got := PropertySort([]*Node{
 			Declaration("display", "flex"),
 			Declaration("--tw-sort", "row-gap"),
@@ -320,6 +328,7 @@ func TestPropertySortTwSortLatch(t *testing.T) {
 	})
 
 	t.Run("an unknown value does not latch", func(t *testing.T) {
+		t.Parallel()
 		got := PropertySort([]*Node{
 			Declaration("--tw-sort", "not-a-real-property"),
 			Declaration("display", "flex"),
@@ -334,6 +343,7 @@ func TestPropertySortTwSortLatch(t *testing.T) {
 // which the per-case comparison would satisfy vacuously if the engine's own answers happened to be
 // already sorted.
 func TestPropertySortOrderIsAscendingAndDeduplicated(t *testing.T) {
+	t.Parallel()
 	corpus := loadASTCorpus(t)
 
 	for _, testCase := range corpus.Cases {
@@ -354,6 +364,7 @@ func TestPropertySortOrderIsAscendingAndDeduplicated(t *testing.T) {
 // declarations. The fixture records both trees; this asserts the emitted tree really can differ
 // while the reading does not, so the invariance is demonstrated rather than assumed.
 func TestVariantsDoNotChangeTheReading(t *testing.T) {
+	t.Parallel()
 	corpus := loadASTCorpus(t)
 
 	withVariants := 0
@@ -396,6 +407,7 @@ func TestVariantsDoNotChangeTheReading(t *testing.T) {
 // array. That is a use-after-free-shaped bug in Go's clothing, and it only shows up when the caller
 // passes a subslice of something larger, which is exactly what the CSS parser will do.
 func TestPropertySortDoesNotMutateItsInput(t *testing.T) {
+	t.Parallel()
 	// A backing array larger than the slice handed to PropertySort, so an append that fails to copy
 	// writes into the tail rather than reallocating.
 	backing := make([]*Node, 0, 16)

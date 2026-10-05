@@ -44,6 +44,7 @@ func decide(t *testing.T, matcher *Matcher, relativePath string, isDirectory boo
 
 // Each rule gitignore(5) states, decided on one small tree, with the deciding line named.
 func TestTheMatcherFollowsGitignoreSemantics(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{
 		".git/info/exclude": "# a comment\nper-repo\nkept-by-gitignore\n",
@@ -123,6 +124,7 @@ func TestTheMatcherFollowsGitignoreSemantics(t *testing.T) {
 
 // A file's byte order mark and each line's carriage return are not part of a pattern.
 func TestAByteOrderMarkAndCarriageReturnsAreNotPatternText(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{".gitignore": "\xEF\xBB\xBFfirst\r\nsecond\r\n"})
 	matcher, err := New(root)
@@ -138,7 +140,9 @@ func TestAByteOrderMarkAndCarriageReturnsAreNotPatternText(t *testing.T) {
 
 // What cannot be read faithfully is refused by name, never skipped.
 func TestAnIgnoreFileThatCannotBeReadIsRefused(t *testing.T) {
+	t.Parallel()
 	t.Run("a symbolic link in the tree", func(t *testing.T) {
+		t.Parallel()
 		root := t.TempDir()
 		writeTree(t, root, map[string]string{"patterns": "x\n", "sub/": ""})
 		if err := os.Symlink("../patterns", filepath.Join(root, "sub", ".gitignore")); err != nil {
@@ -153,6 +157,7 @@ func TestAnIgnoreFileThatCannotBeReadIsRefused(t *testing.T) {
 		}
 	})
 	t.Run("a NUL byte", func(t *testing.T) {
+		t.Parallel()
 		root := t.TempDir()
 		writeTree(t, root, map[string]string{".gitignore": "a\x00b\n"})
 		if _, err := New(root); err == nil || !strings.Contains(err.Error(), ".gitignore:1") {
@@ -160,6 +165,7 @@ func TestAnIgnoreFileThatCannotBeReadIsRefused(t *testing.T) {
 		}
 	})
 	t.Run("a nested repository", func(t *testing.T) {
+		t.Parallel()
 		root := t.TempDir()
 		writeTree(t, root, map[string]string{"nested/.git/HEAD": "ref: refs/heads/main\n"})
 		matcher, err := New(root)
@@ -174,6 +180,7 @@ func TestAnIgnoreFileThatCannotBeReadIsRefused(t *testing.T) {
 
 // Asking through the wrong directory's matcher would silently leave out the ignore files between.
 func TestAskingOutsideTheMatchersDirectoryPanics(t *testing.T) {
+	t.Parallel()
 	matcher, err := New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

@@ -55,6 +55,7 @@ func TestImportRequireNodeNamespaceFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ImportRequireNodeNamespace, "probe.ts", testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -103,6 +104,7 @@ func TestImportRequireNodeNamespaceStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ImportRequireNodeNamespace, "probe.ts", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})

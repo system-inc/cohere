@@ -107,12 +107,14 @@ func compareFormat(t *testing.T, inputs []string) int {
 }
 
 func TestFormatFixturesMatchOracle(t *testing.T) {
+	t.Parallel()
 	compareFormat(t, formatFixtures)
 }
 
 // TestFormatOracleCanFail proves the comparison sees a difference: the port's output for one input
 // compared against the oracle's for another must differ.
 func TestFormatOracleCanFail(t *testing.T) {
+	t.Parallel()
 	engine, err := prettier.New(formatoptions.Default())
 	if err != nil {
 		t.Fatal(err)
@@ -134,6 +136,7 @@ func TestFormatOracleCanFail(t *testing.T) {
 // bare and inside emphasis and strong: the escapes word.js adds to delimiter runs depend on which side
 // of a run is flanking, and only an exhaustive sweep reaches every combination. A measuring run.
 func TestExhaustiveDelimitersMatchOracle(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("COHERE_MARKDOWN_EXHAUSTIVE") == "" {
 		t.Skip("set COHERE_MARKDOWN_EXHAUSTIVE to run the sweep")
 	}

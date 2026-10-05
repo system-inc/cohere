@@ -38,6 +38,7 @@ import (
 // Each of those is a fact about how a class reaches a cell. Reconstructing them is the work this
 // measurement is, and getting one wrong reads exactly like a port that cannot answer.
 func TestDescriptorRowsAgreeWithTheEmitters(t *testing.T) {
+	t.Parallel()
 	type counter struct{ compared, agreed int }
 	counts := map[string]*counter{"ByType": {}, "ByNamespace": {}, "Fallback": {}, "Empty": {}}
 	var disagreements []string
@@ -158,6 +159,7 @@ var descriptorCellsTheEmittersCannotReach = map[string]bool{
 
 // The exemption map holds only cells that genuinely still disagree.
 func TestDescriptorExemptionsAreStillNeeded(t *testing.T) {
+	t.Parallel()
 	if len(descriptorCellsTheEmittersCannotReach) == 0 {
 		t.Fatal("the map is empty, so this test measured nothing")
 	}
@@ -212,6 +214,7 @@ func TestDescriptorExemptionsAreStillNeeded(t *testing.T) {
 // parse as some other root. A key that parsed as `text` would reach the cell and the disagreement
 // would stop being harmless.
 func TestNoClassReachesTheTextDropCell(t *testing.T) {
+	t.Parallel()
 	system, _ := liveTableFor(t, corpusRepositories[0].entryPoint)
 	if system == nil {
 		t.Skip("no design system loaded")
@@ -247,6 +250,7 @@ func TestNoClassReachesTheTextDropCell(t *testing.T) {
 // Split from the unmodified measurement rather than folded into it, because the two axes have
 // different populations and a combined total would hide one of them being empty.
 func TestModifierAxesAgreeWithTheEmitters(t *testing.T) {
+	t.Parallel()
 	type counter struct{ compared, agreed int }
 	counts := map[string]*counter{"Alpha": {}, "Themed": {}}
 	var disagreements []string
@@ -359,6 +363,7 @@ var rootConsultsTheThemeForItsModifier = map[string]bool{
 // A root in the set whose axes agree is a stale entry; one outside it whose axes differ is a missing
 // entry, and either would make the measurement above pass while comparing the wrong arm.
 func TestThemedModifierRootsAreTheOnesThatDiffer(t *testing.T) {
+	t.Parallel()
 	var checked int
 
 	for root, descriptor := range baseDescriptors {
@@ -425,6 +430,7 @@ func TestThemedModifierRootsAreTheOnesThatDiffer(t *testing.T) {
 // This test pins the fact rather than the conclusion: if a future change makes the order derivable,
 // it fails and the conclusion above is due a re-read.
 func TestTypeListOrderDecidesTheCellAndEmittersCannotSupplyIt(t *testing.T) {
+	t.Parallel()
 	background, hasBackground := baseDescriptors["bg"]
 	border, hasBorder := baseDescriptors["border"]
 	if !hasBackground || !hasBorder {

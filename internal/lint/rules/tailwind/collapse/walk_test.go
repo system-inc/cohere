@@ -78,6 +78,7 @@ func record(nodes []*Node, decide func(node *Node) WalkAction) string {
 // kind is descended into, including at-root and context, which is upstream's behavior and
 // deliberately unlike PropertySort's.
 func TestWalkVisitsDepthFirstInDocumentOrder(t *testing.T) {
+	t.Parallel()
 	want := "a rule.b b1 atrule:b2 b2a b2b b3 atroot atrule:c1 c1a context d1 rule.d2 d2a comment:e f"
 
 	if got := record(walkFixture(), nil); got != want {
@@ -88,7 +89,9 @@ func TestWalkVisitsDepthFirstInDocumentOrder(t *testing.T) {
 // TestWalkSkipPrunesTheSubtreeAndContinues states what Skip does and, just as importantly, what it
 // does not do: it prunes children, it does not end the walk and it does not skip the next sibling.
 func TestWalkSkipPrunesTheSubtreeAndContinues(t *testing.T) {
+	t.Parallel()
 	t.Run("prunes a rule's children and continues to the next sibling", func(t *testing.T) {
+		t.Parallel()
 		want := "a rule.b atroot atrule:c1 c1a context d1 rule.d2 d2a comment:e f"
 		got := record(walkFixture(), func(node *Node) WalkAction {
 			if node.Kind == KindRule && node.Selector == ".b" {
@@ -102,6 +105,7 @@ func TestWalkSkipPrunesTheSubtreeAndContinues(t *testing.T) {
 	})
 
 	t.Run("prunes only the node it is returned for", func(t *testing.T) {
+		t.Parallel()
 		want := "a rule.b b1 atrule:b2 b3 atroot atrule:c1 c1a context d1 rule.d2 d2a comment:e f"
 		got := record(walkFixture(), func(node *Node) WalkAction {
 			if node.Kind == KindAtRule && node.Params == "b2" {
@@ -115,6 +119,7 @@ func TestWalkSkipPrunesTheSubtreeAndContinues(t *testing.T) {
 	})
 
 	t.Run("skipping a leaf is indistinguishable from continuing", func(t *testing.T) {
+		t.Parallel()
 		skipped := record(walkFixture(), func(node *Node) WalkAction {
 			if node.Kind == KindDeclaration {
 				return WalkSkip
@@ -131,7 +136,9 @@ func TestWalkSkipPrunesTheSubtreeAndContinues(t *testing.T) {
 // current one. A walker that returns from the innermost recursion without propagating would visit
 // the stopped node's later siblings and its ancestors' later siblings, which the deep case catches.
 func TestWalkStopEndsTheWalkImmediately(t *testing.T) {
+	t.Parallel()
 	t.Run("at the top level", func(t *testing.T) {
+		t.Parallel()
 		want := "a rule.b b1 atrule:b2 b2a b2b b3 atroot"
 		got := record(walkFixture(), func(node *Node) WalkAction {
 			if node.Kind == KindAtRoot {
@@ -145,6 +152,7 @@ func TestWalkStopEndsTheWalkImmediately(t *testing.T) {
 	})
 
 	t.Run("from the deepest node, unwinding every level", func(t *testing.T) {
+		t.Parallel()
 		want := "a rule.b b1 atrule:b2 b2a"
 		got := record(walkFixture(), func(node *Node) WalkAction {
 			if node.Kind == KindDeclaration && node.Property == "b2a" {
@@ -158,6 +166,7 @@ func TestWalkStopEndsTheWalkImmediately(t *testing.T) {
 	})
 
 	t.Run("on the very first node", func(t *testing.T) {
+		t.Parallel()
 		want := "a"
 		got := record(walkFixture(), func(node *Node) WalkAction {
 			return WalkStop
@@ -172,6 +181,7 @@ func TestWalkStopEndsTheWalkImmediately(t *testing.T) {
 // package deliberately disagree, so that a later change unifying them fails here with the reason
 // attached.
 func TestWalkDescendsIntoWrappersUnlikePropertySort(t *testing.T) {
+	t.Parallel()
 	buried := Declaration("display", "flex")
 
 	for _, wrapper := range []struct {
@@ -192,6 +202,7 @@ func TestWalkDescendsIntoWrappersUnlikePropertySort(t *testing.T) {
 
 // TestWalkOnEmptyInput covers the edges that a recursive walker gets wrong silently.
 func TestWalkOnEmptyInput(t *testing.T) {
+	t.Parallel()
 	Walk(nil, func(node *Node) WalkAction {
 		t.Error("visited a node in a nil tree")
 		return WalkContinue

@@ -331,11 +331,13 @@ func TestNoRestrictedGlobalsFires(t *testing.T) {
 
 	for _, testCase := range noRestrictedGlobalsFiringCasesBlock0 {
 		t.Run("javascript/"+testCase.source, func(t *testing.T) {
+			t.Parallel()
 			runNoRestrictedGlobalsCase(t, testCase)
 		})
 	}
 	for _, testCase := range noRestrictedGlobalsFiringCasesBlock1 {
 		t.Run("typescript/"+testCase.source, func(t *testing.T) {
+			t.Parallel()
 			runNoRestrictedGlobalsCase(t, testCase)
 		})
 	}
@@ -351,11 +353,13 @@ func TestNoRestrictedGlobalsStaysSilent(t *testing.T) {
 
 	for _, testCase := range noRestrictedGlobalsCleanCasesBlock0 {
 		t.Run("javascript/"+testCase.source, func(t *testing.T) {
+			t.Parallel()
 			runNoRestrictedGlobalsCase(t, testCase)
 		})
 	}
 	for _, testCase := range noRestrictedGlobalsCleanCasesBlock1 {
 		t.Run("typescript/"+testCase.source, func(t *testing.T) {
+			t.Parallel()
 			runNoRestrictedGlobalsCase(t, testCase)
 		})
 	}
@@ -411,6 +415,7 @@ func TestNoRestrictedGlobalsSpan(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			files := map[string]string{"Probe.ts": testCase.source}
 			if testCase.globals != "" {
 				files["EnvironmentGlobals.d.ts"] = "declare var " + testCase.globals + ": any;\n"
@@ -450,6 +455,7 @@ func TestNoRestrictedGlobalsIsInertWithoutConfiguration(t *testing.T) {
 
 	for _, source := range []string{"foo;", "window.foo();", "event;"} {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoRestrictedGlobals,
 				noRestrictedGlobalsFile, source, nil))
 		})
@@ -545,6 +551,7 @@ func TestNoRestrictedGlobalsJudgesOnlyValueReferences(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoRestrictedGlobals, file,
 				testCase.source, decodeNoRestrictedGlobalsOptionsForTest(t, confusing)))
 		})
@@ -561,6 +568,7 @@ func TestNoRestrictedGlobalsJudgesOnlyValueReferences(t *testing.T) {
 	}
 	for _, testCase := range firing {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoRestrictedGlobals, file,
 				testCase.source, decodeNoRestrictedGlobalsOptionsForTest(t, confusing)), testCase.ids...)
 		})
@@ -600,6 +608,7 @@ func TestNoRestrictedGlobalsSkipsAnotherModulesExportName(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, run(t, testCase.source))
 		})
 	}
@@ -612,6 +621,7 @@ func TestNoRestrictedGlobalsSkipsAnotherModulesExportName(t *testing.T) {
 	}
 	for _, testCase := range firing {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, run(t, testCase.source), "defaultMessage")
 		})
 	}
@@ -644,6 +654,7 @@ func TestNoRestrictedGlobalsSkipsDeclarationNamesInADeclarationFile(t *testing.T
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, run(t, testCase.source))
 		})
 	}

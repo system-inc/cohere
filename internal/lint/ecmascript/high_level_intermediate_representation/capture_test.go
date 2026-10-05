@@ -415,6 +415,7 @@ func TestCaptureKeepsSSAValid(t *testing.T) {
 
 	for name, code := range sources {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			outer := lowerTypedFunctions(t, "ssa.tsx", code)[0]
 			Construct(outer)
 			cohereEverywhere(t, outer)

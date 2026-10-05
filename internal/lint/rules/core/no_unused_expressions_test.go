@@ -114,6 +114,7 @@ func TestNoUnusedExpressionsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, testCase.sourceText),
 				"unusedExpression")
@@ -191,6 +192,7 @@ func TestNoUnusedExpressionsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, testCase.sourceText))
 		})
@@ -279,6 +281,7 @@ func TestNoUnusedExpressionsUnderOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
 				testCase.sourceText, testCase.options)
 			expected := make([]string, testCase.findings)
@@ -361,6 +364,7 @@ func TestNoUnusedExpressionsPointsAtTheStatement(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.reported) {
 				t.Fatalf("wanted %d diagnostics, got %d", len(testCase.reported), len(result.Diagnostics))
@@ -404,6 +408,7 @@ func TestNoUnusedExpressionsSeparatesBinaryOperators(t *testing.T) {
 	}
 	for _, sourceText := range silent {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText))
 		})
@@ -418,6 +423,7 @@ func TestNoUnusedExpressionsSeparatesBinaryOperators(t *testing.T) {
 	}
 	for _, sourceText := range fires {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText),
 				"unusedExpression")
@@ -480,6 +486,7 @@ func TestNoUnusedExpressionsChecksBothTernaryBranches(t *testing.T) {
 	options := NoUnusedExpressionsOptions{AllowTernary: true}
 	for _, sourceText := range []string{"a ? b() : c;", "a ? b : c();"} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile, sourceText, options),
 				"unusedExpression")
@@ -507,6 +514,7 @@ func TestNoUnusedExpressionsUnwrapsTypeOnlyWrappers(t *testing.T) {
 	}
 	for _, sourceText := range silent {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText))
 		})
@@ -520,6 +528,7 @@ func TestNoUnusedExpressionsUnwrapsTypeOnlyWrappers(t *testing.T) {
 	}
 	for _, sourceText := range fires {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText),
 				"unusedExpression")
@@ -580,6 +589,7 @@ func TestNoUnusedExpressionsCarvesOutOnlyRealDirectivePrologues(t *testing.T) {
 	}
 	for _, sourceText := range silent {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText))
 		})
@@ -605,6 +615,7 @@ func TestNoUnusedExpressionsCarvesOutOnlyRealDirectivePrologues(t *testing.T) {
 	}
 	for _, sourceText := range fires {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("wanted at least one diagnostic for %q, got none", sourceText)
@@ -642,6 +653,7 @@ func TestNoUnusedExpressionsIgnoreDirectivesIsInertHere(t *testing.T) {
 	}
 	for _, sourceText := range sources {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			off := rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
 				sourceText, NoUnusedExpressionsOptions{IgnoreDirectives: false})
 			on := rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
@@ -672,6 +684,7 @@ func TestNoUnusedExpressionsSeparatesUnaryFormsByKind(t *testing.T) {
 	fires := []string{"typeof a;", "!a;", "+a;", "-a;", "~a;"}
 	for _, sourceText := range fires {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText),
 				"unusedExpression")
@@ -681,6 +694,7 @@ func TestNoUnusedExpressionsSeparatesUnaryFormsByKind(t *testing.T) {
 	silent := []string{"void 0;", "delete a.b;", "++a;", "--a;", "a++;", "a--;"}
 	for _, sourceText := range silent {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText))
 		})

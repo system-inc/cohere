@@ -45,6 +45,7 @@ func TestNoDuplicateEnumValuesStaysSilent(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(fmt.Sprintf("upstream pass %d", index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDuplicateEnumValues, duplicateEnumValuesFile, sourceText))
 		})
 	}
@@ -64,6 +65,7 @@ func TestNoDuplicateEnumValuesFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(fmt.Sprintf("upstream fail %d", index), func(t *testing.T) {
+			t.Parallel()
 			wantIds := make([]string, testCase.findings)
 			for i := range wantIds {
 				wantIds[i] = "noDuplicateEnumValues"
@@ -179,6 +181,7 @@ func TestNoDuplicateEnumValuesComparesTheParsedValueNotTheSpelling(t *testing.T)
 	}
 	for index, sourceText := range cases {
 		t.Run(fmt.Sprintf("spelling %d", index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoDuplicateEnumValues, duplicateEnumValuesFile, sourceText),
 				"noDuplicateEnumValues")
@@ -252,6 +255,7 @@ func TestNoDuplicateEnumValuesDeclinesTheShapesUpstreamDoesNotMatch(t *testing.T
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoDuplicateEnumValues, duplicateEnumValuesFile, testCase.sourceText))
 		})

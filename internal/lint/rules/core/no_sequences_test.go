@@ -140,6 +140,7 @@ func TestNoSequencesFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoSequences, sequencesFile, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, "unexpectedCommaExpression")
 
@@ -246,6 +247,7 @@ func TestNoSequencesStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunWithOptions(t, NoSequences, sequencesFile, testCase.sourceText, testCase.options))
 		})
@@ -275,6 +277,7 @@ func TestNoSequencesReportsBothHalvesOfANestedPair(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoSequences, sequencesFile, testCase.sourceText,
 				decodedSequenceOptions(t, `{"allowInParentheses": false}`))
 			rule_testing.ExpectFindings(t, result,
@@ -310,15 +313,18 @@ func TestNoSequencesOptionDefaultsToAllowingParentheses(t *testing.T) {
 	parenthesized := "var foo = (1, 2);"
 
 	t.Run("nil options, the shape the live config produces", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoSequences, sequencesFile, parenthesized, nil))
 	})
 
 	t.Run("an empty object", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoSequences, sequencesFile, parenthesized,
 			decodedSequenceOptions(t, `{}`)))
 	})
 
 	t.Run("a zero-value struct still allows", func(t *testing.T) {
+		t.Parallel()
 		// Not a redundant spelling of the empty object: this is the value `rule.DecodeOptionsInto`
 		// would have produced, and it is the reason the field is a pointer. If AllowInParentheses
 		// were a plain bool this case would report and every other fixture would stay green.
@@ -327,11 +333,13 @@ func TestNoSequencesOptionDefaultsToAllowingParentheses(t *testing.T) {
 	})
 
 	t.Run("explicitly false", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoSequences, sequencesFile, parenthesized,
 			decodedSequenceOptions(t, `{"allowInParentheses": false}`)), "unexpectedCommaExpression")
 	})
 
 	t.Run("empty input decodes to the default rather than erroring", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoSequencesOptions(nil)
 		if err != nil {
 			t.Fatalf("decoding empty input: %v", err)
@@ -346,6 +354,7 @@ func TestNoSequencesOptionDefaultsToAllowingParentheses(t *testing.T) {
 	})
 
 	t.Run("malformed input is an error rather than a silent default", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeNoSequencesOptions([]byte("[")); err == nil {
 			t.Error("malformed options decoded without an error")
 		}

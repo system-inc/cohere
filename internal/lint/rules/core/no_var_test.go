@@ -32,6 +32,7 @@ func TestNoVarFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoVar, varFile, testCase.sourceText), "unexpectedVar")
 		})
 	}
@@ -68,6 +69,7 @@ func TestNoVarStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoVar, varFile, testCase.sourceText))
 		})
 	}

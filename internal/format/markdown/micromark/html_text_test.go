@@ -198,6 +198,7 @@ var htmlTextFixtures = []string{
 }
 
 func TestHtmlTextEvents(t *testing.T) {
+	t.Parallel()
 	compareEventsWithoutHtmlTextOverride(t, htmlTextFixtures)
 }
 

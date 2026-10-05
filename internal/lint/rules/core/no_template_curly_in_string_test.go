@@ -38,6 +38,7 @@ func TestNoTemplateCurlyInStringFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText),
 				"unexpectedTemplateExpression")
@@ -83,6 +84,7 @@ func TestNoTemplateCurlyInStringStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText))
 		})
@@ -121,6 +123,7 @@ func TestNoTemplateCurlyInStringReportsTheWholeLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
@@ -162,6 +165,7 @@ func TestNoTemplateCurlyInStringReportsOncePerLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantFindings {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantFindings)
@@ -202,6 +206,7 @@ func TestNoTemplateCurlyInStringMatchesTheCookedValue(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText),
 				"unexpectedTemplateExpression")
@@ -243,6 +248,7 @@ func TestNoTemplateCurlyInStringPatternEdges(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(t, result, "unexpectedTemplateExpression")
@@ -279,6 +285,7 @@ func TestNoTemplateCurlyInStringDeclinesOtherLiteralKinds(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText))
 		})

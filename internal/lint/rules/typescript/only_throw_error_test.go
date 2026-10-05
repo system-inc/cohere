@@ -122,6 +122,7 @@ func TestOnlyThrowErrorStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runOnlyThrowError(t, testCase.sourceText, testCase.options))
 		})
 	}
@@ -194,6 +195,7 @@ func TestOnlyThrowErrorFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runOnlyThrowError(t, testCase.sourceText, testCase.options), testCase.wantIds...)
 		})
 	}
@@ -239,6 +241,7 @@ func TestOnlyThrowErrorSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runOnlyThrowError(t, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantSpans))
@@ -376,6 +379,7 @@ func TestOnlyThrowErrorRethrowShape(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runOnlyThrowError(t, testCase.sourceText, strict)
 			if testCase.wantIds == nil {
 				rule_testing.ExpectClean(t, result)
@@ -445,6 +449,7 @@ func TestOnlyThrowErrorDefaultsArePermissive(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			// nil options is what a rule configured as bare "error" is handed.
 			rule_testing.ExpectClean(t, runOnlyThrowError(t, testCase.sourceText, nil))
 			// And the same source under the option turned off, which shows the default is what
@@ -506,6 +511,7 @@ func TestDecodeOnlyThrowErrorOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("an empty object leaves every pointer nil so the rule defaults them", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeOnlyThrowErrorOptions(json.RawMessage(`{}`))
 		if err != nil {
 			t.Fatalf("decoding: %v", err)
@@ -523,6 +529,7 @@ func TestDecodeOnlyThrowErrorOptions(t *testing.T) {
 	})
 
 	t.Run("false is distinguishable from absent", func(t *testing.T) {
+		t.Parallel()
 		decoded, _ := DecodeOnlyThrowErrorOptions(json.RawMessage(`{"allowThrowingAny": false}`))
 		options := decoded.(OnlyThrowErrorOptions)
 		if options.AllowThrowingAny == nil {
@@ -534,6 +541,7 @@ func TestDecodeOnlyThrowErrorOptions(t *testing.T) {
 	})
 
 	t.Run("a bare string lands in AllowInline and an object lands in Allow", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeOnlyThrowErrorOptions(json.RawMessage(
 			`{"allow": ["Promise", {"from": "lib", "name": "undefined"}]}`))
 		if err != nil {
@@ -555,6 +563,7 @@ func TestDecodeOnlyThrowErrorOptions(t *testing.T) {
 	})
 
 	t.Run("name accepts an array as well as a string", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeOnlyThrowErrorOptions(json.RawMessage(
 			`{"allow": [{"from": "file", "name": ["A", "B"], "path": "x.ts"}]}`))
 		if err != nil {
@@ -573,6 +582,7 @@ func TestDecodeOnlyThrowErrorOptions(t *testing.T) {
 	})
 
 	t.Run("an unrecognized from is dropped rather than silently meaning file", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeOnlyThrowErrorOptions(json.RawMessage(
 			`{"allow": [{"from": "nowhere", "name": "X"}]}`))
 		if err != nil {
@@ -587,6 +597,7 @@ func TestDecodeOnlyThrowErrorOptions(t *testing.T) {
 	})
 
 	t.Run("the package form carries its package name", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeOnlyThrowErrorOptions(json.RawMessage(
 			`{"allow": [{"from": "package", "name": "ErrorLike", "package": "errors"}]}`))
 		if err != nil {
@@ -702,6 +713,7 @@ func TestOnlyThrowErrorSurvivesMalformedShapes(t *testing.T) {
 	}
 
 	t.Run("a one-argument then does not index past its arguments", func(t *testing.T) {
+		t.Parallel()
 		// `.then` puts the rejection handler second, so this arrow is the FULFILLMENT handler and
 		// the throw is not a rethrow. Upstream reports it; the point here is that we get a verdict
 		// at all rather than a panic.
@@ -710,6 +722,7 @@ func TestOnlyThrowErrorSurvivesMalformedShapes(t *testing.T) {
 	})
 
 	t.Run("a computed key that is not a literal does not read text off it", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, runOnlyThrowError(t,
 			"declare const o: any;\ndeclare function k(): string;\no[k()](e => {\n  throw e;\n});", strict), "object")
 	})
@@ -791,6 +804,7 @@ func TestOnlyThrowErrorSpecifierComposites(t *testing.T) {
 	}
 
 	t.Run("a union matches only when every member matches", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, runOnlyThrowError(t,
 			"declare const m: Map<string, string> | Map<number, number>;\nthrow m;", allowMap))
 
@@ -799,6 +813,7 @@ func TestOnlyThrowErrorSpecifierComposites(t *testing.T) {
 	})
 
 	t.Run("an intersection matches when any member matches", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, runOnlyThrowError(t,
 			"declare const m: Map<string, string> & { a: 1 };\nthrow m;", allowMap))
 	})
@@ -873,6 +888,7 @@ func TestOnlyThrowErrorDeclinesSynthesizedNodes(t *testing.T) {
 
 	for _, source := range []string{"throw;", "throw ();", "throw (());"} {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runOnlyThrowError(t, source, strict))
 			rule_testing.ExpectClean(t, runOnlyThrowError(t, source, nil))
 		})

@@ -48,6 +48,7 @@ var storedAcknowledgement = AcknowledgedDifference{
 
 // An acknowledged difference is excused by the text on its line, wherever the line has moved to.
 func TestAnAcknowledgementExcusesTheFindingItsAnchorNames(t *testing.T) {
+	t.Parallel()
 	report := compareWithAcknowledgements([]AcknowledgedDifference{storedAcknowledgement},
 		Finding{File: "app/Probe.tsx", Line: 2, Rule: "storage-no-direct-local-storage"})
 	if got := report.Differences[0].Classification; got != ClassificationAcknowledged {
@@ -67,6 +68,7 @@ func TestAnAcknowledgementExcusesTheFindingItsAnchorNames(t *testing.T) {
 // prevent. The excuse has to be exactly as narrow as the reason written beside it. Each finding here
 // is the only one in its run, so the entry is also stale, which is the run failing as it should.
 func TestAnAcknowledgementExcusesNothingElse(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range []struct {
 		name    string
 		finding Finding
@@ -78,6 +80,7 @@ func TestAnAcknowledgementExcusesNothingElse(t *testing.T) {
 		{"the same finding from the other side", Finding{File: "app/Probe.tsx", Line: 2, Rule: "storage-no-direct-local-storage"}, SideGate},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			inputs := Inputs{
 				CoherePopulation: Population{FilesWalked: 2},
 				GatePopulation:   Population{FilesWalked: 2},
@@ -105,6 +108,7 @@ func TestAnAcknowledgementExcusesNothingElse(t *testing.T) {
 // An entry that names no current difference is stale, and a stale entry fails a run that would
 // otherwise agree: it is an excuse waiting for whatever lands on its site next.
 func TestAStaleAcknowledgementFailsTheRun(t *testing.T) {
+	t.Parallel()
 	report := compareWithAcknowledgements([]AcknowledgedDifference{storedAcknowledgement})
 	report.Provenance = provenProvenance()
 	if len(report.StaleAcknowledgements) != 1 || report.StaleAcknowledgements[0].Key() != storedAcknowledgement.Key() {
@@ -132,6 +136,7 @@ func TestAStaleAcknowledgementFailsTheRun(t *testing.T) {
 // An anchor that names several differences excuses none of them, since it would excuse more than its
 // reason was written about.
 func TestAnAmbiguousAcknowledgementExcusesNone(t *testing.T) {
+	t.Parallel()
 	broad := storedAcknowledgement
 	broad.Anchor = "window.localStorage"
 	report := compareWithAcknowledgements([]AcknowledgedDifference{broad},
@@ -154,6 +159,7 @@ func TestAnAmbiguousAcknowledgementExcusesNone(t *testing.T) {
 // A comparison that cannot read the tree cannot tell an anchor that holds from one that moved, so it
 // trusts none of them.
 func TestWithoutTheSourceEveryAcknowledgementIsStale(t *testing.T) {
+	t.Parallel()
 	report := Compare(Inputs{
 		CohereFindings:   []Finding{{File: "app/Probe.tsx", Line: 2, Rule: "storage-no-direct-local-storage"}},
 		CoherePopulation: Population{Findings: 1, FilesWalked: 2},
@@ -172,6 +178,7 @@ func TestWithoutTheSourceEveryAcknowledgementIsStale(t *testing.T) {
 // indistinguishable from a suppression added to turn a red run green, and one without an anchor would
 // match every line of its file.
 func TestEveryKnownGateDefectStatesAReasonAndAnAnchor(t *testing.T) {
+	t.Parallel()
 	if len(KnownGateDefects) == 0 {
 		t.Skip("no acknowledgements are recorded, so this proves nothing")
 	}
@@ -188,6 +195,7 @@ func TestEveryKnownGateDefectStatesAReasonAndAnAnchor(t *testing.T) {
 // Run reads the tree's lines 1-based, as both gates number them, and refuses a line past the end
 // rather than handing back an empty one an anchor could never match anyway.
 func TestSourceLineReaderReadsTheTreesLinesOneBased(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "app"), 0o755); err != nil {
 		t.Fatal(err)

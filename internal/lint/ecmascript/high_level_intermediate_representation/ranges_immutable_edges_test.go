@@ -16,6 +16,7 @@ func TestImmutableSourcesDoNotWidenThroughMutableFallbacks(t *testing.T) {
 	} {
 		for _, functionName := range []string{"Component", "ordinary"} {
 			t.Run(testCase.name+"/"+functionName, func(t *testing.T) {
+				t.Parallel()
 				function, ranges := rangesFor(t, fmt.Sprintf("function %s(props) {%s mutate(items); return props;}", functionName, testCase.binding))
 				var mutationOrder EvaluationOrder
 				calls := 0
@@ -92,6 +93,7 @@ function Component() {const request = useProjects(); const result = useMemo(() =
 		{"unpreserved dependency", `import {useMemo} from 'react'; function Component({propA}) {return useMemo(() => propA.x(), [propA.x]);}`, true},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			findings, lowered := findingsForSource(t, testCase.source)
 			if !lowered {
 				t.Fatal("fixture did not lower")

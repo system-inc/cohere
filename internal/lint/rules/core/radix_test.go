@@ -76,6 +76,7 @@ func TestRadixFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, Radix, radixFile,
 				testCase.sourceText), testCase.messages...)
 		})
@@ -140,6 +141,7 @@ func TestRadixStaysSilent(t *testing.T) {
 		"parseInt(\"10\", foo);",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, Radix, radixFile, sourceText))
 		})
 	}
@@ -181,6 +183,7 @@ func TestRadixSuggestsARadixOfTen(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, Radix, radixFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "missingRadix")
 			if len(result.Diagnostics[0].Suggestions) != 1 {
@@ -253,6 +256,7 @@ func TestRadixPointsAtTheWholeCall(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, Radix, radixFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "missingRadix")
 			source := result.SourceFile.Text()
@@ -297,6 +301,7 @@ func TestRadixResolvesShadowsPerCallSite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, Radix, radixFile,
 				testCase.sourceText), testCase.messages...)
 		})
@@ -317,6 +322,7 @@ func TestRadixIgnoresItsDeprecatedOption(t *testing.T) {
 
 	for _, sourceText := range []string{`parseInt("10", 8);`, `parseInt("10", foo);`} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, Radix, radixFile, sourceText))
 		})
 	}

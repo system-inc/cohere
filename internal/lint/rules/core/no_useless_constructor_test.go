@@ -62,6 +62,7 @@ func TestNoUselessConstructorStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessConstructor,
 				uselessConstructorFile, sourceText))
 		})
@@ -106,6 +107,7 @@ func TestNoUselessConstructorFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessConstructor, uselessConstructorFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "noUselessConstructor")
 
@@ -168,6 +170,7 @@ func TestNoUselessConstructorSpansTheHead(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessConstructor, uselessConstructorFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
@@ -202,6 +205,7 @@ func TestNoUselessConstructorAccessibility(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessConstructor, uselessConstructorFile, testCase.sourceText)
 			if testCase.wantFinding {
 				rule_testing.ExpectFindings(t, result, "noUselessConstructor")
@@ -262,6 +266,7 @@ func TestNoUselessConstructorForwardingMustMatchExactly(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessConstructor, uselessConstructorFile, testCase.sourceText)
 			if testCase.wantFinding {
 				rule_testing.ExpectFindings(t, result, "noUselessConstructor")
@@ -303,6 +308,7 @@ func TestNoUselessConstructorHeritageAndSoleStatement(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUselessConstructor, uselessConstructorFile, testCase.sourceText)
 			if testCase.wantFinding {
 				rule_testing.ExpectFindings(t, result, "noUselessConstructor")

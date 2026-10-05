@@ -415,8 +415,10 @@ var noUnsafeEnumComparisonSilentCases = []noUnsafeEnumComparisonCase{
 }
 
 func TestNoUnsafeEnumComparisonFires(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range noUnsafeEnumComparisonFiresCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, testCase.ids...)
 		})
@@ -424,8 +426,10 @@ func TestNoUnsafeEnumComparisonFires(t *testing.T) {
 }
 
 func TestNoUnsafeEnumComparisonStaysSilent(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range noUnsafeEnumComparisonSilentCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -452,6 +456,7 @@ func TestNoUnsafeEnumComparisonStaysSilent(t *testing.T) {
 // constituent is, because an intersection is all of its parts at once and `number & {}` is still a
 // number.
 func TestNoUnsafeEnumComparisonUnionsMustBeWhollyPrimitive(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		source  string
@@ -474,6 +479,7 @@ func TestNoUnsafeEnumComparisonUnionsMustBeWhollyPrimitive(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile,
 				testCase.source)
 			if testCase.reports {
@@ -499,6 +505,7 @@ func TestNoUnsafeEnumComparisonUnionsMustBeWhollyPrimitive(t *testing.T) {
 // rather than an argument, and so a future change that makes gate four reachable without an enum
 // fails loudly.
 func TestNoUnsafeEnumComparisonGateOneIsACostGuard(t *testing.T) {
+	t.Parallel()
 	const source = "declare const a: string;\ndeclare const b: number;\nconst c = a === b;\n"
 
 	result := rule_testing.RunTyped(t, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, source)
@@ -529,6 +536,7 @@ func TestNoUnsafeEnumComparisonGateOneIsACostGuard(t *testing.T) {
 // that union stops being seen as carrying enums at all, gate one exits early, and the finding is
 // silently lost.
 func TestNoUnsafeEnumComparisonReadsUnionsConstituentwise(t *testing.T) {
+	t.Parallel()
 	// A union of two enums compared against a bare string. Every constituent is an enum literal, so
 	// the comparison is unsafe and must report.
 	const source = "enum A { X = 'x' }\nenum B { Y = 'y' }\ndeclare const either: A | B;\nconst c = either === 'x';\n"

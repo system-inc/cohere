@@ -64,6 +64,7 @@ func TestNoUnassignedVarsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText),
 				testCase.wantIds...)
@@ -116,6 +117,7 @@ func TestNoUnassignedVarsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText))
 		})
@@ -148,6 +150,7 @@ func TestNoUnassignedVarsPointsAtTheDeclaredName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("wanted %d findings, got %d", len(testCase.want), len(result.Diagnostics))
@@ -246,6 +249,7 @@ func TestNoUnassignedVarsFindsEveryWriteShape(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText))
 		})
@@ -280,6 +284,7 @@ func TestNoUnassignedVarsDoesNotMistakeReadsForWrites(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText),
 				"noUnassignedVars")
@@ -326,6 +331,7 @@ func TestNoUnassignedVarsSeparatesShadowedBindings(t *testing.T) {
 
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText),
 				testCase.wantIds...)
@@ -402,6 +408,7 @@ func TestNoUnassignedVarsExemptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText))
 		})
@@ -429,6 +436,7 @@ func TestNoUnassignedVarsRequiresARead(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText)
 			// The third case has one genuine finding; the first two have none. Asserting the count
 			// against the number of readable declarations keeps this one table.

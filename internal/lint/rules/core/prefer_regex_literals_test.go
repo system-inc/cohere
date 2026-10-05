@@ -634,6 +634,7 @@ func TestPreferRegexLiteralsReportsWhatTheGlobalsConfigWouldHaveSilenced(t *test
 
 	for _, row := range preferRegexLiteralsDecidedByGlobalsConfig {
 		t.Run(row.source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runPreferRegexLiterals(t, row), row.ids...)
 		})
 	}
@@ -704,6 +705,7 @@ func TestPreferRegexLiteralsRecordsTheLanguageEditionDivergence(t *testing.T) {
 
 	for _, row := range preferRegexLiteralsDecidedByLanguageEdition {
 		t.Run(row.source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runPreferRegexLiterals(t, row), row.ids...)
 		})
 	}
@@ -727,6 +729,7 @@ func TestPreferRegexLiteralsStaysSilent(t *testing.T) {
 
 	for _, row := range preferRegexLiteralsClean {
 		t.Run(row.source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runPreferRegexLiterals(t, row))
 		})
 	}
@@ -737,6 +740,7 @@ func TestPreferRegexLiteralsFires(t *testing.T) {
 
 	for _, row := range preferRegexLiteralsReporting {
 		t.Run(row.source, func(t *testing.T) {
+			t.Parallel()
 			result := runPreferRegexLiterals(t, row)
 			rule_testing.ExpectFindings(t, result, row.ids...)
 			expectPreferRegexLiteralsSuggestions(t, row, result)

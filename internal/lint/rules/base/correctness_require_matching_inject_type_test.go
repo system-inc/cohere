@@ -59,6 +59,7 @@ func TestInjectTypeMatchesParameterStaysSilent(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(correctnessRequireMatchingInjectTypeCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, CorrectnessRequireMatchingInjectType,
 				correctnessRequireMatchingInjectTypeFile, sourceText))
 		})
@@ -117,6 +118,7 @@ func TestInjectTypeMatchesParameterFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(correctnessRequireMatchingInjectTypeCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, CorrectnessRequireMatchingInjectType,
 				correctnessRequireMatchingInjectTypeFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "mismatch")

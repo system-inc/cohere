@@ -220,12 +220,14 @@ func compareFormat(t *testing.T, inputs []string) int {
 }
 
 func TestFormatFixturesMatchOracle(t *testing.T) {
+	t.Parallel()
 	compareFormat(t, formatFixtures)
 }
 
 // TestFormatOracleCanFail proves the comparison sees a difference: the port's output for one input
 // against the oracle's for another.
 func TestFormatOracleCanFail(t *testing.T) {
+	t.Parallel()
 	engine := oracletest.Open(t, t.Name()).Engine(formatoptions.Default())
 	expected, err := engine.Format("fixture.yaml", "a: [b]")
 	if err != nil {
@@ -247,6 +249,7 @@ func TestFormatOracleCanFail(t *testing.T) {
 // TestPrintDocLeavesTheTrailingHardline checks the embedding contract: PrintDoc's doc ends in the
 // hardline that upstream's textToDoc strips, and the caller strips it.
 func TestPrintDocLeavesTheTrailingHardline(t *testing.T) {
+	t.Parallel()
 	texts, _, trees := parseInputs(t, []string{"a: b\n"})
 	document, err := PrintDoc(trees[0].root, texts[0], formatoptions.Default(), nil)
 	if err != nil {
@@ -304,5 +307,6 @@ func suiteInputs(t *testing.T) []string {
 // TestYamlTestSuiteMatchesOracle runs the suite through both sides under every option set. Inputs the
 // oracle cannot format (the suite's error cases) must fail in the parser too.
 func TestYamlTestSuiteMatchesOracle(t *testing.T) {
+	t.Parallel()
 	compareFormat(t, suiteInputs(t))
 }

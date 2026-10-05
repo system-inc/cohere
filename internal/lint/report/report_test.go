@@ -11,6 +11,7 @@ import (
 // The property this whole package exists for: a run that checked nothing must not be able to
 // produce the same output as a run that checked everything and found it clean.
 func TestNothingCheckedIsNotCleanish(t *testing.T) {
+	t.Parallel()
 	var checkedNothing strings.Builder
 	WriteNothingChecked(&checkedNothing, "no binary for darwin-arm64")
 
@@ -31,6 +32,7 @@ func TestNothingCheckedIsNotCleanish(t *testing.T) {
 // The coverage line has to carry the numbers, not just the verdict. A reader who cannot see how
 // many files were checked cannot tell a narrow run from a full one.
 func TestCoverageStatesWhatWasChecked(t *testing.T) {
+	t.Parallel()
 	var out strings.Builder
 	Write(&out, nil, Coverage{
 		FilesInProgram: 9530,
@@ -49,6 +51,7 @@ func TestCoverageStatesWhatWasChecked(t *testing.T) {
 }
 
 func TestWriteReturnsWhetherItPassed(t *testing.T) {
+	t.Parallel()
 	var out strings.Builder
 	if passed := Write(&out, nil, Coverage{FilesChecked: 1, RulesRun: 1}); !passed {
 		t.Error("no findings should report as passed")
@@ -68,6 +71,7 @@ func TestWriteReturnsWhetherItPassed(t *testing.T) {
 }
 
 func TestDurationReadsAtAGlance(t *testing.T) {
+	t.Parallel()
 	cases := map[time.Duration]string{
 		231 * time.Millisecond:               "231ms",
 		4*time.Second + 500*time.Millisecond: "4.50s",

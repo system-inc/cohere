@@ -12,6 +12,7 @@ import (
 // text, a nested declaration's fields and their order, raws.value.scss, and an at-rule name joined with
 // the interpolation after it.
 func TestParseSCSSTree(t *testing.T) {
+	t.Parallel()
 	root, err := ParseSCSS("// a /* b\n.x { margin: 0 // c\n { left: 1px } }\n@media#{$q} {}")
 	if err != nil {
 		t.Fatal(err)
@@ -50,6 +51,7 @@ func TestParseSCSSTree(t *testing.T) {
 
 // TestParseSCSSErrors checks the refusals postcss-scss adds, and that its TypeError is marked too.
 func TestParseSCSSErrors(t *testing.T) {
+	t.Parallel()
 	for _, each := range []struct {
 		text   string
 		reason string
@@ -85,6 +87,7 @@ func TestParseSCSSErrors(t *testing.T) {
 // TestParseSCSSNeverPanics parses every prefix of every scss fixture: each must parse or be refused with
 // a marked error, never fail any other way.
 func TestParseSCSSNeverPanics(t *testing.T) {
+	t.Parallel()
 	for _, fixture := range scssParseFixtures {
 		for end := 0; end <= len(fixture.text); end++ {
 			_, err := ParseSCSS(fixture.text[:end])

@@ -30,6 +30,7 @@ func TestNoDuplicateCaseReportsRepeatedTest(t *testing.T) {
 		{"nested switch has its own duplicate", `switch (a) { case 1: switch (b) { case 2: break; case 2: break; } break; }`, 1},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDuplicateCase, "file.ts", testCase.source)
 			wantIds := make([]string, testCase.want)
 			for index := range wantIds {
@@ -94,6 +95,7 @@ func TestNoDuplicateCaseAcceptsDistinctTests(t *testing.T) {
 		{"template literals with different substitutions", "switch (a) { case `t${x}`: break; case `t${y}`: break; }"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDuplicateCase, "file.ts", testCase.source))
 		})
 	}

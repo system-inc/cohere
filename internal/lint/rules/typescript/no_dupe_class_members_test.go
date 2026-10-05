@@ -67,6 +67,7 @@ func TestNoDupeClassMembersStaysSilent(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(noDupeClassMembersCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDupeClassMembers,
 				noDupeClassMembersFile, sourceText))
 		})
@@ -173,6 +174,7 @@ func TestNoDupeClassMembersFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noDupeClassMembersCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDupeClassMembers, noDupeClassMembersFile,
 				testCase.sourceText)
 
@@ -227,6 +229,7 @@ func TestNoDupeClassMembersRestoresTheMemberList(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			observed := 0
 			observer := rule.Rule{
 				Name: "test/no-dupe-class-members-restore",

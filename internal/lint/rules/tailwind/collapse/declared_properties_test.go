@@ -11,6 +11,7 @@ import (
 // partition the roots: a root in two of them would make the dispatch order a silent precedence, and
 // which slice answered would depend on the order somebody wrote the ifs in.
 func TestEmitterSlicesDoNotOverlap(t *testing.T) {
+	t.Parallel()
 	owner := map[string]string{}
 	for root := range FrameworkFunctionalUtilities {
 		owner[root] = "single-declaration"
@@ -66,6 +67,7 @@ func equalPropertySets(left, right []string) bool {
 // emitter derives, and each would silently stop being made if a branch were flattened: the class
 // still resolves, still reports no finding on correct code, and starts failing to report a real one.
 func TestComputedPropertiesMakeTheDistinctionsTheOverrideTablesHeld(t *testing.T) {
+	t.Parallel()
 	functional := func(root, value string, resolution ValueResolution) []string {
 		properties, resolved := DeclaredPropertiesFor(&ParsedCandidate{
 			Kind:  ParsedCandidateKindFunctional,
@@ -158,6 +160,7 @@ func TestComputedPropertiesMakeTheDistinctionsTheOverrideTablesHeld(t *testing.T
 // way real code does not exercise, and a corpus measures the code somebody wrote rather than the
 // code somebody could write, so this pairs the classes directly.
 func TestCustomPropertiesAreStrippedFromDeclaredProperties(t *testing.T) {
+	t.Parallel()
 	// Roots whose emitters write a `--tw-*` variable alongside a real property. Each must report only
 	// the real one, or a class sharing the variable becomes a false conflict.
 	for _, probe := range []struct {

@@ -72,6 +72,7 @@ func TestPruneAlwaysInvalidatingSeedsFromAllocationsOnly(t *testing.T) {
 		{name: "a primitive does not allocate", value: &Primitive{}, wantPruned: false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function := &Function{Identifiers: []*Identifier{{Id: 0}, {Id: 1}}}
 			allocation := Place{Identifier: 1}
 

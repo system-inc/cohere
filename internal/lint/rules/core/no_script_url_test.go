@@ -32,6 +32,7 @@ func TestNoScriptUrlFires(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoScriptUrl, scriptUrlFile, sourceText), "unexpectedScriptURL")
 		})
@@ -58,6 +59,7 @@ func TestNoScriptUrlStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoScriptUrl, scriptUrlFile, sourceText))
 		})
 	}
@@ -98,6 +100,7 @@ func TestNoScriptUrlTaggedTemplateExemptionIsTheDirectParent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoScriptUrl, scriptUrlFile, testCase.sourceText)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(t, result, "unexpectedScriptURL")
@@ -145,6 +148,7 @@ func TestNoScriptUrlComparisonIsAnchoredAndAsciiFolded(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoScriptUrl, scriptUrlFile, testCase.sourceText)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(t, result, "unexpectedScriptURL")
@@ -176,6 +180,7 @@ func TestNoScriptUrlDeclinesOtherLiteralKinds(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoScriptUrl, scriptUrlFile, testCase.sourceText))
 		})
 	}
@@ -205,6 +210,7 @@ func TestNoScriptUrlReportsTheWholeLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoScriptUrl, scriptUrlFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))

@@ -1560,6 +1560,7 @@ useCallback<ReturnsVoid | ReturnsPromiseVoid>(async () => {});
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMisusedPromises, testCase.fileName, testCase.sourceText, testCase.options)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -2876,6 +2877,7 @@ const obj: O = {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMisusedPromises, testCase.fileName, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
@@ -3076,6 +3078,7 @@ class Derived implements Base {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMisusedPromises, testCase.fileName, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted exactly one finding to slice, got %d", len(result.Diagnostics))
@@ -3180,6 +3183,7 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(t *testing.T
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decodedAny, err := decode([]byte(testCase.config))
 			if err != nil {
 				t.Fatalf("decoding %s: %v", testCase.config, err)
@@ -3216,6 +3220,7 @@ func TestNoMisusedPromisesTreatsNilOptionsAsEveryCheckEnabled(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMisusedPromises, testCase.fileName, testCase.sourceText, nil)
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
@@ -3390,6 +3395,7 @@ f([async () => {}, async () => {}, async () => {}]);
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 
@@ -3460,6 +3466,7 @@ export {};
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			bare := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, bare, testCase.wantWithoutTheGlobals...)
 
@@ -3521,6 +3528,7 @@ f(async () => {}, async () => {});
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "voidReturnArgument")
 		})
@@ -3601,6 +3609,7 @@ const obj: O = {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "voidReturnProperty")
 
@@ -3631,6 +3640,7 @@ func TestNoMisusedPromisesSurvivesAttributeValuesThatAreNotExpressionContainers(
 	t.Parallel()
 
 	t.Run("a string-valued attribute beside a reporting one does not crash the rule", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesTsxFile, `
 type Props = { onEvent: () => void; label: string };
 declare function Component(props: Props): null;
@@ -3640,6 +3650,7 @@ const element = <Component onEvent={async () => {}} label="hello" />;
 	})
 
 	t.Run("a string-valued attribute on a void-function prop is silent rather than fatal", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesTsxFile, `
 type Props = { onEvent: () => void };
 declare function Component(props: Props): null;
@@ -3649,6 +3660,7 @@ const element = <Component onEvent="hello" />;
 	})
 
 	t.Run("a shorthand attribute with no initializer at all is silent rather than fatal", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesTsxFile, `
 type Props = { onEvent?: () => void };
 declare function Component(props: Props): null;
@@ -3709,6 +3721,7 @@ interface Child extends Parent {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "voidReturnInheritedMethod")
 

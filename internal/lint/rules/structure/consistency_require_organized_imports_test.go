@@ -95,6 +95,7 @@ func TestConsistencyOrganizeImportsFires(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyRequireOrganizedImports, "/repository/app/Thing.tsx", testCase.source)
 			rule_testing.ExpectFindings(t, result, "importsNotOrganized")
 
@@ -187,6 +188,7 @@ func TestConsistencyOrganizeImportsStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			fileName := testCase.fileName
 			if fileName == "" {
 				fileName = "/repository/app/Thing.tsx"
@@ -201,6 +203,7 @@ func TestConsistencyOrganizeImportsStaysSilent(t *testing.T) {
 // the generator writes the house form, so a finding here is a defect in the generator. The rule used to
 // decline these files, and both spellings of generated output are reported now.
 func TestConsistencyOrganizeImportsHoldsGeneratedFilesToTheRule(t *testing.T) {
+	t.Parallel()
 	for _, fileName := range []string{"/repository/app/generated/Thing.tsx", "/repository/app/Thing.generated.ts"} {
 		result := rule_testing.Run(t, ConsistencyRequireOrganizedImports, fileName, "import z from 'zebra';\nimport a from 'alpha';\n\nexport const X = 1;\n")
 		rule_testing.ExpectFindings(t, result, "importsNotOrganized")

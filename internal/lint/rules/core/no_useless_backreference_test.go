@@ -124,6 +124,7 @@ func TestNoUselessBackreferenceFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, testCase.sourceText),
 				testCase.findings...)
@@ -244,6 +245,7 @@ func TestNoUselessBackreferenceStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, testCase.sourceText))
 		})
@@ -286,6 +288,7 @@ func TestNoUselessBackreferenceHandlesConstructorArgumentShapes(t *testing.T) {
 	t.Parallel()
 
 	t.Run("a regex literal argument reports at the literal and at the call", func(t *testing.T) {
+		t.Parallel()
 		result := rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, `RegExp(/\1(a)/, '');`)
 		rule_testing.ExpectFindings(t, result, "forward", "forward")
 	})
@@ -295,12 +298,14 @@ func TestNoUselessBackreferenceHandlesConstructorArgumentShapes(t *testing.T) {
 		"RegExp('\\\\1(a)', `${flags}`);",
 	} {
 		t.Run("unreadable flags check under none: "+sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, sourceText), "forward")
 		})
 	}
 
 	t.Run("flags in a constant binding are read", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile,
 			`const flags = 'gus'; RegExp('\\1(a){', flags);`))
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile,
@@ -325,6 +330,7 @@ func TestNoUselessBackreferenceIgnoresALocalRegExp(t *testing.T) {
 	}
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, sourceText))
 		})
 	}
@@ -361,6 +367,7 @@ func TestNoUselessBackreferencePointsAtThePattern(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.reported) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.reported), len(result.Diagnostics))
@@ -443,6 +450,7 @@ func TestNoUselessBackreferenceStaysSilentOnAPatternTheEngineWouldRefuse(t *test
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, testCase.sourceText))
 		})
@@ -453,11 +461,13 @@ func TestNoUselessBackreferenceStaysSilentOnAPatternTheEngineWouldRefuse(t *test
 	// check in opensQuantifier a real decision rather than an unreachable guard: read it as a
 	// quantifier and the pattern is judged well-formed under `u` when it is not.
 	t.Run("a literal brace does not suppress the finding", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t,
 			rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a){,}')`),
 			"forward")
 	})
 	t.Run("the same brace under u is a syntax error", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectClean(t,
 			rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a){,}', 'u')`))
 	})

@@ -395,6 +395,7 @@ func TestSecurityNoInterpolatedSqlStringFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			sourceText := securityNoInterpolatedSqlStringSource(testCase.lines...)
 			result := rule_testing.RunTyped(t, SecurityNoInterpolatedSqlString, securityNoInterpolatedSqlStringFile, sourceText)
 			securityNoInterpolatedSqlStringExpectSpans(t, result, sourceText, testCase.wantSpans)
@@ -625,6 +626,7 @@ func TestSecurityNoInterpolatedSqlStringStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, SecurityNoInterpolatedSqlString, securityNoInterpolatedSqlStringFile, securityNoInterpolatedSqlStringSource(testCase.lines...))
 			rule_testing.ExpectClean(t, result)
 		})

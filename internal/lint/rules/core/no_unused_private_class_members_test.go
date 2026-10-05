@@ -246,6 +246,7 @@ func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "noUnusedPrivateClassMember"
@@ -572,6 +573,7 @@ func TestNoUnusedPrivateClassMembersStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnusedPrivateClassMembers,
 				unusedPrivateClassMembersFile, testCase.sourceText))
 		})
@@ -607,6 +609,7 @@ func TestNoUnusedPrivateClassMembersDivergesFromOxcOnDiscardedConditionals(t *te
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnusedPrivateClassMembers,
 				unusedPrivateClassMembersFile, testCase.sourceText))
 		})
@@ -649,6 +652,7 @@ func TestNoUnusedPrivateClassMembersPointsAtThePrivateName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedPrivateClassMembers,
 				unusedPrivateClassMembersFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.reported) {
@@ -718,6 +722,7 @@ func TestNoUnusedPrivateClassMembersNamesTheMember(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoUnusedPrivateClassMembers,
 				unusedPrivateClassMembersFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {

@@ -167,6 +167,7 @@ func TestConsistencyNoHandRolledDelayReports(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			sourceText := strings.Join(testCase.lines, "\n") + "\n"
 			result := rule_testing.Run(t, ConsistencyNoHandRolledDelay, consistencyNoHandRolledDelayFile, sourceText)
 			rule_testing.ExpectFindings(t, result, consistencyNoHandRolledDelayId)
@@ -307,6 +308,7 @@ func TestConsistencyNoHandRolledDelayStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoHandRolledDelay, consistencyNoHandRolledDelayFile, strings.Join(testCase.lines, "\n")+"\n")
 			rule_testing.ExpectClean(t, result)
 		})

@@ -120,4 +120,7 @@ var mathFixtures = []string{
 	"> x $a$ y",
 }
 
-func TestMathEvents(t *testing.T) { compareEvents(t, mathFixtures) }
+func TestMathEvents(t *testing.T) {
+	t.Parallel()
+	compareEvents(t, mathFixtures)
+}

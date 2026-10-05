@@ -94,6 +94,7 @@ func TestRequireAwaitFires(t *testing.T) {
 
 	for _, testCase := range requireAwaitFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			wantIds := make([]string, len(testCase.wantNames))
 			for index := range wantIds {
 				wantIds[index] = "missingAwait"
@@ -108,6 +109,7 @@ func TestRequireAwaitStaysSilent(t *testing.T) {
 
 	for _, testCase := range requireAwaitSilentCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runRequireAwait(t, testCase))
 		})
 	}
@@ -124,6 +126,7 @@ func TestRequireAwaitNamesTheFunction(t *testing.T) {
 
 	for _, testCase := range requireAwaitFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runRequireAwait(t, testCase)
 			if len(result.Diagnostics) != len(testCase.wantNames) {
 				t.Fatalf("wanted %d findings, got %d", len(testCase.wantNames),
@@ -157,6 +160,7 @@ func TestRequireAwaitSuggestsRemovingAsync(t *testing.T) {
 	semicolons := 0
 	for _, testCase := range requireAwaitFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runRequireAwait(t, testCase)
 			if len(result.Diagnostics) != len(testCase.wantReplacements) {
 				t.Fatalf("wanted %d findings, got %d", len(testCase.wantReplacements),
@@ -228,6 +232,7 @@ func TestRequireAwaitSemicolonNeedsBothHalves(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runRequireAwait(t, requireAwaitCase{sourceText: testCase.sourceText})
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -266,6 +271,7 @@ func TestRequireAwaitFindsAsyncPastOtherModifiers(t *testing.T) {
 	}
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runRequireAwait(t, requireAwaitCase{sourceText: sourceText})
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -345,6 +351,7 @@ func TestRequireAwaitReportsOnTheFunctionHead(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runRequireAwait(t, requireAwaitCase{sourceText: testCase.sourceText})
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))

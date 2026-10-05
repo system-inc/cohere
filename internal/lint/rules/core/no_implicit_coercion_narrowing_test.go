@@ -71,6 +71,7 @@ func TestNoImplicitCoercionFixKeepsNarrowing(t *testing.T) {
 
 	// The control first. If the old output compiled, the check below would pass for any fix.
 	t.Run("the Boolean rewrite of the phi shape does not compile", func(t *testing.T) {
+		t.Parallel()
 		broken := narrowingDeclarations + "const data = request.data;\nconst hasData = Boolean(data);\n" +
 			"export const total = hasData ? data.energy.credits : 0;\n"
 		if errors := compileErrors(t, broken); len(errors) == 0 {
@@ -124,6 +125,7 @@ func TestNoImplicitCoercionFixKeepsNarrowing(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
 				narrowingDeclarations+testCase.source, nil)
 			rule_testing.ExpectFindings(t, result, "implicitCoercion")
@@ -148,6 +150,7 @@ func TestNoImplicitCoercionFixKeepsNarrowing(t *testing.T) {
 		{name: "a boolean that may be undefined", source: "export const on = !!fallback;\n"},
 	} {
 		t.Run("declines: "+testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
 				narrowingDeclarations+testCase.source, nil)
 			rule_testing.ExpectFindings(t, result, "implicitCoercion")

@@ -210,6 +210,7 @@ var mediaQueryFixtures = []mediaQueryFixture{
 // tenth of the corpus params, or if the corpus yields none: an oracle that rejects everything, or a
 // corpus that reaches nothing, would otherwise read as agreement.
 func TestParseAgreesWithPostcssMediaQueryParser(t *testing.T) {
+	t.Parallel()
 	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	corpora := os.Getenv("COHERE_CSS_CORPORA")
 	if root == "" || corpora == "" {

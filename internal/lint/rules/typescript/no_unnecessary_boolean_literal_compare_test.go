@@ -153,6 +153,7 @@ func TestNoUnnecessaryBooleanLiteralCompareStaysSilentOnUpstreamPassCases(t *tes
 	}
 	for index, testCase := range cases {
 		t.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t,
 				NoUnnecessaryBooleanLiteralCompare, noUnnecessaryBooleanLiteralCompareFile,
 				testCase.sourceText,
@@ -527,6 +528,7 @@ func TestNoUnnecessaryBooleanLiteralCompareFiresOnUpstreamFailCases(t *testing.T
 	}
 	for index, testCase := range cases {
 		t.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoUnnecessaryBooleanLiteralCompare,
 				noUnnecessaryBooleanLiteralCompareFile, testCase.sourceText,
 				decodeNoUnnecessaryBooleanLiteralCompareOptions(t, testCase.configuration))
@@ -614,6 +616,7 @@ func TestNoUnnecessaryBooleanLiteralCompareKeepsEverythingInTheExpression(t *tes
 	}
 	for index, testCase := range cases {
 		t.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoUnnecessaryBooleanLiteralCompare,
 				noUnnecessaryBooleanLiteralCompareFile, testCase.sourceText, nil)
 			rule_testing.ExpectFindings(t, result, "direct")
@@ -781,6 +784,7 @@ func TestNoUnnecessaryBooleanLiteralCompareDiscriminatesOnCasesUpstreamDoesNotWr
 	}
 	for index, testCase := range cases {
 		t.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoUnnecessaryBooleanLiteralCompare,
 				noUnnecessaryBooleanLiteralCompareFile, testCase.sourceText,
 				decodeNoUnnecessaryBooleanLiteralCompareOptions(t, testCase.configuration))
@@ -820,6 +824,7 @@ func TestNoUnnecessaryBooleanLiteralCompareDecoderKeepsTheDefaultsTrue(t *testin
 	}
 	for index, testCase := range cases {
 		t.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeNoUnnecessaryBooleanLiteralCompareOptions([]byte(testCase.configuration))
 			if err != nil {
 				t.Fatalf("decoding %s: %v", testCase.configuration, err)
@@ -915,6 +920,7 @@ func TestNoUnnecessaryBooleanLiteralCompareStrictNullChecksArmIsHarnessBlocked(t
 	}
 	for index, testCase := range cases {
 		t.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			options := core.CompilerOptions{
 				Strict:           testCase.strict,
 				StrictNullChecks: testCase.strictNullChecks,

@@ -61,6 +61,7 @@ func TestNoConsoleStaysSilent(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(consistencyNoConsoleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistencyNoConsole, consistencyNoConsoleFile, testCase.sourceText))
 		})
 	}
@@ -212,6 +213,7 @@ func TestNoConsoleFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(consistencyNoConsoleCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoConsole, consistencyNoConsoleFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
@@ -270,6 +272,7 @@ func TestNoConsoleReportsAnyBindingNamedConsole(t *testing.T) {
 	}
 	for index, sourceText := range reporting {
 		t.Run("reports"+strconv.Itoa(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, ConsistencyNoConsole, consistencyNoConsoleFile, sourceText),
 				"consistencyNoConsole")
 		})
@@ -284,6 +287,7 @@ func TestNoConsoleReportsAnyBindingNamedConsole(t *testing.T) {
 	}
 	for index, sourceText := range clean {
 		t.Run("clean"+strconv.Itoa(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistencyNoConsole, consistencyNoConsoleFile, sourceText))
 		})
 	}

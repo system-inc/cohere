@@ -20,6 +20,7 @@ import (
 // report is a total mismatch — which is indistinguishable, in shape, from a real 130-finding
 // disagreement. A well-formed report of a comparison that did not happen.
 func TestRuleNamesFromBothGatesCollapseToTheSameName(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		raw    string
 		expect string
@@ -59,6 +60,7 @@ func TestRuleNamesFromBothGatesCollapseToTheSameName(t *testing.T) {
 // gate's findings reports a clean diff for every defect cohere finds alone, and it looks exactly
 // like agreement.
 func TestCompareDetectsADifferenceInEachDirection(t *testing.T) {
+	t.Parallel()
 	rules := Inputs{
 		CohereRules:     map[string]bool{"consistency-no-enum": true},
 		ConfiguredRules: map[string]bool{"consistency-no-enum": true},
@@ -96,6 +98,7 @@ func TestCompareDetectsADifferenceInEachDirection(t *testing.T) {
 // This is the control for the test above: without it, a Compare that reported everything as a
 // difference would pass both direction tests and be completely broken.
 func TestMatchingFindingsAreNotDifferences(t *testing.T) {
+	t.Parallel()
 	report := Compare(Inputs{
 		CohereFindings:   []Finding{{File: "a.ts", Line: 3, Column: 16, Rule: "consistency-no-enum", Side: SideCohere}},
 		GateFindings:     []Finding{{File: "a.ts", Line: 3, Column: 9, Rule: "consistency-no-enum", Side: SideGate}},
@@ -122,6 +125,7 @@ func TestMatchingFindingsAreNotDifferences(t *testing.T) {
 // and reporting those as disagreements reports noise as signal — while reporting a genuine
 // disagreement as a coverage gap hides the only class that blocks the claim.
 func TestClassificationSeparatesCoverageFromCorrectness(t *testing.T) {
+	t.Parallel()
 	inputs := Inputs{
 		GateFindings: []Finding{
 			{File: "a.tsx", Line: 1, Rule: "react-component-no-multiple-primary", Side: SideGate},
@@ -159,6 +163,7 @@ func TestClassificationSeparatesCoverageFromCorrectness(t *testing.T) {
 
 // Only both-active differences block the claim.
 func TestUnportedRulesDoNotBlockAgreement(t *testing.T) {
+	t.Parallel()
 	provenance := provenProvenance()
 
 	notPorted := Compare(Inputs{
@@ -191,6 +196,7 @@ func TestUnportedRulesDoNotBlockAgreement(t *testing.T) {
 // This is the exact failure the gate cohere replaces shipped for days, and a diff harness inherits
 // it in a worse form, because an empty diff over two empty runs reads as proof of agreement.
 func TestARunOverNoFilesIsNotComparable(t *testing.T) {
+	t.Parallel()
 	report := Compare(Inputs{
 		CoherePopulation: Population{FilesWalked: 0, Rules: 22},
 		GatePopulation:   Population{FilesWalked: 3407},
@@ -214,6 +220,7 @@ func TestARunOverNoFilesIsNotComparable(t *testing.T) {
 // This is the property the whole package is named for, and it is the one that four vacuous probes
 // in one night got past: each had a plausible population and an empty result.
 func TestAnEmptyDiffWithoutControlsIsNotAgreement(t *testing.T) {
+	t.Parallel()
 	unproven := Compare(Inputs{
 		CoherePopulation: Population{FilesWalked: 3407, Rules: 22},
 		GatePopulation:   Population{FilesWalked: 3407},
@@ -249,6 +256,7 @@ func TestAnEmptyDiffWithoutControlsIsNotAgreement(t *testing.T) {
 
 // A control that fired in only one direction is not proof.
 func TestOneDirectionOfControlIsNotProven(t *testing.T) {
+	t.Parallel()
 	oneDirection := Provenance{
 		CohereFilesLinted: 3407,
 		GateFilesLinted:   3407,
@@ -275,6 +283,7 @@ func TestOneDirectionOfControlIsNotProven(t *testing.T) {
 
 // A population too small to be the tree is its own tell.
 func TestAnImplausiblySmallRunIsUntrustworthy(t *testing.T) {
+	t.Parallel()
 	tiny := provenProvenance()
 	tiny.CohereFilesLinted = 2
 	trustworthy, reasons := tiny.Trustworthy()
@@ -312,6 +321,7 @@ func provenProvenance() Provenance {
 // The degradation is deliberate: fall back to the two-way split, which is honest about what the
 // caller actually knows, rather than to the three-way split, which claims knowledge it does not have.
 func TestUnknownConfigurationDoesNotExcuseEveryRule(t *testing.T) {
+	t.Parallel()
 	report := Compare(Inputs{
 		CohereFindings:   []Finding{{File: "a.ts", Line: 1, Rule: "consistency-no-enum", Side: SideCohere}},
 		CoherePopulation: Population{Findings: 1, FilesWalked: 3407, Rules: 22},
@@ -347,6 +357,7 @@ func TestUnknownConfigurationDoesNotExcuseEveryRule(t *testing.T) {
 // as not-configured, and the harness excuses exactly the findings it exists to surface. It reached
 // a real run and rendered as one wrong word in a table.
 func TestAPluginPrefixedConfigKeyKeepsTheRuleName(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		raw    string
 		expect string
@@ -385,6 +396,7 @@ func TestAPluginPrefixedConfigKeyKeepsTheRuleName(t *testing.T) {
 // gate has been enforcing them for months rather than that they are worthless. A clean diff
 // therefore cannot be the signal to remove the old tool.
 func TestTheVerdictNamesTheRulesItDidNotCompare(t *testing.T) {
+	t.Parallel()
 	partial := Compare(Inputs{
 		CoherePopulation: Population{FilesWalked: 3407, Rules: 33},
 		GatePopulation:   Population{FilesWalked: 3407},

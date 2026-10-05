@@ -108,6 +108,7 @@ func TestNoIrregularWhitespaceFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoIrregularWhitespace,
 				irregularWhitespaceFile, testCase.sourceText, testCase.options)
 
@@ -294,6 +295,7 @@ func TestNoIrregularWhitespaceStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoIrregularWhitespace,
 				irregularWhitespaceFile, testCase.sourceText, testCase.options))
 		})
@@ -321,6 +323,7 @@ func TestNoIrregularWhitespaceCoversTheUnsnapshottedBlock(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoIrregularWhitespace,
 				irregularWhitespaceFile, testCase.sourceText,
 				NoIrregularWhitespaceOptions{SkipComments: boolOf(false)}),
@@ -387,6 +390,7 @@ func TestNoIrregularWhitespaceReportsTheCharacterItself(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoIrregularWhitespace,
 				irregularWhitespaceFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -430,6 +434,7 @@ func TestNoIrregularWhitespaceCoversCharactersUpstreamNeverFails(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile, testCase.sourceText),
 				"noIrregularWhitespace")

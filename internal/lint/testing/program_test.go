@@ -59,6 +59,7 @@ func isNumeric(typeName string) bool {
 // nothing, and pass. Green, and having proven nothing. So this asserts the positive direction with
 // a rule that can only answer by asking the checker.
 func TestTypedHarnessSuppliesALiveChecker(t *testing.T) {
+	t.Parallel()
 	result := RunTyped(t, awaitedTypeIsThenable, "Subject.ts", `
 		async function main() {
 			const value = 3;
@@ -72,6 +73,7 @@ func TestTypedHarnessSuppliesALiveChecker(t *testing.T) {
 // TestTypedHarnessStaysSilentOnCorrectCode is the other direction, and the half a violation-only
 // corpus never has. A harness whose rule fired on everything would pass the test above.
 func TestTypedHarnessStaysSilentOnCorrectCode(t *testing.T) {
+	t.Parallel()
 	result := RunTyped(t, awaitedTypeIsThenable, "Subject.ts", `
 		async function main() {
 			const value = Promise.resolve(3);
@@ -89,6 +91,7 @@ func TestTypedHarnessStaysSilentOnCorrectCode(t *testing.T) {
 // written that way passes while exercising only the nil path, which is why a type-aware rule must
 // use RunTyped and why that is worth failing loudly about rather than documenting.
 func TestSyntaxOnlyHarnessCannotProveATypeAwareRule(t *testing.T) {
+	t.Parallel()
 	result := Run(t, awaitedTypeIsThenable, "Subject.ts", `
 		async function main() {
 			const value = 3;
@@ -106,6 +109,7 @@ func TestSyntaxOnlyHarnessCannotProveATypeAwareRule(t *testing.T) {
 // TestTypedHarnessResolvesAcrossFiles covers the questions a single-file program cannot pose:
 // whether an imported symbol is what the rule thinks it is.
 func TestTypedHarnessResolvesAcrossFiles(t *testing.T) {
+	t.Parallel()
 	result := RunTypedFiles(t, awaitedTypeIsThenable, map[string]string{
 		"Helper.ts": `export const helperValue = 3;`,
 		"Subject.ts": `
@@ -134,6 +138,7 @@ func TestTypedHarnessResolvesAcrossFiles(t *testing.T) {
 // asked the wrong question, and knowing which is the difference between debugging the harness and
 // debugging the rule.
 func TestNarrowedLiteralTypesReachTheRule(t *testing.T) {
+	t.Parallel()
 	reported := []string{}
 	recorder := rule.Rule{
 		Name: "probe-type-names",

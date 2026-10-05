@@ -52,6 +52,7 @@ func expectName(t *testing.T, source string, accept property.Kinds, want string,
 
 // TestStaticAcceptsEverySettledSpelling covers the union set.
 func TestStaticAcceptsEverySettledSpelling(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct{ source, want string }{
 		{"({ plain: 1 });", "plain"},
 		{"({ 'quoted': 1 });", "quoted"},
@@ -79,12 +80,14 @@ func TestStaticAcceptsEverySettledSpelling(t *testing.T) {
 // Reading the variable's spelling as the key reported `[foo]()` and `foo()` as duplicate class
 // members, caught by upstream's own clean case rather than by inspection.
 func TestVariableInBracketsIsAlwaysDeclined(t *testing.T) {
+	t.Parallel()
 	expectName(t, "({ [variable]: 1 });", property.Static, "", false)
 }
 
 // TestTextualDeclinesWhatItDoesNotAccept pins the narrow set three callers use. Each of these is a
 // spelling those callers never meet, and accepting it would widen their rules silently.
 func TestTextualDeclinesWhatItDoesNotAccept(t *testing.T) {
+	t.Parallel()
 	expectName(t, "({ plain: 1 });", property.Textual, "plain", true)
 	expectName(t, "({ 'quoted': 1 });", property.Textual, "quoted", true)
 	expectName(t, "({ 42: 1 });", property.Textual, "", false)
@@ -98,6 +101,7 @@ func TestTextualDeclinesWhatItDoesNotAccept(t *testing.T) {
 // read the text first and filtered afterwards crashes the linter. Three of the six lifted
 // implementations had no guard, because their callers never met the shape.
 func TestComputedPropertyNameDoesNotPanic(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			t.Fatalf("Name panicked on a computed key: %v", recovered)
@@ -117,6 +121,7 @@ func TestComputedPropertyNameDoesNotPanic(t *testing.T) {
 // `[1.0]` and `['1.0']` are different class members while `10` and `1e1` are the same one, so
 // neither the source spelling nor the cooked text answers alone.
 func TestNameTaggedSeparatesNumbersFromStrings(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct{ source, want string }{
 		{"({ plain: 1 });", "string:plain"},
 		{"({ 'quoted': 1 });", "string:quoted"},
@@ -145,6 +150,7 @@ func TestNameTaggedSeparatesNumbersFromStrings(t *testing.T) {
 // TestNilIsNotAName covers the guard a shared function needs and a rule-local one did not: inside a
 // rule the node always came from a walk, and on a shelf any caller can pass anything.
 func TestNilIsNotAName(t *testing.T) {
+	t.Parallel()
 	if _, ok := property.Name(nil, property.Static); ok {
 		t.Error("Name(nil) reported a name")
 	}
@@ -159,6 +165,7 @@ func TestNilIsNotAName(t *testing.T) {
 // TestAccessedName covers the member-access half, where the two spellings of one property have to
 // compare as one reference and a variable subscript must not.
 func TestAccessedName(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		source string
 		want   string

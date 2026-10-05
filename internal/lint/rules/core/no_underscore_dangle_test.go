@@ -67,8 +67,10 @@ func runNoUnderscoreDangle(t *testing.T, testCase noUnderscoreDangleCase) rule_t
 
 // TestNoUnderscoreDangleStaysSilent runs upstream's whole `valid` list.
 func TestNoUnderscoreDangleStaysSilent(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range noUnderscoreDangleCleanCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runNoUnderscoreDangle(t, testCase))
 		})
 	}
@@ -76,8 +78,10 @@ func TestNoUnderscoreDangleStaysSilent(t *testing.T) {
 
 // TestNoUnderscoreDangleFires runs upstream's whole `invalid` list, asserting spans and identifiers.
 func TestNoUnderscoreDangleFires(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range noUnderscoreDangleReportingCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoUnderscoreDangle(t, testCase)
 
 			wantIds := make([]string, 0, len(testCase.findings))
@@ -116,6 +120,7 @@ func TestNoUnderscoreDangleFires(t *testing.T) {
 // `enforceInMethodNames`. A decoder ignoring it leaves a project believing it turned an arm off
 // when that arm was never on.
 func TestNoUnderscoreDangleDecoderAcceptsTheShapesTheConfigLayerDelivers(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		raw     string
@@ -198,6 +203,7 @@ func TestNoUnderscoreDangleDecoderAcceptsTheShapesTheConfigLayerDelivers(t *test
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeNoUnderscoreDangleOptions(json.RawMessage(testCase.raw))
 			if testCase.wantErr {
 				if err == nil {
@@ -225,6 +231,7 @@ func TestNoUnderscoreDangleDecoderAcceptsTheShapesTheConfigLayerDelivers(t *test
 // above. Each row here is one source under two configurations with opposite verdicts, which is the
 // only shape that separates them. Nine options, nine pairs.
 func TestNoUnderscoreDangleEveryOptionReachesTheRule(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		option        string
 		source        string
@@ -256,6 +263,7 @@ func TestNoUnderscoreDangleEveryOptionReachesTheRule(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.option, func(t *testing.T) {
+			t.Parallel()
 			withOption := runNoUnderscoreDangle(t,
 				noUnderscoreDangleCase{source: testCase.source, optionsJson: testCase.on})
 			without := runNoUnderscoreDangle(t, noUnderscoreDangleCase{source: testCase.source})
@@ -307,6 +315,7 @@ func TestNoUnderscoreDangleEveryOptionReachesTheRule(t *testing.T) {
 // The distinguishing source coins two names under different pattern kinds in one declaration, and
 // upstream's own corpus carries it. Verdicts measured against the installed 10.8.1 build.
 func TestNoUnderscoreDangleNestedDestructuringSeparatesTheTwoFlags(t *testing.T) {
+	t.Parallel()
 	const source = `const { foo: [_bar, { a: _a, b } ] } = { foo: [1, { a: 'a', b: 'b' }] }`
 
 	both := runNoUnderscoreDangle(t, noUnderscoreDangleCase{
@@ -345,7 +354,9 @@ func TestNoUnderscoreDangleNestedDestructuringSeparatesTheTwoFlags(t *testing.T)
 // Each is exempt in a different set of places, and the corpus asserts each only where it applies, so
 // a port widening or narrowing one passes. Verdicts measured against the installed build.
 func TestNoUnderscoreDangleSpecialCasesAreScopedWhereUpstreamScopesThem(t *testing.T) {
+	t.Parallel()
 	t.Run("a lone underscore is clean in every arm", func(t *testing.T) {
+		t.Parallel()
 		for _, source := range []string{
 			`var _ = require('underscore');`,
 			`function _() {}`,
@@ -362,6 +373,7 @@ func TestNoUnderscoreDangleSpecialCasesAreScopedWhereUpstreamScopesThem(t *testi
 	})
 
 	t.Run("__proto__ is exempt in a member access only", func(t *testing.T) {
+		t.Parallel()
 		member := runNoUnderscoreDangle(t, noUnderscoreDangleCase{source: `foo.bar.__proto__;`})
 		if len(member.Diagnostics) != 0 {
 			t.Errorf("a member access to __proto__ is exempt, got %v", member.MessageIds())
@@ -373,6 +385,7 @@ func TestNoUnderscoreDangleSpecialCasesAreScopedWhereUpstreamScopesThem(t *testi
 	})
 
 	t.Run("a private identifier renders with its hash", func(t *testing.T) {
+		t.Parallel()
 		result := runNoUnderscoreDangle(t, noUnderscoreDangleCase{
 			source:      `class A { #_bar() {} }`,
 			optionsJson: `{"enforceInMethodNames":true}`,
@@ -833,9 +846,11 @@ var noUnderscoreDangleReportingCases = []noUnderscoreDangleCase{
 // Three conditions, and each row below removes one. Every verdict measured against the installed
 // 10.8.1 build.
 func TestNoUnderscoreDangleThisConstructorIsThreeConditions(t *testing.T) {
+	t.Parallel()
 	const on = `{"allowAfterThisConstructor":true}`
 
 	t.Run("this.constructor._bar is exempt", func(t *testing.T) {
+		t.Parallel()
 		result := runNoUnderscoreDangle(t,
 			noUnderscoreDangleCase{source: `this.constructor._bar`, optionsJson: on})
 		if len(result.Diagnostics) != 0 {
@@ -877,6 +892,7 @@ func TestNoUnderscoreDangleThisConstructorIsThreeConditions(t *testing.T) {
 	}
 	for _, testCase := range reporting {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoUnderscoreDangle(t,
 				noUnderscoreDangleCase{source: testCase.source, optionsJson: on})
 			if len(result.Diagnostics) == 0 {

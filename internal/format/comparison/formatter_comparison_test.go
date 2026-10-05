@@ -8,6 +8,7 @@ import (
 // TestFormatsCrampedSource is the known-dirty control. A differ that has never returned a positive
 // has not been shown to work, so this proves the formatter is actually reached and actually edits.
 func TestFormatsCrampedSource(t *testing.T) {
+	t.Parallel()
 	formatted, ok, _, _ := FormatFile("/probe.ts", "const   x=1;\n")
 	if !ok {
 		t.Fatal("could not parse the probe")
@@ -23,6 +24,7 @@ func TestFormatsCrampedSource(t *testing.T) {
 // TestLeavesFormattedSourceAlone is the clean control, and the other half of proving the differ
 // works: a detector that flags everything is as useless as one that flags nothing.
 func TestLeavesFormattedSourceAlone(t *testing.T) {
+	t.Parallel()
 	source := "const x = 1;\n"
 	formatted, ok, _, _ := FormatFile("/clean.ts", source)
 	if !ok {
@@ -37,6 +39,7 @@ func TestLeavesFormattedSourceAlone(t *testing.T) {
 // the formatter never breaks a line to fit one. Prettier's entire layout algorithm is line-width
 // driven, so this is the gap that decides the phase.
 func TestDoesNotWrapLongLines(t *testing.T) {
+	t.Parallel()
 	// Well past printWidth 120, and trivially breakable by Prettier at every comma.
 	source := "const value = someFunction(" + strings.Repeat("argument, ", 30) + "last);\n"
 	formatted, ok, _, _ := FormatFile("/long.ts", source)
@@ -51,6 +54,7 @@ func TestDoesNotWrapLongLines(t *testing.T) {
 // TestDoesNotJoinShortLines is the mirror: Prettier collapses a needlessly broken call onto one
 // line when it fits. The formatter preserves the author's breaks instead.
 func TestDoesNotJoinShortLines(t *testing.T) {
+	t.Parallel()
 	source := "const value = f(\n    1,\n    2,\n);\n"
 	formatted, ok, _, _ := FormatFile("/short.ts", source)
 	if !ok {
@@ -64,6 +68,7 @@ func TestDoesNotJoinShortLines(t *testing.T) {
 // TestDoesNotNormalizeQuotes pins the second unmapped Prettier option. singleQuote has no field on
 // FormatCodeSettings, and the formatter does not touch string literals at all.
 func TestDoesNotNormalizeQuotes(t *testing.T) {
+	t.Parallel()
 	source := "const name = \"double\";\n"
 	formatted, ok, _, _ := FormatFile("/quotes.ts", source)
 	if !ok {
@@ -78,6 +83,7 @@ func TestDoesNotNormalizeQuotes(t *testing.T) {
 // silently corrupts every range after the first length change, and the corruption looks like a
 // formatting difference rather than a bug in the harness.
 func TestApplyIsBackToFront(t *testing.T) {
+	t.Parallel()
 	formatted, ok, _, _ := FormatFile("/multi.ts", "const  a=1;\nconst  b=2;\nconst  c=3;\n")
 	if !ok {
 		t.Fatal("could not parse")
@@ -95,6 +101,7 @@ func TestApplyIsBackToFront(t *testing.T) {
 // TestKeywordSpaceIsSettable pins the largest divergence class and the setting that closes it. Our
 // house style is `if(x)`; the formatter's default is `if (x)`, and one boolean settles it.
 func TestKeywordSpaceIsSettable(t *testing.T) {
+	t.Parallel()
 	source := "if(x) {\n    y();\n}\n"
 	formatted, ok, _, _ := FormatFile("/keyword.ts", source)
 	if !ok {
@@ -109,6 +116,7 @@ func TestKeywordSpaceIsSettable(t *testing.T) {
 // rewrites `{ a: number }` to `{ a: number; }`, which our Prettier never does; "ignore" is correct
 // for a codebase whose semicolons are already right.
 func TestDoesNotAddTypeMemberSemicolons(t *testing.T) {
+	t.Parallel()
 	source := "const r: Record<string, { label: string }> = {};\n"
 	formatted, ok, _, _ := FormatFile("/members.ts", source)
 	if !ok {
@@ -122,6 +130,7 @@ func TestDoesNotAddTypeMemberSemicolons(t *testing.T) {
 // TestKeepsEmptyBracesTight pins the third, which is also what makes our fork's anonymous-function
 // customization survive: `function() {}` must not become `function() { }`.
 func TestKeepsEmptyBracesTight(t *testing.T) {
+	t.Parallel()
 	source := "const a = function() {};\n"
 	formatted, ok, _, _ := FormatFile("/empty.ts", source)
 	if !ok {
@@ -135,6 +144,7 @@ func TestKeepsEmptyBracesTight(t *testing.T) {
 // TestPreservesForkCatchAndFinallyPlacement pins our fork's other customization. Both keywords sit
 // on their own line after the closing brace, and the formatter must leave that alone.
 func TestPreservesForkCatchAndFinallyPlacement(t *testing.T) {
+	t.Parallel()
 	source := "try {\n    a();\n}\ncatch(error) {\n    b();\n}\nfinally {\n    c();\n}\n"
 	formatted, ok, _, _ := FormatFile("/try.ts", source)
 	if !ok {
@@ -153,6 +163,7 @@ func TestPreservesForkCatchAndFinallyPlacement(t *testing.T) {
 // Nothing in FormatCodeSettings changes this, so closing it means a post-pass or accepting the
 // reflow. It is whitespace-only and does not change line count.
 func TestFlattensBinaryContinuationInCallArguments(t *testing.T) {
+	t.Parallel()
 	source := "function f() {\n    throw new Error(\n        'a' +\n            'b' +\n            'c',\n    );\n}\n"
 	want := "function f() {\n    throw new Error(\n        'a' +\n        'b' +\n        'c',\n    );\n}\n"
 
@@ -170,6 +181,7 @@ func TestFlattensBinaryContinuationInCallArguments(t *testing.T) {
 // back up and leaves the closing brace hanging. This one changes how the file reads, not just where
 // its whitespace sits.
 func TestCollapsesTemplateExpressionBreaks(t *testing.T) {
+	t.Parallel()
 	source := "const c = `x ${\n    condition ? 'a' : 'b'\n} y`;\n"
 	formatted, ok, _, _ := FormatFile("/template.tsx", source)
 	if !ok {
@@ -184,6 +196,7 @@ func TestCollapsesTemplateExpressionBreaks(t *testing.T) {
 // `for(; ;)`, which is not valid style anywhere and is nobody's preference. Ten files in the corpus
 // hit it. Recorded rather than worked around, because a reconciliation layer needs to know.
 func TestForStatementEmptyClauses(t *testing.T) {
+	t.Parallel()
 	source := "for(;;) {\n    a();\n}\n"
 	formatted, ok, _, _ := FormatFile("/for.ts", source)
 	if !ok {

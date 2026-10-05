@@ -210,4 +210,7 @@ var listFixtures = []string{
 	"-\u00a0a",
 }
 
-func TestListEvents(t *testing.T) { compareEvents(t, listFixtures) }
+func TestListEvents(t *testing.T) {
+	t.Parallel()
+	compareEvents(t, listFixtures)
+}

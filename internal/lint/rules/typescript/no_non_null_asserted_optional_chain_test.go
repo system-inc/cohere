@@ -33,6 +33,7 @@ func TestNoNonNullAssertedOptionalChainFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoNonNullAssertedOptionalChain, assertedOptionalChainFile, testCase.sourceText),
 				"noNonNullOptionalChain")
@@ -74,6 +75,7 @@ func TestNoNonNullAssertedOptionalChainStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoNonNullAssertedOptionalChain, assertedOptionalChainFile, testCase.sourceText))
 		})
@@ -117,6 +119,7 @@ func TestNoNonNullAssertedOptionalChainSuggestsRemovingTheOperator(t *testing.T)
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoNonNullAssertedOptionalChain,
 				assertedOptionalChainFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {

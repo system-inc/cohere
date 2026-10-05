@@ -10,6 +10,7 @@ import (
 // Every expectation below is what `new RegExp(source, flags).test(subject)`
 // answers in JavaScript.
 func TestTest(t *testing.T) {
+	t.Parallel()
 	const (
 		LS = "\u2028"
 		PS = "\u2029"
@@ -213,6 +214,7 @@ func TestTest(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			re, err := Compile(test.source, test.flags)
 			if err != nil {
 				t.Fatalf("Compile(%q, %q) = %v", test.source, test.flags, err)
@@ -225,6 +227,7 @@ func TestTest(t *testing.T) {
 }
 
 func TestCompileRejects(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		source string
@@ -272,6 +275,7 @@ func TestCompileRejects(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := Compile(test.source, test.flags)
 			if !errors.Is(err, test.is) {
 				t.Errorf("Compile(%q, %q) error = %v, want %v", test.source, test.flags, err, test.is)
@@ -281,6 +285,7 @@ func TestCompileRejects(t *testing.T) {
 }
 
 func TestAccessorsKeepTheWrittenForm(t *testing.T) {
+	t.Parallel()
 	re := MustCompile("^a.b$", "im")
 	if re.Source() != "^a.b$" {
 		t.Errorf("Source() = %q, want the pattern as written", re.Source())
@@ -299,6 +304,7 @@ func TestAccessorsKeepTheWrittenForm(t *testing.T) {
 // needs it — running the pathological case to watch it stop costs a core for
 // as long as the bound allows, every time the suite runs.
 func TestMatchingIsBounded(t *testing.T) {
+	t.Parallel()
 	if MatchTimeout <= 0 {
 		t.Fatalf("MatchTimeout = %s, want a finite bound", MatchTimeout)
 	}
@@ -315,6 +321,7 @@ func TestMatchingIsBounded(t *testing.T) {
 // pathological pattern stops at the first check rather than costing a core for
 // a second.
 func TestTestOrTimeoutFailsOpen(t *testing.T) {
+	t.Parallel()
 	re := MustCompile(`^(?:(a+)+b|a+)$`, "")
 	re.Unwrap().MatchTimeout = time.Nanosecond
 	subject := strings.Repeat("a", 200)
@@ -328,6 +335,7 @@ func TestTestOrTimeoutFailsOpen(t *testing.T) {
 }
 
 func TestNilIsSafe(t *testing.T) {
+	t.Parallel()
 	var re *RegExp
 	if re.Test("anything") {
 		t.Error("a nil RegExp matched")

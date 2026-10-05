@@ -117,6 +117,7 @@ func TestRestrictTemplateExpressionsStaysSilent(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(restrictTemplateExpressionsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t,
 				RestrictTemplateExpressions, restrictTemplateExpressionsFile, testCase.sourceText,
 				restrictTemplateExpressionsSettingsFor(t, testCase.wire)))
@@ -610,6 +611,7 @@ func TestRestrictTemplateExpressionsFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(restrictTemplateExpressionsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, RestrictTemplateExpressions,
 				restrictTemplateExpressionsFile, testCase.sourceText,
 				restrictTemplateExpressionsSettingsFor(t, testCase.wire))
@@ -659,6 +661,7 @@ func TestRestrictTemplateExpressionsReadsNilOptionsAsUpstreamsDefault(t *testing
 	}
 	for index, sourceText := range cases {
 		t.Run(restrictTemplateExpressionsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			// nil rather than a decoded struct, which is what the config layer delivers.
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t,
 				RestrictTemplateExpressions, restrictTemplateExpressionsFile, sourceText, nil))

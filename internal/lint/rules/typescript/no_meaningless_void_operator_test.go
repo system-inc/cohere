@@ -559,6 +559,7 @@ func TestNoMeaninglessVoidOperatorStaysSilent(t *testing.T) {
 
 	for index, testCase := range noMeaninglessVoidOperatorSilentRows() {
 		t.Run(noMeaninglessVoidOperatorCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoMeaninglessVoidOperator,
 				noMeaninglessVoidOperatorFile, testCase.sourceText,
 				noMeaninglessVoidOperatorOptionsFor(t, testCase.optionsJson)))
@@ -574,6 +575,7 @@ func TestNoMeaninglessVoidOperatorFires(t *testing.T) {
 
 	for index, testCase := range noMeaninglessVoidOperatorFiringRows() {
 		t.Run(noMeaninglessVoidOperatorCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoMeaninglessVoidOperator,
 				noMeaninglessVoidOperatorFile, testCase.sourceText,
 				noMeaninglessVoidOperatorOptionsFor(t, testCase.optionsJson))
@@ -681,6 +683,7 @@ func TestDecodeNoMeaninglessVoidOperatorOptions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeNoMeaninglessVoidOperatorOptions(json.RawMessage(testCase.raw))
 			if err != nil {
 				t.Fatalf("decoding %s: %v", testCase.raw, err)

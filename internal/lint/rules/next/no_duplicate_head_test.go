@@ -117,6 +117,7 @@ func TestNoDuplicateHeadReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoDuplicateHead, testCase.fileName, testCase.source)
 			rule_testing.ExpectFindings(t, result, messageNoDuplicateHead.Id)
 		})
@@ -221,6 +222,7 @@ func TestNoDuplicateHeadIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoDuplicateHead, testCase.fileName, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -263,6 +265,7 @@ func TestNoDuplicateHeadReportsOncePerFile(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoDuplicateHead, "components/Shell.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected exactly one finding however many copies, got %d", len(result.Diagnostics))
@@ -304,6 +307,7 @@ func TestNoDuplicateHeadPointsAtTheFirstOccurrence(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoDuplicateHead, "components/Shell.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))

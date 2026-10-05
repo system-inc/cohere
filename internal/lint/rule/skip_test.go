@@ -15,6 +15,7 @@ import (
 // SkipCovered names a declared cover and gives its reason, as a string literal a reader can find. A skip
 // with no reason is a rule that checked nothing and said nothing, which is the failure Skip exists to end.
 func TestEverySkipSaysWhichKindItIs(t *testing.T) {
+	t.Parallel()
 	covers := map[string]bool{"CoverTypeCheck": true}
 	calls := 0
 	err := filepath.WalkDir("../rules", func(path string, entry fs.DirEntry, err error) error {

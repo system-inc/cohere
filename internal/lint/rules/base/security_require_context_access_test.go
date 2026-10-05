@@ -134,6 +134,7 @@ func TestContextRequiresAccessFires(t *testing.T) {
 
 	for _, testCase := range securityRequireContextAccessFiresCases() {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			wantIds := make([]string, len(testCase.wantKeys))
 			for index := range testCase.wantKeys {
 				wantIds[index] = "missingProtector"
@@ -148,6 +149,7 @@ func TestContextRequiresAccessStaysSilent(t *testing.T) {
 
 	for _, testCase := range securityRequireContextAccessSilentCases() {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runContextRequiresAccess(t, testCase))
 		})
 	}
@@ -163,6 +165,7 @@ func TestContextRequiresAccessNamesTheKey(t *testing.T) {
 
 	for _, testCase := range securityRequireContextAccessFiresCases() {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runContextRequiresAccess(t, testCase)
 			if len(result.Diagnostics) != len(testCase.wantKeys) {
 				t.Fatalf("wanted %d findings, got %d", len(testCase.wantKeys),
@@ -257,6 +260,7 @@ func TestContextRequiresAccessSurprises(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runContextRequiresAccess(t, testCase)
 			if len(testCase.wantKeys) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -332,6 +336,7 @@ func TestContextRequiresAccessUnmeasurableShapes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runContextRequiresAccess(t, testCase)
 			if len(testCase.wantKeys) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -385,6 +390,7 @@ func TestDecodeContextRequiresAccessOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("nil input yields an empty list", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeContextRequiresAccessOptions(nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -395,6 +401,7 @@ func TestDecodeContextRequiresAccessOptions(t *testing.T) {
 	})
 
 	t.Run("a requirement with no contextKey is rejected", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeContextRequiresAccessOptions(
 			[]byte(`{"requirements":[{"requiresAny":["A"]}]}`)); err == nil {
 			t.Error("a requirement naming no key decoded")
@@ -402,6 +409,7 @@ func TestDecodeContextRequiresAccessOptions(t *testing.T) {
 	})
 
 	t.Run("an empty requiresAny is rejected", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeContextRequiresAccessOptions(
 			[]byte(`{"requirements":[{"contextKey":"K","requiresAny":[]}]}`)); err == nil {
 			t.Error("a requirement nothing could satisfy decoded")
@@ -409,6 +417,7 @@ func TestDecodeContextRequiresAccessOptions(t *testing.T) {
 	})
 
 	t.Run("the live wiring decodes", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeContextRequiresAccessOptions([]byte(
 			`{"requirements":[{"contextKey":"AccountRequestContextKey",` +
 				`"requiresAny":["RequireSessionAccess","WithSessionAccess"]}]}`)); err != nil {
@@ -443,6 +452,7 @@ func TestContextRequiresAccessSurvivesUnusualParameters(t *testing.T) {
 		"class A { [computed](@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
 	} {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			// The assertion is that this returns at all. What it reports is covered above; a panic
 			// here would be invisible to every other test in this file, which all use ordinary
 			// parameters.

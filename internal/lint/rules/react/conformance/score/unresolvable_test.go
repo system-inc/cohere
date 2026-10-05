@@ -18,6 +18,7 @@ import (
 // A fixture that stays silent with types present was never excused by their absence, and its
 // verdict is an excuse rather than a measurement.
 func TestUnresolvableTypesIsEarnedNotAssumed(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("builds a TypeScript program per fixture")
 	}

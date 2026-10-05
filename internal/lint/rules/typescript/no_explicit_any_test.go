@@ -84,6 +84,7 @@ func TestNoExplicitAnyFires(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, testCase.sourceText)
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
@@ -141,6 +142,7 @@ func TestNoExplicitAnyStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExplicitAny, explicitAnyFile, testCase.sourceText))
 		})
 	}
@@ -209,6 +211,7 @@ func TestNoExplicitAnyIgnoreRestArgsStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoExplicitAny, explicitAnyFile,
 				testCase.sourceText, NoExplicitAnyOptions{IgnoreRestArgs: true}))
 		})
@@ -275,6 +278,7 @@ func TestNoExplicitAnyIgnoreRestArgsIsWhatSilencesThem(t *testing.T) {
 
 	for _, sourceText := range testCases {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("expected the rest-parameter `any` to report with ignoreRestArgs off, got silence for %q", sourceText)
@@ -315,6 +319,7 @@ func TestNoExplicitAnyPointsAtTheKeywordItself(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
@@ -407,6 +412,7 @@ func TestNoExplicitAnyFixToUnknownRewritesTheKeyword(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoExplicitAny, explicitAnyFile, testCase.sourceText,
 				NoExplicitAnyOptions{FixToUnknown: true})
 			rule_testing.ExpectFixedSource(t, result, testCase.wantSource)
@@ -456,6 +462,7 @@ func TestNoExplicitAnyDeclinesJavaScriptFiles(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.fileName+" "+testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExplicitAny, testCase.fileName, testCase.sourceText))
 		})
 	}
@@ -478,6 +485,7 @@ func TestNoExplicitAnyCoversEveryTypeScriptExtension(t *testing.T) {
 		"/repository/source/Thing.d.ts",
 	} {
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoExplicitAny, fileName, "declare const x: any;"),
 				"unexpectedAny")
 		})
@@ -516,6 +524,7 @@ func TestNoExplicitAnyIgnoreRestArgsExemptsByContainmentNotByShape(t *testing.T)
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoExplicitAny, explicitAnyFile, testCase.sourceText,
 				NoExplicitAnyOptions{IgnoreRestArgs: true})
 			if len(testCase.wantIds) == 0 {
@@ -560,6 +569,7 @@ func TestNoExplicitAnyReportsPositionsOurTreeActuallyWrites(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, testCase.sourceText)
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
@@ -589,6 +599,7 @@ func TestNoExplicitAnyIgnoresIdentifiersNamedAny(t *testing.T) {
 		"import { any } from \"./m\";",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExplicitAny, explicitAnyFile, sourceText))
 		})
 	}

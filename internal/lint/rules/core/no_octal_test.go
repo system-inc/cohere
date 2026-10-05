@@ -65,6 +65,7 @@ func TestNoOctalFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoOctal, octalFile, testCase.sourceText), "noOctal")
 		})
@@ -121,6 +122,7 @@ func TestNoOctalStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoOctal, octalFile, testCase.sourceText))
 		})
 	}
@@ -172,6 +174,7 @@ func TestNoOctalOnSourceOurParserAcceptsAndESLintRejects(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoOctal, octalFile, testCase.sourceText), "noOctal")
 		})
@@ -209,6 +212,7 @@ func TestNoOctalReportsTheLiteralSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoOctal, octalFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "noOctal")
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]

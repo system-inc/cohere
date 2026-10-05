@@ -81,6 +81,7 @@ func TestNoEvalFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, NoEval, evalFile, testCase.sourceText), testCase.wantIds...)
 		})
@@ -153,6 +154,7 @@ func TestNoEvalStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoEval, evalFile, testCase.sourceText))
 		})
 	}
@@ -197,6 +199,7 @@ func TestNoEvalAllowIndirect(t *testing.T) {
 	}
 	for _, sourceText := range allowed {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(
 				t, NoEval, evalFile, sourceText, NoEvalOptions{AllowIndirect: true}))
 		})
@@ -205,6 +208,7 @@ func TestNoEvalAllowIndirect(t *testing.T) {
 	// The direct call is still reported with the option on. That is the whole point of the option
 	// being narrower than off.
 	t.Run("a direct call is still reported", func(t *testing.T) {
+		t.Parallel()
 		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(
 			t, NoEval, evalFile, "eval('foo')", NoEvalOptions{AllowIndirect: true}), "noEval")
 	})
@@ -245,6 +249,7 @@ func TestNoEvalSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoEval, evalFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.want))

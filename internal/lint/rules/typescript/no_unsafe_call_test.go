@@ -65,6 +65,7 @@ func TestNoUnsafeCallStaysSilent(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(noUnsafeCallCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeCall, noUnsafeCallFile, sourceText))
 		})
 	}
@@ -371,6 +372,7 @@ func TestNoUnsafeCallFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noUnsafeCallCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnsafeCall, noUnsafeCallFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))

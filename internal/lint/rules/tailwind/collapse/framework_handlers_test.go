@@ -19,6 +19,7 @@ import (
 // as strings and equal as readings alike; TestEmittedPropertyNamesAreTheMeasuredOnes is what covers
 // those six roots.
 func TestEmittedDeclarationsAgreeWithTheMeasuredProperty(t *testing.T) {
+	t.Parallel()
 	// A sentinel rather than a resolved value, to make the point that the emitters are being asked
 	// for a shape. If any of these bodies started reading its value, the reading would be computed
 	// from a string that is not CSS, and this test would be the place it showed.
@@ -83,6 +84,7 @@ func TestEmittedDeclarationsAgreeWithTheMeasuredProperty(t *testing.T) {
 // test, since it never runs `PropertySort` and so never touches the code path the port exists to
 // feed.
 func TestEmittedPropertyNamesAreTheMeasuredOnes(t *testing.T) {
+	t.Parallel()
 	var compared, unknownToPropertyOrder int
 	for root, utility := range FrameworkFunctionalUtilities {
 		emitted := utility.Emit(root, ResolvedUtilityValue{Value: "zzsentinel"})
@@ -121,6 +123,7 @@ func TestEmittedPropertyNamesAreTheMeasuredOnes(t *testing.T) {
 // mattering on real data. What it can show is that the lookup runs at all: a static name resolves
 // through the static emitter and an unrecognised one falls through to the handle body.
 func TestStaticValuesEmitTheirOwnProperty(t *testing.T) {
+	t.Parallel()
 	utility, known := FrameworkFunctionalUtilities["order"]
 	if !known {
 		t.Fatal("order is not in the table")
@@ -166,6 +169,7 @@ func describeDeclarations(nodes []*Node) string {
 // whose emitter was never written would agree with the table perfectly, because both sides would be
 // reading the same field.
 func TestUnportedRootEmitsNothing(t *testing.T) {
+	t.Parallel()
 	utility := FrameworkFunctionalUtilities["cursor"]
 	// Reported through describeDeclarations rather than with %v, because a `[]*Node` formats as a
 	// pointer and a failure that names no property tells the next reader nothing about what fired.

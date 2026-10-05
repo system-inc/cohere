@@ -115,6 +115,7 @@ func TestInitDeclarationsStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(initDeclarationsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runInitDeclarations(t, testCase.sourceText, testCase.options))
 		})
 	}
@@ -326,6 +327,7 @@ func TestInitDeclarationsFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(initDeclarationsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := runInitDeclarations(t, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -424,6 +426,7 @@ func TestInitDeclarationsLeavesDestructuringPatternsAlone(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runInitDeclarations(t, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -493,6 +496,7 @@ func TestInitDeclarationsExemptsEveryConstantBindingUnderNever(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runInitDeclarations(t, testCase.sourceText, `["never"]`)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -542,6 +546,7 @@ func TestInitDeclarationsDecoderReadsThePositionalArray(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.raw, func(t *testing.T) {
+			t.Parallel()
 			decoded := decodeInitDeclarationsOptionsForTest(t, testCase.raw)
 			settings, isSettings := decoded.(InitDeclarationsOptions)
 			if !isSettings {

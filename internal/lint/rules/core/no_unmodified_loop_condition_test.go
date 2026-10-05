@@ -28,6 +28,7 @@ func TestNoUnmodifiedLoopConditionFires(t *testing.T) {
 
 	for _, testCase := range unmodifiedLoopFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 
 			wantIds := make([]string, len(testCase.variables))
@@ -57,6 +58,7 @@ func TestNoUnmodifiedLoopConditionStaysSilent(t *testing.T) {
 
 	for _, source := range unmodifiedLoopCleanCases {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source))
 		})
@@ -83,6 +85,7 @@ func TestNoUnmodifiedLoopConditionOptionOnlyCasesAreRecordedNotAsserted(t *testi
 	}
 	for _, testCase := range unmodifiedLoopOptionOnlyCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			// Runs the rule for its own sake: these are real sources and a crash on one is a
 			// defect whatever the option question is.
 			rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
@@ -126,6 +129,7 @@ func TestNoUnmodifiedLoopConditionSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			if len(result.Diagnostics) != len(testCase.reports) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.reports), len(result.Diagnostics))
@@ -215,6 +219,7 @@ func TestNoUnmodifiedLoopConditionForInAndForOfAreNeverJudged(t *testing.T) {
 		"var foo = []; for (var item of foo) { } foo = 1;",
 	} {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source))
 		})
@@ -260,6 +265,7 @@ func TestNoUnmodifiedLoopConditionUnnamedFunctionDeclarationHasNoNameToReach(t *
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			if testCase.fires {
 				rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
@@ -313,6 +319,7 @@ func TestNoUnmodifiedLoopConditionClimbStopsAtTheNearestFunctionDeclaration(t *t
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			if testCase.fires {
 				rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
@@ -369,6 +376,7 @@ func TestNoUnmodifiedLoopConditionDynamicCheckDoesNotDescendIntoFunctions(t *tes
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			wantIds := make([]string, testCase.reports)
 			for index := range wantIds {
@@ -423,6 +431,7 @@ func TestNoUnmodifiedLoopConditionVarInitializerCountsAsAWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			if testCase.fires {
 				rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
@@ -469,6 +478,7 @@ func TestNoUnmodifiedLoopConditionModifierReachedThroughACall(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			if testCase.fires {
 				rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
@@ -733,6 +743,7 @@ async function watch() {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, ambient+testCase.source)
 			if testCase.fires {
 				rule_testing.ExpectFindings(t, result, "loopConditionNotModified")

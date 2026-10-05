@@ -25,6 +25,7 @@ import (
 // Found by @system_cohere_lint_fix running real rules through the engine rather than reasoning
 // about ranges.
 func TestFixHelpersDoNotEatLeadingTrivia(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		source string
@@ -37,6 +38,7 @@ func TestFixHelpersDoNotEatLeadingTrivia(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			sourceFile, specifier := parseModuleSpecifier(t, testCase.source)
 			context := Context{SourceFile: sourceFile}
 
@@ -56,6 +58,7 @@ func TestFixHelpersDoNotEatLeadingTrivia(t *testing.T) {
 // guessed would be wrong half the time. A rule that wants the surrounding whitespace gone says so
 // with ReplaceRange over a range it computed.
 func TestRemoveNodeLeavesTriviaBehind(t *testing.T) {
+	t.Parallel()
 	source := "import * as X from /* pinned */ 'fs';"
 	sourceFile, specifier := parseModuleSpecifier(t, source)
 	context := Context{SourceFile: sourceFile}
@@ -73,6 +76,7 @@ func TestRemoveNodeLeavesTriviaBehind(t *testing.T) {
 // Inserting before a node's trivia rather than before the node puts a modifier above the comment
 // that documents the declaration, which is never what a rule means.
 func TestInsertBeforeLandsOnTheTokenNotItsComment(t *testing.T) {
+	t.Parallel()
 	source := "import * as X from /* pinned */ 'fs';"
 	sourceFile, specifier := parseModuleSpecifier(t, source)
 	context := Context{SourceFile: sourceFile}
@@ -88,6 +92,7 @@ func TestInsertBeforeLandsOnTheTokenNotItsComment(t *testing.T) {
 // TestInsertAfterNeedsNoTrimming confirms the one helper that was already correct, so a later
 // refactor cannot quietly break it while fixing the others.
 func TestInsertAfterNeedsNoTrimming(t *testing.T) {
+	t.Parallel()
 	source := "import * as X from 'fs';"
 	sourceFile, specifier := parseModuleSpecifier(t, source)
 	context := Context{SourceFile: sourceFile}
@@ -103,6 +108,7 @@ func TestInsertAfterNeedsNoTrimming(t *testing.T) {
 // TestTokenRangeSurvivesANilSourceFile keeps the helper from panicking in a harness that parsed no
 // file. Untrimmed is wrong, but a crash inside a linter is worse.
 func TestTokenRangeSurvivesANilSourceFile(t *testing.T) {
+	t.Parallel()
 	_, specifier := parseModuleSpecifier(t, "import * as X from 'fs';")
 
 	if got := TokenRange(nil, specifier); got != specifier.Loc {
@@ -159,6 +165,7 @@ func parseModuleSpecifier(t *testing.T, source string) (*ast.SourceFile, *ast.No
 // This is worse than an offset because it is invisible in a count. A finding at the wrong line
 // still reads as a real finding.
 func TestReportNodeAnchorsOnTheTokenNotItsComment(t *testing.T) {
+	t.Parallel()
 	source := strings.Join([]string{
 		"const {",
 		"    method,",
@@ -183,6 +190,7 @@ func TestReportNodeAnchorsOnTheTokenNotItsComment(t *testing.T) {
 // TestReportNodeWithFixesAnchorsOnTheToken covers the variant that matters twice over: a finding at
 // the wrong line carrying a fix means the repair lands somewhere the reader was never shown.
 func TestReportNodeWithFixesAnchorsOnTheToken(t *testing.T) {
+	t.Parallel()
 	source := "const {\n    // a comment\n    params,\n} = message;"
 
 	sourceFile, binding := parseNamedBinding(t, source, "params")

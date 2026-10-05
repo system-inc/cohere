@@ -21,6 +21,7 @@ const callback = React.useCallback(() => properties.inputReference.current.value
 		{"missing reactive dependency", `import {useMemo} from 'react'; function Component(props) { const result = useMemo(() => [props.value], []); return <div>{result}</div>; }`, true},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			findings, lowered := findingsForSource(t, testCase.source)
 			if !lowered || (len(findings) != 0) != testCase.fires {
 				t.Fatalf("lowered=%t findings=%v; want fires=%t", lowered, findings, testCase.fires)

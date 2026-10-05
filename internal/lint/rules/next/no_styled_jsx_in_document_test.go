@@ -72,6 +72,7 @@ func TestNoStyledJsxInDocumentReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoStyledJsxInDocument, testCase.fileName, testCase.source)
 			rule_testing.ExpectFindings(t, result, messageNoStyledJsxInDocument.Id)
 		})
@@ -170,6 +171,7 @@ func TestNoStyledJsxInDocumentIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoStyledJsxInDocument, testCase.fileName, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})

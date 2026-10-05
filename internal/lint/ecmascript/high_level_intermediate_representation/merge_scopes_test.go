@@ -222,6 +222,7 @@ func TestMergeMatchesReact(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, scopes := buildMergeCase(t, testCase)
 			merged := MergeOverlappingReactiveScopes(function, scopes)
 

@@ -779,6 +779,7 @@ func TestPruneDeclarationsLastUsedBefore(t *testing.T) {
 		{name: "no recorded usage keeps it", recorded: false, scopeEnd: 10, wantRemoved: 0},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			dependencies := &ScopeDependencies{
 				declarations: map[ScopeId][]IdentifierId{1: {1}},
 			}

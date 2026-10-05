@@ -5,6 +5,7 @@ import "testing"
 // The five phi web routes that lost prerendering are the first rows, by their real paths, because
 // they are the files this helper exists for.
 func TestIsRouteContractExport(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		filePath string
@@ -42,6 +43,7 @@ func TestIsRouteContractExport(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if got := IsRouteContractExport(testCase.filePath, testCase.export); got != testCase.want {
 				t.Errorf("IsRouteContractExport(%q, %q) = %v, want %v", testCase.filePath, testCase.export, got, testCase.want)
 			}

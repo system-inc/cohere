@@ -66,6 +66,7 @@ func TestImportNoForbiddenSourceFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ImportNoForbiddenSource, forbiddenSourceFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
 
@@ -118,6 +119,7 @@ func TestImportNoForbiddenSourceExemptsOnlyTheSanctionedWrapper(t *testing.T) {
 	}
 	for _, wrapper := range wrappers {
 		t.Run(wrapper.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ImportNoForbiddenSource, wrapper.fileName, wrapper.sourceText))
 		})
 	}
@@ -138,6 +140,7 @@ func TestImportNoForbiddenSourceExemptsOnlyTheSanctionedWrapper(t *testing.T) {
 	}
 	for _, neighbour := range neighbours {
 		t.Run(neighbour.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ImportNoForbiddenSource, neighbour.fileName, neighbour.sourceText)
 			rule_testing.ExpectFindings(t, result, neighbour.wantId)
 			rule_testing.ExpectFixedSource(t, result,
@@ -191,6 +194,7 @@ func TestImportNoForbiddenSourceStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ImportNoForbiddenSource, forbiddenSourceFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})

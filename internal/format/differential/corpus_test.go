@@ -33,6 +33,7 @@ import (
 // the format phase refuses to walk into a nested repository and a percentage taken across a boundary
 // nobody can see is the 08-25 mistake: a root that silently measures half its tree.
 func TestCorpora(t *testing.T) {
+	t.Parallel()
 	roots := os.Getenv("COHERE_FORMAT_CORPORA")
 	if roots == "" {
 		t.Skip("set COHERE_FORMAT_CORPORA to measure; this is a measuring run, not a unit test")

@@ -41,6 +41,7 @@ func TestNoDupeClassMembersFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText),
 				"noDupeClassMembers")
@@ -85,6 +86,7 @@ func TestNoDupeClassMembersStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText))
 		})
@@ -136,6 +138,7 @@ func TestNoDupeClassMembersAllowsOverloadSignatures(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText))
 		})
@@ -162,6 +165,7 @@ func TestNoDupeClassMembersStillReportsDuplicatesBesideOverloads(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText),
 				"noDupeClassMembers")

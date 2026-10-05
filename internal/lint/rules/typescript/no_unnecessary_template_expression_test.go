@@ -97,6 +97,7 @@ func TestNoUnnecessaryTemplateExpressionStaysSilent(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(noUnnecessaryTemplateExpressionCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnnecessaryTemplateExpression,
 				noUnnecessaryTemplateExpressionFile, sourceText))
 		})
@@ -603,6 +604,7 @@ func TestNoUnnecessaryTemplateExpressionFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noUnnecessaryTemplateExpressionCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnnecessaryTemplateExpression,
 				noUnnecessaryTemplateExpressionFile, testCase.sourceText)
 
@@ -1102,6 +1104,7 @@ func TestNoUnnecessaryTemplateExpressionFixes(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noUnnecessaryTemplateExpressionCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnnecessaryTemplateExpression,
 				noUnnecessaryTemplateExpressionFile, testCase.sourceText)
 

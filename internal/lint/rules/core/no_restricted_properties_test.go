@@ -158,6 +158,7 @@ func TestNoRestrictedPropertiesFires(t *testing.T) {
 
 	for _, testCase := range noRestrictedPropertiesFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runNoRestrictedProperties(t, testCase),
 				testCase.wantIds...)
 		})
@@ -169,6 +170,7 @@ func TestNoRestrictedPropertiesStaysSilent(t *testing.T) {
 
 	for _, testCase := range noRestrictedPropertiesSilentCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runNoRestrictedProperties(t, testCase))
 		})
 	}
@@ -294,6 +296,7 @@ func TestNoRestrictedPropertiesRendersTheWholeMessage(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoRestrictedProperties(t, noRestrictedPropertiesCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(result.Diagnostics) != 1 {
@@ -339,6 +342,7 @@ func TestNoRestrictedPropertiesPointsAtTheAccess(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runNoRestrictedProperties(t, noRestrictedPropertiesCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -387,6 +391,7 @@ func TestNoRestrictedPropertiesReadsAssignmentDestructuring(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runNoRestrictedProperties(t, testCase)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -437,6 +442,7 @@ func TestNoRestrictedPropertiesReadsUpstreamsPropertyNames(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runNoRestrictedProperties(t, testCase)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)
@@ -456,6 +462,7 @@ func TestDecodeNoRestrictedPropertiesOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("nil input yields an empty list", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoRestrictedPropertiesOptions(nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -466,6 +473,7 @@ func TestDecodeNoRestrictedPropertiesOptions(t *testing.T) {
 	})
 
 	t.Run("an entry naming neither an object nor a property is rejected", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeNoRestrictedPropertiesOptions(
 			[]byte(`[{"message":"nope"}]`)); err == nil {
 			t.Error("an entry that can never match anything decoded")
@@ -473,6 +481,7 @@ func TestDecodeNoRestrictedPropertiesOptions(t *testing.T) {
 	})
 
 	t.Run("object paired with allowObjects is rejected", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeNoRestrictedPropertiesOptions(
 			[]byte(`[{"object":"foo","allowObjects":["bar"]}]`)); err == nil {
 			t.Error("a self-contradictory pairing decoded")
@@ -480,6 +489,7 @@ func TestDecodeNoRestrictedPropertiesOptions(t *testing.T) {
 	})
 
 	t.Run("property paired with allowProperties is rejected", func(t *testing.T) {
+		t.Parallel()
 		if _, err := DecodeNoRestrictedPropertiesOptions(
 			[]byte(`[{"property":"foo","allowProperties":["bar"]}]`)); err == nil {
 			t.Error("a self-contradictory pairing decoded")
@@ -487,6 +497,7 @@ func TestDecodeNoRestrictedPropertiesOptions(t *testing.T) {
 	})
 
 	t.Run("every element is a restriction, upstream's variadic spelling", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeNoRestrictedPropertiesOptions(
 			[]byte(`[{"object":"foo","property":"bar"},{"property":"__proto__","message":"No."}]`))
 		if err != nil {
@@ -499,6 +510,7 @@ func TestDecodeNoRestrictedPropertiesOptions(t *testing.T) {
 	})
 
 	t.Run("shapes the config layer does not deliver, or upstream refuses, are rejected", func(t *testing.T) {
+		t.Parallel()
 		for _, raw := range []string{
 			// The wrapper this decoder used to read.
 			`{"restrictions":[{"object":"foo"}]}`,
@@ -602,6 +614,7 @@ func TestNoRestrictedPropertiesSkipsParenthesesAndRestElements(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoRestrictedProperties(t, noRestrictedPropertiesCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(testCase.wantIds) == 0 {

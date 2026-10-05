@@ -122,6 +122,7 @@ func TestGetterReturnFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTyped(t, GetterReturn, getterReturnFile, testCase.sourceText), testCase.id)
 		})
@@ -161,6 +162,7 @@ func TestGetterReturnFiresWithAllowImplicit(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTypedWithOptions(t, GetterReturn, getterReturnFile, testCase.sourceText,
 					GetterReturnOptions{AllowImplicit: true}), testCase.id)
@@ -271,6 +273,7 @@ func TestGetterReturnStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, GetterReturn, getterReturnFile, testCase.sourceText))
 		})
 	}
@@ -301,6 +304,7 @@ func TestGetterReturnStaysSilentWithAllowImplicit(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTypedWithOptions(t, GetterReturn, getterReturnFile, testCase.sourceText,
 					GetterReturnOptions{AllowImplicit: true}))
@@ -394,6 +398,7 @@ func TestGetterReturnPointsAtTheGetterHead(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, GetterReturn, getterReturnFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))

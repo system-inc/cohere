@@ -43,6 +43,7 @@ func TestConsistencyNoLongLineCommentFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoLongLineComment, longCommentFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "longLineComment")
 		})
@@ -102,6 +103,7 @@ func TestConsistencyNoLongLineCommentStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoLongLineComment, testCase.fileName, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -114,6 +116,7 @@ func TestConsistencyNoLongLineCommentStaysSilent(t *testing.T) {
 // the generator writes a block comment, so a finding here is a defect in the generator. The rule used
 // to skip these files.
 func TestConsistencyNoLongLineCommentHoldsGeneratedFilesToTheRule(t *testing.T) {
+	t.Parallel()
 	for _, fileName := range []string{"/repository/source/generated/Thing.ts", "/repository/source/Thing.generated.ts"} {
 		result := rule_testing.Run(t, ConsistencyNoLongLineComment, fileName, lineCommentRun(9))
 		rule_testing.ExpectFindings(t, result, "longLineComment")

@@ -243,6 +243,7 @@ func utilityCandidateFromCase(aCase utilityCase) *ParsedCandidate {
 // everything would agree on every class that compiles and be wrong on the 6,000-odd that do not,
 // while looking identical in a summary that only counted matches.
 func TestUtilityMatchesEngine(t *testing.T) {
+	t.Parallel()
 	corpus := utilityLoadCorpus(t)
 	evaluator, ok := utilityBuildEvaluator(t, corpus)
 	if !ok {
@@ -328,6 +329,7 @@ func TestUtilityMatchesEngine(t *testing.T) {
 // The count is asserted too. If a repository change made the exception set smaller, this component's
 // justification changed and that should be read rather than silently passed.
 func TestUtilityReproducesTheKnownExceptions(t *testing.T) {
+	t.Parallel()
 	corpus := utilityLoadCorpus(t)
 	evaluator, ok := utilityBuildEvaluator(t, corpus)
 	if !ok {
@@ -398,6 +400,7 @@ func TestUtilityReproducesTheKnownExceptions(t *testing.T) {
 // a repository with no such `@utility` block would make every other test in this file pass over an
 // empty population, which is the failure mode this whole slice has been bitten by.
 func TestUtilityFindsThePerDeclarationRoots(t *testing.T) {
+	t.Parallel()
 	corpus := utilityLoadCorpus(t)
 	evaluator, ok := utilityBuildEvaluator(t, corpus)
 	if !ok {
@@ -460,6 +463,7 @@ func TestUtilityFindsThePerDeclarationRoots(t *testing.T) {
 // refactor. The suppression reaches into the same evaluation state the real path uses, so it cannot
 // drift away from what it is mutating.
 func TestUtilityDropIsNotDefault(t *testing.T) {
+	t.Parallel()
 	corpus := utilityLoadCorpus(t)
 	evaluator, ok := utilityBuildEvaluator(t, corpus)
 	if !ok {
@@ -517,6 +521,7 @@ func TestUtilityDropIsNotDefault(t *testing.T) {
 // assertion is that the population where it does matter is non-empty, since a splice that never fires
 // is a branch this suite has not exercised.
 func TestUtilityRatioSpliceIsLoadBearing(t *testing.T) {
+	t.Parallel()
 	corpus := utilityLoadCorpus(t)
 	evaluator, ok := utilityBuildEvaluator(t, corpus)
 	if !ok {
@@ -565,6 +570,7 @@ func TestUtilityRatioSpliceIsLoadBearing(t *testing.T) {
 // whole chain and asserts the same answers, so a mismatch between what the fixture recorded and what
 // the Go parser produces is a failure here rather than a surprise in the rule.
 func TestUtilityAgreesThroughTheGoCandidateParser(t *testing.T) {
+	t.Parallel()
 	corpus := utilityLoadCorpus(t)
 	evaluator, ok := utilityBuildEvaluator(t, corpus)
 	if !ok {
@@ -636,6 +642,7 @@ func TestUtilityAgreesThroughTheGoCandidateParser(t *testing.T) {
 // mechanism it does not implement, which is a right answer for a wrong reason waiting to become a
 // wrong one.
 func TestUtilityDoesNotClaimTheShadowQuirk(t *testing.T) {
+	t.Parallel()
 	corpus := utilityLoadCorpus(t)
 	evaluator, ok := utilityBuildEvaluator(t, corpus)
 	if !ok {
@@ -669,6 +676,7 @@ func TestUtilityDoesNotClaimTheShadowQuirk(t *testing.T) {
 // cases are the ones a reasonable guess gets wrong, since `1.50` and `+1` are multiples of 0.25 and
 // are not how `String(Number(x))` spells them.
 func TestUtilitySpacingMultiplierRejects(t *testing.T) {
+	t.Parallel()
 	accepted := []string{"0", "1", "0.25", "0.5", "1.25", "2.75", "100"}
 	rejected := []string{"1.3", "0.1", "-0.25", "1.50", "+1", "1e2", "", "abc", ".25"}
 
@@ -692,6 +700,7 @@ func TestUtilitySpacingMultiplierRejects(t *testing.T) {
 // so a port that skipped normalization would fail quietly on exactly the classes this component
 // exists to get right. The cases are upstream's own documented examples.
 func TestUtilityNormalizesValueArguments(t *testing.T) {
+	t.Parallel()
 	cases := []struct{ argument, want string }{
 		{"--spacing", "--spacing-*"},
 		{"--spacing- *", "--spacing-*"},
@@ -728,6 +737,7 @@ func TestUtilityNormalizesValueArguments(t *testing.T) {
 // self-contained: the generator writes each synthetic stylesheet next to the repository's own entry
 // point so `@import "tailwindcss"` resolves, measures it, and deletes it.
 func TestUtilitySyntheticCasesMatchEngine(t *testing.T) {
+	t.Parallel()
 	corpus := utilityLoadCorpus(t)
 
 	if len(corpus.SyntheticCases) == 0 {
@@ -736,6 +746,8 @@ func TestUtilitySyntheticCasesMatchEngine(t *testing.T) {
 
 	var totalCompared, totalCompiling, totalRejecting int
 	for _, syntheticCase := range corpus.SyntheticCases {
+		// Not parallel: its subtests add to totals the test checks after them, and a parallel subtest would run
+		// only after the test had returned, so the check would pass on nothing.
 		t.Run(syntheticCase.Name, func(t *testing.T) {
 			theme := NewTheme()
 			for key, value := range syntheticCase.ThemeEntries {

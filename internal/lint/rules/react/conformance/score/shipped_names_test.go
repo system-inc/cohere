@@ -32,6 +32,7 @@ import (
 // Scored by mutation: setting `hooks` back to `react/rules-of-hooks` SURVIVED the entire suite
 // before this test existed, and so did corrupting an unwired rule's value. Both are caught now.
 func TestShippedRuleNamesAreRegistered(t *testing.T) {
+	t.Parallel()
 	registered := map[string]bool{}
 	var names []string
 	for _, registeredRule := range registry.All() {
@@ -66,6 +67,7 @@ func TestShippedRuleNamesAreRegistered(t *testing.T) {
 // and expected: `ShippedRules` is what cohere HAS, `Rules` is what this harness has WIRED, and the
 // gap between them is the honest measure of what is left to do.
 func TestEveryWiredRuleIsAShippedRule(t *testing.T) {
+	t.Parallel()
 	for _, upstream := range UpstreamNames() {
 		if _, shipped := react_conformance.ShippedRules[upstream]; !shipped {
 			t.Errorf("rule %q is wired in the engine but absent from ShippedRules, so its fixtures would be classified as unshipped", upstream)
@@ -86,6 +88,7 @@ func TestEveryWiredRuleIsAShippedRule(t *testing.T) {
 // `ShippedRules` says implements that upstream rule, so wiring `react.UseMemo` under the key
 // `gating` fails here rather than producing a confidently wrong per-rule scoreboard.
 func TestWiredRuleNamesMatchTheRegisteredRule(t *testing.T) {
+	t.Parallel()
 	for _, upstream := range UpstreamNames() {
 		want := react_conformance.ShippedRules[upstream]
 		if got := Rules[upstream].Rule.Name; got != want {

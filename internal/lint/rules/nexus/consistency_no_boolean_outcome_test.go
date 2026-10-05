@@ -27,6 +27,7 @@ func TestConsistencyNoBooleanOutcomeFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoBooleanOutcome, outcomeFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "booleanOutcome")
 		})
@@ -57,6 +58,7 @@ func TestConsistencyNoBooleanOutcomeStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoBooleanOutcome, testCase.fileName, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -66,6 +68,7 @@ func TestConsistencyNoBooleanOutcomeStaysSilent(t *testing.T) {
 // Generated code is held to the rule like hand-written code (Kirk's ruling on generated code, #c076xbg):
 // a generator emitting a boolean outcome is fixed at the generator. The rule used to skip these files.
 func TestConsistencyNoBooleanOutcomeHoldsGeneratedFilesToTheRule(t *testing.T) {
+	t.Parallel()
 	for _, fileName := range []string{"/repository/source/generated/Api.ts", "/repository/source/Api.generated.ts"} {
 		result := rule_testing.Run(t, ConsistencyNoBooleanOutcome, fileName, "export interface LookupResult {\n    success: boolean;\n    error: string;\n}\n")
 		rule_testing.ExpectFindings(t, result, "booleanOutcome")

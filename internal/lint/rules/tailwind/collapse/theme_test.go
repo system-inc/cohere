@@ -180,6 +180,7 @@ func buildThemeForCase(t *testing.T, aCase themeCase) (*Theme, []SkippedDirectiv
 // and this component's whole claim is about scale: it is checked against two real design systems,
 // not against a reading.
 func TestThemeMatchesEngine(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 
 	var totalEntries, totalNamespaces, totalNamespaceEntries, totalKeysInNamespace int
@@ -187,6 +188,8 @@ func TestThemeMatchesEngine(t *testing.T) {
 	var repositoriesChecked, syntheticChecked int
 
 	for _, aCase := range corpus.Cases {
+		// Not parallel: its subtests add to totals the test checks after them, and a parallel subtest would run
+		// only after the test had returned, so the check would pass on nothing.
 		t.Run(aCase.Name, func(t *testing.T) {
 			theme, _, ok := buildThemeForCase(t, aCase)
 			if !ok {
@@ -374,6 +377,7 @@ func TestThemeMatchesEngine(t *testing.T) {
 // passes trivially because the two themes became identical, the assertion below fails rather than
 // quietly succeeding.
 func TestThemeRepositoriesDiffer(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 
 	type resolved struct {
@@ -455,6 +459,7 @@ func TestThemeRepositoriesDiffer(t *testing.T) {
 // by that many keys, and this is what makes that arrive as a visible directive rather than as a
 // wrong count. See the boundary note in themeloader.go.
 func TestThemeLoaderReportsSkippedDirectives(t *testing.T) {
+	t.Parallel()
 	corpus := loadThemeCorpus(t)
 
 	ran := 0
@@ -502,6 +507,7 @@ func TestThemeLoaderReportsSkippedDirectives(t *testing.T) {
 // does not. A port that appends on every write reorders every redefinition, which is what a
 // repository's `@theme` does to nearly every framework default it overrides.
 func TestThemeInsertionOrderSurvivesRedefinition(t *testing.T) {
+	t.Parallel()
 	theme := NewTheme()
 	for _, entry := range [][2]string{{"--color-a", "red"}, {"--color-b", "blue"}, {"--color-c", "green"}} {
 		if err := theme.Add(entry[0], entry[1], ThemeOptionNone); err != nil {
@@ -535,6 +541,7 @@ func TestThemeInsertionOrderSurvivesRedefinition(t *testing.T) {
 // forever. The bound is the property worth pinning; the exact threshold is an implementation
 // choice and is not asserted.
 func TestThemeKeyOrderCompacts(t *testing.T) {
+	t.Parallel()
 	theme := NewTheme()
 
 	const rounds = 500
@@ -570,6 +577,7 @@ func TestThemeKeyOrderCompacts(t *testing.T) {
 // every namespace read with one extra bogus member, and no corpus stylesheet contains the input
 // that would reveal it.
 func TestThemeAddRejectsInvalidNamespaceClear(t *testing.T) {
+	t.Parallel()
 	theme := NewTheme()
 	if err := theme.Add("--color-*", "red", ThemeOptionNone); err == nil {
 		t.Fatal("Add(\"--color-*\", \"red\") returned no error; the engine throws")
@@ -586,6 +594,7 @@ func TestThemeAddRejectsInvalidNamespaceClear(t *testing.T) {
 // rules are not intuitive: a lone `-` is escaped, a leading digit becomes a hex escape with a
 // trailing space, and a digit in second position is escaped only after a `-`.
 func TestEscapeRoundTrip(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		value  string
 		escape string

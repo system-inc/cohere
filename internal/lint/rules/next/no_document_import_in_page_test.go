@@ -56,6 +56,7 @@ func TestNoDocumentImportInPageIsSilentOnUpstreamPassCases(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDocumentImportInPage, testCase.fileName, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -98,6 +99,7 @@ func TestNoDocumentImportInPageReportsOnUpstreamFailCases(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDocumentImportInPage, testCase.fileName, testCase.source)
 			rule_testing.ExpectFindings(t, result, messageNoDocumentImportInPage.Id)
 		})
@@ -174,6 +176,7 @@ func TestNoDocumentImportInPageReportsOnShapesTheCorpusNeverPins(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDocumentImportInPage, testCase.fileName, testCase.source)
 			rule_testing.ExpectFindings(t, result, messageNoDocumentImportInPage.Id)
 		})
@@ -287,6 +290,7 @@ func TestNoDocumentImportInPageIsSilentOnShapesTheCorpusNeverPins(t *testing.T) 
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoDocumentImportInPage, testCase.fileName, testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})

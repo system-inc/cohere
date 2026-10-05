@@ -52,6 +52,7 @@ func TestNoInvalidRegexpFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoInvalidRegexp, noInvalidRegexpFile, testCase.sourceText),
 				"invalidRegexp")
 		})
@@ -100,6 +101,7 @@ func TestNoInvalidRegexpStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoInvalidRegexp, noInvalidRegexpFile, testCase.sourceText))
 		})
 	}

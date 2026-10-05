@@ -97,6 +97,7 @@ func TestConsistencyNoForInReportsEveryForIn(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			sourceText := strings.Join(testCase.lines, "\n") + "\n"
 			result := rule_testing.Run(t, ConsistencyNoForIn, consistencyNoForInFile, sourceText)
 
@@ -158,6 +159,7 @@ func TestConsistencyNoForInStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoForIn, consistencyNoForInFile, strings.Join(testCase.lines, "\n")+"\n")
 			rule_testing.ExpectClean(t, result)
 		})

@@ -72,8 +72,10 @@ func runNoBitwise(t *testing.T, testCase noBitwiseCase) rule_testing.Result {
 
 // TestNoBitwiseStaysSilent runs upstream's whole `valid` list.
 func TestNoBitwiseStaysSilent(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range noBitwiseCleanCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runNoBitwise(t, testCase))
 		})
 	}
@@ -81,8 +83,10 @@ func TestNoBitwiseStaysSilent(t *testing.T) {
 
 // TestNoBitwiseFires runs upstream's whole `invalid` list, asserting the span and the operator.
 func TestNoBitwiseFires(t *testing.T) {
+	t.Parallel()
 	for _, testCase := range noBitwiseReportingCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoBitwise(t, testCase)
 
 			wantIds := make([]string, 0, len(testCase.findings))
@@ -115,6 +119,7 @@ func TestNoBitwiseFires(t *testing.T) {
 // The corpus writes exactly two `int32Hint` cases, `a|0` on and `a|0` with allow, so nothing in it
 // separates "the right operand is the literal zero" from any looser reading. These do.
 func TestNoBitwiseInt32HintEdges(t *testing.T) {
+	t.Parallel()
 	const hintOn = `{"int32Hint":true}`
 	cases := []noBitwiseCase{
 		{name: "x|0 is the idiom", source: `x|0`, optionsJson: hintOn, reason: "the corpus case"},
@@ -129,6 +134,7 @@ func TestNoBitwiseInt32HintEdges(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoBitwise(t, testCase)
 			if len(result.Diagnostics) != 0 {
 				t.Errorf("expected silence, got %v. %s", result.MessageIds(), testCase.reason)
@@ -166,6 +172,7 @@ func TestNoBitwiseInt32HintEdges(t *testing.T) {
 	}
 	for _, testCase := range reporting {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runNoBitwise(t, testCase)
 			if len(result.Diagnostics) == 0 {
 				t.Errorf("expected a finding and got none. %s", testCase.reason)
@@ -187,6 +194,7 @@ func TestNoBitwiseInt32HintEdges(t *testing.T) {
 // batch unwraps for the opposite reason: there the parens sit on a finding rather than on an
 // exemption, and declining costs findings.
 func TestNoBitwiseParenthesizedZeroDivergesFromUpstream(t *testing.T) {
+	t.Parallel()
 	result := runNoBitwise(t, noBitwiseCase{source: `x|(0)`, optionsJson: `{"int32Hint":true}`})
 	rule_testing.ExpectFindings(t, result, messageNoBitwise.Id)
 }
@@ -197,6 +205,7 @@ func TestNoBitwiseParenthesizedZeroDivergesFromUpstream(t *testing.T) {
 // different bytes. `meta.schema` declares ONE element here, so the cohere spelling and upstream's
 // coincide, and that is the fact being pinned rather than assumed.
 func TestNoBitwiseDecoderAcceptsTheShapesTheConfigLayerDelivers(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name      string
 		raw       string
@@ -236,6 +245,7 @@ func TestNoBitwiseDecoderAcceptsTheShapesTheConfigLayerDelivers(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeNoBitwiseOptions(json.RawMessage(testCase.raw))
 			if testCase.wantErr {
 				if err == nil {
@@ -265,6 +275,7 @@ func TestNoBitwiseDecoderAcceptsTheShapesTheConfigLayerDelivers(t *testing.T) {
 // A decoder that round-trips and a rule that ignores what it decoded look identical from the test
 // above. One source, two configurations, opposite verdicts.
 func TestNoBitwiseAllowActuallyReachesTheRule(t *testing.T) {
+	t.Parallel()
 	allowed := runNoBitwise(t, noBitwiseCase{source: `~a`, optionsJson: `{"allow":["~"]}`})
 	if len(allowed.Diagnostics) != 0 {
 		t.Errorf("with `~` allowed the rule must be silent, got %v", allowed.MessageIds())
@@ -285,12 +296,14 @@ func TestNoBitwiseAllowActuallyReachesTheRule(t *testing.T) {
 // absent: `&&`, `||`, `??` and `!`. The corpus asserts the assignment forms; the plain forms and the
 // remaining arithmetic operators are stated here so a mutation adding a kind to the map fails.
 func TestNoBitwiseLogicalOperatorsStayClean(t *testing.T) {
+	t.Parallel()
 	sources := []string{
 		`a && b`, `a || b`, `a ?? b`, `!a`, `a + b`, `a - b`, `a * b`, `a / b`, `a % b`,
 		`a ** b`, `a += b`, `a -= b`, `a &&= b`, `a ||= b`, `a ??= b`, `a === b`, `a < b`, `a > b`,
 	}
 	for _, source := range sources {
 		t.Run(source, func(t *testing.T) {
+			t.Parallel()
 			result := runNoBitwise(t, noBitwiseCase{source: source})
 			if len(result.Diagnostics) != 0 {
 				t.Errorf("expected silence, got %v: this operator is not bitwise", result.MessageIds())
@@ -423,6 +436,7 @@ var noBitwiseReportingCases = []noBitwiseCase{
 // which is the only assertion that fails when the two drift. The count is asserted too, so removing
 // an entry from either side fails here rather than quietly testing less.
 func TestNoBitwiseEveryAcceptedSpellingActuallyExempts(t *testing.T) {
+	t.Parallel()
 	// One source per operator, chosen so the operator under test is the only one present.
 	sourceFor := map[string]string{
 		"^": `a ^ b`, "|": `a | b`, "&": `a & b`,
@@ -445,6 +459,7 @@ func TestNoBitwiseEveryAcceptedSpellingActuallyExempts(t *testing.T) {
 			continue
 		}
 		t.Run(spelling, func(t *testing.T) {
+			t.Parallel()
 			// It reports with no options...
 			rule_testing.ExpectFindings(t,
 				runNoBitwise(t, noBitwiseCase{source: source}), messageNoBitwise.Id)

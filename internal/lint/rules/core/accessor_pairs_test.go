@@ -390,6 +390,7 @@ func TestAccessorPairsFires(t *testing.T) {
 
 	for _, testCase := range accessorPairsFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runAccessorPairs(t, testCase), testCase.wantIds...)
 		})
 	}
@@ -400,6 +401,7 @@ func TestAccessorPairsStaysSilent(t *testing.T) {
 
 	for _, testCase := range accessorPairsSilentCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runAccessorPairs(t, testCase))
 		})
 	}
@@ -434,6 +436,7 @@ func TestAccessorPairsGlobalShadowing(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, runAccessorPairs(t, testCase), testCase.wantIds...)
 		})
 	}
@@ -523,6 +526,7 @@ func TestAccessorPairsPointsAtTheAccessorHead(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runAccessorPairs(t, accessorPairsCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -589,6 +593,7 @@ func TestAccessorPairsDescribesTheAccessor(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runAccessorPairs(t, accessorPairsCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(result.Diagnostics) != 1 {
@@ -613,6 +618,7 @@ func TestDecodeAccessorPairsOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("nil input yields upstream's defaults", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeAccessorPairsOptions(nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -625,6 +631,7 @@ func TestDecodeAccessorPairsOptions(t *testing.T) {
 	})
 
 	t.Run("an explicit false overrides a true default", func(t *testing.T) {
+		t.Parallel()
 		decoded, err := DecodeAccessorPairsOptions([]byte(`{"setWithoutGet": false}`))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -639,6 +646,7 @@ func TestDecodeAccessorPairsOptions(t *testing.T) {
 	})
 
 	t.Run("the wire shape is the bare object, not upstream's array", func(t *testing.T) {
+		t.Parallel()
 		// cohere's config layer unwraps the `[severity, options]` tuple before dispatch, so the
 		// decoder is handed `{...}` where upstream's schema writes `[{...}]`.
 		if _, err := DecodeAccessorPairsOptions([]byte(`[{"setWithoutGet": false}]`)); err == nil {
@@ -706,6 +714,7 @@ func TestAccessorPairsSeparatesComputedKeysByShape(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := runAccessorPairs(t, testCase)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(t, result)

@@ -40,6 +40,7 @@ import (
 // a stale table and the differential would not catch it, because both sides would be reading the
 // same wrong number. This test is the thing that would catch it.
 func TestRepositoryVariantsCannotMoveFrameworkRegistrations(t *testing.T) {
+	t.Parallel()
 	baseline, packageRoot := frameworkVariantStylesheet(t, `@import "tailwindcss";`)
 
 	baselineSystem, err := LoadDesignSystem(LoadOptions{EntryPoint: baseline, TailwindPackageRoot: packageRoot})
@@ -105,6 +106,7 @@ func TestRepositoryVariantsCannotMoveFrameworkRegistrations(t *testing.T) {
 // framework itself registers, so a table of them cannot pick up a repository token the way
 // KnownStatics did, back when that table existed.
 func TestCollapseFamiliesHoldForRootsTheFrameworkOwns(t *testing.T) {
+	t.Parallel()
 	if len(CollapseFamilies) == 0 {
 		t.Fatal("no collapse families, which is a broken table rather than a Tailwind with no shorthands")
 	}
@@ -140,6 +142,7 @@ func TestCollapseFamiliesHoldForRootsTheFrameworkOwns(t *testing.T) {
 // checks against the blocks this repository declares rather than a hardcoded list, so a repository
 // adding a utility extends the check automatically.
 func TestFrameworkStaticsCarryNoRepositoryTokens(t *testing.T) {
+	t.Parallel()
 	system := loadWave1DesignSystem(t)
 
 	declared := system.RepositoryStaticUtilityNames()

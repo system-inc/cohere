@@ -384,6 +384,7 @@ func normalize(text string) string {
 
 // TestTokensMatchUpstream runs every fixture through both sides, whole.
 func TestTokensMatchUpstream(t *testing.T) {
+	t.Parallel()
 	inputs := make([]oracleInput, 0, len(fixtures))
 	for _, fixture := range fixtures {
 		inputs = append(inputs, oracleInput{Text: normalize(fixture)})
@@ -395,6 +396,7 @@ func TestTokensMatchUpstream(t *testing.T) {
 // TestChunkedTokensMatchUpstream feeds every fixture in chunks of 1, 2, 3, 5 and 8 code units, which
 // splits lines, tokens and surrogate pairs at every point the lexer has to buffer across.
 func TestChunkedTokensMatchUpstream(t *testing.T) {
+	t.Parallel()
 	var inputs []oracleInput
 	for _, fixture := range fixtures {
 		for _, chunk := range []int{1, 2, 3, 5, 8} {
@@ -408,6 +410,7 @@ func TestChunkedTokensMatchUpstream(t *testing.T) {
 // TestGeneratedTokensMatchUpstream compares inputs drawn from YAML's indicator characters, spaces,
 // tabs, line breaks and a few letters, where the hand-written fixtures cannot reach every combination.
 func TestGeneratedTokensMatchUpstream(t *testing.T) {
+	t.Parallel()
 	count := 20000
 	if testing.Short() {
 		count = 2000
@@ -423,6 +426,7 @@ func TestGeneratedTokensMatchUpstream(t *testing.T) {
 // TestOracleCanFail proves the comparison sees a difference: the tokens of one input compared against
 // upstream's for another must differ.
 func TestOracleCanFail(t *testing.T) {
+	t.Parallel()
 	expected := upstreamOutputs(t, []oracleInput{{Text: "a: b"}, {Text: "a: [b]"}})
 	if portOutput(oracleInput{Text: "a:  b"}) == expected[0] {
 		t.Fatal("the comparison found no difference between the tokens of a: b and a:  b")
@@ -435,6 +439,7 @@ func TestOracleCanFail(t *testing.T) {
 // TestYamlTestSuiteMatchesUpstream compares every case of the yaml-test-suite package in the fork, whole
 // and in chunks of 3.
 func TestYamlTestSuiteMatchesUpstream(t *testing.T) {
+	t.Parallel()
 	root := forkRoot(t)
 	suite := filepath.Join(root, "node_modules", "yaml-test-suite", "index.js")
 	if _, err := os.Stat(suite); err != nil {
@@ -467,6 +472,7 @@ process.stdout.write(JSON.stringify(inputs));`
 
 // TestCorpusMatchesUpstream compares every .yaml and .yml file under COHERE_YAML_CORPUS, a measuring run.
 func TestCorpusMatchesUpstream(t *testing.T) {
+	t.Parallel()
 	root := os.Getenv("COHERE_YAML_CORPUS")
 	if root == "" {
 		t.Skip("set COHERE_YAML_CORPUS to a directory to compare every .yaml and .yml file under it")

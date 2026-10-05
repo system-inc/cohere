@@ -189,6 +189,7 @@ func TestConsistentTypeAssertionsStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(consistentTypeAssertionsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, runConsistentTypeAssertions(t, testCase.fileName,
 				testCase.sourceText, testCase.options))
 		})
@@ -1170,6 +1171,7 @@ func TestConsistentTypeAssertionsFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(consistentTypeAssertionsCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := runConsistentTypeAssertions(t, testCase.fileName,
 				testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -1272,6 +1274,7 @@ func TestConsistentTypeAssertionsOnPrecedenceShapesUpstreamsCorpusDoesNotWrite(t
 	const options = `{"assertionStyle": "as"}`
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runConsistentTypeAssertions(t, consistentTypeAssertionsFile,
 				testCase.sourceText, options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -1322,6 +1325,7 @@ func TestConsistentTypeAssertionsDecoderReadsUpstreamsUnion(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.raw, func(t *testing.T) {
+			t.Parallel()
 			decoded := decodeConsistentTypeAssertionsOptionsForTest(t, testCase.raw)
 			settings, isSettings := decoded.(ConsistentTypeAssertionsOptions)
 			if !isSettings {
@@ -1452,6 +1456,7 @@ func TestConsistentTypeAssertionsOnSuggestionAndTemplateShapes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := runConsistentTypeAssertions(t, consistentTypeAssertionsFile,
 				testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)

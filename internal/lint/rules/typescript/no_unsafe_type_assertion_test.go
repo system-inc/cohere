@@ -60,6 +60,7 @@ func TestNoUnsafeTypeAssertionStaysSilent(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(noUnsafeTypeAssertionCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeTypeAssertion,
 				noUnsafeTypeAssertionFile, sourceText))
 		})
@@ -417,6 +418,7 @@ func TestNoUnsafeTypeAssertionFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noUnsafeTypeAssertionCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoUnsafeTypeAssertion, noUnsafeTypeAssertionFile,
 				testCase.sourceText)
 

@@ -52,6 +52,7 @@ func staleAgainstCommitted(t *testing.T, files map[string][]byte) []string {
 // TestTheCommittedFilesAreCurrent: docs/data is what Build produces now, every file but cli.json, which
 // needs the binary built and is checked by the generator's -check.
 func TestTheCommittedFilesAreCurrent(t *testing.T) {
+	t.Parallel()
 	if stale := staleAgainstCommitted(t, built(t, sourceInputs(t))); len(stale) > 0 {
 		t.Errorf("stale: %v; run go run ./internal/docsdata/tools/generate", stale)
 	}
@@ -60,6 +61,7 @@ func TestTheCommittedFilesAreCurrent(t *testing.T) {
 // TestCheckSeesARegistryChange is -check's contract for the registry, in both directions: the committed
 // files pass as they are, and fail once a rule is removed or added.
 func TestCheckSeesARegistryChange(t *testing.T) {
+	t.Parallel()
 	inputs := sourceInputs(t)
 	if stale := staleAgainstCommitted(t, built(t, inputs)); len(stale) > 0 {
 		t.Fatalf("the committed files are already stale (%v), so a change could not be told apart", stale)
@@ -82,6 +84,7 @@ func TestCheckSeesARegistryChange(t *testing.T) {
 
 // TestCheckSeesATierChange: a rule set resolving differently makes sets.json and rules.json stale.
 func TestCheckSeesATierChange(t *testing.T) {
+	t.Parallel()
 	inputs := sourceInputs(t)
 	changedSet := inputs.SetNames[0]
 	var changedRule string
@@ -117,6 +120,7 @@ func TestCheckSeesATierChange(t *testing.T) {
 // that engine's language, and nothing else. The Swift registry is read from swift/Rules.json, which a
 // Swift test holds to the Swift engine's registry.
 func TestEveryRegisteredRuleHasOneRow(t *testing.T) {
+	t.Parallel()
 	committed, err := os.ReadFile(filepath.Join(moduleRoot, RulesPath))
 	if err != nil {
 		t.Fatal(err)
@@ -178,6 +182,7 @@ func TestEveryRegisteredRuleHasOneRow(t *testing.T) {
 // a Swift rule with an unknown origin, a misnamed house rule, or a verdict naming a missing Swift rule
 // refuses the build.
 func TestCheckSeesASwiftRegistryChange(t *testing.T) {
+	t.Parallel()
 	inputs := sourceInputs(t)
 	if stale := staleAgainstCommitted(t, built(t, inputs)); len(stale) > 0 {
 		t.Fatalf("the committed files are already stale (%v), so a change could not be told apart", stale)
@@ -246,6 +251,7 @@ func TestCheckSeesASwiftRegistryChange(t *testing.T) {
 // TestEveryHouseRuleFollowsTheNamingScheme: every house rule builds with a category and no port carries
 // one, and a house rule registered under a name outside the scheme refuses the build.
 func TestEveryHouseRuleFollowsTheNamingScheme(t *testing.T) {
+	t.Parallel()
 	inputs := sourceInputs(t)
 	var rules Rules
 	if err := json.Unmarshal(built(t, inputs)[RulesPath], &rules); err != nil {
@@ -278,6 +284,7 @@ func TestEveryHouseRuleFollowsTheNamingScheme(t *testing.T) {
 
 // TestBuildIsDeterministic: two builds give the same bytes, so a regeneration diffs to nothing.
 func TestBuildIsDeterministic(t *testing.T) {
+	t.Parallel()
 	inputs := sourceInputs(t)
 	first, second := built(t, inputs), built(t, inputs)
 	if len(first) != len(second) {
@@ -293,6 +300,7 @@ func TestBuildIsDeterministic(t *testing.T) {
 // TestEveryFieldHasASourceNote: rules.json says where each field of a row comes from, and names no field
 // a row does not have.
 func TestEveryFieldHasASourceNote(t *testing.T) {
+	t.Parallel()
 	encoded, err := json.Marshal(RuleRow{Options: &RuleOptions{}, Swift: &SwiftVerdict{}, Sets: []RuleSetSeverity{{}}, MessageIds: []string{""},
 		Namespace: "-", UpstreamName: "-", Category: "-", FixKind: "-", TypeScriptRules: []string{""}})
 	if err != nil {
@@ -317,6 +325,7 @@ func TestEveryFieldHasASourceNote(t *testing.T) {
 // TestTheHelpParserReadsWhatTheFlagPackageWrites: a flag set with every shape the binary uses, printed by
 // the flag package itself, parses back to exactly what the set holds.
 func TestTheHelpParserReadsWhatTheFlagPackageWrites(t *testing.T) {
+	t.Parallel()
 	set := flag.NewFlagSet("cohere", flag.ContinueOnError)
 	set.String("tsconfig", "tsconfig.json", "the tsconfig, quoted \"here\"")
 	set.String("directory", "", "the root (default: the nearest tsconfig.json)")
@@ -356,6 +365,7 @@ func TestTheHelpParserReadsWhatTheFlagPackageWrites(t *testing.T) {
 
 // TestTheVerbHelpKeepsItsSynopsis: a verb's usage lines and summary are told apart from its flags.
 func TestTheVerbHelpKeepsItsSynopsis(t *testing.T) {
+	t.Parallel()
 	help := "usage: cohere rename <file>:<line>:<column> <newName>\n" +
 		"       cohere rename <name> <newName>\n\n" +
 		"Renames a symbol.\nNothing is written without --write.\n\n" +
@@ -379,6 +389,7 @@ func TestTheVerbHelpKeepsItsSynopsis(t *testing.T) {
 // TestTheChangelogParsesEveryRelease: every release heading in CHANGELOG.md becomes one entry, and a
 // second-level heading that is not a release refuses the parse.
 func TestTheChangelogParsesEveryRelease(t *testing.T) {
+	t.Parallel()
 	changelog, err := os.ReadFile(filepath.Join(moduleRoot, "CHANGELOG.md"))
 	if err != nil {
 		t.Fatal(err)
@@ -407,6 +418,7 @@ func TestTheChangelogParsesEveryRelease(t *testing.T) {
 // files wins, a rule with an asserted fix shows its fixed source, and the message ids and fix kind cover
 // every asserted case, those run with options included.
 func TestPickExamplesPrefersWhatAReaderCanRun(t *testing.T) {
+	t.Parallel()
 	finding := func(id string, fix bool) []capture.Finding {
 		return []capture.Finding{{Line: 1, Column: 1, MessageId: id, Fix: fix}}
 	}
@@ -442,6 +454,7 @@ func TestPickExamplesPrefersWhatAReaderCanRun(t *testing.T) {
 // TestACaseRunWithOptionsIsNeverShown: a rule whose only asserted cases ran with options has no example,
 // and its message ids still count.
 func TestACaseRunWithOptionsIsNeverShown(t *testing.T) {
+	t.Parallel()
 	picked, withOptions := PickExamples([]capture.Record{
 		{Rule: "r", File: "a.ts", Source: "x", Options: json.RawMessage(`{"Mode": "TypeAnnotation"}`), Outcome: capture.OutcomeFindings,
 			Findings: []capture.Finding{{MessageId: "only"}}},
@@ -459,6 +472,7 @@ func TestACaseRunWithOptionsIsNeverShown(t *testing.T) {
 // TestPickExamplesCountsACaseOnce: one case asserted twice, as findings and then as its fixed source, or
 // as findings by two tests, is counted once per outcome, and the fixed record is the one shown.
 func TestPickExamplesCountsACaseOnce(t *testing.T) {
+	t.Parallel()
 	findings := capture.Record{Rule: "r", File: "a.ts", Source: "x", Options: json.RawMessage(`{"a":1}`), Outcome: capture.OutcomeFindings}
 	_, withOptions := PickExamples([]capture.Record{findings, findings})
 	if withOptions != 1 {

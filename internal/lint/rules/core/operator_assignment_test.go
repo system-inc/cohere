@@ -124,6 +124,7 @@ func TestOperatorAssignmentFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name+" ["+testCase.options+"]", func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, OperatorAssignment, operatorAssignmentFile,
 				testCase.name, decodedOperatorAssignmentOptions(t, testCase.options))
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
@@ -223,6 +224,7 @@ func TestOperatorAssignmentStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name+" ["+testCase.options+"]", func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, OperatorAssignment, operatorAssignmentFile,
 				testCase.name, decodedOperatorAssignmentOptions(t, testCase.options))
 			rule_testing.ExpectClean(t, result)
@@ -267,6 +269,7 @@ func TestOperatorAssignmentTypeScriptShapes(t *testing.T) {
 		{"a non-null assertion on the target reports without a repair", "x! += 1", "\"never\"", "unexpected", "", false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, OperatorAssignment, operatorAssignmentFile,
 				testCase.sourceText, decodedOperatorAssignmentOptions(t, testCase.options))
 			rule_testing.ExpectFindings(t, result, testCase.wantId)

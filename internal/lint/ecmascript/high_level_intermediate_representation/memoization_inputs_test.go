@@ -101,6 +101,7 @@ func TestMemoizationLevelOfMatchesUpstreamGroups(t *testing.T) {
 		{name: "store global", want: MemoizationUnmemoized, value: &StoreGlobal{}},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if got := MemoizationLevelOf(testCase.value); got != testCase.want {
 				t.Errorf("got %s, want %s", got, testCase.want)
 			}
@@ -138,6 +139,7 @@ func TestMemoizationLevelOfReactiveValueHandlesComposites(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if got := MemoizationLevelOfReactiveValue(testCase.value); got != testCase.want {
 				t.Errorf("got %s, want %s", got, testCase.want)
 			}

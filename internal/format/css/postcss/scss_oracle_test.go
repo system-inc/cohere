@@ -237,6 +237,7 @@ var scssParseFixtures = []parseFixture{
 //
 // A .scss file postcss-scss refuses is counted, and the test fails if that passes a tenth of them.
 func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
+	t.Parallel()
 	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	if root == "" {
 		t.Skip("set COHERE_PRETTIER_ROOT to compare the scss parser against postcss-scss")

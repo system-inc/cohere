@@ -36,6 +36,7 @@ func TestNoNewWrappersFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTypedFiles(t, NoNewWrappers,
 					map[string]string{newWrappersFile: testCase.sourceText}, newWrappersFile),
@@ -69,6 +70,7 @@ func TestNoNewWrappersStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTypedFiles(t, NoNewWrappers,
 					map[string]string{newWrappersFile: testCase.sourceText}, newWrappersFile))
@@ -119,6 +121,7 @@ func TestNoNewWrappersReportsWhereUpstreamsGlobalsConfigWouldNot(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunTypedFiles(t, NoNewWrappers,
 					map[string]string{newWrappersFile: testCase.sourceText}, newWrappersFile),
@@ -153,6 +156,7 @@ func TestNoNewWrappersReportsTheWholeNewExpression(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			sourceOnDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			result := rule_testing.RunTypedFiles(t, NoNewWrappers,
 				map[string]string{newWrappersFile: testCase.sourceText}, newWrappersFile)
@@ -222,6 +226,7 @@ func TestNoNewWrappersOnFormsUpstreamDoesNotWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedFiles(t, NoNewWrappers,
 				map[string]string{newWrappersFile: testCase.sourceText}, newWrappersFile)
 			if testCase.wantReport {

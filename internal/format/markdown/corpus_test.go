@@ -157,6 +157,7 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 }
 
 func TestCorpusFormatMatchesOracle(t *testing.T) {
+	t.Parallel()
 	roots := os.Getenv("COHERE_MARKDOWN_CORPORA")
 	if roots == "" {
 		t.Skip("set COHERE_MARKDOWN_CORPORA to measure; this is a measuring run, not a unit test")

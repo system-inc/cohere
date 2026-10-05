@@ -26,6 +26,7 @@ func TestPhiValueKindsPreserveMixedFrozenValues(t *testing.T) {
 		{"unvisited predecessor", EffectValueFrozen, EffectValueMutable, EffectValueMutable, true},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			state := newAliasingState()
 			for index, kind := range []EffectValueKind{testCase.left, testCase.right} {
 				place := Place{Identifier: IdentifierId(index + 1)}
@@ -49,6 +50,7 @@ func TestFreezeRetainsAlreadyImmutableKinds(t *testing.T) {
 	t.Parallel()
 	for _, kind := range []EffectValueKind{EffectValuePrimitive, EffectValueGlobal, EffectValueFrozen} {
 		t.Run(kind.String(), func(t *testing.T) {
+			t.Parallel()
 			state := newAliasingState()
 			place := Place{Identifier: 1}
 			state.create(place, aliasingNodeObject)
@@ -86,6 +88,7 @@ function Component(props) {
 		{"direct method", strings.Replace(source, "function findItem(id) { return items.find(item => item.id === id); }\n const item = findItem(props.id);", "const item = items.find(item => item.id === props.id);", 1), true},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			findings, lowered := findingsForSource(t, testCase.source)
 			if !lowered || (len(findings) > 0) != testCase.fires {
 				t.Fatalf("lowered=%t findings=%v; want fires=%t", lowered, findings, testCase.fires)
@@ -110,6 +113,7 @@ func TestReadOnlyClosureEffectsRejectUnprovenBodies(t *testing.T) {
 		{"object method", "return {run() {consume(values)}};", false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			function, _ := rangesFor(t, "function helper(values, id) {"+testCase.body+"}")
 			if got := hasReadOnlyClosureEffects(function, map[*Function]bool{}); got != testCase.readOnly {
 				t.Fatalf("read-only=%t, want %t", got, testCase.readOnly)

@@ -55,6 +55,7 @@ func TestReactComponentNoDisplayNameFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ReactComponentNoDisplayName, displayNameFile, testCase.sourceText)
 			ids := result.MessageIds()
 			if len(ids) != testCase.wantCount {
@@ -157,6 +158,7 @@ func TestReactComponentNoDisplayNameStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentNoDisplayName, displayNameFile, testCase.sourceText))
 		})
 	}

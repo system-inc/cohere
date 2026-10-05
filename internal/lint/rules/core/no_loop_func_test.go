@@ -31,6 +31,7 @@ func TestNoLoopFuncFires(t *testing.T) {
 
 	for _, testCase := range loopFuncFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, "unsafeRefs")
 
@@ -56,6 +57,7 @@ func TestNoLoopFuncStaysSilent(t *testing.T) {
 
 	for _, testCase := range loopFuncCleanCases {
 		t.Run(testCase.source, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source))
 		})
@@ -99,6 +101,7 @@ func TestNoLoopFuncSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, "unsafeRefs")
 			// Sliced out of the source the harness wrote, not out of the Go literal.
@@ -211,6 +214,7 @@ func TestNoLoopFuncBorderIsTheOutermostLoop(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
 			if testCase.fires {
 				rule_testing.ExpectFindings(t, result, "unsafeRefs")
@@ -262,6 +266,7 @@ func TestNoLoopFuncLetDeclarationStopsTheBorderClimb(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
 			if testCase.fires {
 				rule_testing.ExpectFindings(t, result, "unsafeRefs")
@@ -330,6 +335,7 @@ func TestNoLoopFuncHeadPositionsThatAreOutsideTheLoop(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
 			if testCase.fires {
 				rule_testing.ExpectFindings(t, result, "unsafeRefs")
@@ -389,6 +395,7 @@ func TestNoLoopFuncPropertyNamesAreNotReferences(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
 			if !testCase.fires {
 				rule_testing.ExpectClean(t, result)
@@ -447,6 +454,7 @@ func TestNoLoopFuncMergedVariableDeclarations(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
 			if testCase.fires {
 				rule_testing.ExpectFindings(t, result, "unsafeRefs")
@@ -527,6 +535,7 @@ func TestNoLoopFuncDestructuredBindingsCarryTheirKind(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
 			if testCase.fires {
 				rule_testing.ExpectFindings(t, result, "unsafeRefs")
@@ -573,6 +582,7 @@ func TestNoLoopFuncJudgesEveryMethodLikeShape(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, "unsafeRefs")
 			const want = "The unsafe reference is to 'u'."
@@ -608,6 +618,7 @@ func TestNoLoopFuncMethodLikeShapesStaySilentWhenSafe(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source))
 		})
@@ -686,6 +697,7 @@ func TestNoLoopFuncMethodSpanIncludesTheName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
 			rule_testing.ExpectFindings(t, result, "unsafeRefs")
 			onDisk := harnessSource(testCase.source)
@@ -700,6 +712,7 @@ func TestNoLoopFuncMethodSpanIncludesTheName(t *testing.T) {
 	// the same node for the same reason and predates this rule; if either is narrowed to an
 	// upstream node boundary, this stops holding.
 	t.Run("require-yield anchors a method the same way", func(t *testing.T) {
+		t.Parallel()
 		const source = "const o = { *onStatement(sql) { return 1; } };"
 		result := rule_testing.Run(t, RequireYield, loopFuncFile, source)
 		if len(result.Diagnostics) != 1 {
@@ -748,6 +761,7 @@ func TestNoLoopFuncAsyncImmediatelyInvokedIsNotSkipped(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
 			if testCase.fires {
 				rule_testing.ExpectFindings(t, result, "unsafeRefs")
@@ -787,6 +801,7 @@ func TestNoLoopFuncNamedImmediatelyInvokedReachableByName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
 			if testCase.fires {
 				rule_testing.ExpectFindings(t, result, "unsafeRefs")

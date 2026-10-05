@@ -38,6 +38,7 @@ func TestNoSyncScriptsReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoSyncScripts, "Component.tsx", testCase.source)
 			rule_testing.ExpectFindings(t, result, messageNoSyncScripts.Id)
 		})
@@ -90,6 +91,7 @@ export const C = () => <Script src="/a.js" />;`,
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoSyncScripts, "Component.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})

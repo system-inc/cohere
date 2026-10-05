@@ -43,6 +43,7 @@ func itoa(number int) string {
 
 // TestParseTrees runs without node: trees taken from the library's own output for these params.
 func TestParseTrees(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		params string
 		want   string
@@ -111,6 +112,7 @@ func TestParseTrees(t *testing.T) {
 // TestParseRefusals checks the two ways the library does not return: a TypeError from an unbalanced "}"
 // in a feature, and an endless loop on an unclosed url( (which the oracle cannot run).
 func TestParseRefusals(t *testing.T) {
+	t.Parallel()
 	for _, params := range []string{"(a} b", "screen and (color}", "url(", "  url (a(b)"} {
 		tree, err := Parse(params)
 		if err == nil {

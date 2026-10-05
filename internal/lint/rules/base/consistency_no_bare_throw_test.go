@@ -144,6 +144,7 @@ func TestNoBareThrowFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(consistencyNoBareThrowCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, ConsistencyNoBareThrow, testCase.fileName, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantSpans))
@@ -184,6 +185,7 @@ func consistencyNoBareThrowWording(constructorName string) string {
 // TestNoBareThrowRendersAnEditedEntry: the finding's words come from policy/messages, so an edit to the
 // entry shows up in the finding. Not parallel, since it swaps the catalog every render reads.
 func TestNoBareThrowRendersAnEditedEntry(t *testing.T) {
+	t.Parallel()
 	original, err := fs.ReadFile(policy.MessageFiles(), "consistency-no-bare-throw.json")
 	if err != nil {
 		t.Fatal(err)
@@ -365,6 +367,7 @@ func TestNoBareThrowStaysSilent(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(consistencyNoBareThrowCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistencyNoBareThrow,
 				testCase.fileName, testCase.sourceText))
 		})
@@ -399,6 +402,7 @@ func TestNoBareThrowSurvivesThrownShapesThatCannotBeRead(t *testing.T) {
 		"unclosedNew":    "export function f(): void { throw new Error( }",
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.Run(t, ConsistencyNoBareThrow, "/repository/source/modules/thing/Service.ts", sourceText)
 		})
 	}

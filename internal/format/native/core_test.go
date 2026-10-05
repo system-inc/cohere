@@ -15,6 +15,7 @@ import (
 // TypeScript print a carriage-return file differently from the fork, while the others happen to
 // tolerate it, which is luck a new printer should not have to rely on.
 func TestByteOrderMarksAndCarriageReturnsMatchTheForkInEveryLanguage(t *testing.T) {
+	t.Parallel()
 	sources := map[string]string{
 		"probe.ts":      "const a = { b: 1 }\n// comment\nconst c = `line\nline`\n",
 		"probe.tsx":     "const view = <div className='x'>{a}</div>\n",

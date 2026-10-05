@@ -4,6 +4,7 @@ import "testing"
 
 // The letter after the prefix is the whole test, which is why "used" and "user" are not hooks.
 func TestIsHookName(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		want bool
@@ -28,6 +29,7 @@ func TestIsHookName(t *testing.T) {
 // The test is unicode rather than an ASCII range, and that is upstream's behavior rather than a
 // generalization: oxlint uses `char::is_uppercase` while ESLint's regex is ASCII-only.
 func TestIsLikelyComponentName(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		want bool

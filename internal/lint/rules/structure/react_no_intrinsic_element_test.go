@@ -55,6 +55,7 @@ func TestReactNoAnchorElementFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			fileName := anchorFile
 			if testCase.name == "an anchor in a differently placed Link.tsx" {
 				fileName = "/repository/source/widgets/Link.tsx"
@@ -135,6 +136,7 @@ func TestReactNoAnchorElementStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactElementNoAnchor, testCase.fileName, testCase.sourceText))
 		})
 	}
@@ -186,6 +188,7 @@ func TestReactNoHorizontalRuleElementStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactElementNoHorizontalRule, testCase.fileName, testCase.sourceText))
 		})
 	}

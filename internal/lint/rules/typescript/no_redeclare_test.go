@@ -83,6 +83,7 @@ func TestNoRedeclareFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
 		})
@@ -118,6 +119,7 @@ func TestNoRedeclareStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t,
 				rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, testCase.options))
 		})
@@ -247,6 +249,7 @@ func TestNoRedeclareSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))

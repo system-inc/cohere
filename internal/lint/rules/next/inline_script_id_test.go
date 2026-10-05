@@ -54,6 +54,7 @@ func TestInlineScriptIdIsSilentOnUpstreamPassCases(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -90,6 +91,7 @@ func TestInlineScriptIdFiresOnUpstreamFailCases(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
 			rule_testing.ExpectFindings(t, result, "inlineScriptId")
 		})
@@ -159,6 +161,7 @@ func TestInlineScriptIdIsSilentOnCasesUpstreamDoesNotWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -212,6 +215,7 @@ func TestInlineScriptIdFiresOnCasesUpstreamDoesNotWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
 			rule_testing.ExpectFindings(t, result, "inlineScriptId")
 		})
@@ -259,6 +263,7 @@ func TestInlineScriptIdPointsAtTheTagName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
 			rule_testing.ExpectFindings(t, result, "inlineScriptId")
 

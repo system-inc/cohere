@@ -67,6 +67,7 @@ func describeIslands(report *Report) string {
 // that it reports them as ONE cluster rather than as an export the flat view can see and two
 // private declarations the flat view cannot see at all.
 func TestClosureFindsTheIsland(t *testing.T) {
+	t.Parallel()
 	report := runFixture(t, true)
 
 	var cluster *Island
@@ -109,6 +110,7 @@ func TestClosureFindsTheIsland(t *testing.T) {
 // rooted files' declarations as roots reports it dead. That is the cascade this whole feature has
 // to not do.
 func TestClosureSparesLiveCode(t *testing.T) {
+	t.Parallel()
 	report := runFixture(t, true)
 	for _, island := range report.Islands {
 		for _, member := range island.Members {
@@ -129,6 +131,7 @@ func TestClosureSparesLiveCode(t *testing.T) {
 // two answers differ, and it is written down as a test so a future no-unused-vars port that
 // disagrees disagrees loudly.
 func TestClosureReportsSelfReferenceAsDead(t *testing.T) {
+	t.Parallel()
 	flat := runFixture(t, false)
 	for _, finding := range flat.Unreferenced {
 		if finding.Name == "recursiveOrphan" {
@@ -158,6 +161,7 @@ func TestClosureReportsSelfReferenceAsDead(t *testing.T) {
 // TestClosureIsOptIn proves the flat report is unchanged when the closure is not asked for, so a
 // reader comparing the two numbers is comparing the same flat analysis against itself.
 func TestClosureIsOptIn(t *testing.T) {
+	t.Parallel()
 	flat := runFixture(t, false)
 	if len(flat.Islands) != 0 {
 		t.Fatalf("islands were computed without being asked for: %d", len(flat.Islands))
@@ -188,6 +192,7 @@ func TestClosureIsOptIn(t *testing.T) {
 // rule is what correctly reports four abandoned payment icons whose only mention anywhere is a
 // barrel nothing imports.
 func TestReExportIsAPassThrough(t *testing.T) {
+	t.Parallel()
 	// One export reachable only through a re-export, and a barrel nothing imports.
 	barrelFixture := fixturePath(t, "barrel")
 	graph, err := program.Build(program.Options{
@@ -241,6 +246,7 @@ func TestReExportIsAPassThrough(t *testing.T) {
 // needs deleting -- this one survived being labelled considered judgment for exactly as long as
 // nothing checked it.
 func TestDeadCodeReferenceStillCountsAsAUse(t *testing.T) {
+	t.Parallel()
 	deadrefFixture := fixturePath(t, "deadref")
 	graph, err := program.Build(program.Options{
 		ConfigFileName:   deadrefFixture + "/tsconfig.json",

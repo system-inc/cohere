@@ -48,6 +48,7 @@ func TestNoLonelyIfFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoLonelyIf, noLonelyIfFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "unexpectedLonelyIf")
 
@@ -88,6 +89,7 @@ func TestNoLonelyIfStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoLonelyIf, noLonelyIfFile, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -117,6 +119,7 @@ func TestNoLonelyIfInsertsASpaceWhenElseTouchesTheBrace(t *testing.T) {
 		{"no spaces anywhere", "if(a){;}else{if(b){;}}", "if(a){;}else if(b){;}"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoLonelyIf, noLonelyIfFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "unexpectedLonelyIf")
 			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
@@ -149,6 +152,7 @@ func TestNoLonelyIfBracedConsequentIsExemptFromTheSemicolonInsertionTest(t *test
 		{"a braced consequent followed by a parenthesis", "if (a) {;} else { if (b) {;} } (x);", "if (a) {;} else if (b) {;} (x);"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoLonelyIf, noLonelyIfFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "unexpectedLonelyIf")
 			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
@@ -181,6 +185,7 @@ func TestNoLonelyIfDanglingElse(t *testing.T) {
 		{"an inner if whose chain ends without one", "if (a) if (a) {} else { if (b) {} else if (c) {} } else {}", false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoLonelyIf, noLonelyIfFile, testCase.sourceText)
 			if testCase.wantReport {
 				rule_testing.ExpectFindings(t, result, "unexpectedLonelyIf")
@@ -219,6 +224,7 @@ func TestNoLonelyIfThenBranchIsNotTheSubject(t *testing.T) {
 		"if (a) { if (b) {} else {} } else {}",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoLonelyIf, noLonelyIfFile, sourceText)
 			rule_testing.ExpectClean(t, result)
 		})
@@ -244,6 +250,7 @@ func TestNoLonelyIfElseLookaheadIsATokenNotAPrefix(t *testing.T) {
 		{"a plain identifier after the block", "if (a) if (a) {} else { if (b) {} }\nother;"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NoLonelyIf, noLonelyIfFile, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, "unexpectedLonelyIf")
 		})

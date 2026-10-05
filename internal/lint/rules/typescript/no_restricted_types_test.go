@@ -122,6 +122,7 @@ func TestNoRestrictedTypesStaysSilent(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noRestrictedTypesCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoRestrictedTypes,
 				noRestrictedTypesFile, testCase.sourceText,
 				noRestrictedTypesDecoded(t, testCase.optionsJson)))
@@ -558,6 +559,7 @@ func TestNoRestrictedTypesFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(noRestrictedTypesCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoRestrictedTypes, noRestrictedTypesFile,
 				testCase.sourceText, noRestrictedTypesDecoded(t, testCase.optionsJson))
 
@@ -677,6 +679,7 @@ func TestNoRestrictedTypesOffersSuggestions(t *testing.T) {
 	const sourceText = "let value: Foo;\n"
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoRestrictedTypes, noRestrictedTypesFile,
 				sourceText, noRestrictedTypesDecoded(t, testCase.optionsJson))
 			rule_testing.ExpectFindings(t, result, "bannedTypeMessage")

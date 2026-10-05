@@ -29,6 +29,7 @@ func TestUseIsNaNFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, UseIsNaN, isNaNFile, testCase.sourceText),
 				"comparisonWithNaN")
 		})
@@ -69,6 +70,7 @@ func TestUseIsNaNFiresOnSwitches(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, UseIsNaN, isNaNFile, testCase.sourceText), testCase.wantId)
 		})
 	}
@@ -123,6 +125,7 @@ func TestUseIsNaNStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, UseIsNaN, isNaNFile, testCase.sourceText))
 		})
 	}

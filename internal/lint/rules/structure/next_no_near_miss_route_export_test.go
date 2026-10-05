@@ -34,6 +34,7 @@ func TestNextNoNearMissRouteExportFiresOnThePhiWebSites(t *testing.T) {
 	}
 	for _, site := range sites {
 		t.Run(site.filePath, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NextNoNearMissRouteExport, site.filePath, site.line+"\n    return [];\n}")
 			rule_testing.ExpectFindings(t, result, "nearMissRouteExport")
 			if !strings.Contains(result.Diagnostics[0].Message.Description, "Rename it to `generateStaticParams`.") {
@@ -83,6 +84,7 @@ func TestNextNoNearMissRouteExportFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NextNoNearMissRouteExport, testCase.filePath, testCase.sourceText)
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
 			if testCase.wantNamed != "" && !strings.Contains(result.Diagnostics[0].Message.Description, "Rename it to `"+testCase.wantNamed+"`.") {
@@ -154,6 +156,7 @@ export function generateImageMetadata() { return []; }`},
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.Run(t, NextNoNearMissRouteExport, testCase.filePath, testCase.sourceText)
 			rule_testing.ExpectClean(t, result)
 		})

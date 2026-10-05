@@ -311,6 +311,7 @@ func TestCorrectnessNoIdenticalBranchesFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			sourceText := correctnessNoIdenticalBranchesSource(testCase.lines...)
 			result := rule_testing.RunTyped(t, CorrectnessNoIdenticalBranches, correctnessNoIdenticalBranchesFile, sourceText)
 			correctnessNoIdenticalBranchesExpectSpans(t, result, sourceText, testCase.wantSpans)
@@ -477,6 +478,7 @@ func TestCorrectnessNoIdenticalBranchesStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, CorrectnessNoIdenticalBranches, correctnessNoIdenticalBranchesFile, correctnessNoIdenticalBranchesSource(testCase.lines...))
 			rule_testing.ExpectClean(t, result)
 		})

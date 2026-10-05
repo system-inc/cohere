@@ -9,6 +9,7 @@ import (
 // proven to fire rather than assumed to. A guard nobody has seen fail is indistinguishable from one
 // that cannot.
 func TestRegisterRejectsADuplicateName(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		recovered := recover()
 		if recovered == nil {
@@ -28,6 +29,7 @@ func TestRegisterRejectsADuplicateName(t *testing.T) {
 // An empty name is unaddressable by the config, so it is refused at registration rather than
 // discovered as a rule that never runs.
 func TestRegisterRejectsAnEmptyName(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if recover() == nil {
 			t.Fatal("registering a rule with no name did not panic")
@@ -39,6 +41,7 @@ func TestRegisterRejectsAnEmptyName(t *testing.T) {
 
 // Registered sorts by name, which is what lets two runs be diffed against each other.
 func TestRegisteredIsSortedByName(t *testing.T) {
+	t.Parallel()
 	Register(
 		Registration{Rule: Rule{Name: "test-order-zulu"}},
 		Registration{Rule: Rule{Name: "test-order-alpha"}},

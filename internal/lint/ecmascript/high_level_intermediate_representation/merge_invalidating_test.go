@@ -149,6 +149,7 @@ func TestAreEqualDependenciesIsSetEquality(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if got := AreEqualDependencies(testCase.a, testCase.b); got != testCase.want {
 				t.Errorf("got %t, want %t", got, testCase.want)
 			}
@@ -371,6 +372,7 @@ func TestCanMergeScopesDeclinesReassignments(t *testing.T) {
 		{name: "both reassign", reassignments: map[ScopeId][]IdentifierId{1: {5}, 2: {6}}},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			withReassignment := &ScopeDependencies{
 				dependencies:  map[ScopeId][]ReactiveScopeDependency{1: shared, 2: shared},
 				reassignments: testCase.reassignments,

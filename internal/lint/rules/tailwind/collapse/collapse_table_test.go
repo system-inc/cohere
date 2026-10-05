@@ -20,6 +20,7 @@ import (
 // approach silently lost. A regeneration that drops one is a regression in what the rule can see,
 // and without this test it would land as a quiet diff in a generated file.
 func TestTableContainsTheKnownFamilies(t *testing.T) {
+	t.Parallel()
 	required := []CollapseFamily{
 		// The canonical example, and the one that proves collapsing is on at all.
 		{First: "px", Second: "py", Output: "p"},
@@ -70,6 +71,7 @@ func TestTableContainsTheKnownFamilies(t *testing.T) {
 // confused by anyone reading the number, and a future generator change that reintroduces the bug
 // will fail here rather than ship.
 func TestTableHasNoSoloRewrites(t *testing.T) {
+	t.Parallel()
 	if len(CollapseFamilies) == 0 {
 		t.Fatal("the table is empty, so every test in this file passes for the wrong reason")
 	}
@@ -101,6 +103,7 @@ func TestTableHasNoSoloRewrites(t *testing.T) {
 
 // TestTableEntriesAreWellFormed guards the shape rather than the content.
 func TestTableEntriesAreWellFormed(t *testing.T) {
+	t.Parallel()
 	seen := map[string]bool{}
 
 	for _, entry := range CollapseFamilies {
@@ -181,6 +184,7 @@ func tableContains(want CollapseFamily) bool {
 // each other, because a table where `flex` and `block` disagree about their property cannot report
 // the conflict between them however correct each entry looks alone.
 func TestDeclaredPropertiesCoverBothReadings(t *testing.T) {
+	t.Parallel()
 	// Names that are genuinely both. Their static reading is what `no-conflicting-classes` needs.
 	bothReadings := []string{"flex", "block"}
 	for _, name := range bothReadings {
@@ -330,6 +334,7 @@ func containsProperty(properties []string, want string) bool {
 // different edges. Caught by the rule's own known-dirty control rather than by reading the table,
 // which is the order this should happen in.
 func TestPropertiesExcludeAtRuleDescriptors(t *testing.T) {
+	t.Parallel()
 	descriptors := []string{"syntax", "inherits", "initial-value"}
 
 	for _, table := range []struct {
@@ -386,6 +391,7 @@ func TestPropertiesExcludeAtRuleDescriptors(t *testing.T) {
 // This asserts the outcome rather than the mechanism, because the mechanism has been wrong in three
 // different ways and the outcome is what a rule reads.
 func TestPropertyExtractionRejectsSelectorsAndKeyframes(t *testing.T) {
+	t.Parallel()
 	// A property name is a CSS property, never a selector, an element name or an animation name.
 	notProperties := []string{
 		"p", "code", "pre", "div", "span", "h1", "li", "table",
@@ -440,6 +446,7 @@ func TestPropertyExtractionRejectsSelectorsAndKeyframes(t *testing.T) {
 // Colors are the same shape at a different scale, handled per root because the palette is large and
 // uniform: `border` is width plus style with a number and `border-color` with a color.
 func TestValueDependentReadingsAreRecorded(t *testing.T) {
+	t.Parallel()
 	// The named-value distinctions, computed rather than excepted.
 	//
 	// `ClassDeclaredProperties` held these as thirteen per-class overrides because a root-keyed table
@@ -540,6 +547,7 @@ func TestValueDependentReadingsAreRecorded(t *testing.T) {
 // This test asserts the property-shorthand structure rather than the count, so a family added upstream
 // that is NOT a shorthand relationship fails here and reopens the question.
 func TestCollapseFamiliesAreCssShorthandRelationships(t *testing.T) {
+	t.Parallel()
 	withProperties := 0
 	for _, family := range CollapseFamilies {
 		first, _ := declaredPropertiesOfRoot(strings.TrimPrefix(family.First, "-"))

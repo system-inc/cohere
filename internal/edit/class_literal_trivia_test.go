@@ -24,6 +24,7 @@ import (
 // run when this was written: restoring `contentRange := literal.Loc` in classLiteralFrom turns this
 // red with both fixes refused for a parse failure, and the file left as it was.
 func TestATailwindFixAfterTriviaNoLongerTakesTheFileBatchDown(t *testing.T) {
+	t.Parallel()
 	source := "import * as NodeFileSystem from 'fs';\n" +
 		"\n" +
 		"export const merged = mergeClassNames(\n" +

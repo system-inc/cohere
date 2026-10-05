@@ -79,6 +79,7 @@ func describeEdits(plan *Plan, root string) string {
 // the shadowed inner binding, the local alias `failure`, and the string key — and each of those is a
 // different mechanism, so a rule that got any one wrong shows up here as a different count.
 func TestRenameFindsEveryReferenceAndNothingElse(t *testing.T) {
+	t.Parallel()
 	graph, root := buildFixture(t)
 	plan := planFor(t, graph, root, "src/origin.ts", 1, 17, "reportError")
 
@@ -108,6 +109,7 @@ func TestRenameFindsEveryReferenceAndNothingElse(t *testing.T) {
 // rewrite `err` and leave `failure`, and the failure mode if it does not is a file that still parses
 // while referring to an import that no longer exists.
 func TestRenameLeavesTheLocalAliasAlone(t *testing.T) {
+	t.Parallel()
 	graph, root := buildFixture(t)
 	plan := planFor(t, graph, root, "src/origin.ts", 1, 17, "reportError")
 
@@ -127,6 +129,7 @@ func TestRenameLeavesTheLocalAliasAlone(t *testing.T) {
 // and never `{ renamedValue }`. Writing the collapsed form changes the shape of the object, which
 // type-checks and is wrong at runtime for every consumer reading that property.
 func TestRenameExpandsShorthandRatherThanReplacingIt(t *testing.T) {
+	t.Parallel()
 	graph, root := buildFixture(t)
 	plan := planFor(t, graph, root, "src/consumer.ts", 13, 11, "renamedValue")
 
@@ -153,6 +156,7 @@ func TestRenameExpandsShorthandRatherThanReplacingIt(t *testing.T) {
 // The inner `err` inside `useBoth` is a different symbol that happens to share a spelling. A rename
 // driven by name matching would capture it; one driven by identity must not.
 func TestRenameDeclinesAShadowedBinding(t *testing.T) {
+	t.Parallel()
 	graph, root := buildFixture(t)
 	plan := planFor(t, graph, root, "src/origin.ts", 1, 17, "reportError")
 
@@ -166,6 +170,7 @@ func TestRenameDeclinesAShadowedBinding(t *testing.T) {
 // TestRenameOfTheShadowedBindingTouchesOnlyItsOwnScope is the other direction of the same property.
 // Renaming the inner one must not escape into the outer scope.
 func TestRenameOfTheShadowedBindingTouchesOnlyItsOwnScope(t *testing.T) {
+	t.Parallel()
 	graph, root := buildFixture(t)
 	plan := planFor(t, graph, root, "src/consumer.ts", 6, 15, "innerValue")
 
@@ -189,6 +194,7 @@ func TestRenameOfTheShadowedBindingTouchesOnlyItsOwnScope(t *testing.T) {
 // project. Renaming it would rewrite our call site and leave the declaration, or worse, rewrite a
 // file we do not own.
 func TestRenameRefusesADeclarationOutsideTheProject(t *testing.T) {
+	t.Parallel()
 	graph, root := buildFixture(t)
 	plan := planFor(t, graph, root, "src/consumer.ts", 22, 18, "toUpper")
 
@@ -208,6 +214,7 @@ func TestRenameRefusesADeclarationOutsideTheProject(t *testing.T) {
 // A collision may still compile — a shadowing one does — so this cannot be deferred to the type
 // phase. Refusing loudly beats writing and hoping something downstream complains.
 func TestRenameRefusesACollision(t *testing.T) {
+	t.Parallel()
 	graph, root := buildFixture(t)
 	plan := planFor(t, graph, root, "src/origin.ts", 5, 14, "err")
 
@@ -225,6 +232,7 @@ func TestRenameRefusesACollision(t *testing.T) {
 // codebase that compiles and is broken at runtime, and nothing after this phase catches it. So the
 // verb must REPORT the blind spot rather than hand back a count that implies completeness.
 func TestRenameReportsWhatItCouldNotSee(t *testing.T) {
+	t.Parallel()
 	graph, root := buildFixture(t)
 	plan := planFor(t, graph, root, "src/origin.ts", 1, 17, "reportError")
 
@@ -244,6 +252,7 @@ func TestRenameReportsWhatItCouldNotSee(t *testing.T) {
 
 // TestRenameRefusesANameThatIsNotAnIdentifier keeps the tool from writing source that cannot parse.
 func TestRenameRefusesANameThatIsNotAnIdentifier(t *testing.T) {
+	t.Parallel()
 	graph, root := buildFixture(t)
 	for _, name := range []string{"class", "with a space", "9lives", "has-a-dash", ""} {
 		plan := planFor(t, graph, root, "src/origin.ts", 1, 17, name)
@@ -255,6 +264,7 @@ func TestRenameRefusesANameThatIsNotAnIdentifier(t *testing.T) {
 
 // TestRenameRefusesRenamingToTheSameName catches the no-op that would otherwise report edits.
 func TestRenameRefusesRenamingToTheSameName(t *testing.T) {
+	t.Parallel()
 	graph, root := buildFixture(t)
 	plan := planFor(t, graph, root, "src/origin.ts", 1, 17, "err")
 	if len(plan.Refusals) == 0 {
@@ -267,6 +277,7 @@ func TestRenameRefusesRenamingToTheSameName(t *testing.T) {
 // A bare name is not a symbol. `err` names both the exported function and the shadowed inner
 // binding, so there is no single right answer and guessing one is worse than refusing.
 func TestBareNameRefusesWhenAmbiguous(t *testing.T) {
+	t.Parallel()
 	graph, _ := buildFixture(t)
 	candidates, symbols, err := ResolveBareName(context.Background(), graph, "err")
 	if err != nil {
@@ -283,6 +294,7 @@ func TestBareNameRefusesWhenAmbiguous(t *testing.T) {
 // TestBareNameResolvesWhenUnambiguous is the other half: the sugar must actually work, or its
 // refusal above proves nothing.
 func TestBareNameResolvesWhenUnambiguous(t *testing.T) {
+	t.Parallel()
 	graph, _ := buildFixture(t)
 	candidates, symbols, err := ResolveBareName(context.Background(), graph, "taken")
 	if err != nil {
@@ -304,6 +316,7 @@ func TestBareNameResolvesWhenUnambiguous(t *testing.T) {
 // printed column was short by the indentation and resolving it failed. Same root cause as the one
 // `rule.TokenRange` exists to prevent, arriving through the reporting path instead of the fix path.
 func TestBareNamePositionRoundTrips(t *testing.T) {
+	t.Parallel()
 	graph, _ := buildFixture(t)
 	candidates, _, err := ResolveBareName(context.Background(), graph, "err")
 	if err != nil {
@@ -331,6 +344,7 @@ func TestBareNamePositionRoundTrips(t *testing.T) {
 // exists to hunt, and the only way to know a rename did not do that is to rebuild the program from
 // the written bytes and ask the compiler. The fixture is copied first, because this test writes.
 func TestApplyProducesATreeThatStillTypechecks(t *testing.T) {
+	t.Parallel()
 	source := fixturePath(t, "symbols")
 	working := t.TempDir()
 	copyTree(t, source, working)
@@ -415,6 +429,7 @@ func TestApplyProducesATreeThatStillTypechecks(t *testing.T) {
 // assertions fixes it. The property being guarded is that a refused plan writes NO BYTES, so the
 // test now points at a real file that Apply could successfully rewrite, and asserts it is unchanged.
 func TestApplyRefusesARefusedPlan(t *testing.T) {
+	t.Parallel()
 	working := t.TempDir()
 	target := filepath.Join(working, "writable.ts")
 	original := "export const err = 1;\n"
@@ -509,6 +524,7 @@ func copyTree(t *testing.T, source string, destination string) {
 // asserting the branch is unreachable, because "unreachable" is a verdict that expires the moment
 // someone adds a caller, and this package exports the type that makes one possible.
 func TestApplyRefusesAPlanThatWouldNotParse(t *testing.T) {
+	t.Parallel()
 	working := t.TempDir()
 	target := filepath.Join(working, "broken.ts")
 	original := "export const value = 1;\n"
@@ -564,6 +580,7 @@ func TestApplyRefusesAPlanThatWouldNotParse(t *testing.T) {
 // refusal and the unchanged bytes rather than on the message, since the message is the half that
 // moves depending on which of the two checks fires.
 func TestApplyRefusesOverlappingEdits(t *testing.T) {
+	t.Parallel()
 	working := t.TempDir()
 	target := filepath.Join(working, "overlap.ts")
 	original := "export const value = 1;\n"
@@ -609,6 +626,7 @@ func TestApplyRefusesOverlappingEdits(t *testing.T) {
 // existing fixture green, because all of them anchored on a declaration where there is no alias to
 // follow. The gap was in the fixtures rather than in the code.
 func TestRenamingFromAnImportSiteRenamesTheExport(t *testing.T) {
+	t.Parallel()
 	graph, root := buildFixture(t)
 
 	fromDeclaration := planFor(t, graph, root, "src/origin.ts", 1, 17, "reportError")
@@ -645,6 +663,7 @@ func TestRenamingFromAnImportSiteRenamesTheExport(t *testing.T) {
 // middle of a line selects the identifier at that column. It simply is not the guard for the
 // mutation that prompted it.
 func TestPositionResolvesTheIdentifierUnderTheCursor(t *testing.T) {
+	t.Parallel()
 	graph, root := buildFixture(t)
 
 	// Column 18 on line 22 is `toUpperCase` in `value.toUpperCase()`. The enclosing property-access

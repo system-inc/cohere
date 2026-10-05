@@ -118,6 +118,7 @@ func formatFor(fileName string) func(string, string, formatoptions.Options) (str
 // TestJavaScriptRefusesWhatTypeScriptReadsDifferently: `a < b > (c)` is two comparisons to babel and a
 // generic call to TypeScript, so printing the TSX parse would rewrite the program's meaning.
 func TestJavaScriptRefusesWhatTypeScriptReadsDifferently(t *testing.T) {
+	t.Parallel()
 	if _, err := FormatJavaScript("Probe.js", "const result = a < b > (c);\n", formatoptions.Default(), nil); err == nil {
 		t.Fatal("a JavaScript file that parses as a TypeScript generic call was printed instead of refused")
 	}
@@ -127,6 +128,7 @@ func TestJavaScriptRefusesWhatTypeScriptReadsDifferently(t *testing.T) {
 }
 
 func TestFormatMatchesTheFork(t *testing.T) {
+	t.Parallel()
 	sameLine := formatoptions.Default()
 	sameLine.BracketSameLine = true
 	for _, options := range []formatoptions.Options{formatoptions.Default(), sameLine} {

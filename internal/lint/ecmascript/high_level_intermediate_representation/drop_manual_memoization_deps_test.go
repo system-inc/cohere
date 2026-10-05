@@ -63,6 +63,7 @@ func TestUnextractableDependencyAbandonsTheWholeList(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			deps, isNil, result := memoDepsFor(t, testCase.source)
 			if result.Recognised == 0 {
 				t.Fatal("no memo call was recognised, so this test asserts nothing about its " +

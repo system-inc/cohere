@@ -152,6 +152,7 @@ func TestStrictVoidReturnStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(strictVoidReturnCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, StrictVoidReturn,
 				strictVoidReturnFile, testCase.sourceText,
 				strictVoidReturnOptionsFor(t, testCase.optionsJson)))
@@ -291,6 +292,7 @@ func TestStrictVoidReturnFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(strictVoidReturnCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, StrictVoidReturn,
 				strictVoidReturnFile, testCase.sourceText,
 				strictVoidReturnOptionsFor(t, testCase.optionsJson))
@@ -339,6 +341,7 @@ func TestDecodeStrictVoidReturnOptions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			decoded, err := DecodeStrictVoidReturnOptions(json.RawMessage(testCase.raw))
 			if err != nil {
 				t.Fatalf("decoding %s: %v", testCase.raw, err)
@@ -392,6 +395,7 @@ func TestStrictVoidReturnDoesNotClaimANestedFunctionsReturns(t *testing.T) {
 	}
 	for index, sourceText := range clean {
 		t.Run(strictVoidReturnCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, StrictVoidReturn,
 				strictVoidReturnFile, sourceText, DefaultStrictVoidReturnSettings()))
 		})
@@ -446,6 +450,7 @@ func TestStrictVoidReturnFiresOnJsxCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(strictVoidReturnCaseName(index), func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTypedWithOptions(t, StrictVoidReturn,
 				"/repository/source/Component.tsx", testCase.sourceText,
 				strictVoidReturnOptionsFor(t, testCase.optionsJson))

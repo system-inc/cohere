@@ -145,6 +145,7 @@ func TestBlockScopedVarFires(t *testing.T) {
 
 	for _, testCase := range blockScopedVarFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, BlockScopedVar,
 				blockScopedVarFile, testCase.sourceText), testCase.wantIds...)
 		})
@@ -156,6 +157,7 @@ func TestBlockScopedVarStaysSilent(t *testing.T) {
 
 	for _, testCase := range blockScopedVarSilentCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, BlockScopedVar,
 				blockScopedVarFile, testCase.sourceText))
 		})
@@ -201,6 +203,7 @@ func TestBlockScopedVarPointsAtTheUseAndNamesTheDeclaration(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, BlockScopedVar, blockScopedVarFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantColumns) {
@@ -298,6 +301,7 @@ func TestBlockScopedVarIgnoresBlockScopedDeclarations(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
+			t.Parallel()
 			result := rule_testing.RunTyped(t, BlockScopedVar, blockScopedVarFile,
 				testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
