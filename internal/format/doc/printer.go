@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 	"unicode/utf16"
+	"unsafe"
 )
 
 // Options are the layout settings the printer reads. Upstream's endOfLine is always "lf" in our
@@ -13,6 +14,11 @@ type Options struct {
 	PrintWidth int
 	TabWidth   int
 	UseTabs    bool
+
+	// ExpectedLength is about how long the printed text will be, in bytes: the length of the text the doc
+	// was printed from, for a formatter. The output starts with room for it rather than growing from empty,
+	// which was 97 MB of a cold run on ahra (#wcgw0n4). Zero starts empty. It never changes the output.
+	ExpectedLength int
 }
 
 type mode int
@@ -236,9 +242,14 @@ func (result *printResult) trim() int {
 	return count
 }
 
+// finish is the printed text. It hands back the buffer itself rather than a copy: nothing writes to a
+// printResult once it is finished, so the bytes can't change under the string.
 func (result *printResult) finish() string {
 	result.settle()
-	return string(result.buffer)
+	if len(result.buffer) == 0 {
+		return ""
+	}
+	return unsafe.String(&result.buffer[0], len(result.buffer))
 }
 
 // command is one entry of the printer's stack.
@@ -399,7 +410,7 @@ func Print(document Doc, options Options) string {
 	commands := []command{{indent: rootIndentation, mode: modeBreak, doc: document}}
 	shouldRemeasure := false
 	var lineSuffix []command
-	result := &printResult{}
+	result := &printResult{buffer: make([]byte, 0, options.ExpectedLength)}
 	built := indentations{}
 
 	PropagateBreaks(document)

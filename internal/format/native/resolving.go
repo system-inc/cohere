@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/format/formatfiles"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
 )
@@ -41,11 +42,16 @@ func (resolving *Resolving) Enumerate(root string) (formatfiles.Enumeration, err
 
 // Format formats one file with the options its own directory resolves to.
 func (resolving *Resolving) Format(fileName string, text string) (string, error) {
+	return resolving.FormatParsed(fileName, text, nil)
+}
+
+// FormatParsed is Format with a tree of the text someone already parsed, or nil (Formatter.FormatParsed).
+func (resolving *Resolving) FormatParsed(fileName string, text string, parsed *ast.SourceFile) (string, error) {
 	resolution, err := resolving.resolver.Resolve(filepath.Dir(fileName))
 	if err != nil {
 		return "", fmt.Errorf("resolving the format options for %s: %w", fileName, err)
 	}
-	return Formatter{Options: resolution.Options}.Format(fileName, text)
+	return Formatter{Options: resolution.Options}.FormatParsed(fileName, text, parsed)
 }
 
 // OptionsFingerprint names the options a file formats with: every field, by name, so two resolutions

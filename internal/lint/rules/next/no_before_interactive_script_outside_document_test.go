@@ -397,6 +397,13 @@ func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnCasesUpstreamDoesNotWrit
 			fileName: "pages/index.tsx",
 			source:   "import Script from \"next/script\";\nexport default function Index() {\n  return <Script strategy=\"beforeInteractive\"></Script>;\n}\n",
 		},
+		{
+			// An entity in the value. ESLint's parser decodes a JSX attribute string, so the installed
+			// plugin (16.3.1) reads beforeInteractive here and reports (#5f61r5b).
+			name:     "a strategy spelled with a character reference",
+			fileName: "pages/index.tsx",
+			source:   "import Script from \"next/script\";\nexport default function Index() {\n  return <Script strategy=\"before&#73;nteractive\" />;\n}\n",
+		},
 	}
 
 	for _, testCase := range cases {

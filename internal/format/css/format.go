@@ -133,9 +133,10 @@ func formatWithParser(text string, prettierOptions formatoptions.Options, parser
 		return "", err
 	}
 	return doc.Print(document, doc.Options{
-		PrintWidth: prettierOptions.PrintWidth,
-		TabWidth:   prettierOptions.TabWidth,
-		UseTabs:    prettierOptions.UseTabs,
+		PrintWidth:     prettierOptions.PrintWidth,
+		TabWidth:       prettierOptions.TabWidth,
+		UseTabs:        prettierOptions.UseTabs,
+		ExpectedLength: len(text),
 	}), nil
 }
 

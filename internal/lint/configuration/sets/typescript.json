@@ -1,7 +1,7 @@
 {
     "extends": [
         "cohere:adamic",
-        "cohere:house"
+        "cohere:style"
     ],
     "format": {
         "tabWidth": 4,
