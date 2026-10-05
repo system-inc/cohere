@@ -455,26 +455,44 @@ func TestSwiftEngineArguments(t *testing.T) {
 	}
 }
 
-// --format-only against a Swift package is refused by name, never dropped: dropped, it made a format gate
-// type-check and lint the whole package (#nqb3mjv). Typed as false it asks for nothing and passes.
-func TestSwiftEngineArgumentsRefuseFormatOnly(t *testing.T) {
+// A flag the engine does not read and the front door does not answer is refused by name, never dropped: a
+// dropped --format-only made a format gate type-check and lint the whole package (#nqb3mjv). A switch typed
+// as false asks for nothing and passes, and the flags the front door answers itself pass too.
+func TestSwiftEngineArgumentsRefuseWhatNothingHonors(t *testing.T) {
 	t.Parallel()
 	location := projectLocation{Root: "/work/macos", Engine: engineSwift, ArgumentBase: "/work/macos"}
-	formatOnly := "true"
+	values := map[string]string{"no-format": "false", "verbose": "true", "phases": "true", "coverage": "true"}
 	value := func(name string) string {
-		if name == "format-only" {
-			return formatOnly
+		if set, found := values[name]; found {
+			return set
 		}
 		return "true"
 	}
-	given := map[string]bool{"no-fix": true, "format-only": true}
-	if _, _, err := swiftEngineArguments(location, given, value, nil); err == nil ||
-		!strings.Contains(err.Error(), "--format-only is not implemented for Swift yet") || !strings.Contains(err.Error(), "nothing was checked") {
-		t.Errorf("--format-only was not refused by name: %v", err)
+
+	for flag, says := range map[string]string{
+		"format-only":    "--format-only is not implemented for Swift yet: the engine has no format-only mode",
+		"no-cache":       "--no-cache is not implemented for Swift yet",
+		"print-config":   "--print-config is not implemented for Swift yet",
+		"stdin-filepath": "--stdin-filepath is not implemented for Swift yet",
+		"cache-dump":     "--cache-dump is not implemented for Swift yet",
+	} {
+		if _, _, err := swiftEngineArguments(location, map[string]bool{"no-fix": true, flag: true}, value, nil); err == nil ||
+			!strings.Contains(err.Error(), says) || !strings.Contains(err.Error(), "nothing was checked") {
+			t.Errorf("--%s was not refused by name: %v", flag, err)
+		}
 	}
-	formatOnly = "false"
-	if arguments, _, err := swiftEngineArguments(location, given, value, nil); err != nil || strings.Join(arguments, " ") != "--contract 3 --root /work/macos --no-fix" {
-		t.Errorf("--format-only=false was refused or changed the run: %q (%v)", strings.Join(arguments, " "), err)
+
+	values["no-format"] = "true"
+	if _, _, err := swiftEngineArguments(location, map[string]bool{"no-format": true}, value, nil); err == nil ||
+		!strings.Contains(err.Error(), "formats on every run") {
+		t.Errorf("--no-format was not refused by name: %v", err)
+	}
+	values["no-format"] = "false"
+
+	given := map[string]bool{"no-fix": true, "no-format": true, "verbose": true, "phases": true, "coverage": true, "directory": true}
+	arguments, _, err := swiftEngineArguments(location, given, value, nil)
+	if err != nil || strings.Join(arguments, " ") != "--contract 3 --root /work/macos --no-fix" {
+		t.Errorf("the flags the front door answers were not passed over: %q (%v)", strings.Join(arguments, " "), err)
 	}
 }
 

@@ -34,7 +34,8 @@ Run it anywhere in a repository. It starts from the project you're in, the neare
 project and every project below it: each TypeScript program and each Swift package, each with its own
 engine and its own settings, all at once. A repository holding more than one gets one report, a section
 per project, a line per project and one summary, and the exit code is the worst of theirs, so it's green
-only when every project is. A run that finds no project fails.
+only when every project is. A run that finds no project fails, and so does one whose every project was
+skipped, such as a Swift package alone under `--format-only`: it checked nothing.
 
 Finding projects never enters what `.gitignore` ignores, at any level, nor `node_modules`, `.build`,
 `.cache` or `testdata`, nor a directory that is a repository of its own: a submodule stays part of the
@@ -247,7 +248,7 @@ run did not check, which a program deciding whether to trust a passing run shoul
 | Code | Meaning |
 | --- | --- |
 | `0` | no problems found |
-| `1` | it found problems, cohere crashed on a file, or cohere itself could not run, for example on a settings error |
+| `1` | it found problems, cohere crashed on a file, cohere itself could not run, for example on a settings error, or there was nothing to check: no project found, or every one skipped |
 | `2` | the command line was wrong, such as an unknown flag |
 
 `1` covers both findings and failures, so in CI the output says which one it was.
