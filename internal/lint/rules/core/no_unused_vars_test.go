@@ -2,6 +2,8 @@ package core
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -770,5 +772,52 @@ func TestNoUnusedVarsIgnoreRestSiblings(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// The fix through the harness's own check, which applies every fix and refuses an overlap, on two rows of
+// the corpus whose fixes do not overlap: one specifier beside a used one, and a whole declaration with its
+// line. The corpus above applies ESLint's one pass itself, which this does not trust it to.
+func TestNoUnusedVarsAutofixRemovalWritesUpstreamsEdit(t *testing.T) {
+	t.Parallel()
+
+	options, err := DecodeNoUnusedVarsOptions(json.RawMessage(`{"enableAutofixRemoval": {"imports": true}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name   string
+		source string
+		want   string
+	}{
+		{"one specifier beside a used one", "import { Unused, Used } from 'module';\nexport { Used };\n", "import {  Used } from 'module';\nexport { Used };\n"},
+		{"the whole declaration and its line", "import { Unused } from 'module';\nexport {};\n", "export {};\n"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(t, NoUnusedVars, map[string]string{"file.ts": testCase.source}, "file.ts", options,
+				func(directory string) {
+					if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noUnusedVarsOptionsCorpusTsconfig), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				})
+			rule_testing.ExpectFixedSource(t, result, testCase.want)
+		})
+	}
+
+	// The default proposes no fix, only the suggestion, so nothing is rewritten unattended.
+	defaults, err := DecodeNoUnusedVarsOptions(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := rule_testing.RunTypedFilesWithSetupAndOptions(t, NoUnusedVars, map[string]string{"file.ts": "import { Unused } from 'module';\nexport {};\n"}, "file.ts", defaults,
+		func(directory string) {
+			if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noUnusedVarsOptionsCorpusTsconfig), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		})
+	if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Fixes) != 0 || len(result.Diagnostics[0].Suggestions) != 1 {
+		t.Fatalf("the default gives %+v, want one finding with one suggestion and no fix", result.Diagnostics)
 	}
 }
