@@ -372,3 +372,36 @@ func TestImportanceIsStrippedBeforeMatching(t *testing.T) {
 			"did not write", rebuilt)
 	}
 }
+
+// Not parallel: testing.AllocsPerRun refuses to run in a parallel test, because other tests'
+// allocations would be counted as this one's.
+//
+// TestParseTailwindVersionReadsTwoFieldsWithoutAllocating pins what the version parse answers and that
+// it answers without allocating, since it runs for every deprecation entry against every class the
+// rule reads (#smshtp5: 670K objects a cold ahra run when it split the string each time).
+func TestParseTailwindVersionReadsTwoFieldsWithoutAllocating(t *testing.T) {
+	testCases := []struct {
+		version      string
+		major, minor int
+	}{
+		{"4.3.3", 4, 3},
+		{"4.1", 4, 1},
+		{"10.20.30-beta.1", 10, 20},
+		{"4", 0, 0},
+		{"", 0, 0},
+		{"not-a-version", 0, 0},
+		{"4.x", 0, 0},
+		{"4..1", 0, 0},
+		{".4", 0, 0},
+	}
+	for _, testCase := range testCases {
+		major, minor := parseTailwindVersion(testCase.version)
+		if major != testCase.major || minor != testCase.minor {
+			t.Errorf("%q: read %d.%d, want %d.%d", testCase.version, major, minor, testCase.major, testCase.minor)
+		}
+	}
+
+	if allocations := testing.AllocsPerRun(100, func() { parseTailwindVersion("4.3.3") }); allocations != 0 {
+		t.Errorf("parsing a version allocated %.0f times per call, want 0", allocations)
+	}
+}

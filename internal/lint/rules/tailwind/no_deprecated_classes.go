@@ -326,14 +326,20 @@ var tailwindVersionForDeprecations = func() string { return tailwindengine.Tailw
 // An unreadable version reports as 0.0, which disables every deprecation rather than enabling all
 // of them. That is the safe direction: this rule reporting nothing is a gap someone notices when
 // they upgrade, while reporting renames that have not happened yet is noise on correct code.
+//
+// Cut rather than Split, because this runs for every deprecation entry against every class the rule
+// reads and Split allocates its slice each time: 670K objects on a cold ahra run (#smshtp5). Cutting
+// at the first two dots reads the same two fields without allocating, and parsing on every call keeps
+// a test's pinned version working with no cache to invalidate.
 func parseTailwindVersion(version string) (int, int) {
-	parts := strings.Split(version, ".")
-	if len(parts) < 2 {
+	majorText, rest, hasMinor := strings.Cut(version, ".")
+	if !hasMinor {
 		return 0, 0
 	}
+	minorText, _, _ := strings.Cut(rest, ".")
 
-	major, majorOk := atoi(parts[0])
-	minor, minorOk := atoi(parts[1])
+	major, majorOk := atoi(majorText)
+	minor, minorOk := atoi(minorText)
 	if !majorOk || !minorOk {
 		return 0, 0
 	}
