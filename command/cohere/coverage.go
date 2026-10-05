@@ -725,8 +725,9 @@ func writeLintReport(out io.Writer, report lintReport) {
 	// The account below is `--verbose`'s; the footer carries what a reader needs of it in every view.
 	account := accountOutput(out)
 	fmt.Fprintf(accountOutput(invocationOutput(out)),
-		"lint: %d findings — %d rules over %d files, %d nodes visited, %s%s\n",
-		len(report.Result.Diagnostics), coverage.RulesRun, coverage.FilesWalked, coverage.NodesVisited, report.WalkCost,
+		"lint: %d findings — %d rules over %d files, %d nodes visited%s, %s%s\n",
+		len(report.Result.Diagnostics), coverage.RulesRun, coverage.FilesWalked, coverage.NodesVisited, nodesReplayedClause(coverage),
+		report.WalkCost,
 		replayedFromCache(report.Result),
 	)
 
@@ -880,11 +881,21 @@ func writeCoverageNotes(out io.Writer, summary coverageSummary, details bool) {
 	}
 }
 
+// nodesReplayedClause is the lint line's account of the nodes the cache answered for, which this run did not
+// walk: ", 2,360,633 more covered by replay". Empty when the walk covered every node itself.
+func nodesReplayedClause(coverage program.Coverage) string {
+	if coverage.NodesReplayed == 0 {
+		return ""
+	}
+	return fmt.Sprintf(", %d more covered by replay", coverage.NodesReplayed)
+}
+
 // replayedFromCache says how much of a verdict was remembered rather than walked, so a reader can always
 // tell the two apart, and how many replayed files ran type-aware rules again because something they import
 // changed: content-keyed rules on every importer of a changed file, shape-keyed ones only where a shape
 // changed. The design-system rules are counted apart, since what re-runs them is a stylesheet rather than an
-// import. Empty when nothing was replayed.
+// import, and so are the derived ones, re-run by the program-wide data their fingerprint covers. Empty when
+// nothing was replayed.
 func replayedFromCache(result program.Result) string {
 	if result.FilesReplayed == 0 {
 		return ""
@@ -895,6 +906,9 @@ func replayedFromCache(result program.Result) string {
 	}
 	if result.DesignSystemRerun > 0 {
 		replayed += fmt.Sprintf(" (design-system rules ran again on %d of them)", result.DesignSystemRerun)
+	}
+	if result.DerivedRerun > 0 {
+		replayed += fmt.Sprintf(" (derived rules ran again on %d of them)", result.DerivedRerun)
 	}
 	return replayed
 }

@@ -14,24 +14,47 @@ import (
  */
 
 // Postprocess reshapes a converted Program the way Prettier does, and returns the root. comments is
-// the file's comment list, which it may merge in place, so it returns that too.
-func Postprocess(program *Node, comments []*Node, text string) (*Node, []*Node) {
+// the file's comment list, which it may merge in place, so it returns that too, and the text stripped of
+// those comments, for the printer to share.
+func Postprocess(program *Node, comments []*Node, text string) (*Node, []*Node, *StrippedText) {
 	comments = mergeNestledJsdocComments(comments)
 
 	// In typescript the Program does not count leading and trailing whitespace and comments.
 	program.Range = [2]int{0, len(text)}
 
-	processor := &postprocessor{text: text, comments: comments}
+	processor := &postprocessor{text: text, stripped: NewStrippedText(text, comments)}
 	program = processor.visit(program)
-	return program, comments
+	return program, comments, processor.stripped
 }
 
 type postprocessor struct {
 	text     string
-	comments []*Node
+	stripped *StrippedText
+}
 
-	strippedText    string
-	hasStrippedText bool
+// StrippedText is a file's text with its comments blanked, StripComments, made the first time it is asked
+// for. The postprocess and the printer both strip the file's text of the file's comments: the same string,
+// and the same list, merged before either reads it and never moved after, so they share one strip rather
+// than make two copies of the file, 37 MB apiece on a cold run on ahra (#wcgw0n4).
+type StrippedText struct {
+	text     string
+	comments []*Node
+	stripped string
+	made     bool
+}
+
+// NewStrippedText is text stripped of comments, made when first asked for.
+func NewStrippedText(text string, comments []*Node) *StrippedText {
+	return &StrippedText{text: text, comments: comments}
+}
+
+// Text is the stripped text.
+func (stripped *StrippedText) Text() string {
+	if !stripped.made {
+		stripped.stripped = StripComments(stripped.text, stripped.comments)
+		stripped.made = true
+	}
+	return stripped.stripped
 }
 
 // visit is upstream's visitNode, postprocess/visit-node.js.
@@ -121,12 +144,8 @@ func (processor *postprocessor) setContentEnd(node *Node) {
 	if end == 0 || processor.text[end-1] != ';' {
 		return
 	}
-	if !processor.hasStrippedText {
-		processor.strippedText = StripComments(processor.text, processor.comments)
-		processor.hasStrippedText = true
-	}
 	end--
-	textBeforeSemicolon := processor.strippedText[LocStart(node):end]
+	textBeforeSemicolon := processor.stripped.Text()[LocStart(node):end]
 	cleaned := TrimEndJavaScript(textBeforeSemicolon)
 	node.ContentEnd = end - (len(textBeforeSemicolon) - len(cleaned))
 	node.HasContentEnd = true

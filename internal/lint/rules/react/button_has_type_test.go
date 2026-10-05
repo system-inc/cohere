@@ -28,7 +28,7 @@ const buttonHasTypeFile = "/repository/source/ButtonHasType.tsx"
 // # Three cases are held back, and each is recorded rather than dropped
 //
 // Two carry `settings: {react: {pragma: 'Foo'}}`, which has no counterpart here because
-// `internal/config` has no settings surface. `Foo.createElement("button")` reports upstream ONLY
+// cohere reads no React settings. `Foo.createElement("button")` reports upstream ONLY
 // under that setting: re-run with settings removed it goes clean, measured, and clean is the answer
 // this port has to produce. Both are pinned as declining cases in
 // `TestButtonHasTypePragmaIsFixedAtReact` with the measurement at the line, rather than sitting in
@@ -204,7 +204,7 @@ func TestButtonHasTypeAcceptsTheTypedUpstreamCase(t *testing.T) {
 // TestButtonHasTypePragmaIsFixedAtReact records the two cases a settings surface would change.
 //
 // Upstream reads the pragma from `settings.react.pragma` or from a `@jsx` annotation comment.
-// `internal/config` has neither, so the pragma is the literal `React` here and a project renaming it
+// cohere reads neither, so the pragma is the literal `React` here and a project renaming it
 // gets a false NEGATIVE. Recorded rather than hidden, because both of these sit in upstream's corpus
 // and dropping them silently would leave the next reader believing the corpus was fully imported.
 //

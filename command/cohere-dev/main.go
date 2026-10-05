@@ -1,22 +1,25 @@
-// Command cohere-dev is the house's way to run cohere's whole-module tests (#3kr3x59).
+// Command cohere-dev runs the house's heavy Go work within the machine's budget (#3kr3x59, #qhg0ntb).
 //
-//	go run ./command/cohere-dev test ./...            every package, through a machine-wide slot
-//	go run ./command/cohere-dev test ./internal/edit  one package, at once
+//	go run ./command/cohere-dev test ./...            every package: the landing gate
+//	go run ./command/cohere-dev test ./internal/edit  one package
 //	go run ./command/cohere-dev test --fast           the edit loop: all but the landing gate's own (fast.go)
-//	go run ./command/cohere-dev test --full-priority  any of these, not niced, for a timed measurement
+//	go run ./command/cohere-dev build|vet [packages]  go build or go vet
+//	go run ./command/cohere-dev exec -- <command>     any other heavy command: a bench, a cohere run, clang
+//	go run ./command/cohere-dev land                  merge main, gate and fast-forward main, one landing at a time
+//	go run ./command/cohere-dev status                the pool: its tokens, their holders, the line, the cache
 //
-// A whole-module run builds and links seventy-odd test binaries on every core the machine has, and
-// several members starting one together made the machine crawl for all of them. So a run naming ./...
-// takes the machine's slot, shared by every checkout on it, and one that finds it taken says whose run
-// holds it and waits. Inside a run nothing is held back: Go's package parallelism and
-// each test's t.Parallel run at full width, as Kirk asked.
+// Every one of them takes a token from the machine's pool, in arrival order, and runs with Go held to the
+// token's share of the cores (pool.go). A dozen members each running go on all sixteen cores held the machine
+// at load 110 to 180, and made every run slower, not only later. When a token's run ends, the Go build
+// cache is looked at, and trimmed under its cap with the pool held (cache.go).
 //
 // A whole-module run never passes -count=1. Go's test cache skips every package whose inputs did not
 // change, which on a one-file change is most of the module, and -count=1 throws that away. A flaky test
 // is fixed, not re-run around; name its package to re-run it alone.
 //
-// Every run is nice 10, and so is everything it starts, so tests use the cores no one else is using and
-// yield to a person typing. --full-priority keeps the priority the run was started with, for a measurement.
+// Every run is nice 10, and so is everything it starts, so heavy work uses the cores no one else is using
+// and yields to a person typing. --full-priority keeps the priority the run was started with, for a
+// measurement.
 package main
 
 import (
@@ -29,20 +32,28 @@ import (
 	"time"
 )
 
-// slotsVariable overrides how many whole-module runs the machine runs at once.
-const slotsVariable = "COHERE_TEST_SLOTS"
-
-// defaultSlots is how many whole-module runs the machine runs at once. Measured on #3kr3x59 with three
-// runs started together at the org's load: all at once, none finished (command/cohere passed go test's
-// ten minutes in all three); one slot finished two green; two slots finished one.
-const defaultSlots = 1
-
 func main() {
-	if len(os.Args) < 2 || os.Args[1] != "test" {
-		fmt.Fprintln(os.Stderr, "usage: cohere-dev test [--full-priority] [go test flags] [packages] | cohere-dev test --fast [--full-priority] [go test flags]")
-		os.Exit(2)
+	if len(os.Args) < 2 {
+		usage()
 	}
-	os.Exit(test(os.Args[2:]))
+	switch os.Args[1] {
+	case "status":
+		os.Exit(status())
+	case trimCacheVerb:
+		os.Exit(trimCache())
+	case "test", "build", "vet", "exec", "land":
+		os.Exit(run(os.Args[1], os.Args[2:]))
+	}
+	usage()
+}
+
+func usage() {
+	fmt.Fprintln(os.Stderr, "usage: cohere-dev test [--fast] [--full-priority] [go test flags] [packages]\n"+
+		"       cohere-dev build|vet [--full-priority] [go flags] [packages]\n"+
+		"       cohere-dev exec [--full-priority] -- <command> [arguments]\n"+
+		"       cohere-dev land\n"+
+		"       cohere-dev status")
+	os.Exit(2)
 }
 
 // fullPriorityFlag keeps a run at the priority it was started with, for a timed measurement. Without it a
@@ -71,8 +82,8 @@ func niceness() (int, error) {
 	return parsed, nil
 }
 
-// test runs go test with the arguments given, through a slot when it names the whole module.
-func test(arguments []string) int {
+// run runs a heavy command, niced, through a token: go test, go build, go vet, or any command with exec.
+func run(verb string, arguments []string) int {
 	arguments, fullPriority := withoutFlag(arguments, fullPriorityFlag)
 	if !fullPriority {
 		level, err := niceness()
@@ -85,92 +96,45 @@ func test(arguments []string) int {
 			return 1
 		}
 	}
+
+	switch verb {
+	case "land":
+		return land(arguments)
+	case "exec":
+		if len(arguments) > 0 && arguments[0] == "--" {
+			arguments = arguments[1:]
+		}
+		if len(arguments) == 0 {
+			usage()
+		}
+		return withToken(strings.Join(arguments, " "), func(environment []string) int {
+			return runCommand(environment, arguments[0], arguments[1:])
+		})
+	case "build", "vet":
+		return withToken("go "+verb+" "+strings.Join(arguments, " "), func(environment []string) int {
+			return runCommand(environment, "go", append([]string{verb}, arguments...))
+		})
+	}
+
 	if len(arguments) > 0 && arguments[0] == "--fast" {
-		return fastTest(arguments[1:])
+		arguments = arguments[1:]
+		// The fast tier rests on Go's test cache, and runs nearly every package, so -count=1 here is the
+		// costliest run there is on a loaded machine (@system_cohere_build's catch).
+		if countsOnce(arguments) {
+			refuseCountOnce()
+			return 2
+		}
+		return withToken("go test --fast "+strings.Join(arguments, " "), func(environment []string) int {
+			return fastTest(environment, arguments)
+		})
 	}
-	if !wholeModule(arguments) {
-		return goTest(arguments)
-	}
-	if countsOnce(arguments) {
+	if wholeModule(arguments) && countsOnce(arguments) {
 		refuseCountOnce()
 		return 2
 	}
-
-	slots, err := slotCount()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
-		return 2
-	}
-	directory, err := os.UserCacheDir()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
-		return 1
-	}
-	directory = filepath.Join(directory, "cohere", "test-slots")
-	if err := os.MkdirAll(directory, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
-		return 1
-	}
-
-	// In line, in arrival order, where a lock holds; see queueTicket.
-	var ticket *queueTicket
-	if filesLock {
-		if ticket, err = joinQueue(directory); err != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: joining the line for a test slot: %v\n", err)
-			return 1
-		}
-		// Left as soon as a slot is taken, so the next in line moves up while this run tests; this covers
-		// every way out before that.
-		defer func() {
-			if ticket != nil {
-				ticket.leave()
-			}
-		}()
-	}
-
-	waitingSince := time.Now()
-	announced := false
-	lastAhead := -1
-	for {
-		ahead, waiting := 0, 0
-		if ticket != nil {
-			if ahead, waiting, err = ticket.place(); err != nil {
-				fmt.Fprintf(os.Stderr, "cohere-dev: reading the line for a test slot: %v\n", err)
-				return 1
-			}
-		}
-		// Only the first in line, as many as there are slots, may take one, so no later arrival passes them.
-		if ahead < slots {
-			held, err := takeSlot(directory, slots, arguments)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "cohere-dev: taking a test slot: %v\n", err)
-				return 1
-			}
-			if held != nil {
-				if ticket != nil {
-					ticket.leave()
-					ticket = nil
-				}
-				if announced {
-					fmt.Fprintf(os.Stderr, "cohere-dev: took a test slot after waiting %s\n", time.Since(waitingSince).Round(time.Second))
-				}
-				defer held.release()
-				return goTest(arguments)
-			}
-		}
-		if !announced {
-			fmt.Fprintf(os.Stderr, "cohere-dev: waiting for a test slot; the machine runs %d whole-module runs at once, and these hold them:\n", slots)
-			for _, holder := range holders(directory, slots) {
-				fmt.Fprintf(os.Stderr, "  %s\n", holder)
-			}
-			announced = true
-		}
-		if ticket != nil && ahead != lastAhead {
-			fmt.Fprintf(os.Stderr, "cohere-dev: %s in line of %d waiting\n", ordinal(ahead+1), waiting)
-			lastAhead = ahead
-		}
-		time.Sleep(time.Second)
-	}
+	return withToken("go test "+strings.Join(arguments, " "), func(environment []string) int {
+		return goTest(environment, arguments)
+	})
 }
 
 // withoutFlag returns the arguments with every copy of flag removed, and whether there was one, so a flag of
@@ -219,21 +183,9 @@ func countsOnce(arguments []string) bool {
 	return false
 }
 
-func slotCount() (int, error) {
-	value := os.Getenv(slotsVariable)
-	if value == "" {
-		return defaultSlots, nil
-	}
-	slots, err := strconv.Atoi(value)
-	if err != nil || slots < 1 {
-		return 0, fmt.Errorf("%s is %q, want a whole number of at least 1", slotsVariable, value)
-	}
-	return slots, nil
-}
-
 // goTest runs go test with the caller's terminal and returns its exit code.
-func goTest(arguments []string) int {
-	environment, uncovered, err := testEnvironment()
+func goTest(base []string, arguments []string) int {
+	environment, uncovered, err := testEnvironment(base)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
 		return 2
@@ -252,11 +204,25 @@ func goTest(arguments []string) int {
 	return 0
 }
 
-// holderLine describes the run holding a slot: who, where, since when and what it ran.
-func holderLine(arguments []string) string {
+// runCommand runs a command with the caller's terminal in the environment given, and returns its exit code.
+func runCommand(environment []string, name string, arguments []string) int {
+	command := exec.Command(name, arguments...)
+	command.Env = environment
+	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
+	if err := command.Run(); err != nil {
+		if exited, ok := err.(*exec.ExitError); ok {
+			return exited.ExitCode()
+		}
+		fmt.Fprintf(os.Stderr, "cohere-dev: running %s: %v\n", name, err)
+		return 1
+	}
+	return 0
+}
+
+// holderLine describes the run holding a token: who, where, since when and what it runs.
+func holderLine(what string) string {
 	directory, _ := os.Getwd()
-	return fmt.Sprintf("pid %d in %s since %s: go test %s", os.Getpid(), directory,
-		time.Now().Format("15:04:05"), strings.Join(arguments, " "))
+	return fmt.Sprintf("pid %d in %s since %s: %s", os.Getpid(), directory, time.Now().Format("15:04:05"), what)
 }
 
 // holders reads who holds each taken slot. A slot that is free says nothing.
@@ -279,8 +245,9 @@ func holderPath(directory string, slot int) string {
 	return filepath.Join(directory, fmt.Sprintf("slot-%d.holder", slot))
 }
 
-// heldSlot is a slot this process holds until release, or until it exits.
+// heldSlot is a token this process holds until release, or until it exits.
 type heldSlot struct {
+	number int
 	lock   *os.File
 	holder string
 }
@@ -291,8 +258,8 @@ func (held *heldSlot) release() {
 	held.lock.Close()
 }
 
-// takeSlot takes the first free slot, or returns nil when every slot is held.
-func takeSlot(directory string, slots int, arguments []string) (*heldSlot, error) {
+// takeSlot takes the first free token, or returns nil when every token is held.
+func takeSlot(directory string, slots int, what string) (*heldSlot, error) {
 	for slot := 1; slot <= slots; slot++ {
 		lock, err := os.OpenFile(lockPath(directory, slot), os.O_CREATE|os.O_RDWR, 0o644)
 		if err != nil {
@@ -308,12 +275,12 @@ func takeSlot(directory string, slots int, arguments []string) (*heldSlot, error
 			continue
 		}
 		holder := holderPath(directory, slot)
-		if err := os.WriteFile(holder, []byte(holderLine(arguments)+"\n"), 0o644); err != nil {
+		if err := os.WriteFile(holder, []byte(holderLine(what)+"\n"), 0o644); err != nil {
 			unlockFile(lock)
 			lock.Close()
 			return nil, err
 		}
-		return &heldSlot{lock: lock, holder: holder}, nil
+		return &heldSlot{number: slot, lock: lock, holder: holder}, nil
 	}
 	return nil, nil
 }

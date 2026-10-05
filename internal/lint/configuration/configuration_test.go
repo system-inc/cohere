@@ -439,10 +439,11 @@ func TestPluginsIsParsedRatherThanIgnored(t *testing.T) {
 // Not parallel: its subtests delete entries from the package's ignoredTopLevelKeys map, which Load reads
 // for every top-level key it does not parse.
 func TestTheThreeRealKeysWouldHaveBeenCaught(t *testing.T) {
-	// `plugins` was one of these and is no longer: it is implemented now, so it is parsed rather
-	// than ignored and the decay guard below correctly refused to keep testing it. Removed here
-	// rather than by weakening the guard, which is the whole point of the guard.
-	for _, key := range []string{"jsPlugins", "settings"} {
+	// `plugins` and `settings` were two of these and are no longer: each is implemented now, so it is
+	// parsed rather than ignored and the decay guard below correctly refused to keep testing it
+	// (`settings` since #gj5nm6e, read for better-tailwindcss). Removed here rather than by weakening
+	// the guard, which is the whole point of the guard.
+	for _, key := range []string{"jsPlugins"} {
 		// Not parallel: each one deletes and restores an entry in the package's ignoredTopLevelKeys map, so
 		// two at once would write the same map.
 		t.Run(key, func(t *testing.T) {

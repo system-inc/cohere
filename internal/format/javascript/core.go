@@ -62,8 +62,8 @@ type settings struct {
 
 	callArguments      map[Node][]Node
 	functionParameters map[Node][]Node
-	strippedText       string
-	hasStrippedText    bool
+	// strippedText is the text without its comments, shared with the parse's postprocess when it ran one.
+	strippedText *estree.StrippedText
 
 	// groupIDs holds createGroupIdMapper's ids, by the mapper's description and then the node.
 	groupIDs map[string]map[Node]*doc.GroupID

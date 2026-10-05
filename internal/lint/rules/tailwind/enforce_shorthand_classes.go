@@ -26,9 +26,8 @@ func messageShorthandClasses(longhands string, shorthands string) rule.Message {
 
 // EnforceShorthandClassesOptions lets a project name the surfaces that carry class strings.
 type EnforceShorthandClassesOptions struct {
-	Attributes []string `json:"attributes"`
-	Callees    []string `json:"callees"`
-	Variables  []string `json:"variables"`
+	TailwindLocationOptions
+	TailwindClassLiteralOptions
 }
 
 // shorthandRule is one collapse: a set of longhand patterns and the classes they become.
@@ -193,25 +192,19 @@ var EnforceShorthandClasses = rule.Rule{
 			return nil
 		}
 
+		configured, isConfigured := rule.OptionsAs[EnforceShorthandClassesOptions](options)
+
 		// nil when there is no design system to ask, and classExistsIn answers true for nil.
 		var system *tailwindengine.LoadedDesignSystem
 		if ctx.Program != nil {
-			if designSystem := DesignSystemForProgram(ctx.Program); designSystem.Err == nil {
+			if designSystem := DesignSystemForProgramAt(ctx.Program, configured.Location()); designSystem.Err == nil {
 				system = designSystem.System
 			}
 		}
 
 		settings := DefaultClassLiteralSettings()
-		if configured, isConfigured := rule.OptionsAs[EnforceShorthandClassesOptions](options); isConfigured {
-			if len(configured.Attributes) > 0 {
-				settings.AttributeNames = configured.Attributes
-			}
-			if len(configured.Callees) > 0 {
-				settings.CalleeNames = configured.Callees
-			}
-			if len(configured.Variables) > 0 {
-				settings.VariablePatterns = configured.Variables
-			}
+		if isConfigured {
+			settings = configured.ClassLiteralSettings()
 		}
 
 		reader := ClassLiteralReaderFor(ctx.FileCache, settings)

@@ -392,9 +392,10 @@ func TestABrokenChainRefusesTheWholeLoad(t *testing.T) {
 	})
 }
 
-// `settings` has a reader that does not follow the chain, so a value in a base would be ignored
-// silently. `format` has one that does (formatoptions applies each file's block over the one it
-// extends), so a base may carry it. Both still load from the project's own file.
+// `settings` are read from the project's own file only, as ESLint reads them from the project's
+// config, so a value in a base would be ignored silently. `format` has a reader that follows the chain
+// (formatoptions applies each file's block over the one it extends), so a base may carry it. Both still
+// load from the project's own file.
 func TestABaseMayCarryOnlyKeysWhoseReadersFollowTheChain(t *testing.T) {
 	t.Parallel()
 	for key, followed := range map[string]bool{"settings": false, "format": true} {
@@ -582,5 +583,25 @@ func TestAnOverrideKeyTheLoaderDoesNotReadIsRefused(t *testing.T) {
 	}
 	if want, _ := filepath.Abs(reasoned); loaded.Overrides[0].File != want {
 		t.Errorf("the override names %q as its file, want %q", loaded.Overrides[0].File, want)
+	}
+}
+
+// The project's own `settings` reach the run as written, keyed by plugin namespace, and a config
+// without them carries none. Which namespaces and keys are read is the rule packages' to check
+// (registry.CheckSettings); the loader only hands them through.
+func TestTheProjectsOwnSettingsAreHandedThrough(t *testing.T) {
+	t.Parallel()
+	written := writeConfigs(t, map[string]string{
+		"base.json":           `{"rules": {}}`,
+		"CohereSettings.json": `{"extends": "./base.json", "settings": {"better-tailwindcss": {"callees": ["cn"]}}}`,
+	})
+	loaded := loadOrFail(t, filepath.Join(written, "CohereSettings.json"))
+	if got := compactJson(loaded.Settings["better-tailwindcss"]); got != `{"callees":["cn"]}` {
+		t.Fatalf("settings[\"better-tailwindcss\"] = %s, want the project's own block as written", got)
+	}
+
+	without := writeConfigs(t, map[string]string{"CohereSettings.json": `{"rules": {}}`})
+	if settings := loadOrFail(t, filepath.Join(without, "CohereSettings.json")).Settings; settings != nil {
+		t.Fatalf("a config with no settings carries %v", settings)
 	}
 }

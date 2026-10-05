@@ -76,13 +76,18 @@ type NoMisusedPromisesChecksVoidReturnOptions struct {
 	Variables        *bool `json:"variables"`
 }
 type NoMisusedPromisesOptions struct {
-	ChecksConditionals   *bool                                     `json:"checksConditionals"`
-	ChecksSpreads        *bool                                     `json:"checksSpreads"`
-	ChecksVoidReturn     *bool                                     `json:"checksVoidReturn"`
-	ChecksVoidReturnOpts *NoMisusedPromisesChecksVoidReturnOptions `json:"-"`
+	ChecksConditionals *bool `json:"checksConditionals"`
+	// ChecksConditionalsFlagUnions is upstream's `checksConditionals: {flagUnions}`: "none" (the
+	// default) reports a value that is always thenable, "all" also one a union makes sometimes
+	// thenable, and "strict" also `Promise<T> | T`, whose awaited half matches the rest.
+	ChecksConditionalsFlagUnions string                                    `json:"-"`
+	ChecksSpreads                *bool                                     `json:"checksSpreads"`
+	ChecksVoidReturn             *bool                                     `json:"checksVoidReturn"`
+	ChecksVoidReturnOpts         *NoMisusedPromisesChecksVoidReturnOptions `json:"-"`
 }
 
-// UnmarshalJSON reads upstream's `checksVoidReturn`, which is a boolean or an object of six booleans.
+// UnmarshalJSON reads upstream's `checksVoidReturn`, which is a boolean or an object of six booleans,
+// and its `checksConditionals`, a boolean or an object holding flagUnions.
 //
 // tsgolint split the two spellings into `ChecksVoidReturn` and `ChecksVoidReturnOpts`, and with no
 // tags the object form could only be written under a key upstream does not have,
@@ -92,14 +97,41 @@ type NoMisusedPromisesOptions struct {
 // `parseChecksVoidReturn` does, and the sub-flags it leaves out default to true in `Run`.
 func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 	var wire struct {
-		ChecksConditionals *bool           `json:"checksConditionals"`
+		ChecksConditionals json.RawMessage `json:"checksConditionals"`
 		ChecksSpreads      *bool           `json:"checksSpreads"`
 		ChecksVoidReturn   json.RawMessage `json:"checksVoidReturn"`
 	}
 	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
 		return err
 	}
-	*options = NoMisusedPromisesOptions{ChecksConditionals: wire.ChecksConditionals, ChecksSpreads: wire.ChecksSpreads}
+	*options = NoMisusedPromisesOptions{ChecksSpreads: wire.ChecksSpreads}
+	// An object turns the check on, as upstream's truthy test reads it, and a missing flagUnions is
+	// "none", as upstream's normalizeFlagUnionsOption has it.
+	conditionals := strings.TrimSpace(string(wire.ChecksConditionals))
+	switch {
+	case conditionals == "":
+	case conditionals == "true" || conditionals == "false":
+		options.ChecksConditionals = type_checking.Ref(conditionals == "true")
+	case strings.HasPrefix(conditionals, "{"):
+		var each struct {
+			FlagUnions *string `json:"flagUnions"`
+		}
+		if err := rule.UnmarshalOptions(wire.ChecksConditionals, &each); err != nil {
+			return fmt.Errorf("checksConditionals: %w", err)
+		}
+		options.ChecksConditionals = type_checking.Ref(true)
+		options.ChecksConditionalsFlagUnions = "none"
+		if each.FlagUnions != nil {
+			switch *each.FlagUnions {
+			case "all", "strict", "none":
+				options.ChecksConditionalsFlagUnions = *each.FlagUnions
+			default:
+				return fmt.Errorf("checksConditionals.flagUnions is %q, and upstream takes all, strict or none", *each.FlagUnions)
+			}
+		}
+	default:
+		return fmt.Errorf("checksConditionals takes a boolean or an object holding flagUnions, got %s", conditionals)
+	}
 	trimmed := strings.TrimSpace(string(wire.ChecksVoidReturn))
 	switch {
 	case trimmed == "":
@@ -169,6 +201,13 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 //	checksConditionals  default TRUE   a Promise in a boolean position, plus array predicates
 //	checksVoidReturn    default TRUE   a Promise-returning function where void was expected
 //	checksSpreads       default TRUE   a Promise spread into an object
+//
+// `checksConditionals` also takes upstream's object, `{flagUnions}`, which turns the check on and
+// says how a union holding a thenable is judged: "none" (the default, and what `true` means) reports
+// only a value every member of which is thenable, "all" any union holding one, and "strict" only
+// `Promise<T> | T`, whose awaited types are the union's other members, each assignable both ways.
+// Checked against upstream's 34 checksConditionals rows and edge rows in
+// no_misused_promises_conditionals_corpus_test.go.
 //
 // `checksVoidReturn` is not one check. It gates SIX sub-flags, each of which is a distinct position
 // in the syntax and a distinct message id, and each of which registers its own listeners:
@@ -297,6 +336,9 @@ var NoMisusedPromises = rule.Rule{
 		}
 		if opts.ChecksConditionals == nil {
 			opts.ChecksConditionals = type_checking.Ref(true)
+		}
+		if opts.ChecksConditionalsFlagUnions == "" {
+			opts.ChecksConditionalsFlagUnions = "none"
 		}
 		if opts.ChecksSpreads == nil {
 			opts.ChecksSpreads = type_checking.Ref(true)
@@ -459,6 +501,20 @@ var NoMisusedPromises = rule.Rule{
 
 			if isAlwaysThenable(node) {
 				ctx.ReportNode(node, buildConditionalMessage())
+				return
+			}
+
+			// flagUnions widens the check to a union holding a thenable: every one under "all", and
+			// under "strict" only one whose awaited half is the rest, as in `Promise<T> | T`.
+			switch opts.ChecksConditionalsFlagUnions {
+			case "all":
+				if isSometimesThenable(ctx.TypeChecker, node) {
+					ctx.ReportNode(node, buildConditionalMessage())
+				}
+			case "strict":
+				if hasMatchingPromiseTypeArgument(ctx.TypeChecker, node) {
+					ctx.ReportNode(node, buildConditionalMessage())
+				}
 			}
 		}
 
@@ -1026,4 +1082,61 @@ var NoMisusedPromises = rule.Rule{
 		return listeners
 
 	},
+}
+
+// isSometimesThenable reports whether any member of a value's union type is thenable, upstream's
+// isSometimesThenable, which flagUnions "all" reports.
+func isSometimesThenable(typeChecker *checker.Checker, node *ast.Node) bool {
+	valueType := typeChecker.GetTypeAtLocation(node)
+	for part := range type_checking.UnionTypePartsSeq(checker.Checker_getApparentType(typeChecker, valueType)) {
+		if type_checking.IsThenableType(typeChecker, node, part) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasMatchingPromiseTypeArgument is upstream's test of the same name, which flagUnions "strict"
+// reports: a union holding thenables whose awaited types are, member for member, the union's other
+// members, so `Promise<T> | T` reports and `Promise<T> | U` does not. Two types are the same when each
+// is assignable to the other.
+func hasMatchingPromiseTypeArgument(typeChecker *checker.Checker, node *ast.Node) bool {
+	valueType := typeChecker.GetTypeAtLocation(node)
+	var thenables, others []*checker.Type
+	for part := range type_checking.UnionTypePartsSeq(checker.Checker_getApparentType(typeChecker, valueType)) {
+		if type_checking.IsThenableType(typeChecker, node, part) {
+			thenables = append(thenables, part)
+		} else {
+			others = append(others, part)
+		}
+	}
+	if len(thenables) == 0 {
+		return false
+	}
+	var awaited []*checker.Type
+	for _, thenable := range thenables {
+		awaitedType := checker.Checker_getAwaitedType(typeChecker, thenable)
+		if awaitedType == nil {
+			return false
+		}
+		awaited = append(awaited, slices.Collect(type_checking.UnionTypePartsSeq(awaitedType))...)
+	}
+	equivalent := func(left *checker.Type, right *checker.Type) bool {
+		return checker.Checker_isTypeAssignableTo(typeChecker, left, right) &&
+			checker.Checker_isTypeAssignableTo(typeChecker, right, left)
+	}
+	matchesAny := func(candidate *checker.Type, among []*checker.Type) bool {
+		return slices.ContainsFunc(among, func(other *checker.Type) bool { return equivalent(candidate, other) })
+	}
+	for _, other := range others {
+		if !matchesAny(other, awaited) {
+			return false
+		}
+	}
+	for _, each := range awaited {
+		if !matchesAny(each, others) {
+			return false
+		}
+	}
+	return true
 }

@@ -67,14 +67,14 @@ func TestNoConcatenatedClassesReportsGluedFragments(t *testing.T) {
 			// The callee surface, which an attribute-only rule cannot see.
 			name:     "inside a class-merging call",
 			fileName: "Component.tsx",
-			source:   "const merged = mergeClassNames(`px-${size}`);",
+			source:   "const merged = cn(`px-${size}`);",
 			wantIds:  []string{"concatenatedClass"},
 		},
 		{
 			// The variable surface.
 			name:     "assigned to a class-named variable",
 			fileName: "Styles.ts",
-			source:   "const buttonClassName = `rounded-${radius}`;",
+			source:   "const className = `rounded-${radius}`;",
 			wantIds:  []string{"concatenatedClass"},
 		},
 	}
@@ -159,7 +159,7 @@ func TestNoConcatenatedClassesStaysSilent(t *testing.T) {
 			// The real-tree shape from TableTheme.ts: two complete literals joined.
 			name:     "two complete literals joined",
 			fileName: "Styles.ts",
-			source:   `const rowClassName = 'border-b border--2 ' + 'data-[state=selected]:x';`,
+			source:   `const className = 'border-b border--2 ' + 'data-[state=selected]:x';`,
 		},
 		{
 			// Choosing between whole class names is the repair this rule wants, so it must not fire

@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/formatfiles"
 	"github.com/system-inc/cohere/internal/format/native"
@@ -57,6 +58,13 @@ type formatEngine interface {
 	OptionsFingerprint(fileName string) (string, error)
 }
 
+// treeFormatter is a format engine that can take a tree of the text the fix engine's guard already parsed,
+// rather than parsing the same bytes again (edit.Transform). The native engine is one; an engine that is
+// not is handed text alone, as before.
+type treeFormatter interface {
+	FormatParsed(fileName string, text string, parsed *ast.SourceFile) (string, error)
+}
+
 // formatTransform adapts a format engine to the edit engine's whole-text transform.
 //
 // The edit engine owns what lands on disk, so formatting arrives as a transform rather than writing
@@ -75,7 +83,7 @@ type formatEngine interface {
 // that never ran indistinguishable from a tree that was already correct, which is the ambiguity the
 // coverage line exists to destroy.
 func formatTransform(engine formatEngine) edit.Transform {
-	return func(fileName string, text string) (string, error) {
+	return func(fileName string, text string, parsed *ast.SourceFile) (string, error) {
 		if engine == nil {
 			// Said as what happened. A nil engine is a run that did not ask to format, and every repository
 			// cohere gates has a format block, so "no formatter is configured" was false on every plain
@@ -92,9 +100,18 @@ func formatTransform(engine formatEngine) edit.Transform {
 		// still rewrites. A writing run that formats once then fails its own `--no-fix` check on the
 		// file it just wrote: 7872fceb did exactly that to two of ahra's files. An already formatted
 		// file is the common case and still costs one pass, because its first pass changes nothing.
+		//
+		// The guard's tree is of the text as given, so only the first pass is offered it.
 		current := text
+		withTree, takesTree := engine.(treeFormatter)
 		for pass := 1; pass <= formatPassLimit; pass++ {
-			formatted, err := engine.Format(fileName, current)
+			var formatted string
+			var err error
+			if takesTree && pass == 1 && parsed != nil {
+				formatted, err = withTree.FormatParsed(fileName, current, parsed)
+			} else {
+				formatted, err = engine.Format(fileName, current)
+			}
 			if err != nil {
 				// A failure is reported as a failure rather than downgraded to a skip. The edit engine
 				// keeps the fixes that already converged, so a formatter falling over on one file does

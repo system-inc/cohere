@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // The transform runs after fixes converge, and it sees the fixed text rather than the original.
@@ -23,7 +25,7 @@ func TestTransformRunsAfterFixesAndSeesTheFixedText(t *testing.T) {
 	}
 
 	sawByTransform := ""
-	transform := func(_ string, text string) (string, error) {
+	transform := func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		sawByTransform = text
 		return strings.ReplaceAll(text, "const", "export const"), nil
 	}
@@ -60,7 +62,7 @@ func TestATransformProducingInvalidSyntaxIsRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	breaking := func(_ string, text string) (string, error) {
+	breaking := func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		return text + "function unclosed() {\n", nil
 	}
 
@@ -104,7 +106,7 @@ func TestATransformThatErrorsDoesNotBlockFixes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	failing := func(_ string, _ string) (string, error) {
+	failing := func(_ string, _ string, _ *ast.SourceFile) (string, error) {
 		return "", errors.New("the formatter fell over")
 	}
 
@@ -146,7 +148,7 @@ func TestTransformRunsWhenNoFixLanded(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := FixAndTransformFile(fileName, proposeOnce(), func(_ string, text string) (string, error) {
+	result, err := FixAndTransformFile(fileName, proposeOnce(), func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		return "export " + text, nil
 	}, DefaultMaxPasses)
 	if err != nil {
@@ -182,7 +184,7 @@ func TestAnIdentityTransformDoesNotTouchTheFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := FixAndTransformFile(fileName, proposeOnce(), func(_ string, text string) (string, error) {
+	result, err := FixAndTransformFile(fileName, proposeOnce(), func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		return text, nil
 	}, DefaultMaxPasses)
 	if err != nil {
@@ -215,14 +217,14 @@ func TestTransformIdempotenceIsCheckable(t *testing.T) {
 	t.Parallel()
 	source := "const a = 1;\n"
 
-	stable := func(_ string, text string) (string, error) {
+	stable := func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		return strings.ReplaceAll(text, "const", "let"), nil
 	}
-	first, err := stable("f.ts", source)
+	first, err := stable("f.ts", source, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := stable("f.ts", first)
+	second, err := stable("f.ts", first, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,14 +234,14 @@ func TestTransformIdempotenceIsCheckable(t *testing.T) {
 
 	// The control: a transform that grows its output every pass. If this fixture cannot tell the
 	// difference, it cannot check idempotence at all.
-	unstable := func(_ string, text string) (string, error) {
+	unstable := func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		return "// pass\n" + text, nil
 	}
-	firstUnstable, err := unstable("f.ts", source)
+	firstUnstable, err := unstable("f.ts", source, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondUnstable, err := unstable("f.ts", firstUnstable)
+	secondUnstable, err := unstable("f.ts", firstUnstable, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +320,7 @@ func TestATransformCanSkipAFileAndTheSkipIsRecorded(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	skipping := func(_ string, _ string) (string, error) {
+	skipping := func(_ string, _ string, _ *ast.SourceFile) (string, error) {
 		return "", fmt.Errorf("%w: markdown doubles a standalone tilde", ErrSkipped)
 	}
 
@@ -418,7 +420,7 @@ func TestASkipWithNoReasonIsStillCounted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := FixAndTransformFile(fileName, proposeOnce(), func(_ string, _ string) (string, error) {
+	result, err := FixAndTransformFile(fileName, proposeOnce(), func(_ string, _ string, _ *ast.SourceFile) (string, error) {
 		return "", ErrSkipped
 	}, DefaultMaxPasses)
 	if err != nil {
@@ -508,7 +510,7 @@ func TestCheckFileComputesTheWriteAndLeavesTheFile(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	transform := func(_ string, text string) (string, error) {
+	transform := func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		return strings.ReplaceAll(text, "const", "export const"), nil
 	}
 
@@ -552,7 +554,7 @@ func TestCheckFileComputesTheWriteAndLeavesTheFile(t *testing.T) {
 // the next run's check; re-linting what was printed fixes it, and the fixed text is formatted again.
 func TestAFixThePrintedTextTriggersLandsInTheSameRun(t *testing.T) {
 	t.Parallel()
-	breakArrow := func(_ string, text string) (string, error) {
+	breakArrow := func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		return strings.ReplaceAll(text, "() => { run(); }", "() => {\n    run();\n}"), nil
 	}
 	repairMultilineArrow := proposeWhileContains("() => {\n", "function() {\n", "no-multiline-arrow")
@@ -576,7 +578,7 @@ func TestAFixThePrintedTextTriggersLandsInTheSameRun(t *testing.T) {
 // rather than written half-settled.
 func TestFixAndFormatThatUndoEachOtherAreBounded(t *testing.T) {
 	t.Parallel()
-	toSingle := func(_ string, text string) (string, error) {
+	toSingle := func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		return strings.ReplaceAll(text, `"a"`, `'a'`), nil
 	}
 	toDouble := proposeWhileContains(`'a'`, `"a"`, "prefer-double")
@@ -611,7 +613,7 @@ func TestAFormattedNonTypeScriptFileIsNotLintedAgain(t *testing.T) {
 		}
 		return nil, nil
 	}
-	tidy := func(_ string, text string) (string, error) {
+	tidy := func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		return strings.ReplaceAll(text, "*  ", "- "), nil
 	}
 

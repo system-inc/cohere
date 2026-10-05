@@ -86,3 +86,19 @@ func TestStrictOrderMatchesUpstream(t *testing.T) {
 		})
 	}
 }
+
+// TestStrictOrderKeysClassesByName pins what upstream's strict order does with a repeated class: it
+// builds its groups as an object keyed by class name, so a repeat collapses into one. Asked of the
+// plugin itself (4.7.0, sandboxed): `a b a` under strict becomes `a b ` (its fixer leaves the freed
+// slot as a trailing space), and `flex block flex` becomes `block flex `, while official keeps both.
+// This rule never reaches it in practice, since a literal holding a repeat waits for
+// no-duplicate-classes before it is ordered; both paths end at `a b`.
+func TestStrictOrderKeysClassesByName(t *testing.T) {
+	t.Parallel()
+	if got := strictClassOrder([]string{"a", "b", "a"}, nil); !slices.Equal(got, []string{"a", "b"}) {
+		t.Errorf("strict order of a b a: %q, want upstream's [a b]", got)
+	}
+	rule_testing.ExpectClean(t, runClassOrderFixtureWithOptions(t,
+		`export const element = <img className="flex block flex" />;`,
+		EnforceConsistentClassOrderOptions{Order: "strict"}))
+}

@@ -91,9 +91,72 @@ func TestANilProgramViewsAsNil(t *testing.T) {
 	if ViewProgram(nil, nil, Rule{Name: "probe", ProgramReads: ReadsOtherFiles}) != nil {
 		t.Error("a nil program gave a non-nil view")
 	}
-	for _, view := range ViewProgramForEach(nil, nil, []Rule{{Name: "a"}, {Name: "b"}}) {
-		if view != nil {
-			t.Error("a nil program gave a non-nil view in a batch")
+	var slot ProgramViewSlot
+	if slot.Point(nil, nil, Rule{Name: "probe", ProgramReads: ReadsOtherFiles}) != nil {
+		t.Error("a nil program gave a non-nil view from a slot")
+	}
+	slot.Release()
+}
+
+// endedOf calls one method and returns the view's "file ended" panic, or "" when the view let the call through.
+func endedOf(call func()) (ended string) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			if message := fmt.Sprint(recovered); strings.Contains(message, "after the file it was given ended") {
+				ended = message
+			}
 		}
+	}()
+	call()
+	return ""
+}
+
+// A slot's view is good for its file only (#9xfg09f). Once released, every read through it panics by the
+// rule's name, including the reads a rule declared, so a rule that kept its Program past the file fails
+// loudly instead of reading through the file the slot was pointed at next. The view a rule kept from one
+// file stays ended while the next file runs, because the slot alternates between two views.
+func TestASlotViewKeptPastItsFileFailsOnEveryRead(t *testing.T) {
+	t.Parallel()
+	program := new(compiler.Program)
+	everything := Rule{Name: "keeps-its-program", ProgramReads: ReadsCompilerOptions | ReadsDefaultLibrary | ReadsModuleResolution | ReadsOtherFiles | ReadsDesignSystem}
+	reads := map[string]func(Program){
+		"Options":                        func(view Program) { view.Options() },
+		"GetCurrentDirectory":            func(view Program) { view.GetCurrentDirectory() },
+		"UseCaseSensitiveFileNames":      func(view Program) { view.UseCaseSensitiveFileNames() },
+		"IsSourceFileDefaultLibrary":     func(view Program) { view.IsSourceFileDefaultLibrary("lib.d.ts") },
+		"DefaultLibraryPath":             func(view Program) { view.DefaultLibraryPath() },
+		"ResolveModule":                  func(view Program) { view.ResolveModule(fileNamed("other.ts"), nil) },
+		"GetSourceFileForResolvedModule": func(view Program) { view.GetSourceFileForResolvedModule("other.ts") },
+		"SourceFiles":                    func(view Program) { view.SourceFiles() },
+		"GetSourceFile":                  func(view Program) { view.GetSourceFile("other.ts") },
+		"FS":                             func(view Program) { view.FS() },
+		"DesignSystemFS":                 func(view Program) { view.DesignSystemFS() },
+		"Identity":                       func(view Program) { view.Identity() },
+	}
+
+	var slot ProgramViewSlot
+	first := slot.Point(program, nil, everything)
+	if ended := endedOf(func() { first.Identity() }); ended != "" {
+		t.Fatalf("a view refused a read during its own file: %s", ended)
+	}
+	slot.Release()
+	second := slot.Point(program, nil, everything)
+
+	for name, read := range reads {
+		ended := endedOf(func() { read(first) })
+		if ended == "" {
+			t.Errorf("Program.%s read through a view whose file had ended", name)
+			continue
+		}
+		if !strings.Contains(ended, everything.Name) || !strings.Contains(ended, name) {
+			t.Errorf("Program.%s's refusal names neither the rule nor the read: %s", name, ended)
+		}
+	}
+	if ended := endedOf(func() { second.Identity() }); ended != "" {
+		t.Errorf("the next file's view was ended along with the last one: %s", ended)
+	}
+	slot.Release()
+	if ended := endedOf(func() { second.Identity() }); ended == "" {
+		t.Error("the second file's view still read after its own release")
 	}
 }

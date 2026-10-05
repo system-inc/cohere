@@ -75,7 +75,7 @@ var keyFixtures = map[string]map[string]string{
 	"cohere":         {"CohereSettings.json": `{"cohere": "^1.0.0"}`},
 	"plugins":        {"CohereSettings.json": `{"plugins": ["react"]}`},
 	"jsPlugins":      {"CohereSettings.json": `{"jsPlugins": ["./rules.js"]}`},
-	"settings":       {"CohereSettings.json": `{"settings": {"react": {"version": "19.0"}}}`},
+	"settings":       {"CohereSettings.json": `{"settings": {"better-tailwindcss": {"callees": ["cn"]}}}`},
 	"output":         {"CohereSettings.json": `{"output": {"phases": true}}`},
 	FormatKey:        {"CohereSettings.json": `{"format": {"tabWidth": 4}}`},
 }

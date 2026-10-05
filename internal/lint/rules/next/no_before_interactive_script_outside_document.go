@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -319,7 +320,9 @@ func beforeInteractiveStrategyAttribute(attributes *ast.Node) *ast.Node {
 		if attribute.Initializer == nil || attribute.Initializer.Kind != ast.KindStringLiteral {
 			return nil
 		}
-		if attribute.Initializer.Text() != "beforeInteractive" {
+		// Decoded as ESLint's parser decodes it, so `strategy="before&#73;nteractive"` is
+		// beforeInteractive here as it is upstream.
+		if text.UnescapeStringLiteralText(attribute.Initializer.Text()) != "beforeInteractive" {
 			return nil
 		}
 		return property

@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/formatfiles"
 )
@@ -149,11 +150,11 @@ func scopedTransform(inner edit.Transform, scope formatScope) edit.Transform {
 		return inner
 	}
 
-	return func(fileName string, text string) (string, error) {
+	return func(fileName string, text string, parsed *ast.SourceFile) (string, error) {
 		if !scope.includes(fileName) && (scope.recorded == nil || scope.recorded(fileName, text)) {
 			return "", fmt.Errorf("%w: outside the format scope, %s", edit.ErrSkipped, scope.Description)
 		}
-		return inner(fileName, text)
+		return inner(fileName, text, parsed)
 	}
 }
 

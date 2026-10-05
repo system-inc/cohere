@@ -58,13 +58,13 @@ func TestNoUnnecessaryWhitespaceReportsPadding(t *testing.T) {
 		{
 			name:     "inside a class-merging call",
 			fileName: "Component.tsx",
-			source:   `const merged = mergeClassNames('flex  items-center');`,
+			source:   `const merged = cn('flex  items-center');`,
 			wantIds:  []string{"unnecessaryWhitespace"},
 		},
 		{
 			name:     "assigned to a class-named variable",
 			fileName: "Styles.ts",
-			source:   `const buttonClassName = 'px-4  py-2';`,
+			source:   `const className = 'px-4  py-2';`,
 			wantIds:  []string{"unnecessaryWhitespace"},
 		},
 		{

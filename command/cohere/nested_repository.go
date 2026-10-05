@@ -12,6 +12,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/gitignore"
 )
 
 /*
@@ -103,11 +104,11 @@ type nestedDriftCheck struct {
 // nestedFormatRecord is a nested repository's own format record, kept in its own cache table and never in
 // the parent's, so it is the same record a run started inside that repository reads and writes.
 //
-// Only where that repository's cohere cache already exists, made by a run inside it. A check that only
-// reads a repository creates nothing there, and creating the directory would move the repository's root
-// mid-run, which the run cache rightly refuses to record (see program.RecordRunCache's readSince), so the
-// first check after it would never replay. A library nobody has run cohere in is formatted whole each
-// check, as before the record.
+// Only where that repository's cohere cache exists: made by a run inside it, or at the start of a run above it
+// (prepareNestedCacheDirectories). The check itself creates nothing there, since creating the directory mid-run
+// would move the repository's root after the run cache started its clock, which it rightly refuses to record
+// (see program.RecordRunCache's readSince), so the first check after it would never replay. A library whose
+// .gitignore does not ignore .cache gets no cache, and is formatted whole each check, as before the record.
 func nestedFormatRecord(repositoryRoot string) *formatRecord {
 	if cacheOff {
 		return formatRecordOff("the cache is off (--no-cache)")
@@ -116,6 +117,48 @@ func nestedFormatRecord(repositoryRoot string) *formatRecord {
 		return formatRecordOff("no cohere cache is kept in " + repositoryRoot)
 	}
 	return loadFormatRecord(repositoryRoot)
+}
+
+// prepareNestedCacheDirectories creates the cohere cache of every repository root declares, and every one those
+// declare, that keeps none yet, at the start of a run, where prepareCacheDirectory creates the project's own.
+//
+// The nested check reads each library's own format record, and only where its cache exists, so a library
+// nobody had run cohere in kept no record, and every check formatted every one of its files: 2,074 files and
+// 0.44 CPU-s of each edit run on an ahra clone, for every fresh clone, CI machine and new laptop, every run
+// (#v0etgwx). Made here, before the run cache starts its clock and before discovery lists the tree, a
+// directory created moves no root a recorded run has read.
+//
+// Only in a repository whose own ignore rules ignore it, so a run never leaves an untracked directory in a
+// library. The record in it is the library's own, the one a run inside the library reads and writes, and an
+// entry still skips only bytes it proved are a fixed point, so drift in a library is reported as before.
+func prepareNestedCacheDirectories(root string) {
+	pending, err := declaredBelow(root, "")
+	if err != nil {
+		return
+	}
+	for len(pending) > 0 {
+		relative := pending[0]
+		pending = pending[1:]
+		repositoryRoot := filepath.Join(root, relative)
+		if !formatfiles.HasOwnRepository(repositoryRoot) {
+			continue
+		}
+		if inner, err := declaredBelow(root, relative); err == nil {
+			pending = append(pending, inner...)
+		}
+		if information, err := os.Stat(cacheDirectory(repositoryRoot)); err == nil && information.IsDir() {
+			continue
+		}
+		matcher, err := gitignore.New(repositoryRoot)
+		if err != nil {
+			continue
+		}
+		if ignored, _, err := matcher.IgnoredPath(".cache/cohere/findings.gob", false); err != nil || !ignored {
+			continue
+		}
+		// A directory that could not be made costs this library what it cost before: a whole check.
+		_ = os.MkdirAll(cacheDirectory(repositoryRoot), 0o755)
+	}
 }
 
 // checkNestedRepositories reads every submodule root declares, and every submodule those declare, and
@@ -250,7 +293,7 @@ func formatNestedFiles(transform edit.Transform, fileNames []string) []nestedOut
 					outcomes[index] = nestedOutcome{err: err}
 					continue
 				}
-				formatted, err := transform(fileNames[index], string(contents))
+				formatted, err := transform(fileNames[index], string(contents), nil)
 				switch {
 				case errors.Is(err, edit.ErrSkipped):
 					outcomes[index] = nestedOutcome{unchecked: strings.TrimPrefix(err.Error(), edit.ErrSkipped.Error()+": ")}

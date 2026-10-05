@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/system-inc/cohere/internal/corpus"
@@ -15,10 +16,10 @@ import (
 // not cover, whether its tests ran or answered from Go's cache, since a skip in a cached package prints
 // nothing (#sycrdr6).
 
-// testEnvironment is the environment a go test run gets, with the corpora file's variables added, and the
-// corpora that stay uncovered.
-func testEnvironment() ([]string, []corpus.Corpus, error) {
-	environment := os.Environ()
+// testEnvironment is the environment a go test run gets, base with the corpora file's variables added, and
+// the corpora that stay uncovered.
+func testEnvironment(base []string) ([]string, []corpus.Corpus, error) {
+	environment := slices.Clone(base)
 	path, err := corpus.ConfigPath()
 	if err != nil {
 		return nil, nil, err

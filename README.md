@@ -4,7 +4,9 @@ cohere type-checks, lints, fixes and formats a TypeScript codebase in one proces
 compiler builds the program once, and that one type graph is what TypeScript's own diagnostics and
 every lint rule read, the rules in one walk of each file. The fix engine and the formatter run in the
 same process. Fixes re-read each file from disk and re-lint it until they stop landing, so they never
-apply to a stale copy. The formatter parses each TypeScript file it formats with the same TypeScript
+apply to a stale copy. They land only in files the lint walk checked: a file the formatter reaches that the
+program does not hold, such as a bundle beside a tsconfig that does not include it, is formatted and never
+fixed. The formatter parses each TypeScript file it formats with the same TypeScript
 parser, and prints every file it formats with cohere's own printers. Keeping the rules on one graph in
 one walk is what lets a codebase carry hundreds of them without each one costing another pass over the
 code.
@@ -74,7 +76,9 @@ See [Output](#output) for what that line says, and for `--verbose` and `--json`.
 
 With no settings file, cohere applies the house stack, each set where the code shows it fits:
 
-- `cohere:typescript` on every file.
+- `cohere:typescript` on every file. It composes two sets a configuration can also name on its own:
+  `cohere:adamic`, the soundness set, whose rules hold types to the truth, and `cohere:style`, the taste
+  set.
 - `cohere:react` on each file that imports `react` or a `react-` package, or contains JSX.
 - `cohere:next` on each file that imports `next`, and, once anything does, on Next's own files: everything
   under `app/` and `pages/`, and `middleware`, `instrumentation` and `next.config`.
@@ -166,6 +170,7 @@ root unless you name another).
 | `--phases` | put where the time went (graph, fix, format, types, lint) first in the footer's parentheses |
 | `--json` | print newline-delimited JSON for a program to read instead of the human view (see [Output](#output)) |
 | `--coverage` | name every rule under the coverage fact that describes it, not only count them |
+| `--adamic-readiness` | say what share of the files are Adamic-ready, in the footer and in `--json` (see [Output](#output)) |
 | `--timing` | report what building the graph cost and the CPU each rule cost, most expensive rule first |
 | `--single-threaded` | use one type checker instead of several |
 | `--profile FILE` | write a Go CPU profile of the run to FILE |
@@ -186,10 +191,13 @@ A run prints three things, in order:
   it cohered, and in the parentheses how much it covered.
 
 ```
-✓ 💎 2.4s (480 rules • 3,926 checked) • 87% Adamic-ready (3,412 of 3,926)
-✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3,923 cached) • 87% Adamic-ready (3,412 of 3,926)
-✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3 checked • 3,923 cached) • 87% Adamic-ready (3,411 of 3,926)
+✓ 💎 2.4s (480 rules • 3,926 checked)
+✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3,923 cached)
+✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3 checked • 3,923 cached)
+✓ 💎 2.6s (488 rules • 3,926 checked) • 87% Adamic-ready (3,412 of 3,926)
 ```
+
+The last line is a run with `--adamic-readiness`.
 
 The words mean exactly this:
 - **cohered:** files cohere rewrote, fixed or formatted, which are the files listed above the footer.
@@ -198,12 +206,13 @@ The words mean exactly this:
 - **cached:** files the cache answered for, unchanged since a run that checked them. Checked and cached
   together are every file in scope.
 - **rules:** the rules that ran.
-- **Adamic-ready:** the share of linted files whose types are true: no type error and no `cohere:adamic`
-  finding, counted before any disable comment and whatever your settings turn on, since Adamic, which
+- **Adamic-ready:** shown only with `--adamic-readiness`. The share of linted files whose types are true: no
+  type error and no `cohere:adamic` finding, counted before any disable comment and whatever your settings turn on, since Adamic, which
   compiles TypeScript native, reads neither. It names the compiler options Adamic sets that your tsconfig
   leaves off (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`), and says `not measured`
   with the reason when it could not measure, never a number it didn't. `--json` gives it as the summary's
-  `adamic`.
+  `adamic`, which is absent without the flag. Measuring runs the set's rules your settings leave off, at the
+  set's own options, without reporting them, so a run that doesn't ask pays nothing for it.
 
 A count is exact, with its thousands grouped (`3,923`); `--json` gives the plain integer. A count of zero
 is left out, so a cold run shows no `cached` and a run with nothing changed no `checked`.

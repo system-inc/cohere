@@ -229,3 +229,35 @@ func plantClone(t *testing.T, directory string) {
 	t.Helper()
 	writeTree(t, directory, map[string]string{".git/HEAD": "ref: refs/heads/main\n"})
 }
+
+// A format candidate the walk never linted is formatted and never fixed (#xn1k1gz). angular/angular keeps a
+// 2.8 MB esbuild bundle beside a tsconfig that does not include it, so no rule runs over it and no finding is
+// reported for it. The format pass printed it, and every later fix pass re-linted the printed text with every
+// rule and applied what they proposed: a vendored file rewritten by repairs nobody was told about, and 26
+// minutes of re-linting on one core.
+//
+// The project's own files losing their violation is the control that proves the fixer ran; the bundle being
+// reformatted proves the format pass reached it; its `debugger` surviving is the boundary.
+func TestAFileTheWalkNeverLintedIsFormattedAndNeverFixed(t *testing.T) {
+	t.Parallel()
+	binary := buildCohere(t)
+	root := t.TempDir()
+	fixScopeProject(t, root, map[string]string{"bundle.js": "var first=1\nfunction run(){debugger;return first}\n"})
+
+	output, code := runCohere(t, binary, root, "--fix")
+	if code != 0 {
+		t.Fatalf("exit %d:\n%s", code, output)
+	}
+	for _, name := range []string{"Producer.ts", "Consumer.ts", "Sibling.ts"} {
+		if strings.Contains(readForTest(t, filepath.Join(root, name)), "debugger") {
+			t.Fatalf("the control failed: the project's own %s kept its violation, so the fixer never ran:\n%s", name, output)
+		}
+	}
+	bundle := readForTest(t, filepath.Join(root, "bundle.js"))
+	if !strings.Contains(bundle, "var first = 1;") {
+		t.Fatalf("the bundle was not formatted, so the format pass never reached it and the boundary is untested:\n%s\noutput:\n%s", bundle, output)
+	}
+	if !strings.Contains(bundle, "debugger") {
+		t.Errorf("a file no rule was run over had a rule's fix applied to it:\n%s\noutput:\n%s", bundle, output)
+	}
+}

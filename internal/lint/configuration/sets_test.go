@@ -24,9 +24,9 @@ func withSetFiles(t *testing.T, files map[string]string) {
 	t.Cleanup(func() { setFiles = original })
 }
 
-// rootSets are the sets that extend nothing: cohere:adamic, the soundness rules, and cohere:house, the
+// rootSets are the sets that extend nothing: cohere:adamic, the soundness rules, and cohere:style, the
 // taste rules, which cohere:typescript composes (#drbrp8c). Every other set sits on cohere:typescript.
-var rootSets = []string{SetPrefix + "adamic", SetPrefix + "house"}
+var rootSets = []string{SetPrefix + "adamic", SetPrefix + "style"}
 
 func TestEverySetCohereCarriesLoads(t *testing.T) {
 	t.Parallel()
@@ -55,6 +55,28 @@ func TestEverySetCohereCarriesLoads(t *testing.T) {
 				t.Errorf("%s does not reach %s: its sources are %v", name, root, loaded.Sources)
 			}
 		}
+	}
+}
+
+// cohere:style and the cohere:system-inc/ tiers each resolve to their own set (#qnjvzh3). The lookup
+// is exact after the cohere: prefix, so no set name reaches another that it begins like.
+func TestCohereStyleAndTheSystemIncTiersResolveToThemselves(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{"cohere:style", "cohere:system-inc/structure", "cohere:system-inc/base"} {
+		directory := writeConfigs(t, map[string]string{"CohereSettings.json": `{"extends": "` + name + `"}`})
+		loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
+		if loaded.Sources[1] != name {
+			t.Errorf("%s resolved to %s first: its sources are %v", name, loaded.Sources[1], loaded.Sources)
+		}
+	}
+	// cohere:style extends nothing, and each tier reaches it only through cohere:typescript.
+	directory := writeConfigs(t, map[string]string{"CohereSettings.json": `{"extends": "cohere:style"}`})
+	if sources := loadOrFail(t, filepath.Join(directory, "CohereSettings.json")).Sources; len(sources) != 2 {
+		t.Errorf("cohere:style should load alone, and its sources are %v", sources)
+	}
+	// A name that doesn't exist is refused rather than matched to a set it begins like.
+	if _, err := SourceContents("cohere:system"); err == nil {
+		t.Error("cohere:system, which is no set, resolved to something")
 	}
 }
 

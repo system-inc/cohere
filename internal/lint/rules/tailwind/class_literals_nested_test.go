@@ -38,8 +38,8 @@ func TestNestedClassLiteralsAreRead(t *testing.T) {
 		},
 		{
 			name:   "array elements",
-			source: `const merged = mergeClassNames(['flex flex', open && 'p-2 p-2']);`,
-			want:   `const merged = mergeClassNames(['flex', open && 'p-2']);`,
+			source: `const merged = cn(['flex flex', open && 'p-2 p-2']);`,
+			want:   `const merged = cn(['flex', open && 'p-2']);`,
 		},
 		{
 			name:   "a string inside a template's hole",
@@ -53,13 +53,13 @@ func TestNestedClassLiteralsAreRead(t *testing.T) {
 		},
 		{
 			name:   "a callee argument's conditional",
-			source: `const merged = mergeClassNames('p-2', open ? 'flex flex' : undefined);`,
-			want:   `const merged = mergeClassNames('p-2', open ? 'flex' : undefined);`,
+			source: `const merged = cn('p-2', open ? 'flex flex' : undefined);`,
+			want:   `const merged = cn('p-2', open ? 'flex' : undefined);`,
 		},
 		{
 			name:   "a variable's initializer behind as const",
-			source: `const buttonClassName = (open ? 'flex flex' : 'hidden') as const;`,
-			want:   `const buttonClassName = (open ? 'flex' : 'hidden') as const;`,
+			source: `const className = (open ? 'flex flex' : 'hidden') as const;`,
+			want:   `const className = (open ? 'flex' : 'hidden') as const;`,
 		},
 	}
 	for _, testCase := range testCases {

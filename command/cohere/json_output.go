@@ -91,9 +91,9 @@ type summaryJSON struct {
 	// Gaps is every way the run fell short of checking everything. A reader deciding whether a green run
 	// can be trusted reads this, not the verdict alone.
 	Gaps runGaps `json:"gaps"`
-	// Adamic is the run's readiness: always present, so a reader never takes its absence for a pass. A run
-	// that did not lint says not measured, and why.
-	Adamic *readinessSummary `json:"adamic"`
+	// Adamic is the run's readiness, present only under --adamic-readiness (#9tgm3dq). A run that asked and
+	// did not lint says not measured, and why, so a reader who asked never takes its absence for a pass.
+	Adamic *readinessSummary `json:"adamic,omitempty"`
 }
 
 // phaseJSON is one phase's outcome.
@@ -111,7 +111,7 @@ func summaryAsJSON(summary runSummary) summaryJSON {
 		verdict = "fail"
 	}
 	adamic := summary.Adamic
-	if adamic == nil {
+	if adamic == nil && summary.AdamicRequested {
 		adamic = notMeasured("lint did not run")
 	}
 	phases := make([]phaseJSON, 0, len(summary.Phases))

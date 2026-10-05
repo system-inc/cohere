@@ -30,10 +30,9 @@ func messageVariableSyntax(written string, corrected string) rule.Message {
 // "variable" is the bracketed `var()` form. Named rather than inferred, so a repository can pick a
 // target instead of having one read off its node_modules.
 type EnforceConsistentVariableSyntaxOptions struct {
-	Attributes []string `json:"attributes"`
-	Callees    []string `json:"callees"`
-	Variables  []string `json:"variables"`
-	Syntax     string   `json:"syntax"`
+	TailwindLocationOptions
+	TailwindClassLiteralOptions
+	Syntax string `json:"syntax"`
 }
 
 // EnforceConsistentVariableSyntax reports a custom property written as an arbitrary value.
@@ -78,15 +77,7 @@ var EnforceConsistentVariableSyntax = rule.Rule{
 		settings := DefaultClassLiteralSettings()
 		syntax := variableSyntaxShorthand
 		if configured, isConfigured := rule.OptionsAs[EnforceConsistentVariableSyntaxOptions](options); isConfigured {
-			if len(configured.Attributes) > 0 {
-				settings.AttributeNames = configured.Attributes
-			}
-			if len(configured.Callees) > 0 {
-				settings.CalleeNames = configured.Callees
-			}
-			if len(configured.Variables) > 0 {
-				settings.VariablePatterns = configured.Variables
-			}
+			settings = configured.ClassLiteralSettings()
 			if configured.Syntax == variableSyntaxVariable {
 				syntax = variableSyntaxVariable
 			}
