@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // UpstreamSha is the facebook/react commit the vendored corpus was taken from.
@@ -241,7 +243,7 @@ func ParsePragmas(firstLine string) []Pragma {
 	var pragmas []Pragma
 	// Entry 0 is whatever preceded the first `@` (the `//` and any prose), never a directive.
 	for _, entry := range strings.Split(firstLine, "@")[1:] {
-		entry = strings.TrimSpace(entry)
+		entry = text.TrimWhitespace(entry)
 		if entry == "" {
 			continue
 		}

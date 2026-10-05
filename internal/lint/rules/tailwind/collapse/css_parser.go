@@ -44,6 +44,8 @@ package tailwind
 import (
 	"fmt"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // The byte constants upstream names, kept at their upstream names so the port diffs against the
@@ -352,7 +354,7 @@ func ParseCSS(input string) ([]*Node, error) {
 					continue
 				}
 				return nil, &CSSSyntaxError{
-					Message: fmt.Sprintf("Invalid declaration: `%s`", strings.TrimSpace(buffer.String())),
+					Message: fmt.Sprintf("Invalid declaration: `%s`", text.TrimWhitespace(buffer.String())),
 					Offset:  bufferStart,
 				}
 			}
@@ -373,7 +375,7 @@ func ParseCSS(input string) ([]*Node, error) {
 		case currentChar == byteOpenCurly && topOfStack(closingBracketStack) != byteCloseParen:
 			closingBracketStack = append(closingBracketStack, byteCloseCurly)
 
-			trimmed := strings.TrimSpace(buffer.String())
+			trimmed := text.TrimWhitespace(buffer.String())
 			if strings.HasPrefix(trimmed, "@") {
 				node = ParseAtRule(trimmed)
 			} else {
@@ -424,7 +426,7 @@ func ParseCSS(input string) ([]*Node, error) {
 						declaration := parseCSSDeclaration(buffer.String(), colonIndex)
 						if declaration == nil {
 							return nil, &CSSSyntaxError{
-								Message: fmt.Sprintf("Invalid declaration: `%s`", strings.TrimSpace(buffer.String())),
+								Message: fmt.Sprintf("Invalid declaration: `%s`", text.TrimWhitespace(buffer.String())),
 								Offset:  bufferStart,
 							}
 						}
@@ -548,7 +550,7 @@ func ParseAtRule(buffer string, nodes ...*Node) *Node {
 		}
 	}
 
-	return AtRule(strings.TrimSpace(name), strings.TrimSpace(params), nodes...)
+	return AtRule(text.TrimWhitespace(name), text.TrimWhitespace(params), nodes...)
 }
 
 // parseCSSDeclaration splits a buffer into a property and a value at colonIndex.
@@ -574,8 +576,8 @@ func parseCSSDeclaration(buffer string, colonIndex int) *Node {
 	}
 
 	declaration := Declaration(
-		strings.TrimSpace(buffer[:colonIndex]),
-		strings.TrimSpace(buffer[colonIndex+1:valueEnd]),
+		text.TrimWhitespace(buffer[:colonIndex]),
+		text.TrimWhitespace(buffer[colonIndex+1:valueEnd]),
 	)
 	declaration.Important = important
 	return declaration

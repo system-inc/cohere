@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -252,7 +253,7 @@ var IframeMissingSandbox = rule.Rule{
 			// yields an empty token. That token is accepted only because the empty string is in
 			// the allowed list, which is why the list carries it.
 			for _, token := range strings.Split(value, " ") {
-				token = strings.TrimSpace(token)
+				token = text.TrimWhitespace(token)
 				if !iframeMissingSandboxAllowedValues[token] {
 					ctx.ReportNode(reported, iframeMissingSandboxInvalidValue(token))
 				}

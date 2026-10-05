@@ -3,6 +3,8 @@ package nexus
 import (
 	"regexp"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // What counts as shouting, in one place.
@@ -343,18 +345,18 @@ func maskJsDocExamples(text string) string {
 // before the indentation is measured, so a comment's own indentation is never mistaken for a code
 // block, while an indented block written inside a JSDoc comment still is one. Mirrors nexus's
 // Shouting.ts, so the quieter and this rule agree on what is code.
-func maskIndentedCodeBlocks(text string) string {
+func maskIndentedCodeBlocks(masked string) string {
 	// Nothing can be indented four deep without four spaces or a tab somewhere.
-	if !strings.Contains(text, "    ") && !strings.ContainsRune(text, '\t') {
-		return text
+	if !strings.Contains(masked, "    ") && !strings.ContainsRune(masked, '\t') {
+		return masked
 	}
 
-	lines := strings.Split(text, "\n")
+	lines := strings.Split(masked, "\n")
 	previousIsBlank := true
 	insideBlock := false
 	for index, line := range lines {
 		content := blockCommentGutter.ReplaceAllString(line, "")
-		if strings.TrimSpace(content) == "" {
+		if text.TrimWhitespace(content) == "" {
 			previousIsBlank = true
 			continue
 		}

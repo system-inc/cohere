@@ -1,9 +1,8 @@
 package react
 
 import (
-	"strings"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -293,10 +292,9 @@ func computedKeySourceText(key *ast.Node) string {
 	}
 	// The range is taken from the node rather than read through `Text()`, which panics on several
 	// expression kinds and would take every rule in this package down for the whole file.
-	text := sourceFile.Text()
 	start, end := inner.Pos(), inner.End()
-	if start < 0 || end > len(text) || start >= end {
+	if start < 0 || end > len(sourceFile.Text()) || start >= end {
 		return "[]"
 	}
-	return strings.TrimSpace(text[start:end])
+	return text.TrimWhitespace(sourceFile.Text()[start:end])
 }

@@ -1,10 +1,9 @@
 package react
 
 import (
-	"unicode"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -302,13 +301,12 @@ func noAdjacentInlineElementsLiteralText(node *ast.Node) string {
 // change and would answer the same. Written as the two anchor tests anyway, because that is the
 // shape upstream wrote and the equivalence is an argument rather than a measurement.
 //
-// `unicode.IsSpace` for the class, which matches JavaScript's `\s` on every character either side
-// treats as whitespace except for a handful of exotic separators no source file writes; the corpus
-// exercises the space, and `&nbsp;` arrives as U+00A0, which both classes accept.
+// `text.IsWhitespace` for the class, which is JavaScript's `\s` exactly; the corpus exercises the
+// space, and `&nbsp;` arrives as U+00A0, which the class accepts.
 func noAdjacentInlineElementsHasEdgeWhitespace(value string) bool {
 	if value == "" {
 		return false
 	}
 	runes := []rune(value)
-	return unicode.IsSpace(runes[0]) || unicode.IsSpace(runes[len(runes)-1])
+	return text.IsWhitespace(runes[0]) || text.IsWhitespace(runes[len(runes)-1])
 }

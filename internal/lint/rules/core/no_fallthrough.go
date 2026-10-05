@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -174,7 +175,7 @@ func fallthroughCommentMatcher(pattern string) func(string) bool {
 		// which is the failure mode a misconfiguration must not be able to cause.
 	}
 	return func(comment string) bool {
-		switch strings.ToLower(strings.TrimSpace(comment)) {
+		switch strings.ToLower(text.TrimWhitespace(comment)) {
 		case "falls through", "fall through", "fallsthrough", "fallthrough":
 			return true
 		}
@@ -282,7 +283,8 @@ func isFallthroughComment(commentText string, matches func(string) bool) bool {
 	case strings.HasPrefix(content, "/*"):
 		content = strings.TrimSuffix(content[2:], "*/")
 	}
-	content = strings.TrimSpace(content)
+	// ESLint trims with JavaScript's trim (no-fallthrough.js:29), the rule's authority over oxc's str::trim.
+	content = text.TrimWhitespace(content)
 
 	if strings.HasPrefix(content, "oxlint-") || strings.HasPrefix(content, "eslint-") {
 		return false

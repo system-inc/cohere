@@ -27,88 +27,22 @@ var goWhitespaceFunctions = map[string][]string{
 	"unicode": {"IsSpace"},
 }
 
-// goWhitespaceUnswept pins how many unmarked Go-whitespace calls each file held when the guard landed,
-// pending #z4nssqs's sweep: lint's files by @system_cohere_lint_rules, format's by @system_cohere_format.
-// Each site either moves to text.TrimWhitespace, text.WhitespaceFields or text.IsWhitespace, because it
-// reads JavaScript source or answers as a JavaScript tool would, or keeps Go's set with a marker saying
-// why. A file leaves this list when its count reaches zero, and the count only goes down: a new call in a
-// pinned file fails just as it would anywhere else.
+// goWhitespaceUnswept pins how many unmarked Go-whitespace calls a file still holds, at its exact count,
+// so nothing new joins them. A file leaves this list when its count reaches zero, and the count only goes
+// down: a new call in a pinned file fails just as it would anywhere else.
+//
+// lint's 139 sites were swept under #z4nssqs. Each moved to text.TrimWhitespace, text.WhitespaceFields
+// or text.IsWhitespace, because it reads JavaScript or answers as a JavaScript tool would, or kept Go's
+// set with a marker saying why. These remain.
 var goWhitespaceUnswept = map[string]int{
-	// lint, @system_cohere_lint_rules.
-	"internal/lint/configuration/configuration.go":                                   6,
-	"internal/lint/ecmascript/comments/comments.go":                                  3,
-	"internal/lint/ecmascript/dotnotation/dotnotation.go":                            1,
-	"internal/lint/optionschema/validate.go":                                         1,
-	"internal/lint/rules/boundaries/dependencies.go":                                 1,
-	"internal/lint/rules/core/array_callback_return.go":                              1,
-	"internal/lint/rules/core/default_case.go":                                       1,
-	"internal/lint/rules/core/max_lines.go":                                          1,
-	"internal/lint/rules/core/no_extra_boolean_cast.go":                              1,
-	"internal/lint/rules/core/no_fallthrough.go":                                     2,
-	"internal/lint/rules/core/no_inline_comments.go":                                 3,
-	"internal/lint/rules/core/no_invalid_this.go":                                    1,
-	"internal/lint/rules/core/no_lonely_if.go":                                       3,
-	"internal/lint/rules/core/no_restricted_imports.go":                              1,
-	"internal/lint/rules/core/no_restricted_imports_matcher.go":                      1,
-	"internal/lint/rules/core/no_unused_vars_fix.go":                                 1,
-	"internal/lint/rules/core/object_shorthand.go":                                   2,
-	"internal/lint/rules/core/prefer_destructuring.go":                               1,
-	"internal/lint/rules/core/prefer_exponentiation_operator.go":                     1,
-	"internal/lint/rules/core/prefer_regex_literals.go":                              1,
-	"internal/lint/rules/core/radix.go":                                              1,
-	"internal/lint/rules/core/require_await.go":                                      1,
-	"internal/lint/rules/core/unicode_bom.go":                                        1,
-	"internal/lint/rules/next/no_html_link_for_pages_options.go":                     2,
-	"internal/lint/rules/nexus/consistency_no_long_line_comment.go":                  3,
-	"internal/lint/rules/nexus/consistency_no_multiline_arrow_function.go":           2,
-	"internal/lint/rules/nexus/correctness_no_caller_data_mutation.go":               4,
-	"internal/lint/rules/nexus/localization_no_untranslated_value.go":                2,
-	"internal/lint/rules/nexus/shouting.go":                                          1,
-	"internal/lint/rules/react/conformance/fixture.go":                               3,
-	"internal/lint/rules/react/conformance/pragma.go":                                1,
-	"internal/lint/rules/react/iframe_missing_sandbox.go":                            1,
-	"internal/lint/rules/react/jsx_fragments.go":                                     1,
-	"internal/lint/rules/react/jsx_no_script_url.go":                                 1,
-	"internal/lint/rules/react/jsx_no_useless_fragment.go":                           2,
-	"internal/lint/rules/react/no_adjacent_inline_elements.go":                       2,
-	"internal/lint/rules/react/no_object_type_as_default_prop.go":                    1,
-	"internal/lint/rules/structure/consistency_require_organized_imports_section.go": 1,
-	"internal/lint/rules/structure/react_hook_require_effect_comment.go":             3,
-	"internal/lint/rules/tailwind/class_literals.go":                                 1,
-	"internal/lint/rules/tailwind/class_templates.go":                                2,
-	"internal/lint/rules/tailwind/collapse/classorder_differential.go":               1,
-	"internal/lint/rules/tailwind/collapse/css_parser.go":                            7,
-	"internal/lint/rules/tailwind/collapse/design_system.go":                         5,
-	"internal/lint/rules/tailwind/collapse/theme_loader.go":                          3,
-	"internal/lint/rules/tailwind/collapse/utility.go":                               2,
-	"internal/lint/rules/tailwind/collapse/variant_printer.go":                       2,
-	"internal/lint/rules/tailwind/enforce_consistent_variable_syntax.go":             1,
-	"internal/lint/rules/tailwind/no_physical_direction.go":                          2,
-	"internal/lint/rules/tailwind/tools/generate_class_order/main.go":                2,
-	"internal/lint/rules/tailwind/tools/generate_css_parser/main.go":                 2,
-	"internal/lint/rules/tailwind/tools/generate_data_type/main.go":                  2,
-	"internal/lint/rules/tailwind/tools/generate_syntax_tree/main.go":                2,
-	"internal/lint/rules/tailwind/tools/generate_theme/main.go":                      2,
-	"internal/lint/rules/tailwind/tools/generate_utility/main.go":                    2,
-	"internal/lint/rules/tailwind/tools/generate_value_parser/main.go":               2,
-	"internal/lint/rules/tailwind/tools/generate_variant/main.go":                    4,
-	"internal/lint/rules/tailwind/tools/tooldirectory/tooldirectory.go":              1,
-	"internal/lint/rules/typescript/array_type.go":                                   1,
-	"internal/lint/rules/typescript/ban_tslint_comment.go":                           1,
-	"internal/lint/rules/typescript/class_literal_property_style.go":                 1,
-	"internal/lint/rules/typescript/consistent_generic_constructors.go":              1,
-	"internal/lint/rules/typescript/consistent_indexed_object_style.go":              1,
-	"internal/lint/rules/typescript/consistent_type_imports.go":                      1,
-	"internal/lint/rules/typescript/consistent_type_imports_fix.go":                  1,
-	"internal/lint/rules/typescript/no_deprecated.go":                                1,
-	"internal/lint/rules/typescript/no_invalid_this.go":                              1,
-	"internal/lint/rules/typescript/no_misused_promises.go":                          2,
-	"internal/lint/rules/typescript/no_restricted_types.go":                          2,
-	"internal/lint/rules/typescript/no_unnecessary_template_expression.go":           1,
-	"internal/lint/rules/typescript/switch_exhaustiveness_check.go":                  1,
-	"internal/lint/rules/typescript/triple_slash_reference.go":                       2,
+	// lint: a gap that is only trivia, or what TypeScript's JSDoc parser kept, which is the scanner's set
+	// (it also skips U+0085 and U+200B), neither Go's nor JavaScript's (#0pbc8mv).
+	"internal/lint/ecmascript/comments/comments.go":       1,
+	"internal/lint/ecmascript/dotnotation/dotnotation.go": 1,
+	"internal/lint/rules/typescript/no_deprecated.go":     1,
+	"internal/lint/rules/typescript/no_invalid_this.go":   1,
 
-	// format, @system_cohere_format.
+	// format, @system_cohere_format's to sweep.
 	"internal/format/prettier/bundles.go": 1,
 	"internal/format/prettier/engine.go":  1,
 }
