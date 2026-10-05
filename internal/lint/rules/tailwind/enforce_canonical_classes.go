@@ -129,7 +129,7 @@ var EnforceCanonicalClasses = rule.Rule{
 			ignore = configured.Ignore
 		}
 
-		reader := NewClassLiteralReader(settings)
+		reader := ClassLiteralReaderFor(ctx.FileCache, settings)
 		ignored := compileIgnorePatterns(ignore)
 
 		report := func(node *ast.Node) {
