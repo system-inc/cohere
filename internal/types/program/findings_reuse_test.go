@@ -2,6 +2,7 @@ package program_test
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -445,10 +446,13 @@ func TestAnEditToAGlobalDeclarationReachesEveryTypeAwareFinding(t *testing.T) {
 // resolution makes a rule type-aware without a checker, since the type fingerprint is what covers it.
 // Compiler options and the default library leave a rule where its checker puts it, since the key
 // covers both. Reading the design system makes a rule a design-system rule (#35nqkwc), unless it also
-// reads the types, which no key here covers together.
-func TestCacheClassesSplitsFourWays(t *testing.T) {
+// reads the types, which no key here covers together. Reading other files with a declared program
+// fingerprint makes a rule derived, types or not (#kdee854); without one, or beside the design system, it
+// stays uncacheable.
+func TestCacheClassesSplitsFiveWays(t *testing.T) {
 	t.Parallel()
-	pure, typeAware, design, never := program.CacheClasses([]rule.Rule{
+	fingerprint := func(rule.Program) [sha256.Size]byte { return [sha256.Size]byte{1} }
+	pure, typeAware, design, derived, never := program.CacheClasses([]rule.Rule{
 		{Name: "pure"},
 		{Name: "options", ProgramReads: rule.ReadsCompilerOptions},
 		{Name: "typed", NeedsTypeChecker: true},
@@ -459,6 +463,11 @@ func TestCacheClassesSplitsFourWays(t *testing.T) {
 		{Name: "both", ProgramReads: rule.ReadsOtherFiles | rule.ReadsModuleResolution, NeedsTypeChecker: true},
 		{Name: "design-and-types", ProgramReads: rule.ReadsDesignSystem, NeedsTypeChecker: true},
 		{Name: "design-and-program", ProgramReads: rule.ReadsDesignSystem | rule.ReadsOtherFiles},
+		{Name: "program-fingerprinted", ProgramReads: rule.ReadsOtherFiles, ProgramFingerprint: fingerprint},
+		{Name: "typed-program-fingerprinted", ProgramReads: rule.ReadsOtherFiles | rule.ReadsModuleResolution, NeedsTypeChecker: true,
+			ProgramFingerprint: fingerprint},
+		{Name: "design-program-fingerprinted", ProgramReads: rule.ReadsDesignSystem | rule.ReadsOtherFiles, ProgramFingerprint: fingerprint},
+		{Name: "fingerprint-alone", ProgramFingerprint: fingerprint},
 	})
 	names := func(rules []rule.Rule) string {
 		joined := ""
@@ -467,9 +476,10 @@ func TestCacheClassesSplitsFourWays(t *testing.T) {
 		}
 		return joined
 	}
-	if names(pure) != "pure options " || names(typeAware) != "typed typed-library resolution " || names(design) != "design-system " ||
-		names(never) != "program both design-and-types design-and-program " {
-		t.Errorf("pure [%s] typed [%s] design [%s] never [%s]", names(pure), names(typeAware), names(design), names(never))
+	if names(pure) != "pure options fingerprint-alone " || names(typeAware) != "typed typed-library resolution " ||
+		names(design) != "design-system " || names(derived) != "program-fingerprinted typed-program-fingerprinted " ||
+		names(never) != "program both design-and-types design-and-program design-program-fingerprinted " {
+		t.Errorf("pure [%s] typed [%s] design [%s] derived [%s] never [%s]", names(pure), names(typeAware), names(design), names(derived), names(never))
 	}
 }
 
@@ -509,7 +519,7 @@ func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(t *testing.T) {
 		}),
 		noting("test-notes-uncacheable", false, rule.ReadsOtherFiles, func(ctx rule.Context, declaration *ast.Node) string { return "walked" }),
 	}
-	if pure, typeAware, _, uncacheable := program.CacheClasses(rules); len(pure) != 1 || len(typeAware) != 1 || len(uncacheable) != 1 {
+	if pure, typeAware, _, _, uncacheable := program.CacheClasses(rules); len(pure) != 1 || len(typeAware) != 1 || len(uncacheable) != 1 {
 		t.Fatalf("the noting rules are not one per class (%d pure, %d type-aware, %d uncacheable), so this proves nothing",
 			len(pure), len(typeAware), len(uncacheable))
 	}
