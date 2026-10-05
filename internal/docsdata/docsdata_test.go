@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/system-inc/cohere/internal/benchresults"
 	"github.com/system-inc/cohere/internal/docsdata/capture"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
@@ -487,5 +488,67 @@ func TestPickExamplesCountsACaseOnce(t *testing.T) {
 	picked, _ := PickExamples([]capture.Record{asserted, fixed, asserted})
 	if picked["r"].Firing == nil || picked["r"].Firing.FixedSource != "\n" {
 		t.Errorf("the fixed record should be the one shown: %+v", picked["r"].Firing)
+	}
+}
+
+// TestBenchmarksHoldEveryRecordNewestFirst: benchmarks.json is every committed record, as recorded, newest
+// first, with a later record placed ahead of the committed ones.
+func TestBenchmarksHoldEveryRecordNewestFirst(t *testing.T) {
+	t.Parallel()
+	inputs := sourceInputs(t)
+	committed, err := benchresults.Read(filepath.Join(moduleRoot, benchresults.Directory))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(committed) == 0 {
+		t.Fatal("bench/results holds no record, so this test would compare nothing")
+	}
+	later := committed[0]
+	later.RecordedAt = "2999-01-01T00:00:00Z"
+	inputs.Benchmarks = append(slices.Clone(committed), later)
+
+	var benchmarks Benchmarks
+	if err := json.Unmarshal(built(t, inputs)[BenchmarksPath], &benchmarks); err != nil {
+		t.Fatal(err)
+	}
+	if len(benchmarks.Records) != len(committed)+1 {
+		t.Fatalf("%d records published for %d given", len(benchmarks.Records), len(committed)+1)
+	}
+	if benchmarks.Records[0].RecordedAt != later.RecordedAt {
+		t.Errorf("the newest record is not first: %s", benchmarks.Records[0].RecordedAt)
+	}
+	for index := 1; index < len(benchmarks.Records); index++ {
+		if benchmarks.Records[index-1].RecordedAt < benchmarks.Records[index].RecordedAt {
+			t.Errorf("records %d and %d are oldest first", index-1, index)
+		}
+	}
+	if benchmarks.SourceNote == "" {
+		t.Error("benchmarks.json says nothing about where its numbers come from")
+	}
+}
+
+// TestAnUnearnedQuietNumberRefusesTheBuild: a record whose mode claims a quiet summary its runs did not earn
+// is refused by Build, not published.
+func TestAnUnearnedQuietNumberRefusesTheBuild(t *testing.T) {
+	t.Parallel()
+	inputs := sourceInputs(t)
+	committed, err := benchresults.Read(filepath.Join(moduleRoot, benchresults.Directory))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(committed) == 0 {
+		t.Fatal("bench/results holds no record, so this test would plant nothing")
+	}
+	tampered := committed[0]
+	tampered.Modes = map[benchresults.Mode]benchresults.ModeSummary{}
+	for mode, summary := range committed[0].Modes {
+		tampered.Modes[mode] = summary
+	}
+	cold := tampered.Modes[benchresults.ModeCold]
+	cold.Quiet = &benchresults.QuietSummary{Count: 1, Best: 0.1, Median: 0.1, Worst: 0.1}
+	tampered.Modes[benchresults.ModeCold] = cold
+	inputs.Benchmarks = []benchresults.Record{tampered}
+	if _, err := Build(inputs); err == nil {
+		t.Error("a quiet number the runs did not earn was published")
 	}
 }

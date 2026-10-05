@@ -37,7 +37,14 @@ func moduleCopy(t *testing.T) string {
 	for _, relative := range []string{"swift/HouseRuleVerdicts.json", "swift/Rules.json", "CHANGELOG.md"} {
 		copyFile(relative)
 	}
-	err := filepath.WalkDir(filepath.Join(moduleRoot, docsdata.Directory), func(path string, entry os.DirEntry, err error) error {
+	records, err := filepath.Glob(filepath.Join(moduleRoot, "bench", "results", "*.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, record := range records {
+		copyFile(filepath.Join("bench", "results", filepath.Base(record)))
+	}
+	err = filepath.WalkDir(filepath.Join(moduleRoot, docsdata.Directory), func(path string, entry os.DirEntry, err error) error {
 		if err != nil || entry.IsDir() {
 			return err
 		}
