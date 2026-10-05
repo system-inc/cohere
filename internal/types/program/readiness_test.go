@@ -190,6 +190,10 @@ func TestReadinessRunsATierEnabledSetRuleOncePerFile(t *testing.T) {
 // TestAWarmReplayRunsNoRuleForReadiness: readiness is a file's property and rides the findings cache, so a
 // walk that replays every file runs no rule to measure, the measure-only and type-aware ones included, and
 // reads the records the walk that recorded them took (#drbrp8c).
+//
+// c.ts carries a directive that silences one of its findings. Replayed whole, it is dispatched with no rule to
+// walk so its directive is tallied, and its record must still be the recorded one: an empty walked part read as
+// unmeasured would leave every directive file out of readiness (#kdee854).
 func TestAWarmReplayRunsNoRuleForReadiness(t *testing.T) {
 	t.Parallel()
 	typeAware := typeAwareRule(t)
@@ -198,6 +202,7 @@ func TestAWarmReplayRunsNoRuleForReadiness(t *testing.T) {
 		"CohereSettings.json": `{"rules": {"test-set-enabled": "error", "test-set-off": "off", "` + typeAware.Name + `": "off"}}`,
 		"a.ts":                "export const first = 1;\nexport const negated = -first;\n",
 		"b.ts":                "export const second = 2;\n",
+		"c.ts":                "// cohere-disable-next-line test-set-enabled -- the directive file\nexport const third = 3;\n",
 	})
 
 	var runs atomic.Int32
@@ -270,8 +275,12 @@ func TestAWarmReplayRunsNoRuleForReadiness(t *testing.T) {
 	if got := runs.Load(); got != 0 {
 		t.Errorf("the warm walk ran rules %d times; readiness rides the findings cache and should run none", got)
 	}
-	if warm.FilesReplayed != 2 {
-		t.Errorf("the warm walk replayed %d of 2 files; every file's record should serve a run that measures", warm.FilesReplayed)
+	if warm.FilesReplayed != 3 {
+		t.Errorf("the warm walk replayed %d of 3 files; every file's record should serve a run that measures", warm.FilesReplayed)
+	}
+	if warm.Coverage.Suppressed != cold.Coverage.Suppressed || cold.Coverage.Suppressed == 0 {
+		t.Errorf("c.ts's directive withheld %d findings warm and %d cold; it should withhold one either way",
+			warm.Coverage.Suppressed, cold.Coverage.Suppressed)
 	}
 	if !reflect.DeepEqual(recordsOf(cold), recordsOf(warm)) {
 		got, _ := json.Marshal(recordsOf(warm))

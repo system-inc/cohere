@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -119,5 +121,53 @@ func TestADirectiveFileReplaysAndCountsItsDirectivesAsAColdRunDoes(t *testing.T)
 	fixture.write("source/Use.ts", strings.Replace(useWithDirective, "// cohere-disable-next-line -- the mixed case\n", "", 1))
 	if undirected := compare("Use.ts's directive deleted"); !strings.Contains(undirected, "no-debugger") {
 		t.Fatalf("with its directive deleted, Use.ts should report no-debugger:\n%s", undirected)
+	}
+}
+
+// A replayed file with directives keeps its Adamic readiness (#kdee854). Replayed whole, such a file is now
+// dispatched with nothing to walk so its directives are tallied, and its readiness is the replayed record merged
+// with the empty one that walk measured. Were that empty part to read as unmeasured, every directive file would
+// silently leave readiness while each check above stayed green. So, with entries recorded by readiness runs, a
+// warm readiness run after an unrelated edit reports the readiness a run with no cache does, file counts, ready,
+// unmeasured and failing files by rule alike, and its directive files replayed.
+func TestADirectiveFileReplaysWithItsAdamicReadiness(t *testing.T) {
+	t.Parallel()
+	fixture := newRunCacheFixture(t, buildCohere(t))
+	fixture.write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","@typescript-eslint/non-nullable-type-assertion-style":"error"}}`)
+	fixture.write("source/Value.ts", "export const value: string | undefined = Math.random() > 0.5 ? 'text' : undefined;\n")
+	fixture.write("source/Use.ts", "import { value } from './Value';\n// cohere-disable-next-line -- the mixed case\nexport const used = value as string; debugger;\n")
+	fixture.write("source/Dead.ts", "// cohere-disable-next-line no-debugger -- left behind\nexport const dead = 1;\n")
+	fixture.commit("directive files")
+
+	readiness := func(cached bool) (string, string) {
+		t.Helper()
+		output, _ := fixture.run(cached, "--no-fix", "--json", "--adamic-readiness")
+		lines := strings.Split(strings.TrimSpace(output), "\n")
+		var summary struct {
+			Cached int             `json:"cached"`
+			Adamic json.RawMessage `json:"adamic"`
+		}
+		if err := json.Unmarshal([]byte(lines[len(lines)-1]), &summary); err != nil || len(summary.Adamic) == 0 {
+			t.Fatalf("no readiness in the summary line (%v):\n%s", err, output)
+		}
+		return string(summary.Adamic), fmt.Sprint(summary.Cached)
+	}
+	readiness(true)
+	readiness(true)
+	fixture.write("source/a.ts", "export const a: number = 2;\n")
+	warm, cached := readiness(true)
+	cold, _ := readiness(false)
+	if cached == "0" {
+		t.Fatal("the warm readiness run replayed no file, so the comparison below is not about replay")
+	}
+	if warm != cold {
+		t.Errorf("readiness differs warm and cold after an unrelated edit\n--- warm\n%s\n--- cold\n%s", warm, cold)
+	}
+	if !strings.Contains(cold, `"measured":true`) {
+		t.Errorf("readiness was not measured, so the comparison above proves nothing: %s", cold)
+	}
+	dump, _ := fixture.run(true, "--cache-dump")
+	if !strings.Contains(dump, "withheld by directive") {
+		t.Fatalf("no entry records a withheld finding, so Use.ts did not replay as a directive file:\n%s", dump)
 	}
 }
