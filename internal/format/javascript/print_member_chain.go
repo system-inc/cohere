@@ -2,6 +2,7 @@ package javascript
 
 import (
 	"regexp"
+	"slices"
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/printing"
@@ -54,9 +55,11 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 	//   [Identifier, CallExpression, MemberExpression, CallExpression]
 	var printedNodes []printedNode
 
-	// unshift is upstream's printedNodes.unshift.
+	// unshift is upstream's printedNodes.unshift. Nothing reads printedNodes until the walk down is done, so
+	// each node is appended and the list reversed once afterwards, rather than copied whole on every unshift:
+	// a new slice per node was 0.1M of the printer's allocations a pass on ahra (#fyw36kf).
 	unshift := func(printed printedNode) {
-		printedNodes = append([]printedNode{printed}, printedNodes...)
+		printedNodes = append(printedNodes, printed)
 	}
 
 	// Here we try to retain one typed empty line after each call expression or
@@ -145,6 +148,7 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 	if current.Child("callee") != nil {
 		call(path, rec, "callee")
 	}
+	slices.Reverse(printedNodes)
 
 	// Once we have a linear list of printed nodes, we want to create groups out
 	// of it.
@@ -170,7 +174,7 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 	//       < fn()[0][1][2] >.something()
 	//   - then, as many MemberExpression as possible but the last one
 	//       < this.items >.something()
-	var groups [][]printedNode
+	groups := make([][]printedNode, 0, len(printedNodes))
 	currentGroup := []printedNode{printedNodes[0]}
 	i := 1
 	for ; i < len(printedNodes); i++ {
@@ -287,7 +291,7 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 		shouldNotWrap(groups)
 
 	printGroup := func(printedGroup []printedNode) Doc {
-		parts := make([]Doc, len(printedGroup))
+		parts := partsIn(path, len(printedGroup))
 		for index, tuple := range printedGroup {
 			parts[index] = tuple.printed
 		}
@@ -299,14 +303,14 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 		if len(groups) == 0 {
 			return emptyDoc
 		}
-		printed := make([]Doc, len(groups))
+		printed := partsIn(path, len(groups))
 		for index, printedGroup := range groups {
 			printed[index] = printGroup(printedGroup)
 		}
 		return indentIn(path, concatIn(path, hardline, join(hardline, printed)))
 	}
 
-	printedGroups := make([]Doc, len(groups))
+	printedGroups := partsIn(path, len(groups))
 	for index, printedGroup := range groups {
 		printedGroups[index] = printGroup(printedGroup)
 	}
@@ -316,7 +320,8 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 	if shouldMerge {
 		cutoff = 3
 	}
-	var flatGroups []printedNode
+	// The groups partition printedNodes, so flattening them refills a list of the same length.
+	flatGroups := make([]printedNode, 0, len(printedNodes))
 	for _, printedGroup := range groups {
 		flatGroups = append(flatGroups, printedGroup...)
 	}

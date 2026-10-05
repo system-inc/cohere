@@ -150,6 +150,16 @@ func concatIn(path *Path, parts ...any) Doc {
 	return result
 }
 
+// partsIn is a []Doc of length count for a concatenation the caller fills, from the format's docMemory when
+// the path's print has one.
+func partsIn(path *Path, count int) []Doc {
+	memory := docMemoryOf(path)
+	if memory == nil {
+		return make([]Doc, count)
+	}
+	return memory.parts.Make(count)[:count]
+}
+
 // groupIn is group with the group from the format's docMemory.
 func groupIn(path *Path, contents any) Doc {
 	return groupWithIn(path, contents, doc.GroupOptions{})
