@@ -730,3 +730,58 @@ func TestImmutabilityRequiresTheTypedHarness(t *testing.T) {
 		t.Errorf("expected silence without a checker, got %d findings", len(result.Diagnostics))
 	}
 }
+
+// TestImmutabilityAnalyzesANestedComponentAsItsOwnUnit is TanStack Query's test shape: a component
+// declared inside a test callback (#zx5xvtg item 8). React Compiler compiles such a component as a
+// unit of its own and resolves the test's variables as it resolves module-level ones, so writing
+// them from a handler, from an effect, or from a memoized callback raises no immutability error.
+// Measured on the compiler bundled in eslint-plugin-react-hooks 7.1.1, run without the plugin's file
+// gate: it compiles the nested `Page` and reports nothing on the first source (the `++` is its Todo,
+// not an error this rule names). cohere used to analyze `Page` as a function nested in the test
+// callback and report all three writes, twice each.
+//
+// The control is the component writing its OWN local after render, which the compiler reports at
+// the same line nested or not, so the nested component is still analyzed, as itself.
+func TestImmutabilityAnalyzesANestedComponentAsItsOwnUnit(t *testing.T) {
+	t.Parallel()
+
+	testVariables := `import {useEffect, useCallback} from 'react';
+declare function it(name: string, body: () => void): void;
+it('counts', () => {
+  let isRefetch = false;
+  let result: unknown = null;
+  let selectCalled = 0;
+  function Page() {
+    useEffect(() => {
+      result = 1;
+    });
+    const select = useCallback((x: number) => {
+      selectCalled++;
+      return x;
+    }, []);
+    return <button onClick={() => { isRefetch = true; }}>{select(1)}</button>;
+  }
+  return [Page, isRefetch, result, selectCalled];
+});
+`
+	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, Immutability, "component.tsx", testVariables))
+
+	nested := rule_testing.RunTyped(t, Immutability, "component.tsx", `declare function it(name: string, body: () => void): void;
+it('own local', () => {
+  function Page() {
+    let local = 0;
+    return <button onClick={() => { local = 1; }}>{local}</button>;
+  }
+  return Page;
+});
+`)
+	topLevel := rule_testing.RunTyped(t, Immutability, "component.tsx", `export function Page() {
+  let local = 0;
+  return <button onClick={() => { local = 1; }}>{local}</button>;
+}
+`)
+	if len(topLevel.Diagnostics) == 0 {
+		t.Fatal("the top-level control reports nothing, so the comparison proves nothing")
+	}
+	rule_testing.ExpectFindings(t, nested, topLevel.MessageIds()...)
+}

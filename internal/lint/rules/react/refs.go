@@ -227,6 +227,10 @@ func refsAnalyzeCompilationUnit(ctx rule.Context, function *high_level_intermedi
 		}
 		return
 	}
+	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
+	// on its own; see AsCompilationUnit.
+	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
+		high_level_intermediate_representation.ForFunction)
 	findings := refsSweepFunction(ctx, function)
 	for _, finding := range findings {
 		refsReport(ctx, function, finding)

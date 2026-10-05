@@ -212,6 +212,10 @@ func analyzeSetStateSubject(ctx rule.Context, function *high_level_intermediate_
 		}
 		return
 	}
+	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
+	// on its own; see AsCompilationUnit.
+	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
+		high_level_intermediate_representation.ForFunction)
 	reportSetStateInRender(ctx, function, function.Node, true, map[high_level_intermediate_representation.IdentifierId]bool{})
 }
 
