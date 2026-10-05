@@ -1,12 +1,12 @@
 {
     "rule": "nexus/consistency-no-multiline-arrow-function",
     "firing": {
-        "file": "/repository/source/Thing.tsx",
-        "source": "const f = value => {\n    return value * 2;\n};\n",
+        "file": "/repository/source/Thing.ts",
+        "source": "async (value) => {\n    await value;\n};\n",
         "findings": [
             {
                 "line": 1,
-                "column": 11,
+                "column": 1,
                 "endLine": 3,
                 "endColumn": 2,
                 "messageId": "multilineArrow",
@@ -14,7 +14,7 @@
                 "fix": true
             }
         ],
-        "fixedSource": "const f = function(value) {\n    return value * 2;\n};\n"
+        "fixedSource": "(async function(value) {\n    await value;\n});\n"
     },
     "clean": {
         "file": "/repository/source/Thing.tsx",

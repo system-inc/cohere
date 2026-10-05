@@ -2,15 +2,15 @@
     "rule": "valid-typeof",
     "firing": {
         "file": "/repository/source/Thing.ts",
-        "source": "declare const value: unknown;\nexport const Bad = typeof value === 'null';\n",
+        "source": "declare const value: unknown;\nexport const Bad = typeof value == 5;\n",
         "findings": [
             {
                 "line": 2,
-                "column": 37,
+                "column": 36,
                 "endLine": 2,
-                "endColumn": 43,
+                "endColumn": 37,
                 "messageId": "invalidTypeofValue",
-                "message": "A typeof expression can only produce one of eight strings, and \"null\" is not among them, so this comparison is always false and the branch behind it is dead. The eight are undefined, object, boolean, number, string, function, symbol and bigint. Almost every finding here is a typo or a guess at a type name that the language does not report: typeof null is \"object\", an array is \"object\", and there is no \"array\", \"null\" or \"date\"."
+                "message": "A typeof expression always produces a string, and `5` is not one, so this comparison is always false (always true for != and !==) and the branch behind it is dead or unconditional. Compare against the string instead: `typeof value === \"undefined\"`, not `typeof value === undefined`."
             }
         ]
     },
@@ -19,6 +19,8 @@
         "source": "declare const value: string;\nexport const Ok = value === 'array';\n"
     },
     "assertedMessageIds": [
-        "invalidTypeofValue"
-    ]
+        "invalidTypeofValue",
+        "notString"
+    ],
+    "assertsSuggestion": true
 }
