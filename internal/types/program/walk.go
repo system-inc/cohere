@@ -281,6 +281,8 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			localIgnored := 0
 			localScopedOff := map[string]int{}
 			localUnconfigured := map[string]int{}
+			// The rule selection for each distinct resolution this worker has met. See rulesFor.
+			localSelections := map[any]*ruleSelection{}
 			localFailures := []error{}
 			localCrashes := []FileCrash{}
 			localRuleCrashes := []RuleCrash{}
@@ -312,19 +314,19 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 				// Configuration is consulted before a checker is acquired, because an ignored file
 				// should cost nothing at all rather than cost a checker and then be discarded.
-				applicable, ruleOptions, resolution, err := g.rulesFor(sourceFile, rules, localScopedOff, localUnconfigured)
-				if err != nil {
-					// A rule that requires an option and did not get one is a hard failure, never a
-					// quiet decline. Declining is indistinguishable from finding nothing, and that
-					// ambiguity kept a dead rule alive for months.
-					localFailures = append(localFailures, err)
-					return
-				}
+				selection, resolution := g.rulesFor(sourceFile.FileName(), rules, localSelections, localScopedOff, localUnconfigured)
 				if resolution.Ignored {
 					localIgnored++
 					return
 				}
-				if len(applicable) == 0 {
+				if selection.err != nil {
+					// A rule that requires an option and did not get one is a hard failure, never a
+					// quiet decline. Declining is indistinguishable from finding nothing, and that
+					// ambiguity kept a dead rule alive for months.
+					localFailures = append(localFailures, selection.err)
+					return
+				}
+				if len(selection.applicable) == 0 {
 					return
 				}
 
@@ -344,27 +346,26 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				//
 				// Design-system rules replay while every path the design system read last time still holds and the
 				// entry was produced under that design system. See DesignSystemKey.
-				walkRules := applicable
+				walkRules := selection.applicable
 				var replayed *LintCacheEntry
 				var replayedNotes RuleNotes
 				var hits classHits
 				var keys cacheKeys
 				if reuse != nil {
-					pureHere, typeAwareHere, designHere, _ := CacheClasses(applicable)
-					shapedHere, typedHere := ShapeClasses(typeAwareHere)
+					classes := selection.classNames()
 					keys = cacheKeys{
 						contentHash:      HashContent(sourceFile.Text()),
-						pure:             ruleNames(pureHere),
-						typed:            ruleNames(typedHere),
+						pure:             classes.pure,
+						typed:            classes.typed,
 						typeFingerprint:  fingerprints[sourceFile.Path()],
-						shaped:           ruleNames(shapedHere),
+						shaped:           classes.shaped,
 						shapeFingerprint: shapeFingerprints[sourceFile.Path()],
-						design:           ruleNames(designHere),
+						design:           classes.design,
 					}
 					if entry, found := reuse.lookup(sourceFile.FileName(), keys); found.pure {
 						replayed = &entry
 						hits = found
-						replays := make(map[string]bool, len(applicable))
+						replays := make(map[string]bool, len(selection.applicable))
 						for _, names := range [][]string{keys.pure, classIf(hits.typed, keys.typed), classIf(hits.shaped, keys.shaped),
 							classIf(hits.design, keys.design)} {
 							for _, name := range names {
@@ -374,7 +375,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 						// The rules still to walk, in the order they were configured: the order rules run in
 						// can decide which findings exist (HashRuleSet).
 						walkRules = nil
-						for _, subject := range applicable {
+						for _, subject := range selection.applicable {
 							if !replays[subject.Name] {
 								walkRules = append(walkRules, subject)
 							}
@@ -460,7 +461,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				visited, silenced, fileNotes, ruleCrashes, crashed := dispatchFileSafely(sourceFile, func(diagnostic rule.Diagnostic) {
 					localDiagnostics = append(localDiagnostics, diagnostic)
 					localReporting[diagnostic.RuleName]++
-				}, walkRules, g, fileChecker, listeningTarget, offeredTarget, ruleOptions, localTimings, catalog, resolution)
+				}, walkRules, g, fileChecker, listeningTarget, offeredTarget, selection.options, localTimings, catalog, resolution)
 
 				release()
 
@@ -1014,9 +1015,16 @@ func dispatchFile(
 	// Keyed by the bare name, because that is what a directive is looked up by (see bareRuleName). A
 	// registered name carries its plugin (`@typescript-eslint/no-misused-spread`), so keying by it
 	// filed every dead directive for a prefixed rule as unported (#6dc4f7k).
-	ranRule := make(map[string]bool, len(rules))
-	for _, subject := range rules {
-		ranRule[bareRuleName(subject.Name)] = true
+	//
+	// Only directives read it, and most files have none, so it is built only for a file that has one:
+	// built for every file it was 42 MB of a cold ahra run's allocation, nearly all of it read by nothing
+	// (#9jpmqm9).
+	var ranRule map[string]bool
+	if len(directives.Directives()) > 0 {
+		ranRule = make(map[string]bool, len(rules))
+		for _, subject := range rules {
+			ranRule[bareRuleName(subject.Name)] = true
+		}
 	}
 
 	for _, containment := range containments {
@@ -1171,49 +1179,120 @@ func walk(node *ast.Node, listeners [][]func(node *ast.Node)) int {
 // When no configuration is loaded every rule applies with nil options, which keeps existing callers
 // and tests working unchanged. The command always loads a real config and fails loudly if it
 // cannot, so that permissive path is reachable only from a caller that chose it.
+//
+// A selection depends on the file's resolution alone, so it is made once per distinct resolution and
+// shared by every file that resolved the same way (see configuration.Resolved.Identity), through the
+// worker's selections. Made per file, the applicable slice, the decoded options and the cache classes
+// were about 1 GB of a cold ahra run's allocation, for a few dozen distinct answers (#9jpmqm9). The
+// scoped-off and unconfigured counts are still counted per file, from the selection's names.
 func (g *Graph) rulesFor(
-	sourceFile *ast.SourceFile,
+	fileName string,
 	rules []rule.Rule,
+	selections map[any]*ruleSelection,
 	scopedOff map[string]int,
 	unconfigured map[string]int,
-) ([]rule.Rule, map[string]any, configuration.Resolved, error) {
+) (*ruleSelection, configuration.Resolved) {
 	if g.LintConfig == nil {
-		return rules, nil, configuration.Resolved{}, nil
+		return &ruleSelection{applicable: rules}, configuration.Resolved{}
 	}
 
-	resolution := g.LintConfig.Resolve(sourceFile.FileName())
+	resolution := g.LintConfig.Resolve(fileName)
 	if resolution.Ignored {
-		return nil, nil, resolution, nil
+		return nil, resolution
 	}
 
-	applicable := make([]rule.Rule, 0, len(rules))
-	options := map[string]any{}
+	identity := resolution.Identity()
+	selection, made := selections[identity]
+	if identity == nil || !made {
+		selection = g.selectRules(rules, resolution)
+		if identity != nil {
+			selections[identity] = selection
+		}
+	}
+	if selection.err != nil {
+		return selection, resolution
+	}
+
+	for _, name := range selection.scopedOff {
+		scopedOff[name]++
+	}
+	for _, name := range selection.unconfigured {
+		unconfigured[name]++
+	}
+	return selection, resolution
+}
+
+// ruleSelection is what one resolution decides about the rule set: the rules that apply, their decoded
+// options, and the rules left out and why.
+//
+// Shared by every file that resolved the same way, on one worker, so nothing may write into it after it
+// is made, its options included: a rule reads its options and never writes them.
+type ruleSelection struct {
+	applicable []rule.Rule
+	options    map[string]any
+
+	// scopedOff is the rules the configuration turned off here, and unconfigured the rules it never
+	// mentions. Both are counted for every file the selection serves.
+	scopedOff    []string
+	unconfigured []string
+
+	// err is a rule's options failing to decode, which fails the run.
+	err error
+
+	// classes is the applicable rules' findings-cache classes by name, made on first use. See classNames.
+	classes *ruleClassNames
+}
+
+// ruleClassNames is the applicable rules' names in each findings-cache class. See CacheClasses and
+// ShapeClasses.
+type ruleClassNames struct {
+	pure   []string
+	typed  []string
+	shaped []string
+	design []string
+}
+
+// classNames returns the selection's cache classes, made once. Made per file they were about 470 MB of a
+// cold ahra run's allocation (#9jpmqm9).
+func (s *ruleSelection) classNames() *ruleClassNames {
+	if s.classes == nil {
+		pure, typeAware, design, _ := CacheClasses(s.applicable)
+		shaped, typed := ShapeClasses(typeAware)
+		s.classes = &ruleClassNames{pure: ruleNames(pure), typed: ruleNames(typed), shaped: ruleNames(shaped), design: ruleNames(design)}
+	}
+	return s.classes
+}
+
+// selectRules makes the selection for one resolution.
+func (g *Graph) selectRules(rules []rule.Rule, resolution configuration.Resolved) *ruleSelection {
+	selection := &ruleSelection{applicable: make([]rule.Rule, 0, len(rules)), options: map[string]any{}}
 	for _, subject := range rules {
 		switch status, _ := resolution.StatusOf(subject.Name); status {
 		case configuration.StatusScopedOff:
 			// Someone configured this rule off, here or tree-wide. Counted rather than dropped
 			// silently, because a rule absent across a directory is otherwise indistinguishable
 			// from a rule with nothing to report.
-			scopedOff[subject.Name]++
+			selection.scopedOff = append(selection.scopedOff, subject.Name)
 			continue
 		case configuration.StatusUnconfigured:
 			// Nobody has said whether this rule should run. That is a different fact from a
 			// deliberate exclusion and it is counted separately, or a rule waiting on a decision
 			// reads as one somebody already made.
-			unconfigured[subject.Name]++
+			selection.unconfigured = append(selection.unconfigured, subject.Name)
 			continue
 		}
 
 		decoded, err := g.RuleOptions.Decode(subject.Name, resolution.RawOptionsFor(subject.Name))
 		if err != nil {
-			return nil, nil, resolution, err
+			selection.err = err
+			return selection
 		}
 		if decoded != nil {
-			options[subject.Name] = decoded
+			selection.options[subject.Name] = decoded
 		}
-		applicable = append(applicable, subject)
+		selection.applicable = append(selection.applicable, subject)
 	}
-	return applicable, options, resolution, nil
+	return selection
 }
 
 // assignFilesToWorkers gives each worker the files of one checker, so no two workers ever want the same

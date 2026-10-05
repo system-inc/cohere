@@ -1,12 +1,17 @@
 package configuration
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // Resolved is one file's answer: whether it is linted at all, and which rules apply to it.
+//
+// Shared, not owned: files that resolve the same way get the same Rules map, so nothing may write into
+// one (see resolutionMemo).
 type Resolved struct {
 	// Ignored is true when an ignorePattern excluded the file entirely.
 	Ignored bool
@@ -17,6 +22,50 @@ type Resolved struct {
 
 	// Rules is the effective setting per rule name after overrides are applied.
 	Rules map[string]RuleSetting
+
+	// identity is the memo entry this resolution came from, nil for one built by hand.
+	identity *resolutionIdentity
+}
+
+// resolutionIdentity names one distinct resolution of one Config. A field of its own, because pointers to
+// zero-size values need not be distinct.
+type resolutionIdentity struct {
+	match string
+}
+
+// Identity is the same for every file of one Config that resolved the same way, and different otherwise,
+// so a caller can derive what depends only on the resolution once per resolution rather than once per
+// file: which rules apply, and their decoded options. Nil for a resolution with no identity, an ignored
+// file or one built by hand, which a caller treats as unique.
+func (r Resolved) Identity() any {
+	if r.identity == nil {
+		return nil
+	}
+	return r.identity
+}
+
+// resolutionMemo is a Config's resolutions, by which of its overrides a path matched.
+//
+// A resolution depends on nothing else: the base rules, then each matching override in order. So two
+// paths matching the same overrides resolve identically, and copying the base map for each was the
+// largest cost of resolving: 248 MB allocated on a cold ahra run, one copy of about 500 settings per file
+// (#9jpmqm9). A tree has a few dozen distinct override matches across thousands of files.
+//
+// Per Config, which under zero config means per house variant: the whole stack's Config dispatches to a
+// variant before anything is matched, so a React file and a Node file matching the same overrides still
+// resolve through different variants (see Config.Resolve).
+type resolutionMemo struct {
+	mutex   sync.Mutex
+	byMatch map[string]Resolved
+}
+
+// resolutions returns the Config's memo, creating it on first use.
+func (c *Config) resolutions() *resolutionMemo {
+	if memo := c.resolutionMemo.Load(); memo != nil {
+		return memo
+	}
+	c.resolutionMemo.CompareAndSwap(nil, &resolutionMemo{byMatch: map[string]Resolved{}})
+	return c.resolutionMemo.Load()
 }
 
 // Enabled reports whether a rule runs on this file.
@@ -170,6 +219,10 @@ func KeyReachesRule(key string, ruleName string) bool {
 // even supposed to run.
 //
 // Under zero config the file resolves through the variant of the house stack it gets (see house.go).
+// That dispatch comes first, before the memo, so each variant memoizes its own resolutions.
+//
+// Resolutions are memoized by which overrides a path matched (see resolutionMemo), so the result is
+// shared with every other path that matched the same ones.
 func (c *Config) Resolve(path string) Resolved {
 	if c.house != nil {
 		return c.house.variantFor(path).Resolve(path)
@@ -182,6 +235,31 @@ func (c *Config) Resolve(path string) Resolved {
 		}
 	}
 
+	// The match, as the indices of the overrides that apply, in order. On the stack for the common case
+	// of a few dozen overrides, and looked up without converting it to a string, so a path whose match is
+	// already memoized allocates nothing here.
+	var matchStorage [64]byte
+	match := matchStorage[:0]
+	for index, override := range c.Overrides {
+		if MatchAny(override.Files, relative) {
+			match = binary.AppendUvarint(match, uint64(index))
+		}
+	}
+
+	memo := c.resolutions()
+	memo.mutex.Lock()
+	defer memo.mutex.Unlock()
+	if resolved, found := memo.byMatch[string(match)]; found {
+		return resolved
+	}
+	resolved := c.resolveMatch(match)
+	memo.byMatch[string(match)] = resolved
+	return resolved
+}
+
+// resolveMatch builds the resolution for one match: the base rules, then each override the match names,
+// in order.
+func (c *Config) resolveMatch(match []byte) Resolved {
 	// The base map is copied rather than shared, because an override writes into the result and a
 	// shared map would leak one file's overrides into every later file.
 	effective := make(map[string]RuleSetting, len(c.Rules))
@@ -189,10 +267,10 @@ func (c *Config) Resolve(path string) Resolved {
 		effective[name] = setting
 	}
 
-	for _, override := range c.Overrides {
-		if !MatchAny(override.Files, relative) {
-			continue
-		}
+	for remaining := match; len(remaining) > 0; {
+		index, width := binary.Uvarint(remaining)
+		remaining = remaining[width:]
+		override := c.Overrides[index]
 		for name, setting := range override.Rules {
 			// A bare severity re-states the rule's level and keeps its options, as ESLint does and as a
 			// bare severity across `extends` already does. Dropping them changed what a rule checked on
@@ -206,7 +284,7 @@ func (c *Config) Resolve(path string) Resolved {
 		}
 	}
 
-	return Resolved{Rules: effective}
+	return Resolved{Rules: effective, identity: &resolutionIdentity{match: string(match)}}
 }
 
 // relativePath expresses a path the way the config's patterns are written: relative to the config

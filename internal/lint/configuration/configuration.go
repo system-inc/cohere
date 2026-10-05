@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 )
 
 // Severity is whether a rule runs, and how loudly.
@@ -132,6 +133,9 @@ type Config struct {
 
 	// house is the per-file dispatch of a zero-config configuration, nil for one that names its sets.
 	house *houseSets
+
+	// resolutionMemo is Resolve's results by match, created on first use. See resolutionMemo.
+	resolutionMemo atomic.Pointer[resolutionMemo]
 }
 
 // Departure is one rule a configuration sets differently from the file it extends, and why.
