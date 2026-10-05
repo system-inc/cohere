@@ -37,7 +37,7 @@ var (
  *
  * # How
  *
- * At every pair flow.Walk relates, when the target is a class instance type, the source must be an
+ * At every pair the file's flow.Walker relates, when the target is a class instance type, the source must be an
  * instance of that class or of one derived from it, and for the class itself every type argument must be
  * identical. A derived generic class seen as its generic base is accepted without comparing arguments,
  * since mapping them through the heritage clause is not built; Adamic 0.1 has no `extends`, so this is a
@@ -59,26 +59,31 @@ var NominalClass = rule.Rule{
 			return nil
 		}
 		typeChecker := ctx.TypeChecker
-		return flow.Listeners(ctx, func(site flow.Site) {
-			var handle policy.MessageHandle
-			found, wrong := flow.Walk(typeChecker, site, func(pair flow.Pair) (bool, bool) {
-				if !isClassInstance(pair.Target) {
-					return false, true
-				}
-				verdict := nominalVerdict(typeChecker, pair.Source, pair.Target)
-				switch verdict {
-				case nominalAccepted:
-					return false, false
-				case nominalUndecided:
-					// A union or intersection source: the walk pairs its members one by one.
-					return false, true
-				case nominalTypeArgumentsDiffer:
-					handle = nominalClassTypeArgumentsDifferText
-				default:
-					handle = nominalClassNotAnInstanceText
-				}
-				return true, false
-			})
+		walker := flow.WalkerFor(ctx)
+		// The judge and the message it picks are made once per file and set at each site, not a closure per
+		// site (#m6tyg79).
+		var handle policy.MessageHandle
+		judge := func(pair flow.Pair) (bool, bool) {
+			if !isClassInstance(pair.Target) {
+				return false, true
+			}
+			verdict := nominalVerdict(typeChecker, pair.Source, pair.Target)
+			switch verdict {
+			case nominalAccepted:
+				return false, false
+			case nominalUndecided:
+				// A union or intersection source: the walk pairs its members one by one.
+				return false, true
+			case nominalTypeArgumentsDiffer:
+				handle = nominalClassTypeArgumentsDifferText
+			default:
+				handle = nominalClassNotAnInstanceText
+			}
+			return true, false
+		}
+		return walker.Listeners(func(site flow.Site) {
+			handle = policy.MessageHandle{}
+			found, wrong := walker.Walk(site, judge)
 			if !wrong {
 				return
 			}

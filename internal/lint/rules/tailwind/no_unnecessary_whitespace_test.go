@@ -213,10 +213,23 @@ func TestNoUnnecessaryWhitespaceFixMatchesUpstream(t *testing.T) {
 			want:   "const element = <div className={`${extra} flex`} />;",
 		},
 		{
-			// A separator keeps its own first character, so a wrapped list stays wrapped.
-			name:   "keeps a newline's first character",
-			source: "const element = <div className=\"flex\n    items-center\" />;",
-			want:   "const element = <div className=\"flex\nitems-center\" />;",
+			// Upstream's own case ("should remove newlines whenever possible"): with allowMultiline on,
+			// the default, a newline run keeps its newline and indentation and only doubled spaces
+			// between classes are shortened.
+			name:   "keeps a wrapped list wrapped",
+			source: "const element = <img className={`\n      d  c\n      b  a\n    `} />;",
+			want:   "const element = <img className={`\n      d c\n      b a\n    `} />;",
+		},
+		{
+			name:   "drops the spaces before a newline",
+			source: "const element = <div className={`flex  \n    items-center`} />;",
+			want:   "const element = <div className={`flex\n    items-center`} />;",
+		},
+		{
+			// A run longer than one character becomes one space, whatever it was made of.
+			name:   "writes a doubled tab as one space",
+			source: "const element = <div className=\"flex\t\titems-center\" />;",
+			want:   "const element = <div className=\"flex items-center\" />;",
 		},
 	}
 
@@ -287,7 +300,7 @@ func TestWhitespaceFixNeverFusesClassesAcrossAHole(t *testing.T) {
 		TrailingHole: true,
 	}
 
-	tidied, needsTidying := tidyWhitespace(segment)
+	tidied, needsTidying := tidyWhitespace(segment, true)
 	if !needsTidying {
 		t.Fatal("a doubled space inside the segment is a defect and should have been reported")
 	}
@@ -303,8 +316,33 @@ func TestWhitespaceFixNeverFusesClassesAcrossAHole(t *testing.T) {
 
 	// And the discrimination has to be real: with no holes, the same text trims fully.
 	plain := ClassSegment{Text: "  flex  "}
-	plainTidied, plainNeedsTidying := tidyWhitespace(plain)
+	plainTidied, plainNeedsTidying := tidyWhitespace(plain, true)
 	if !plainNeedsTidying || plainTidied != "flex" {
 		t.Fatalf("outside a template the padding should be removed entirely, got %q", plainTidied)
 	}
+}
+
+// TestNoUnnecessaryWhitespaceAllowMultiline is upstream's `allowMultiline`, each way, on upstream's own
+// case. On, the default, a class list written across lines stays across lines. Off, it is whitespace
+// like any other and the list becomes one line.
+func TestNoUnnecessaryWhitespaceAllowMultiline(t *testing.T) {
+	t.Parallel()
+	const source = "const element = <img className={`\n      d  c\n      b  a\n    `} />;"
+	off := false
+
+	rule_testing.ExpectFixedSource(t,
+		rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", source),
+		"const element = <img className={`\n      d c\n      b a\n    `} />;")
+	rule_testing.ExpectFixedSource(t,
+		rule_testing.RunWithOptions(t, NoUnnecessaryWhitespace, "Component.tsx", source,
+			NoUnnecessaryWhitespaceOptions{AllowMultiline: &off}),
+		"const element = <img className={`d c b a`} />;")
+
+	// A wrapped list with nothing else wrong is clean by default and a finding with the option off.
+	const wrapped = "const element = <div className={`flex\n    items-center`} />;"
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", wrapped))
+	rule_testing.ExpectFixedSource(t,
+		rule_testing.RunWithOptions(t, NoUnnecessaryWhitespace, "Component.tsx", wrapped,
+			NoUnnecessaryWhitespaceOptions{AllowMultiline: &off}),
+		"const element = <div className={`flex items-center`} />;")
 }

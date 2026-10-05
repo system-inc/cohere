@@ -1988,3 +1988,29 @@ func TestNoUnstableNestedComponentsCreateElementPropsPosition(t *testing.T) {
 			result.Diagnostics[0].Message.Description)
 	}
 }
+
+// TestPropNamePatternIsCompiledOncePerPattern holds why compilePropNamePattern keeps its matchers:
+// `Run` asks for one per file. A pattern seen before must come back without compiling again, which
+// is an allocation-free lookup, and the matcher it returns must still be the pattern's.
+//
+// Not parallel: testing.AllocsPerRun reads the process-wide allocation count, so a test running
+// beside it would add its allocations to this one's.
+func TestPropNamePatternIsCompiledOncePerPattern(t *testing.T) {
+	compiled := testing.AllocsPerRun(10, func() {
+		buildPropNamePattern("render*")
+	})
+	if compiled < 1 {
+		t.Fatalf("compiling a pattern allocated %.0f times; the comparison below cannot fail", compiled)
+	}
+	compilePropNamePattern("cached*")
+	repeated := testing.AllocsPerRun(10, func() {
+		compilePropNamePattern("cached*")
+	})
+	if repeated != 0 {
+		t.Errorf("asking again for a pattern already seen allocated %.0f times, want 0", repeated)
+	}
+	matches := compilePropNamePattern("cached*")
+	if !matches("cachedValue") || matches("renderValue") {
+		t.Error("the kept matcher does not match its own pattern")
+	}
+}

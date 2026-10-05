@@ -25,13 +25,15 @@ import (
 // broken config, and refusing it would make every outsider's zero-config run fail on the house's
 // patterns rather than its own.
 func (c *Config) ValidateSelectors(fileNames []string) error {
-	lintable := make([]string, 0, len(fileNames))
+	// Each file split once and each pattern compiled once, rather than both on every pairing (#hsd2dfb).
+	globs := c.globs()
+	lintable := make([][]string, 0, len(fileNames))
 	for _, fileName := range fileNames {
-		relative := c.relativePath(fileName)
-		if MatchAny(c.IgnorePatterns, relative) {
+		segments := splitPath(c.relativePath(fileName))
+		if matchesAny(globs.ignore, segments) {
 			continue
 		}
-		lintable = append(lintable, relative)
+		lintable = append(lintable, segments)
 	}
 
 	type miss struct {
@@ -48,10 +50,11 @@ func (c *Config) ValidateSelectors(fileNames []string) error {
 			misses = append(misses, miss{override: overrideIndex, empty: true})
 			continue
 		}
-		for _, pattern := range override.Files {
+		for patternIndex, pattern := range override.Files {
+			compiled := globs.overrides[overrideIndex][patternIndex]
 			matched := false
-			for _, fileName := range lintable {
-				if Match(pattern, fileName) {
+			for _, segments := range lintable {
+				if compiled.matches(segments) {
 					matched = true
 					break
 				}

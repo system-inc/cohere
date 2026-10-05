@@ -266,9 +266,10 @@ func TestDecodeBanTsCommentOptionsRefusesWhatUpstreamRefuses(t *testing.T) {
 
 // TestBanTsCommentDeclinesJavaScriptFiles pins the gate kept as a stand-in for config scope.
 //
-// Upstream's rule has no file-type gate; ESLint configs commonly scope it to TypeScript files, and
-// cohere's settings cannot. The rule's doc comment has the TanStack measurement and the open question
-// (#dttt878). Flipping this is the decision to drop the gate, and it should fail here when made.
+// Upstream's rule has no file-type gate; ESLint configs commonly scope it to TypeScript files. cohere's
+// overrides can too, but readiness resolves cohere:adamic once for `index.ts`, so the scope cannot
+// move into the set yet. The rule's doc comment has the TanStack measurement. #6aa3wrx moves the
+// scope and deletes this test with the gate.
 func TestBanTsCommentDeclinesJavaScriptFiles(t *testing.T) {
 	t.Parallel()
 

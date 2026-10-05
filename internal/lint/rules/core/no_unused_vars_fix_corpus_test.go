@@ -161,6 +161,7 @@ func TestNoUnusedVarsFixUpstreamCorpus(t *testing.T) {
 			if output != wantOutput {
 				t.Fatalf("one pass of the fixes writes %q, and the corpus records %q", output, wantOutput)
 			}
+			rule_testing.RecordAssertedCase(t, result)
 		})
 	}
 }

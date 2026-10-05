@@ -59,6 +59,36 @@ type resolutionMemo struct {
 	byMatch map[string]Resolved
 }
 
+// configGlobs is a Config's patterns compiled once (#hsd2dfb): ignore is IgnorePatterns by index, and
+// overrides holds each override's Files by the same indices as Overrides.
+type configGlobs struct {
+	ignore    []glob
+	overrides [][]glob
+}
+
+// globs returns the Config's compiled patterns, compiling them on first use. Two goroutines racing to
+// compile build the same answer, and the first one stored wins.
+func (c *Config) globs() *configGlobs {
+	if compiled := c.compiledGlobs.Load(); compiled != nil {
+		return compiled
+	}
+	compiled := &configGlobs{
+		ignore:    make([]glob, len(c.IgnorePatterns)),
+		overrides: make([][]glob, len(c.Overrides)),
+	}
+	for index, pattern := range c.IgnorePatterns {
+		compiled.ignore[index] = compileGlob(pattern)
+	}
+	for index, override := range c.Overrides {
+		compiled.overrides[index] = make([]glob, len(override.Files))
+		for fileIndex, pattern := range override.Files {
+			compiled.overrides[index][fileIndex] = compileGlob(pattern)
+		}
+	}
+	c.compiledGlobs.CompareAndSwap(nil, compiled)
+	return c.compiledGlobs.Load()
+}
+
 // resolutions returns the Config's memo, creating it on first use.
 func (c *Config) resolutions() *resolutionMemo {
 	if memo := c.resolutionMemo.Load(); memo != nil {
@@ -227,11 +257,13 @@ func (c *Config) Resolve(path string) Resolved {
 	if c.house != nil {
 		return c.house.variantFor(path).Resolve(path)
 	}
-	relative := c.relativePath(path)
+	// Split once, and asked of every compiled pattern.
+	segments := splitPath(c.relativePath(path))
+	globs := c.globs()
 
-	for _, pattern := range c.IgnorePatterns {
-		if Match(pattern, relative) {
-			return Resolved{Ignored: true, IgnoredBy: pattern}
+	for index, pattern := range globs.ignore {
+		if pattern.matches(segments) {
+			return Resolved{Ignored: true, IgnoredBy: c.IgnorePatterns[index]}
 		}
 	}
 
@@ -240,8 +272,8 @@ func (c *Config) Resolve(path string) Resolved {
 	// already memoized allocates nothing here.
 	var matchStorage [64]byte
 	match := matchStorage[:0]
-	for index, override := range c.Overrides {
-		if MatchAny(override.Files, relative) {
+	for index, files := range globs.overrides {
+		if matchesAny(files, segments) {
 			match = binary.AppendUvarint(match, uint64(index))
 		}
 	}

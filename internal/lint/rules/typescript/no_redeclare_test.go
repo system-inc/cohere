@@ -99,6 +99,7 @@ func TestNoRedeclareUpstreamCorpus(t *testing.T) {
 			if fmt.Sprint(reported) != fmt.Sprint(row.findings) {
 				t.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
 			}
+			rule_testing.RecordAssertedCase(t, result)
 		})
 	}
 }

@@ -20,6 +20,9 @@
     },
     "assertedMessageIds": [
         "noUnusedVars",
+        "usedIgnoredVar",
         "usedOnlyAsType"
-    ]
+    ],
+    "assertsFix": true,
+    "assertsSuggestion": true
 }

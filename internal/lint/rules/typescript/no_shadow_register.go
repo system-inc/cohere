@@ -7,8 +7,11 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // Its own file rather than a line in the package's register.go, so two ports landing at once do not
 // conflict on a file neither is really changing.
 //
-// No Decode: this port covers upstream's default option set only and takes no options. See the
-// rule's doc comment for which axes are covered and which are left.
+// The decoder is the rule's own rather than `rule.DecodeOptionsInto`, because two of its options
+// default to true and the generic helper cannot tell an absent key from an explicit false.
 func init() {
-	rule.Register(rule.Registration{Rule: NoShadow})
+	rule.Register(rule.Registration{
+		Rule:   NoShadow,
+		Decode: DecodeNoShadowOptions,
+	})
 }

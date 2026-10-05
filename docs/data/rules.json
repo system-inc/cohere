@@ -1488,9 +1488,13 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-empty-object-type",
             "typeAware": false,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "noEmptyInterface",
-                "noEmptyObjectType"
+                "noEmptyInterfaceWithSuper",
+                "noEmptyObject"
             ],
             "fixKind": "suggestion",
             "sets": [
@@ -2247,7 +2251,8 @@
                 "elements": "one"
             },
             "messageIds": [
-                "redeclared"
+                "redeclared",
+                "redeclaredAsBuiltin"
             ],
             "sets": [
                 {
@@ -2383,9 +2388,13 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-shadow",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "noEnumShadow",
-                "noShadow"
+                "noShadow",
+                "noShadowGlobal"
             ],
             "sets": [
                 {
@@ -3204,8 +3213,10 @@
             },
             "messageIds": [
                 "noUnusedVars",
+                "usedIgnoredVar",
                 "usedOnlyAsType"
             ],
+            "fixKind": "both",
             "sets": [
                 {
                     "set": "cohere:next",

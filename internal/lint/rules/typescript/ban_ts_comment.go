@@ -117,11 +117,13 @@ func messageBanTsCommentDescriptionFormat(directive string, pattern string) rule
 //
 // oxc's eighth difference is kept for now, recorded rather than settled. Upstream's rule has no
 // file-type gate, so which files it sees is the config's decision, and an ESLint config commonly
-// scopes typescript-eslint's rules to TypeScript files. cohere's settings cannot scope a rule by
-// file, so a translated config applies it everywhere. Measured on TanStack Query: without the gate,
+// scopes typescript-eslint's rules to TypeScript files. cohere's settings can do the same, through an
+// override's `files` globs, so the scope belongs in cohere:adamic rather than here. What stops it
+// moving today is readiness: it resolves cohere:adamic once, for `index.ts`, so a file-scoped
+// override in the set would not reach it. Measured on TanStack Query: without the gate,
 // `// @ts-nocheck` atop scripts/create-github-release.mjs reports, where its own ESLint config does
-// not apply the rule to that file at all. Until settings can say which files a rule reads, the gate
-// stands in for the scope those configs set (#dttt878).
+// not apply the rule to that file at all. #6aa3wrx makes readiness resolve the set per file, moves
+// the scope into the set, and removes this gate.
 //
 // # The three patterns, read without a regular expression engine
 //

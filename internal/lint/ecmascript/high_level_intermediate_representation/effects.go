@@ -651,6 +651,11 @@ var effectGlobalFunctions = map[string]effectSignature{
 //
 // Returns a non-nil table for a nil function so a caller need not guard.
 func InferAliasingEffects(function *Function) *AliasingEffects {
+	return inferAliasingEffects(function, newCalleeProducers(function))
+}
+
+// inferAliasingEffects is the pass, taking the producer table its signature lookups share.
+func inferAliasingEffects(function *Function, producers *calleeProducers) *AliasingEffects {
 	effects := &AliasingEffects{byInstruction: map[InstructionId][]AliasingEffect{}}
 	if function == nil {
 		return effects
@@ -660,7 +665,7 @@ func InferAliasingEffects(function *Function) *AliasingEffects {
 		if instruction == nil {
 			continue
 		}
-		list := effectsForInstruction(function, instruction)
+		list := effectsForInstruction(function, producers, instruction)
 		if _, property := instruction.Value.(*PropertyLoad); property && primitiveProperties[instruction.LValue.Identifier] {
 			list = []AliasingEffect{create(instruction.LValue, EffectValuePrimitive)}
 		}
@@ -705,7 +710,7 @@ func mutate(kind AliasingEffectKind, value Place) AliasingEffect {
 //
 // A pure function of one instruction, which is why this pass needs no fixpoint: see the package
 // comment. Upstream caches the result per instruction for the same reason.
-func effectsForInstruction(function *Function, instruction *Instruction) []AliasingEffect {
+func effectsForInstruction(function *Function, producers *calleeProducers, instruction *Instruction) []AliasingEffect {
 	lvalue := instruction.LValue
 	switch value := instruction.Value.(type) {
 
@@ -897,13 +902,13 @@ func effectsForInstruction(function *Function, instruction *Instruction) []Alias
 	// --- Calls, which is where the signature table enters ----------------------------------
 
 	case *CallExpression:
-		return effectsForCall(function, instruction, value.Callee, value.Callee, value.Args, lvalue, true)
+		return effectsForCall(function, producers, instruction, value.Callee, value.Callee, value.Args, lvalue, true)
 
 	case *MethodCall:
-		return effectsForCall(function, instruction, value.Receiver, value.Property, value.Args, lvalue, false)
+		return effectsForCall(function, producers, instruction, value.Receiver, value.Property, value.Args, lvalue, false)
 
 	case *NewExpression:
-		return effectsForCall(function, instruction, value.Callee, value.Callee, value.Args, lvalue, false)
+		return effectsForCall(function, producers, instruction, value.Callee, value.Callee, value.Args, lvalue, false)
 
 	case *TaggedTemplateExpression:
 		// Upstream passes a Hole for the strings array then the subexpressions, and never trusts a
@@ -913,7 +918,7 @@ func effectsForInstruction(function *Function, instruction *Instruction) []Alias
 		for _, sub := range value.Subexprs {
 			args = append(args, Argument{Place: sub})
 		}
-		return effectsForCall(function, instruction, value.Tag, value.Tag, args, lvalue, true)
+		return effectsForCall(function, producers, instruction, value.Tag, value.Tag, args, lvalue, true)
 
 	// --- Async and iteration ---------------------------------------------------------------
 
@@ -1090,6 +1095,7 @@ func preserveExistingMemoizationEnabled(function *Function) bool {
 // itself is treated as mutated by being invoked.
 func effectsForCall(
 	function *Function,
+	producers *calleeProducers,
 	instruction *Instruction,
 	receiver Place,
 	callee Place,
@@ -1098,7 +1104,7 @@ func effectsForCall(
 	mutatesCallee bool,
 ) []AliasingEffect {
 	name := calleeName(function, instruction, callee)
-	signature, known := lookupSignature(function, instruction, name)
+	signature, known := lookupSignature(function, producers, instruction, name)
 	if !known {
 		// A zero-argument call of a locally-declared function whose body does not mutate what it
 		// closed over.
@@ -1279,7 +1285,7 @@ func effectsForUnknownCall(
 // A method name is looked up in the method table and a bare callee in the function table, kept
 // apart for the reason effectGlobalFunctions gives. Returns false for anything unknown, which sends
 // the call to the conservative default.
-func lookupSignature(function *Function, instruction *Instruction, name string) (effectSignature, bool) {
+func lookupSignature(function *Function, producers *calleeProducers, instruction *Instruction, name string) (effectSignature, bool) {
 	var origin ModuleExportOrigin
 	switch call := instruction.Value.(type) {
 	case *CallExpression:
@@ -1298,7 +1304,7 @@ func lookupSignature(function *Function, instruction *Instruction, name string) 
 			return effectSignature{Receiver: EffectRead, Rest: EffectFreeze, HasRest: true, Result: EffectValueFrozen}, true
 		}
 	}
-	if origin.Module != "react" && isModuleHookCall(function, instruction) {
+	if origin.Module != "react" && isModuleHookCall(function, producers, instruction) {
 		return customHookSignature(function), true
 	}
 	if name == "" {
