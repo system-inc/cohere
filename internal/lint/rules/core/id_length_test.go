@@ -33,7 +33,7 @@ func idLengthOf(optionJson string) any {
 // languageOptions, and ZERO cases change verdict between that configuration and cohere's.
 //
 // 35 of these cases carry non-ASCII identifiers, which is what makes the grapheme count testable:
-// see idLengthGraphemeCount for the 36-shape differential against Intl.Segmenter.
+// see text.GraphemeCount, which is scored against Intl.Segmenter.
 //
 //	84 reporting cases, 97 clean cases.
 func TestIdLengthFires(t *testing.T) {

@@ -3,9 +3,9 @@ package core
 import (
 	"fmt"
 	"regexp"
-	"unicode"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -168,15 +168,12 @@ var messageIdLengthTooLongPrivate = rule.Message{
 // One identifier, wrong in both directions, so it is a divergence rather than a conservative
 // approximation. `葛󠄀` is a base character plus a variation selector: two runes, one grapheme.
 //
-// The count below is stdlib-only and adds no dependency. It skips combining marks
-// (`unicode.Mn`/`Me`/`Mc`, which covers variation selectors) and Hangul conjoining vowel and trail
-// jamo, both of which continue a cluster rather than starting one. **Scored against upstream**
-// rather than reasoned about: 36 identifier-legal name shapes, 7 of them multi-rune, all 36
-// agreeing with `Intl.Segmenter`.
-//
-// The two grapheme classes this cannot handle are regional-indicator pairs and emoji ZWJ
-// sequences, and neither is reachable: measured, the parser rejects both as identifier characters
-// outright, so no name this rule can ever see contains one.
+// The count is `text.GraphemeCount`, which follows Unicode's grapheme cluster rules from Go's own
+// character tables and is scored against `Intl.Segmenter` there. It began here as a count that only
+// skipped combining marks and Hangul jamo, which is all an identifier can hold: the parser rejects
+// regional indicators and emoji joiner sequences as identifier characters outright, so no name this
+// rule sees contains one. It moved to the shelf when ban-ts-comment needed the same count over
+// comment text, which can hold both.
 //
 // # No fix
 //
@@ -198,29 +195,6 @@ var IdLength = rule.Rule{
 	},
 }
 
-// idLengthGraphemeCount is upstream's `getGraphemeCount`, in the stdlib.
-//
-// See the grapheme section on the rule for why a rune count is not a substitute and for the
-// 36-shape differential that validates this one.
-func idLengthGraphemeCount(name string) int {
-	count := 0
-	for _, character := range name {
-		// A combining mark continues the cluster before it. This class covers the variation
-		// selectors, which is what the corpus's `葛󠄀` needs.
-		if unicode.In(character, unicode.Mn, unicode.Me, unicode.Mc) {
-			continue
-		}
-		// Hangul conjoining vowel and trail jamo likewise continue their leading jamo's cluster,
-		// and they carry no combining-mark property so the test above does not reach them. A
-		// decomposed `각` is three runes and one grapheme.
-		if character >= 0x1160 && character <= 0x11FF {
-			continue
-		}
-		count++
-	}
-	return count
-}
-
 // checkIdLengthName judges one identifier.
 func checkIdLengthName(ctx rule.Context, node *ast.Node, settings IdLengthSettings) {
 	parent := node.Parent
@@ -236,7 +210,7 @@ func checkIdLengthName(ctx rule.Context, node *ast.Node, settings IdLengthSettin
 		name = name[1:]
 	}
 
-	length := idLengthGraphemeCount(name)
+	length := text.GraphemeCount(name)
 	tooShort := length < settings.Minimum
 	tooLong := settings.HasMaximum && length > settings.Maximum
 	if !tooShort && !tooLong {
