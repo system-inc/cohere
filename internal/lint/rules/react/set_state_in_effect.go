@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
 	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -296,6 +297,10 @@ func analyzeSetStateInEffectSubject(ctx rule.Context, function *high_level_inter
 		}
 		return
 	}
+	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
+	// on its own; see AsCompilationUnit.
+	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
+		high_level_intermediate_representation.ForFunctionWithoutManualMemoization)
 	reportSetStateInEffects(ctx, function)
 }
 
@@ -1011,8 +1016,14 @@ func reportSetter(ctx rule.Context, function *high_level_intermediate_representa
 	}
 }
 
-// trimmedRange advances a range past leading whitespace, matching what `rule.TokenRange` does for a
-// node.
+// trimmedRange advances a range past its leading trivia, comments included, matching what
+// `rule.TokenRange` does for a node.
+//
+// It skipped whitespace alone, and a Place's range begins at the raw start of the reference, so a
+// setter call with a comment above it reported from the comment. On TanStack Query's own utils.tsx
+// that comment was `// eslint-disable-next-line react-hooks/set-state-in-effect`: the finding moved
+// onto the comment's line, the suppression naming the next line no longer covered it, and cohere
+// reported what the author had suppressed and React does not (#zx5xvtg item 8).
 func trimmedRange(ctx rule.Context, span core.TextRange) core.TextRange {
 	if ctx.SourceFile == nil {
 		return span
@@ -1022,13 +1033,8 @@ func trimmedRange(ctx rule.Context, span core.TextRange) core.TextRange {
 	if start < 0 || end > len(sourceText) || start >= end {
 		return span
 	}
-	for start < end {
-		switch sourceText[start] {
-		case ' ', '\t', '\n', '\r':
-			start++
-		default:
-			return core.NewTextRange(start, end)
-		}
+	if trimmed := scanner.SkipTrivia(sourceText, start); trimmed < end {
+		return core.NewTextRange(trimmed, end)
 	}
 	return span
 }
