@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"unicode/utf16"
 
+	"github.com/system-inc/cohere/internal/format/arena"
 	"github.com/system-inc/cohere/internal/format/yaml/compose"
 	"github.com/system-inc/cohere/internal/format/yaml/cst"
 )
@@ -39,10 +40,15 @@ type context struct {
 
 	// positions is every node's position object, upstream's node.position.
 	positions map[*Node]*position
+
+	// nodes is where the tree's nodes come from, nil to allocate each (#93dpede).
+	nodes *arena.Arena[Node]
 }
 
-func newContext(text []uint16, lineCounter *cst.LineCounter) *context {
-	return &context{text: text, comments: []*Node{}, lineCounter: lineCounter, positions: map[*Node]*position{}}
+func newContext(text []uint16, lineCounter *cst.LineCounter, nodes *arena.Arena[Node]) *context {
+	// Sized for about a node per eight units of text, so the map is not rebuilt as it grows.
+	positions := make(map[*Node]*position, len(text)/8)
+	return &context{text: text, comments: []*Node{}, lineCounter: lineCounter, positions: positions, nodes: nodes}
 }
 
 // position is node.position.

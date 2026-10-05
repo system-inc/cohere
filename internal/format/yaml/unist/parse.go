@@ -9,6 +9,7 @@ import (
 	"sort"
 	"unicode/utf16"
 
+	"github.com/system-inc/cohere/internal/format/arena"
 	"github.com/system-inc/cohere/internal/format/yaml/compose"
 	"github.com/system-inc/cohere/internal/format/yaml/cst"
 )
@@ -24,7 +25,9 @@ import (
 //
 // The root keeps Comments, every comment in the file, as upstream's root does; Prettier's parser deletes
 // root.comments before printing, and the printer never reads it.
-func Parse(text string) (root *Node, err error) {
+//
+// The nodes come from nodes, which may be nil; the tree is valid until it is Reset.
+func Parse(text string, nodes *arena.Arena[Node]) (root *Node, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			if thrown, isThrown := recovered.(*ThrownError); isThrown {
@@ -44,7 +47,7 @@ func Parse(text string) (root *Node, err error) {
 	offsets := newUnitOffsets(text)
 
 	lineCounter := cst.NewLineCounter()
-	context := newContext(units, lineCounter)
+	context := newContext(units, lineCounter, nodes)
 	parser := cst.NewParser(lineCounter.AddNewLine)
 	composer := compose.NewComposer(compose.UnistParserOptions())
 	parsedDocuments := []*compose.Document{}

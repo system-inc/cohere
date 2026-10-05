@@ -87,83 +87,99 @@ func gfmAutolinkLiteralExtension() *Extension {
 }
 
 // tokenizeGfmAutolinkLiteralEmailAutolink is an email autolink literal: `a contact@example.org b`.
+//
+// It is tried at nearly every position of text, and nearly every try fails its first check, so the states
+// past the start are made only once one passes, all in one struct (#93dpede).
 func tokenizeGfmAutolinkLiteralEmailAutolink(self *Self, effects *Effects, ok State, nok State) State {
-	dot := false
-	data := false
-
-	var start, atext, emailDomain, emailDomainDot, emailDomainAfter State
-
 	// Start of email autolink literal.
-	start = func(code Code) State {
+	return func(code Code) State {
 		if !gfmAutolinkLiteralAtext(code) || !gfmAutolinkLiteralPreviousEmail(self.Previous) ||
 			gfmAutolinkLiteralPreviousUnbalanced(self.Events) {
 			return nok(code)
 		}
 		effects.Enter(typeLiteralAutolink, nil)
 		effects.Enter(typeLiteralAutolinkEmail, nil)
-		return atext(code)
+		return newEmailAutolink(self, effects, ok, nok).atext(code)
+	}
+}
+
+// emailAutolink is an email autolink literal past its start: the closure state upstream keeps in
+// variables, and its states, each made once. Most words that start one have no `@`, so the domain's states
+// are made only when one is consumed.
+type emailAutolink struct {
+	self    *Self
+	effects *Effects
+	ok, nok State
+
+	dot, data bool
+
+	atextState, emailDomainState, emailDomainDotState, emailDomainAfterState State
+}
+
+func newEmailAutolink(self *Self, effects *Effects, ok State, nok State) *emailAutolink {
+	run := &emailAutolink{self: self, effects: effects, ok: ok, nok: nok}
+	run.atextState = run.atext
+	return run
+}
+
+// In email atext.
+func (run *emailAutolink) atext(code Code) State {
+	if gfmAutolinkLiteralAtext(code) {
+		run.effects.Consume(code)
+		return run.atextState
+	}
+	if code == CodeAtSign {
+		run.effects.Consume(code)
+		run.emailDomainState, run.emailDomainDotState, run.emailDomainAfterState = run.emailDomain, run.emailDomainDot, run.emailDomainAfter
+		return run.emailDomainState
+	}
+	return run.nok(code)
+}
+
+// In email domain.
+//
+// The reference code is a bit overly complex as it handles the `@`, of which
+// there may be just one.
+// Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L318>
+func (run *emailAutolink) emailDomain(code Code) State {
+	// Dot followed by alphanumerical (not `-` or `_`).
+	if code == CodeDot {
+		return run.effects.Check(gfmAutolinkLiteralEmailDomainDotTrail, run.emailDomainAfterState, run.emailDomainDotState)(code)
 	}
 
-	// In email atext.
-	atext = func(code Code) State {
-		if gfmAutolinkLiteralAtext(code) {
-			effects.Consume(code)
-			return atext
-		}
-		if code == CodeAtSign {
-			effects.Consume(code)
-			return emailDomain
-		}
-		return nok(code)
+	// Alphanumerical, `-`, and `_`.
+	if code == CodeDash || code == CodeUnderscore || asciiAlphanumeric(code) {
+		run.data = true
+		run.effects.Consume(code)
+		return run.emailDomainState
 	}
 
-	// In email domain.
-	//
-	// The reference code is a bit overly complex as it handles the `@`, of which
-	// there may be just one.
-	// Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L318>
-	emailDomain = func(code Code) State {
-		// Dot followed by alphanumerical (not `-` or `_`).
-		if code == CodeDot {
-			return effects.Check(gfmAutolinkLiteralEmailDomainDotTrail, emailDomainAfter, emailDomainDot)(code)
-		}
+	// To do: `/` if xmpp.
 
-		// Alphanumerical, `-`, and `_`.
-		if code == CodeDash || code == CodeUnderscore || asciiAlphanumeric(code) {
-			data = true
-			effects.Consume(code)
-			return emailDomain
-		}
+	// Note: normally we’d truncate trailing punctuation from the link.
+	// However, email autolink literals cannot contain any of those markers,
+	// except for `.`, but that can only occur if it isn’t trailing.
+	// So we can ignore truncating!
+	return run.emailDomainAfter(code)
+}
 
-		// To do: `/` if xmpp.
+// In email domain, on dot that is not a trail.
+func (run *emailAutolink) emailDomainDot(code Code) State {
+	run.effects.Consume(code)
+	run.dot = true
+	return run.emailDomainState
+}
 
-		// Note: normally we’d truncate trailing punctuation from the link.
-		// However, email autolink literals cannot contain any of those markers,
-		// except for `.`, but that can only occur if it isn’t trailing.
-		// So we can ignore truncating!
-		return emailDomainAfter(code)
+// After email domain.
+func (run *emailAutolink) emailDomainAfter(code Code) State {
+	// Domain must not be empty, must include a dot, and must end in alphabetical.
+	// Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L332>.
+	if run.data && run.dot && asciiAlpha(run.self.Previous) {
+		run.effects.Exit(typeLiteralAutolinkEmail)
+		run.effects.Exit(typeLiteralAutolink)
+		return run.ok(code)
 	}
-
-	// In email domain, on dot that is not a trail.
-	emailDomainDot = func(code Code) State {
-		effects.Consume(code)
-		dot = true
-		return emailDomain
-	}
-
-	// After email domain.
-	emailDomainAfter = func(code Code) State {
-		// Domain must not be empty, must include a dot, and must end in alphabetical.
-		// Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L332>.
-		if data && dot && asciiAlpha(self.Previous) {
-			effects.Exit(typeLiteralAutolinkEmail)
-			effects.Exit(typeLiteralAutolink)
-			return ok(code)
-		}
-		return nok(code)
-	}
-
-	return start
+	return run.nok(code)
 }
 
 // tokenizeGfmAutolinkLiteralWwwAutolink is a `www` autolink literal: `a www.example.org b`.

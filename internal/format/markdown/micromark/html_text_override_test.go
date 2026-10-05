@@ -77,7 +77,7 @@ func TestHtmlTextOverrideEvents(t *testing.T) {
 // mergeConstructs puts every construct not marked "after" before the existing ones, so `add: "before"`
 // holds the copy ahead of the defaults.
 func TestHtmlTextOverrideOrder(t *testing.T) {
-	constructs := newParser(MarkdownExtensions()).Constructs.Text.ByCode[CodeLessThan]
+	constructs := MarkdownConstructs().Text.ByCode[CodeLessThan]
 	want := []*Construct{htmlTextOverride, autolink, htmlText}
 	if len(constructs) != len(want) {
 		t.Fatalf("%d constructs on `<`, want %d", len(constructs), len(want))

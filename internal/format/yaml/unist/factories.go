@@ -32,7 +32,7 @@ func createEmptyPosition(at *point) *position {
 
 // newNode makes a node of the type and registers its position object.
 func (context *context) newNode(nodeType string, position *position) *Node {
-	node := &Node{NodeType: nodeType}
+	node := context.nodes.New(Node{NodeType: nodeType})
 	context.positions[node] = position
 	return node
 }

@@ -167,7 +167,7 @@ func embedFrontMatter(node *Node) embedPrint {
 // content, in document order. A report uses it to attribute a difference to a missing printer by name.
 func EmbeddedParsers(text string) []string {
 	text = strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(text, "\ufeff"), "\r\n", "\n"), "\r", "\n")
-	ast, err := mdast.ParseMarkdown(text)
+	ast, err := mdast.ParseMarkdown(text, nil)
 	if err != nil {
 		return nil
 	}

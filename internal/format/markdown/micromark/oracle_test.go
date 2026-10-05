@@ -113,7 +113,7 @@ func portEvents(input string) (described []string) {
 			described = []string{fmt.Sprintf("panic: %v", recovered)}
 		}
 	}()
-	events := Parse(SourceUnits(input), MarkdownExtensions())
+	events := Parse(SourceUnits(input), MarkdownConstructs(), nil)
 	for _, event := range events {
 		kind := "exit"
 		if event.Enter {

@@ -8,6 +8,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/format/arena"
 	"github.com/system-inc/cohere/internal/format/markdown/mdast"
 )
 
@@ -80,14 +81,14 @@ func containsClass(ranges [][2]rune, text string) bool {
 }
 
 // splitText splits text into whitespaces and words. A word is a single CJK character or a sequence of
-// non-CJK characters.
-func splitText(text string) []*Node {
-	var nodes []*Node
+// non-CJK characters. The nodes come from the format's arena (nil to allocate each).
+func splitText(text string, nodes *arena.Arena[Node]) []*Node {
+	var split []*Node
 
 	appendNode := func(node *Node) {
 		var lastNode *Node
-		if len(nodes) > 0 {
-			lastNode = nodes[len(nodes)-1]
+		if len(split) > 0 {
+			lastNode = split[len(split)-1]
 		}
 		isBetween := func(kind1 string, kind2 string) bool {
 			return (lastNode.Kind == kind1 && node.Kind == kind2) || (lastNode.Kind == kind2 && node.Kind == kind1)
@@ -96,9 +97,9 @@ func splitText(text string) []*Node {
 			!isBetween(kindNonCJK, kindCJKPunctuation) &&
 			// disallow leading/trailing full-width whitespace
 			!strings.ContainsRune(lastNode.Value, '\u3000') && !strings.ContainsRune(node.Value, '\u3000') {
-			nodes = append(nodes, &Node{NodeType: "whitespace", Value: "", IsLiteral: true})
+			split = append(split, nodes.New(Node{NodeType: "whitespace", Value: "", IsLiteral: true}))
 		}
-		nodes = append(nodes, node)
+		split = append(split, node)
 	}
 
 	tokens := splitKeepingSeparators(text, func(character rune) bool {
@@ -111,7 +112,7 @@ func splitText(text string) []*Node {
 			if strings.Contains(token, "\n") {
 				value = "\n"
 			}
-			nodes = append(nodes, &Node{NodeType: "whitespace", Value: value, IsLiteral: true})
+			split = append(split, nodes.New(Node{NodeType: "whitespace", Value: value, IsLiteral: true}))
 			continue
 		}
 
@@ -130,7 +131,7 @@ func splitText(text string) []*Node {
 			// non-CJK word
 			if innerIndex%2 == 0 {
 				if innerToken != "" {
-					appendNode(&Node{
+					appendNode(nodes.New(Node{
 						NodeType:               "word",
 						Value:                  innerToken,
 						IsLiteral:              true,
@@ -138,7 +139,7 @@ func splitText(text string) []*Node {
 						IsCJ:                   false,
 						HasLeadingPunctuation:  isPunctuationUnit(firstUnit(innerToken)),
 						HasTrailingPunctuation: isPunctuationUnit(lastUnit(innerToken)),
-					})
+					}))
 				}
 				continue
 			}
@@ -147,25 +148,25 @@ func splitText(text string) []*Node {
 
 			// punctuation for CJ(K). Korean doesn't use them in horizontal writing usually.
 			if containsClass(punctuationRanges, innerToken) {
-				appendNode(&Node{
+				appendNode(nodes.New(Node{
 					NodeType: "word", Value: innerToken, IsLiteral: true, Kind: kindCJKPunctuation, IsCJ: true,
 					HasLeadingPunctuation: true, HasTrailingPunctuation: true,
-				})
+				}))
 				continue
 			}
 
 			// Korean uses space to divide words, but Chinese & Japanese do not. This is why Korean should
 			// be treated like non-CJK.
 			if containsClass(hangulRanges, innerToken) {
-				appendNode(&Node{NodeType: "word", Value: innerToken, IsLiteral: true, Kind: kindKLetter, IsCJ: false})
+				appendNode(nodes.New(Node{NodeType: "word", Value: innerToken, IsLiteral: true, Kind: kindKLetter, IsCJ: false}))
 				continue
 			}
 
-			appendNode(&Node{NodeType: "word", Value: innerToken, IsLiteral: true, Kind: kindCJLetter, IsCJ: true})
+			appendNode(nodes.New(Node{NodeType: "word", Value: innerToken, IsLiteral: true, Kind: kindCJLetter, IsCJ: true}))
 		}
 	}
 
-	return nodes
+	return split
 }
 
 // splitKeepingSeparators is text.split(/(<separator>+)/): pieces alternate with the separator runs that
@@ -263,14 +264,17 @@ func hasGitDiffFriendlyOrderedList(node *Node, originalText string) bool {
 	return len(node.Children) > 2 && getOrderedListItemInfo(node.Children[2], originalText).number == 1
 }
 
-// mapAst is upstream's mapAst: a preorder copy, each node shallow-copied after the handler sees it, with
-// the parent stack built from the copies.
+// mapAst is upstream's mapAst: a preorder walk that replaces each node with what the handler returns and
+// each parent's children with their replacements, the parent stack holding the replacements.
 func mapAst(ast *Node, handler func(node *Node, index int, parentStack []*Node) *Node) *Node {
 	var preorder func(node *Node, index int, parentStack []*Node) *Node
 	preorder = func(node *Node, index int, parentStack []*Node) *Node {
-		handled := handler(node, index, parentStack)
-		copied := *handled
-		newNode := &copied
+		// Upstream spreads each handled node into a new object. Here the handled node itself is kept: no
+		// caller holds the tree a pass was given (preprocess replaces it with each pass's result), so a copy
+		// would only be garbage, the largest share of a markdown format's allocation (#93dpede). What a
+		// handler sees is unchanged: its parents' Children are still the slices being walked, since each
+		// is replaced only once all its children are mapped.
+		newNode := handler(node, index, parentStack)
 		if newNode.Children != nil {
 			children := make([]*Node, len(newNode.Children))
 			stack := append([]*Node{newNode}, parentStack...)

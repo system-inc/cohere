@@ -1,29 +1,46 @@
 package micromark
 
-import "unicode/utf16"
+import (
+	"sync"
+	"unicode/utf16"
+
+	"github.com/system-inc/cohere/internal/format/arena"
+)
 
 // Parse tokenizes markdown into events, the way mdast-util-from-markdown drives micromark:
 // postprocess(parse(options).document().write(preprocess()(value, encoding, true))).
 //
-// source is UTF-16 code units. Every point in the result counts them.
-func Parse(source []uint16, extensions []*Extension) []Event {
-	parser := newParser(extensions)
+// source is UTF-16 code units. Every point in the result counts them. The tokens come from tokens, which may
+// be nil; the events are valid until it is Reset.
+//
+// constructs is the defaults combined with the extensions (Combine), made once rather than per parse.
+func Parse(source []uint16, constructs *FullConstructs, tokens *arena.Arena[Token]) []Event {
+	parser := &ParseContext{Constructs: constructs, Lazy: map[int]bool{}, tokens: tokens}
 	return postprocess(parser.create(ContentTypeDocument, nil).Write(preprocess(source)))
 }
 
 // SourceUnits converts text to the UTF-16 code units micromark reads, the way a JavaScript string holds it.
 func SourceUnits(text string) []uint16 {
-	return utf16.Encode([]rune(text))
+	return AppendSourceUnits(nil, text)
 }
 
-// newParser is upstream's parse(), micromark/lib/parse.js.
-func newParser(extensions []*Extension) *ParseContext {
-	all := append([]*Extension{defaultConstructs()}, extensions...)
-	return &ParseContext{
-		Constructs: combineExtensions(all),
-		Lazy:       map[int]bool{},
+// AppendSourceUnits is SourceUnits appended to units, so a caller can reuse one buffer for every text.
+func AppendSourceUnits(units []uint16, text string) []uint16 {
+	for _, character := range text {
+		units = utf16.AppendRune(units, character)
 	}
+	return units
 }
+
+// Combine is the constructs of upstream's parse(), micromark/lib/parse.js: the defaults combined with the
+// extensions, which a parse only reads.
+func Combine(extensions []*Extension) *FullConstructs {
+	return combineExtensions(append([]*Extension{defaultConstructs()}, extensions...))
+}
+
+// MarkdownConstructs is Combine(MarkdownExtensions()), made once: every markdown parse reads the same
+// table, and combining it was a measurable share of a format's allocation (#93dpede).
+var MarkdownConstructs = sync.OnceValue(func() *FullConstructs { return Combine(MarkdownExtensions()) })
 
 // create makes a tokenizer for a content type, upstream's parser.document() and friends.
 func (parser *ParseContext) create(contentType string, from *Point) *TokenizeContext {
