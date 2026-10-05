@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/printing"
@@ -31,6 +32,11 @@ import (
 // name, not by extension.
 type Print func(fileName string, text string, options formatoptions.Options) (string, error)
 
+// PrintParsed is a Print that can take a tree of the text someone already parsed, rather than parsing it
+// again, and parses as Print does when the tree is nil or not the one it would build. Only the TypeScript
+// printer has one: its parse is typescript-go's, the same one the fix engine's guard runs first (#dk2502g).
+type PrintParsed func(fileName string, text string, parsed *ast.SourceFile, options formatoptions.Options) (string, error)
+
 // PrintDoc is a printer's textToDoc (src/main/multiparser.js): the doc for text embedded in another
 // language's file, with the trailing hardline stripped, for the outer printer to lay out at its own
 // indentation. parser is the one the embedding asked for (a fence's language can pick json for a file
@@ -39,9 +45,10 @@ type PrintDoc func(fileName string, text string, options formatoptions.Options, 
 	textToDoc printing.TextToDoc) (doc.Doc, error)
 
 var (
-	mutex       sync.RWMutex
-	printers    = map[string]Print{}
-	docPrinters = map[string]PrintDoc{}
+	mutex          sync.RWMutex
+	printers       = map[string]Print{}
+	parsedPrinters = map[string]PrintParsed{}
+	docPrinters    = map[string]PrintDoc{}
 )
 
 // RegisterDoc routes an extension to a printer's doc entry, for embedding. A printer without one is
@@ -116,6 +123,25 @@ func TextToDoc(options formatoptions.Options, parentParser string) printing.Text
 	}
 }
 
+func lookupParsed(fileName string) (PrintParsed, bool) {
+	mutex.RLock()
+	defer mutex.RUnlock()
+	printParsed, present := parsedPrinters[strings.ToLower(filepath.Ext(fileName))]
+	return printParsed, present
+}
+
+// RegisterParsed gives an extension's printer a second entry that takes a tree (see PrintParsed). The
+// extension's Print must be registered too: it is what formats when there is no tree to offer.
+func RegisterParsed(extension string, printParsed PrintParsed) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	extension = strings.ToLower(extension)
+	if _, taken := parsedPrinters[extension]; taken {
+		panic(fmt.Sprintf("native: %s is registered twice to take a tree", extension))
+	}
+	parsedPrinters[extension] = printParsed
+}
+
 // Register routes an extension (".tsx", with the dot) to a printer. Registering one twice is a
 // programming error, because two printers claiming a file type would make the result depend on init
 // order, so it panics at startup rather than formatting with whichever won.
@@ -154,6 +180,12 @@ func (formatter Formatter) Handles(fileName string) bool {
 
 // Format formats a file, or refuses one no printer handles.
 func (formatter Formatter) Format(fileName string, text string) (string, error) {
+	return formatter.FormatParsed(fileName, text, nil)
+}
+
+// FormatParsed is Format with a tree of the text someone already parsed, or nil. A printer that parses
+// with typescript-go takes it where it is the tree it would build, and every other printer ignores it.
+func (formatter Formatter) FormatParsed(fileName string, text string, parsed *ast.SourceFile) (string, error) {
 	print, present := lookup(fileName)
 	if !present {
 		return "", fmt.Errorf("native: no printer for %s yet", fileName)
@@ -168,7 +200,16 @@ func (formatter Formatter) Format(fileName string, text string) (string, error) 
 		text = strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
 	}
 
-	formatted, err := print(fileName, text, formatter.Options)
+	// The tree is of the text as given, so a byte order mark or a carriage return taken off above leaves it
+	// describing other bytes, and the printer is then not offered it. It would refuse it anyway, by comparing
+	// texts, but not handing it over says why.
+	var formatted string
+	var err error
+	if printParsed, takesTree := lookupParsed(fileName); takesTree && parsed != nil && parsed.Text() == text {
+		formatted, err = printParsed(fileName, text, parsed, formatter.Options)
+	} else {
+		formatted, err = print(fileName, text, formatter.Options)
+	}
 	if err != nil {
 		return "", err
 	}

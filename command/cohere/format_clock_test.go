@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // TestTheFormatClockCountsWallTimeNotCalls holds 💅 to the phase's wall clock: two formats overlapping
@@ -44,8 +46,8 @@ func TestTheFormatClockKeepsATransformsAnswer(t *testing.T) {
 		t.Error("a nil transform came back as a transform")
 	}
 	refused := errors.New("refused")
-	timed := clock.timing(func(fileName string, text string) (string, error) { return text + "!", refused })
-	if text, err := timed("a.ts", "x"); text != "x!" || !errors.Is(err, refused) {
+	timed := clock.timing(func(fileName string, text string, _ *ast.SourceFile) (string, error) { return text + "!", refused })
+	if text, err := timed("a.ts", "x", nil); text != "x!" || !errors.Is(err, refused) {
 		t.Errorf("the timed transform answered %q, %v", text, err)
 	}
 }

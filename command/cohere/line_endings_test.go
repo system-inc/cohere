@@ -5,6 +5,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // A file handed to the formatter with CRLF is counted once, however many passes it takes, and the note
@@ -12,7 +14,7 @@ import (
 func TestCRLFFilesAreNamedOnceWithTheFix(t *testing.T) {
 	t.Parallel()
 	var lineEndings crlfFiles
-	transform := lineEndings.observing(func(fileName string, text string) (string, error) {
+	transform := lineEndings.observing(func(fileName string, text string, _ *ast.SourceFile) (string, error) {
 		return strings.ReplaceAll(text, "\r\n", "\n"), nil
 	})
 
@@ -26,7 +28,7 @@ func TestCRLFFilesAreNamedOnceWithTheFix(t *testing.T) {
 		group.Add(1)
 		go func() {
 			defer group.Done()
-			if _, err := transform(file.name, file.text); err != nil {
+			if _, err := transform(file.name, file.text, nil); err != nil {
 				t.Error(err)
 			}
 		}()
