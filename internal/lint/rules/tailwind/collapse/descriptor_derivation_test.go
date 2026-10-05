@@ -215,7 +215,7 @@ func TestDescriptorExemptionsAreStillNeeded(t *testing.T) {
 // would stop being harmless.
 func TestNoClassReachesTheTextDropCell(t *testing.T) {
 	t.Parallel()
-	system, _ := liveTableFor(t, corpusRepositories[0].entryPoint)
+	system, _ := liveTableFor(t, corpusRepositories[0].spelling)
 	if system == nil {
 		t.Skip("no design system loaded")
 	}

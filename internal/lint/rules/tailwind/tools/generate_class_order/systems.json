@@ -1,10 +1,10 @@
 [
     {
         "name": "ahra",
-        "path": "/Users/kirkouimet/Projects/ahra/app/_theme/styles/theme.css"
+        "path": "ahra:app/_theme/styles/theme.css"
     },
     {
         "name": "www-connected-app",
-        "path": "/Users/kirkouimet/Projects/connected/www-connected-app/app/_theme/styles/theme.css"
+        "path": "connected:app/_theme/styles/theme.css"
     }
 ]

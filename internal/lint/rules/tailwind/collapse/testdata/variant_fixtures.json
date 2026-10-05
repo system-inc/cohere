@@ -5174,7 +5174,7 @@
             "name": "ahra",
             "source": "repository",
             "input": "",
-            "entryPath": "/Users/kirkouimet/Projects/ahra/app/_theme/styles/theme.css",
+            "entryPath": "ahra:app/_theme/styles/theme.css",
             "registry": {
                 "entries": [
                     {
@@ -5630,7 +5630,7 @@
             "name": "ahra/class-lists",
             "source": "repository",
             "input": "",
-            "entryPath": "/Users/kirkouimet/Projects/ahra/app/_theme/styles/theme.css",
+            "entryPath": "ahra:app/_theme/styles/theme.css",
             "classLists": [
                 {
                     "name": "ahra/list-0",
@@ -93538,7 +93538,7 @@
             "name": "www-connected-app",
             "source": "repository",
             "input": "",
-            "entryPath": "/Users/kirkouimet/Projects/connected/www-connected-app/app/_theme/styles/theme.css",
+            "entryPath": "connected:app/_theme/styles/theme.css",
             "registry": {
                 "entries": [
                     {
@@ -93994,7 +93994,7 @@
             "name": "www-connected-app/class-lists",
             "source": "repository",
             "input": "",
-            "entryPath": "/Users/kirkouimet/Projects/connected/www-connected-app/app/_theme/styles/theme.css",
+            "entryPath": "connected:app/_theme/styles/theme.css",
             "classLists": [
                 {
                     "name": "www-connected-app/list-0",

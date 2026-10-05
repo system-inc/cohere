@@ -529,3 +529,93 @@ func privatePool(t *testing.T) string {
 	claimCacheLook(slots, time.Now())
 	return home
 }
+
+// The trim never keeps a token idle while another runs: with a long job holding token 2, it holds nothing,
+// so token 1 stays free for anyone, and it trims once the job ends. Taking tokens one at a time and
+// waiting for each, it held token 1 idle for the whole job, half the pool behind a land gate for minutes
+// (2026-10-05 15:55, #jc6ca7r).
+func TestTheCacheTrimKeepsNoTokenIdleWhileAnotherRuns(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("the trim holds tokens, a Unix lock")
+	}
+	wrapper := filepath.Join(t.TempDir(), "cohere-dev")
+	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
+		t.Fatalf("building: %v\n%s", err, output)
+	}
+	home := t.TempDir()
+	slots := filepath.Join(home, "cache", "cohere", "test-slots")
+	if runtime.GOOS == "darwin" {
+		slots = filepath.Join(home, "Library", "Caches", "cohere", "test-slots")
+	}
+	if err := os.MkdirAll(slots, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cache := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for index := 0; index < 10; index++ {
+		path := filepath.Join(cache, fmt.Sprintf("%02x", index), fmt.Sprintf("%02xaa-d", index))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, make([]byte, 1024), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		old := time.Now().Add(-3 * time.Hour)
+		if err := os.Chtimes(path, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// The long job holds token 2: take token 1 for a moment to reach it, then give token 1 back.
+	first, err := takeSlot(slots, 2, "reaching token 2")
+	if err != nil || first == nil || first.number != 1 {
+		t.Fatalf("taking token 1: %v", err)
+	}
+	job, err := takeSlot(slots, 2, "a long land gate")
+	if err != nil || job == nil || job.number != 2 {
+		t.Fatalf("taking token 2: %v", err)
+	}
+	first.release()
+
+	trim := exec.Command(wrapper, trimCacheVerb)
+	trim.Env = append(outsideThePool(os.Environ()), "HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, "cache"),
+		"GOCACHE="+cache, tokensVariable+"=2", cacheCapVariable+"="+strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64))
+	if err := trim.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Through three seconds of the job, token 1 must be free whenever the test looks: anyone may take it.
+	// A hold counts once two looks in a row find it: the trim's own look takes token 1 for microseconds
+	// before it finds token 2 busy and lets go, and a look landing in that instant is not idle time.
+	idle := time.Duration(0)
+	const step = 20 * time.Millisecond
+	wasHeld := false
+	for end := time.Now().Add(3 * time.Second); time.Now().Before(end); time.Sleep(step) {
+		lock, err := os.OpenFile(lockPath(slots, 1), os.O_CREATE|os.O_RDWR, 0o644)
+		if err != nil {
+			t.Fatal(err)
+		}
+		taken, _ := tryLockFile(lock)
+		if taken {
+			unlockFile(lock)
+		} else if wasHeld {
+			idle += step
+		}
+		wasHeld = !taken
+		lock.Close()
+	}
+	job.release()
+	if err := trim.Wait(); err != nil {
+		t.Fatalf("the trim failed: %v", err)
+	}
+	if idle > 0 {
+		t.Errorf("the trim held token 1 idle for about %s while the job held token 2", idle)
+	}
+	status, _ := os.ReadFile(filepath.Join(slots, "gocache.status"))
+	if !strings.Contains(string(status), "trimmed from") {
+		t.Errorf("the trim did not trim once the job ended: %q", status)
+	}
+}
