@@ -14,6 +14,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
 )
 
@@ -241,7 +242,7 @@ line"`},
 // would hand the library from the CSS corpus, every extra at-rule param, and every inline fixture, the
 // Go tree must equal postcss-values-parser's, field for field, under both { loose: true } and
 // { loose: false }, and a refusal must be a refusal on both sides with the same message. Off unless
-// COHERE_PRETTIER_ROOT names the fork (whose node_modules hold postcss-values-parser 2.0.1 and postcss)
+// COHERE_PRETTIER_FORK names the fork (whose node_modules hold postcss-values-parser 2.0.1 and postcss)
 // and COHERE_CSS_CORPORA lists .css files or directories to walk (colon-separated, node_modules
 // skipped).
 //
@@ -250,11 +251,11 @@ line"`},
 // perfect agreement.
 func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 	t.Parallel()
-	root := os.Getenv("COHERE_PRETTIER_ROOT")
 	corpora := os.Getenv("COHERE_CSS_CORPORA")
-	if root == "" || corpora == "" {
-		t.Skip("set COHERE_PRETTIER_ROOT and COHERE_CSS_CORPORA to compare the parser against postcss-values-parser")
+	if corpora == "" {
+		t.Skip("set COHERE_CSS_CORPORA to compare the parser against postcss-values-parser")
 	}
+	root := corpus.PrettierFork.Root(t)
 
 	type request struct {
 		Name string  `json:"name"`
