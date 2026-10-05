@@ -14,8 +14,8 @@ import (
 // costs of zero are refused too, so an entry cannot be added unmeasured. CPU is user plus system time,
 // which the load does not inflate the way it inflates wall.
 //
-// It is itself the landing gate's: under the fast tier it skips, since measuring its entries costs
-// about 45s of CPU in an edit loop meant to be instant.
+// It is itself the landing gate's: under the fast tier it skips, since measuring three entries costs
+// about 30s of CPU in an edit loop meant to be instant.
 //
 // Not parallel: it measures wall, and the package's other tests beside it would add to what it reads.
 func TestEveryLandingGateOnlyEntryStillEarnsItsPlace(t *testing.T) {
