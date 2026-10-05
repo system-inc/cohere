@@ -71,7 +71,7 @@ func renderThirdPartyNotices(moduleDirectory string, compiled []Module, reposito
 		return nil, fmt.Errorf("reading the TypeScript compiler's license: %w", err)
 	}
 	writeEntry(&builder, entry{Name: "TypeScript (typescript-go)", URL: "https://github.com/microsoft/typescript-go", License: "Apache-2.0",
-		Carries: "The TypeScript compiler, built from the modified fork " + compilerFork + ". Its NOTICE is in [NOTICE](NOTICE).",
+		Carries: "The TypeScript compiler, built from the modified fork " + compilerFork + ", and a few of its functions copied into internal/lint/checking. Its NOTICE is in [NOTICE](NOTICE).",
 		Text:    string(compilerLicense)})
 
 	for _, module := range compiled {
@@ -134,6 +134,9 @@ type entry struct {
 	License string
 	Carries string
 	Text    string
+
+	// Note is written in place of Text when a project publishes no license text.
+	Note string
 }
 
 func writeEntry(builder *strings.Builder, entry entry) {
@@ -144,6 +147,10 @@ func writeEntry(builder *strings.Builder, entry entry) {
 	}
 	builder.WriteString("- License: `" + entry.License + "`\n")
 	builder.WriteString("- In cohere: " + entry.Carries + "\n\n")
+	if entry.Text == "" {
+		builder.WriteString(entry.Note + "\n\n")
+		return
+	}
 	// Four backticks, so a license that quotes code in three can't close the block early.
 	builder.WriteString("````text\n")
 	builder.WriteString(strings.TrimRight(strings.ReplaceAll(entry.Text, "\r\n", "\n"), "\n \t") + "\n")
@@ -169,6 +176,14 @@ func writeModule(builder *strings.Builder, module Module, carries string) error 
 }
 
 func writeUpstream(builder *strings.Builder, upstream Upstream) error {
+	if (upstream.LicenseFile == "") == (upstream.Note == "") {
+		return fmt.Errorf("%s needs exactly one of a license file and a note saying why there is none", upstream.Name)
+	}
+	if upstream.LicenseFile == "" {
+		writeEntry(builder, entry{Name: upstream.Name, URL: upstream.URL, Version: upstream.Version, License: upstream.License,
+			Carries: upstream.Carries, Note: upstream.Note})
+		return nil
+	}
 	text, err := licenseTexts.ReadFile("licenses/" + upstream.LicenseFile)
 	if err != nil {
 		return fmt.Errorf("%s names the license file %s, which isn't in internal/release/notices/licenses: %w", upstream.Name, upstream.LicenseFile, err)

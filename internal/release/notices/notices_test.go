@@ -124,7 +124,12 @@ func TestEveryLicenseTextIsUsedAndEveryReferenceExists(t *testing.T) {
 
 	named := map[string]bool{"go.txt": true}
 	for _, upstream := range Upstreams {
-		named[upstream.LicenseFile] = true
+		if (upstream.LicenseFile == "") == (upstream.Note == "") {
+			t.Errorf("%s needs exactly one of a license file and a note saying why there is none", upstream.Name)
+		}
+		if upstream.LicenseFile != "" {
+			named[upstream.LicenseFile] = true
+		}
 	}
 	for _, license := range swiftLicenses {
 		named[license.File] = true
