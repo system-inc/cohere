@@ -50,9 +50,7 @@ func test(arguments []string) int {
 		return goTest(arguments)
 	}
 	if countsOnce(arguments) {
-		fmt.Fprintln(os.Stderr, "cohere-dev: a whole-module run never passes -count=1: it re-runs every package whose "+
-			"inputs did not change, which Go's test cache would have skipped. Fix a flaky test rather than re-run "+
-			"around it, and name a package to re-run it alone: go test -count=1 ./its/package")
+		refuseCountOnce()
 		return 2
 	}
 
@@ -106,6 +104,14 @@ func wholeModule(arguments []string) bool {
 		}
 	}
 	return false
+}
+
+// refuseCountOnce says why a run of nearly every package, through the slot or the fast tier, never passes
+// -count=1.
+func refuseCountOnce() {
+	fmt.Fprintln(os.Stderr, "cohere-dev: a whole-module run never passes -count=1: it re-runs every package whose "+
+		"inputs did not change, which Go's test cache would have skipped. Fix a flaky test rather than re-run "+
+		"around it, and name a package to re-run it alone: go test -count=1 ./its/package")
 }
 
 // countsOnce reports whether the arguments turn Go's test cache off with -count=1.

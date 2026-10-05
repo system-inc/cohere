@@ -74,3 +74,14 @@ func measureTests(t *testing.T, root string, pattern string, environment []strin
 	}
 	return time.Since(start).Seconds(), (command.ProcessState.UserTime() + command.ProcessState.SystemTime()).Seconds()
 }
+
+// The fast tier refuses -count=1 as a whole-module run does, before it runs anything: it would throw away
+// the cache the fast tier rests on, across nearly every package, with no slot.
+func TestTheFastTierRefusesCountOnce(t *testing.T) {
+	t.Parallel()
+	for _, arguments := range [][]string{{"--fast", "-count=1"}, {"--fast", "-count", "1"}, {"--fast", "-v", "--count=1"}} {
+		if code := test(arguments); code != 2 {
+			t.Errorf("cohere-dev test %v exited %d, want 2, the refusal", arguments, code)
+		}
+	}
+}
