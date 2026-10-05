@@ -81,3 +81,26 @@ func TestNoDebuggerRemovesTheStatement(t *testing.T) {
 	// wrong.
 	rule_testing.ExpectFixedSource(t, result, "export function run() {\n    \n}\n")
 }
+
+// TestNoDebuggerRepairsOnlyInAStatementList pins where the removal is offered. In a list of
+// statements it is; as the whole body of an unbraced branch, a loop or a label it is not, since
+// `if (flag)` with nothing after it does not parse. ESLint's corpus writes that shape and offers no fix
+// for any shape (#kq9vtva).
+func TestNoDebuggerRepairsOnlyInAStatementList(t *testing.T) {
+	t.Parallel()
+
+	result := rule_testing.Run(t, NoDebugger, debuggerFile, "export function run() {\n    debugger;\n}\n")
+	rule_testing.ExpectFixedSource(t, result, "export function run() {\n    \n}\n")
+
+	for _, sourceText := range []string{
+		"export function run(flag: boolean) {\n    if(flag) debugger;\n}\n",
+		"export function run(flag: boolean) {\n    while(flag) debugger;\n}\n",
+		"export function run() {\n    here: debugger;\n}\n",
+	} {
+		result := rule_testing.Run(t, NoDebugger, debuggerFile, sourceText)
+		rule_testing.ExpectFindings(t, result, "unexpectedDebugger")
+		if len(result.Diagnostics[0].Fixes) != 0 {
+			t.Errorf("a fix was offered for the lone body in %q", sourceText)
+		}
+	}
+}
