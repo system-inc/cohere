@@ -220,8 +220,17 @@ func corpusPlace(start int, end int) string {
 	return fmt.Sprintf("%d-%d", start, end)
 }
 
+// fastTierVariable is set by `cohere-dev test --fast`, the edit loop, which leaves the ESLint corpus to the
+// landing gate (#6gct10n): it was most of the registry's run, and the registry reruns on every rule edit.
+// Go's test cache keys on the variable, since the test reads it, so a fast run's result never answers for
+// a full one.
+const fastTierVariable = "COHERE_FAST_TIER"
+
 func TestCohereAgreesWithESLintsCoreCorpus(t *testing.T) {
 	t.Parallel()
+	if os.Getenv(fastTierVariable) != "" {
+		t.Skip("the ESLint corpus, left to the landing gate by cohere-dev test --fast")
+	}
 
 	registrations := map[string]rule.Registration{}
 	coreRules := []string{}

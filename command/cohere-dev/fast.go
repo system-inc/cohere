@@ -22,7 +22,8 @@ import (
 // starts, so a fast run beside a held full gate is visible. It is never the landing gate, and says so last.
 
 // fastTierVariable tells a package's tests that the fast tier is running them, so a test the landing gate
-// alone runs can skip itself. The corpus walks in high_level_intermediate_representation read it.
+// alone runs can skip itself. The corpus walks in high_level_intermediate_representation read it, and so
+// does the registry's ESLint corpus.
 const fastTierVariable = "COHERE_FAST_TIER"
 
 // fastBudget is what an entry in landingGateOnly must still cost, measured alone with -count=1, to stay
@@ -71,6 +72,15 @@ var landingGateOnly = []landingGateEntry{
 		wallSeconds: 10.8, cpuSeconds: 29.0,
 		reason: "the corpus walks lower hundreds of real files, again in each of about 45 tests; the package's " +
 			"other tests stay in the fast tier",
+	},
+	{
+		pattern:   "./internal/lint/registry",
+		skippedBy: fastTierVariable,
+		// At load about 190, with the compile cached: the package in full took 5.4 to 6.6s and 20.3 to 21.3s of
+		// CPU, in the fast tier 2.2 to 2.8s and 7.8 to 8.4s. On wall alone it clears the budget.
+		wallSeconds: 3.6, cpuSeconds: 12.4,
+		reason: "ESLint's own rows for every core rule replay through cohere, and the registry reruns on every " +
+			"rule edit; its other tests stay in the fast tier",
 	},
 }
 
