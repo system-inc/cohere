@@ -28,3 +28,19 @@ func changeTimeAndInode(path string, information os.FileInfo) (changedNanosecond
 	}
 	return status.Ctimespec.Nano(), status.Ino
 }
+
+// identityFromInfo is statIdentity read from a stat already taken, so a caller that statted a file for another
+// reason need not stat it again.
+func identityFromInfo(information os.FileInfo) (fileIdentity, bool) {
+	status, ok := information.Sys().(*syscall.Stat_t)
+	if !ok {
+		return fileIdentity{}, false
+	}
+	return fileIdentity{
+		size:                status.Size,
+		modifiedNanoseconds: status.Mtimespec.Nano(),
+		changedNanoseconds:  status.Ctimespec.Nano(),
+		inode:               status.Ino,
+		device:              uint64(status.Dev),
+	}, true
+}

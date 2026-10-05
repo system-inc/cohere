@@ -20,11 +20,13 @@ import (
 // convention names one file or one tool's rule, and neither can be an Adamic `.a`. An entry marked
 // pending is a decision its owner converts under that task; it leaves this list when it does.
 var tsDecisionsAllowed = map[string]string{
-	// Pending: converted under #6mhafvb, in its format unit.
-	"command/cohere/outside_program.go: .ts":                      "pending #6mhafvb: a named .a outside the program is a TypeScript file",
-	"internal/edit/write.go: .ts":                                 "pending #6mhafvb: the fix guard re-parses a written .a as TypeScript (lint_fix's package)",
-	"internal/format/javascript/print_type_parameters.go: \\.ts$": "pending #6mhafvb: <T,>'s comma follows .ts for an .a file",
-	"internal/format/prettier/handles.go: .ts":                    "pending #6mhafvb: the comparison engine parses .a with typescript",
+	// A table keyed by extension, which its one reader looks up with the name sourcename.TreatedAs gives.
+	"internal/edit/write.go: .ts":              "TypeScriptParsable reads its list with sourcename.TreatedAs(fileName)",
+	"internal/format/prettier/handles.go: .ts": "parserFor reads its table with sourcename.TreatedAs(fileName)",
+
+	// A tool's disk walk with no program to ask, so it cannot tell Adamic source from a static library.
+	"command/formatter_comparison/main.go: .ts":                        "the comparison tool's corpus walk, which has no program",
+	"internal/lint/rules/tailwind/tools/generate_variant/main.go: .ts": "the variant generator's walk of a Tailwind consumer, which has no program",
 
 	// One file, by its house name: a pinned file is that file, never an Adamic one.
 	"internal/lint/rules/base/consistency_no_hand_built_declared_error.go: /BaseError.ts":        "Base's own BaseError.ts",
@@ -125,6 +127,9 @@ func tsDecisionsIn(fileSet *token.FileSet, file *ast.File, relative string) []ts
 					add(call, literal, "a suffix check on a name that is not sourcename.TreatedAs")
 				}
 			}
+			if call, isKind := callsSelector(typed, "core", "GetScriptKindFromFileName"); isKind && len(call.Args) == 1 && !treated(call.Args[0]) {
+				add(call, "GetScriptKindFromFileName", "a script kind read from a name that is not sourcename.TreatedAs, which is Unknown for `.a`")
+			}
 			if call, isRegexp := callsSelector(typed, "regexp", "MustCompile", "Compile"); isRegexp && len(call.Args) == 1 {
 				if literal, isLiteral := stringLiteral(call.Args[0]); isLiteral && strings.Contains(literal, `\.ts`) {
 					add(call, literal, "a regexp on a `.ts` ending; check sourcename.TreatedAs(name) with strings.HasSuffix instead")
@@ -137,6 +142,21 @@ func tsDecisionsIn(fileSet *token.FileSet, file *ast.File, relative string) []ts
 			for _, pair := range [][2]ast.Expr{{typed.X, typed.Y}, {typed.Y, typed.X}} {
 				if literal, isLiteral := stringLiteral(pair[0]); isLiteral && literal == ".ts" && !treated(pair[1]) {
 					add(typed, literal, "an extension compared with `.ts` that is not sourcename.TreatedAs's")
+				}
+			}
+		case *ast.SwitchStmt:
+			if typed.Tag == nil || treated(typed.Tag) {
+				return true
+			}
+			for _, statement := range typed.Body.List {
+				clause, isClause := statement.(*ast.CaseClause)
+				if !isClause {
+					continue
+				}
+				for _, expression := range clause.List {
+					if literal, isLiteral := stringLiteral(expression); isLiteral && literal == ".ts" {
+						add(clause, literal, "a switch case on `.ts` over a value that is not sourcename.TreatedAs's")
+					}
 				}
 			}
 		case *ast.CompositeLit:
@@ -232,6 +252,14 @@ func probe(name, extension string) {
 	_ = map[string]bool{".ts": true}
 	_ = regexp.MustCompile(` + "`" + `\.ts$` + "`" + `)
 	_ = strings.HasSuffix(name, ".d.ts")
+	switch filepath.Ext(name) {
+	case ".ts", ".mts":
+	}
+	switch filepath.Ext(sourcename.TreatedAs(name)) {
+	case ".ts":
+	}
+	_ = core.GetScriptKindFromFileName(name)
+	_ = core.GetScriptKindFromFileName(sourcename.TreatedAs(name))
 }`
 	fileSet := token.NewFileSet()
 	file, err := parser.ParseFile(fileSet, "probe.go", source, 0)
@@ -242,7 +270,7 @@ func probe(name, extension string) {
 	for _, decision := range tsDecisionsIn(fileSet, file, "probe.go") {
 		lines = append(lines, fmt.Sprintf("%d %s", decision.line, decision.literal))
 	}
-	want := []string{"3 .test.ts", "5 .ts", "7 .ts", "9 .ts", "10 \\.ts$"}
+	want := []string{"3 .test.ts", "5 .ts", "7 .ts", "9 .ts", "10 \\.ts$", "13 .ts", "18 GetScriptKindFromFileName"}
 	if !slices.Equal(lines, want) {
 		t.Fatalf("the guard found %v, want %v", lines, want)
 	}

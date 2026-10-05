@@ -48,7 +48,7 @@ func TestARuleCrashFailsTheRunAndNamesItselfAsCohere(t *testing.T) {
 		case err == nil:
 			return string(output), 0
 		case errors.As(err, &exitError):
-			return string(output), exitError.ExitCode()
+			return string(output), childExitCode(t, exitError)
 		}
 		t.Fatalf("running cohere: %v\n%s", err, output)
 		return "", 0

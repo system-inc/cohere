@@ -17,6 +17,10 @@ var (
 	activeContentPackRoot string
 )
 
+// runCacheCheckStats is what the run cache's check statted this run, nil when no check ran. A pack opened after
+// it validates against these rather than statting each file again. See program.StatSnapshot.
+var runCacheCheckStats *program.StatSnapshot
+
 // openContentPack returns the project's content pack for a build, opening it once per run, or nil with
 // the cache off. A pack it cannot trust is said once and read around: every file then comes from disk.
 func openContentPack(root string) *program.ContentPack {
@@ -33,6 +37,7 @@ func openContentPack(root string) *program.ContentPack {
 		// A fact about this invocation, never about the tree, so a replay never says it again.
 		fmt.Fprintf(accountOutput(invocationOutput(os.Stderr)), "note: %v\n", err)
 	}
+	pack.TrustStats(runCacheCheckStats)
 	activeContentPack, activeContentPackRoot = pack, root
 	return pack
 }

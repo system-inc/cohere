@@ -70,6 +70,15 @@ const anything: {} = dogs;`, "dogs", "{}"},
 		"a union of a primitive and an array": {animals + `
 const dogs: Dog[] = [rex];
 const either: string | Animal[] = dogs;`, "dogs", "string | Animal[]"},
+		// #53w68gt: offered once the walk reaches them, and fired in invariant-mutable's own fixtures.
+		"a type parameter whose constraint is an array": {animals + `
+function admit<Pack extends Animal[], Narrow extends Pack>(narrow: Narrow): Pack {
+	const pack: Pack = narrow;
+	return pack;
+}`, "narrow", "Pack"},
+		"an intersection with an array": {animals + `
+declare const tagged: Dog[] & { tag: string };
+const wide: Animal[] & { tag: string } = tagged;`, "tagged", "Animal[] & { tag: string; }"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -146,41 +155,6 @@ thing.push({ name: 'Tom' });`,
 			if typeErrorCount(t, fixture.write) == 0 {
 				t.Errorf("tsc accepts a write through the skipped target, so skipping it can hide a hole")
 			}
-		})
-	}
-}
-
-// TestTheWalkStillSkipsTwoHolesThePruneDidNotOpen names what the prune skips that is a real hole, so the
-// gap is on record rather than discovered. Each probe is accepted by tsc 6.0.3 and fails in Node with
-// `dog.bark is not a function`. Neither target has an Object flag, a constrained type parameter and an
-// intersection, and the walk related neither part by part before the prune either, so the prune opened
-// no hole: lifting them is a question about what the rules should walk, for #system_cohere_lint.
-func TestTheWalkStillSkipsTwoHolesThePruneDidNotOpen(t *testing.T) {
-	t.Parallel()
-	for name, fixture := range map[string]struct {
-		source string
-		value  string
-	}{
-		"a constrained type parameter": {animals + `
-function admit<Pack extends Animal[], Narrow extends Pack>(narrow: Narrow, extra: Pack[number]): void {
-	const pack: Pack = narrow;
-	pack.push(extra);
-}`, "narrow"},
-		"an intersection with an array": {animals + `
-declare const tagged: Dog[] & { tag: string };
-const wide: Animal[] & { tag: string } = tagged;`, "tagged"},
-	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			if typeErrorCount(t, fixture.source) != 0 {
-				t.Fatalf("the probe is not a program tsc accepts")
-			}
-			targets := offeredTargets(t, fixture.source)
-			if _, offered := targets[fixture.value]; offered {
-				t.Errorf("%s is now offered: the walk reaches this hole, so move this case to the fired fixtures",
-					fixture.value)
-			}
-			rule_testing.ExpectClean(t, runAdamic(t, InvariantMutable, fixture.source))
 		})
 	}
 }
