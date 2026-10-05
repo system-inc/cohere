@@ -74,7 +74,7 @@ const jsonOutputPath = flagValue('--json');
 const resolveRootArgument = flagValue('--resolve-root');
 const corpusRootArgument = flagValue('--corpus-root');
 
-const { designSystem, tailwindVersion, entryPoint, resolveRoot, inferDataType } = await loadDesignSystem(
+const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint, resolveRoot, inferDataType } = await loadDesignSystem(
     entryPointArgument,
     resolveRootArgument,
 );
@@ -1342,7 +1342,7 @@ const ownContributions = await surveyOwnContributions(designSystem, resolveRoot)
 
 const report = {
     tailwindVersion,
-    entryPoint,
+    entryPoint: recordedEntryPoint,
     groundTruth: 'compileAstNodes (internal API; getClassOrder used as the public end-to-end control)',
     population: {
         registryClasses: registryClassNames.length,
@@ -1504,7 +1504,7 @@ if (assertionFailures.length > 0) {
 if (jsonOutputPath) {
     const table = {
         tailwindVersion,
-        entryPoint,
+        entryPoint: recordedEntryPoint,
         roots: Array.from(descriptors.values(), (descriptor) => ({
             root: descriptor.root,
             typeList: descriptor.typeList,

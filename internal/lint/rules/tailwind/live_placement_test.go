@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
@@ -66,13 +67,13 @@ func livePlacementLiterals(t *testing.T) map[string][][]string {
 		t.Fatalf("read %s: %v", path, err)
 	}
 
-	var corpus livePlacementCorpus
-	if err := json.Unmarshal(contents, &corpus); err != nil {
+	var fixture livePlacementCorpus
+	if err := json.Unmarshal(contents, &fixture); err != nil {
 		t.Fatalf("parse %s: %v", path, err)
 	}
 
 	literals := map[string][][]string{}
-	for _, aCase := range corpus.Cases {
+	for _, aCase := range fixture.Cases {
 		if aCase.EntryPath == "" {
 			continue
 		}
@@ -93,15 +94,13 @@ func livePlacementLiterals(t *testing.T) map[string][][]string {
 
 // livePlacementSystem builds the design system one corpus entry point names.
 //
-// A missing repository yields a result carrying its error rather than failing, because the corpus
-// records absolute paths from the machine it was captured on and a checkout holding one of the two
-// repositories should still measure that one's half.
-func livePlacementSystem(t *testing.T, entryPoint string) DesignSystemResult {
+// The fixture spells the entry point inside its corpus, so an unset corpus skips the test naming its
+// variable, and a corpus that is set but lacks the stylesheet fails. A stylesheet that is there but
+// will not load yields a result carrying its error, which the population floors then catch.
+func livePlacementSystem(t *testing.T, spelling string) DesignSystemResult {
 	t.Helper()
 
-	if _, err := os.Stat(entryPoint); err != nil {
-		return DesignSystemResult{Err: err}
-	}
+	entryPoint := corpus.Resolve(t, spelling)
 	packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint), diskFileExists)
 	if packageRoot == "" {
 		return DesignSystemResult{Err: os.ErrNotExist}
@@ -476,8 +475,9 @@ func TestConflictingClassesPerRepositoryPlacement(t *testing.T) {
 		}
 	}
 
+	// An unset corpus has already skipped this test, so both are set and loading neither is a failure.
 	if len(byRepository) == 0 {
-		t.Skip("neither corpus repository is checked out here, so there is nothing to measure")
+		t.Fatal("both corpora are set and neither design system loaded, so there is nothing to measure")
 	}
 
 	entryPoints := make([]string, 0, len(byRepository))
@@ -551,7 +551,8 @@ func TestRepositoryColorTokensReadAsColors(t *testing.T) {
 
 	t.Logf("colour tokens read from live themes: %d across %d repositories", checkedTokens, checkedRepositories)
 
+	// An unset corpus has already skipped this test, so an empty count is a failure.
 	if checkedRepositories == 0 || checkedTokens == 0 {
-		t.Skip("no design system loaded, so this test measured nothing")
+		t.Fatal("no design system loaded, so this test measured nothing")
 	}
 }

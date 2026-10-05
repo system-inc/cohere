@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -62,10 +63,87 @@ func (corpus Corpus) Root(t testing.TB) string {
 	return root
 }
 
+// Covered reports whether the corpus's variable is set, so a test whose cases skip one by one can count
+// how many it should have run.
+func (corpus Corpus) Covered() bool {
+	return os.Getenv(corpus.Variable) != ""
+}
+
 // Path is a path inside the corpus, or the skip or failure Root gives.
 func (corpus Corpus) Path(t testing.TB, elements ...string) string {
 	t.Helper()
 	return filepath.Join(append([]string{corpus.Root(t)}, elements...)...)
+}
+
+// A file that records a path inside a corpus, such as a fixture's entry point, spells it
+// "<corpus>:<path in it>", as in "ahra:app/_theme/styles/theme.css", so the file reads the same on every
+// machine. "ahra:" alone is the corpus's root. A corpus name is a word, never one letter, so a spelling
+// cannot be read as a drive letter.
+var spellingPattern = regexp.MustCompile(`^([a-z][a-z0-9-]+):(.*)$`)
+
+// Spelled splits a "<corpus>:<path in it>" spelling into the corpus and the slash-separated path inside
+// it. spelled is false for anything else, such as an absolute path. A spelling whose name is no corpus
+// is an error, never a relative path, so a typo cannot read some other file.
+func Spelled(spelling string) (corpus Corpus, inside string, spelled bool, err error) {
+	match := spellingPattern.FindStringSubmatch(spelling)
+	if match == nil {
+		return Corpus{}, "", false, nil
+	}
+	for _, candidate := range All {
+		if candidate.Name == match[1] {
+			return candidate, match[2], true, nil
+		}
+	}
+	return Corpus{}, "", true, fmt.Errorf("%s names the corpus %q, which is no corpus; the corpora are %s", spelling, match[1], corpusNames())
+}
+
+// Resolve is the path a "<corpus>:<path in it>" spelling names. When the corpus is unset it skips naming
+// the variable, as Root does. It fails when the corpus is set and the path is not there, and when the
+// spelling names no corpus or is not a spelling at all.
+func Resolve(t testing.TB, spelling string) string {
+	t.Helper()
+	corpus, inside, spelled, err := Spelled(spelling)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !spelled {
+		t.Fatalf("%q is not spelled <corpus>:<path in it>, so it names no corpus", spelling)
+	}
+	path := corpus.Path(t, filepath.FromSlash(inside))
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("%s is set, but %s is not in it: %v", corpus.Variable, spelling, err)
+	}
+	return path
+}
+
+// Locate is Resolve for a generator, which has no test to skip: the corpus's variable, or else the user's
+// corpora file, gives the root, and an error says which to set when neither does. Anything that is not a
+// spelling is a path, returned as it was given.
+func Locate(spelling string) (string, error) {
+	return locate(spelling, os.Getenv, ConfigPath)
+}
+
+func locate(spelling string, lookup func(string) string, configPath func() (string, error)) (string, error) {
+	corpus, inside, spelled, err := Spelled(spelling)
+	if err != nil || !spelled {
+		return spelling, err
+	}
+	root := lookup(corpus.Variable)
+	if root == "" {
+		path, err := configPath()
+		if err != nil {
+			return "", err
+		}
+		config, err := ReadConfig(path)
+		if err != nil {
+			return "", err
+		}
+		root = config[corpus.Name]
+	}
+	if root == "" {
+		return "", fmt.Errorf("%s needs %s: set %s, or name %q in the corpora file", spelling, corpus.What, corpus.Variable, corpus.Name)
+	}
+	return filepath.Join(root, filepath.FromSlash(inside)), nil
 }
 
 // Uncovered is every corpus whose variable lookup leaves unset, in All's order.

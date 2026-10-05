@@ -398,6 +398,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				var replayedRecord *AdamicRecord
 				var hits classHits
 				var keys cacheKeys
+				var replays map[string]bool
 				if reuse != nil {
 					classes := selection.classNames()
 					keys = cacheKeys{
@@ -411,10 +412,10 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 						derived:          classes.derived,
 					}
 					keys.derivedFingerprint = derivedKey(classes, g.programFingerprints(selection), keys.typeFingerprint)
-					if entry, found := reuse.lookup(sourceFile.FileName(), keys); found.pure {
+					if entry, found := reuse.lookup(sourceFile.FileName(), keys, sourceFile.Text()); found.pure {
 						replayed = &entry
 						hits = found
-						replays := make(map[string]bool, len(selection.applicable))
+						replays = make(map[string]bool, len(selection.applicable))
 						for _, names := range [][]string{keys.pure, classIf(hits.typed, keys.typed), classIf(hits.shaped, keys.shaped),
 							classIf(hits.design, keys.design), classIf(hits.derived, keys.derived)} {
 							for _, name := range names {
@@ -447,7 +448,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 						if g.Readiness != nil {
 							replayedRecord = replayedAdamic(entry, hits)
 						}
-						if len(walkRules) == 0 {
+						// A file with directives is dispatched even with nothing to walk, so its directives are read,
+						// marked with what the replayed rules withheld, and tallied, as a walk of every rule does.
+						if len(walkRules) == 0 && !entry.Directives {
 							localNodesReplayed += entry.VisitedNodes
 							if len(replayedNotes) > 0 {
 								localNotes[sourceFile.FileName()] = replayedNotes
@@ -517,6 +520,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					listeningTarget, offeredTarget = fileListening, fileOffered
 				}
 				diagnosticsBefore := len(localDiagnostics)
+				if replayed != nil {
+					dispatcher.replayed = &directiveReplay{withheld: withheldBy(replayed.Withheld, replays), rules: selection.applicable}
+				}
 				visited, silenced, fileNotes, ruleCrashes, fileAdamic, crashed := dispatcher.dispatchFileSafely(sourceFile, report,
 					walkRules, walkSlots, fileChecker, listeningTarget, offeredTarget, selection.options, selection.measureOnly,
 					resolution)
@@ -586,7 +592,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				}
 				if recording && replayed != nil {
 					if entry, eligible := refreshClasses(*replayed, keys, hits,
-						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes, walkedRecord); eligible {
+						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes, walkedRecord, silenced); eligible {
 						reuse.keep(entry)
 					}
 				}
@@ -958,6 +964,21 @@ type fileDispatcher struct {
 
 	// readiness is the file's readiness measurement, nil when the run measures none. See Readiness.
 	readiness *fileReadiness
+
+	// withheld is the findings the file's directives silenced, by rule and directive, for the findings cache.
+	withheld []LintCacheWithheld
+
+	// replayed is what the findings cache replayed on the file, nil when it replayed nothing. Set by the walk
+	// before the dispatch. See directiveReplay.
+	replayed *directiveReplay
+}
+
+// directiveReplay is what a dispatch needs from a replayed file's entry to count its directives as a walk of every
+// rule would (#kdee854): the replayed rules' withheld findings, each marked applied on its directive before the
+// tally, and every rule applicable to the file, replayed ones included, as the rules that ran.
+type directiveReplay struct {
+	withheld []LintCacheWithheld
+	rules    []rule.Rule
 }
 
 // ruleSlot is one rule on one worker: what dispatching the rule needs that does not change between files.
@@ -1039,7 +1060,8 @@ func (d *fileDispatcher) slotFor(ruleName string) *ruleSlot {
 			return
 		}
 
-		if d.directives.Suppresses(diagnostic.RuleName, diagnostic.Range.Pos()) {
+		if directive := d.directives.SuppressedBy(diagnostic.RuleName, diagnostic.Range.Pos()); directive >= 0 {
+			d.withheld = append(d.withheld, LintCacheWithheld{RuleName: diagnostic.RuleName, Directive: int32(directive)})
 			return
 		}
 
@@ -1153,6 +1175,15 @@ func (d *fileDispatcher) dispatchFile(
 	// a file with no directives costs one pass and then answers every query with an empty slice.
 	directives := suppression.Build(sourceFile.Text())
 	reportUnknownRuleReferences(sourceFile, directives, d.catalog, report, d.unrunRuleReferences)
+	// The replayed rules' withheld findings, which this walk does not produce. FindingsReuse.lookup proved each
+	// names a directive that can silence its rule.
+	ranRules := rules
+	if d.replayed != nil {
+		for _, withheld := range d.replayed.withheld {
+			directives.MarkApplied(int(withheld.Directive))
+		}
+		ranRules = d.replayed.rules
+	}
 
 	d.sourceFile, d.directives, d.report = sourceFile, directives, report
 	d.readiness = newFileReadiness(d.graph.Readiness, rules, measureOnly)
@@ -1255,10 +1286,12 @@ func (d *fileDispatcher) dispatchFile(
 	// Only directives read it, and most files have none, so it is built only for a file that has one:
 	// built for every file it was 42 MB of a cold ahra run's allocation, nearly all of it read by nothing
 	// (#9jpmqm9).
+	//
+	// For a replayed file, every rule applicable to it, since the replayed ones ran too, only earlier.
 	var ranRule map[string]bool
 	if len(directives.Directives()) > 0 {
-		ranRule = make(map[string]bool, len(rules))
-		for _, subject := range rules {
+		ranRule = make(map[string]bool, len(ranRules))
+		for _, subject := range ranRules {
 			ranRule[bareRuleName(subject.Name)] = true
 		}
 	}
@@ -1269,7 +1302,10 @@ func (d *fileDispatcher) dispatchFile(
 		}
 	}
 
-	return visitedNodes, tally(sourceFile.FileName(), directives, ranRule, resolution), d.notes, ruleCrashes, readiness
+	silenced = tally(sourceFile.FileName(), directives, ranRule, resolution)
+	silenced.directives = len(directives.Directives()) > 0 || len(directives.RuleReferences()) > 0
+	silenced.withheld = d.withheld
+	return visitedNodes, silenced, d.notes, ruleCrashes, readiness
 }
 
 // endFile empties the table the file filled and lets go of the file. Each emptied kind is cleared before it
@@ -1285,6 +1321,7 @@ func (d *fileDispatcher) endFile(slots []*ruleSlot) {
 	}
 	d.used = d.used[:0]
 	d.sourceFile, d.directives, d.notes, d.report, d.readiness = nil, nil, nil, nil, nil
+	d.withheld, d.replayed = nil, nil
 }
 
 // walk is the package's walk over the dispatcher's table: every node once, each listener called through its
@@ -1308,7 +1345,13 @@ func (d *fileDispatcher) walk(node *ast.Node, meter *workerMeter) int {
 }
 
 // suppressionTally is what one file's directives did, summed across the run.
+//
+// directives and withheld are one file's, for the findings cache, and add leaves them out: whether the file has
+// a directive or names a rule in one, and which of its findings the directives withheld.
 type suppressionTally struct {
+	directives bool
+	withheld   []LintCacheWithheld
+
 	applied          int
 	appliedNoReason  int
 	unusedDirectives int

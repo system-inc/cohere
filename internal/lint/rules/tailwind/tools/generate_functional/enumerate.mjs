@@ -40,7 +40,7 @@ function flagValue(name) {
     return index === -1 ? undefined : process.argv[index + 1];
 }
 
-const { designSystem, tailwindVersion, entryPoint } = await loadDesignSystem(
+const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint } = await loadDesignSystem(
     entryPointArgument,
     flagValue('--resolve-root'),
 );
@@ -122,7 +122,7 @@ if (rejected === 0) {
 
 process.stdout.write(JSON.stringify({
     tailwindVersion,
-    entryPoint,
+    entryPoint: recordedEntryPoint,
     groundTruth: 'compileAstNodes declarations; resolution is observed through its effect rather than read directly',
     probeCount: entries.length,
     rejectedCount: rejected,

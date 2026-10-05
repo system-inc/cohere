@@ -40,7 +40,7 @@ if (!entryPointArgument) {
     process.exit(2);
 }
 
-const { designSystem, tailwindVersion, entryPoint } = await loadDesignSystem(entryPointArgument);
+const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint } = await loadDesignSystem(entryPointArgument);
 
 /*
  * The theme namespaces, recovered the way generate_descriptor_table recovers them: every
@@ -531,7 +531,7 @@ for (const [name, stylesheet, probes, options = {}] of syntheticStylesheets) {
 
 process.stdout.write(JSON.stringify({
     tailwindVersion,
-    entryPoint,
+    entryPoint: recordedEntryPoint,
     keysByNamespace,
     utilityBlocks,
     perDeclarationRoots,

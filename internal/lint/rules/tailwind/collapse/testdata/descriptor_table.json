@@ -1,6 +1,6 @@
 {
   "tailwindVersion": "4.3.3",
-  "entryPoint": "/Users/kirkouimet/Projects/ahra/app/_theme/styles/theme.css",
+  "entryPoint": "ahra:app/_theme/styles/theme.css",
   "roots": [
     {
       "root": "-bg-conic",

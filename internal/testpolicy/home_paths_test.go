@@ -41,17 +41,6 @@ func TestHomePathsFindsAPlantedHomePath(t *testing.T) {
 	}
 }
 
-// knownHomePaths is every test file that still names a home directory, and how many times, held exactly
-// while #sycrdr6 moves each corpus behind internal/corpus. It may only shrink: a file not listed, or a
-// count that grew, fails, and so does a count that fell until it is lowered here.
-var knownHomePaths = map[string]int{
-	"internal/differential/parse_test.go":                                            3,
-	"internal/lint/rules/next/no_before_interactive_script_outside_document_test.go": 4,
-	"internal/lint/rules/tailwind/class_order_live_test.go":                          1,
-	"internal/lint/rules/tailwind/collapse/framework_utility_test.go":                1,
-	"internal/lint/rules/tailwind/design_system_live_walk_test.go":                   1,
-}
-
 // TestNoCohereTestNamesAHomeDirectory holds the module to reading outside code by name (#sycrdr6).
 func TestNoCohereTestNamesAHomeDirectory(t *testing.T) {
 	t.Parallel()
@@ -61,38 +50,19 @@ func TestNoCohereTestNamesAHomeDirectory(t *testing.T) {
 		found = append(found, inFile...)
 		return err
 	})
-	counts := map[string]int{}
 	lines := map[string][]string{}
 	for _, homePath := range found {
 		relative, _ := filepath.Rel(root, homePath.Position.Filename)
 		relative = filepath.ToSlash(relative)
-		counts[relative]++
 		lines[relative] = append(lines[relative], fmt.Sprintf("  %s:%d %q", relative, homePath.Position.Line, homePath.Value))
 	}
-	files := map[string]bool{}
-	for file := range counts {
-		files[file] = true
+	files := make([]string, 0, len(lines))
+	for file := range lines {
+		files = append(files, file)
 	}
-	for file := range knownHomePaths {
-		files[file] = true
-	}
-	sorted := make([]string, 0, len(files))
-	for file := range files {
-		sorted = append(sorted, file)
-	}
-	sort.Strings(sorted)
-	for _, file := range sorted {
-		known, listed := knownHomePaths[file]
-		switch {
-		case !listed:
-			t.Errorf("%s names a home directory. Ask for the code by name through internal/corpus, or, for a literal "+
-				"that only looks like one, say why above it with %q:\n%s", file, NotAMachinePathMarker, strings.Join(lines[file], "\n"))
-		case counts[file] > known:
-			t.Errorf("%s names a home directory %d times, more than the %d known:\n%s", file, counts[file], known,
-				strings.Join(lines[file], "\n"))
-		case counts[file] < known:
-			t.Errorf("%s names a home directory %d times, fewer than the %d known: lower knownHomePaths to match", file,
-				counts[file], known)
-		}
+	sort.Strings(files)
+	for _, file := range files {
+		t.Errorf("%s names a home directory. Ask for the code by name through internal/corpus, or, for a literal "+
+			"that only looks like one, say why above it with %q:\n%s", file, NotAMachinePathMarker, strings.Join(lines[file], "\n"))
 	}
 }

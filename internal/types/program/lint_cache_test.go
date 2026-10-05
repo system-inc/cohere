@@ -79,6 +79,10 @@ func sampleLintCache() *program.LintCache {
 				// Measured with nothing to count: empty, not nil, and a round trip that turned it nil would make a
 				// readiness run miss this file forever.
 				Adamic: &program.AdamicRecord{},
+				// A file whose directive silenced a cacheable rule's finding: the entry keeps which, so a replay
+				// marks the directive applied.
+				Directives: true,
+				Withheld:   []program.LintCacheWithheld{{RuleName: "no-empty", Directive: 1}},
 			},
 		},
 	}
@@ -180,6 +184,12 @@ func TestLintCacheRoundTripsEveryField(t *testing.T) {
 		}
 		if !reflect.DeepEqual(got.Adamic, want.Adamic) || want.Adamic == nil {
 			t.Errorf("entry %d Adamic: %+v against %+v", index, got.Adamic, want.Adamic)
+		}
+		if got.Directives != want.Directives {
+			t.Errorf("entry %d Directives: %t against %t", index, got.Directives, want.Directives)
+		}
+		if !reflect.DeepEqual(got.Withheld, want.Withheld) {
+			t.Errorf("entry %d Withheld: %+v against %+v", index, got.Withheld, want.Withheld)
 		}
 		if len(got.Findings) != len(want.Findings) {
 			t.Fatalf("entry %d findings: %d back from %d", index, len(got.Findings), len(want.Findings))
@@ -373,7 +383,7 @@ func TestLintCacheEntryHasNoUncheckedFields(t *testing.T) {
 	compared := map[string]struct{}{
 		"Path": {}, "ContentHash": {}, "Rules": {}, "TypedRules": {}, "TypeFingerprint": {}, "Listening": {},
 		"VisitedNodes": {}, "Findings": {}, "ShapedRules": {}, "ShapeFingerprint": {}, "DesignRules": {}, "DesignFingerprint": {},
-		"DerivedRules": {}, "DerivedFingerprint": {}, "Notes": {}, "Adamic": {},
+		"DerivedRules": {}, "DerivedFingerprint": {}, "Notes": {}, "Adamic": {}, "Directives": {}, "Withheld": {},
 	}
 	entryType := reflect.TypeOf(program.LintCacheEntry{})
 	for index := range entryType.NumField() {

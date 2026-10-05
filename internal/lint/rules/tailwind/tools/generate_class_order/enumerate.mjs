@@ -26,6 +26,7 @@
 
 import * as NodeFileSystem from 'node:fs';
 import * as NodePath from 'node:path';
+import { recordBeside } from '../corpus.mjs';
 import { loadDesignSystem, parseCandidate, readingOf } from '../generate_descriptors/loader.mjs';
 
 const systemsArgument = process.argv[2];
@@ -215,7 +216,7 @@ function registrationTables(designSystem) {
 const systems = [];
 for (const definition of systemDefinitions) {
     process.stderr.write(`enumerate.mjs: loading ${definition.name}\n`);
-    const { designSystem, tailwindVersion, entryPoint } = await loadDesignSystem(definition.path);
+    const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint } = await loadDesignSystem(definition.path);
 
     const registryClassNames = expandRegistry(designSystem);
     const corpus = scanCorpus(entryPoint);
@@ -290,9 +291,9 @@ for (const definition of systemDefinitions) {
 
     systems.push({
         name: definition.name,
-        entryPoint,
+        entryPoint: recordedEntryPoint,
         tailwindVersion,
-        corpusRoot: corpus.corpusRoot,
+        corpusRoot: recordBeside(definition.path, corpus.corpusRoot),
         counts: {
             registryClasses: registryClassNames.length,
             corpusOccurrences: corpus.occurrences,
