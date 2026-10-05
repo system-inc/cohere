@@ -52,7 +52,6 @@ var goWhitespaceUnswept = map[string]int{
 	"internal/lint/rules/core/no_restricted_imports.go":                              1,
 	"internal/lint/rules/core/no_restricted_imports_matcher.go":                      1,
 	"internal/lint/rules/core/no_unused_vars_fix.go":                                 1,
-	"internal/lint/rules/core/no_warning_comments.go":                                3,
 	"internal/lint/rules/core/object_shorthand.go":                                   2,
 	"internal/lint/rules/core/prefer_destructuring.go":                               1,
 	"internal/lint/rules/core/prefer_exponentiation_operator.go":                     1,
