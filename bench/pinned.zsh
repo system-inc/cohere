@@ -9,6 +9,12 @@
 # editing can move a number, and the project's own caches are never read or written. A copy is reused
 # by later invocations at the same commits, and refused if its files no longer match what was extracted.
 #
+# The copy keeps the checkout's repository shape, because cohere reads it: a `.git` file in each submodule
+# makes it a nested repository the format walk skips and discovery treats as linked, and the root's `.git`
+# directory carries the project's own `info/exclude`, which the format walk applies. Without them the copy
+# formatted libraries/structure as part of ahra, 5,269 files where a developer's run formats 3,198
+# (#679s763). git itself never runs on the copy, so the markers hold nothing else.
+#
 # The engine. The launcher rebuilds whenever a cohere commit lands, which during a working session is
 # every few minutes, so a benchmark run through it can measure two binaries and report one number. The
 # engine the launcher resolves at the start is copied beside the logs and run directly.
@@ -26,11 +32,13 @@ wait_for_quiet() {
 
 # extract writes the tree of <repository> at <commit> into <destination>, then each submodule at the
 # commit that tree records. A submodule commit the local clone does not have stops the benchmark rather
-# than leaving a hole in the program.
+# than leaving a hole in the program. Each submodule is marked a repository of its own, as a checkout's is.
 extract() {
   local repository=$1 commit=$2 destination=$3
   mkdir -p $destination
   git -C $repository archive $commit | tar -x -C $destination || fail "extracting $repository at $commit"
+  [[ $destination != $copy ]] &&
+    print "gitdir: none, a benchmark copy of $repository at $commit" > $destination/.git
   git -C $repository ls-tree -r $commit | awk '$2 == "commit" { print $3 "\t" $4 }' |
     while IFS=$'\t' read -r submodule_commit submodule_path; do
       git -C $repository/$submodule_path cat-file -e "$submodule_commit^{commit}" 2> /dev/null ||
@@ -54,7 +62,8 @@ prepare_copy() {
   project=${project:A}
   [[ -d $project/.git || -f $project/.git ]] || fail "$project is not a git checkout"
   project_commit=$(git -C $project rev-parse HEAD) || fail "cannot read $project's HEAD"
-  copy=$work/${project:t}-${project_commit[1,12]}
+  # The layout is in the name, so a copy extracted before the repository markers is never reused.
+  copy=$work/${project:t}-${project_commit[1,12]}-repositories
   if [[ -f $copy/bench-ready ]]; then
     print -u2 "reusing the copy at $copy"
     [[ $(tree_hash) == $(< $copy/bench-ready) ]] ||
@@ -63,6 +72,10 @@ prepare_copy() {
     [[ -e $copy ]] && fail "$copy exists but was never finished; remove it and run again"
     print -u2 "extracting ${project:t} at ${project_commit[1,12]} into $copy"
     extract $project $project_commit $copy
+    # The root is a repository, as the project's checkout is, with the same local excludes.
+    mkdir -p $copy/.git/info
+    local exclude=$(git -C $project rev-parse --path-format=absolute --git-path info/exclude)
+    [[ -f $exclude ]] && cp $exclude $copy/.git/info/exclude
     # Every package in the copy uses the project's installed dependencies, linked rather than copied.
     (cd $copy && find . -name package.json -not -path '*/node_modules/*') | while read -r manifest; do
       local package=${manifest:h}
