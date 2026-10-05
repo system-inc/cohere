@@ -1,6 +1,6 @@
 // Code generated from typescript-estree's dist/jsx/xhtml-entities.js (8.65.0). DO NOT EDIT.
 
-package estree
+package text
 
 // xhtmlEntities are the named character references upstream's unescapeStringLiteralText decodes.
 var xhtmlEntities = map[string]string{

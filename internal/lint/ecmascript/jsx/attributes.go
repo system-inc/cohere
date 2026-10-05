@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // Attribute names are matched two ways because upstream matches them two ways, and which one a
@@ -82,6 +83,11 @@ func AttributeName(property *ast.Node) (string, bool) {
 // guessing would report on code whose real value is unknown. oxc expresses the same rule as
 // `get_prop_value(...).as_string_literal()`.
 //
+// The value is decoded as ESLint's parser decodes it: typescript-estree runs a JSX attribute's
+// string through unescapeStringLiteralText, so `href="&#47;about"` reads `/about` to an ESLint rule.
+// Returning the raw text made every rule reading an attribute this way disagree with ESLint on an
+// encoded value (#51y9jh2).
+//
 // Shared rather than copied because several rules read an attribute exactly this way, and a second
 // implementation would be free to drift on the spread case, which is the one a porter is most
 // likely to miss.
@@ -110,7 +116,7 @@ func StringAttributeValue(attributes *ast.Node, name string, matches NameMatch) 
 		if attribute.Initializer == nil || attribute.Initializer.Kind != ast.KindStringLiteral {
 			return "", false
 		}
-		return attribute.Initializer.Text(), true
+		return text.UnescapeStringLiteralText(attribute.Initializer.Text()), true
 	}
 
 	return "", false
