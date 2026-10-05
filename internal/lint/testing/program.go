@@ -241,6 +241,7 @@ func runTypedFiles(
 		built, err := program.Build(program.Options{
 			ConfigFileName:   configPath,
 			CurrentDirectory: directory,
+			LibraryParses:    libraryParses,
 			// One checker rather than several: a fixture is one file, and the parallel path adds
 			// scheduling nondeterminism to a test whose whole value is being deterministic.
 			SingleThreaded: true,
