@@ -8,9 +8,9 @@ import (
 
 const emptyObjectFile = "/repository/source/Thing.ts"
 
-// Seeded from oxc's own pass and fail vectors. The two cases that decide this rule — an interface
-// extending two names, and `{}` inside an intersection — are both in that corpus and neither would
-// have been invented here.
+// Upstream's own rows, all of them, replay in no_empty_object_type_corpus_test.go, suggestions and the
+// shapes a rewrite keeps or drops included. These were the oxc port's vectors, kept for the shapes the
+// replay does not write: values that look like `{}` and are not types.
 
 func TestNoEmptyObjectTypeFiresOnInterfaces(t *testing.T) {
 	t.Parallel()
@@ -18,19 +18,20 @@ func TestNoEmptyObjectTypeFiresOnInterfaces(t *testing.T) {
 	cases := []struct {
 		name       string
 		sourceText string
+		id         string
 	}{
-		{"an empty interface", "export interface Base {}\n"},
-		// Extending exactly one name is an alias written the long way, and oxc flags it under the
-		// default `allowInterfaces: never`.
-		{"extending a single name", "interface Base {\n    name: string;\n}\nexport interface Derived extends Base {}\n"},
-		{"extending a generic", "export interface Base extends Array<number> {}\n"},
-		{"a generic extending a generic", "interface Derived<T> {\n    value: T;\n}\nexport interface Base<T> extends Derived<T> {}\n"},
+		{"an empty interface", "export interface Base {}\n", "noEmptyInterface"},
+		// Extending exactly one name is the supertype under a second name, flagged under the default
+		// `allowInterfaces: never` with its own message.
+		{"extending a single name", "interface Base {\n    name: string;\n}\nexport interface Derived extends Base {}\n", "noEmptyInterfaceWithSuper"},
+		{"extending a generic", "export interface Base extends Array<number> {}\n", "noEmptyInterfaceWithSuper"},
+		{"a generic extending a generic", "interface Derived<T> {\n    value: T;\n}\nexport interface Base<T> extends Derived<T> {}\n", "noEmptyInterfaceWithSuper"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoEmptyObjectType, emptyObjectFile, testCase.sourceText),
-				"noEmptyInterface")
+				testCase.id)
 		})
 	}
 }
@@ -51,7 +52,7 @@ func TestNoEmptyObjectTypeFiresOnObjectTypes(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoEmptyObjectType, emptyObjectFile, testCase.sourceText),
-				"noEmptyObjectType")
+				"noEmptyObject")
 		})
 	}
 }
@@ -108,13 +109,12 @@ func TestNoEmptyObjectTypeStaysSilent(t *testing.T) {
 		sourceText string
 	}{
 		{"an interface with members", "export interface Base {\n    name: string;\n}\n"},
-		// The case the whole rule turns on, and it is oxc's comment that explains why: extending
-		// multiple interfaces is how a reader expresses an intersection of named types where a union
-		// would be wrong. Two or more is allowed; exactly one is not.
+		// The case the whole rule turns on: extending multiple interfaces is how a reader expresses an
+		// intersection of named types where a union would be wrong. Two or more is allowed; exactly one
+		// is not.
 		{"extending two names", "interface Base {\n    name: string;\n}\ninterface Derived {\n    age: number;\n}\nexport interface Both extends Base, Derived {}\n"},
 		{"extending three names", "interface A {\n    a: string;\n}\ninterface B {\n    b: string;\n}\ninterface C {\n    c: string;\n}\nexport interface All extends A, B, C {}\n"},
-		// `Base & {}` forces a type to display expanded rather than by name. The empty half is doing
-		// real work, which is why oxc exempts it.
+		// `Base & {}` inside an intersection is exempt: the empty half is doing real work there.
 		{"inside an intersection", "interface Base {\n    name: string;\n}\nexport type Expanded = Base & {};\n"},
 		// A non-empty object type is not this rule's concern in either position.
 		{"a populated type literal", "export type Base = { name: string };\n"},
@@ -130,30 +130,5 @@ func TestNoEmptyObjectTypeStaysSilent(t *testing.T) {
 			t.Parallel()
 			rule_testing.ExpectClean(t, rule_testing.Run(t, NoEmptyObjectType, emptyObjectFile, testCase.sourceText))
 		})
-	}
-}
-
-// TestNoEmptyObjectTypeNeverRewritesAnInterface pins that an empty interface is reported bare.
-//
-// Swept after `consistent-indexed-object-style` shipped an interface-to-alias repair that deleted
-// `export`. typescript-eslint's version of this rule offers `export type Foo = Bar` for an interface
-// extending one name; this port follows oxc and offers no repair on an interface at all, so there is
-// no rebuilt declaration to lose a modifier from. Asserted rather than assumed, across the modifier
-// shapes the other sweeps broke on.
-func TestNoEmptyObjectTypeNeverRewritesAnInterface(t *testing.T) {
-	t.Parallel()
-
-	for _, sourceText := range []string{
-		"export interface Base {}\n",
-		"interface Base {\n    name: string;\n}\nexport interface Derived extends Base {}\n",
-		"interface Base {\n    name: string;\n}\ndeclare interface Derived extends Base {}\n",
-		"interface Base<T> {\n    value: T;\n}\nexport declare interface Derived<T> extends Base<T> {}\n",
-	} {
-		result := rule_testing.Run(t, NoEmptyObjectType, emptyObjectFile, sourceText)
-		rule_testing.ExpectFindings(t, result, "noEmptyInterface")
-		if diagnostic := result.Diagnostics[0]; len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no repair on %q, got %d fixes and %d suggestions",
-				sourceText, len(diagnostic.Fixes), len(diagnostic.Suggestions))
-		}
 	}
 }
