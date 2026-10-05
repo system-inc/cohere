@@ -2,6 +2,7 @@ package program
 
 import (
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,6 +52,7 @@ func (r *InputRecorder) note(path string, present bool, depended bool) {
 	if r == nil || path == "" {
 		return
 	}
+	path = withoutTrailingSlash(path)
 	r.mutex.Lock()
 	r.existed[path] = r.existed[path] || present
 	r.depended[path] = r.depended[path] || depended
@@ -64,9 +66,20 @@ func (r *InputRecorder) note(path string, present bool, depended bool) {
 // subset of present. Module resolution asks that of every directory from the project up to the root, on its
 // way to a package.json or a node_modules, and the answer can only change by the path ceasing to be there.
 // See RecordRunCache, which records such a directory for its existence alone.
+//
+// The same tree records the same inputs on every build (#zc57tqg). Which existence probes reach the disk
+// depends on which of the parallel loaders asks first: on excalidraw, six builds of one tree each recorded the
+// probe of a package's directory, such as node_modules/react-dom/, only sometimes, the times module resolution
+// answered a second import of the package from its own cache by a path the first did not take. Every one of them
+// had a path beneath it that every build read, its package.json among them. So a probe is left out when a
+// present path lies beneath it: the descendant can only be there while the directory is, so its own record
+// already catches the directory going away, and the probe adds nothing a check could fail on. What remains is
+// the same set whichever loader went first. A path is recorded without a trailing slash, since the resolver asks
+// for some directories both ways.
 func (r *InputRecorder) Inputs() (present []string, absent []string, probed []string) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+	var existenceOnly []string
 	for path, existed := range r.existed {
 		if r.written[path] {
 			continue
@@ -75,16 +88,43 @@ func (r *InputRecorder) Inputs() (present []string, absent []string, probed []st
 		case !existed:
 			absent = append(absent, path)
 		case !r.depended[path]:
-			present = append(present, path)
-			probed = append(probed, path)
+			existenceOnly = append(existenceOnly, path)
 		default:
 			present = append(present, path)
 		}
+	}
+	// Every present path, probes included, can imply a probe above it.
+	everyPresent := append(append([]string{}, present...), existenceOnly...)
+	sort.Strings(everyPresent)
+	for _, path := range existenceOnly {
+		if hasPathBeneath(everyPresent, path) {
+			continue
+		}
+		present = append(present, path)
+		probed = append(probed, path)
 	}
 	sort.Strings(present)
 	sort.Strings(absent)
 	sort.Strings(probed)
 	return present, absent, probed
+}
+
+// hasPathBeneath reports whether sorted holds a path inside directory.
+func hasPathBeneath(sorted []string, directory string) bool {
+	prefix := directory + "/"
+	if directory == "/" {
+		prefix = "/"
+	}
+	position := sort.SearchStrings(sorted, prefix)
+	return position < len(sorted) && strings.HasPrefix(sorted[position], prefix) && sorted[position] != directory
+}
+
+// withoutTrailingSlash is path with any trailing slash removed, the root excepted.
+func withoutTrailingSlash(path string) string {
+	for len(path) > 1 && strings.HasSuffix(path, "/") {
+		path = path[:len(path)-1]
+	}
+	return path
 }
 
 // recordingFS is a vfs.FS that reports each path it serves to an InputRecorder.
@@ -173,6 +213,7 @@ func (f *recordingFS) Chtimes(path string, accessTime time.Time, modifiedTime ti
 }
 
 func (f *recordingFS) markWritten(path string) {
+	path = withoutTrailingSlash(path)
 	f.recorder.mutex.Lock()
 	f.recorder.written[path] = true
 	f.recorder.mutex.Unlock()
