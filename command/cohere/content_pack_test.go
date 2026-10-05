@@ -84,3 +84,61 @@ func TestTheContentPackServesAReplacedDeclarationFresh(t *testing.T) {
 		}
 	}
 }
+
+// A graph rebuilt after the fix phase reads the bytes the fixer wrote, not the ones the run cache's check saw
+// (#kdee854). A missed run's pack validates against the check's stats rather than statting again, and the rebuild
+// reads through that same pack, so a rewritten file whose pack entry and check stat both predate the rewrite was
+// served to the rebuilt graph at its old bytes: its types and lint then reported text that no longer existed.
+//
+// Here the rewritten file is one nobody touched. Use.ts asserts a value from Value.ts `as string`, which is no
+// finding while the value is a string or a number; Value.ts changes to a string or undefined, so Use.ts, unchanged
+// since the last run, now has a non-null assertion spelled long, and the fixer rewrites it to `value!`.
+func TestARebuildAfterAFixReadsTheFixedBytes(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+		t.Skip("the content pack serves nothing on this platform")
+	}
+	binary := buildCohere(t)
+	root := t.TempDir()
+	write := func(name string, contents string) {
+		t.Helper()
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
+	write("CohereSettings.json", `{"rules":{"@typescript-eslint/non-nullable-type-assertion-style":"error"}}`)
+	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
+	write(".gitignore", ".cache/\nnode_modules/\n")
+	write("source/Value.ts", "export const value: string | number = Math.random() > 0.5 ? 'text' : 1;\n")
+	write("source/Use.ts", "import { value } from './Value';\nexport const used = value as string;\n")
+	runCohere(t, binary, root)
+	runCohere(t, binary, root)
+	if _, err := os.Stat(filepath.Join(root, ".cache", "cohere", "contents.index")); err != nil {
+		t.Fatalf("the runs wrote no content pack, so the run below proves nothing: %v", err)
+	}
+
+	time.Sleep(10 * time.Millisecond)
+	write("source/Value.ts", "export const value: string | undefined = Math.random() > 0.5 ? 'text' : undefined;\n")
+	warm, _ := runCohere(t, binary, root)
+	if !strings.Contains(warm, "graph rebuilt") {
+		t.Fatalf("the fixer rewrote nothing, so the rebuild this test is about never ran:\n%s", warm)
+	}
+	fixed, err := os.ReadFile(filepath.Join(root, "source", "Use.ts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(fixed), "value!") {
+		t.Fatalf("the fixer did not rewrite Use.ts as this test expects:\n%s", fixed)
+	}
+	finding := regexp.MustCompile(`(?m)^\S+:\d+:\d+ - .*$`)
+	cold, _ := runCohere(t, binary, root, "--no-fix", "--no-cache")
+	if got, want := finding.FindAllString(warm, -1), finding.FindAllString(cold, -1); strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("the run that fixed Use.ts reported other findings after its rebuild than a run with no cache over the fixed tree\n--- warm\n%s\n--- cold\n%s",
+			warm, cold)
+	}
+}
