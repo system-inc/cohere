@@ -542,6 +542,7 @@ func run() error {
 			SingleThreaded:   *singleThreaded,
 			Inputs:           runCacheInputs,
 			ContentPack:      contentPack,
+			CheckedStats:     runCacheCheckStats,
 			Timing:           graphTiming,
 			Yielded:          yield.yieldedFiles(),
 			Listings:         discoveredListings,
@@ -1332,6 +1333,8 @@ func rebuildGraph(
 	yieldedFiles map[string]struct{},
 ) (*program.Graph, time.Duration, error) {
 	start := time.Now()
+	// The check's stats predate the rewrite. See distrustCheckStats.
+	distrustCheckStats()
 	rebuilt, err := program.Build(program.Options{
 		ConfigFileName:   configFileName,
 		CurrentDirectory: directory,
