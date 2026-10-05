@@ -1,4 +1,7 @@
-package release
+// Package crosscompile proves cohere compiles for every platform a release ships. It reads the whole
+// program, so any edit reruns it, and it lives apart from internal/release/packaging so that the edit
+// reruns it alone and not packaging's Swift and staging tests too (#nxgt2ca).
+package crosscompile
 
 import (
 	"fmt"
@@ -8,6 +11,8 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/packages"
+
+	release "github.com/system-inc/cohere/internal/release/packaging"
 )
 
 // crossCompileVariable chooses how TestEveryReleaseTargetCompiles proves the targets. Unset, it
@@ -36,9 +41,9 @@ const crossCompileVariable = "COHERE_CROSS_COMPILE"
 // and every machine that ran the tests was a Mac. The first place it would have shown up was a
 // release, the most expensive place there is to find it.
 //
-// It ranges over Targets itself rather than a list of its own, because a second list is how a
+// It ranges over release.Targets itself rather than a list of its own, because a second list is how a
 // dropped or renamed platform stops being checked without anything failing. It compiles through
-// goBuildCommand, the same command the release runs, for the same reason.
+// release.GoBuildCommand, the same command the release runs, for the same reason.
 //
 // It type-checks rather than builds, locally and in release.yml; crossCompileVariable says why, with the
 // measurements. `-short` skips it for a quick local loop and says so.
@@ -46,7 +51,7 @@ func TestEveryReleaseTargetCompiles(t *testing.T) {
 	t.Parallel()
 
 	if testing.Short() {
-		t.Skipf("NOT MEASURED: -short skips checking cohere for the %d release targets, so a platform that no longer builds would pass here", len(Targets))
+		t.Skipf("NOT MEASURED: -short skips checking cohere for the %d release targets, so a platform that no longer builds would pass here", len(release.Targets))
 	}
 	mode := os.Getenv(crossCompileVariable)
 	if mode != "" && mode != "build" {
@@ -55,19 +60,18 @@ func TestEveryReleaseTargetCompiles(t *testing.T) {
 
 	moduleDirectory := filepath.Join("..", "..", "..")
 
-	for _, target := range Targets {
-		// Not parallel: in type-check mode, the default, these run one after another, because a type-check
-		// holds about 900 MB and six at once is not worth five seconds. In build mode each one calls
-		// t.Parallel below, after the type-check branch has returned.
+	for _, target := range release.Targets {
+		// Six type-checks at once hold about 5.4 GB, 900 MB each. One after another they were most of
+		// packaging's wall on every edit, about 6s against about 2s in parallel (#nxgt2ca).
 		t.Run(target.String(), func(t *testing.T) {
+			t.Parallel()
 			if mode != "build" {
 				if problems := typeCheckTarget(moduleDirectory, target); len(problems) > 0 {
 					t.Fatalf("cohere does not type-check for %s, so a release would fail there:\n%s", target, strings.Join(problems, "\n"))
 				}
 				return
 			}
-			t.Parallel()
-			command := goBuildCommand(moduleDirectory, target, strings.Join(StripFlags, " "), filepath.Join(t.TempDir(), target.BinaryFileName()))
+			command := release.GoBuildCommand(moduleDirectory, target, strings.Join(release.StripFlags, " "), filepath.Join(t.TempDir(), target.BinaryFileName()))
 			if output, err := command.CombinedOutput(); err != nil {
 				t.Fatalf("cohere does not compile for %s, so a release would fail there: %v\n%s", target, err, output)
 			}
@@ -78,7 +82,7 @@ func TestEveryReleaseTargetCompiles(t *testing.T) {
 // typeCheckTarget type-checks the package the release builds, and everything it imports, from source as
 // target would compile it, and returns every error, or none. Nothing is compiled, so nothing is written
 // to the build cache.
-func typeCheckTarget(moduleDirectory string, target Target) []string {
+func typeCheckTarget(moduleDirectory string, target release.Target) []string {
 	loaded, err := packages.Load(&packages.Config{
 		// Syntax and type information for every dependency is what makes go/packages type-check them all
 		// from source rather than reading export data, which it would have to compile first.
@@ -116,10 +120,10 @@ func TestTypeCheckCatchesAPlatformOnlyBreak(t *testing.T) {
 	writeFile(t, filepath.Join(directory, "command", "cohere", "only_darwin.go"), "package main\n\nfunc onlyOnDarwin() {}\n")
 	writeFile(t, filepath.Join(directory, "command", "cohere", "broken_windows.go"), "package main\n\nvar broken int = \"text\"\n")
 
-	if problems := typeCheckTarget(directory, Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}); len(problems) > 0 {
+	if problems := typeCheckTarget(directory, release.Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}); len(problems) > 0 {
 		t.Fatalf("the control does not type-check even for darwin, so it cannot show anything: %v", problems)
 	}
-	problems := strings.Join(typeCheckTarget(directory, Target{GoOperatingSystem: "windows", GoArchitecture: "amd64"}), "\n")
+	problems := strings.Join(typeCheckTarget(directory, release.Target{GoOperatingSystem: "windows", GoArchitecture: "amd64"}), "\n")
 	for _, want := range []string{"onlyOnDarwin", "broken_windows.go"} {
 		if !strings.Contains(problems, want) {
 			t.Errorf("the windows type-check did not report %s: %q", want, problems)
@@ -138,17 +142,27 @@ func TestCrossCompileCatchesAPlatformOnlyBreak(t *testing.T) {
 	writeFile(t, filepath.Join(directory, "command", "cohere", "main.go"), "package main\n\nfunc main() { onlyOnDarwin() }\n")
 	writeFile(t, filepath.Join(directory, "command", "cohere", "only_darwin.go"), "package main\n\nfunc onlyOnDarwin() {}\n")
 
-	darwin := Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
-	if output, err := goBuildCommand(directory, darwin, "", filepath.Join(t.TempDir(), "cohere")).CombinedOutput(); err != nil {
+	darwin := release.Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
+	if output, err := release.GoBuildCommand(directory, darwin, "", filepath.Join(t.TempDir(), "cohere")).CombinedOutput(); err != nil {
 		t.Fatalf("the control does not compile even for darwin, so it cannot show anything: %v\n%s", err, output)
 	}
 
-	windows := Target{GoOperatingSystem: "windows", GoArchitecture: "amd64"}
-	output, err := goBuildCommand(directory, windows, "", filepath.Join(t.TempDir(), "cohere.exe")).CombinedOutput()
+	windows := release.Target{GoOperatingSystem: "windows", GoArchitecture: "amd64"}
+	output, err := release.GoBuildCommand(directory, windows, "", filepath.Join(t.TempDir(), "cohere.exe")).CombinedOutput()
 	if err == nil {
 		t.Fatal("a call to a darwin-only function compiled for windows, so the cross-compile check cannot catch a platform-only break")
 	}
 	if !strings.Contains(string(output), "onlyOnDarwin") {
 		t.Fatalf("the windows build failed, but not on the darwin-only call: %s", output)
+	}
+}
+
+func writeFile(t *testing.T, path string, contents string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

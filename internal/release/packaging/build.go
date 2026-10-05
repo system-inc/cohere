@@ -437,7 +437,7 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 		"-X", packagePath+".goToolchain="+goToolchain,
 	)
 
-	command := goBuildCommand(options.ModuleDirectory, target, strings.Join(stamps, " "), binaryPath)
+	command := GoBuildCommand(options.ModuleDirectory, target, strings.Join(stamps, " "), binaryPath)
 	command.Stderr = os.Stderr
 
 	if err := command.Run(); err != nil {
@@ -446,13 +446,13 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 	return nil
 }
 
-// goBuildCommand is the `go build` that produces cohere for one target.
+// GoBuildCommand is the `go build` that produces cohere for one target.
 //
 // It is the single definition of how a target is compiled, shared by the release and by
-// TestEveryReleaseTargetCompiles, so a flag or an environment variable added here for the release
+// TestEveryReleaseTargetCompiles (internal/release/crosscompile), so a flag or an environment variable added here for the release
 // is one the test compiles with too. A test with its own copy would keep passing on the copy after
 // the release had changed.
-func goBuildCommand(moduleDirectory string, target Target, linkerFlags string, binaryPath string) *exec.Cmd {
+func GoBuildCommand(moduleDirectory string, target Target, linkerFlags string, binaryPath string) *exec.Cmd {
 	arguments := append([]string{"build"}, BuildFlags...)
 	arguments = append(arguments, "-ldflags="+linkerFlags, "-o", binaryPath, "./command/cohere")
 
