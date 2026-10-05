@@ -17,7 +17,9 @@
 #   prime   `cohere`, not measured, so the cache describes the tree as it stands: run again until one
 #           replays, up to three times, since a first run after a new engine or the cold run can leave
 #           a cache the next run does not replay whole (measured 2026-10-05: prime and warm both checked
-#           all 3,976 files, and the run after replayed)
+#           all 3,976 files, and the run after replayed, #547dhjz). Each run's row carries how many
+#           primes its round needed, and the summary names every round that needed more than one, so
+#           the retry cannot hide that bug
 #   warm    `cohere` again on the unchanged tree: the replay
 #   edit    one line added to one function body, `cohere`, then the file's original bytes put back
 #   cold    `cohere --no-cache`: every phase from source, nothing read or written
@@ -123,8 +125,8 @@ measure() {
   local output engine_seconds findings cache
   output=$($run_output_reader $log) || fail "could not read the run's output, see $log"
   IFS=$'\t' read -r engine_seconds findings cache <<< $output
-  printf '%s\t%d\t%.3f\t%.3f\t%s\t%s\t%s\t%s\t%s\t%s\t%d\n' $mode $round $verdict_seconds $settled_seconds \
-    $engine_seconds $findings "$cache" $before $after $quiet $exit_code |
+  printf '%s\t%d\t%.3f\t%.3f\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%d\n' $mode $round $verdict_seconds $settled_seconds \
+    $engine_seconds $findings "$cache" $before $after $quiet $exit_code $primes |
     tee -a $runs_table
 }
 
@@ -132,9 +134,11 @@ edit_original=$logs/edit-original
 cp $copy/$edit $edit_original
 original_hash=$(shasum -a 256 < $edit_original)
 
-printf 'mode\tround\tverdict_s\tsettled_s\tengine_s\tfindings\tcache\tload_before\tload_after\tquiet\texit\n'
+printf 'mode\tround\tverdict_s\tsettled_s\tengine_s\tfindings\tcache\tload_before\tload_after\tquiet\texit\tprimes\n'
 for round in $(seq 1 $runs); do
+  primes=0
   for prime in 1 2 3; do
+    primes=$prime
     run_cohere $logs/prime-$round-$prime.log
     [[ $($run_output_reader $logs/prime-$round-$prime.log | cut -f3) == replay ]] && break
   done
@@ -166,6 +170,11 @@ done
 awk -F'\t' '$1 == "warm" { warm[$2] = $6 } $1 == "edit" { edit[$2] = $6 }
   END { for (round in edit) if (edit[round] != warm[round])
     printf "note: round %s edit reported %s findings and warm %s, so the edit was not neutral\n", round, edit[round], warm[round] }' $runs_table
+
+# A round whose prime did not replay on its first run met #547dhjz: a run after a change that left a cache
+# the next run could not replay whole. The retry keeps the warm run a real replay, and this says it was needed.
+awk -F'\t' '$1 == "warm" && $12 > 1 {
+    printf "note: round %s needed %s primes before a run replayed whole (#547dhjz); see its prime logs\n", $2, $12 }' $runs_table
 
 print
 print "verdict seconds, by mode (quiet runs are the number; loaded runs are shown, not reported):"

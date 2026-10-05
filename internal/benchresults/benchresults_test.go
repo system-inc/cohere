@@ -27,6 +27,8 @@ func honestRecord() Record {
 		{Mode: ModeCold, Round: 2, VerdictSeconds: 1.9, SettledSeconds: 2.2, EngineSeconds: 1.85, LoadBefore: 4, LoadAfter: 4.5, Cache: "off"},
 	}
 	for index := range runs {
+		// Round 2 needed a second prime, as #547dhjz makes a round do, and the record says so.
+		runs[index].Primes = runs[index].Round
 		runs[index].Quiet = runs[index].LoadBefore <= 4 && runs[index].LoadAfter <= 4
 	}
 	return Record{
@@ -87,16 +89,18 @@ func TestADishonestRecordIsRefused(t *testing.T) {
 		},
 		// The first real record (91cf8e39) read 'none' on every replay, since the instrument grepped a footer
 		// that had moved behind --verbose (#zrgrk14).
-		"a replay whose cache read none":       func(record *Record) { record.Runs[0].Cache = "none" },
-		"an edit run that replayed nothing":    func(record *Record) { record.Runs[1].Cache = "none" },
-		"an edit run that replayed everything": func(record *Record) { record.Runs[1].Cache = "files 3976/3976" },
-		"a cold run that read the cache":       func(record *Record) { record.Runs[2].Cache = "files 3891/3976" },
-		"a run whose output was not read":      func(record *Record) { record.Runs[0].EngineSeconds = 0 },
-		"an engine from a modified tree":       func(record *Record) { record.Cohere.Dirty = true },
-		"an abbreviated commit":                func(record *Record) { record.Cohere.Commit = record.Cohere.Commit[:12] },
-		"a missing round":                      func(record *Record) { record.Runs = record.Runs[:5]; record.Modes = Summarize(record.Runs) },
-		"a ceiling of zero":                    func(record *Record) { record.LoadCeiling = 0 },
-		"another schema":                       func(record *Record) { record.Schema = SchemaVersion + 1 },
+		"a replay whose cache read none":            func(record *Record) { record.Runs[0].Cache = "none" },
+		"an edit run that replayed nothing":         func(record *Record) { record.Runs[1].Cache = "none" },
+		"an edit run that replayed everything":      func(record *Record) { record.Runs[1].Cache = "files 3976/3976" },
+		"a cold run that read the cache":            func(record *Record) { record.Runs[2].Cache = "files 3891/3976" },
+		"a round whose runs disagree on its primes": func(record *Record) { record.Runs[1].Primes = 2 },
+		"a run with no primes recorded":             func(record *Record) { record.Runs[0].Primes = 0 },
+		"a run whose output was not read":           func(record *Record) { record.Runs[0].EngineSeconds = 0 },
+		"an engine from a modified tree":            func(record *Record) { record.Cohere.Dirty = true },
+		"an abbreviated commit":                     func(record *Record) { record.Cohere.Commit = record.Cohere.Commit[:12] },
+		"a missing round":                           func(record *Record) { record.Runs = record.Runs[:5]; record.Modes = Summarize(record.Runs) },
+		"a ceiling of zero":                         func(record *Record) { record.LoadCeiling = 0 },
+		"another schema":                            func(record *Record) { record.Schema = SchemaVersion + 1 },
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

@@ -100,6 +100,9 @@ type Run struct {
 	Findings int    `json:"findings"`
 	Cache    string `json:"cache"`
 	Exit     int    `json:"exit"`
+	// Primes is how many unmeasured runs the round needed before one replayed whole, from 1 to 3, the same
+	// on each of the round's runs. More than one is #547dhjz showing itself, and the record keeps it.
+	Primes int `json:"primes"`
 }
 
 // ModeSummary is one mode's verdict seconds.
@@ -164,6 +167,7 @@ func Validate(record Record) error {
 		return fmt.Errorf("%d rounds at a load ceiling of %g measure nothing", record.Rounds, record.LoadCeiling)
 	}
 	counts := map[Mode]int{}
+	primesByRound := map[int]int{}
 	for _, run := range record.Runs {
 		counts[run.Mode]++
 		quiet := run.LoadBefore <= record.LoadCeiling && run.LoadAfter <= record.LoadCeiling
@@ -178,6 +182,13 @@ func Validate(record Record) error {
 		if run.EngineSeconds <= 0 {
 			return fmt.Errorf("%s round %d has no engine seconds, so its output was not read", run.Mode, run.Round)
 		}
+		if run.Primes < 1 || run.Primes > 3 {
+			return fmt.Errorf("%s round %d needed %d primes, and the benchmark runs 1 to 3", run.Mode, run.Round, run.Primes)
+		}
+		if primes, seen := primesByRound[run.Round]; seen && primes != run.Primes {
+			return fmt.Errorf("round %d's runs disagree on its primes, %d and %d", run.Round, primes, run.Primes)
+		}
+		primesByRound[run.Round] = run.Primes
 		if err := cacheFitsMode(run); err != nil {
 			return fmt.Errorf("%s round %d: %w", run.Mode, run.Round, err)
 		}

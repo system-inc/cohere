@@ -167,7 +167,8 @@ func thisMachine() (benchresults.Machine, error) {
 }
 
 // readRuns reads quiet_machine.sh's runs table: mode, round, verdict_s, settled_s, engine_s, findings,
-// cache, load_before, load_after, quiet, exit, tab-separated, with a header line the script prints apart.
+// cache, load_before, load_after, quiet, exit, primes, tab-separated, with a header line the script prints
+// apart.
 func readRuns(path string) ([]benchresults.Run, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -179,8 +180,8 @@ func readRuns(path string) ([]benchresults.Run, error) {
 	scanner := bufio.NewScanner(file)
 	for line := 1; scanner.Scan(); line++ {
 		fields := strings.Split(scanner.Text(), "\t")
-		if len(fields) != 11 {
-			return nil, fmt.Errorf("%s:%d: %d fields, want 11", path, line, len(fields))
+		if len(fields) != 12 {
+			return nil, fmt.Errorf("%s:%d: %d fields, want 12", path, line, len(fields))
 		}
 		mode, found := modes[fields[0]]
 		if !found {
@@ -190,7 +191,7 @@ func readRuns(path string) ([]benchresults.Run, error) {
 			return nil, fmt.Errorf("%s:%d: quiet is %q, want quiet or loaded", path, line, fields[9])
 		}
 		numbers := map[int]float64{}
-		for _, index := range []int{1, 2, 3, 4, 5, 7, 8, 10} {
+		for _, index := range []int{1, 2, 3, 4, 5, 7, 8, 10, 11} {
 			if numbers[index], err = strconv.ParseFloat(fields[index], 64); err != nil {
 				return nil, fmt.Errorf("%s:%d: field %d: %w", path, line, index+1, err)
 			}
@@ -198,7 +199,7 @@ func readRuns(path string) ([]benchresults.Run, error) {
 		runs = append(runs, benchresults.Run{
 			Mode: mode, Round: int(numbers[1]), VerdictSeconds: numbers[2], SettledSeconds: numbers[3],
 			EngineSeconds: numbers[4], LoadBefore: numbers[7], LoadAfter: numbers[8], Quiet: fields[9] == "quiet",
-			Findings: int(numbers[5]), Cache: fields[6], Exit: int(numbers[10]),
+			Findings: int(numbers[5]), Cache: fields[6], Exit: int(numbers[10]), Primes: int(numbers[11]),
 		})
 	}
 	return runs, scanner.Err()
