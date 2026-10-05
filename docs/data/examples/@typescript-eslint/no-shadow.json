@@ -16,10 +16,11 @@
     },
     "clean": {
         "file": "file.ts",
-        "source": "class A {}\n"
+        "source": "{\n  let a;\n}\nlet a;\n"
     },
     "assertedMessageIds": [
         "noEnumShadow",
-        "noShadow"
+        "noShadow",
+        "noShadowGlobal"
     ]
 }

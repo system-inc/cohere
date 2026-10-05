@@ -318,7 +318,7 @@ func reportRedeclarationsIn(ctx rule.Context, sourceFile *ast.Node, settings NoR
 		}
 		declarations := survivingDeclarations(groups[key].declarations, settings)
 		message := messageNoRedeclare
-		if checksBuiltins && key.container == sourceFile && len(declarations) > 0 && isBuiltinGlobal(ctx, key.name) {
+		if checksBuiltins && key.container == sourceFile && len(declarations) > 0 && isBuiltinGlobal(ctx.TypeChecker, ctx.Program, key.name) {
 			// The builtin is the first declaration, so every one in the file redeclares it.
 			message = messageNoRedeclareAsBuiltin
 		} else if len(declarations) < 2 {
@@ -335,36 +335,6 @@ func reportRedeclarationsIn(ctx rule.Context, sourceFile *ast.Node, settings NoR
 			ctx.ReportNode(name, message)
 		}
 	}
-}
-
-// eslintLatestGlobals is ESLint 10.8.1's own ECMAScript globals at `ecmaVersion: "latest"` (es2026 in
-// conf/globals.js), which its Linter declares read-only in every global scope before any rule runs
-// (lib/languages/js/source-code/source-code.js:955 at 10.8.1, `getGlobalsForEcmaVersion`), on top of
-// whatever the parser's scope manager put there. They are why `var NaN = 1;` and
-// `function toString() {}` report in a script although the TypeScript lib gives neither a type.
-var eslintLatestGlobals = map[string]bool{
-	"AggregateError": true, "Array": true, "ArrayBuffer": true, "AsyncDisposableStack": true,
-	"Atomics": true, "BigInt": true, "BigInt64Array": true, "BigUint64Array": true, "Boolean": true,
-	"DataView": true, "Date": true, "DisposableStack": true, "Error": true, "EvalError": true,
-	"FinalizationRegistry": true, "Float16Array": true, "Float32Array": true, "Float64Array": true,
-	"Function": true, "Infinity": true, "Int16Array": true, "Int32Array": true, "Int8Array": true,
-	"Intl": true, "Iterator": true, "JSON": true, "Map": true, "Math": true, "NaN": true,
-	"Number": true, "Object": true, "Promise": true, "Proxy": true, "RangeError": true,
-	"ReferenceError": true, "Reflect": true, "RegExp": true, "Set": true, "SharedArrayBuffer": true,
-	"String": true, "SuppressedError": true, "Symbol": true, "SyntaxError": true, "Temporal": true,
-	"TypeError": true, "URIError": true, "Uint16Array": true, "Uint32Array": true, "Uint8Array": true,
-	"Uint8ClampedArray": true, "WeakMap": true, "WeakRef": true, "WeakSet": true, "constructor": true,
-	"decodeURI": true, "decodeURIComponent": true, "encodeURI": true, "encodeURIComponent": true,
-	"escape": true, "eval": true, "globalThis": true, "hasOwnProperty": true, "isFinite": true,
-	"isNaN": true, "isPrototypeOf": true, "parseFloat": true, "parseInt": true,
-	"propertyIsEnumerable": true, "toLocaleString": true, "toString": true, "undefined": true,
-	"unescape": true, "valueOf": true,
-}
-
-// isBuiltinGlobal reports whether an ESLint run under typescript-eslint's parser holds name as a
-// read-only global: ESLint's own ECMAScript globals, or a type the program's lib declares.
-func isBuiltinGlobal(ctx rule.Context, name string) bool {
-	return eslintLatestGlobals[name] || isLibraryTypeGlobal(ctx, name)
 }
 
 // upstreamVisitsScope reports whether upstream ever examines the scope a container stands for.
@@ -385,36 +355,6 @@ func upstreamVisitsScope(container *ast.Node) bool {
 		return container.Parent == nil || container.Parent.Kind != ast.KindClassStaticBlockDeclaration
 	}
 	return true
-}
-
-// isLibraryTypeGlobal reports whether the program's standard library declares name as a type, which
-// is what typescript-eslint's scope manager seeds the global scope with.
-//
-// Read through the global symbol rather than a list of the lib files, which would be a read of other
-// files that no findings key covers. The checker merges lib files into the globals first, and when a
-// script's declaration conflicts with a lib one, `mergeSymbol` reports it and keeps the lib's symbol,
-// so a lib declaration is on the global whether the user's merged into it or not.
-//
-// The kinds are the ones the scope manager's lib generator keeps, the type variables: a
-// `declare var NaN` or a `declare function parseInt` alone is a value with no type and is not a
-// builtin to upstream, while `interface Object` beside `declare var Object` is.
-func isLibraryTypeGlobal(ctx rule.Context, name string) bool {
-	symbol := ctx.TypeChecker.GetGlobalSymbol(name, ast.SymbolFlagsAll, nil)
-	if symbol == nil {
-		return false
-	}
-	for _, declaration := range symbol.Declarations {
-		switch declaration.Kind {
-		case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration, ast.KindClassDeclaration,
-			ast.KindEnumDeclaration, ast.KindModuleDeclaration:
-		default:
-			continue
-		}
-		if file := ast.GetSourceFileOfNode(declaration); file != nil && ctx.Program.IsSourceFileDefaultLibrary(file.Path()) {
-			return true
-		}
-	}
-	return false
 }
 
 // scopedName identifies one name inside one scope.

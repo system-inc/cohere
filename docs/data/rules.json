@@ -2383,9 +2383,13 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-shadow",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "noEnumShadow",
-                "noShadow"
+                "noShadow",
+                "noShadowGlobal"
             ],
             "sets": [
                 {
