@@ -22,6 +22,9 @@ func (engine *countingEngine) Enumerate(root string) (formatfiles.Enumeration, e
 	return engine.Resolving.Enumerate(root)
 }
 
+// Not parallel: it sets aheadFormatWalk, the package-level walk the fix phase takes, which a run in this
+// package beside it could take or replace.
+//
 // The format walk begun beside the graph build is the walk the fix phase would have made (#679s763): taken
 // for the same engine and root, it equals a walk made on the spot, and it is taken once. A walk of another
 // root, or by another engine, is made on the spot.
