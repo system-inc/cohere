@@ -241,6 +241,36 @@ func IsTypeUnknownArrayType(
 		IsTypeUnknownType(checker.Checker_getTypeArguments(typeChecker, t)[0])
 }
 
+// CanBeUnsafeAssignment answers whether IsUnsafeAssignment could find this sender unsafe against any
+// receiver at all. It finds one unsafe only at an `any`, reached either directly or through the type
+// arguments of type references, so a sender with no `any` on any such path is safe whatever the
+// receiver is. A caller whose receiver type is costly to resolve (a JSX attribute's resolves the
+// element's props) asks this first and skips the receiver (#hekjpw3).
+func CanBeUnsafeAssignment(typeChecker *checker.Checker, sender *checker.Type) bool {
+	return canBeUnsafeAssignmentWorker(typeChecker, sender, map[*checker.Type]bool{})
+}
+
+func canBeUnsafeAssignmentWorker(
+	typeChecker *checker.Checker,
+	t *checker.Type,
+	visited map[*checker.Type]bool,
+) bool {
+	if IsTypeAnyType(t) {
+		return true
+	}
+	// A type already visited had its arguments searched in full, so reaching it again adds nothing.
+	if !checker.IsNonDeferredTypeReference(t) || visited[t] {
+		return false
+	}
+	visited[t] = true
+	for _, argument := range checker.Checker_getTypeArguments(typeChecker, t) {
+		if canBeUnsafeAssignmentWorker(typeChecker, argument, visited) {
+			return true
+		}
+	}
+	return false
+}
+
 /**
  * Does a simple check to see if there is an any being assigned to a non-any type.
  *

@@ -276,6 +276,41 @@ formatted instead of doing it on a machine nobody looks at. A nonzero exit fails
 files included. `--no-fix` does not stop cohere writing its own cache in `.cache/cohere`,
 which is safe to persist between CI runs to speed them up, or to discard.
 
+## Verifying a release
+
+Every release is built by [release.yml](.github/workflows/release.yml) in GitHub Actions, from a commit
+on this repository, and you can check what you installed came from it.
+
+cohere checks part of this on every run. `@system-inc/cohere` ships a `SHA256SUMS` of every binary in
+its platform packages, and before running the binary it checks the binary against it. A binary that
+differs, from a corrupted download or cache or from tampering, is refused by name and never run. Setting
+`COHERE_BINARY` to a build of your own skips the check, since no release describes that build.
+
+To check it yourself, run three commands from your project's root, putting your version and platform in.
+The first runs where you are; the other two run from the directory holding both cohere packages, which
+the `cd` finds the same way for npm and pnpm installs:
+
+```sh
+npm audit signatures
+
+cd "$(dirname "$(realpath node_modules/@system-inc/cohere)")"
+gh release download v1.0.0 --repo system-inc/cohere --pattern SHA256SUMS --output - | shasum -a 256 -c --ignore-missing
+gh attestation verify cohere-darwin-arm64/bin/cohere --repo system-inc/cohere
+```
+
+- `npm audit signatures` checks the registry's signature on every package installed, and the provenance
+  each cohere package was published with, which names the workflow run and commit that built it. npm
+  shows the same provenance on each package's page.
+- The `SHA256SUMS` attached to the GitHub release is the same file as the one inside the package, but it
+  reaches you without going through npm, and `shasum` checks the installed binaries against it. A line
+  that ends `OK` is a match. It exits nonzero on any mismatch, and when it finds none of the files, so
+  running it from the wrong directory fails rather than passing.
+- `gh attestation verify` checks the binary against the build attestation the release made for it,
+  signed through Sigstore by the workflow and stored on this repository. Every binary, the `SHA256SUMS`
+  and the VS Code extension are attested.
+
+The commands are written for a macOS or Linux shell.
+
 ## Contributing
 
 How cohere is built, and why, is in [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -118,7 +118,7 @@ var EnforceConsistentVariantOrder = rule.Rule{
 			}
 		}
 
-		reader := NewClassLiteralReader(settings)
+		reader := ClassLiteralReaderFor(ctx.FileCache, settings)
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {

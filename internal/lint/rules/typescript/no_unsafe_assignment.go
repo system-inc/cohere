@@ -514,11 +514,18 @@ func noUnsafeAssignmentCheckAtRange(
 	reportRange shimcore.TextRange,
 	comparison noUnsafeAssignmentComparison,
 ) bool {
-	receiverType := noUnsafeAssignmentReceiverType(ctx, receiverNode, comparison)
+	// Upstream resolves the receiver first. It is read only for an `any` sender and for a sender
+	// IsUnsafeAssignment could find unsafe, so it is resolved only then: for a JSX attribute it
+	// resolves the element's props, which was 0.8s of CPU on ahra for attributes whose value could
+	// never be unsafe (#hekjpw3).
 	senderType := ctx.TypeChecker.GetTypeAtLocation(senderNode)
-	if senderType == nil {
+	if senderType == nil || !type_checking.CanBeUnsafeAssignment(ctx.TypeChecker, senderType) {
 		return false
 	}
+	if comparison == noUnsafeAssignmentComparisonNone && !type_checking.IsTypeAnyType(senderType) {
+		return false
+	}
+	receiverType := noUnsafeAssignmentReceiverType(ctx, receiverNode, comparison)
 
 	if type_checking.IsTypeAnyType(senderType) {
 		// `unknown` is what a receiver is supposed to declare when the value cannot be trusted, so

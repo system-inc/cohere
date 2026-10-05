@@ -205,7 +205,10 @@ var StrictVoidReturn = rule.Rule{
 				if initializer == nil || initializer.Kind != ast.KindJsxExpression {
 					return
 				}
-				if inner := initializer.AsJsxExpression().Expression; inner != nil {
+				// The attribute's expected type resolves the element's props, for every attribute,
+				// and a value that is not a non-void function is silent whatever was expected, so
+				// the value is asked first (#hekjpw3).
+				if inner := initializer.AsJsxExpression().Expression; inner != nil && state.isNonVoidFunctionValue(inner) {
 					state.checkExpression(inner)
 				}
 			},
@@ -414,13 +417,16 @@ func (s *strictVoidReturnState) allowedReturnFlags() checker.TypeFlags {
 	return allowed
 }
 
-// reportIfNonVoidFunction is the decision tree, and its order is upstream's.
-func (s *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
+// isNonVoidFunctionValue answers whether the value is a function with a return this rule does not
+// accept, from the value's own type alone. It is the first step of reportIfNonVoidFunction, which
+// is silent whenever this is false, so a position whose expected type is costly to resolve asks it
+// before asking the position (#hekjpw3).
+func (s *strictVoidReturnState) isNonVoidFunctionValue(node *ast.Node) bool {
 	allowed := s.allowedReturnFlags()
 
 	actual := checker.Checker_getApparentType(s.ctx.TypeChecker, s.ctx.TypeChecker.GetTypeAtLocation(node))
 	if actual == nil {
-		return
+		return false
 	}
 
 	// Already void: every constituent of every call signature's return type is acceptable.
@@ -437,11 +443,17 @@ func (s *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 			}
 		}
 	}
-	if !sawOne || acceptable {
-		// No call signatures means nothing to complain about here, and upstream's `every` over an
-		// empty list is vacuously true, so both land on the same silence.
+	// No call signatures means nothing to complain about here, and upstream's `every` over an
+	// empty list is vacuously true, so both land on the same silence.
+	return sawOne && !acceptable
+}
+
+// reportIfNonVoidFunction is the decision tree, and its order is upstream's.
+func (s *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
+	if !s.isNonVoidFunctionValue(node) {
 		return
 	}
+	allowed := s.allowedReturnFlags()
 
 	isArrow := node.Kind == ast.KindArrowFunction
 	isFunctionExpression := node.Kind == ast.KindFunctionExpression

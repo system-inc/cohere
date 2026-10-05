@@ -260,8 +260,10 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 // This is the most expensive rule in the family and it should be read that way. It registers up to
 // fourteen listeners, several on kinds that appear on nearly every line (call expressions, binary
 // expressions, property access, variable declarations), and most arms reach the checker before they
-// can decline. `checkArguments` resolves the callee's type and then walks every signature's every
-// parameter for every call in the file. The syntactic escape hatches upstream wrote — `isPossiblyFunctionType`
+// can decline. Upstream's `checkArguments` resolves the callee's type and then walks every signature's
+// every parameter for every call in the file, and its JSX arm resolves every attribute's contextual
+// type; both now ask the cheap half of their conjunction first, which is the one departure from
+// upstream's order (#hekjpw3). The syntactic escape hatches upstream wrote — `isPossiblyFunctionType`
 // on return statements and variable declarations, the `Arguments() == nil` early exit — exist for
 // exactly that reason and are carried across rather than being treated as optional.
 var NoMisusedPromises = rule.Rule{
@@ -529,8 +531,16 @@ var NoMisusedPromises = rule.Rule{
 			}
 			expressionContainer := node.Initializer.AsJsxExpression()
 			expression := expressionContainer.Expression
+			// Upstream asks for the contextual type first and the expression's type last. The three
+			// questions are a conjunction with no side effects, so the cheap one goes first: the
+			// attribute's contextual type resolves the element's props for every attribute, and was
+			// 1.2s of this rule's 2.5s of CPU on ahra, while the expression's own type was 0.2s and
+			// is a function returning a thenable for almost no attribute (#hekjpw3).
+			if !returnsThenable(expression) {
+				return
+			}
 			contextualType := checker.Checker_getContextualType(ctx.TypeChecker, node.Initializer, checker.ContextFlagsNone)
-			if contextualType != nil && isVoidReturningFunctionType(node.Initializer, contextualType) && returnsThenable(expression) {
+			if contextualType != nil && isVoidReturningFunctionType(node.Initializer, contextualType) {
 				ctx.ReportNode(node.Initializer, buildVoidReturnAttributeMessage())
 			}
 		}
@@ -674,20 +684,33 @@ var NoMisusedPromises = rule.Rule{
 			return voidReturnIndices
 		}
 
+		// An argument is reported when its position takes a void-returning function AND the argument
+		// returns a thenable. Upstream resolves the positions first, which walks every parameter of
+		// every signature and asks each its contextual type, for every call in the file, including
+		// calls with no arguments at all. Asking each argument first is the same conjunction in the
+		// other order: almost no argument returns a thenable, so almost no call resolves its
+		// positions (#hekjpw3).
 		checkArguments := func(
 			node *ast.Expression,
 		) {
+			thenableArguments := []int{}
+			for index, argument := range node.Arguments() {
+				if returnsThenable(argument) {
+					thenableArguments = append(thenableArguments, index)
+				}
+			}
+			if len(thenableArguments) == 0 {
+				return
+			}
+
 			voidArgs := voidFunctionArguments(node)
 			if len(voidArgs) == 0 {
 				return
 			}
 
-			for index, argument := range node.Arguments() {
-				if !slices.Contains(voidArgs, index) {
-					continue
-				}
-				if returnsThenable(argument) {
-					ctx.ReportNode(argument, buildVoidReturnArgumentMessage())
+			for _, index := range thenableArguments {
+				if slices.Contains(voidArgs, index) {
+					ctx.ReportNode(node.Arguments()[index], buildVoidReturnArgumentMessage())
 				}
 			}
 		}

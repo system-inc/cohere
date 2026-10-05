@@ -62,10 +62,18 @@ import (
 // TOO, so this is a case whose verdict depends on a module existing rather than a shape our harness
 // cannot express. The alias branch it exercises is reached by a different fixture, recorded there.
 //
-// # Cost
+// # Cost, and why the walk starts at the outermost enum or namespace
 //
-// One walk of the file, and the checker is asked only at a qualified name or a non-computed
-// property access whose object is an entity name. Most files have neither.
+// The checker is asked only at a qualified name or a non-computed property access whose object is
+// an entity name, which is nearly every `a.b` in a file. Outside every enum and namespace none of
+// them can report: the first question compares the qualifier's declarations against the stack of
+// enclosing declarations, and that stack is empty there, so the answer is no before the checker's
+// answer is read. This rule walked the whole file from the source file and asked anyway, 0.9s of
+// CPU on ahra, whose files have almost no enums and no namespaces (#hekjpw3).
+//
+// So the walk starts at each outermost enum or namespace, with that declaration as the stack's
+// first entry, which is the stack the whole-file walk had at that point. A nested one is reached
+// by its outermost one's walk, and skipped by the listener so no subtree is walked twice.
 var NoUnnecessaryQualifier = rule.Rule{
 	Name: "@typescript-eslint/no-unnecessary-qualifier",
 
@@ -74,85 +82,92 @@ var NoUnnecessaryQualifier = rule.Rule{
 	NeedsTypeChecker: true,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		return rule.Listeners{
-			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+		walkOutermost := func(node *ast.Node) {
+			if ctx.TypeChecker == nil {
+				return
+			}
+			for ancestor := node.Parent; ancestor != nil; ancestor = ancestor.Parent {
+				if ancestor.Kind == ast.KindEnumDeclaration || ancestor.Kind == ast.KindModuleDeclaration {
 					return
 				}
+			}
 
-				// namespacesInScope is upstream's push/pop stack of the enum and namespace
-				// declarations this position is lexically inside. Upstream pushes the ESTree
-				// declaration node; we push the same declaration our checker hands back from a
-				// symbol, so the identity comparison below is over the same objects.
-				namespacesInScope := []*ast.Node{}
+			// namespacesInScope is upstream's push/pop stack of the enum and namespace
+			// declarations this position is lexically inside. Upstream pushes the ESTree
+			// declaration node; we push the same declaration our checker hands back from a
+			// symbol, so the identity comparison below is over the same objects.
+			namespacesInScope := []*ast.Node{}
 
-				var visit func(*ast.Node)
-				visit = func(current *ast.Node) {
-					switch current.Kind {
-					case ast.KindEnumDeclaration, ast.KindModuleDeclaration:
-						namespacesInScope = append(namespacesInScope, current)
-						current.ForEachChild(func(child *ast.Node) bool {
-							visit(child)
-							return false
-						})
-						namespacesInScope = namespacesInScope[:len(namespacesInScope)-1]
-						return
-
-					case ast.KindQualifiedName:
-						qualifiedName := current.AsQualifiedName()
-						if qualifiedName.Left == nil || qualifiedName.Right == nil {
-							break
-						}
-						// A type-position qualifier cannot itself be parenthesized in the grammar
-						// (`A.(B)` is not a type), so there is nothing to unwrap on the left. The
-						// parenthesized TYPE case `const x: (A.T) = 3` puts the parens around the
-						// whole type reference, above this node, and reaches here unwrapped.
-						if unnecessaryQualifierReport(ctx, namespacesInScope,
-							qualifiedName.Left, qualifiedName.Right) {
-							// Reported: upstream suppresses everything inside this node, and so
-							// does declining to recurse. See the doc comment.
-							return
-						}
-
-					case ast.KindPropertyAccessExpression:
-						propertyAccess := current.AsPropertyAccessExpression()
-						if propertyAccess.Expression == nil {
-							break
-						}
-						// Upstream's selector is `MemberExpression[computed=false]` and it then
-						// requires the object to be an entity name expression, which is an
-						// identifier or a chain of non-computed accesses over one. A computed
-						// access is a different node kind here, so the first half is the kind.
-						//
-						// The unwrap is ours and it costs findings without it. estree has no
-						// parenthesized node, so upstream's `node.object` for `(A).x` is the bare
-						// identifier and the case reports; our parser hands back a
-						// KindParenthesizedExpression, which the entity-name predicate declines.
-						// Measured on the installed 8.67.0 build rather than reasoned about,
-						// because the corpus writes no parenthesized form: `(A).x`, `(A.B).x`,
-						// `((A).B).x` and `(A.T)` in type position ALL report there. A loop
-						// rather than one step, since `((A))` nests.
-						qualifier := unwrapQualifierParentheses(propertyAccess.Expression)
-						if qualifier == nil || !isEntityNameExpressionForQualifier(qualifier) {
-							break
-						}
-						name := propertyAccess.Name()
-						if name == nil {
-							break
-						}
-						if unnecessaryQualifierReport(ctx, namespacesInScope, qualifier, name) {
-							return
-						}
-					}
-
+			var visit func(*ast.Node)
+			visit = func(current *ast.Node) {
+				switch current.Kind {
+				case ast.KindEnumDeclaration, ast.KindModuleDeclaration:
+					namespacesInScope = append(namespacesInScope, current)
 					current.ForEachChild(func(child *ast.Node) bool {
 						visit(child)
 						return false
 					})
+					namespacesInScope = namespacesInScope[:len(namespacesInScope)-1]
+					return
+
+				case ast.KindQualifiedName:
+					qualifiedName := current.AsQualifiedName()
+					if qualifiedName.Left == nil || qualifiedName.Right == nil {
+						break
+					}
+					// A type-position qualifier cannot itself be parenthesized in the grammar
+					// (`A.(B)` is not a type), so there is nothing to unwrap on the left. The
+					// parenthesized TYPE case `const x: (A.T) = 3` puts the parens around the
+					// whole type reference, above this node, and reaches here unwrapped.
+					if unnecessaryQualifierReport(ctx, namespacesInScope,
+						qualifiedName.Left, qualifiedName.Right) {
+						// Reported: upstream suppresses everything inside this node, and so
+						// does declining to recurse. See the doc comment.
+						return
+					}
+
+				case ast.KindPropertyAccessExpression:
+					propertyAccess := current.AsPropertyAccessExpression()
+					if propertyAccess.Expression == nil {
+						break
+					}
+					// Upstream's selector is `MemberExpression[computed=false]` and it then
+					// requires the object to be an entity name expression, which is an
+					// identifier or a chain of non-computed accesses over one. A computed
+					// access is a different node kind here, so the first half is the kind.
+					//
+					// The unwrap is ours and it costs findings without it. estree has no
+					// parenthesized node, so upstream's `node.object` for `(A).x` is the bare
+					// identifier and the case reports; our parser hands back a
+					// KindParenthesizedExpression, which the entity-name predicate declines.
+					// Measured on the installed 8.67.0 build rather than reasoned about,
+					// because the corpus writes no parenthesized form: `(A).x`, `(A.B).x`,
+					// `((A).B).x` and `(A.T)` in type position ALL report there. A loop
+					// rather than one step, since `((A))` nests.
+					qualifier := unwrapQualifierParentheses(propertyAccess.Expression)
+					if qualifier == nil || !isEntityNameExpressionForQualifier(qualifier) {
+						break
+					}
+					name := propertyAccess.Name()
+					if name == nil {
+						break
+					}
+					if unnecessaryQualifierReport(ctx, namespacesInScope, qualifier, name) {
+						return
+					}
 				}
 
-				visit(node)
-			},
+				current.ForEachChild(func(child *ast.Node) bool {
+					visit(child)
+					return false
+				})
+			}
+
+			visit(node)
+		}
+		return rule.Listeners{
+			ast.KindEnumDeclaration:   walkOutermost,
+			ast.KindModuleDeclaration: walkOutermost,
 		}
 	},
 }

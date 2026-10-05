@@ -13,6 +13,7 @@ package tailwind
 import (
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -80,13 +81,69 @@ func DefaultClassLiteralSettings() ClassLiteralSettings {
 
 // ClassLiteralReader finds class-carrying strings in a file.
 //
-// Compiled once per file rather than per node: the variable patterns are regular expressions, and
-// recompiling them at every declaration in a 3,000-file tree is the kind of cost that makes a rule
-// expensive for no reason.
+// Rules get one from ClassLiteralReaderFor, which compiles each distinct set of settings once per run
+// and hands every rule reading a file with those settings the same reader, so a node is read once
+// however many rules listen to it. NewClassLiteralReader builds an unshared one, for a harness.
 type ClassLiteralReader struct {
 	attributeNames   map[string]bool
 	calleeNames      map[string]bool
 	variablePatterns []*regexp.Regexp
+
+	// values holds what each node read as, for the one file this reader serves. Nil on a reader that
+	// is not bound to a file, which then reads every node afresh.
+	values map[*ast.Node]classValues
+}
+
+// ClassLiteralReaderFor returns the reader for these settings in this file, shared through the file's
+// cache by every rule that reads with the same settings.
+//
+// Thirteen rules listen on the same three kinds, so before this each class surface was read thirteen
+// times per file, and each rule compiled its own copy of the variable patterns on every file:
+// 13 × 3,978 files × 2 patterns in ahra, about 0.08s of CPU spent recompiling two regular
+// expressions. Reading is a pure function of the node and the settings, so one reading serves them
+// all. A rule configured with different surfaces gets its own reader, keyed apart.
+//
+// Under --timing the first rule to reach a node pays for reading it and the rest read the memo, so
+// the family's total is the honest number and one rule's row carries the shared reading.
+//
+// A nil cache yields a reader bound to nothing shared, which still memoizes within the one rule.
+func ClassLiteralReaderFor(cache *rule.FileCache, settings ClassLiteralSettings) *ClassLiteralReader {
+	key := settings.key()
+	return rule.Cached(cache, "tailwind.classValues:"+key, func() *ClassLiteralReader {
+		bound := *compiledClassLiteralReader(key, settings)
+		bound.values = map[*ast.Node]classValues{}
+		return &bound
+	})
+}
+
+// compiledClassLiteralReaders holds one compiled reader per distinct settings key, for the life of the
+// process. Each is never written after it is stored, so the walk's workers share them freely, and the
+// key is the whole input, so an entry cannot go stale.
+var compiledClassLiteralReaders sync.Map
+
+// compiledClassLiteralReader returns the compiled, unbound reader for these settings.
+func compiledClassLiteralReader(key string, settings ClassLiteralSettings) *ClassLiteralReader {
+	if existing, isCompiled := compiledClassLiteralReaders.Load(key); isCompiled {
+		return existing.(*ClassLiteralReader)
+	}
+	compiled, _ := compiledClassLiteralReaders.LoadOrStore(key, NewClassLiteralReader(settings))
+	return compiled.(*ClassLiteralReader)
+}
+
+// key is the settings as one string, every list kept in order and every name kept apart, so two
+// settings share a key only when they would read every node the same way.
+func (s ClassLiteralSettings) key() string {
+	var builder strings.Builder
+	for index, names := range [][]string{s.AttributeNames, s.CalleeNames, s.VariablePatterns} {
+		if index > 0 {
+			builder.WriteByte(1)
+		}
+		for _, name := range names {
+			builder.WriteString(name)
+			builder.WriteByte(0)
+		}
+	}
+	return builder.String()
 }
 
 // NewClassLiteralReader compiles the settings into a reader.
@@ -167,8 +224,24 @@ type classTemplateValue struct {
 	edges classValueEdges
 }
 
-// classValuesIn dispatches on the three class surfaces.
+// classValuesIn returns what a node carries, read once per file when the reader is bound to one.
+//
+// The slices in a remembered reading are shared by every rule that asks, so callers range over them
+// and never write into them.
 func (r *ClassLiteralReader) classValuesIn(node *ast.Node) classValues {
+	if r.values == nil {
+		return r.readClassValues(node)
+	}
+	if remembered, isRead := r.values[node]; isRead {
+		return remembered
+	}
+	values := r.readClassValues(node)
+	r.values[node] = values
+	return values
+}
+
+// readClassValues dispatches on the three class surfaces.
+func (r *ClassLiteralReader) readClassValues(node *ast.Node) classValues {
 	if node == nil {
 		return classValues{}
 	}

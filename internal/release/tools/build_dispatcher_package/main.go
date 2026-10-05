@@ -54,5 +54,25 @@ func main() {
 		panic(err)
 	}
 
+	// The launcher runs only a binary its checksums list, so they are taken from the platform packages
+	// already staged beside this one. With none there it would install and run nothing, so it stops here.
+	var platformDirectories []string
+	for _, target := range release.Targets {
+		if _, err := os.Stat(filepath.Join(os.Args[1], target.DirectoryName(), "bin")); err == nil {
+			platformDirectories = append(platformDirectories, target.DirectoryName())
+		}
+	}
+	if len(platformDirectories) == 0 {
+		fmt.Fprintln(os.Stderr, "no platform package is staged in", os.Args[1], "so the launcher would have no binary it could check; stage one there first")
+		os.Exit(1)
+	}
+	checksums, err := release.Checksums(os.Args[1], platformDirectories)
+	if err != nil {
+		panic(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, release.ChecksumsFileName), checksums, 0o644); err != nil {
+		panic(err)
+	}
+
 	fmt.Println("staged", directory)
 }
