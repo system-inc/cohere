@@ -43,7 +43,8 @@ func TestRulesDeclareExactlyWhatTheyReadOfTheProgram(t *testing.T) {
 		// as the defect it guards against.
 		t.Fatal("found no rule source files, so this test proved nothing")
 	}
-	helpers := programHelperReads(t, append(append([]string{}, ruleFiles...), checkingSourceFiles(t)...))
+	helpers := programHelperReads(t, append(append(append([]string{}, ruleFiles...), checkingSourceFiles(t)...),
+		ruleInterfaceSourceFiles(t)...))
 
 	sawProgramReader := false
 	for _, path := range ruleFiles {
@@ -88,7 +89,8 @@ func TestRulesDeclareExactlyWhatTheyReadOfTheProgram(t *testing.T) {
 func TestReadProgramFactsSeesCodeNotComments(t *testing.T) {
 	t.Parallel()
 
-	helpers := map[string]programRead{"type_checking.IsPromiseLike": readsCompilerOptions | readsDefaultLibrary}
+	helpers := map[string]programRead{"type_checking.IsPromiseLike": readsCompilerOptions | readsDefaultLibrary,
+		"probe.fingerprint": readsCompilerOptions}
 	testCases := []struct {
 		name   string
 		source string
@@ -128,6 +130,20 @@ var Probe = rule.Rule{ProgramReads: rule.ReadsModuleResolution, Run: func(c rule
 			source: `package probe
 var Probe = rule.Rule{ProgramReads: rule.ReadsCompilerOptions, Run: func(ctx rule.Context, options any) rule.Listeners { _ = type_checking.IsPromiseLike(ctx.Program, nil, nil); return nil }}`,
 			want: programFacts{readsProgram: true, definesRule: true, reads: readsCompilerOptions | readsDefaultLibrary, declared: readsCompilerOptions},
+		},
+		{
+			// The walk calls a rule's ProgramFingerprint with the rule's own view of the program, so its
+			// reads count as the rule's.
+			name: "a read through the program fingerprint",
+			source: `package probe
+var Probe = rule.Rule{ProgramReads: rule.ReadsCompilerOptions, ProgramFingerprint: fingerprint, Run: func(ctx rule.Context, options any) rule.Listeners { return nil }}`,
+			want: programFacts{readsProgram: true, definesRule: true, reads: readsCompilerOptions, declared: readsCompilerOptions},
+		},
+		{
+			name: "a program fingerprint this cannot see",
+			source: `package probe
+var Probe = rule.Rule{ProgramFingerprint: elsewhere, Run: func(ctx rule.Context, options any) rule.Listeners { return nil }}`,
+			want: programFacts{readsProgram: true, definesRule: true, unseenCallees: []string{"probe.elsewhere"}},
 		},
 		{
 			name: "a Program handed to a function this cannot see",
@@ -284,7 +300,9 @@ func programHelperReads(t *testing.T, paths []string) map[string]programRead {
 			}
 			names := map[string]bool{}
 			for _, field := range function.Type.Params.List {
-				if isRuleSelector(field.Type, "Program") {
+				// Inside the rule package itself the type is spelled bare (rule.FingerprintPath).
+				bare, isBare := field.Type.(*ast.Ident)
+				if isRuleSelector(field.Type, "Program") || (file.Name.Name == "rule" && isBare && bare.Name == "Program") {
 					for _, name := range field.Names {
 						names[name.Name] = true
 					}
@@ -369,6 +387,9 @@ func readProgramFacts(t *testing.T, path string, helpers map[string]programRead)
 	}
 
 	facts := programFacts{}
+	// The function a rule names as its ProgramFingerprint, which the walk calls with the rule's own view of
+	// the program, so what it reads is the rule's to declare as much as anything Run reads.
+	var fingerprint string
 	ast.Inspect(file, func(node ast.Node) bool {
 		switch typed := node.(type) {
 		case *ast.SelectorExpr:
@@ -376,6 +397,14 @@ func readProgramFacts(t *testing.T, path string, helpers map[string]programRead)
 				facts.readsProgram = true
 			}
 		case *ast.KeyValueExpr:
+			if key, isIdentifier := typed.Key.(*ast.Ident); isIdentifier && key.Name == "ProgramFingerprint" {
+				if function, isNamed := typed.Value.(*ast.Ident); isNamed {
+					fingerprint = function.Name
+				} else {
+					facts.unseenCallees = append(facts.unseenCallees, "a ProgramFingerprint that is not a named function")
+				}
+				facts.readsProgram = true
+			}
 			if key, isIdentifier := typed.Key.(*ast.Ident); isIdentifier && key.Name == "ProgramReads" {
 				ast.Inspect(typed.Value, func(inner ast.Node) bool {
 					if selector, isSelector := inner.(*ast.SelectorExpr); isSelector {
@@ -391,6 +420,14 @@ func readProgramFacts(t *testing.T, path string, helpers map[string]programRead)
 		}
 		return true
 	})
+
+	if fingerprint != "" {
+		read, known := helpers[file.Name.Name+"."+fingerprint]
+		if !known {
+			facts.unseenCallees = append(facts.unseenCallees, file.Name.Name+"."+fingerprint)
+		}
+		facts.reads |= read
+	}
 
 	uses := usesOf(file, file.Name.Name, isContextProgram)
 	for _, method := range uses.methods {
@@ -426,6 +463,13 @@ func isRuleSelector(expression ast.Expr, name string) bool {
 func ruleSourceFiles(t *testing.T) []string {
 	t.Helper()
 	return goSourceFilesUnder(t, "../lint/rules")
+}
+
+// ruleInterfaceSourceFiles lists the non-test Go files of the rule package, whose helpers taking a
+// Program (rule.FingerprintPath) read it for the rules that call them.
+func ruleInterfaceSourceFiles(t *testing.T) []string {
+	t.Helper()
+	return goSourceFilesUnder(t, "../lint/rule")
 }
 
 // checkingSourceFiles lists the non-test Go files of the shared type-checking helpers, which take a
