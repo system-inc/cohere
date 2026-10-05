@@ -830,3 +830,143 @@ func TestExhaustiveDepsNonEffectRebuildsTheArray(t *testing.T) {
 		})
 	}
 }
+
+// exhaustiveDepsWithOptions runs a fixture through the registered decoder with the given options.
+func exhaustiveDepsWithOptions(t *testing.T, optionsJson string, sourceText string) rule_testing.Result {
+	t.Helper()
+	decoded, err := rule.DecodeOptionsInto[ExhaustiveDepsOptions]()(json.RawMessage(optionsJson))
+	if err != nil {
+		t.Fatalf("the decoder refused %s: %v", optionsJson, err)
+	}
+	return rule_testing.RunTypedWithOptions(t, ExhaustiveDeps, exhaustiveDepsFile, sourceText, decoded)
+}
+
+// requireExplicitEffectDeps, from React's row and its controls: an effect with no second argument
+// reports, an explicit `undefined` is an answer, and the option is what turns it on.
+func TestExhaustiveDepsRequireExplicitEffectDeps(t *testing.T) {
+	t.Parallel()
+
+	const required = `{"requireExplicitEffectDeps": true}`
+	cases := []struct {
+		name        string
+		optionsJson string
+		sourceText  string
+		wantIds     []string
+	}{
+		{"React's row: an effect with no array", required,
+			"function MyComponent(props) { useEffect(() => { console.log(props.foo); }); }",
+			[]string{"exhaustiveDepsRequireExplicitEffectDeps"}},
+		{"an explicit undefined answers it", required,
+			"function MyComponent(props) { useEffect(() => { console.log(props.foo); }, undefined); }",
+			nil},
+		{"without the option the same effect is clean", `{}`,
+			"function MyComponent(props) { useEffect(() => { console.log(props.foo); }); }",
+			nil},
+		{"a Hook that is not an effect is not asked", required,
+			"function MyComponent(props) { useMemo(() => props.foo); }",
+			[]string{"exhaustiveDepsUselessWithoutDependencies"}},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			result := exhaustiveDepsWithOptions(t, testCase.optionsJson, testCase.sourceText)
+			if len(testCase.wantIds) == 0 {
+				rule_testing.ExpectClean(t, result)
+				return
+			}
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		})
+	}
+}
+
+// experimental_autoDependenciesHooks, from React's three rows: a literal `null` array is no array to
+// check, the absent array is not the setState loop, and a real array is still checked.
+func TestExhaustiveDepsAutoDependenciesHooks(t *testing.T) {
+	t.Parallel()
+
+	const auto = `{"additionalHooks": "useSpecialEffect", "experimental_autoDependenciesHooks": ["useSpecialEffect"]}`
+	const additionalOnly = `{"additionalHooks": "useSpecialEffect"}`
+	const setStateWithoutArray = "function MyComponent() { const [state, setState] = React.useState<number>(0); " +
+		"useSpecialEffect(() => { const someNumber: typeof state = 2; setState(prevState => prevState + someNumber); }) }"
+	cases := []struct {
+		name        string
+		optionsJson string
+		sourceText  string
+		wantIds     []string
+	}{
+		{"a null array behaves like no array", auto,
+			"function MyComponent(props) { useSpecialEffect(() => { console.log(props.foo); }, null); }",
+			nil},
+		{"the absent array is not the setState loop", auto, setStateWithoutArray, nil},
+		{"the same Hook not named auto is the setState loop", additionalOnly, setStateWithoutArray,
+			[]string{"exhaustiveDepsSetStateNoDependencies"}},
+		{"a real array is still checked", auto,
+			"function MyComponent() { const [state, setState] = React.useState<number>(0); " +
+				"useSpecialEffect(() => { const someNumber: typeof state = 2; setState(prevState => prevState + someNumber + state); }, []) }",
+			[]string{"exhaustiveDepsMissing"}},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			result := exhaustiveDepsWithOptions(t, testCase.optionsJson, testCase.sourceText)
+			if len(testCase.wantIds) == 0 {
+				rule_testing.ExpectClean(t, result)
+				return
+			}
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		})
+	}
+}
+
+// enableDangerousAutofixThisMayCauseInfiniteLoops, at each of the five places React offers a repair,
+// with the source React's own fixer produces, measured through ESLint's verifyAndFix on the installed
+// build. Without the option none of them is applied, which the last row pins.
+func TestExhaustiveDepsDangerousAutofix(t *testing.T) {
+	t.Parallel()
+
+	const dangerous = `{"enableDangerousAutofixThisMayCauseInfiniteLoops": true}`
+	cases := []struct {
+		name       string
+		sourceText string
+		wantId     string
+		wantSource string
+	}{
+		{"React's row: the corrected array",
+			"function MyComponent() { const local = {}; useEffect(() => { console.log(local); }, []); }",
+			"exhaustiveDepsMissing",
+			"function MyComponent() { const local = {}; useEffect(() => { console.log(local); }, [local]); }"},
+		{"a callback that is not a function written here",
+			"function MyComponent() { const myEffect = debounce(() => {}, 1); useEffect(myEffect, []); }",
+			"exhaustiveDepsMissing",
+			"function MyComponent() { const myEffect = debounce(() => {}, 1); useEffect(myEffect, [myEffect]); }"},
+		{"an array added to an effect that sets state",
+			"function MyComponent() { const [data, setData] = useState(0); useEffect(() => { setData(1); }); }",
+			"exhaustiveDepsSetStateNoDependencies",
+			"function MyComponent() { const [data, setData] = useState(0); useEffect(() => { setData(1); }, []); }"},
+		{"a useEffectEvent function removed from the array",
+			"function MyComponent() { const onEvent = useEffectEvent(() => {}); useEffect(() => { onEvent(); }, [onEvent]); }",
+			"exhaustiveDepsEffectEvent",
+			"function MyComponent() { const onEvent = useEffectEvent(() => {}); useEffect(() => { onEvent(); }, []); }"},
+		{"a function used outside the Hook wrapped in useCallback",
+			"function MyComponent() { const handle = () => {}; useEffect(() => { handle(); }, [handle]); return handle; }",
+			"exhaustiveDepsConstruction",
+			"function MyComponent() { const handle = useCallback(() => {}); useEffect(() => { handle(); }, [handle]); return handle; }"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			result := exhaustiveDepsWithOptions(t, dangerous, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.wantId)
+			rule_testing.ExpectFixedSource(t, result, testCase.wantSource+"\n")
+
+			// The control: without the option the finding stands and carries no fix.
+			unconfigured := exhaustiveDepsWithOptions(t, `{}`, testCase.sourceText)
+			rule_testing.ExpectFindings(t, unconfigured, testCase.wantId)
+			for _, diagnostic := range unconfigured.Diagnostics {
+				if len(diagnostic.Fixes) > 0 {
+					t.Errorf("without the option %s carries a fix", diagnostic.Message.Id)
+				}
+			}
+		})
+	}
+}

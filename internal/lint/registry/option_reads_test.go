@@ -48,6 +48,9 @@ var unreadOptionFields = map[string]string{
 	// Upstream's option, accepted so a config writing it loads. ESLint's two directive checks agree on
 	// every input, so the option changes nothing there either; see the field's comment.
 	"NoUnusedExpressionsOptions.IgnoreDirectives": "inert upstream too: the structural directive check runs unconditionally",
+	// Upstream's rules-of-hooks schema declares it and its create never reads it, only the shared
+	// settings key cohere does not carry (#d21war2).
+	"RulesOfHooksOptions.AdditionalHooks": "inert upstream too: the rule reads settings, never this option",
 	// Captures matter only to a selector or a message template that reads them, and this port refuses
 	// both, so no value of it can change a finding.
 	"elementDescriptor.Capture": "read only by selector and template features this port refuses",

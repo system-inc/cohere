@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -1547,3 +1548,26 @@ func TestRulesOfHooksBeyondTheCorpus(t *testing.T) {
 		})
 	}
 }
+
+// TestRulesOfHooksAdditionalHooksChangesNothing pins upstream's inert option: the decoder accepts it,
+// and the findings with it are the findings without it, which is what the installed build does.
+func TestRulesOfHooksAdditionalHooksChangesNothing(t *testing.T) {
+	t.Parallel()
+
+	decoded, err := rule.DecodeOptionsInto[RulesOfHooksOptions]()([]byte(`{"additionalHooks": "useCustomEffect"}`))
+	if err != nil {
+		t.Fatalf("decoding additionalHooks: %v", err)
+	}
+	const source = "function MyComponent(props) { if (props.on) { useCustomEffect(() => {}); useState(0); } }"
+	with := rule_testing.RunWithOptions(t, RulesOfHooks, rulesOfHooksOptionFile, source, decoded)
+	without := rule_testing.Run(t, RulesOfHooks, rulesOfHooksOptionFile, source)
+	if strings.Join(with.MessageIds(), ",") != strings.Join(without.MessageIds(), ",") || len(with.Diagnostics) == 0 {
+		t.Errorf("with the option %v, without %v; want the same, non-empty", with.MessageIds(), without.MessageIds())
+	}
+
+	if _, err := rule.DecodeOptionsInto[RulesOfHooksOptions]()([]byte(`{"additionalEffectHooks": "x"}`)); err == nil {
+		t.Error("the settings key decoded as an option; upstream's schema has only additionalHooks")
+	}
+}
+
+const rulesOfHooksOptionFile = "/repository/source/RulesOfHooksOption.tsx"

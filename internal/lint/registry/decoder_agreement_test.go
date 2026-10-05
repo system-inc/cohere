@@ -119,7 +119,11 @@ func decodeEmptyOption(registration rule.Registration) (decoded any, decodeError
 // The fifteen React Compiler rules decode only `{}`, which ESLint writes into resolved configs and
 // which carries nothing, so their Run has no option to read (#d21war2). A non-empty object is
 // refused at decode; TestCompilerRulesAcceptOnlyTheEmptyObject drives each one's registered Decode.
+//
+// react-hooks/rules-of-hooks accepts `additionalHooks` and reads it nowhere, because upstream's rule
+// reads it nowhere either; TestRulesOfHooksAdditionalHooksChangesNothing pins that.
 var optionsReadUnreachableOnProbe = map[string]bool{
+	"react-hooks/rules-of-hooks":               true,
 	"react-hooks/config":                       true,
 	"react-hooks/error-boundaries":             true,
 	"react-hooks/globals":                      true,

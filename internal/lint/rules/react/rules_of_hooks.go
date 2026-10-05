@@ -232,6 +232,19 @@ var RulesOfHooks = rule.Rule{
 	Run:  runRulesOfHooks,
 }
 
+// RulesOfHooksOptions is upstream's schema for this rule, which declares one option that changes
+// nothing.
+//
+// The schema accepts `{additionalHooks: string}`, and the rule never reads it. Upstream's `create`
+// reads only the shared `settings["react-hooks"].additionalEffectHooks`, which cohere does not carry,
+// and never `context.options`; at 7.1.1 the option is accepted and inert, and React's own corpus has
+// no row for it. Accepting means implementing, and implementing this option is accepting it: a config
+// copied from ESLint loads, and the findings are what ESLint's are (#d21war2).
+type RulesOfHooksOptions struct {
+	// AdditionalHooks is accepted and, as upstream, read by nothing.
+	AdditionalHooks string `json:"additionalHooks"`
+}
+
 func runRulesOfHooks(ctx rule.Context, options any) rule.Listeners {
 	// One graph per code path root per file, built lazily and only for roots that actually contain a
 	// Hook call. Most functions contain none, and building a graph for them would make this rule pay

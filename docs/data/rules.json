@@ -12756,6 +12756,9 @@
             "origin": "react-hooks",
             "upstreamName": "react-hooks/rules-of-hooks",
             "typeAware": false,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
                 "rulesOfHooksAsync",
                 "rulesOfHooksCallback",

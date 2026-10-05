@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -98,6 +99,13 @@ var (
 		Description: "A cleanup function runs after the component has moved on, so a ref read there " +
 			"gives whatever the ref points at then, not what it pointed at when the effect ran. Copy " +
 			"the ref's value into a local inside the effect and read that local in the cleanup.",
+	}
+	messageExhaustiveDepsRequireExplicitEffectDeps = rule.Message{
+		Id: "exhaustiveDepsRequireExplicitEffectDeps",
+		Description: "This effect was called with no second argument, and the configuration asks every " +
+			"effect to say what it depends on. An effect with no array runs after every render, which " +
+			"is sometimes the intent and often an oversight nobody can tell apart from it. Pass a " +
+			"dependency array, or an explicit `undefined` to say every render is meant.",
 	}
 	messageExhaustiveDepsStaleAssignment = rule.Message{
 		Id: "exhaustiveDepsStaleAssignment",
@@ -349,11 +357,21 @@ var (
 // through a JavaScript plugin bridge cohere does not have. Not changed here, because that file is
 // the differential's own and a rule port should not quietly rewrite the harness that judges it.
 //
-// The `additionalHooks` option is decoded and honored. The three React-only options
-// (`enableDangerousAutofixThisMayCauseInfiniteLoops`, `experimental_autoDependenciesHooks`,
-// `requireExplicitEffectDeps`) are not: oxc does not implement them, the inventory's config carries
-// none of them, and the first one only promotes the suggestion this rule deliberately does not
-// promote.
+// # The options
+//
+// All four of React's options are decoded and honored (#d21war2), each checked against React's own
+// rows for it. `additionalHooks` adds Hooks by pattern. `requireExplicitEffectDeps` reports an effect
+// called with no second argument; an explicit `undefined` is an answer and satisfies it.
+// `experimental_autoDependenciesHooks` names Hooks whose array the compiler fills in, so for those a
+// literal `null` in the array position means "no array to check" and the absent array is not a
+// setState loop.
+//
+// `enableDangerousAutofixThisMayCauseInfiniteLoops` promotes each repair React offers as a suggestion
+// to a fix the engine applies unattended, at the five places React offers one: the corrected array,
+// `[callback]` for a callback that is not a function written here, a dependency array added to an
+// effect that sets state, removing a useEffectEvent function from the array, and wrapping a function
+// used outside the Hook in useCallback. That is the hazard "The repair" above describes, and it is the
+// author's explicit choice by an option named for it, so it is the one place this rule writes code.
 var ExhaustiveDeps = rule.Rule{
 	Name:             "react-hooks/exhaustive-deps",
 	NeedsTypeChecker: true,
@@ -362,9 +380,7 @@ var ExhaustiveDeps = rule.Rule{
 
 // ExhaustiveDepsOptions is the rule's option surface.
 //
-// The inventory says this rule takes no options and the inventory is wrong: oxc declares
-// `ExhaustiveDepsConfig` with `additionalHooks`, and React's `meta.schema` declares that plus three
-// more. `additionalHooks` is the one both implementations share and the only one ported.
+// React's `meta.schema` declares four options, and all four are here. See "The options" on the rule.
 type ExhaustiveDepsOptions struct {
 	// AdditionalHooks is a regular expression naming further Hooks whose first argument is a
 	// callback and whose second is a dependency array.
@@ -377,6 +393,37 @@ type ExhaustiveDepsOptions struct {
 	// to report a config error per rule anyway. An empty string is not an extension, which both
 	// implementations already agree on: oxc filters it out explicitly.
 	AdditionalHooks string `json:"additionalHooks"`
+
+	// EnableDangerousAutofixThisMayCauseInfiniteLoops applies each repair as a fix rather than offering
+	// it as a suggestion. Off by default, and named by upstream for what it risks.
+	EnableDangerousAutofixThisMayCauseInfiniteLoops bool `json:"enableDangerousAutofixThisMayCauseInfiniteLoops"`
+
+	// ExperimentalAutoDependenciesHooks names Hooks whose dependency array may be the literal `null`,
+	// meaning the compiler supplies it, so there is nothing to check.
+	ExperimentalAutoDependenciesHooks []string `json:"experimental_autoDependenciesHooks"`
+
+	// RequireExplicitEffectDeps reports an effect called with no dependency argument at all.
+	RequireExplicitEffectDeps bool `json:"requireExplicitEffectDeps"`
+}
+
+// exhaustiveDepsRun is the options, read once per file into the shape the visitors use.
+type exhaustiveDepsRun struct {
+	additionalHooks           *regexp.Regexp
+	autoDependenciesHooks     map[string]bool
+	dangerousAutofix          bool
+	requireExplicitEffectDeps bool
+}
+
+// report reports a finding, carrying its repair as a fix only under the dangerous option.
+//
+// Without the option a repair is not offered here at all, as before, because the message already
+// says what to write and this rule never applies one unattended.
+func (run exhaustiveDepsRun) report(ctx rule.Context, node *ast.Node, message rule.Message, fixes ...rule.Fix) {
+	if run.dangerousAutofix && len(fixes) > 0 {
+		ctx.ReportNodeWithFixes(node, message, fixes...)
+		return
+	}
+	ctx.ReportNode(node, message)
 }
 
 // hookNames are the Hooks whose dependency array this rule checks, and the argument index the
@@ -405,11 +452,18 @@ var effectHookNamePattern = regexp.MustCompile(`Effect($|[^a-z])`)
 
 func runExhaustiveDeps(ctx rule.Context, options any) rule.Listeners {
 	settings, _ := rule.OptionsAs[ExhaustiveDepsOptions](options)
-	var additionalHooks *regexp.Regexp
+	run := exhaustiveDepsRun{
+		autoDependenciesHooks:     map[string]bool{},
+		dangerousAutofix:          settings.EnableDangerousAutofixThisMayCauseInfiniteLoops,
+		requireExplicitEffectDeps: settings.RequireExplicitEffectDeps,
+	}
 	if settings.AdditionalHooks != "" {
 		// A malformed pattern disables the extension rather than failing the run. See the option's
 		// own comment for why.
-		additionalHooks, _ = regexp.Compile(settings.AdditionalHooks)
+		run.additionalHooks, _ = regexp.Compile(settings.AdditionalHooks)
+	}
+	for _, name := range settings.ExperimentalAutoDependenciesHooks {
+		run.autoDependenciesHooks[name] = true
 	}
 
 	return rule.Listeners{
@@ -417,7 +471,7 @@ func runExhaustiveDeps(ctx rule.Context, options any) rule.Listeners {
 			if ctx.TypeChecker == nil {
 				return
 			}
-			visitHookCall(ctx, node, additionalHooks)
+			visitHookCall(ctx, node, run)
 		},
 	}
 }
@@ -427,7 +481,7 @@ func runExhaustiveDeps(ctx rule.Context, options any) rule.Listeners {
 // The order is observable rather than incidental: a Hook with no callback reports about the missing
 // callback and stops, so a `useCallback()` with no arguments never also reports that it has no
 // dependency array.
-func visitHookCall(ctx rule.Context, node *ast.Node, additionalHooks *regexp.Regexp) {
+func visitHookCall(ctx rule.Context, node *ast.Node, run exhaustiveDepsRun) {
 	call := node.AsCallExpression()
 	if call == nil {
 		return
@@ -438,7 +492,7 @@ func visitHookCall(ctx rule.Context, node *ast.Node, additionalHooks *regexp.Reg
 	}
 	callbackIndex, known := hookCallbackIndexes[hookName]
 	if !known {
-		if additionalHooks == nil || !additionalHooks.MatchString(hookName) {
+		if run.additionalHooks == nil || !run.additionalHooks.MatchString(hookName) {
 			return
 		}
 		callbackIndex = 0
@@ -471,7 +525,17 @@ func visitHookCall(ctx rule.Context, node *ast.Node, additionalHooks *regexp.Reg
 
 	isEffect := effectHookNamePattern.MatchString(hookName)
 
-	if dependencyArrayNode == nil && !isEffect {
+	// No second argument at all, which an explicit `undefined` is not: it is the author answering.
+	// Upstream reports on the Hook's name and carries on.
+	if run.requireExplicitEffectDeps && isEffect && callbackIndex+1 >= len(arguments) {
+		ctx.ReportNode(call.Expression, messageExhaustiveDepsRequireExplicitEffectDeps)
+	}
+
+	// For a Hook whose array the compiler fills in, a literal `null` there is the absent array.
+	autoDependencies := run.autoDependenciesHooks[hookName] && dependencyArrayNode != nil &&
+		ast.SkipParentheses(dependencyArrayNode).Kind == ast.KindNullKeyword
+
+	if (dependencyArrayNode == nil || autoDependencies) && !isEffect {
 		if hooksUselessWithoutDependencies[hookName] {
 			ctx.ReportNode(node, messageExhaustiveDepsUselessWithoutDependencies)
 		}
@@ -484,14 +548,14 @@ func visitHookCall(ctx rule.Context, node *ast.Node, additionalHooks *regexp.Reg
 	}
 	switch callback.Kind {
 	case ast.KindArrowFunction, ast.KindFunctionExpression:
-		visitCallbackWithDependencies(ctx, callback, dependencyArrayNode, node, hookName,
+		visitCallbackWithDependencies(ctx, run, callback, dependencyArrayNode, node, hookName,
 			componentScope, isEffect)
 
 	case ast.KindIdentifier:
 		// The callback is a name rather than a literal function. Upstream follows the name to its
 		// declaration and analyzes that function in place, so a helper defined beside the component
 		// is checked as though it had been written inline.
-		if dependencyArrayNode == nil {
+		if dependencyArrayNode == nil || autoDependencies {
 			return
 		}
 		if dependencyArrayNamesIdentifier(dependencyArrayNode, callback.Text()) {
@@ -504,13 +568,16 @@ func visitHookCall(ctx rule.Context, node *ast.Node, additionalHooks *regexp.Reg
 			// `const myEffect = debounce(() => {...}, delay)` is upstream's own case. The callback
 			// itself is then the dependency, because it is rebuilt every render, and upstream says
 			// so rather than giving up: the array has to name the callback.
-			ctx.ReportNode(dependencyArrayNode, messageExhaustiveDepsMissing)
+			run.report(ctx, dependencyArrayNode, messageExhaustiveDepsMissing, rule.Fix{
+				Range: rule.TokenRange(ctx.SourceFile, dependencyArrayNode),
+				Text:  "[" + callback.Text() + "]",
+			})
 			return
 		case callbackResolutionUnknown:
 			ctx.ReportNode(node, messageExhaustiveDepsUnknownDependencies)
 			return
 		}
-		visitCallbackWithDependencies(ctx, resolved, dependencyArrayNode, node, hookName,
+		visitCallbackWithDependencies(ctx, run, resolved, dependencyArrayNode, node, hookName,
 			componentScope, isEffect)
 
 	default:
@@ -551,8 +618,9 @@ type dependencyRead struct {
 }
 
 // visitCallbackWithDependencies is upstream's `visitFunctionWithDependencies`.
-func visitCallbackWithDependencies(ctx rule.Context, callback *ast.Node, dependencyArrayNode *ast.Node,
-	hookCall *ast.Node, hookName string, componentScope *ast.Node, isEffect bool) {
+func visitCallbackWithDependencies(ctx rule.Context, run exhaustiveDepsRun, callback *ast.Node,
+	dependencyArrayNode *ast.Node, hookCall *ast.Node, hookName string, componentScope *ast.Node,
+	isEffect bool) {
 
 	if isEffect && ast.HasSyntacticModifier(callback, ast.ModifierFlagsAsync) {
 		ctx.ReportNode(callback, messageExhaustiveDepsAsyncEffect)
@@ -560,8 +628,16 @@ func visitCallbackWithDependencies(ctx rule.Context, callback *ast.Node, depende
 
 	reads := gatherDependencies(ctx, callback, componentScope)
 
+	isAutoDependenciesHook := run.autoDependenciesHooks[hookName]
 	if dependencyArrayNode == nil {
-		reportSetStateWithoutDependencies(ctx, callback, hookCall, reads, componentScope)
+		// A Hook the compiler supplies the array for is not the loop this finding describes.
+		if isAutoDependenciesHook {
+			return
+		}
+		reportSetStateWithoutDependencies(ctx, run, callback, hookCall, reads, componentScope)
+		return
+	}
+	if isAutoDependenciesHook && ast.SkipParentheses(dependencyArrayNode).Kind == ast.KindNullKeyword {
 		return
 	}
 
@@ -582,8 +658,8 @@ func visitCallbackWithDependencies(ctx rule.Context, callback *ast.Node, depende
 
 	if len(recommendation.missing) == 0 && len(recommendation.unnecessary) == 0 &&
 		len(recommendation.duplicate) == 0 {
-		reportEveryRenderConstructions(ctx, declared, componentScope, callback, dependencyArrayNode)
-		reportEntryFindings(ctx, entryFindings)
+		reportEveryRenderConstructions(ctx, run, declared, componentScope, callback, dependencyArrayNode)
+		reportEntryFindings(ctx, run, entryFindings)
 		return
 	}
 
@@ -600,16 +676,23 @@ func visitCallbackWithDependencies(ctx rule.Context, callback *ast.Node, depende
 
 	message, count := firstNonEmptyWarning(recommendation)
 	if count == 0 {
-		reportEntryFindings(ctx, entryFindings)
+		reportEntryFindings(ctx, run, entryFindings)
 		return
 	}
-	ctx.ReportNodeWithSuggestions(dependencyArrayNode, message,
-		rule.Suggestion{Message: rule.Message{
-			Id: "exhaustiveDepsUpdateArray",
-			Description: "Update the dependency array to " +
-				formatDependencyArray(suggested, reads) + ".",
-		}})
-	reportEntryFindings(ctx, entryFindings)
+	suggestedArray := formatDependencyArray(suggested, reads)
+	if run.dangerousAutofix {
+		ctx.ReportNodeWithFixes(dependencyArrayNode, message, rule.Fix{
+			Range: rule.TokenRange(ctx.SourceFile, dependencyArrayNode),
+			Text:  suggestedArray,
+		})
+	} else {
+		ctx.ReportNodeWithSuggestions(dependencyArrayNode, message,
+			rule.Suggestion{Message: rule.Message{
+				Id:          "exhaustiveDepsUpdateArray",
+				Description: "Update the dependency array to " + suggestedArray + ".",
+			}})
+	}
+	reportEntryFindings(ctx, run, entryFindings)
 }
 
 // entryFinding is one thing wrong with a single dependency array entry, held until the finding
@@ -617,11 +700,13 @@ func visitCallbackWithDependencies(ctx rule.Context, callback *ast.Node, depende
 type entryFinding struct {
 	node    *ast.Node
 	message rule.Message
+	// fixes is the repair upstream offers for the entry, applied only under the dangerous option.
+	fixes []rule.Fix
 }
 
-func reportEntryFindings(ctx rule.Context, findings []entryFinding) {
+func reportEntryFindings(ctx rule.Context, run exhaustiveDepsRun, findings []entryFinding) {
 	for _, finding := range findings {
-		ctx.ReportNode(finding.node, finding.message)
+		run.report(ctx, finding.node, finding.message, finding.fixes...)
 	}
 }
 
@@ -1137,7 +1222,7 @@ func readDeclaredDependencies(ctx rule.Context, dependencyArrayNode *ast.Node,
 		// argument rather than an entry inside it. Both findings then carry the SAME span, so source
 		// position cannot order them and upstream's own order is the only tie-break: it reports what
 		// is missing first and the unreadable list second.
-		return nil, []entryFinding{{dependencyArrayNode, messageExhaustiveDepsNotArrayLiteral}}
+		return nil, []entryFinding{{node: dependencyArrayNode, message: messageExhaustiveDepsNotArrayLiteral}}
 	}
 
 	declared := []declaredDependency{}
@@ -1149,20 +1234,23 @@ func readDeclaredDependencies(ctx rule.Context, dependencyArrayNode *ast.Node,
 			continue
 		}
 		if element.Kind == ast.KindSpreadElement {
-			findings = append(findings, entryFinding{element, messageExhaustiveDepsSpread})
+			findings = append(findings, entryFinding{node: element, message: messageExhaustiveDepsSpread})
 			continue
 		}
 		if isEffectEventResult(ctx, element, componentScope) {
-			findings = append(findings, entryFinding{element, messageExhaustiveDepsEffectEvent})
+			// Upstream's repair removes the entry's own range and nothing around it, so a separating
+			// comma stays behind: `[a, onEvent]` becomes `[a, ]`.
+			findings = append(findings, entryFinding{node: element, message: messageExhaustiveDepsEffectEvent,
+				fixes: []rule.Fix{{Range: rule.TokenRange(ctx.SourceFile, element)}}})
 			continue
 		}
 		key, readable := analyzePropertyChain(element, nil)
 		if !readable {
 			if isLiteralExpression(unwrapExpression(element)) {
-				findings = append(findings, entryFinding{element, messageExhaustiveDepsLiteral})
+				findings = append(findings, entryFinding{node: element, message: messageExhaustiveDepsLiteral})
 			} else {
 				findings = append(findings,
-					entryFinding{element, messageExhaustiveDepsComplexExpression})
+					entryFinding{node: element, message: messageExhaustiveDepsComplexExpression})
 			}
 			continue
 		}
@@ -1485,7 +1573,7 @@ func functionReadsOnlyStableValues(ctx rule.Context, function *ast.Node, compone
 // the comparison's standards. `const o = {}; useEffect(() => log(o), [o])` names exactly what it
 // reads. The defect is one level down, in what `o` is: a new object each render, so the comparison
 // against the previous render never matches and the effect runs every time.
-func reportEveryRenderConstructions(ctx rule.Context, declared []declaredDependency,
+func reportEveryRenderConstructions(ctx rule.Context, run exhaustiveDepsRun, declared []declaredDependency,
 	componentScope *ast.Node, callback *ast.Node, dependencyArrayNode *ast.Node) {
 
 	for _, dependency := range declared {
@@ -1510,8 +1598,71 @@ func reportEveryRenderConstructions(ctx rule.Context, declared []declaredDepende
 		if !isEveryRenderConstruction(declaration) {
 			continue
 		}
-		ctx.ReportNode(declaration, messageExhaustiveDepsConstruction)
+		run.report(ctx, declaration, messageExhaustiveDepsConstruction,
+			wrapConstructionInUseCallback(ctx, declaration, symbol, componentScope, callback, dependencyArrayNode)...)
 	}
+}
+
+// wrapConstructionInUseCallback is upstream's one construction repair: a variable whose initializer
+// is a function, used somewhere other than the Hook, wrapped in its own useCallback. Upstream offers
+// nothing for any other construction, so neither does this.
+//
+// One replacement of the initializer rather than an insertion on each side, because two fixes in one
+// diagnostic are not applied together and half of the pair is broken code.
+func wrapConstructionInUseCallback(ctx rule.Context, declaration *ast.Node, symbol *ast.Symbol,
+	componentScope *ast.Node, callback *ast.Node, dependencyArrayNode *ast.Node) []rule.Fix {
+
+	if declaration.Kind != ast.KindVariableDeclaration {
+		return nil
+	}
+	initializer := declaration.AsVariableDeclaration().Initializer
+	if initializer == nil {
+		return nil
+	}
+	switch initializer.Kind {
+	case ast.KindArrowFunction, ast.KindFunctionExpression:
+	default:
+		return nil
+	}
+	if !isUsedOutsideOfHook(ctx, symbol, declaration, componentScope, callback, dependencyArrayNode) {
+		return nil
+	}
+	initializerRange := rule.TokenRange(ctx.SourceFile, initializer)
+	return []rule.Fix{{
+		Range: initializerRange,
+		Text:  "useCallback(" + ctx.SourceFile.Text()[initializerRange.Pos():initializerRange.End()] + ")",
+	}}
+}
+
+// isUsedOutsideOfHook is upstream's question of the same name: is the binding read anywhere other
+// than inside the Hook's callback or its dependency array, or written a second time after its
+// declaration. Only then does wrapping it pay, since a value used only by the Hook belongs inside it.
+func isUsedOutsideOfHook(ctx rule.Context, symbol *ast.Symbol, declaration *ast.Node, componentScope *ast.Node,
+	callback *ast.Node, dependencyArrayNode *ast.Node) bool {
+
+	used := false
+	var walk func(node *ast.Node)
+	walk = func(node *ast.Node) {
+		if node == nil || used {
+			return
+		}
+		if node.Kind == ast.KindIdentifier && node != declaration.Name() && !isNonDependencyIdentifier(node) &&
+			resolveIdentifier(ctx, node) == symbol {
+			parent := node.Parent
+			written := parent != nil && parent.Kind == ast.KindBinaryExpression &&
+				parent.AsBinaryExpression().Left == node && ast.IsAssignmentOperator(parent.AsBinaryExpression().OperatorToken.Kind)
+			if written || (!nodeContains(callback, node) && !nodeContains(dependencyArrayNode, node)) {
+				used = true
+				return
+			}
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			walk(child)
+			return false
+		})
+	}
+	walk(componentScope)
+	return used
 }
 
 // isEveryRenderConstruction reports whether a declaration binds a value that is rebuilt each render.
@@ -1570,8 +1721,8 @@ func constructsANewValue(node *ast.Node) bool {
 
 // reportSetStateWithoutDependencies reports an effect that calls a state setter and has no array, so
 // it runs after every render and each run causes the next one.
-func reportSetStateWithoutDependencies(ctx rule.Context, callback *ast.Node, hookCall *ast.Node,
-	reads map[string]*dependencyRead, componentScope *ast.Node) {
+func reportSetStateWithoutDependencies(ctx rule.Context, run exhaustiveDepsRun, callback *ast.Node,
+	hookCall *ast.Node, reads map[string]*dependencyRead, componentScope *ast.Node) {
 
 	found := false
 	var walk func(node *ast.Node)
@@ -1601,9 +1752,16 @@ func reportSetStateWithoutDependencies(ctx rule.Context, callback *ast.Node, hoo
 		})
 	}
 	walk(callback)
-	if found {
-		ctx.ReportNode(hookCall, messageExhaustiveDepsSetStateNoDependencies)
+	if !found {
+		return
 	}
+	// Upstream's repair adds the array the effect needs right after the callback. It joins the
+	// paths as they are, without the `?.` formatting the corrected array gets.
+	suggested := collectRecommendations(reads, nil, true).suggested
+	run.report(ctx, hookCall, messageExhaustiveDepsSetStateNoDependencies, rule.Fix{
+		Range: core.NewTextRange(callback.End(), callback.End()),
+		Text:  ", [" + strings.Join(suggested, ", ") + "]",
+	})
 }
 
 // isStateSetterName reports whether an identifier names the setter half of a `useState` pair
