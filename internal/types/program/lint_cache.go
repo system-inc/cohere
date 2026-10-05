@@ -65,6 +65,10 @@ type LintCache struct {
 	// stale pass. It was called RuleSetHash when the rule set was all it covered.
 	Key [sha256.Size]byte
 
+	// KeyParts is Key's parts, so a run under another key can say which part moved. Zero when the run that
+	// recorded it kept none. See RunCacheKeyParts.
+	KeyParts RunCacheKeyParts
+
 	// Entries is one record per cached file.
 	Entries []LintCacheEntry
 
@@ -335,6 +339,16 @@ func (c *LintCache) Lookup(path string, contentHash [sha256.Size]byte, key [sha2
 		return LintCacheEntry{}, false
 	}
 	return entry, true
+}
+
+// holds reports whether the cache has an entry for path at all, matching or not, so a miss can say whether the
+// file was never recorded or recorded at other bytes. The index must already be built (ensureIndex).
+func (c *LintCache) holds(path string) bool {
+	if c == nil || c.index == nil {
+		return false
+	}
+	_, found := c.index[path]
+	return found
 }
 
 // ensureIndex builds the path index if it is missing. A caller about to share the cache across

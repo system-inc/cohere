@@ -58,7 +58,7 @@ func shapeWalk(t *testing.T, root string, rules []rule.Rule, previous *program.L
 	}
 	shapes, _ := graph.Signatures(context.Background(), previousShapes)
 	graph.Shapes = shapes
-	reuse := program.NewFindingsReuse(program.HashRuleSet([]string{"fixture"}), previous)
+	reuse := program.NewFindingsReuse(program.HashRuleSet([]string{"fixture"}), previous, program.PathAnchor{})
 	graph.FindingsReuse = reuse
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
 	if err != nil {

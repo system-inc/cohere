@@ -69,6 +69,9 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// A cached run says how many shapes it keyed on content (#5txm9gg); a cold run keys none, so the line is
 	// the invocation's, not the tree's.
 	contentKeyedLine := regexp.MustCompile(`(?m)^  cache: \d+ files?'s? shapes? (is|are) keyed on content.*\n?`)
+	// A run the cache did not answer whole says why (#547dhjz); a cold run reads no cache, so it never has the
+	// line, which is the invocation's rather than the tree's.
+	missLine := regexp.MustCompile(`(?m)^cache: (not replayed whole|findings): .*\n?`)
 	// The total line's shape depends on timing as well as its numbers: the types phase's check runs alongside
 	// the fix walk, so whether the phases overlap is a property of this invocation, never of the tree.
 	totalLine := regexp.MustCompile(`(?m)^  total .*\n`)
@@ -76,7 +79,7 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// cache answered for, which a warm run and a cold one differ in by design.
 	footerLine := regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) .*\n?`)
 	normalized := func(output string) string {
-		output = contentKeyedLine.ReplaceAllString(output, "")
+		output = missLine.ReplaceAllString(contentKeyedLine.ReplaceAllString(output, ""), "")
 		return typesClause.ReplaceAllString(footerLine.ReplaceAllString(totalLine.ReplaceAllString(cacheOffLine.ReplaceAllString(layerTwoClause.ReplaceAllString(durations.ReplaceAllString(output, "T"), ""), ""), ""), ""), "")
 	}
 	keepLines := func(output string, drop ...string) string {

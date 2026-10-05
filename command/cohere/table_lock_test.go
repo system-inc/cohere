@@ -136,10 +136,10 @@ func TestAReaderNeverSeesOneWritersRunBesideAnothersFindings(t *testing.T) {
 			table := program.NewCacheTable()
 			table.Runs["--no-fix"] = &program.RunCache{Key: marker(index)}
 			table.Findings = &program.LintCache{Key: program.HashRuleSet([]string{marker(index)})}
-			err := program.WriteCacheTable(directory, table, identity, program.CacheTableSections{Runs: []string{"--no-fix"}})
+			err := program.WriteCacheTable(directory, table, identity, program.CacheTableSections{Runs: []string{"--no-fix"}}, program.PathAnchor{})
 			time.Sleep(2 * time.Millisecond)
 			if err == nil {
-				err = program.WriteCacheTable(directory, table, identity, program.CacheTableSections{Findings: true})
+				err = program.WriteCacheTable(directory, table, identity, program.CacheTableSections{Findings: true}, program.PathAnchor{})
 			}
 			release()
 			if err != nil {
@@ -160,7 +160,7 @@ func TestAReaderNeverSeesOneWritersRunBesideAnothersFindings(t *testing.T) {
 		default:
 		}
 		release, _ := holdTableReadLock(directory, 10*time.Second)
-		table, _ := program.ReadCacheTable(directory, identity, program.CacheTableSections{Runs: []string{"--no-fix"}, Findings: true})
+		table, _ := program.ReadCacheTable(directory, identity, program.CacheTableSections{Runs: []string{"--no-fix"}, Findings: true}, program.PathAnchor{})
 		release()
 		run := table.Runs["--no-fix"]
 		if run == nil || table.Findings == nil {

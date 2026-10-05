@@ -56,7 +56,8 @@
 #   --work DIR         where the copies live (default $TMPDIR/cohere-quiet-machine)
 #   --record           also write the run to bench/results as a record to commit
 #                      (internal/benchresults): the machine, the commits, every run and each mode's
-#                      numbers, refused when it disagrees with its own runs or the engine is dirty
+#                      numbers, refused when it disagrees with its own runs or the engine is dirty;
+#                      commit it with what `go run ./internal/docsdata/tools/generate` rewrites
 #
 # Exit status: 0 when every mode has a quiet number, 3 when some mode has none, 1 when it could not
 # measure at all, including a copy that changed under it or a cohere that changed between runs.
@@ -207,5 +208,8 @@ if [[ $record == true ]]; then
   (cd ${0:A:h:h} && go run ./internal/benchresults/tools/record -runs $runs_table -engine $engine \
     -project ${project:t} -project-commit $project_commit -ceiling $ceiling -settle $settle -rounds $runs \
     -edit $edit) || fail "could not record the run; its logs are in $logs"
+  # The website's benchmarks page is generated from bench/results, and a record committed alone leaves
+  # docs/data stale, which TestTheRenderedFilesAreCurrent fails (@system_cohere_web_data).
+  print "commit the record with what \`go run ./internal/docsdata/tools/generate\` rewrites in docs/data"
 fi
 exit $outcome

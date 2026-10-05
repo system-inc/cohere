@@ -2,7 +2,9 @@ package program
 
 import (
 	"crypto/sha256"
+	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -27,6 +29,9 @@ type FindingsReuse struct {
 	key      [sha256.Size]byte
 	previous *LintCache
 
+	// anchor is the project root the design system's paths are anchored at. See PathAnchor.
+	anchor PathAnchor
+
 	// designFingerprint is the previous run's design system when every path it read still holds, so its
 	// design-system rules' findings may replay; zero when it does not, or there was none.
 	designFingerprint [sha256.Size]byte
@@ -34,6 +39,13 @@ type FindingsReuse struct {
 	mutex    sync.Mutex
 	next     map[string]LintCacheEntry
 	replayed atomic.Int64
+
+	// missingEntries, changedEntries and unmeasuredEntries count the files looked up and not replayed, by why:
+	// no entry for the file, an entry at other bytes or under another rule list, or one taken by a run that
+	// did not measure readiness. See Misses.
+	missingEntries    atomic.Int64
+	changedEntries    atomic.Int64
+	unmeasuredEntries atomic.Int64
 
 	// designReads and designLoaded are what this run's design system read, gathered from each walk. See
 	// NoteDesignSystem.
@@ -54,20 +66,21 @@ func (r *FindingsReuse) MeasureReadiness() {
 }
 
 // NewFindingsReuse prepares a run's reuse. A previous cache under a different key is dropped at
-// once rather than consulted per file: nothing in it can be valid.
+// once rather than consulted per file: nothing in it can be valid. anchor is the project root, which the
+// design system's paths are named relative to; the zero anchor names them as they are.
 //
 // The previous cache's lookup index is built here, before any worker runs. Lookup would otherwise
 // build it on first use, and sixteen workers missing at once would race to build it.
-func NewFindingsReuse(key [sha256.Size]byte, previous *LintCache) *FindingsReuse {
+func NewFindingsReuse(key [sha256.Size]byte, previous *LintCache, anchor PathAnchor) *FindingsReuse {
 	if previous != nil && previous.Key != key {
 		previous = nil
 	}
-	reuse := &FindingsReuse{key: key, previous: previous, next: map[string]LintCacheEntry{}}
+	reuse := &FindingsReuse{key: key, previous: previous, anchor: anchor, next: map[string]LintCacheEntry{}}
 	if previous != nil {
 		previous.ensureIndex()
 		// Checked once, here, by re-hashing what the design system read last time: a few stats and small reads,
 		// against building the design system to find out.
-		if previous.DesignSystem.stillHolds() {
+		if previous.DesignSystem.stillHolds(anchor) {
 			reuse.designFingerprint = previous.DesignSystem.Fingerprint
 		}
 	}
@@ -84,6 +97,29 @@ func (r *FindingsReuse) NoteDesignSystem(reads []rule.FileRead, loaded bool) {
 	defer r.mutex.Unlock()
 	r.designLoaded = true
 	r.designReads = append(r.designReads, reads...)
+}
+
+// Misses says why the files this run looked up and did not replay were not replayed, in words, empty when
+// every one was or none was looked up. A run whose whole findings section was missing or under another key
+// says so itself (the command does), since then no file was looked up in anything.
+func (r *FindingsReuse) Misses() string {
+	if r == nil {
+		return ""
+	}
+	var reasons []string
+	if count := r.missingEntries.Load(); count > 0 {
+		reasons = append(reasons, fmt.Sprintf("%d with no entry", count))
+	}
+	if count := r.changedEntries.Load(); count > 0 {
+		reasons = append(reasons, fmt.Sprintf("%d whose bytes or rules changed", count))
+	}
+	if count := r.unmeasuredEntries.Load(); count > 0 {
+		reasons = append(reasons, fmt.Sprintf("%d taken without measuring readiness", count))
+	}
+	if len(reasons) == 0 {
+		return ""
+	}
+	return "files not replayed: " + strings.Join(reasons, ", ")
 }
 
 // Replayed is how many files this run served from cache.
@@ -129,7 +165,7 @@ func (r *FindingsReuse) Recorded() *LintCache {
 func (r *FindingsReuse) settleDesignSystem() (key *DesignSystemKey, keepReplayed bool) {
 	zero := [sha256.Size]byte{}
 	if r.designLoaded {
-		key, held := designSystemKeyFromReads(r.designReads)
+		key, held := designSystemKeyFromReads(r.designReads, r.anchor)
 		if !held {
 			return nil, false
 		}
@@ -175,6 +211,14 @@ type cacheKeys struct {
 // names; a file none of them applies to has nothing to replay or run.
 func (r *FindingsReuse) lookup(path string, keys cacheKeys) (entry LintCacheEntry, hits classHits) {
 	entry, pureHit := r.previous.Lookup(path, keys.contentHash, r.key, keys.pure)
+	switch {
+	case !pureHit && r.previous.holds(path):
+		r.changedEntries.Add(1)
+	case !pureHit:
+		r.missingEntries.Add(1)
+	case r.readiness && entry.Adamic == nil:
+		r.unmeasuredEntries.Add(1)
+	}
 	if !pureHit || r.readiness && entry.Adamic == nil {
 		return LintCacheEntry{}, classHits{}
 	}

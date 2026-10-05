@@ -234,7 +234,7 @@ func TestAWarmReplayRunsNoRuleForReadiness(t *testing.T) {
 		graph.Readiness = &program.Readiness{Options: map[string][]json.RawMessage{
 			"test-set-enabled": nil, "test-set-off": nil, typeAware.Name: nil,
 		}}
-		reuse := program.NewFindingsReuse(program.HashRuleSet([]string{"fixture"}), previous)
+		reuse := program.NewFindingsReuse(program.HashRuleSet([]string{"fixture"}), previous, program.PathAnchor{})
 		reuse.MeasureReadiness()
 		graph.FindingsReuse = reuse
 		result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)

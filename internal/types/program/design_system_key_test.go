@@ -27,43 +27,43 @@ func TestDesignSystemKeyDeclinesAMovedFileAndHoldsUntilAChange(t *testing.T) {
 	read := rule.FileRead{Path: theme, Present: true, Size: info.Size(), ModifiedNanoseconds: info.ModTime().UnixNano()}
 	absent := rule.FileRead{Path: missing}
 
-	key, made := designSystemKeyFromReads([]rule.FileRead{read, absent})
-	if !made || !key.stillHolds() {
+	key, made := designSystemKeyFromReads([]rule.FileRead{read, absent}, PathAnchor{})
+	if !made || !key.stillHolds(PathAnchor{}) {
 		t.Fatalf("a key over unmoved reads was not made, or does not hold: made %v", made)
 	}
 
 	moved := read
 	moved.ModifiedNanoseconds -= int64(time.Second)
-	if _, made := designSystemKeyFromReads([]rule.FileRead{moved}); made {
+	if _, made := designSystemKeyFromReads([]rule.FileRead{moved}, PathAnchor{}); made {
 		t.Error("a file whose time moved after it was read was keyed anyway")
 	}
 	grown := read
 	grown.Size++
-	if _, made := designSystemKeyFromReads([]rule.FileRead{grown}); made {
+	if _, made := designSystemKeyFromReads([]rule.FileRead{grown}, PathAnchor{}); made {
 		t.Error("a file whose size moved after it was read was keyed anyway")
 	}
 
 	if err := os.WriteFile(theme, []byte("@theme { --color-x: red; }\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if key.stillHolds() {
+	if key.stillHolds(PathAnchor{}) {
 		t.Error("the key still holds after the stylesheet it covers was edited")
 	}
 	if err := os.WriteFile(theme, []byte("@theme {}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if !key.stillHolds() {
+	if !key.stillHolds(PathAnchor{}) {
 		t.Error("the key does not hold once the stylesheet is back to the bytes it covers")
 	}
 	if err := os.WriteFile(missing, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if key.stillHolds() {
+	if key.stillHolds(PathAnchor{}) {
 		t.Error("the key still holds after a path it recorded absent was created")
 	}
 
 	var unset *DesignSystemKey
-	if unset.stillHolds() || (&DesignSystemKey{}).stillHolds() {
+	if unset.stillHolds(PathAnchor{}) || (&DesignSystemKey{}).stillHolds(PathAnchor{}) {
 		t.Error("a missing or zero key holds, which would replay findings produced under no design system")
 	}
 }

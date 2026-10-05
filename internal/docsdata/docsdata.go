@@ -4,8 +4,8 @@
 // Nothing here is typed in. Each output reads one source the build already trusts: the rule registry
 // and what each registration declares, the rule sets cohere carries as the loader resolves them, the
 // Swift registry and verdict catalog, the settings schemas internal/settingsschema renders, CHANGELOG.md, the flag
-// set as the binary prints it, and the cases the rule tests assert, recorded by the capture hook in
-// internal/lint/testing. A field no source holds yet is left out rather than guessed, and the
+// set as the binary prints it, the cases the rule tests assert, recorded by the capture hook in
+// internal/lint/testing, and the benchmark runs bench/quiet_machine.sh recorded in bench/results. A field no source holds yet is left out rather than guessed, and the
 // sourceNotes in rules.json say where each field comes from.
 //
 // The per-rule .md files beside the rules are internal working notes and are never read here.
@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/system-inc/cohere/internal/benchresults"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -35,6 +36,7 @@ const (
 	SetsPath           = Directory + "/sets.json"
 	CliPath            = Directory + "/cli.json"
 	ChangelogPath      = Directory + "/changelog.json"
+	BenchmarksPath     = Directory + "/benchmarks.json"
 	ExamplesDirectory  = Directory + "/examples"
 	settingsSchemaName = "CohereSettings.schema.json"
 )
@@ -64,6 +66,9 @@ type Inputs struct {
 
 	// Changelog is CHANGELOG.md.
 	Changelog []byte
+
+	// Benchmarks is every recorded benchmark run in bench/results, as internal/benchresults reads them.
+	Benchmarks []benchresults.Record
 
 	// Help is what `cohere -help` writes, and VerbHelp what each verb's `-help` writes, keyed by verb.
 	// Nil leaves cli.json out of Build's output, for a caller that did not build the binary.
@@ -125,6 +130,16 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 		return nil, err
 	}
 	files[ChangelogPath] = encodedChangelog
+
+	benchmarks, err := buildBenchmarks(inputs.Benchmarks)
+	if err != nil {
+		return nil, err
+	}
+	encodedBenchmarks, err := encode(benchmarks)
+	if err != nil {
+		return nil, err
+	}
+	files[BenchmarksPath] = encodedBenchmarks
 
 	if inputs.Help != nil {
 		cli, err := parseCli(inputs.Help, inputs.VerbHelp)

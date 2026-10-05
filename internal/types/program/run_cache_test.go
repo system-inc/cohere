@@ -289,10 +289,10 @@ func TestRunCacheReplaysOutputAndExitCodeThroughDisk(t *testing.T) {
 	table := program.NewCacheTable()
 	table.Runs["--no-fix"] = tree.record(t)
 	sections := program.CacheTableSections{Runs: []string{"--no-fix"}}
-	if err := program.WriteCacheTable(directory, table, testIdentity, sections); err != nil {
+	if err := program.WriteCacheTable(directory, table, testIdentity, sections, program.PathAnchor{}); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	read, err := program.ReadCacheTable(directory, testIdentity, sections)
+	read, err := program.ReadCacheTable(directory, testIdentity, sections, program.PathAnchor{})
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}

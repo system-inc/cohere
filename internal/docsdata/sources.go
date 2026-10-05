@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/system-inc/cohere/internal/benchresults"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -32,6 +33,9 @@ func SourceInputs(root string) (Inputs, error) {
 		return inputs, err
 	}
 	if inputs.SettingsSchemas, err = settingsschema.Build(names); err != nil {
+		return inputs, err
+	}
+	if inputs.Benchmarks, err = benchresults.Read(filepath.Join(root, benchresults.Directory)); err != nil {
 		return inputs, err
 	}
 	inputs.Examples, err = ReadCommittedExamples(root)
