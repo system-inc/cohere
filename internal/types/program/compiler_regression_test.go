@@ -14,9 +14,10 @@ import (
 // members into the inferred type as public ones, so since #63932 (intersection properties take the
 // most permissive accessibility) `getAccount() as Account` reported TS2352. tsc 6.0.3 accepts it.
 //
-// cohere is pinned to the fix commit on kirkouimet/TypeScript while the PR is open, because upstream
-// main still has the defect. This is what fails if the pin moves back to upstream before Microsoft
-// merges, and it stays after they do. It was found on two Base authentication casts of this shape.
+// cohere's compiler is System, Inc.'s fork, system-inc/TypeScript on its adamic branch, which carries
+// the fix while the PR is open, because upstream main still has the defect. This is what fails if the
+// pin moves back to upstream before Microsoft merges, and it stays after they do. It was found on two
+// Base authentication casts of this shape.
 func TestReverseMappedInferenceDoesNotExposePrivateMembers(t *testing.T) {
 	t.Parallel()
 	source := `class Entity {
