@@ -1,3 +1,8 @@
+//go:build unix
+
+// Every project here is checked through a stand-in Swift engine, a /bin/sh script, so the file builds on
+// Unix, as swift_engine_test.go does (#tejf9bc).
+
 package main
 
 import (
@@ -27,23 +32,6 @@ func mixedRepository(t *testing.T, swiftDirectory string) string {
 		"Sources/Toy/Toy.swift": "let toy = 1\n",
 	})
 	return root
-}
-
-// runWithEngine runs cohere from a directory with the Swift engine the override names.
-func runWithEngine(t *testing.T, binary string, engine string, directory string, arguments ...string) (string, int) {
-	t.Helper()
-	command := exec.Command(binary, verboseArguments(arguments)...)
-	command.Dir = directory
-	command.Env = append(os.Environ(), "COHERE_SWIFT_ENGINE="+engine, "COHERE_VERDICT_FD=")
-	output, err := command.CombinedOutput()
-	if err == nil {
-		return string(output), 0
-	}
-	exited, isExit := err.(*exec.ExitError)
-	if !isExit {
-		t.Fatalf("running cohere: %v\n%s", err, output)
-	}
-	return string(output), exited.ExitCode()
 }
 
 // A mixed repository is checked whole from its root: each project in its own section under its own

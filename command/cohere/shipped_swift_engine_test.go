@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/release/dispatch"
@@ -46,21 +45,6 @@ func installCohere(t *testing.T, version string) string {
 		}
 	}
 	return binary
-}
-
-// stampedBinaries is this command built once per version stamp for the package run, each in a directory
-// TestMain removes.
-var stampedBinaries = struct {
-	sync.Mutex
-	byVersion map[string]*stampedBinary
-}{byVersion: map[string]*stampedBinary{}}
-
-type stampedBinary struct {
-	once      sync.Once
-	directory string
-	path      string
-	output    []byte
-	err       error
 }
 
 // stampedCohere returns this command's binary stamped with version, built on the first call for it.

@@ -83,23 +83,36 @@ func TestEveryReleaseTargetCompiles(t *testing.T) {
 // target would compile it, and returns every error, or none. Nothing is compiled, so nothing is written
 // to the build cache.
 func typeCheckTarget(moduleDirectory string, target release.Target) []string {
+	return typeCheck(moduleDirectory, target, false, "./command/cohere")
+}
+
+// typeCheck type-checks the packages patterns name, and everything they import, from source as target
+// would compile them, their tests too when tests is set, and returns every error once, or none.
+func typeCheck(moduleDirectory string, target release.Target, tests bool, patterns ...string) []string {
 	loaded, err := packages.Load(&packages.Config{
 		// Syntax and type information for every dependency is what makes go/packages type-check them all
 		// from source rather than reading export data, which it would have to compile first.
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedImports |
 			packages.NeedDeps | packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo,
-		Dir: moduleDirectory,
-		Env: append(os.Environ(), "GOOS="+target.GoOperatingSystem, "GOARCH="+target.GoArchitecture, "CGO_ENABLED=0"),
-	}, "./command/cohere")
+		Dir:   moduleDirectory,
+		Env:   append(os.Environ(), "GOOS="+target.GoOperatingSystem, "GOARCH="+target.GoArchitecture, "CGO_ENABLED=0"),
+		Tests: tests,
+	}, patterns...)
 	if err != nil {
 		return []string{err.Error()}
 	}
 	var problems []string
+	// With tests a package is loaded twice, alone and with its test files, and an error in the code both
+	// share is reported by each, so each is kept once.
+	seen := map[string]bool{}
 	checked := 0
 	packages.Visit(loaded, nil, func(pkg *packages.Package) {
 		checked++
 		for _, problem := range pkg.Errors {
-			problems = append(problems, problem.Error())
+			if !seen[problem.Error()] {
+				seen[problem.Error()] = true
+				problems = append(problems, problem.Error())
+			}
 		}
 	})
 	if checked == 0 {
@@ -128,6 +141,60 @@ func TestTypeCheckCatchesAPlatformOnlyBreak(t *testing.T) {
 		if !strings.Contains(problems, want) {
 			t.Errorf("the windows type-check did not report %s: %q", want, problems)
 		}
+	}
+}
+
+// TestEveryPackagesTestsTypeCheckForWindows type-checks every package of the module for Windows, its tests
+// included, so a test that cannot build there fails here and not on a Windows machine someone finally runs
+// it on.
+//
+// Release targets prove only what ships: command/cohere's tests used a Unix-only stand-in engine for weeks
+// without anything noticing, since only three named Windows tests run in release.yml (#tejf9bc). Windows
+// alone, because it is the one shipped platform that is not Unix: a file a Unix build constraint keeps
+// out of linux builds would also be kept out of darwin's, which every test run here already compiles.
+func TestEveryPackagesTestsTypeCheckForWindows(t *testing.T) {
+	t.Parallel()
+
+	if testing.Short() {
+		t.Skip("NOT MEASURED: -short skips type-checking the module's tests for Windows, so a test that no longer builds there would pass here")
+	}
+	var windows release.Target
+	for _, target := range release.Targets {
+		if target.GoOperatingSystem == "windows" {
+			windows = target
+			break
+		}
+	}
+	if windows.GoOperatingSystem == "" {
+		t.Fatal("no release target is Windows, so there is nothing for this test to check against")
+	}
+	if problems := typeCheck(filepath.Join("..", "..", ".."), windows, true, "./..."); len(problems) > 0 {
+		t.Fatalf("the module's tests do not type-check for %s:\n%s", windows, strings.Join(problems, "\n"))
+	}
+}
+
+// TestTypeCheckOfTestsCatchesAUnixOnlyTestHelper is the known-dirty control for the test above: a test
+// that calls a helper only Unix defines type-checks for darwin and fails for windows, and only when tests
+// are checked.
+func TestTypeCheckOfTestsCatchesAUnixOnlyTestHelper(t *testing.T) {
+	t.Parallel()
+
+	directory := t.TempDir()
+	writeFile(t, filepath.Join(directory, "go.mod"), "module crosscompile\n\ngo 1.21\n")
+	writeFile(t, filepath.Join(directory, "tool", "tool.go"), "package tool\n")
+	writeFile(t, filepath.Join(directory, "tool", "helper_unix_test.go"), "//go:build unix\n\npackage tool\n\nfunc stand() string { return \"/bin/sh\" }\n")
+	writeFile(t, filepath.Join(directory, "tool", "tool_test.go"), "package tool\n\nimport \"testing\"\n\nfunc TestTool(t *testing.T) { _ = stand() }\n")
+
+	darwin := release.Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
+	windows := release.Target{GoOperatingSystem: "windows", GoArchitecture: "amd64"}
+	if problems := typeCheck(directory, darwin, true, "./..."); len(problems) > 0 {
+		t.Fatalf("the control does not type-check even for darwin, so it cannot show anything: %v", problems)
+	}
+	if problems := typeCheck(directory, windows, false, "./..."); len(problems) > 0 {
+		t.Fatalf("the control's code alone failed for windows, so it does not isolate the tests: %v", problems)
+	}
+	if problems := strings.Join(typeCheck(directory, windows, true, "./..."), "\n"); !strings.Contains(problems, "stand") {
+		t.Errorf("the windows type-check of the tests did not report the Unix-only helper: %q", problems)
 	}
 }
 
