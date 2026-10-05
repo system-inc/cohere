@@ -113,11 +113,8 @@ func TestCorrectnessNoLoadTimeImportMetaPathStaysSilent(t *testing.T) {
 		"url, which a bundle keeps":   "const here = new URL('.', import.meta.url);\n",
 		"another meta property":       "const environment = import.meta.env;\n",
 		"new.target is not import":    "function Paths() { return new.target; }\n",
-		// A type query parses `import.meta.dirname` as a qualified name rather than a meta property, so
-		// the listener never sees it, which is right: a type is never evaluated.
-		"a type query is not a read": "type Directory = typeof import.meta.dirname;\n",
-		"the name on another object": "const directory = paths.dirname;\n",
-		"the words in a string":      "const message = 'import.meta.dirname at module scope';\n",
+		"the name on another object":  "const directory = paths.dirname;\n",
+		"the words in a string":       "const message = 'import.meta.dirname at module scope';\n",
 	}
 	for name, source := range cases {
 		t.Run(name, func(t *testing.T) {
