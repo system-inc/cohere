@@ -19,7 +19,35 @@ import (
 // it for a known file type: .tsx parses with JSX and .ts without. A hashbang becomes a line comment,
 // upstream's replaceHashbang, before parsing; the caller keeps the original text for printing.
 func ParseTypeScript(fileName string, text string, nodes *Arena) (*Node, []*Node, *StrippedText, error) {
-	sourceFile := ParseSourceFile(fileName, ReplaceHashbang(text))
+	return ParseTypeScriptFrom(fileName, text, nil, nodes)
+}
+
+// ParseTypeScriptFrom is ParseTypeScript given a tree someone already parsed, so the file is not parsed a
+// second time: the fix engine's guard parses every TypeScript file it is handed, and the formatter parsed
+// the same bytes again, 0.18 GB a cold ahra run (#dk2502g).
+//
+// The tree is taken only where ParseSourceFile would have built the same one: the same bytes, no hashbang
+// (which ParseTypeScript rewrites before parsing), the script kind this file's extension picks, and a name
+// that is a declaration file exactly when this one is. Those are all the parser reads (parser/parser.go:
+// the text, the kind, IsDeclarationFileName of the name, and the module-indicator options, which set a
+// property of the file and no node), so a tree that matches them is the tree a fresh parse returns.
+// Anything else is parsed here as before, so a nil tree, or the wrong one, costs a parse and never a
+// different result.
+func ParseTypeScriptFrom(fileName string, text string, parsed *ast.SourceFile, nodes *Arena) (*Node, []*Node, *StrippedText, error) {
+	if !treeIsFor(fileName, text, parsed) {
+		parsed = ParseSourceFile(fileName, ReplaceHashbang(text))
+	}
+	return convertTypeScript(parsed, text, nodes)
+}
+
+// treeIsFor reports whether parsed is the tree ParseTypeScript would build for text: see ParseTypeScriptFrom.
+func treeIsFor(fileName string, text string, parsed *ast.SourceFile) bool {
+	return parsed != nil && parsed.Text() == text && parsed.ScriptKind == scriptKindOf(fileName) && !strings.HasPrefix(text, "#!") &&
+		tspath.IsDeclarationFileName(parsed.FileName()) == tspath.IsDeclarationFileName(fileName)
+}
+
+// convertTypeScript is the convert and postprocess half of ParseTypeScript, over a tree in hand.
+func convertTypeScript(sourceFile *ast.SourceFile, text string, nodes *Arena) (*Node, []*Node, *StrippedText, error) {
 	program, comments, err := Convert(sourceFile, nodes)
 	if err != nil {
 		return nil, nil, nil, err
@@ -70,22 +98,26 @@ func findTypeScriptNode(node *Node) *Node {
 
 // ParseSourceFile parses one file with typescript-go, choosing the script kind by extension.
 func ParseSourceFile(fileName string, text string) *ast.SourceFile {
-	scriptKind := core.ScriptKindTS
-	switch strings.ToLower(filepath.Ext(fileName)) {
-	case ".tsx":
-		scriptKind = core.ScriptKindTSX
-	case ".jsx":
-		scriptKind = core.ScriptKindJSX
-	case ".js", ".mjs", ".cjs":
-		// TSX, not JS: see ParseJavaScript.
-		scriptKind = core.ScriptKindTSX
-	}
 	rooted := fileName
 	if !tspath.IsRootedDiskPath(rooted) {
 		rooted = "/" + strings.TrimPrefix(rooted, "/")
 	}
 	rooted = tspath.NormalizePath(rooted)
-	return parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: rooted, Path: tspath.Path(rooted)}, text, scriptKind)
+	return parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: rooted, Path: tspath.Path(rooted)}, text, scriptKindOf(fileName))
+}
+
+// scriptKindOf is the script kind ParseSourceFile parses a file as, chosen by extension.
+func scriptKindOf(fileName string) core.ScriptKind {
+	switch strings.ToLower(filepath.Ext(fileName)) {
+	case ".tsx":
+		return core.ScriptKindTSX
+	case ".jsx":
+		return core.ScriptKindJSX
+	case ".js", ".mjs", ".cjs":
+		// TSX, not JS: see ParseJavaScript.
+		return core.ScriptKindTSX
+	}
+	return core.ScriptKindTS
 }
 
 // ReplaceHashbang is upstream's replaceHashbang: `#!` becomes `//`, the same length.

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
 )
 
@@ -24,7 +25,7 @@ type crlfFiles struct {
 // observing wraps the format transform so it counts each file whose text arrives with CRLF. The format
 // pass runs in parallel, so the count is guarded.
 func (c *crlfFiles) observing(transform edit.Transform) edit.Transform {
-	return func(fileName string, text string) (string, error) {
+	return func(fileName string, text string, parsed *ast.SourceFile) (string, error) {
 		if strings.Contains(text, "\r\n") {
 			c.mutex.Lock()
 			if c.files == nil {
@@ -33,7 +34,7 @@ func (c *crlfFiles) observing(transform edit.Transform) edit.Transform {
 			c.files[fileName] = struct{}{}
 			c.mutex.Unlock()
 		}
-		return transform(fileName, text)
+		return transform(fileName, text, parsed)
 	}
 }
 
