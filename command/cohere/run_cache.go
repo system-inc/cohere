@@ -201,6 +201,9 @@ func (t *teeStream) stop(target **os.File) {
 // each of them may join any of those runs. Each is still its own record, because each prints a different
 // body: the key covers the arguments, and whether the output is colored.
 //
+// `--adamic-readiness` measures what the run without it does not, so it is its own record too, and a run
+// with it never replays one without it, nor one without it a run with it (#9tgm3dq).
+//
 // `--no-cache` is refused by name rather than left to the argument shape. Most flags make a run
 // ineligible, but the promise that flag makes, nothing read and nothing written, should not rest on which
 // arguments happen to be admitted next.
@@ -211,7 +214,7 @@ func runCacheEligible() bool {
 	seen := map[string]bool{}
 	for _, argument := range os.Args[1:] {
 		switch argument {
-		case "--no-fix", "--format", "--no-format", "--verbose", "--json", "--phases":
+		case "--no-fix", "--format", "--no-format", "--verbose", "--json", "--phases", "--adamic-readiness":
 		default:
 			return false
 		}

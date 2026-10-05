@@ -69,7 +69,7 @@ func TestReadinessNamesTheOptionsAdamicSetsThatTheProjectLacks(t *testing.T) {
 }
 
 // TestTheFooterAndTheSummarySayReadiness: the segment ends the footer's line before its gaps, a run that
-// could not measure says why, and --json always carries the object, measured or not.
+// could not measure says why, and --json carries the object exactly when the run asked for it.
 func TestTheFooterAndTheSummarySayReadiness(t *testing.T) {
 	t.Parallel()
 	measured := runSummary{Total: 2400 * time.Millisecond, Rules: 480, FilesInScope: 4, FilesChecked: 4,
@@ -85,11 +85,20 @@ func TestTheFooterAndTheSummarySayReadiness(t *testing.T) {
 		t.Errorf("a run that did not lint names readiness in its footer: %q", got)
 	}
 
-	line, err := json.Marshal(summaryAsJSON(runSummary{Total: time.Second}))
+	// --json carries adamic only under --adamic-readiness (#9tgm3dq), and then always: a run that asked and did
+	// not lint says why.
+	unasked, err := json.Marshal(summaryAsJSON(runSummary{Total: time.Second}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(line), `"adamic":{"measured":false,"reason":"lint did not run"`) {
-		t.Errorf("a run that did not lint has no not-measured adamic object in its summary: %s", line)
+	if strings.Contains(string(unasked), `"adamic"`) {
+		t.Errorf("a run that did not ask for readiness carries adamic in its summary: %s", unasked)
+	}
+	asked, err := json.Marshal(summaryAsJSON(runSummary{Total: time.Second, AdamicRequested: true}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(asked), `"adamic":{"measured":false,"reason":"lint did not run"`) {
+		t.Errorf("a run that asked and did not lint has no not-measured adamic object in its summary: %s", asked)
 	}
 }

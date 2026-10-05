@@ -170,6 +170,7 @@ root unless you name another).
 | `--phases` | put where the time went (graph, fix, format, types, lint) first in the footer's parentheses |
 | `--json` | print newline-delimited JSON for a program to read instead of the human view (see [Output](#output)) |
 | `--coverage` | name every rule under the coverage fact that describes it, not only count them |
+| `--adamic-readiness` | say what share of the files are Adamic-ready, in the footer and in `--json` (see [Output](#output)) |
 | `--timing` | report what building the graph cost and the CPU each rule cost, most expensive rule first |
 | `--single-threaded` | use one type checker instead of several |
 | `--profile FILE` | write a Go CPU profile of the run to FILE |
@@ -190,10 +191,13 @@ A run prints three things, in order:
   it cohered, and in the parentheses how much it covered.
 
 ```
-✓ 💎 2.4s (480 rules • 3,926 checked) • 87% Adamic-ready (3,412 of 3,926)
-✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3,923 cached) • 87% Adamic-ready (3,412 of 3,926)
-✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3 checked • 3,923 cached) • 87% Adamic-ready (3,411 of 3,926)
+✓ 💎 2.4s (480 rules • 3,926 checked)
+✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3,923 cached)
+✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3 checked • 3,923 cached)
+✓ 💎 2.6s (488 rules • 3,926 checked) • 87% Adamic-ready (3,412 of 3,926)
 ```
+
+The last line is a run with `--adamic-readiness`.
 
 The words mean exactly this:
 - **cohered:** files cohere rewrote, fixed or formatted, which are the files listed above the footer.
@@ -202,12 +206,13 @@ The words mean exactly this:
 - **cached:** files the cache answered for, unchanged since a run that checked them. Checked and cached
   together are every file in scope.
 - **rules:** the rules that ran.
-- **Adamic-ready:** the share of linted files whose types are true: no type error and no `cohere:adamic`
-  finding, counted before any disable comment and whatever your settings turn on, since Adamic, which
+- **Adamic-ready:** shown only with `--adamic-readiness`. The share of linted files whose types are true: no
+  type error and no `cohere:adamic` finding, counted before any disable comment and whatever your settings turn on, since Adamic, which
   compiles TypeScript native, reads neither. It names the compiler options Adamic sets that your tsconfig
   leaves off (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`), and says `not measured`
   with the reason when it could not measure, never a number it didn't. `--json` gives it as the summary's
-  `adamic`.
+  `adamic`, which is absent without the flag. Measuring runs the set's rules your settings leave off, at the
+  set's own options, without reporting them, so a run that doesn't ask pays nothing for it.
 
 A count is exact, with its thousands grouped (`3,923`); `--json` gives the plain integer. A count of zero
 is left out, so a cold run shows no `cached` and a run with nothing changed no `checked`.
