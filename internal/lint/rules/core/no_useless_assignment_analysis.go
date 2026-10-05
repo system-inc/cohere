@@ -74,10 +74,28 @@ func analyzeDeadStoresByLiveness(ctx rule.Context, sourceFile *ast.Node) {
 	// Symbol-level judgments are file-wide even though the liveness pass is per-root: a closure in
 	// one root reading a binding declared in another is exactly the shape the capture guard exists
 	// for, and a per-root scan cannot see it.
-	symbols := collectSymbolFacts(ctx, sourceFile)
+	symbols, occupied := collectSymbolFacts(ctx, sourceFile)
 
-	for _, root := range deadStoreRoots(sourceFile) {
-		analyzeRootLiveness(ctx, root, exported, symbols)
+	// Only a root holding an occurrence of a tracked binding emits an event, and a root with no event
+	// solves to nothing, so only those are built. On a cold ahra run that is 8.1% of roots (#tmn9n27).
+	for _, root := range codePathRoots(ctx, sourceFile) {
+		if !occupied[root.Node] {
+			if CheckCodePathGates {
+				deadStoreCheckSkipped(ctx, root.Node, symbols)
+			}
+			continue
+		}
+		analyzeRootLiveness(ctx, root.Node, exported, symbols)
+	}
+}
+
+// deadStoreCheckSkipped is the gate's check under CheckCodePathGates: a root skipped for holding no
+// tracked occurrence must emit no event.
+func deadStoreCheckSkipped(ctx rule.Context, root *ast.Node, symbols map[*ast.Symbol]*symbolFacts) {
+	for _, block := range deadStoreGraph(ctx, root, symbols).Blocks {
+		if len(block.Events) > 0 {
+			panic("no-useless-assignment skipped a root whose graph holds an event")
+		}
 	}
 }
 
@@ -105,7 +123,10 @@ type symbolFacts struct {
 // cheaper than a symbol resolution while being unable to err in the unsafe direction, since two
 // bindings sharing a name are still separated by symbol identity and a read of a differently-named
 // binding can never keep a write live.
-func collectSymbolFacts(ctx rule.Context, sourceFile *ast.Node) map[*ast.Symbol]*symbolFacts {
+//
+// The second result is the roots an eligible binding's occurrence runs in, by RootOf. They are the
+// only roots whose graph can hold an event, since an event is an occurrence of an eligible binding.
+func collectSymbolFacts(ctx rule.Context, sourceFile *ast.Node) (map[*ast.Symbol]*symbolFacts, map[*ast.Node]bool) {
 	var identifiers []*ast.Node
 	interesting := map[string]bool{}
 
@@ -130,10 +151,11 @@ func collectSymbolFacts(ctx rule.Context, sourceFile *ast.Node) map[*ast.Symbol]
 	visit(sourceFile)
 
 	if len(interesting) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	facts := map[*ast.Symbol]*symbolFacts{}
+	occupied := map[*ast.Node]bool{}
 	for _, identifier := range identifiers {
 		if !interesting[identifier.Text()] {
 			continue
@@ -176,7 +198,9 @@ func collectSymbolFacts(ctx rule.Context, sourceFile *ast.Node) map[*ast.Symbol]
 		// So a cross-root read silences every write to the binding, and a cross-root write silences
 		// only itself. A first attempt used one flag for both, which fixed the second shape and
 		// silently gave up the first.
-		captured := control_flow_graph.RootOf(identifier) != control_flow_graph.RootOf(entry.declaration)
+		root := control_flow_graph.RootOf(identifier)
+		occupied[root] = true
+		captured := root != control_flow_graph.RootOf(entry.declaration)
 		// A declarator with no initializer is classified as a read so the liveness pass errs safe,
 		// but it reads nothing, and counting it here made `let provenance: string;` look read. Every
 		// write to a binding nothing reads was then reported, once per write, beside the single
@@ -188,32 +212,7 @@ func collectSymbolFacts(ctx rule.Context, sourceFile *ast.Node) map[*ast.Symbol]
 			}
 		}
 	}
-	return facts
-}
-
-// deadStoreRoots returns every node the control-flow graph is defined over in one file.
-//
-// Shaped after `unused_exports.codePathRoots`, deliberately rather than incidentally: two consumers of one
-// graph inventing two root sets would drift, and the set is a property of the graph rather than of
-// either rule. `control_flow_graph.IsRoot` is the graph's own answer, so it is asked rather than restated —
-// which additionally picks up property initializers, a root `unused` enumerates by hand.
-func deadStoreRoots(sourceFile *ast.Node) []*ast.Node {
-	roots := []*ast.Node{sourceFile}
-
-	var visit func(node *ast.Node) bool
-	visit = func(node *ast.Node) bool {
-		if node == nil {
-			return false
-		}
-		if control_flow_graph.IsRoot(node) {
-			roots = append(roots, node)
-		}
-		node.ForEachChild(visit)
-		return false
-	}
-	sourceFile.ForEachChild(visit)
-
-	return roots
+	return facts, occupied
 }
 
 // analyzeRootLiveness runs the backward liveness dataflow over one code path root.
@@ -233,19 +232,7 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 		return
 	}
 
-	graph := control_flow_graph.Build(root, control_flow_graph.Hooks[deadStoreEvent]{
-		Read: func(builder *control_flow_graph.Builder[deadStoreEvent], node *ast.Node) {
-			// The Read hook fires for plain write targets too, so what this occurrence is comes
-			// from the AST. A plain write emits nothing here; its store is recorded by the Write
-			// hook, which is where it belongs in evaluation order.
-			if kind := occurrenceKindOf(node); kind != occurrenceWrite {
-				recordDeadStoreEvent(builder, ctx, node, occurrenceRead, symbols)
-			}
-		},
-		Write: func(builder *control_flow_graph.Builder[deadStoreEvent], node *ast.Node) {
-			recordDeadStoreEvent(builder, ctx, node, occurrenceWrite, symbols)
-		},
-	})
+	graph := deadStoreGraph(ctx, root, symbols)
 
 	// A write laid out in any reachable block is reachable code, whatever other blocks also hold it.
 	//
@@ -364,6 +351,23 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 			reportDeadStore(ctx, verdict.event, exported, symbols)
 		}
 	}
+}
+
+// deadStoreGraph builds one root's graph with an event for each occurrence of an eligible binding.
+func deadStoreGraph(ctx rule.Context, root *ast.Node, symbols map[*ast.Symbol]*symbolFacts) *control_flow_graph.Graph[deadStoreEvent] {
+	return control_flow_graph.Build(root, control_flow_graph.Hooks[deadStoreEvent]{
+		Read: func(builder *control_flow_graph.Builder[deadStoreEvent], node *ast.Node) {
+			// The Read hook fires for plain write targets too, so what this occurrence is comes
+			// from the AST. A plain write emits nothing here; its store is recorded by the Write
+			// hook, which is where it belongs in evaluation order.
+			if kind := occurrenceKindOf(node); kind != occurrenceWrite {
+				recordDeadStoreEvent(builder, ctx, node, occurrenceRead, symbols)
+			}
+		},
+		Write: func(builder *control_flow_graph.Builder[deadStoreEvent], node *ast.Node) {
+			recordDeadStoreEvent(builder, ctx, node, occurrenceWrite, symbols)
+		},
+	})
 }
 
 // deadStoreLiveness is this rule's lattice: a set of symbols, met by union, transferred by walking
