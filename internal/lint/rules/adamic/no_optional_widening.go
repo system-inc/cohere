@@ -66,6 +66,12 @@ var NoOptionalWidening = rule.Rule{
 				if pair.Target.Flags()&checker.TypeFlagsObject == 0 || pair.Source.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsAny) != 0 {
 					return false, true
 				}
+				// A tuple's optional element is a position its fixed length rules out: tsc refuses `[number]`
+				// as `[]`, so a value typed `[]` holds no element 0 (probe t6 on #drbrp8c). A function's optional
+				// members stay judged, since Object.assign can hand a function any of them (probe t5).
+				if flow.IsArrayLike(typeChecker, pair.Target) {
+					return false, true
+				}
 				if exactAtTop && len(pair.Path) == 0 {
 					return false, true
 				}

@@ -60,6 +60,14 @@ const shape: { kind: string } = circle;`, "circle"},
 		"a union slot that may be missing": {animals + `
 const dogs: Dog[] = [rex];
 const maybe: Animal[] | undefined = dogs;`, "dogs"},
+		"shared elements in a new array": {animals + `
+const kennels: { pet: Dog }[] = [{ pet: rex }];
+const pens: { pet: Animal }[] = kennels.map((kennel) => kennel);`, "kennels.map((kennel) => kennel)"},
+		// t4 on #drbrp8c: a function can hand back what it holds, so its result is walked like any value.
+		"a function's shared result": {animals + `
+const kennel: Dog[] = [rex];
+const dogsOf = (): Dog[] => kennel;
+const animalsOf: () => Animal[] = dogsOf;`, "dogsOf"},
 		"a mutable callback slot": {animals + `
 const handler: { onAnimal: (animal: Dog) => void } = { onAnimal: (dog) => { dog.bark(); } };
 const wide: { onAnimal: (animal: never) => void } = handler;`, "handler"},
@@ -90,6 +98,17 @@ func TestInvariantMutableStaysCleanWhereNothingCanBeWrittenThrough(t *testing.T)
 		"a class instance":      animals + `class Box<Item> { item: Item; constructor(item: Item) { this.item = item; } } const box: Box<Animal> = new Box<Dog>(rex);`,
 		"a width-only widening": `const point = { x: 1, y: 2 }; const flat: { x: number } = point;`,
 		"a callback argument":   animals + `const dogs: Dog[] = [rex]; dogs.forEach((dog) => dog.bark());`,
+		// t1 on #drbrp8c: a union slot is judged whole. Judged member by member, its `null` read as a slot a
+		// handler could be written into; every element seen as an Element reported onfullscreenchange that way.
+		"a union slot": `interface Handler { readonly run: (label: string) => string } interface SameHandler { readonly run: (label: string) => string } declare const source: { onEvent: Handler | null }; const wide: { onEvent: SameHandler | null } = source;`,
+		// t1b on #drbrp8c: what the wider slot can hold is assignable back, so writing it is safe. The two slot
+		// types differ (one is readonly), so identity would report it.
+		"a slot assignable back": `declare const source: { pet: { readonly name: string } }; const wide: { pet: { name: string } } = source;`,
+		"an any element":         `declare const loose: any[]; const strict: string[] = loose;`,
+		"a new array from map":   animals + `const dogs: Dog[] = [rex]; const all: Animal[] = dogs.map((dog) => dog);`,
+		"a new map":              animals + `const all: Map<string, Animal> = new Map<string, Dog>([['Rex', rex]]);`,
+		"Object.values":          animals + `declare const byName: { readonly [name: string]: Dog }; const all: Animal[] = Object.values(byName);`,
+		"a conditional literal":  `declare const flag: boolean; const maybe: { kind: string } | undefined = flag ? { kind: 'Circle' } : undefined;`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

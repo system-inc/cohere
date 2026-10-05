@@ -3,6 +3,7 @@ package adamic
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -64,7 +65,10 @@ var NoUncheckedCast = rule.Rule{
 			if source == nil || target == nil || source == target {
 				return
 			}
-			if source.Flags()&checker.TypeFlagsAny == 0 {
+			// An `any` anywhere in the source (`any`, `any[]`, `Promise<any>`) is assignable to everything, so
+			// the upcast test would pass it: the cast is the only claim the value's type gets, and nothing
+			// checks it. The consumers showed `result.rows as RowType[]` on an `any[]` passing every rule.
+			if !type_checking.CanBeUnsafeAssignment(typeChecker, source) {
 				if checker.Checker_isTypeAssignableTo(typeChecker, source, target) {
 					return
 				}
@@ -72,7 +76,7 @@ var NoUncheckedCast = rule.Rule{
 					ctx.Note(CheckedDowncastNote)
 					return
 				}
-			} else if target.Flags()&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 {
+			} else if target.Flags()&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 || type_checking.IsTypeUnknownArrayType(target, typeChecker) {
 				return
 			}
 			ctx.ReportNode(node, rule.Message{
