@@ -272,11 +272,33 @@ func TestBuildFailsLoudly(t *testing.T) {
 	t.Run("config does not parse", func(t *testing.T) {
 		t.Parallel()
 		directory := writeProject(t, map[string]string{
-			"tsconfig.json": `{"compilerOptions": {"target": "NotARealTarget"}}`,
+			"tsconfig.json": `{"compilerOptions": {"target": "ES2022",, "strict": true}}`,
 			"main.ts":       "export const value = 1;\n",
 		})
 		if _, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory}); err == nil {
-			t.Fatal("an invalid compiler option built a program instead of failing")
+			t.Fatal("a tsconfig with a JSON syntax error built a program instead of failing")
+		}
+	})
+
+	// An option's value outside the values it takes is not a refusal (#wvgxtey, ruled by @system_cohere): the
+	// graph builds and the diagnostic is the program's, so it is reported and fails the run instead of
+	// building against silently wrong options.
+	t.Run("an invalid option value builds and is reported", func(t *testing.T) {
+		t.Parallel()
+		directory := writeProject(t, map[string]string{
+			"tsconfig.json": `{"compilerOptions": {"target": "NotARealTarget"}}`,
+			"main.ts":       "export const value = 1;\n",
+		})
+		graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+		if err != nil {
+			t.Fatalf("an invalid option value refused the build: %v", err)
+		}
+		reported := false
+		for _, diagnostic := range graph.ConfigDiagnostics(context.Background()) {
+			reported = reported || (diagnostic.Code() == 6046 && graph.IsOptionsDiagnostic(diagnostic))
+		}
+		if !reported {
+			t.Fatal("the invalid option value was not reported as an options diagnostic (TS6046)")
 		}
 	})
 }
