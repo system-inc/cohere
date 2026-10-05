@@ -56,6 +56,41 @@ var sharedBinary struct {
 	err       error
 }
 
+// stampedBinaries is this command built once per version stamp for the package run, each in a directory
+// TestMain removes. Declared here rather than beside stampedCohere, which builds them on Unix only, because
+// TestMain cleans them up on every platform (#tejf9bc).
+var stampedBinaries = struct {
+	sync.Mutex
+	byVersion map[string]*stampedBinary
+}{byVersion: map[string]*stampedBinary{}}
+
+type stampedBinary struct {
+	once      sync.Once
+	directory string
+	path      string
+	output    []byte
+	err       error
+}
+
+// runWithEngine runs cohere from a directory with the Swift engine the override names, or none when it is empty.
+// Here rather than beside the Swift tests, which build on Unix only, because the TypeScript-only ownership tests
+// call it with no engine on every platform (#tejf9bc).
+func runWithEngine(t *testing.T, binary string, engine string, directory string, arguments ...string) (string, int) {
+	t.Helper()
+	command := exec.Command(binary, verboseArguments(arguments)...)
+	command.Dir = directory
+	command.Env = append(os.Environ(), "COHERE_SWIFT_ENGINE="+engine, "COHERE_VERDICT_FD=")
+	output, err := command.CombinedOutput()
+	if err == nil {
+		return string(output), 0
+	}
+	exited, isExit := err.(*exec.ExitError)
+	if !isExit {
+		t.Fatalf("running cohere: %v\n%s", err, output)
+	}
+	return string(output), exited.ExitCode()
+}
+
 // buildCohere returns this command's binary, built on the first call. A build failure is fatal rather
 // than a skip: a skipped binary test reads exactly like a passing one, which is the failure this suite
 // is about.
