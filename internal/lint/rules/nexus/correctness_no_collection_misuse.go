@@ -388,7 +388,7 @@ func correctnessNoCollectionMisuseKeyMissesEveryMember(ctx rule.Context, collect
 		return false
 	}
 	collections := correctnessNoCollectionMisuseParts(ctx, collection)
-	for _, part := range type_checking.UnionTypeParts(keyType) {
+	for part := range type_checking.UnionTypePartsSeq(keyType) {
 		switch {
 		case type_checking.IsTypeFlagSet(part, checker.TypeFlagsStringLiteral):
 			name, isString := part.AsLiteralType().Value().(string)

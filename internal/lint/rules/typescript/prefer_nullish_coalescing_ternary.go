@@ -533,7 +533,7 @@ func preferNullishCoalescingUnionFlags(subject *checker.Type) checker.TypeFlags 
 	if subject == nil {
 		return combined
 	}
-	for _, part := range type_checking.UnionTypeParts(subject) {
+	for part := range type_checking.UnionTypePartsSeq(subject) {
 		if part != nil {
 			combined |= checker.Type_flags(part)
 		}

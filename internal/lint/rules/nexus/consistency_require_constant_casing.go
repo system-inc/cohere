@@ -566,7 +566,7 @@ func holdsAFunctionType(ctx rule.Context, name *ast.Node) bool {
 	if valueType == nil {
 		return false
 	}
-	for _, part := range type_checking.UnionTypeParts(ctx.TypeChecker.GetNonNullableType(valueType)) {
+	for part := range type_checking.UnionTypePartsSeq(ctx.TypeChecker.GetNonNullableType(valueType)) {
 		callSignatures := ctx.TypeChecker.GetSignaturesOfType(part, checker.SignatureKindCall)
 		if len(callSignatures) == 0 {
 			return false
@@ -606,7 +606,7 @@ func mayReturnAnElement(typeChecker *checker.Checker, returnType *checker.Type) 
 	if type_checking.IsTypeFlagSet(returnType, checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
 		return true
 	}
-	for _, part := range type_checking.UnionTypeParts(returnType) {
+	for part := range type_checking.UnionTypePartsSeq(returnType) {
 		if !type_checking.IsObjectType(part) && !type_checking.IsIntersectionType(part) {
 			continue
 		}

@@ -240,10 +240,10 @@ func (s *strictVoidReturnState) isVoidReturningFunctionType(subject *checker.Typ
 	// `tsutils.getCallSignaturesOfType`, which upstream calls, does this splitting itself. The shim
 	// exposes the raw checker method, which does not.
 	found := 0
-	for _, part := range type_checking.UnionTypeParts(subject) {
+	for part := range type_checking.UnionTypePartsSeq(subject) {
 		for _, signature := range checker.Checker_getSignaturesOfType(s.ctx.TypeChecker, part, checker.SignatureKindCall) {
 			returnType := checker.Checker_getReturnTypeOfSignature(s.ctx.TypeChecker, signature)
-			for _, constituent := range type_checking.UnionTypeParts(returnType) {
+			for constituent := range type_checking.UnionTypePartsSeq(returnType) {
 				found++
 				if !type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsVoid) {
 					return false
@@ -378,7 +378,7 @@ func (s *strictVoidReturnState) reportIfNonVoidFunctionAtProperty(property *ast.
 		return
 	}
 	var expected *checker.Type
-	for _, part := range type_checking.UnionTypeParts(objectExpected) {
+	for part := range type_checking.UnionTypePartsSeq(objectExpected) {
 		symbol := checker.Checker_getPropertyOfType(s.ctx.TypeChecker, part, propertyName)
 		if symbol == nil {
 			continue
@@ -432,10 +432,10 @@ func (s *strictVoidReturnState) isNonVoidFunctionValue(node *ast.Node) bool {
 	// Already void: every constituent of every call signature's return type is acceptable.
 	acceptable := true
 	sawOne := false
-	for _, part := range type_checking.UnionTypeParts(actual) {
+	for part := range type_checking.UnionTypePartsSeq(actual) {
 		for _, signature := range checker.Checker_getSignaturesOfType(s.ctx.TypeChecker, part, checker.SignatureKindCall) {
 			returnType := checker.Checker_getReturnTypeOfSignature(s.ctx.TypeChecker, signature)
-			for _, constituent := range type_checking.UnionTypeParts(returnType) {
+			for constituent := range type_checking.UnionTypePartsSeq(returnType) {
 				sawOne = true
 				if !type_checking.IsTypeFlagSet(constituent, allowed) {
 					acceptable = false
@@ -554,7 +554,7 @@ func (s *strictVoidReturnState) checkCall(node *ast.Node) {
 		return
 	}
 	signatures := []*checker.Signature{}
-	for _, constituent := range type_checking.UnionTypeParts(calleeType) {
+	for constituent := range type_checking.UnionTypePartsSeq(calleeType) {
 		signatures = append(signatures,
 			checker.Checker_getSignaturesOfType(s.ctx.TypeChecker, constituent, signatureKind)...)
 	}
@@ -574,7 +574,7 @@ func (s *strictVoidReturnState) checkCall(node *ast.Node) {
 			if parameterType == nil {
 				continue
 			}
-			for _, constituent := range type_checking.UnionTypeParts(parameterType) {
+			for constituent := range type_checking.UnionTypePartsSeq(parameterType) {
 				for _, parameterSignature := range checker.Checker_getSignaturesOfType(
 					s.ctx.TypeChecker, constituent, checker.SignatureKindCall) {
 					expectedReturns = append(expectedReturns,

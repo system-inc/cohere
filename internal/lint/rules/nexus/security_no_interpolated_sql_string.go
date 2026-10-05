@@ -440,7 +440,7 @@ func securityNoInterpolatedSqlStringCanHoldText(typeChecker *checker.Checker, va
 	if valueType == nil || depth > 8 {
 		return false
 	}
-	for _, part := range type_checking.UnionTypeParts(valueType) {
+	for part := range type_checking.UnionTypePartsSeq(valueType) {
 		flags := part.Flags()
 		switch {
 		case type_checking.IsIntrinsicErrorType(part):
@@ -572,7 +572,7 @@ func securityNoInterpolatedSqlStringCanHoldQuote(typeChecker *checker.Checker, v
 	if valueType == nil || depth > 8 {
 		return false
 	}
-	for _, part := range type_checking.UnionTypeParts(valueType) {
+	for part := range type_checking.UnionTypePartsSeq(valueType) {
 		if securityNoInterpolatedSqlStringPartCanHoldQuote(typeChecker, part, depth) {
 			return true
 		}

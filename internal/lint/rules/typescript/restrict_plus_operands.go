@@ -256,7 +256,7 @@ var RestrictPlusOperands = rule.Rule{
 
 				// A RegExp carries the object flag as well as its name, so it has to be named before
 				// the generic object test below would swallow it.
-				for _, subBaseType := range type_checking.UnionTypeParts(side.baseType) {
+				for subBaseType := range type_checking.UnionTypePartsSeq(side.baseType) {
 					var reportThisPart bool
 					if ctx.TypeChecker.TypeToString(subBaseType) == "RegExp" {
 						// Reported when RegExps are forbidden, and ALSO when they are allowed but
@@ -385,7 +385,7 @@ func restrictPlusOperandsStringLike(settings restrictPlusOperandsSettings) strin
 // upstream spells with an `isTypeFlagSet` imported from its `../util`, because that import is
 // union-aware too. See the note on the rule about why the source reads as though it is not.
 func restrictPlusOperandsIsTypeFlagSetInUnion(t *checker.Type, flags checker.TypeFlags) bool {
-	for _, part := range type_checking.UnionTypeParts(t) {
+	for part := range type_checking.UnionTypePartsSeq(t) {
 		if type_checking.IsTypeFlagSet(part, flags) {
 			return true
 		}

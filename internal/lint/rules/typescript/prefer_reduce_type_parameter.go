@@ -112,7 +112,7 @@ var PreferReduceTypeParameter = rule.Rule{
 		// A non-union is its own single constituent and a non-intersection likewise, so the two
 		// nested loops read the same for a plain `number[]` as for `[number] | number[]`.
 		isArrayOrTupleThroughout := func(receiverType *checker.Type) bool {
-			for _, unionPart := range type_checking.UnionTypeParts(receiverType) {
+			for unionPart := range type_checking.UnionTypePartsSeq(receiverType) {
 				for _, part := range type_checking.IntersectionTypeParts(unionPart) {
 					if !checker.Checker_isArrayType(ctx.TypeChecker, part) &&
 						!checker.IsTupleType(part) {

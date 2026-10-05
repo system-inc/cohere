@@ -96,7 +96,7 @@ var PreferFind = rule.Rule{
 		var isArrayish func(subject *checker.Type) bool
 		isArrayish = func(subject *checker.Type) bool {
 			foundArray := false
-			for _, unionPart := range type_checking.UnionTypeParts(subject) {
+			for unionPart := range type_checking.UnionTypePartsSeq(subject) {
 				if type_checking.IsTypeFlagSet(unionPart, checker.TypeFlagsNull) ||
 					type_checking.IsTypeFlagSet(unionPart, checker.TypeFlagsUndefined) {
 					continue

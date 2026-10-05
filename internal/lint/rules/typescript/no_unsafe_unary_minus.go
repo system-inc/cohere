@@ -160,7 +160,7 @@ var NoUnsafeUnaryMinus = rule.Rule{
 
 				argType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, expr.Operand)
 
-				for _, t := range type_checking.UnionTypeParts(argType) {
+				for t := range type_checking.UnionTypePartsSeq(argType) {
 					if !type_checking.IsTypeFlagSet(t, checker.TypeFlagsAny|checker.TypeFlagsNever|checker.TypeFlagsBigIntLike|checker.TypeFlagsNumberLike) {
 						ctx.ReportNode(node, buildUnaryMinusMessage(ctx.TypeChecker.TypeToString(t)))
 						break

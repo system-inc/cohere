@@ -283,7 +283,7 @@ func singleInterpolationCollapses(ctx rule.Context, interpolation *ast.Node, isT
 // Written here rather than added to the shared shelf, because five agents are editing that package
 // right now and this is four lines over a shimmed flag.
 func isStringLikeType(subject *checker.Type) bool {
-	for _, unionPart := range type_checking.UnionTypeParts(subject) {
+	for unionPart := range type_checking.UnionTypePartsSeq(subject) {
 		matched := false
 		for _, part := range type_checking.IntersectionTypeParts(unionPart) {
 			if type_checking.IsTypeFlagSet(part, checker.TypeFlagsStringLike) {
@@ -303,7 +303,7 @@ func isStringLikeType(subject *checker.Type) bool {
 // An enum member's text in a type position is its qualified name rather than its value, so
 // splicing it in raw changes what the type says.
 func isEnumMemberType(subject *checker.Type) bool {
-	for _, unionPart := range type_checking.UnionTypeParts(subject) {
+	for unionPart := range type_checking.UnionTypePartsSeq(subject) {
 		for _, part := range type_checking.IntersectionTypeParts(unionPart) {
 			symbol := checker.Type_symbol(part)
 			if symbol != nil && symbol.ValueDeclaration != nil &&

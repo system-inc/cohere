@@ -39,6 +39,8 @@
 package type_checking
 
 import (
+	"iter"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -49,6 +51,28 @@ func UnionTypeParts(t *checker.Type) []*checker.Type {
 		return t.Types()
 	}
 	return []*checker.Type{t}
+}
+
+// UnionTypePartsSeq yields what UnionTypeParts returns, for a caller that only loops over it, as
+// strings.SplitSeq does for strings.Split.
+//
+// UnionTypeParts builds a one-element slice for every type that is not a union, and that slice
+// reaches the heap: the function is over the inlining budget (cost 88 of 80, the call to Types alone
+// is most of it), so the compiler cannot see the caller drop it. That was 1.05M objects on a cold ahra
+// run, three quarters of them from strict-void-return (#rwsffzm). This one is small enough to inline,
+// so a range loop over it allocates nothing, which TestUnionTypePartsSeqAllocatesNothing holds.
+func UnionTypePartsSeq(t *checker.Type) iter.Seq[*checker.Type] {
+	return func(yield func(*checker.Type) bool) {
+		if !IsUnionType(t) {
+			yield(t)
+			return
+		}
+		for _, part := range t.Types() {
+			if !yield(part) {
+				return
+			}
+		}
+	}
 }
 func IntersectionTypeParts(t *checker.Type) []*checker.Type {
 	if IsIntersectionType(t) {
@@ -154,7 +178,7 @@ func IsCallback(
 		}
 	}
 
-	for _, subType := range UnionTypeParts(t) {
+	for subType := range UnionTypePartsSeq(t) {
 		if len(GetCallSignatures(typeChecker, subType)) != 0 {
 			return true
 		}
@@ -172,7 +196,7 @@ func IsThenableType(
 	if t == nil {
 		t = typeChecker.GetTypeAtLocation(node)
 	}
-	for _, typePart := range UnionTypeParts(checker.Checker_getApparentType(typeChecker, t)) {
+	for typePart := range UnionTypePartsSeq(checker.Checker_getApparentType(typeChecker, t)) {
 		then := checker.Checker_getPropertyOfType(typeChecker, typePart, "then")
 		if then == nil {
 			continue
@@ -180,7 +204,7 @@ func IsThenableType(
 
 		thenType := typeChecker.GetTypeOfSymbolAtLocation(then, node)
 
-		for _, subTypePart := range UnionTypeParts(thenType) {
+		for subTypePart := range UnionTypePartsSeq(thenType) {
 			for _, signature := range checker.Checker_getSignaturesOfType(typeChecker, subTypePart, checker.SignatureKindCall) {
 				if len(checker.Signature_parameters(signature)) != 0 && IsCallback(typeChecker, checker.Signature_parameters(signature)[0], node) {
 					return true

@@ -191,7 +191,7 @@ var AwaitThenable = rule.Rule{
 					return
 				}
 
-				for _, typePart := range type_checking.UnionTypeParts(exprType) {
+				for typePart := range type_checking.UnionTypePartsSeq(exprType) {
 					if type_checking.GetWellKnownSymbolPropertyOfType(typePart, "asyncIterator", ctx.TypeChecker) != nil {
 						return
 					}
@@ -227,7 +227,7 @@ var AwaitThenable = rule.Rule{
 						continue
 					}
 
-					for _, typePart := range type_checking.UnionTypeParts(initType) {
+					for typePart := range type_checking.UnionTypePartsSeq(initType) {
 						if type_checking.GetWellKnownSymbolPropertyOfType(typePart, "asyncDispose", ctx.TypeChecker) != nil {
 							continue DeclaratorLoop
 						}
@@ -302,7 +302,7 @@ func awaitThenableIsPromiseAggregatorCall(ctx rule.Context, call *ast.Node) bool
 // awaitThenableIsAlwaysNonAwaitable is upstream's `isAlwaysNonAwaitableType`: every union part is
 // never awaitable.
 func awaitThenableIsAlwaysNonAwaitable(ctx rule.Context, node *ast.Node, t *checker.Type) bool {
-	for _, part := range type_checking.UnionTypeParts(t) {
+	for part := range type_checking.UnionTypePartsSeq(t) {
 		if type_checking.NeedsToBeAwaited(ctx.TypeChecker, node, part) != type_checking.TypeAwaitableNever {
 			return false
 		}
@@ -313,7 +313,7 @@ func awaitThenableIsAlwaysNonAwaitable(ctx rule.Context, node *ast.Node, t *chec
 // awaitThenableContainsNonAwaitable is upstream's `containsNonAwaitableType`: some union part is
 // never awaitable.
 func awaitThenableContainsNonAwaitable(ctx rule.Context, node *ast.Node, t *checker.Type) bool {
-	for _, part := range type_checking.UnionTypeParts(t) {
+	for part := range type_checking.UnionTypePartsSeq(t) {
 		if type_checking.NeedsToBeAwaited(ctx.TypeChecker, node, part) == type_checking.TypeAwaitableNever {
 			return true
 		}
@@ -327,12 +327,12 @@ func awaitThenableContainsNonAwaitable(ctx rule.Context, node *ast.Node, t *chec
 // A non-iterable argument is already a type error, so it is left to the checker. An iterable one
 // reports when any of its value types contains a part that is never awaitable.
 func awaitThenableIsInvalidAggregatorInput(ctx rule.Context, node *ast.Node, t *checker.Type) bool {
-	for _, part := range type_checking.UnionTypeParts(t) {
+	for part := range type_checking.UnionTypePartsSeq(t) {
 		if type_checking.GetWellKnownSymbolPropertyOfType(part, "iterator", ctx.TypeChecker) == nil {
 			return false
 		}
 	}
-	for _, part := range type_checking.UnionTypeParts(t) {
+	for part := range type_checking.UnionTypePartsSeq(t) {
 		for _, valueType := range awaitThenableValueTypesOfArrayLike(ctx, part) {
 			if awaitThenableContainsNonAwaitable(ctx, node, valueType) {
 				return true

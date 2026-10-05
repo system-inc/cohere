@@ -293,7 +293,7 @@ func correctnessRequireChildProcessErrorListenerNamesError(ctx rule.Context, cal
 	if eventType == nil {
 		return true
 	}
-	for _, part := range type_checking.UnionTypeParts(eventType) {
+	for part := range type_checking.UnionTypePartsSeq(eventType) {
 		if !type_checking.IsTypeFlagSet(part, checker.TypeFlagsStringLiteral) {
 			return true
 		}

@@ -194,7 +194,7 @@ func verifyTypeIsArray(typeChecker *checker.Checker, subject *checker.Type) bool
 	if subject == nil {
 		return false
 	}
-	for _, part := range type_checking.UnionTypeParts(subject) {
+	for part := range type_checking.UnionTypePartsSeq(subject) {
 		if checker.Checker_isArrayType(typeChecker, part) || checker.IsTupleType(part) {
 			return true
 		}

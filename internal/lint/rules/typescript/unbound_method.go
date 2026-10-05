@@ -307,7 +307,7 @@ func reportUnboundConstituent(
 	propertyName string,
 	subjectType *checker.Type,
 ) bool {
-	for _, unionPart := range type_checking.UnionTypeParts(subjectType) {
+	for unionPart := range type_checking.UnionTypePartsSeq(subjectType) {
 		for _, intersectionPart := range type_checking.IntersectionTypeParts(unionPart) {
 			property := checker.Checker_getPropertyOfType(ctx.TypeChecker, intersectionPart, propertyName)
 			if reportIfUnboundMethod(ctx, settings, reportNode, property) {
@@ -470,7 +470,7 @@ func accessedPropertyNames(ctx rule.Context, node *ast.Node, property *ast.Node)
 		return nil
 	}
 	var names []string
-	for _, part := range type_checking.UnionTypeParts(subscriptType) {
+	for part := range type_checking.UnionTypePartsSeq(subscriptType) {
 		if !type_checking.IsTypeFlagSet(part, checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral) {
 			continue
 		}

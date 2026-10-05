@@ -536,7 +536,7 @@ func noMisusedSpreadAwaitSuggestion(ctx rule.Context, argument *ast.Node) rule.S
 // Returns nothing when the type is a union with a non-Map constituent, matching upstream: the
 // rewrite is only sound if every constituent is a Map, and the finding is still reported without it.
 func noMisusedSpreadMapSuggestions(ctx rule.Context, spread *ast.Node, argument *ast.Node, argumentType *checker.Type) []rule.Suggestion {
-	for _, part := range type_checking.UnionTypeParts(argumentType) {
+	for part := range type_checking.UnionTypePartsSeq(argumentType) {
 		if !noMisusedSpreadIsMap(ctx, part) {
 			return nil
 		}

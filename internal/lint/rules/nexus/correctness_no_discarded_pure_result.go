@@ -182,7 +182,7 @@ func correctnessNoDiscardedPureResultIsCallable(ctx rule.Context, argument *ast.
 	if argumentType == nil {
 		return true
 	}
-	for _, part := range type_checking.UnionTypeParts(argumentType) {
+	for part := range type_checking.UnionTypePartsSeq(argumentType) {
 		if type_checking.IsTypeFlagSet(part, checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
 			return true
 		}

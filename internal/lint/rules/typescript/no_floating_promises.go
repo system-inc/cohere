@@ -328,7 +328,7 @@ var NoFloatingPromises = rule.Rule{
 			t *checker.Type,
 			matcher func(signature *checker.Signature) bool,
 		) bool {
-			for _, part := range type_checking.UnionTypeParts(t) {
+			for part := range type_checking.UnionTypePartsSeq(t) {
 				if type_checking.Some(type_checking.GetCallSignatures(ctx.TypeChecker, part), matcher) {
 					return true
 				}
@@ -343,7 +343,7 @@ var NoFloatingPromises = rule.Rule{
 		) bool {
 			t := checker.Checker_getApparentType(ctx.TypeChecker, ctx.TypeChecker.GetTypeOfSymbolAtLocation(param, node))
 
-			for _, part := range type_checking.UnionTypeParts(t) {
+			for part := range type_checking.UnionTypePartsSeq(t) {
 				if len(type_checking.GetCallSignatures(ctx.TypeChecker, part)) != 0 {
 					return true
 				}
@@ -404,7 +404,7 @@ var NoFloatingPromises = rule.Rule{
 
 		isPromiseArray := func(node *ast.Node) bool {
 			t := ctx.TypeChecker.GetTypeAtLocation(node)
-			for _, typePart := range type_checking.UnionTypeParts(t) {
+			for typePart := range type_checking.UnionTypePartsSeq(t) {
 				apparent := checker.Checker_getApparentType(ctx.TypeChecker, typePart)
 
 				if checker.Checker_isArrayType(ctx.TypeChecker, apparent) {

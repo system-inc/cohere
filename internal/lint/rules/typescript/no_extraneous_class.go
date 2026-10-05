@@ -377,7 +377,7 @@ func noExtraneousClassIsConstructorSlot(ctx rule.Context, reference *ast.Node) b
 	if contextual == nil || contextual == ctx.TypeChecker.GetTypeAtLocation(reference) {
 		return false
 	}
-	for _, part := range type_checking.UnionTypeParts(contextual) {
+	for part := range type_checking.UnionTypePartsSeq(contextual) {
 		if len(type_checking.GetConstructSignatures(ctx.TypeChecker, part)) > 0 {
 			return true
 		}

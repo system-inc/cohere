@@ -122,7 +122,7 @@ func typeIncludesUndefined(subjectType *checker.Type) bool {
 		return true
 	}
 	if type_checking.IsUnionType(subjectType) {
-		for _, part := range type_checking.UnionTypeParts(subjectType) {
+		for part := range type_checking.UnionTypePartsSeq(subjectType) {
 			if typeIncludesUndefined(part) {
 				return true
 			}

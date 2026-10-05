@@ -364,7 +364,7 @@ func noImplicitCoercionNarrowingRewrite(ctx rule.Context, node *ast.Node, operan
 	}
 
 	hasNull, hasUndefined, hasPossiblyFalsy := false, false, false
-	for _, constituent := range type_checking.UnionTypeParts(operandType) {
+	for constituent := range type_checking.UnionTypePartsSeq(operandType) {
 		switch {
 		case type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsAny):
 			// `any` absorbs a union, and truthiness does not narrow it, so nothing can be lost.
@@ -756,7 +756,7 @@ func noImplicitCoercionIsAlready(ctx rule.Context, operand *ast.Node, kinds chec
 	if operandType == nil {
 		return false
 	}
-	for _, constituent := range type_checking.UnionTypeParts(operandType) {
+	for constituent := range type_checking.UnionTypePartsSeq(operandType) {
 		if type_checking.IsTypeFlagSet(constituent, kinds) {
 			continue
 		}

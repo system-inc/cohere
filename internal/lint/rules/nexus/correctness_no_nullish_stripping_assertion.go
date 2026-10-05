@@ -215,7 +215,7 @@ func correctnessNoNullishStrippingAssertionCouldBeNullish(typeChecker *checker.C
 		if constraint == nil || constraint == candidate {
 			return true
 		}
-		for _, constraintPart := range type_checking.UnionTypeParts(constraint) {
+		for constraintPart := range type_checking.UnionTypePartsSeq(constraint) {
 			if correctnessNoNullishStrippingAssertionCouldBeNullish(typeChecker, constraintPart, depth+1) {
 				return true
 			}

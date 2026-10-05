@@ -382,7 +382,7 @@ var NoMisusedPromises = rule.Rule{
 		isAlwaysThenable := func(node *ast.Node) bool {
 			t := ctx.TypeChecker.GetTypeAtLocation(node)
 
-			for _, subType := range type_checking.UnionTypeParts(checker.Checker_getApparentType(ctx.TypeChecker, t)) {
+			for subType := range type_checking.UnionTypePartsSeq(checker.Checker_getApparentType(ctx.TypeChecker, t)) {
 				thenProp := checker.Checker_getPropertyOfType(ctx.TypeChecker, subType, "then")
 
 				// If one of the alternates has no then property, it is not thenable in all
@@ -396,7 +396,7 @@ var NoMisusedPromises = rule.Rule{
 				// be of the right form to consider it thenable.
 				thenType := ctx.TypeChecker.GetTypeOfSymbolAtLocation(thenProp, node)
 				hasThenableSignature := false
-				for _, subType := range type_checking.UnionTypeParts(thenType) {
+				for subType := range type_checking.UnionTypePartsSeq(thenType) {
 					for _, signature := range type_checking.GetCallSignatures(ctx.TypeChecker, subType) {
 						params := checker.Signature_parameters(signature)
 						if len(params) != 0 && isFunctionParam(params[0], node) {
@@ -484,7 +484,7 @@ var NoMisusedPromises = rule.Rule{
 			t *checker.Type,
 		) bool {
 			hadVoidReturn := false
-			for _, t := range type_checking.UnionTypeParts(t) {
+			for t := range type_checking.UnionTypePartsSeq(t) {
 				for _, sig := range type_checking.GetCallSignatures(ctx.TypeChecker, t) {
 					returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, sig)
 					// If a certain positional argument accepts both thenable and void returns,
@@ -617,7 +617,7 @@ var NoMisusedPromises = rule.Rule{
 			// We can't use checker.getResolvedSignature because it prefers an early '() => void' over a later '() => Promise<void>'
 			// See https://github.com/microsoft/TypeScript/issues/48077
 
-			for _, subType := range type_checking.UnionTypeParts(t) {
+			for subType := range type_checking.UnionTypePartsSeq(t) {
 				// Standard function calls and `new` have two different types of signatures
 				var signatures []*checker.Signature
 				if ast.IsCallExpression(node) {

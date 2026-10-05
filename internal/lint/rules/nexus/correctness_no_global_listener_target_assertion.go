@@ -268,7 +268,7 @@ func correctnessNoGlobalListenerTargetAssertionAt(ctx rule.Context, access *ast.
 // is a specific element type, with at least one such member.
 func correctnessNoGlobalListenerTargetAssertionIsSpecific(ctx rule.Context, asserted *checker.Type) bool {
 	specific := false
-	for _, part := range type_checking.UnionTypeParts(asserted) {
+	for part := range type_checking.UnionTypePartsSeq(asserted) {
 		if type_checking.IsTypeFlagSet(part, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
 			continue
 		}

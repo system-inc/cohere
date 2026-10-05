@@ -140,7 +140,7 @@ var NoUselessDefaultAssignment = rule.Rule{
 			if type_checking.IsTypeAnyType(subject) || type_checking.IsTypeUnknownType(subject) {
 				return true
 			}
-			for _, part := range type_checking.UnionTypeParts(subject) {
+			for part := range type_checking.UnionTypePartsSeq(subject) {
 				if type_checking.IsTypeFlagSet(part, checker.TypeFlagsUndefined) {
 					return true
 				}
@@ -400,7 +400,7 @@ func contextualParameterType(ctx rule.Context, node *ast.Node) (*checker.Type, b
 		if type_checking.IsTypeAnyType(parameterType) || type_checking.IsTypeUnknownType(parameterType) {
 			return nil, false
 		}
-		for _, part := range type_checking.UnionTypeParts(parameterType) {
+		for part := range type_checking.UnionTypePartsSeq(parameterType) {
 			if type_checking.IsTypeFlagSet(part, checker.TypeFlagsUndefined) {
 				return nil, false
 			}

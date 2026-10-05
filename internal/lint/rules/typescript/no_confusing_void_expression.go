@@ -574,7 +574,7 @@ func isConfusingVoidReturningFunction(ctx rule.Context, function *ast.Node) bool
 	if contextualType == nil {
 		return false
 	}
-	for _, part := range type_checking.UnionTypeParts(contextualType) {
+	for part := range type_checking.UnionTypePartsSeq(contextualType) {
 		for _, signature := range ctx.TypeChecker.GetSignaturesOfType(part, checker.SignatureKindCall) {
 			if confusingVoidTypeIncludesVoid(ctx.TypeChecker.GetReturnTypeOfSignature(signature)) {
 				return true
@@ -619,7 +619,7 @@ func confusingVoidTypeIncludesVoid(subject *checker.Type) bool {
 	if subject == nil {
 		return false
 	}
-	for _, part := range type_checking.UnionTypeParts(subject) {
+	for part := range type_checking.UnionTypePartsSeq(subject) {
 		if type_checking.IsIntrinsicVoidType(part) {
 			return true
 		}

@@ -243,7 +243,7 @@ func couldBeNullish(typeChecker *checker.Checker, candidate *checker.Type) bool 
 	}
 
 	if type_checking.IsUnionType(candidate) {
-		for _, part := range type_checking.UnionTypeParts(candidate) {
+		for part := range type_checking.UnionTypePartsSeq(candidate) {
 			if couldBeNullish(typeChecker, part) {
 				return true
 			}

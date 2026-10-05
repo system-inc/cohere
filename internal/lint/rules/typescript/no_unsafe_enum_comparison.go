@@ -361,7 +361,7 @@ func noUnsafeEnumComparisonEnumValueKind(t *checker.Type) noUnsafeEnumValueKind 
 // swapped for the other reading. `TestNoUnsafeEnumComparisonReadsUnionsConstituentwise` pins it.
 func noUnsafeEnumComparisonEnumTypes(typeChecker *checker.Checker, t *checker.Type) []*checker.Type {
 	var enumTypes []*checker.Type
-	for _, part := range type_checking.UnionTypeParts(t) {
+	for part := range type_checking.UnionTypePartsSeq(t) {
 		if !type_checking.IsTypeFlagSet(part, checker.TypeFlagsEnumLiteral) {
 			continue
 		}

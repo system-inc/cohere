@@ -363,7 +363,7 @@ func consistencyRequireMatchingReturnTypeContextualReturnType(ctx rule.Context, 
 		return nil
 	}
 	var returnTypes []*checker.Type
-	for _, part := range type_checking.UnionTypeParts(contextual) {
+	for part := range type_checking.UnionTypePartsSeq(contextual) {
 		if part == nil {
 			continue
 		}
@@ -429,7 +429,7 @@ func consistencyRequireMatchingReturnTypeClassify(
 	// The union's constituents OR'd, not the type's own flags: `string | void` is a union whose own
 	// flags carry no Void bit, and the shelf's `IsTypeFlagSet` would answer false for it.
 	var combined checker.TypeFlags
-	for _, part := range type_checking.UnionTypeParts(returnType) {
+	for part := range type_checking.UnionTypePartsSeq(returnType) {
 		if part != nil {
 			combined |= checker.Type_flags(part)
 		}

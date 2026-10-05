@@ -461,7 +461,7 @@ func buttonHasTypeProvenPermitted(ctx rule.Context, expression *ast.Node, settin
 	if expressionType == nil {
 		return false
 	}
-	for _, constituent := range type_checking.UnionTypeParts(expressionType) {
+	for constituent := range type_checking.UnionTypePartsSeq(expressionType) {
 		if !type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsStringLiteral) {
 			return false
 		}

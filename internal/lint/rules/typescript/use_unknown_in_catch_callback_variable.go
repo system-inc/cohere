@@ -159,7 +159,7 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 			if handlerType == nil {
 				return false
 			}
-			for _, unionPart := range type_checking.UnionTypeParts(handlerType) {
+			for unionPart := range type_checking.UnionTypePartsSeq(handlerType) {
 				for _, callSignature := range type_checking.GetCallSignatures(ctx.TypeChecker, unionPart) {
 					parameters := checker.Signature_parameters(callSignature)
 					if len(parameters) == 0 {
