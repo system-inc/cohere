@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -221,5 +222,58 @@ func TestOrdinalSaysAPlaceAsAPersonWould(t *testing.T) {
 		if got := ordinal(place); got != want {
 			t.Errorf("ordinal(%d) is %q, want %q", place, got, want)
 		}
+	}
+}
+
+// A run makes itself nice, so the go command and test binaries it starts inherit it and yield the machine
+// to a person; --full-priority keeps the priority it was started with, for a timed measurement, and never
+// reaches go test (#2qc6j8g). Shown at nice 19 through COHERE_DEV_NICENESS, since the house runs its tests
+// at nice 10 already, where a run that failed to lower itself would look the same as one that did.
+func TestARunIsNiceUnlessItAsksForFullPriority(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("nice is a Unix priority")
+	}
+	wrapper := filepath.Join(t.TempDir(), "cohere-dev")
+	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
+		t.Fatalf("building: %v\n%s", err, output)
+	}
+	// A go that says how nice it is and what it was asked.
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\necho nice=$(ps -o nice= -p $$ | tr -d ' ') \"$@\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	niceOf := func(arguments ...string) (int, string) {
+		t.Helper()
+		command := exec.Command(wrapper, append([]string{"test"}, arguments...)...)
+		command.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), nicenessVariable+"=19")
+		output, err := command.CombinedOutput()
+		if err != nil {
+			t.Fatalf("cohere-dev test %v: %v\n%s", arguments, err, output)
+		}
+		fields := strings.Fields(strings.TrimPrefix(strings.TrimSpace(string(output)), "nice="))
+		nice, err := strconv.Atoi(fields[0])
+		if err != nil {
+			t.Fatalf("the stand-in go printed %q", output)
+		}
+		return nice, strings.Join(fields[1:], " ")
+	}
+	output, err := exec.Command("ps", "-o", "nice=", "-p", strconv.Itoa(os.Getpid())).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	own, err := strconv.Atoi(strings.TrimSpace(string(output)))
+	if err != nil {
+		t.Fatalf("ps printed %q for this test's nice", output)
+	}
+
+	if own == 19 {
+		t.Skip("this test already runs at nice 19, the most a run can lower itself, so lowering cannot be seen")
+	}
+	if nice, asked := niceOf("./internal/edit"); nice != 19 || asked != "test ./internal/edit" {
+		t.Errorf("a default run's go ran at nice %d asked %q, want nice 19 asked %q", nice, asked, "test ./internal/edit")
+	}
+	if nice, asked := niceOf("--full-priority", "./internal/edit"); nice != own || asked != "test ./internal/edit" {
+		t.Errorf("a --full-priority run's go ran at nice %d asked %q, want this test's own nice %d and the flag left out", nice, asked, own)
 	}
 }
