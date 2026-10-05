@@ -115,6 +115,7 @@ func RunWithOptions(t *testing.T, subject rule.Rule, fileName string, sourceText
 		walk(sourceFile.AsNode(), listeners)
 	}
 
+	expectEachFixParses(t, sourceFile, diagnostics)
 	return Result{Diagnostics: diagnostics, SourceFile: sourceFile, capture: captured}
 }
 

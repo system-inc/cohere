@@ -25,14 +25,35 @@ var messageUnexpectedDebugger = rule.Message{
 // likely person to notice.
 //
 // The fix removes the statement rather than commenting it out. There is no form of this statement
-// that belongs in committed code, so there is nothing to preserve.
+// that belongs in committed code, so there is nothing to preserve. ESLint offers no fix at all; this
+// one is ours, and it is offered only where the statement sits in a list of statements. As the whole
+// body of an unbraced `if`, a loop or a label, removing it leaves `if (foo)` with no statement, which
+// does not parse (ESLint's own corpus row, caught by the harness's fix-parses check, #kq9vtva), so
+// there the finding stands without a repair.
 var NoDebugger = rule.Rule{
 	Name: "no-debugger",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDebuggerStatement: func(node *ast.Node) {
+				if !noDebuggerSitsInAStatementList(node) {
+					ctx.ReportNode(node, messageUnexpectedDebugger)
+					return
+				}
 				ctx.ReportNodeWithFixes(node, messageUnexpectedDebugger, ctx.RemoveNode(node))
 			},
 		}
 	},
+}
+
+// noDebuggerSitsInAStatementList reports whether removing the statement leaves its parent whole: a
+// block, a file, a module body or a case clause holds a list, and losing one entry of it is fine.
+func noDebuggerSitsInAStatementList(node *ast.Node) bool {
+	if node.Parent == nil {
+		return false
+	}
+	switch node.Parent.Kind {
+	case ast.KindBlock, ast.KindSourceFile, ast.KindModuleBlock, ast.KindCaseClause, ast.KindDefaultClause:
+		return true
+	}
+	return false
 }

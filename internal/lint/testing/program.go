@@ -301,6 +301,7 @@ func runTypedFiles(
 		walk(sourceFile.AsNode(), listeners)
 	}
 
+	expectEachFixParses(t, sourceFile, diagnostics)
 	return Result{
 		Diagnostics: diagnostics,
 		SourceFile:  sourceFile,

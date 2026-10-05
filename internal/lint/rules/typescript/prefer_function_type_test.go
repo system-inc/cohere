@@ -535,3 +535,32 @@ func TestPreferFunctionTypeKeepsTheExport(t *testing.T) {
 		rule_testing.ExpectFixedSource(t, result, testCase.want)
 	}
 }
+
+// TestPreferFunctionTypeKeepsATypeParameterListWrittenOnePerLine is trpc's mutationOptions.ts,
+// reduced. A list written one parameter per line ends in a trailing comma and a newline before its
+// `>`, and the alias used to be cut one byte past the last parameter, at the comma, so the fix read
+// `type Options<TDef, TFlags extends object = {}, = ...` and did not parse (TS1139, #kq9vtva).
+// Upstream slices from the name through the list's own closing bracket, so the comma and the newline
+// survive into the alias, as they do here.
+func TestPreferFunctionTypeKeepsATypeParameterListWrittenOnePerLine(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		sourceText string
+		want       string
+	}{
+		{
+			"export interface Options<\n  TDef,\n  TFlags extends object = {},\n> {\n  <TContext = unknown>(opts?: TDef): TContext;\n}\n",
+			"export type Options<\n  TDef,\n  TFlags extends object = {},\n> = <TContext = unknown>(opts?: TDef) => TContext;\n",
+		},
+		{
+			"interface Options<T,> {\n  (value: T): void;\n}\n",
+			"type Options<T,> = (value: T) => void;\n",
+		},
+	}
+	for _, testCase := range cases {
+		result := rule_testing.Run(t, PreferFunctionType, preferFunctionTypeFile, testCase.sourceText)
+		rule_testing.ExpectFindings(t, result, "functionTypeOverCallableType")
+		rule_testing.ExpectFixedSource(t, result, testCase.want)
+	}
+}

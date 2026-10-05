@@ -308,7 +308,31 @@ func arrowFunctionFix(ctx rule.Context, node *ast.Node) (rule.Fix, bool) {
 		replacementBody = "{ return " + text[bodyRange.Pos():bodyRange.End()] + "; }"
 	}
 
-	return ctx.ReplaceNode(node, asyncKeyword+"function"+generics+signature+" "+replacementBody), true
+	replacement := asyncKeyword + "function" + generics + signature + " " + replacementBody
+	// A statement that begins with `function` is a declaration, and a declaration needs a name, so an
+	// arrow that leads an expression statement, `() => { ... };`, rewritten bare read as a nameless
+	// declaration and did not parse (TS1003, two trpc test files, #kq9vtva). Parenthesized it stays
+	// the expression it was.
+	if arrowLeadsExpressionStatement(sourceFile, node) {
+		replacement = "(" + replacement + ")"
+	}
+	return ctx.ReplaceNode(node, replacement), true
+}
+
+// arrowLeadsExpressionStatement reports whether the arrow's first token is its statement's first token,
+// in an expression statement, where a leading `function` would start a declaration instead.
+func arrowLeadsExpressionStatement(sourceFile *ast.SourceFile, node *ast.Node) bool {
+	start := rule.TokenRange(sourceFile, node).Pos()
+	for current := node; current.Parent != nil; current = current.Parent {
+		parent := current.Parent
+		if rule.TokenRange(sourceFile, parent).Pos() != start {
+			return false
+		}
+		if parent.Kind == ast.KindExpressionStatement {
+			return true
+		}
+	}
+	return false
 }
 
 // readsInheritedBinding reports whether an arrow reads something it inherits and a function would
