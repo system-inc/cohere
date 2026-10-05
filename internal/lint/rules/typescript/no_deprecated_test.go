@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -180,15 +181,16 @@ func runNoDeprecatedCases(t *testing.T, cases []noDeprecatedCase) {
 // the failure mode this whole file is arranged against, so the link is what makes those three
 // assertions mean anything.
 //
-// The test skips rather than fails when the packages are not installed, because their absence says
-// nothing about the rule.
+// The packages are ahra's installed ones, so the case skips where the ahra corpus is not set, and the gate
+// names it as not covered (#sycrdr6). Where it is set, a missing @types/react fails: the corpus is there and
+// the case would otherwise read nothing.
 func linkInstalledTypesForNoDeprecated(t *testing.T) func(string) {
 	t.Helper()
 	return func(directory string) {
-		source := "/Users/kirkouimet/Projects/ahra/node_modules"
+		source := corpus.Ahra.Path(t, "node_modules")
 		if _, err := os.Stat(filepath.Join(source, "@types", "react")); err != nil {
-			t.Skipf("this case reads its deprecation from an installed @types package, and %s is "+
-				"not present: %v", source, err)
+			t.Fatalf("this case reads its deprecation from @types/react, which the ahra corpus at %s does "+
+				"not have installed: %v", source, err)
 		}
 		if err := os.Symlink(source, filepath.Join(directory, "node_modules")); err != nil {
 			t.Fatalf("linking node_modules into the fixture: %v", err)
