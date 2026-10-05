@@ -65,18 +65,18 @@ func swiftPackage(t *testing.T, parent string) string {
 }
 
 // runInstalled runs an installed cohere from directory with no engine named by the override, so the
-// run resolves its engine the way an installed one does.
+// run resolves its engine the way an installed one does. The override is cleared in the child's
+// environment alone, not this process's, so the tests that call it run in parallel (#nxgt2ca).
 func runInstalled(t *testing.T, binary string, directory string, arguments ...string) (string, int) {
 	t.Helper()
-	t.Setenv(dispatch.SwiftEngineOverrideVariable, "")
-	return runCohere(t, binary, directory, arguments...)
+	return runCohereWithEnvironment(t, binary, directory, []string{dispatch.SwiftEngineOverrideVariable + "="}, arguments...)
 }
 
 // A released cohere runs the engine its package ships beside it, with no checkout anywhere, reached
 // through a symlink the way a package manager's `bin` link reaches it.
-// Not parallel: it clears the Swift engine override variable with t.Setenv through runInstalled, which a parallel test
-// may not
 func TestAReleasedCohereRunsTheEngineShippedBesideIt(t *testing.T) {
+	t.Parallel()
+
 	binary := installCohere(t, "1.0.0")
 	invoked := placeSiblingEngine(t, binary)
 	link := filepath.Join(t.TempDir(), "cohere")
@@ -116,9 +116,9 @@ func TestAReleasedCohereRunsTheEngineShippedBesideIt(t *testing.T) {
 // A released cohere with no engine beside it is a broken install, and says so, even standing inside a
 // cohere checkout it could build one from: an engine built there would run unpaired rules under the
 // release's version.
-// Not parallel: it clears the Swift engine override variable with t.Setenv through runInstalled, which a parallel test
-// may not
 func TestAReleasedCohereWithNoEngineBesideItNeverBuildsOne(t *testing.T) {
+	t.Parallel()
+
 	binary := installCohere(t, "1.0.0")
 	checkout := t.TempDir()
 	writeTree(t, checkout, map[string]string{
@@ -151,9 +151,9 @@ func TestAReleasedCohereWithNoEngineBesideItNeverBuildsOne(t *testing.T) {
 
 // A development cohere never takes an engine from beside itself, so a stale cohere-swift next to a
 // `go build -o` cannot run in place of the checkout's. Outside a checkout it has none, and says so.
-// Not parallel: it clears the Swift engine override variable with t.Setenv through runInstalled, which a parallel test
-// may not
 func TestADevelopmentCohereIgnoresAnEngineBesideIt(t *testing.T) {
+	t.Parallel()
+
 	binary := installCohere(t, "")
 	invoked := placeSiblingEngine(t, binary)
 	root := swiftPackage(t, "")

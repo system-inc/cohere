@@ -79,8 +79,20 @@ func buildCohere(t *testing.T) string {
 // runCohere runs the binary from a directory and returns its combined output and exit code.
 func runCohere(t *testing.T, binary string, directory string, arguments ...string) (string, int) {
 	t.Helper()
+	return runCohereWithEnvironment(t, binary, directory, nil, arguments...)
+}
+
+// runCohereWithEnvironment is runCohere with variables set for the binary alone, each "NAME=value"
+// overriding this process's own. A test that sets them this way rather than with t.Setenv can run in
+// parallel (#nxgt2ca).
+func runCohereWithEnvironment(t *testing.T, binary string, directory string, environment []string, arguments ...string) (string, int) {
+	t.Helper()
 	command := exec.Command(binary, verboseArguments(arguments)...)
 	command.Dir = directory
+	if environment != nil {
+		// A later "NAME=value" wins over an earlier one for the same name.
+		command.Env = append(os.Environ(), environment...)
+	}
 	output, err := command.CombinedOutput()
 	if err == nil {
 		return string(output), 0

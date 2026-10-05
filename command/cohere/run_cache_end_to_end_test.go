@@ -52,82 +52,6 @@ func TestMain(m *testing.M) {
 func TestRunCacheEndToEnd(t *testing.T) {
 	t.Parallel()
 	binary := buildCohere(t)
-	home := t.TempDir()
-	root := t.TempDir()
-
-	git := func(arguments ...string) {
-		t.Helper()
-		command := exec.Command("git", arguments...)
-		command.Dir = root
-		command.Env = append(os.Environ(), "HOME="+home)
-		if output, err := command.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", arguments, err, output)
-		}
-	}
-	write := func(name, contents string) {
-		t.Helper()
-		path := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	remove := func(name string) {
-		t.Helper()
-		if err := os.RemoveAll(filepath.Join(root, name)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	commit := func(message string) {
-		t.Helper()
-		git("add", "-A")
-		git("commit", "--quiet", "--allow-empty", "-m", message)
-	}
-
-	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`)
-	write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`)
-	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
-	write(".gitignore", ".cache/\nnode_modules/\n")
-	write("source/a.ts", "export const a: number = 1;\n")
-	write("source/nested/b.ts", "import { a } from \"../a\";\nexport const b = a + 1;\n")
-	write("docs/keep.md", "keep\n")
-	git("init", "--quiet")
-	git("config", "user.email", "fixture@example.com")
-	git("config", "user.name", "fixture")
-	commit("initial")
-
-	// run launches the binary bare unless arguments are given; bare and `--no-fix` are the shapes the
-	// run cache serves. cached false is the cold truth every cached result is held against.
-	run := func(cached bool, arguments ...string) (string, int) {
-		t.Helper()
-		command := exec.Command(binary, verboseArguments(arguments)...)
-		command.Dir = root
-		environment := []string{"HOME=" + home}
-		for _, variable := range os.Environ() {
-			if !strings.HasPrefix(variable, "HOME=") {
-				environment = append(environment, variable)
-			}
-		}
-		if !cached {
-			command.Args = append(command.Args, "--no-cache")
-		}
-		// What the cache notices is the subject here, not formatting: the fixture's JSON is written unformatted
-		// on purpose, and a run that formats it is a run that writes, which is never recorded.
-		command.Args = append(command.Args, "--no-format")
-		command.Env = environment
-		output, err := command.CombinedOutput()
-		if err == nil {
-			return string(output), 0
-		}
-		exitError, isExit := err.(*exec.ExitError)
-		if !isExit {
-			t.Fatalf("running cohere: %v\n%s", err, output)
-		}
-		return string(output), exitError.ExitCode()
-	}
-
 	// Gigabytes too: the memory line reads available memory live, so two runs a second apart differ there.
 	durations := regexp.MustCompile(`\d+(\.\d+)?(ms|s|µs| GB)\b`)
 	// The findings cache's clause says how much of the verdict was remembered; a cold run never has it,
@@ -146,7 +70,6 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	normalized := func(output string) string {
 		return typesClause.ReplaceAllString(footerLine.ReplaceAllString(totalLine.ReplaceAllString(cacheOffLine.ReplaceAllString(layerTwoClause.ReplaceAllString(durations.ReplaceAllString(output, "T"), ""), ""), ""), ""), "")
 	}
-	isReplay := func(output string) bool { return strings.HasPrefix(output, "cached: ") }
 	keepLines := func(output string, drop ...string) string {
 		kept := []string{}
 	line:
@@ -177,113 +100,92 @@ func TestRunCacheEndToEnd(t *testing.T) {
 		return strings.Join(lines, "\n")
 	}
 
-	establishHit := func() {
-		t.Helper()
-		run(true)
-		if output, _ := run(true); !isReplay(output) {
-			t.Fatalf("an unchanged tree did not replay, so nothing below can show a change was noticed:\n%s", output)
-		}
-	}
-
 	// layerTwo says whether the run after the change should serve unchanged files from the findings
 	// cache. A change to the lint config or the tsconfig changes the cache's key, so nothing may be
 	// replayed; any other change leaves the untouched files replayable.
 	scenarios := []struct {
 		name     string
 		layerTwo bool
-		prepare  func()
-		change   func()
-		undo     func()
+		prepare  func(fixture *runCacheFixture)
+		change   func(fixture *runCacheFixture)
 	}{
 		// Type errors rather than lint findings: a finding with a fixer is rewritten by the run that
 		// sees it, which is the fix-run case below and a different property.
 		{"a source file edited to add a finding", true, nil,
-			func() { write("source/a.ts", "export const a: number = \"x\";\n") },
-			func() { write("source/a.ts", "export const a: number = 1;\n") }},
+			func(fixture *runCacheFixture) { fixture.write("source/a.ts", "export const a: number = \"x\";\n") }},
 		// The same size and the old modification time, as cp -p, rsync -t and touch -r leave a file: only
 		// the change time and the bytes moved.
 		{"a same-size edit with its modification time restored", true, nil,
-			func() {
-				information, err := os.Stat(filepath.Join(root, "source/a.ts"))
+			func(fixture *runCacheFixture) {
+				information, err := os.Stat(filepath.Join(fixture.root, "source/a.ts"))
 				if err != nil {
-					t.Fatal(err)
+					fixture.t.Fatal(err)
 				}
 				time.Sleep(10 * time.Millisecond)
-				write("source/a.ts", "export const a: string = 1;\n")
-				if err := os.Chtimes(filepath.Join(root, "source/a.ts"), information.ModTime(), information.ModTime()); err != nil {
-					t.Fatal(err)
+				fixture.write("source/a.ts", "export const a: string = 1;\n")
+				if err := os.Chtimes(filepath.Join(fixture.root, "source/a.ts"), information.ModTime(), information.ModTime()); err != nil {
+					fixture.t.Fatal(err)
 				}
-			},
-			func() { write("source/a.ts", "export const a: number = 1;\n") }},
+			}},
 		{"a file added at the top level", true, nil,
-			func() { write("source/z.ts", "export const z: number = \"x\";\n") },
-			func() { remove("source/z.ts") }},
+			func(fixture *runCacheFixture) { fixture.write("source/z.ts", "export const z: number = \"x\";\n") }},
 		// The case the design first missed: a file added one directory down moves only that
 		// directory's mtime.
 		{"a file added in a nested directory", true, nil,
-			func() { write("source/nested/y.ts", "export const y: number = \"x\";\n") },
-			func() { remove("source/nested/y.ts") }},
+			func(fixture *runCacheFixture) {
+				fixture.write("source/nested/y.ts", "export const y: number = \"x\";\n")
+			}},
 		{"a file deleted", true, nil,
-			func() { remove("source/nested/b.ts") },
-			func() { write("source/nested/b.ts", "import { a } from \"../a\";\nexport const b = a + 1;\n") }},
+			func(fixture *runCacheFixture) { fixture.remove("source/nested/b.ts") }},
 		{"the lint config changed", false, nil,
-			func() {
-				write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error","prefer-const":"error"}}`)
-			},
-			func() {
-				write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`)
+			func(fixture *runCacheFixture) {
+				fixture.write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error","prefer-const":"error"}}`)
 			}},
 		// Only the base is edited, and it is untracked, so git reports the same changed files before and
 		// after and the scope fact cannot see it. The run cache's declared inputs and the findings
 		// cache's key must each name every file in the extends chain, or both replay the old verdict.
 		{"a base the lint config extends changed", false,
-			func() {
-				write("lint/base.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`)
-				write("CohereSettings.json", `{"extends":"./lint/base.json","rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off"}}`)
+			func(fixture *runCacheFixture) {
+				fixture.write("lint/base.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`)
+				fixture.write("CohereSettings.json", `{"extends":"./lint/base.json","rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off"}}`)
 			},
-			func() {
-				write("lint/base.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error","prefer-const":"error"}}`)
-			},
-			func() {
-				write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`)
-				remove("lint")
+			func(fixture *runCacheFixture) {
+				fixture.write("lint/base.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error","prefer-const":"error"}}`)
 			}},
 		{"the tsconfig changed", false, nil,
-			func() {
-				write("tsconfig.json", `{"compilerOptions":{"strict":false,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`)
-			},
-			func() {
-				write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`)
+			func(fixture *runCacheFixture) {
+				fixture.write("tsconfig.json", `{"compilerOptions":{"strict":false,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`)
 			}},
 		{"package.json edited in place", true, nil,
-			func() { write("package.json", `{"name":"fixture","private":true,"type":"commonjs"}`) },
-			func() { write("package.json", `{"name":"fixture","private":true,"type":"module"}`) }},
+			func(fixture *runCacheFixture) {
+				fixture.write("package.json", `{"name":"fixture","private":true,"type":"commonjs"}`)
+			}},
 		// node_modules is ignored, so git never mentions it and the scope fact cannot see this. Only
 		// the input recorder can: the build read this declaration, so its signature is an input.
 		{"a dependency's declaration changed", true,
-			func() {
-				write("node_modules/dep/package.json", `{"name":"dep","types":"index.d.ts"}`)
-				write("node_modules/dep/index.d.ts", "export declare const d: number;\n")
-				write("source/u.ts", "import { d } from \"dep\";\nexport const u: number = d;\n")
+			func(fixture *runCacheFixture) {
+				fixture.write("node_modules/dep/package.json", `{"name":"dep","types":"index.d.ts"}`)
+				fixture.write("node_modules/dep/index.d.ts", "export declare const d: number;\n")
+				fixture.write("source/u.ts", "import { d } from \"dep\";\nexport const u: number = d;\n")
 			},
-			func() { write("node_modules/dep/index.d.ts", "export declare const d: string;\n") },
-			func() { remove("source/u.ts"); remove("node_modules") }},
+			func(fixture *runCacheFixture) {
+				fixture.write("node_modules/dep/index.d.ts", "export declare const d: string;\n")
+			}},
 	}
 
 	for _, scenario := range scenarios {
-		// Not parallel: each scenario changes and runs the one fixture repository at root and undoes its change after,
-		// so two at once would each see the other's edit
 		t.Run(scenario.name, func(t *testing.T) {
+			t.Parallel()
+			fixture := newRunCacheFixture(t, binary)
 			if scenario.prepare != nil {
-				scenario.prepare()
+				scenario.prepare(fixture)
 			}
-			establishHit()
-			scenario.change()
-			defer scenario.undo()
+			fixture.establishHit()
+			scenario.change(fixture)
 
-			afterChange, afterChangeExit := run(true)
-			cold, coldExit := run(false)
-			if isReplay(afterChange) {
+			afterChange, afterChangeExit := fixture.run(true)
+			cold, coldExit := fixture.run(false)
+			if isRunCacheReplay(afterChange) {
 				t.Fatalf("the change was not noticed: the recorded run was replayed as current:\n%s", afterChange)
 			}
 			// The clause rides on the lint line, and a run whose types bail prints no lint line at all, as a
@@ -302,8 +204,8 @@ func TestRunCacheEndToEnd(t *testing.T) {
 					afterChangeExit, coldExit, afterChange, cold)
 			}
 
-			next, nextExit := run(true)
-			if !isReplay(next) {
+			next, nextExit := fixture.run(true)
+			if !isRunCacheReplay(next) {
 				t.Fatalf("the run after that did not replay the new truth:\n%s", next)
 			}
 			// Under zero config the sets line comes first, and it replays as it was: which sets applied is the
@@ -326,33 +228,30 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// key, because the run printed git's changed set; it no longer asks git, and with no formatter its
 	// format scope is a constant, so a replay here is correct. The proof is that it equals the cold run.
 	for _, scenario := range []struct {
-		name          string
-		prepare, undo func()
-		change        func()
+		name    string
+		prepare func(fixture *runCacheFixture)
+		change  func(fixture *runCacheFixture)
 	}{
 		// A commit makes a changed file unchanged and moves no file's mtime.
 		{"an uncommitted change committed",
-			func() { write("source/a.ts", "export const a: number = 2;\n") },
-			func() { write("source/a.ts", "export const a: number = 1;\n"); commit("restore") },
-			func() { commit("commit the change") }},
+			func(fixture *runCacheFixture) { fixture.write("source/a.ts", "export const a: number = 2;\n") },
+			func(fixture *runCacheFixture) { fixture.commit("commit the change") }},
 		// docs exists and is tracked, and the build reads nothing in it, so no watched directory moves.
 		{"an untracked file in a directory the build never reads", nil,
-			func() { remove("docs/notes.md") },
-			func() { write("docs/notes.md", "notes\n") }},
+			func(fixture *runCacheFixture) { fixture.write("docs/notes.md", "notes\n") }},
 	} {
-		// Not parallel: each scenario changes and runs the one fixture repository at root and undoes its change after,
-		// so two at once would each see the other's edit
 		t.Run(scenario.name, func(t *testing.T) {
+			t.Parallel()
+			fixture := newRunCacheFixture(t, binary)
 			if scenario.prepare != nil {
-				scenario.prepare()
+				scenario.prepare(fixture)
 			}
-			establishHit()
-			scenario.change()
-			defer scenario.undo()
+			fixture.establishHit()
+			scenario.change(fixture)
 
-			replayed, replayedExit := run(true)
-			cold, coldExit := run(false)
-			if isReplay(replayed) && (replayBody(replayed) != verdict(cold) || replayedExit != coldExit) {
+			replayed, replayedExit := fixture.run(true)
+			cold, coldExit := fixture.run(false)
+			if isRunCacheReplay(replayed) && (replayBody(replayed) != verdict(cold) || replayedExit != coldExit) {
 				t.Fatalf("the replay is not the cold run's verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
 					replayedExit, coldExit, replayBody(replayed), verdict(cold))
 			}
@@ -362,18 +261,18 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// A run whose fix phase rewrites a file is never replayed. The record step stats inputs after the
 	// rewrite, so without the decline the next run would match the fixed tree and replay "1 of 1 files
 	// rewritten" over a tree it never touched.
-	// Not parallel: it edits and runs the one fixture repository at root that every subtest here shares
 	t.Run("a fix run is not replayed", func(t *testing.T) {
-		establishHit()
-		write("source/a.ts", "export const a: number = 1;\ndebugger;\n")
-		defer write("source/a.ts", "export const a: number = 1;\n")
+		t.Parallel()
+		fixture := newRunCacheFixture(t, binary)
+		fixture.establishHit()
+		fixture.write("source/a.ts", "export const a: number = 1;\ndebugger;\n")
 
-		fixRun, _ := run(true)
+		fixRun, _ := fixture.run(true)
 		if !strings.Contains(fixRun, "1 of 1 files rewritten") {
 			t.Fatalf("the fix run rewrote nothing, so this case proves nothing:\n%s", fixRun)
 		}
-		next, _ := run(true)
-		cold, _ := run(false)
+		next, _ := fixture.run(true)
+		cold, _ := fixture.run(false)
 		if strings.Contains(next, "files rewritten, 1 fixes applied") {
 			t.Fatalf("the rewrite was replayed over a tree nothing touched:\n%s", next)
 		}
@@ -385,23 +284,23 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// `--no-fix` is cached on its own key: it records and replays, and it never replays a bare run's
 	// verdict or hands its own to one. The two print different reports, since `--no-fix` reports what a
 	// writing run would rewrite, so either one replayed as the other would be a wrong report.
-	// Not parallel: it runs against the one fixture repository at root that every subtest here shares, and needs its
-	// cache to hold only its own runs
 	t.Run("--no-fix is cached apart from a bare run", func(t *testing.T) {
-		establishHit()
-		if output, _ := run(true, "--no-fix"); isReplay(output) {
+		t.Parallel()
+		fixture := newRunCacheFixture(t, binary)
+		fixture.establishHit()
+		if output, _ := fixture.run(true, "--no-fix"); isRunCacheReplay(output) {
 			t.Fatalf("the first --no-fix run replayed, so it was served the bare run's recording:\n%s", output)
 		}
-		replayed, replayedExit := run(true, "--no-fix")
-		if !isReplay(replayed) {
+		replayed, replayedExit := fixture.run(true, "--no-fix")
+		if !isRunCacheReplay(replayed) {
 			t.Fatalf("an unchanged --no-fix run did not replay its own recording:\n%s", replayed)
 		}
-		cold, coldExit := run(false, "--no-fix")
+		cold, coldExit := fixture.run(false, "--no-fix")
 		if replayBody(replayed) != verdict(cold) || replayedExit != coldExit {
 			t.Fatalf("the --no-fix replay is not the cold --no-fix verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
 				replayedExit, coldExit, replayBody(replayed), verdict(cold))
 		}
-		if bare, _ := run(true); !isReplay(bare) {
+		if bare, _ := fixture.run(true); !isRunCacheReplay(bare) {
 			t.Fatalf("the bare run lost its own recording to the --no-fix one:\n%s", bare)
 		}
 	})
@@ -409,22 +308,23 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// A cache table that cannot be trusted is thrown away, file by file, said so once, and replaced.
 	// Overwritten rather than deleted, because a missing table is a first run and proves nothing about the
 	// discard.
-	// Not parallel: it overwrites the cache table of the one fixture repository at root that every subtest here shares
 	t.Run("a corrupt cache table is discarded, said so, and rewritten", func(t *testing.T) {
-		establishHit()
-		// The table is the project's own, and the isolated home holds none.
-		tables := cacheTableFiles(t, root)
+		t.Parallel()
+		fixture := newRunCacheFixture(t, binary)
+		fixture.establishHit()
+		// The table is the project's own, and the isolated fixture.home holds none.
+		tables := cacheTableFiles(t, fixture.root)
 		if len(tables) == 0 {
-			t.Fatalf("no cache table in the project %s", root)
+			t.Fatalf("no cache table in the project %s", fixture.root)
 		}
-		filepath.WalkDir(home, func(path string, entry os.DirEntry, err error) error {
+		filepath.WalkDir(fixture.home, func(path string, entry os.DirEntry, err error) error {
 			if err == nil && !entry.IsDir() && strings.HasSuffix(entry.Name(), ".gob") {
-				t.Errorf("a cache table landed in the user's home: %s", path)
+				t.Errorf("a cache table landed in the user's fixture.home: %s", path)
 			}
 			return nil
 		})
 		// Every run here leaves formatting out (see run), so the bare run is recorded as `--no-format`.
-		if dump, _ := run(true, "--cache-dump"); !strings.Contains(dump, "runs: ") || !strings.Contains(dump, "--no-format: recorded ") {
+		if dump, _ := fixture.run(true, "--cache-dump"); !strings.Contains(dump, "runs: ") || !strings.Contains(dump, "--no-format: recorded ") {
 			t.Fatalf("--cache-dump did not show the bare run it just recorded:\n%s", dump)
 		}
 		for _, table := range tables {
@@ -432,13 +332,13 @@ func TestRunCacheEndToEnd(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		if dump, _ := run(true, "--cache-dump"); !strings.Contains(dump, "cache table discarded") {
+		if dump, _ := fixture.run(true, "--cache-dump"); !strings.Contains(dump, "cache table discarded") {
 			t.Fatalf("--cache-dump printed a table this build would discard as though it were in use:\n%s", dump)
 		}
 
-		discarded, discardedExit := run(true)
-		cold, coldExit := run(false)
-		if isReplay(discarded) {
+		discarded, discardedExit := fixture.run(true)
+		cold, coldExit := fixture.run(false)
+		if isRunCacheReplay(discarded) {
 			t.Fatalf("a corrupt table replayed:\n%s", discarded)
 		}
 		if !strings.Contains(discarded, "note: cache table discarded") {
@@ -448,11 +348,114 @@ func TestRunCacheEndToEnd(t *testing.T) {
 		if normalized(withoutNote) != normalized(cold) || discardedExit != coldExit {
 			t.Fatalf("the run after the discard differs from a cold run:\n--- after discard\n%s\n--- cold\n%s", discarded, cold)
 		}
-		if again, _ := run(true); !isReplay(again) || strings.Contains(again, "discarded") {
+		if again, _ := fixture.run(true); !isRunCacheReplay(again) || strings.Contains(again, "discarded") {
 			t.Fatalf("the run after the discard did not write a table the next run could replay:\n%s", again)
 		}
 	})
 }
+
+// runCacheFixture is a repository TestRunCacheEndToEnd's scenarios run cohere in: a small project committed
+// once, with a home of its own. Each scenario has its own, so they run in parallel; on one shared
+// repository they ran one after another, each undoing its change for the next (#nxgt2ca).
+type runCacheFixture struct {
+	t      *testing.T
+	binary string
+	root   string
+	home   string
+}
+
+func newRunCacheFixture(t *testing.T, binary string) *runCacheFixture {
+	t.Helper()
+	fixture := &runCacheFixture{t: t, binary: binary, root: t.TempDir(), home: t.TempDir()}
+	fixture.write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`)
+	fixture.write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`)
+	fixture.write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
+	fixture.write(".gitignore", ".cache/\nnode_modules/\n")
+	fixture.write("source/a.ts", "export const a: number = 1;\n")
+	fixture.write("source/nested/b.ts", "import { a } from \"../a\";\nexport const b = a + 1;\n")
+	fixture.write("docs/keep.md", "keep\n")
+	fixture.git("init", "--quiet")
+	fixture.git("config", "user.email", "fixture@example.com")
+	fixture.git("config", "user.name", "fixture")
+	fixture.commit("initial")
+	return fixture
+}
+
+func (fixture *runCacheFixture) git(arguments ...string) {
+	fixture.t.Helper()
+	command := exec.Command("git", arguments...)
+	command.Dir = fixture.root
+	command.Env = append(os.Environ(), "HOME="+fixture.home)
+	if output, err := command.CombinedOutput(); err != nil {
+		fixture.t.Fatalf("git %v: %v\n%s", arguments, err, output)
+	}
+}
+
+func (fixture *runCacheFixture) write(name, contents string) {
+	fixture.t.Helper()
+	path := filepath.Join(fixture.root, name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		fixture.t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		fixture.t.Fatal(err)
+	}
+}
+
+func (fixture *runCacheFixture) remove(name string) {
+	fixture.t.Helper()
+	if err := os.RemoveAll(filepath.Join(fixture.root, name)); err != nil {
+		fixture.t.Fatal(err)
+	}
+}
+
+func (fixture *runCacheFixture) commit(message string) {
+	fixture.t.Helper()
+	fixture.git("add", "-A")
+	fixture.git("commit", "--quiet", "--allow-empty", "-m", message)
+}
+
+// run launches the binary bare unless arguments are given; bare and `--no-fix` are the shapes the
+// run cache serves. cached false is the cold truth every cached result is held against.
+func (fixture *runCacheFixture) run(cached bool, arguments ...string) (string, int) {
+	fixture.t.Helper()
+	command := exec.Command(fixture.binary, verboseArguments(arguments)...)
+	command.Dir = fixture.root
+	environment := []string{"HOME=" + fixture.home}
+	for _, variable := range os.Environ() {
+		if !strings.HasPrefix(variable, "HOME=") {
+			environment = append(environment, variable)
+		}
+	}
+	if !cached {
+		command.Args = append(command.Args, "--no-cache")
+	}
+	// What the cache notices is the subject here, not formatting: the fixture's JSON is written unformatted
+	// on purpose, and a run that formats it is a run that writes, which is never recorded.
+	command.Args = append(command.Args, "--no-format")
+	command.Env = environment
+	output, err := command.CombinedOutput()
+	if err == nil {
+		return string(output), 0
+	}
+	exitError, isExit := err.(*exec.ExitError)
+	if !isExit {
+		fixture.t.Fatalf("running cohere: %v\n%s", err, output)
+	}
+	return string(output), exitError.ExitCode()
+}
+
+// establishHit runs twice and requires the second to replay the first.
+func (fixture *runCacheFixture) establishHit() {
+	fixture.t.Helper()
+	fixture.run(true)
+	if output, _ := fixture.run(true); !isRunCacheReplay(output) {
+		fixture.t.Fatalf("an unchanged tree did not replay, so nothing below can show a change was noticed:\n%s", output)
+	}
+}
+
+// isRunCacheReplay reports a run the cache answered: a replay says so on its first line.
+func isRunCacheReplay(output string) bool { return strings.HasPrefix(output, "cached: ") }
 
 // pinGoEnvironment sets the go command's caches and settings in the environment as the caller has them, before
 // TestMain moves HOME. The go command finds its build cache, its module cache and its settings file under

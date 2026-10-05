@@ -1,12 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -313,21 +315,36 @@ func TestTheRecordFollowsTheFormatterNotTheBinary(t *testing.T) {
 	// whenever another node edited it between builds, and the second build then discarded the record:
 	// the test failed about one run in three, measuring the tree's churn rather than the record's rule.
 	snapshot := sourceSnapshot(t)
-	stamped := func(selfCommit string, formatter string) string {
-		t.Helper()
-		binary := filepath.Join(t.TempDir(), "cohere")
-		const packaging = "github.com/system-inc/cohere/internal/release/packaging"
-		build := exec.Command("go", "build", "-buildvcs=false", "-o", binary,
-			"-ldflags=-X "+packaging+".selfCommit="+selfCommit+" -X "+packaging+".formatterIdentity="+formatter, "./command/cohere")
-		build.Dir = snapshot
-		if output, err := build.CombinedOutput(); err != nil {
-			t.Fatalf("cannot build cohere: %v\n%s", err, output)
-		}
-		return binary
+	// The three differ only in what the linker stamps, so every package compiles once and comes from the
+	// build cache for the other two, and the three links run at once: one after another they were most
+	// of this test's time (#nxgt2ca).
+	stamps := []struct{ selfCommit, formatter string }{
+		{strings.Repeat("1", 40), "formatterA"},
+		{strings.Repeat("2", 40), "formatterA"},
+		{strings.Repeat("2", 40), "formatterB"},
 	}
-	first := stamped(strings.Repeat("1", 40), "formatterA")
-	lintOnly := stamped(strings.Repeat("2", 40), "formatterA")
-	printerChanged := stamped(strings.Repeat("2", 40), "formatterB")
+	binaries := make([]string, len(stamps))
+	failures := make([]string, len(stamps))
+	var builds sync.WaitGroup
+	for index, stamp := range stamps {
+		binaries[index] = filepath.Join(t.TempDir(), "cohere")
+		builds.Go(func() {
+			const packaging = "github.com/system-inc/cohere/internal/release/packaging"
+			build := exec.Command("go", "build", "-buildvcs=false", "-o", binaries[index],
+				"-ldflags=-X "+packaging+".selfCommit="+stamp.selfCommit+" -X "+packaging+".formatterIdentity="+stamp.formatter, "./command/cohere")
+			build.Dir = snapshot
+			if output, err := build.CombinedOutput(); err != nil {
+				failures[index] = fmt.Sprintf("cannot build cohere stamped %s, %s: %v\n%s", stamp.selfCommit, stamp.formatter, err, output)
+			}
+		})
+	}
+	builds.Wait()
+	for _, failure := range failures {
+		if failure != "" {
+			t.Fatal(failure)
+		}
+	}
+	first, lintOnly, printerChanged := binaries[0], binaries[1], binaries[2]
 
 	root := t.TempDir()
 	home := t.TempDir()
@@ -361,6 +378,10 @@ func TestTheRecordFollowsTheFormatterNotTheBinary(t *testing.T) {
 // afterward. The compiler pin (TypeScript, a submodule nobody edits in passing) is linked rather than
 // copied. It is a copy of the working tree rather than of a commit, so the test still builds the code
 // someone is changing: an export of HEAD would quietly test the old record logic instead.
+//
+// It copies only what `go build` reads: test files and testdata directories are left out, since the
+// build ignores both and no go:embed reaches into either. They were most of the copy's 4,000 files and
+// 95 MB.
 func sourceSnapshot(t *testing.T) string {
 	t.Helper()
 	moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))
@@ -382,9 +403,12 @@ func sourceSnapshot(t *testing.T) string {
 				return err
 			}
 			if entry.IsDir() {
+				if entry.Name() == "testdata" {
+					return filepath.SkipDir
+				}
 				return os.MkdirAll(filepath.Join(snapshot, relative), 0o755)
 			}
-			if !entry.Type().IsRegular() {
+			if !entry.Type().IsRegular() || strings.HasSuffix(entry.Name(), "_test.go") {
 				return nil
 			}
 			copySnapshotFile(t, path, filepath.Join(snapshot, relative))
