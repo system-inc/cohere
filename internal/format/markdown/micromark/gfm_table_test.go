@@ -175,7 +175,7 @@ func TestGfmTableAlignMatchesUpstream(t *testing.T) {
 	tables := 0
 	for index, input := range gfmTableFixtures {
 		var actual []string
-		for _, event := range Parse(SourceUnits(input), MarkdownExtensions()) {
+		for _, event := range Parse(SourceUnits(input), MarkdownConstructs(), nil) {
 			if event.Enter && event.Token.Type == typeTable {
 				actual = append(actual, strings.Join(event.Token.Align, ","))
 			}

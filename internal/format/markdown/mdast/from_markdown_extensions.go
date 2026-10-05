@@ -55,12 +55,12 @@ func gfmFootnoteFromMarkdown() extension {
 			"gfmFootnoteCallString": buffer,
 			"gfmFootnoteCall": func(context *compileContext, token *micromark.Token) {
 				empty := ""
-				context.enter(&Node{NodeType: "footnoteReference", Label: &empty}, token, nil)
+				context.enter(context.nodes.New(Node{NodeType: "footnoteReference", Label: &empty}), token, nil)
 			},
 			"gfmFootnoteDefinitionLabelString": buffer,
 			"gfmFootnoteDefinition": func(context *compileContext, token *micromark.Token) {
 				empty := ""
-				context.enter(&Node{NodeType: "footnoteDefinition", Label: &empty, IsParent: true, Children: []*Node{}}, token, nil)
+				context.enter(context.nodes.New(Node{NodeType: "footnoteDefinition", Label: &empty, IsParent: true, Children: []*Node{}}), token, nil)
 			},
 		},
 		exit: map[string]handle{
@@ -85,7 +85,7 @@ func gfmStrikethroughFromMarkdown() extension {
 		canContainEols: []string{"delete"},
 		enter: map[string]handle{
 			"strikethrough": func(context *compileContext, token *micromark.Token) {
-				context.enter(&Node{NodeType: "delete", IsParent: true, Children: []*Node{}}, token, nil)
+				context.enter(context.nodes.New(Node{NodeType: "delete", IsParent: true, Children: []*Node{}}), token, nil)
 			},
 		},
 		exit: map[string]handle{
@@ -97,7 +97,7 @@ func gfmStrikethroughFromMarkdown() extension {
 // gfmTableFromMarkdown is mdast-util-gfm-table's.
 func gfmTableFromMarkdown() extension {
 	enterCell := func(context *compileContext, token *micromark.Token) {
-		context.enter(&Node{NodeType: "tableCell", IsParent: true, Children: []*Node{}}, token, nil)
+		context.enter(context.nodes.New(Node{NodeType: "tableCell", IsParent: true, Children: []*Node{}}), token, nil)
 	}
 	exit := func(context *compileContext, token *micromark.Token) { context.exit(token, nil) }
 	return extension{
@@ -109,13 +109,13 @@ func gfmTableFromMarkdown() extension {
 						align[index] = value
 					}
 				}
-				context.enter(&Node{NodeType: "table", Align: align, IsParent: true, Children: []*Node{}}, token, nil)
+				context.enter(context.nodes.New(Node{NodeType: "table", Align: align, IsParent: true, Children: []*Node{}}), token, nil)
 				context.data.inTable = true
 			},
 			"tableData":   enterCell,
 			"tableHeader": enterCell,
 			"tableRow": func(context *compileContext, token *micromark.Token) {
-				context.enter(&Node{NodeType: "tableRow", IsParent: true, Children: []*Node{}}, token, nil)
+				context.enter(context.nodes.New(Node{NodeType: "tableRow", IsParent: true, Children: []*Node{}}), token, nil)
 			},
 		},
 		exit: map[string]handle{
@@ -229,11 +229,11 @@ func mathFromMarkdown() extension {
 	return extension{
 		enter: map[string]handle{
 			"mathFlow": func(context *compileContext, token *micromark.Token) {
-				context.enter(&Node{NodeType: "math", IsLiteral: true}, token, nil)
+				context.enter(context.nodes.New(Node{NodeType: "math", IsLiteral: true}), token, nil)
 			},
 			"mathFlowFenceMeta": buffer,
 			"mathText": func(context *compileContext, token *micromark.Token) {
-				context.enter(&Node{NodeType: "inlineMath", IsLiteral: true}, token, nil)
+				context.enter(context.nodes.New(Node{NodeType: "inlineMath", IsLiteral: true}), token, nil)
 				buffer(context, token)
 			},
 		},
@@ -274,7 +274,7 @@ func wikiLinkFromMarkdown() extension {
 	return extension{
 		enter: map[string]handle{
 			"wikiLink": func(context *compileContext, token *micromark.Token) {
-				context.enter(&Node{NodeType: "wikiLink", IsLiteral: true, ValueNull: true}, token, nil)
+				context.enter(context.nodes.New(Node{NodeType: "wikiLink", IsLiteral: true, ValueNull: true}), token, nil)
 			},
 		},
 		exit: map[string]handle{
@@ -295,7 +295,7 @@ func liquidFromMarkdown() extension {
 		canContainEols: []string{"liquidNode"},
 		enter: map[string]handle{
 			"liquidNode": func(context *compileContext, token *micromark.Token) {
-				context.enter(&Node{NodeType: "liquidNode"}, token, nil)
+				context.enter(context.nodes.New(Node{NodeType: "liquidNode"}), token, nil)
 				buffer(context, token)
 			},
 		},

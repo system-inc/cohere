@@ -6,7 +6,9 @@ package yaml
 
 import (
 	"errors"
+	"sync"
 
+	"github.com/system-inc/cohere/internal/format/arena"
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/printing"
@@ -30,7 +32,9 @@ func formatWithProseWrap(fileName string, text string, options formatoptions.Opt
 	if trim(text) == "" {
 		return "", nil
 	}
-	root, err := parse(text)
+	nodes := nodeArenas.Get().(*arena.Arena[unist.Node])
+	defer releaseNodes(nodes)
+	root, err := parse(text, nodes)
 	if err != nil {
 		return "", err
 	}
@@ -43,11 +47,26 @@ func formatWithProseWrap(fileName string, text string, options formatoptions.Opt
 // ends in its trailing hardline, which the caller strips (doc.StripTrailingHardline) as upstream's
 // textToDoc does. A text that does not parse fails with an error printing.IsSyntax recognizes.
 func FormatDoc(text string, options formatoptions.Options, textToDoc printing.TextToDoc) (doc.Doc, error) {
-	root, err := parse(text)
+	nodes := nodeArenas.Get().(*arena.Arena[unist.Node])
+	defer releaseNodes(nodes)
+	root, err := parse(text, nodes)
 	if err != nil {
 		return nil, err
 	}
+	// The doc holds only text, no node, so the tree is released once it is built.
 	return PrintDoc(root, text, options, textToDoc)
+}
+
+// nodeArenas hold the node memory of YAML formats that have finished, for the next to reuse (#93dpede):
+// markdown's front matter formats a tree like this for nearly every file. A pool, because files are
+// formatted on several goroutines at once and each Get is that caller's alone.
+var nodeArenas = sync.Pool{New: func() any {
+	return &arena.Arena[unist.Node]{Poison: unist.Node{NodeType: "released", Value: "released"}}
+}}
+
+func releaseNodes(nodes *arena.Arena[unist.Node]) {
+	nodes.Reset()
+	nodeArenas.Put(nodes)
 }
 
 // parse is parser-yaml.js's parse: yaml-unist-parser's parse with { uniqueKeys: false }, and root.comments
@@ -57,8 +76,8 @@ func FormatDoc(text string, options formatoptions.Options, textToDoc printing.Te
 // of failure here come from the input (yaml-unist-parser's TypeErrors are on !!pairs and !!omap shapes
 // it does not expect), so both are marked as syntax errors and the format phase skips the file. A panic
 // in the port itself is a bug, not malformed input, and is returned unmarked.
-func parse(text string) (*unist.Node, error) {
-	root, err := unist.Parse(text)
+func parse(text string, nodes *arena.Arena[unist.Node]) (*unist.Node, error) {
+	root, err := unist.Parse(text, nodes)
 	if err != nil {
 		var syntaxError *unist.SyntaxError
 		var thrown *unist.ThrownError

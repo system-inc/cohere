@@ -5,8 +5,10 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/format/arena"
 	"github.com/system-inc/cohere/internal/format/markdown/micromark"
 )
 
@@ -47,6 +49,9 @@ type compileContext struct {
 
 	tokenizer *micromark.TokenizeContext
 	offsets   []int
+
+	// nodes is where the tree's nodes come from, nil to allocate each (#93dpede).
+	nodes *arena.Arena[Node]
 }
 
 func (context *compileContext) sliceSerialize(token *micromark.Token) string {
@@ -65,25 +70,47 @@ func (context *compileContext) point(point micromark.Point) Point {
 // FromMarkdown parses markdown the way the fork's parseMarkdown does with the given source, and returns
 // the tree. source is the text micromark reads (front matter already blanked by the caller); original is
 // the text positions refer to, which has the same UTF-16 length.
-func FromMarkdown(source string, original string) (root *Node, err error) {
+func FromMarkdown(source string, original string, nodes *arena.Arena[Node]) (root *Node, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("markdown: %v", recovered)
 		}
 	}()
-	units := micromark.SourceUnits(source)
-	offsets := byteOffsets(original)
-	if len(offsets) != len(units)+1 {
-		return nil, fmt.Errorf("markdown: the parsed text and the original differ in length (%d and %d UTF-16 units)", len(units), len(offsets)-1)
+	memory := parseMemories.Get().(*parseMemory)
+	defer func() {
+		memory.tokens.Reset()
+		parseMemories.Put(memory)
+	}()
+	memory.units = micromark.AppendSourceUnits(memory.units[:0], source)
+	units := memory.units
+	memory.offsets = byteOffsets(original, memory.offsets[:0])
+	if len(memory.offsets) != len(units)+1 {
+		return nil, fmt.Errorf("markdown: the parsed text and the original differ in length (%d and %d UTF-16 units)", len(units), len(memory.offsets)-1)
 	}
-	events := micromark.Parse(units, micromark.MarkdownExtensions())
-	return compile(events, newConfig(), offsets), nil
+	events := micromark.Parse(units, micromark.MarkdownConstructs(), &memory.tokens)
+	return compile(events, compileConfig(), memory.offsets, nodes), nil
 }
 
-// byteOffsets maps every UTF-16 index of text, and its end, to a byte offset. An index inside a
-// surrogate pair maps to the start of its character.
-func byteOffsets(text string) []int {
-	offsets := make([]int, 0, len(text)+1)
+// parseMemory is what one parse uses only while it runs, kept for the next (#93dpede): the tokens, the text
+// as UTF-16 units, and the map from UTF-16 index to byte offset. The tree compile builds keeps none of them:
+// every point copies its offset out, and every value is copied out of the units as a string.
+type parseMemory struct {
+	tokens  arena.Arena[micromark.Token]
+	units   []uint16
+	offsets []int
+}
+
+// parseMemories hold the memory of parses that have finished. A pool, because files are formatted on
+// several goroutines at once and each Get is that caller's alone.
+var parseMemories = sync.Pool{New: func() any {
+	released := micromark.Point{Line: 1 << 30, Column: 1 << 30, Offset: 1 << 30}
+	return &parseMemory{tokens: arena.Arena[micromark.Token]{Poison: micromark.Token{Type: "released", Start: released, End: released}}}
+}}
+
+// byteOffsets maps every UTF-16 index of text, and its end, to a byte offset, appended to offsets. An index
+// inside a surrogate pair maps to the start of its character.
+func byteOffsets(text string, offsets []int) []int {
+	offsets = slices.Grow(offsets, len(text)+1)
 	for index, character := range text {
 		offsets = append(offsets, index)
 		if character >= 0x10000 && character != utf8.RuneError {
@@ -96,6 +123,10 @@ func byteOffsets(text string) []int {
 // newConfig is upstream's compiler config with the fork's mdastExtensions configured in, in order:
 // gfmFromMarkdown() (autolink literal without its transform, footnote, strikethrough, table, task list
 // item), mathFromMarkdown(), the wiki-link fromMarkdown() and liquidFromMarkdown().
+// compileConfig is newConfig, made once: every compile reads the same handlers and never changes them, and
+// making them was a measurable share of a format's allocation (#93dpede).
+var compileConfig = sync.OnceValue(newConfig)
+
 func newConfig() *config {
 	config := &config{
 		canContainEols: []string{"emphasis", "fragment", "heading", "paragraph", "strong"},
@@ -224,9 +255,9 @@ func newConfig() *config {
 }
 
 // compile turns events into a tree, upstream's compile.
-func compile(events []micromark.Event, config *config, offsets []int) *Node {
-	tree := &Node{NodeType: "root", IsParent: true, Children: []*Node{}}
-	context := &compileContext{stack: []*Node{tree}, config: config, offsets: offsets}
+func compile(events []micromark.Event, config *config, offsets []int, nodes *arena.Arena[Node]) *Node {
+	tree := nodes.New(Node{NodeType: "root", IsParent: true, Children: []*Node{}})
+	context := &compileContext{stack: []*Node{tree}, config: config, offsets: offsets, nodes: nodes}
 	var listStack []int
 
 	for index := 0; index < len(events); index++ {
@@ -393,9 +424,9 @@ func prepareList(eventsPointer *[]micromark.Event, start int, length int) int {
 }
 
 // opener is upstream's opener: create a node and enter it, then run `and`.
-func opener(create func(token *micromark.Token) *Node, and handle) handle {
+func opener(create func(token *micromark.Token) Node, and handle) handle {
 	return func(context *compileContext, token *micromark.Token) {
-		context.enter(create(token), token, nil)
+		context.enter(context.nodes.New(create(token)), token, nil)
 		if and != nil {
 			and(context, token)
 		}
@@ -404,7 +435,7 @@ func opener(create func(token *micromark.Token) *Node, and handle) handle {
 
 // buffer pushes a fragment to collect text into.
 func buffer(context *compileContext, _ *micromark.Token) {
-	context.stack = append(context.stack, &Node{NodeType: "fragment", IsParent: true, Children: []*Node{}})
+	context.stack = append(context.stack, context.nodes.New(Node{NodeType: "fragment", IsParent: true, Children: []*Node{}}))
 }
 
 func (context *compileContext) enter(node *Node, token *micromark.Token, errorHandler func(*compileContext, *micromark.Token, *micromark.Token)) {
@@ -579,7 +610,7 @@ func onEnterData(context *compileContext, token *micromark.Token) {
 
 	if tail == nil || tail.NodeType != "text" {
 		// Add a new text node.
-		tail = &Node{NodeType: "text", IsLiteral: true}
+		tail = context.nodes.New(Node{NodeType: "text", IsLiteral: true})
 		tail.Position = &Position{Start: context.point(token.Start)}
 		node.Children = append(node.Children, tail)
 	}
@@ -749,40 +780,40 @@ func onExitAutolinkEmail(context *compileContext, token *micromark.Token) {
 // Creaters.
 //
 
-func newParent(nodeType string) func(*micromark.Token) *Node {
-	return func(*micromark.Token) *Node {
-		return &Node{NodeType: nodeType, IsParent: true, Children: []*Node{}}
+func newParent(nodeType string) func(*micromark.Token) Node {
+	return func(*micromark.Token) Node {
+		return Node{NodeType: nodeType, IsParent: true, Children: []*Node{}}
 	}
 }
 
-func newBlockQuote(token *micromark.Token) *Node { return newParent("blockquote")(token) }
+func newBlockQuote(token *micromark.Token) Node { return newParent("blockquote")(token) }
 
-func newCodeFlow(*micromark.Token) *Node { return &Node{NodeType: "code", IsLiteral: true} }
+func newCodeFlow(*micromark.Token) Node { return Node{NodeType: "code", IsLiteral: true} }
 
-func newCodeText(*micromark.Token) *Node { return &Node{NodeType: "inlineCode", IsLiteral: true} }
+func newCodeText(*micromark.Token) Node { return Node{NodeType: "inlineCode", IsLiteral: true} }
 
-func newDefinition(*micromark.Token) *Node { return &Node{NodeType: "definition"} }
+func newDefinition(*micromark.Token) Node { return Node{NodeType: "definition"} }
 
-func newHeading(*micromark.Token) *Node {
-	return &Node{NodeType: "heading", IsParent: true, Children: []*Node{}}
+func newHeading(*micromark.Token) Node {
+	return Node{NodeType: "heading", IsParent: true, Children: []*Node{}}
 }
 
-func newHardBreak(*micromark.Token) *Node { return &Node{NodeType: "break"} }
+func newHardBreak(*micromark.Token) Node { return Node{NodeType: "break"} }
 
-func newHTML(*micromark.Token) *Node { return &Node{NodeType: "html", IsLiteral: true} }
+func newHTML(*micromark.Token) Node { return Node{NodeType: "html", IsLiteral: true} }
 
-func newImage(*micromark.Token) *Node { return &Node{NodeType: "image"} }
+func newImage(*micromark.Token) Node { return Node{NodeType: "image"} }
 
-func newLink(*micromark.Token) *Node {
-	return &Node{NodeType: "link", IsParent: true, Children: []*Node{}}
+func newLink(*micromark.Token) Node {
+	return Node{NodeType: "link", IsParent: true, Children: []*Node{}}
 }
 
-func newList(token *micromark.Token) *Node {
-	return &Node{NodeType: "list", Ordered: token.Type == "listOrdered", Spread: token.Spread, IsParent: true, Children: []*Node{}}
+func newList(token *micromark.Token) Node {
+	return Node{NodeType: "list", Ordered: token.Type == "listOrdered", Spread: token.Spread, IsParent: true, Children: []*Node{}}
 }
 
-func newListItem(token *micromark.Token) *Node {
-	return &Node{NodeType: "listItem", Spread: token.Spread, IsParent: true, Children: []*Node{}}
+func newListItem(token *micromark.Token) Node {
+	return Node{NodeType: "listItem", Spread: token.Spread, IsParent: true, Children: []*Node{}}
 }
 
-func newThematicBreak(*micromark.Token) *Node { return &Node{NodeType: "thematicBreak"} }
+func newThematicBreak(*micromark.Token) Node { return Node{NodeType: "thematicBreak"} }

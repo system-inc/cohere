@@ -198,10 +198,10 @@ func compareTree(oracle *treeOracle, text string) string {
 	if err != nil {
 		return "upstream failed: " + err.Error()
 	}
-	convertOffsets(expected, byteOffsets(text))
+	convertOffsets(expected, byteOffsets(text, nil))
 	normalizeUpstream(expected)
 
-	root, err := ParseMarkdown(text)
+	root, err := ParseMarkdown(text, nil)
 	if err != nil {
 		return "the port failed: " + err.Error()
 	}
@@ -296,7 +296,7 @@ func TestTreeOracleCanFail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root, _ := ParseMarkdown("**a**")
+	root, _ := ParseMarkdown("**a**", nil)
 	encoded, _ := json.Marshal(describe(root))
 	var actual any
 	_ = json.Unmarshal(encoded, &actual)

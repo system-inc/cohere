@@ -258,7 +258,7 @@ func htmlTextPortEvents(input string, extensions []*Extension) (described []stri
 			described = []string{fmt.Sprintf("panic: %v", recovered)}
 		}
 	}()
-	for _, event := range Parse(SourceUnits(input), extensions) {
+	for _, event := range Parse(SourceUnits(input), Combine(extensions), nil) {
 		kind := "exit"
 		if event.Enter {
 			kind = "enter"

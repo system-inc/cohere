@@ -4,18 +4,19 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/format/arena"
 	"github.com/system-inc/cohere/internal/format/markdown/mdast"
 )
 
 // preprocess is src/language-markdown/print/preprocess.js for the markdown parser (the MDX branches are
 // not ported: no corpus holds .mdx).
-func preprocess(ast *Node, originalText string, tabWidth int) *Node {
+func preprocess(ast *Node, originalText string, tabWidth int, nodes *arena.Arena[Node]) *Node {
 	ast = addRawToText(ast, originalText)
-	ast = mergeContinuousTexts(ast)
+	ast = mergeContinuousTexts(ast, nodes)
 	ast = transformIndentedCodeblock(ast, originalText)
 	ast = markOriginalImageAndLinkAlt(ast, originalText)
 	ast = markAlignedList(ast, originalText, tabWidth)
-	ast = splitTextIntoSentences(ast)
+	ast = splitTextIntoSentences(ast, nodes)
 	return ast
 }
 
@@ -61,24 +62,24 @@ func mergeChildren(ast *Node, shouldMerge func(previous *Node, node *Node) bool,
 	})
 }
 
-func mergeContinuousTexts(ast *Node) *Node {
+func mergeContinuousTexts(ast *Node, nodes *arena.Arena[Node]) *Node {
 	return mergeChildren(ast,
 		func(previous *Node, node *Node) bool { return previous.NodeType == "text" && node.NodeType == "text" },
 		func(previous *Node, node *Node) *Node {
 			// The merged node has no `raw`, as upstream's has none.
-			return &Node{
+			return nodes.New(Node{
 				NodeType:  "text",
 				IsLiteral: true,
 				Value:     previous.Value + node.Value,
 				Position:  &mdast.Position{Start: previous.Position.Start, End: node.Position.End},
-			}
+			})
 		})
 }
 
 // htmlWhitespace is Prettier's html-whitespace utility: https://infra.spec.whatwg.org/#ascii-whitespace.
 const htmlWhitespace = "\t\n\f\r "
 
-func splitTextIntoSentences(ast *Node) *Node {
+func splitTextIntoSentences(ast *Node, nodes *arena.Arena[Node]) *Node {
 	canOpenAccidentalWikiLink := map[*Node]bool{}
 	// We can't use nodes themselves because they will be cloned.
 	riskyParagraphPositions := map[*mdast.Position]bool{}
@@ -163,10 +164,10 @@ func splitTextIntoSentences(ast *Node) *Node {
 		}
 
 		if paragraphNode != nil && riskyParagraphPositions[paragraphNode.Position] {
-			return &Node{NodeType: "text", IsLiteral: true, Position: node.Position, Value: text}
+			return nodes.New(Node{NodeType: "text", IsLiteral: true, Position: node.Position, Value: text})
 		}
 
-		return &Node{NodeType: "sentence", Position: node.Position, IsParent: true, Children: nonNil(splitText(text))}
+		return nodes.New(Node{NodeType: "sentence", Position: node.Position, IsParent: true, Children: nonNil(splitText(text, nodes))})
 	})
 }
 

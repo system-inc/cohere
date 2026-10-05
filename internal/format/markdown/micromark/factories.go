@@ -4,39 +4,44 @@ package micromark
 
 // factorySpace is micromark-factory-space. max 0 is upstream's undefined: no limit.
 func factorySpace(effects *Effects, ok State, tokenType string, max int) State {
-	limit := -1 // Infinity.
-	if max != 0 {
-		limit = max - 1
-	}
-	size := 0
-
-	var start, prefix State
-
-	start = func(code Code) State {
-		if markdownSpace(code) {
-			effects.Enter(tokenType, nil)
-			return prefix(code)
+	// Most calls meet no space at all, so the state that eats a run of them is made only once one is
+	// seen (#93dpede).
+	return func(code Code) State {
+		if !markdownSpace(code) {
+			return ok(code)
 		}
-
-		return ok(code)
-	}
-
-	prefix = func(code Code) State {
-		if markdownSpace(code) {
-			// `size++ < limit`: the increment happens whether or not the comparison passes.
-			below := limit < 0 || size < limit
-			size++
-			if below {
-				effects.Consume(code)
-				return prefix
-			}
+		effects.Enter(tokenType, nil)
+		run := &spaceRun{effects: effects, ok: ok, tokenType: tokenType, limit: -1} // Infinity.
+		if max != 0 {
+			run.limit = max - 1
 		}
+		run.prefixState = run.prefix
+		return run.prefix(code)
+	}
+}
 
-		effects.Exit(tokenType)
-		return ok(code)
+// spaceRun is factorySpace inside a run of spaces: upstream's closure state, with its state made once.
+type spaceRun struct {
+	effects     *Effects
+	ok          State
+	tokenType   string
+	limit, size int
+	prefixState State
+}
+
+func (run *spaceRun) prefix(code Code) State {
+	if markdownSpace(code) {
+		// `size++ < limit`: the increment happens whether or not the comparison passes.
+		below := run.limit < 0 || run.size < run.limit
+		run.size++
+		if below {
+			run.effects.Consume(code)
+			return run.prefixState
+		}
 	}
 
-	return start
+	run.effects.Exit(run.tokenType)
+	return run.ok(code)
 }
 
 // factoryWhitespace is micromark-factory-whitespace.

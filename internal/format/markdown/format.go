@@ -4,7 +4,9 @@ package markdown
 
 import (
 	"fmt"
+	"sync"
 
+	"github.com/system-inc/cohere/internal/format/arena"
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/markdown/mdast"
@@ -29,11 +31,17 @@ var mdastPrinter = &printing.Printer[*Node]{
 	VisitorKeys: func(node *Node) []string { return visitorKeys[node.NodeType] },
 	Embed:       embed,
 	Preprocess: func(ast *Node, options *options) *Node {
-		return preprocess(ast, options.OriginalText, settingsOf(options).tabWidth)
+		return preprocess(ast, options.OriginalText, settingsOf(options).tabWidth, settingsOf(options).nodes)
 	},
 	HasPrettierIgnore:    hasPrettierIgnore,
 	PrintPrettierIgnored: printPrettierIgnored,
 }
+
+// nodeArenas hold the node memory of formats that have finished, for the next to reuse (#93dpede). A pool,
+// because files are formatted on several goroutines at once and each Get is that caller's alone.
+var nodeArenas = sync.Pool{New: func() any {
+	return &arena.Arena[Node]{Poison: Node{NodeType: "released", Value: "released", IsLiteral: true}}
+}}
 
 // Format is Prettier's format for a markdown file: parse, print to a doc, lay the doc out.
 //
@@ -57,7 +65,14 @@ func formatWithProseWrap(text string, prettierOptions formatoptions.Options, pro
 
 	// Byte order marks and line endings, main/core.js's part, are normalized by the caller,
 	// native.Formatter, once for every printer.
-	ast, err := mdast.ParseMarkdown(text)
+	// The tree, and the words and whitespace preprocess splits its text into, come from an arena released
+	// once the file is printed: doc.Print below has read the last of them before the deferred release runs.
+	nodes := nodeArenas.Get().(*arena.Arena[Node])
+	defer func() {
+		nodes.Reset()
+		nodeArenas.Put(nodes)
+	}()
+	ast, err := mdast.ParseMarkdown(text, nodes)
 	if err != nil {
 		return "", err
 	}
@@ -71,6 +86,7 @@ func formatWithProseWrap(text string, prettierOptions formatoptions.Options, pro
 			tabWidth:    prettierOptions.TabWidth,
 			printWidth:  prettierOptions.PrintWidth,
 			useTabs:     prettierOptions.UseTabs,
+			nodes:       nodes,
 		},
 		EmbeddedLanguageFormatting: "auto",
 		TextToDoc:                  textToDoc,

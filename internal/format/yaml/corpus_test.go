@@ -327,7 +327,7 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 		for index, tree := range parseTrees(t, values) {
 			frontMatters.trees[frontMatterFiles[index]] = tree
 			// The Go parser must refuse exactly the values the real one refuses.
-			if _, err := parse(values[index]); (err != nil) != (tree.err != "") {
+			if _, err := parse(values[index], nil); (err != nil) != (tree.err != "") {
 				parseDisagreements++
 				report.WriteString(fmt.Sprintf("front matter: the Go parser disagrees (real: %q, Go: %v): %s\n", tree.err, err, frontMatterFiles[index]))
 			}

@@ -165,7 +165,7 @@ func (context *TokenizeContext) consume(code Code) {
 
 func (context *TokenizeContext) enter(tokenType string, token *Token) *Token {
 	if token == nil {
-		token = &Token{}
+		token = context.Parser.tokens.New(Token{})
 	}
 	token.Type = tokenType
 	token.Start = context.Now()
@@ -206,96 +206,119 @@ func (context *TokenizeContext) onSuccessfulCheck(_ *Construct, info *storeInfo)
 // success and in whether constructs see `interrupt: true`.
 func (context *TokenizeContext) constructFactory(onReturn func(*Construct, *storeInfo), interrupt bool) func(Constructs, State, State) State {
 	return func(constructs Constructs, returnState State, bogusState State) State {
-		var listOfConstructs []*Construct
-		var constructIndex int
-		var currentConstruct *Construct
-		var info *storeInfo
-
-		var handleConstruct func(construct *Construct) State
-		var ok, nok State
-
-		handleListOfConstructs := func(list []*Construct) State {
-			listOfConstructs = list
-			constructIndex = 0
-
-			if len(list) == 0 {
-				if bogusState == nil {
-					panic("micromark: expected `bogusState` to be given")
-				}
-				return bogusState
-			}
-
-			return handleConstruct(list[constructIndex])
-		}
-
-		handleMapOfConstructs := func(record *ConstructRecord) State {
-			return func(code Code) State {
-				var list []*Construct
-				if code != CodeEof {
-					list = append(list, record.ByCode[code]...)
-					list = append(list, record.Null...)
-				}
-				return handleListOfConstructs(list)(code)
-			}
-		}
-
-		handleConstruct = func(construct *Construct) State {
-			return func(code Code) State {
-				info = context.store()
-				currentConstruct = construct
-
-				if !construct.Partial {
-					context.CurrentConstruct = construct
-				}
-
-				if construct.Name != "" && slices.Contains(context.Parser.Constructs.Disable, construct.Name) {
-					return nok(code)
-				}
-
-				self := &Self{TokenizeContext: context}
-				if interrupt {
-					self.isView = true
-					self.viewInterrupt = true
-				}
-				return construct.Tokenize(self, context.effects, ok, nok)(code)
-			}
-		}
-
-		ok = func(code Code) State {
-			if code != context.expectedCode {
-				panic("micromark: expected code")
-			}
-			context.consumed = true
-			onReturn(currentConstruct, info)
-			return returnState
-		}
-
-		nok = func(code Code) State {
-			if code != context.expectedCode {
-				panic("micromark: expected code")
-			}
-			context.consumed = true
-			info.restore()
-
-			constructIndex++
-			if constructIndex < len(listOfConstructs) {
-				return handleConstruct(listOfConstructs[constructIndex])
-			}
-
-			return bogusState
-		}
+		run := &attempt{context: context, onReturn: onReturn, interrupt: interrupt, returnState: returnState, bogusState: bogusState}
+		run.ok, run.nok, run.start = run.succeed, run.fail, run.startPending
 
 		switch typed := constructs.(type) {
 		case ConstructList:
-			return handleListOfConstructs(typed)
+			return run.handleListOfConstructs(typed)
 		case *Construct:
-			return handleListOfConstructs([]*Construct{typed})
+			run.single[0] = typed
+			return run.handleListOfConstructs(run.single[:])
 		case *ConstructRecord:
-			return handleMapOfConstructs(typed)
+			return run.handleMapOfConstructs(typed)
 		default:
 			panic("micromark: unknown constructs")
 		}
 	}
+}
+
+// attempt is one call of an attempt, check or interrupt. Upstream keeps its state in a closure's
+// variables; here it is one struct, and its three states are made once per call, so trying a construct
+// allocates no closure of its own (#93dpede).
+type attempt struct {
+	context                 *TokenizeContext
+	onReturn                func(*Construct, *storeInfo)
+	interrupt               bool
+	returnState, bogusState State
+
+	listOfConstructs []*Construct
+	constructIndex   int
+	currentConstruct *Construct
+	info             storeInfo
+
+	// pending is the construct start begins: the one handleConstruct named, which start reads before any
+	// other construct of this attempt can be named.
+	pending *Construct
+	// single holds a lone construct as a list, without allocating one.
+	single [1]*Construct
+
+	ok, nok, start State
+}
+
+func (run *attempt) handleListOfConstructs(list []*Construct) State {
+	run.listOfConstructs = list
+	run.constructIndex = 0
+
+	if len(list) == 0 {
+		if run.bogusState == nil {
+			panic("micromark: expected `bogusState` to be given")
+		}
+		return run.bogusState
+	}
+
+	return run.handleConstruct(list[run.constructIndex])
+}
+
+func (run *attempt) handleMapOfConstructs(record *ConstructRecord) State {
+	return func(code Code) State {
+		var list []*Construct
+		if code != CodeEof {
+			list = append(list, record.ByCode[code]...)
+			list = append(list, record.Null...)
+		}
+		return run.handleListOfConstructs(list)(code)
+	}
+}
+
+func (run *attempt) handleConstruct(construct *Construct) State {
+	run.pending = construct
+	return run.start
+}
+
+func (run *attempt) startPending(code Code) State {
+	construct, context := run.pending, run.context
+	run.info = context.store()
+	run.currentConstruct = construct
+
+	if !construct.Partial {
+		context.CurrentConstruct = construct
+	}
+
+	if construct.Name != "" && slices.Contains(context.Parser.Constructs.Disable, construct.Name) {
+		return run.nok(code)
+	}
+
+	self := &Self{TokenizeContext: context}
+	if run.interrupt {
+		self.isView = true
+		self.viewInterrupt = true
+	}
+	return construct.Tokenize(self, context.effects, run.ok, run.nok)(code)
+}
+
+func (run *attempt) succeed(code Code) State {
+	if code != run.context.expectedCode {
+		panic("micromark: expected code")
+	}
+	run.context.consumed = true
+	run.onReturn(run.currentConstruct, &run.info)
+	return run.returnState
+}
+
+func (run *attempt) fail(code Code) State {
+	if code != run.context.expectedCode {
+		panic("micromark: expected code")
+	}
+	run.context.consumed = true
+	run.info.restore()
+
+	run.constructIndex++
+	if run.constructIndex < len(run.listOfConstructs) {
+		return run.handleConstruct(run.listOfConstructs[run.constructIndex])
+	}
+
+	return run.bogusState
 }
 
 func (context *TokenizeContext) addResult(entry resolvable, from int) {
@@ -315,27 +338,39 @@ func (context *TokenizeContext) addResult(entry resolvable, from int) {
 	}
 }
 
-// storeInfo is upstream's Info: where events were when an attempt started, and how to go back.
+// storeInfo is upstream's Info: where events were when an attempt started, and how to go back. Upstream's
+// restore is a closure over the saved state; here the state is the struct's own fields and restore a method,
+// so taking one allocates only the copy of the stack it must keep.
 type storeInfo struct {
-	from    int
-	restore func()
+	from int
+
+	context          *TokenizeContext
+	point            Point
+	previous         Code
+	currentConstruct *Construct
+	stack            []*Token
 }
 
-func (context *TokenizeContext) store() *storeInfo {
-	startPoint := context.Now()
-	startPrevious := context.Previous
-	startCurrentConstruct := context.CurrentConstruct
-	startEventsIndex := len(context.Events)
-	startStack := slices.Clone(context.stack)
+func (context *TokenizeContext) store() storeInfo {
+	return storeInfo{
+		from:             len(context.Events),
+		context:          context,
+		point:            context.Now(),
+		previous:         context.Previous,
+		currentConstruct: context.CurrentConstruct,
+		stack:            slices.Clone(context.stack),
+	}
+}
 
-	return &storeInfo{from: startEventsIndex, restore: func() {
-		context.point = startPoint
-		context.Previous = startPrevious
-		context.CurrentConstruct = startCurrentConstruct
-		context.Events = context.Events[:startEventsIndex]
-		context.stack = startStack
-		context.accountForPotentialSkip()
-	}}
+// restore puts the tokenizer back where store found it.
+func (info *storeInfo) restore() {
+	context := info.context
+	context.point = info.point
+	context.Previous = info.previous
+	context.CurrentConstruct = info.currentConstruct
+	context.Events = context.Events[:info.from]
+	context.stack = info.stack
+	context.accountForPotentialSkip()
 }
 
 // accountForPotentialSkip moves the current point a bit forward in the line when it’s on a column skip.

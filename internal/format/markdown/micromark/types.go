@@ -20,6 +20,8 @@
 //     reproduces that binding: reads are live, and a write lands on the view when there is one.
 package micromark
 
+import "github.com/system-inc/cohere/internal/format/arena"
+
 // Code is a character code: a UTF-16 code unit, or one of the negative virtual codes, or CodeEof.
 type Code int
 
@@ -252,6 +254,9 @@ type ParseContext struct {
 	// GfmFootnotes is upstream's parser.gfmFootnotes, which micromark-extension-gfm-footnote hangs on the
 	// parser: the identifiers of the footnote definitions seen so far.
 	GfmFootnotes []string
+
+	// tokens is where the parse's tokens come from, nil to allocate each (#93dpede).
+	tokens *arena.Arena[Token]
 }
 
 // Content types, upstream's constants.contentType*.

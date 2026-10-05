@@ -3,6 +3,8 @@ package mdast
 import (
 	"strings"
 	"unicode/utf16"
+
+	"github.com/system-inc/cohere/internal/format/arena"
 )
 
 // ParseMarkdown is the fork's parseMarkdown, src/language-markdown/parse/parse-markdown.js: front matter
@@ -11,16 +13,16 @@ import (
 //
 // text is what Prettier's core hands the parser: line endings normalized to \n and a byte order mark
 // removed.
-func ParseMarkdown(text string) (*Node, error) {
+func ParseMarkdown(text string, nodes *arena.Arena[Node]) (*Node, error) {
 	frontMatter, content := ParseFrontMatter(text)
-	root, err := FromMarkdown(content, text)
+	root, err := FromMarkdown(content, text, nodes)
 	if err != nil {
 		return nil, err
 	}
 
 	if frontMatter != nil {
 		lines := strings.Split(frontMatter.Raw, "\n")
-		node := &Node{
+		node := nodes.New(Node{
 			NodeType:    "frontMatter",
 			FrontMatter: frontMatter,
 			Position: &Position{
@@ -33,7 +35,7 @@ func ParseMarkdown(text string) (*Node, error) {
 					Offset: len(frontMatter.Raw),
 				},
 			},
-		}
+		})
 		root.Children = append([]*Node{node}, root.Children...)
 	}
 

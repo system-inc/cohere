@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/format/arena"
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
@@ -23,6 +24,9 @@ type settings struct {
 	tabWidth    int
 	printWidth  int
 	useTabs     bool
+
+	// nodes is the arena this format's split text comes from, released once the file is printed.
+	nodes *arena.Arena[Node]
 }
 
 func settingsOf(options *options) *settings { return options.Settings.(*settings) }
@@ -126,7 +130,7 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 		// - parts.length is odd
 		// - odd (0-indexed) elements are line-like doc
 		parts := []doc.Doc{doc.Text("")}
-		textsNodes := splitText(options.OriginalText[node.Position.Start.Offset:node.Position.End.Offset])
+		textsNodes := splitText(options.OriginalText[node.Position.Start.Offset:node.Position.End.Offset], settings.nodes)
 		for _, textNode := range textsNodes {
 			if textNode.NodeType == "word" {
 				parts[len(parts)-1] = doc.Concat{parts[len(parts)-1], doc.Text(textNode.Value)}

@@ -315,7 +315,7 @@ func (c *comparison) node(path string, mine *Node, theirs *jsonNode) {
 
 // compareParse compares Parse's result for the text with the oracle's and returns the differences.
 func compareParse(text string, expected oracleResult) []string {
-	root, err := Parse(text)
+	root, err := Parse(text, nil)
 	offsets := newUnitOffsets(text)
 	if expected.Error != nil {
 		if err == nil {
