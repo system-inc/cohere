@@ -109,6 +109,9 @@ type runCacheSession struct {
 	// shapes is every project file's shape this run, recorded so the next computes only what changed. Nil
 	// when no rule is keyed on shapes, since then nothing reads them and computing them would be waste.
 	shapes map[string]program.SignatureEntry
+	// shapesGraph is the graph shapes describe, the one rebuilt after a fix rewrite when there was one, kept so
+	// the shapes still keyed on content can graduate after the verdict. See graduateSignatures.
+	shapesGraph *program.Graph
 
 	// types is the types phase's section, what the table held and what this run records. Nil when the
 	// graph never reached a walk.
@@ -607,10 +610,13 @@ func finishRunCache(exitCode int) {
 		// The table's lock is taken first and held until the table is in place, so a run the caller starts
 		// next waits for this write rather than reading around it. See table_lock.go.
 		release := holdTableLock(session.directory)
-		sendVerdict(exitCode)
+		answered := sendVerdict(exitCode)
 		var recorded *program.RunCache
 		if session.declared && session.declined == "" {
 			recorded = session.record(exitCode)
+		}
+		if answered {
+			graduateSignatures(session.directory, session.shapesGraph, session.shapes)
 		}
 		session.write(recorded)
 		release()
@@ -618,11 +624,37 @@ func finishRunCache(exitCode int) {
 		// A run nothing records still leaves the types section for the next, after its caller has the answer.
 		pendingTypes = nil
 		release := holdTableLock(record.directory)
-		sendVerdict(exitCode)
+		if sendVerdict(exitCode) {
+			record.computedShapes += graduateSignatures(record.directory, record.shapesGraph, record.shapes)
+		}
 		record.write()
 		release()
 	}
 	exitProcess(exitCode)
+}
+
+// signatureGraduationBudget is how long a run spends giving content-keyed shapes real signatures after its
+// verdict is out. The table's lock is held throughout, so a run started at once waits this long at most.
+var signatureGraduationBudget = time.Second
+
+// graduateSignatures gives the shapes still keyed on content real declaration signatures, for at most
+// signatureGraduationBudget, and returns how many entries changed, the abandoned one included (#9knyr86).
+//
+// Only after the verdict reached the dispatcher, which is what lets the emit's cost go unseen: a run nobody
+// answered early is still a caller's wait. A project with no build info used to keep every shape keyed on
+// content, so a comment in one file re-ran its importers' shape-keyed rules and re-checked their types; on ahra,
+// 3,974 of 3,976 files, and an edit run's types phase of about 250ms against about 50ms once they graduate.
+func graduateSignatures(directory string, graph *program.Graph, shapes map[string]program.SignatureEntry) int {
+	if graph == nil || shapes == nil {
+		return 0
+	}
+	graduated, abandoned := graph.GraduateSignatures(shapes, time.Now().Add(signatureGraduationBudget), signatureGraduationBudget/2)
+	if abandoned != "" {
+		cacheNote(directory, fmt.Sprintf("%s's declaration emit ran past %s, so its shape stays keyed on content until its bytes change",
+			abandoned, signatureGraduationBudget/2))
+		return graduated + 1
+	}
+	return graduated
 }
 
 // record captures this run, or returns nil when it cannot.
@@ -930,7 +962,7 @@ func attachFindingsCache(graph *program.Graph, location projectLocation) {
 	if anyRuleKeyedOnShapes(registry.All()) {
 		shapes, _ := graph.Signatures(context.Background(), graph.SeedSignatures(session.table.Signatures))
 		graph.Shapes = shapes
-		session.shapes = shapes
+		session.shapes, session.shapesGraph = shapes, graph
 	}
 	graph.FindingsReuse = session.findings
 	// An entry recorded by a run that did not measure readiness was never measured, so a run that does must
@@ -959,10 +991,10 @@ func carryCaches(replaced *program.Graph, rebuilt *program.Graph) {
 	shapes, computed := rebuilt.Signatures(context.Background(), replaced.Shapes)
 	rebuilt.Shapes = shapes
 	if session := activeRunCache; session != nil && session.shapes != nil {
-		session.shapes = shapes
+		session.shapes, session.shapesGraph = shapes, rebuilt
 	}
 	if record := pendingTypes; record != nil {
-		record.shapes = shapes
+		record.shapes, record.shapesGraph = shapes, rebuilt
 		record.computedShapes += computed
 	}
 }
@@ -996,6 +1028,8 @@ type typesRecord struct {
 	// computed rather than carried from the table.
 	shapes         map[string]program.SignatureEntry
 	computedShapes int
+	// shapesGraph is the graph shapes describe. See runCacheSession.shapesGraph.
+	shapesGraph *program.Graph
 }
 
 // attachTypesCache gives a run the run cache does not record the types section, and the shapes it is keyed
@@ -1016,6 +1050,7 @@ func attachTypesCache(graph *program.Graph, location projectLocation) {
 	release()
 	record := &typesRecord{directory: directory, anchor: anchor, reuse: program.NewTypeDiagnosticsReuse(table.Types, typesKey)}
 	record.shapes, record.computedShapes = graph.Signatures(context.Background(), graph.SeedSignatures(table.Signatures))
+	record.shapesGraph = graph
 	graph.Shapes = record.shapes
 	pendingTypes = record
 }

@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
@@ -68,6 +70,10 @@ type SignatureEntry struct {
 	// Syntax is the hash of the file's text with its function bodies elided. Computed from the parse
 	// alone, so it costs no checker and is filled in for any entry that lacks it, a seeded one included.
 	Syntax string
+
+	// Abandoned is set on a content-keyed entry whose emit was still running at GraduateSignatures' deadline, so
+	// these bytes are never emitted again. Edited bytes start a fresh entry without it.
+	Abandoned bool
 }
 
 // FileVersion is a file's version as the compiler defines it: the xxh3 hash of its text, in hex.
@@ -146,6 +152,122 @@ func (g *Graph) Signatures(ctx context.Context, previous map[string]SignatureEnt
 	}
 	g.ContentKeyedShapes = countContentKeyed(projectFiles, signatures)
 	return signatures, len(stale) + contentKeyed
+}
+
+// beforeSignatureEmit, when set, runs before GraduateSignatures emits a file. Only a test sets it, to plant a
+// file whose emit outruns the deadline.
+var beforeSignatureEmit func(fileName string)
+
+// GraduateSignatures gives files whose shape is keyed on content a real declaration signature, emitting them
+// one at a time until every one is done or deadline passes, and updates shapes in place. It returns how many
+// graduated, and the file it abandoned, "" when it abandoned none (#9knyr86).
+//
+// Signatures never emits a file without a real recorded signature, because an emit has no ceiling and cannot
+// be cancelled (#5txm9gg), so a project with no build info keyed every shape on content forever. Here the run's
+// verdict is already out, so an emit nobody waits on can be left behind at the deadline: the caller writes the
+// table and exits, which ends it. The file it was on is marked Abandoned, and is not tried again while its
+// bytes are the same, but only when that emit had run for abandonAfter: a file the deadline caught a moment
+// after it began is innocent (ahra's slowest emit is 116ms, its median 0.1ms), and the next run tries it first,
+// with the whole budget. A file the deadline stopped before it began is simply tried by the next run.
+//
+// The emits run on a goroutine of their own, and only this function touches shapes, so whatever the goroutine
+// finishes after the deadline is dropped.
+func (g *Graph) GraduateSignatures(shapes map[string]SignatureEntry, deadline time.Time, abandonAfter time.Duration) (graduated int, abandoned string) {
+	var candidates []*ast.SourceFile
+	for _, sourceFile := range g.ProjectFiles() {
+		if sourceFile.IsDeclarationFile || ast.IsJsonSourceFile(sourceFile) {
+			continue
+		}
+		entry, found := shapes[sourceFile.FileName()]
+		if !found || entry.Signature != entry.Version || entry.Abandoned || entry.Version != FileVersion(sourceFile.Text()) {
+			continue
+		}
+		candidates = append(candidates, sourceFile)
+	}
+	if len(candidates) == 0 {
+		return 0, ""
+	}
+
+	type emitted struct {
+		fileName string
+		entry    SignatureEntry
+	}
+	type emitting struct {
+		fileName string
+		started  time.Time
+	}
+	results := make(chan emitted, len(candidates))
+	var inProgress atomic.Pointer[emitting]
+	// Read once, here, so a test restoring the hook never races the goroutine it left behind.
+	hook := beforeSignatureEmit
+	go func() {
+		defer close(results)
+		for _, sourceFile := range candidates {
+			fileName := sourceFile.FileName()
+			inProgress.Store(&emitting{fileName: fileName, started: time.Now()})
+			if hook != nil {
+				hook(fileName)
+			}
+			var entry *SignatureEntry
+			g.Program.Emit(context.Background(), compiler.EmitOptions{
+				TargetSourceFiles: []*ast.SourceFile{sourceFile},
+				EmitOnly:          compiler.EmitOnlyBuilderSignature,
+				WriteFile: func(_ string, text string, data *compiler.WriteFileData) error {
+					if data != nil && data.SourceFile != nil {
+						entry = &SignatureEntry{
+							Version:   FileVersion(data.SourceFile.Text()),
+							Signature: declarationSignature(data.SourceFile, text, data),
+							Syntax:    elidedBodiesVersion(data.SourceFile),
+						}
+					}
+					return nil
+				},
+			})
+			inProgress.Store(nil)
+			// A file the emit wrote nothing for keeps its version as its signature, as Signatures does, and is
+			// tried again next run.
+			if entry != nil {
+				results <- emitted{fileName, *entry}
+			}
+		}
+	}()
+
+	timer := time.NewTimer(time.Until(deadline))
+	defer timer.Stop()
+	for {
+		select {
+		case result, open := <-results:
+			if !open {
+				return graduated, ""
+			}
+			shapes[result.fileName] = result.entry
+			graduated++
+		case <-timer.C:
+			// What finished before now is kept, the file in progress included if it finished while this read.
+			current := inProgress.Load()
+			for drained := false; !drained; {
+				select {
+				case result, open := <-results:
+					if !open {
+						return graduated, ""
+					}
+					shapes[result.fileName] = result.entry
+					graduated++
+				default:
+					drained = true
+				}
+			}
+			if current == nil || time.Since(current.started) < abandonAfter {
+				return graduated, ""
+			}
+			if entry := shapes[current.fileName]; entry.Signature == entry.Version {
+				entry.Abandoned = true
+				shapes[current.fileName] = entry
+				return graduated, current.fileName
+			}
+			return graduated, ""
+		}
+	}
 }
 
 // countContentKeyed is how many of the project's source files have their version for a signature: no
