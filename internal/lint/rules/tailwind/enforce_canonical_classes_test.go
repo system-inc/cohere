@@ -527,3 +527,48 @@ func TestIgnoredClassesAreExempt(t *testing.T) {
 		t.Fatal("the rule stayed silent without any ignore option, so the exemption proves nothing")
 	}
 }
+
+// TestCanonicalCollapseOption is upstream's `collapse`, each way, on upstream's own case: on by default
+// `w-10 h-10` is `size-10`, and off nothing this rule reports remains.
+func TestCanonicalCollapseOption(t *testing.T) {
+	t.Parallel()
+	const source = `const element = <img className="w-10 h-10 flex" />;`
+	off, on := false, true
+
+	if result := runCanonicalFixture(t, "Component.tsx", source); len(result.Diagnostics) != 1 {
+		t.Fatalf("by default the pair should collapse, got %d findings", len(result.Diagnostics))
+	}
+	if result := runCanonicalFixtureWithOptions(t, "Component.tsx", source,
+		EnforceCanonicalClassesOptions{Collapse: &on}); len(result.Diagnostics) != 1 {
+		t.Fatalf("collapse: true is the default and should collapse too, got %d findings", len(result.Diagnostics))
+	}
+	if result := runCanonicalFixtureWithOptions(t, "Component.tsx", source,
+		EnforceCanonicalClassesOptions{Collapse: &off}); len(result.Diagnostics) != 0 {
+		t.Fatalf("collapse: false should report no collapse, got %d findings", len(result.Diagnostics))
+	}
+}
+
+// TestCanonicalLogicalOption is upstream's `logical`, each way. `mr-2 ml-2` is upstream's own case for
+// it: `mx` declares `margin-inline`, which matches `margin-right` and `margin-left` only while the
+// canonicalizer reads logical properties as physical ones. `w-8 h-8` merges into `size-8` through a
+// utility relationship rather than a logical property, which the generator measured
+// (RequiresLogicalToPhysical false), and is the control that `logical: false` silences only the
+// families that need it.
+func TestCanonicalLogicalOption(t *testing.T) {
+	t.Parallel()
+	const logicalPair = `const element = <img className="mr-2 ml-2" />;`
+	const physicalPair = `const element = <img className="w-8 h-8" />;`
+	off := false
+
+	if result := runCanonicalFixture(t, "Component.tsx", logicalPair); len(result.Diagnostics) != 1 {
+		t.Fatalf("by default mr-2 ml-2 should collapse to mx-2, got %d findings", len(result.Diagnostics))
+	}
+	if result := runCanonicalFixtureWithOptions(t, "Component.tsx", logicalPair,
+		EnforceCanonicalClassesOptions{Logical: &off}); len(result.Diagnostics) != 0 {
+		t.Fatalf("logical: false should leave mr-2 ml-2 alone, got %d findings", len(result.Diagnostics))
+	}
+	if result := runCanonicalFixtureWithOptions(t, "Component.tsx", physicalPair,
+		EnforceCanonicalClassesOptions{Logical: &off}); len(result.Diagnostics) != 1 {
+		t.Fatalf("logical: false should still collapse w-8 h-8, got %d findings", len(result.Diagnostics))
+	}
+}

@@ -137,8 +137,14 @@ const designSystem = await tailwindModule.__unstable__loadDesignSystem(
  *
  * `rem` is deliberately absent. Passing it rewrites arbitrary values, turning `h-[76px]` into `h-19`,
  * and produces findings upstream does not report.
+ *
+ * `logicalToPhysical` is enumerated both ways. `enforce-canonical-classes` takes upstream's `logical`
+ * option, which is this flag, and with it off the canonicalizer stops expanding logical properties
+ * into physical ones when it compares signatures, so some families no longer collapse. Which ones is
+ * a fact about the engine, measured here rather than reasoned about, and each family records it.
  */
 const canonicalizeOptions = { collapse: true, logicalToPhysical: true };
+const physicalOnlyOptions = { collapse: true, logicalToPhysical: false };
 
 function parseCandidate(className) {
     try {
@@ -485,22 +491,23 @@ const probeValues = ['4', '2', 'md', 'sm', 'lg', 'full', 'px'];
  * reported 1,326 families including `-bg-conic + -end => -inset-e`, which is nonsense: `-end-4`
  * rewrites alone and `-bg-conic-4` was simply along for the ride.
  *
- * Memoized because the loop asks about each root roughly 327 times.
+ * Memoized because the loop asks about each root roughly 327 times, once per option set.
  */
-const soloRewrites = new Map();
-function rewritesAlone(className) {
-    if (soloRewrites.has(className)) return soloRewrites.get(className);
+const soloRewrites = new Map([[canonicalizeOptions, new Map()], [physicalOnlyOptions, new Map()]]);
+function rewritesAlone(className, options) {
+    const memo = soloRewrites.get(options);
+    if (memo.has(className)) return memo.get(className);
 
     let answer = false;
     try {
-        const result = designSystem.canonicalizeCandidates([className], canonicalizeOptions);
+        const result = designSystem.canonicalizeCandidates([className], options);
         answer = result.some((candidate) => candidate !== className);
     }
     catch {
         answer = false;
     }
 
-    soloRewrites.set(className, answer);
+    memo.set(className, answer);
     return answer;
 }
 
@@ -511,17 +518,17 @@ function rewritesAlone(className) {
  * family when it stops being produced once either input is removed, which is exactly what
  * distinguishes `px-4 + py-4 => p-4` from one class rewriting beside an unrelated neighbour.
  */
-function collapseOf(rootA, rootB, value) {
+function collapseOf(rootA, rootB, value, options) {
     const classA = rootA + '-' + value;
     const classB = rootB + '-' + value;
 
     // A class that rewrites alone poisons the pair test, because its rewrite appears in the output
     // whether or not the other class had anything to do with it.
-    if (rewritesAlone(classA) || rewritesAlone(classB)) return null;
+    if (rewritesAlone(classA, options) || rewritesAlone(classB, options)) return null;
 
     let result;
     try {
-        result = designSystem.canonicalizeCandidates([classA, classB], canonicalizeOptions);
+        result = designSystem.canonicalizeCandidates([classA, classB], options);
     }
     catch {
         // Tailwind throws on candidates it cannot compile. A pair that will not compile has no family.
@@ -538,7 +545,7 @@ function collapseOf(rootA, rootB, value) {
     for (const soleInput of inputs) {
         let alone;
         try {
-            alone = designSystem.canonicalizeCandidates([soleInput], canonicalizeOptions);
+            alone = designSystem.canonicalizeCandidates([soleInput], options);
         }
         catch {
             return null;
@@ -554,45 +561,49 @@ function collapseOf(rootA, rootB, value) {
 }
 
 const families = [];
+// Families that collapse only with logicalToPhysical off. The table has no way to say that, so the Go
+// side refuses to write one rather than drop it; none has been seen.
+const physicalOnlyFamilies = [];
 let pairsProbed = 0;
+
+// The first probe value at which a pair collapses under one option set, and what it becomes.
+function firstCollapse(rootA, rootB, options) {
+    for (const value of probeValues) {
+        const outputRoot = collapseOf(rootA, rootB, value, options);
+        if (outputRoot !== null) return { output: outputRoot, value };
+    }
+    return null;
+}
 
 for (let indexA = 0; indexA < roots.length; indexA++) {
     for (let indexB = indexA + 1; indexB < roots.length; indexB++) {
         pairsProbed++;
-        for (const value of probeValues) {
-            const outputRoot = collapseOf(roots[indexA], roots[indexB], value);
-            if (outputRoot === null) continue;
-            families.push({ inputs: [roots[indexA], roots[indexB]], output: outputRoot, discoveredAtValue: value });
-            break;
+        const withLogical = firstCollapse(roots[indexA], roots[indexB], canonicalizeOptions);
+        const withoutLogical = firstCollapse(roots[indexA], roots[indexB], physicalOnlyOptions);
+        if (withLogical === null) {
+            if (withoutLogical !== null) {
+                physicalOnlyFamilies.push({ inputs: [roots[indexA], roots[indexB]], output: withoutLogical.output, discoveredAtValue: withoutLogical.value });
+            }
+            continue;
         }
+        families.push({
+            inputs: [roots[indexA], roots[indexB]],
+            output: withLogical.output,
+            discoveredAtValue: withLogical.value,
+            // Off means the pair does not collapse to the same root with the flag off: either not at
+            // all, or into something else, and the rule then reports nothing for it.
+            requiresLogicalToPhysical: withoutLogical === null || withoutLogical.output !== withLogical.output,
+        });
     }
 }
 
 families.sort((left, right) => left.inputs.join(' ').localeCompare(right.inputs.join(' ')));
 
 /*
- * The CSS properties each root declares, for `no-conflicting-classes`.
- *
- * Two classes conflict when they declare the same property, so the rule needs a property set per
- * class. Measured across `1`, `4`, `8`, `left`, `right` and `center`: every root produces one
- * distinct property set regardless of value, so this is a fact about roots exactly like the collapse
- * families are, and the table stays small rather than growing with the theme's scale.
- *
- * Property NAMES, not values. `w-8` and `h-8` declare the same value under `width` and `height` and
- * do not conflict; `px-4` and `px-8` declare different values under one property and do. Keying on
- * values would invert both answers.
- *
- * `p` and `px` are deliberately allowed to differ: `padding` and `padding-inline` are different
- * property names, and upstream reports no conflict between `p-4` and `px-8` even though they
- * visually overlap. Normalising shorthands here would invent a finding upstream does not report.
- */
-/*
  * The declarations a class emits, in source order, keeping custom properties.
  *
- * Separate from `declaredProperties` on purpose, and the two disagree deliberately.
- * `no-conflicting-classes` strips `--tw-*` because two classes both setting `--tw-border-style` are
- * not in conflict about anything an author can see. Ordering is the opposite: Tailwind's own sort
- * indexes custom properties, and they are what separates classes that share a visible one.
+ * Custom properties are kept. Tailwind's own sort indexes them, and they are what separates classes
+ * that share a visible property.
  *
  * `shadow-lg` declares `--tw-shadow` then `box-shadow`; `ring-1` declares `--tw-ring-shadow` then
  * `box-shadow`. Stripping the first left both with the identical key `[box-shadow]`, so their
@@ -630,209 +641,6 @@ function orderingProperties(className) {
     return properties.length === 0 ? null : properties;
 }
 
-function declaredProperties(className) {
-    let compiled;
-    try {
-        compiled = designSystem.candidatesToCss?.([className]);
-    }
-    catch {
-        return null;
-    }
-    if (!compiled || !compiled[0]) return null;
-
-    /*
-     * Only the utility's own rule body, stopping at the first at-rule.
-     *
-     * `border-l-4` compiles to its two declarations followed by an `@property --tw-border-style`
-     * block, and that block's descriptors are `syntax`, `inherits` and `initial-value`. Scanning
-     * the whole output picks those up as if the class declared them, so every class that touches
-     * border style would appear to share three properties with every other one and report a
-     * conflict. The at-rule is Tailwind's plumbing rather than anything the author wrote.
-     *
-     * Custom properties are dropped for the same reason: two classes both setting `--tw-border-style`
-     * are not in conflict about anything the author can see.
-     */
-    /*
-     * Only declarations inside a rule body, and only from a single-rule utility.
-     *
-     * A first version scanned `compiled[0].split('@')[0]` with a `name: value;` regex, which reads
-     * the CSS as though it were one flat block. Two things break that, and a sweep of all 1,145
-     * table entries against the engine found both:
-     *
-     *   `.slide-in-from-end:dir(ltr) { --enter-translate-x: 100%; }` declares only a custom
-     *   property, and the regex matched the SELECTOR `slide-in-from-end` from the `:dir(ltr)` part
-     *   as if it were a property name. So a class declaring nothing was recorded as declaring
-     *   itself, and any two such classes would read as conflicting.
-     *
-     *   `.markdown-content p { ... } .markdown-content code { ... }` is a component class emitting
-     *   several rules, and the regex harvested `p`, `code` and `pre` as property names.
-     *
-     * Braces are the fix: a declaration is inside them and a selector is not. A utility emitting
-     * more than one rule is skipped entirely rather than merged, because the properties it declares
-     * belong to descendants rather than to the element the class sits on, and a conflict rule
-     * comparing them against a sibling's would be comparing different elements.
-     */
-    // At-rule blocks first, then braces. Both guards are needed and each was added after the other
-    // was already there: dropping the at-rule split reintroduced `syntax`, `inherits` and
-    // `initial-value` from `@property`, because braces match inside at-rules too.
-    const beforeAtRules = compiled[0].split('@')[0];
-    const bodies = Array.from(beforeAtRules.matchAll(/\{([^{}]*)\}/g)).map((match) => match[1]);
-    if (bodies.length === 0) return null;
-
-    /*
-     * A utility emitting several rules is skipped rather than merged.
-     *
-     * `markdown-content`, `prose` and `typing-dots` are component classes whose rules target
-     * descendants: `.markdown-content p`, `.markdown-content code`, `.markdown-content pre`. Their
-     * declarations belong to those children rather than to the element the class sits on, so a
-     * conflict rule comparing them against a sibling class would be comparing different elements.
-     * Recording nothing is the honest answer, and it makes the rule silent about them rather than
-     * wrong about them.
-     */
-    if (bodies.length > 1) return null;
-
-    const properties = bodies
-        .flatMap((body) => Array.from(body.matchAll(/([-a-zA-Z]+)\s*:\s*[^;]+;/g)))
-        .map((match) => match[1].trim())
-        .filter((property) => !property.startsWith('--'));
-
-    const distinct = Array.from(new Set(properties)).sort();
-    return distinct.length === 0 ? null : distinct;
-}
-
-/*
- * Properties per root, split by value when the root needs it.
- *
- * A first version recorded one property set per root, having probed only numeric and keyword values.
- * That is wrong for 23 of 294 roots, and wrong in the direction that reports false conflicts on
- * correct code: `border` is `border-width` plus `border-style` with a number and `border-color` with
- * a color, so `border border-neutral-200`, which is idiomatic Tailwind, read as a conflict. It
- * produced 347 findings on a tree whose real count is zero.
- *
- * The split is by value kind rather than by exact value, verified across ten colors, six numbers and
- * three arbitrary values: every color-valued border gives `border-color`, every numeric one gives
- * width plus style, and `border-[#fff]` versus `border-[3px]` splits the same way. But deciding
- * which kind a value is requires knowing the theme's color names, which is precisely the
- * theme-dependent knowledge a Go-side table exists to carry. So the generator records the property
- * set per (root, value) for the values the design system actually defines, and the rule looks up the
- * pair rather than inferring the kind.
- */
-const rootProperties = [];
-const rootValueProperties = [];
-
-const colorNames = new Set();
-for (const entry of designSystem.getClassList?.() ?? []) {
-    const name = Array.isArray(entry) ? entry[0] : typeof entry === 'string' ? entry : entry?.name;
-    if (typeof name !== 'string') continue;
-    if (!name.startsWith('text-')) continue;
-
-    const candidate = parseCandidate(name);
-    if (candidate?.kind !== 'functional' || candidate.root !== 'text') continue;
-
-    const properties = declaredProperties(name);
-    if (properties === null || properties.join(',') !== 'color') continue;
-
-    const value = candidate.value?.value;
-    if (typeof value === 'string' && value !== '') colorNames.add(value);
-}
-
-
-for (const root of roots) {
-    // Two distinct values of one root producing identical text means the root layers rather than
-    // overwrites, so two of its classes never conflict with each other.
-    /*
-     * Two values the root actually accepts, found by trying several scales.
-     *
-     * This is the third probe in this file to have missed a root because its values were named
-     * rather than numeric. `shadow-4` and `shadow-8` are not classes, so a numeric-only test
-     * reported `shadow` as not composing while recording `ring` correctly, and `shadow-lg ring-1`
-     * is exactly the pair that has to come out silent.
-     */
-    const candidateValues = allProbeValues();
-
-    let first = null;
-    let firstValue = null;
-    for (const value of candidateValues) {
-        const text = declarationText(root + '-' + value);
-        if (text === null) continue;
-        first = text;
-        firstValue = value;
-        break;
-    }
-    if (first === null) continue;
-
-    for (const value of candidateValues) {
-        if (value === firstValue) continue;
-        const second = declarationText(root + '-' + value);
-        if (second === null) continue;
-        if (first === second) composingRoots.push(root);
-        break;
-    }
-}
-
-for (const root of roots) {
-    const defaultProperties = rootDefault.get(root);
-    if (defaultProperties === undefined) continue;
-
-    // Probe the root with a color the theme defines. A root that gives a different answer for a
-    // color than for a number needs both readings recorded.
-    const sampleColor = colorNames.values().next().value;
-    if (sampleColor === undefined) break;
-
-    const colorProperties = declaredProperties(root + '-' + sampleColor);
-    if (colorProperties === null) continue;
-    if (colorProperties.join(',') === defaultProperties) continue;
-
-    rootValueProperties.push({ root, properties: colorProperties });
-}
-
-const colorProperties = new Map(rootValueProperties.map((entry) => [entry.root, entry.properties.join(',')]));
-
-/*
- * Classes whose properties differ from their root's default, recorded individually.
- *
- * The color split was the first instance and it is not the only one: `font-medium` declares
- * `font-weight` while `font-mono` declares `font-family`, and both parse as root `font`. A probe
- * picks one reading and every class taking the other is then wrong, which showed up as
- * `font-medium font-mono` being reported as a conflict on real code.
- *
- * Only the exceptions are stored, so the table stays small: a class absent here takes its root's
- * entry. Multi-rule utilities are already excluded by declaredProperties, so a component class
- * cannot land here either.
- */
-for (const entry of designSystem.getClassList?.() ?? []) {
-    const name = Array.isArray(entry) ? entry[0] : typeof entry === 'string' ? entry : entry?.name;
-    if (typeof name !== 'string') continue;
-
-    const candidate = parseCandidate(name);
-    if (candidate?.kind !== 'functional' || !candidate.root) continue;
-
-    const rootProperties = rootDefault.get(candidate.root);
-    if (rootProperties === undefined) continue;
-
-    const properties = declaredProperties(name);
-    if (properties === null) continue;
-    if (properties.join(',') === rootProperties) continue;
-
-    // Colors are already handled per root, and they are the bulk of the exceptions: recording them
-    // here too produced 8,428 entries and a 10,000-line file for a distinction the color reading
-    // already makes.
-    const colorReading = colorProperties.get(candidate.root);
-    if (colorReading !== undefined && properties.join(',') === colorReading) continue;
-
-    classProperties.push({ root: name, properties });
-}
-
-classProperties.sort((left, right) => left.root.localeCompare(right.root));
-rootValueProperties.sort((left, right) => left.root.localeCompare(right.root));
-
-const staticProperties = [];
-for (const name of Array.from(staticUtilities).sort()) {
-    const properties = declaredProperties(name);
-    if (properties === null) continue;
-    staticProperties.push({ root: name, properties });
-}
-
 const tailwindVersion = JSON.parse(
     NodeFileSystem.readFileSync(
         NodeModule.createRequire(NodePath.join(projectRoot, 'noop.js')).resolve('tailwindcss/package.json'),
@@ -849,16 +657,13 @@ process.stdout.write(
             staticUtilities: staticUtilities.size,
             pairsProbed,
             families,
-            rootProperties,
+            physicalOnlyFamilies,
             propertyOrder,
             orderingByRoot,
             orderingByStatic,
             orderingByClass,
             variantOrder,
             unreachableRoots: unreachableRoots.sort(),
-            rootColorProperties: rootValueProperties,
-            classProperties,
-            staticProperties,
         },
         null,
         2,

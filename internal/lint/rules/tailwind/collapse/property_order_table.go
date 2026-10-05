@@ -4,7 +4,7 @@
 //
 //	go run ./internal/lint/rules/tailwind/tools/generate_collapse -entry-point <theme.css>
 //
-// Source: Tailwind 4.3.3. 359 ordered properties, 12 sort overrides.
+// Source: Tailwind 4.3.3. 359 ordered properties.
 //
 // Tailwind sorts utilities into a stable total order, and enforce-consistent-class-order reports
 // class lists written in a different one. Its own sort is about twenty-five lines: compare by
@@ -390,15 +390,7 @@ var PropertyOrder = map[string]int{
 // value and looks it up in `PropertyOrder`, so a value that names a known property latches the order
 // there and a value that does not falls through. Neither branch consults a list of which values are
 // legal, because the lookup answers that by hitting or missing.
-//
-// `c097bb8` recorded it as dead alongside `RootSelectorShapes` and left both standing rather than
-// grow a diff that was already carrying two authors' work. This is the rest of that.
 
-// OrderingPropertiesByRoot is the declarations a root's utilities emit, in source order, custom
-// properties included.
-//
-// OrderingPropertiesByClass overrides a root's entry where the value changes what is emitted.
-//
 // VariantOrder is the position of each variant prefix in Tailwind's sort order.
 //
 // Asked of the engine rather than guessed. Ranking variants by prefix length put focus: before
