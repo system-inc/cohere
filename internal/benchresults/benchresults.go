@@ -101,7 +101,8 @@ type Run struct {
 	Cache    string `json:"cache"`
 	Exit     int    `json:"exit"`
 	// Primes is how many unmeasured runs the round needed before one replayed whole, from 1 to 3, the same
-	// on each of the round's runs. More than one is #547dhjz showing itself, and the record keeps it.
+	// on each of the round's runs. Two is expected after the first round, since the edit run's cache entry
+	// holds the edited bytes and the next run rechecks the restored file and its importers.
 	Primes int `json:"primes"`
 }
 
@@ -216,8 +217,8 @@ func Validate(record Record) error {
 }
 
 // cacheFitsMode refuses a cache use the run's mode cannot have: Cold runs with --no-cache, so its cache is
-// off; Warm replays an unchanged tree, so it is a whole replay or every file replayed; Edit changed one
-// file, so some files and not all of them were replayed.
+// off; Warm replays an unchanged tree after a prime that replayed, so it is a whole replay; Edit changed one
+// file, so some files and not all of them were taken from the cache.
 func cacheFitsMode(run Run) error {
 	replayed, inScope := 0, 0
 	partial := false
@@ -226,7 +227,7 @@ func cacheFitsMode(run Run) error {
 	}
 	switch {
 	case run.Mode == ModeCold && run.Cache == "off":
-	case run.Mode == ModeWarm && (run.Cache == "replay" || (replayed > 0 && replayed == inScope)):
+	case run.Mode == ModeWarm && run.Cache == "replay":
 	case run.Mode == ModeEdit && partial:
 	default:
 		return fmt.Errorf("its cache read %q, which a %s run cannot have", run.Cache, run.Mode)

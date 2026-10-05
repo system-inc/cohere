@@ -15,11 +15,11 @@
 #
 # One round, interleaved, so a load that drifts lands on every mode alike:
 #   prime   `cohere`, not measured, so the cache describes the tree as it stands: run again until one
-#           replays, up to three times, since a first run after a new engine or the cold run can leave
-#           a cache the next run does not replay whole (measured 2026-10-05: prime and warm both checked
-#           all 3,976 files, and the run after replayed, #547dhjz). Each run's row carries how many
-#           primes its round needed, and the summary names every round that needed more than one, so
-#           the retry cannot hide that bug
+#           replays, up to three times. A second prime is expected every round after the first: the edit
+#           run's cache entry holds the edited bytes, so the next run rechecks the restored file and its
+#           importers. Each run's row carries how many primes its round needed, every prime's cache use
+#           is kept in primes.tsv, and the summary warns on what is actually wrong: a prime after the first
+#           round that took nothing from the cache (#547dhjz), or a warm run that is not a whole replay
 #   warm    `cohere` again on the unchanged tree: the replay
 #   edit    one line added to one function body, `cohere`, then the file's original bytes put back
 #   cold    `cohere --no-cache`: every phase from source, nothing read or written
@@ -140,7 +140,10 @@ for round in $(seq 1 $runs); do
   for prime in 1 2 3; do
     primes=$prime
     run_cohere $logs/prime-$round-$prime.log
-    [[ $($run_output_reader $logs/prime-$round-$prime.log | cut -f3) == replay ]] && break
+    prime_cache=$($run_output_reader $logs/prime-$round-$prime.log | cut -f3) ||
+      fail "could not read the prime's output, see $logs/prime-$round-$prime.log"
+    printf '%d\t%d\t%s\n' $round $prime "$prime_cache" >> $logs/primes.tsv
+    [[ $prime_cache == replay ]] && break
   done
 
   measure warm $round
@@ -171,10 +174,14 @@ awk -F'\t' '$1 == "warm" { warm[$2] = $6 } $1 == "edit" { edit[$2] = $6 }
   END { for (round in edit) if (edit[round] != warm[round])
     printf "note: round %s edit reported %s findings and warm %s, so the edit was not neutral\n", round, edit[round], warm[round] }' $runs_table
 
-# A round whose prime did not replay on its first run met #547dhjz: a run after a change that left a cache
-# the next run could not replay whole. The retry keeps the warm run a real replay, and this says it was needed.
-awk -F'\t' '$1 == "warm" && $12 > 1 {
-    printf "note: round %s needed %s primes before a run replayed whole (#547dhjz); see its prime logs\n", $2, $12 }' $runs_table
+# What the primes and warm runs should never do. After the first round the cache holds the last round, so a
+# prime that took nothing from it is #547dhjz, a cache the run before left unusable. A warm run is a whole
+# replay or the benchmark measured something else under its name. The first round's first prime may start
+# cold, after a new engine, and is not warned on.
+awk -F'\t' '$1 > 1 && $3 == "none" {
+    printf "warning: round %s prime %s took nothing from the cache (#547dhjz); see prime-%s-%s.log\n", $1, $2, $1, $2 }' $logs/primes.tsv
+awk -F'\t' '$1 == "warm" && $7 != "replay" {
+    printf "warning: round %s warm run read cache %s, not a whole replay\n", $2, $7 }' $runs_table
 
 print
 print "verdict seconds, by mode (quiet runs are the number; loaded runs are shown, not reported):"
