@@ -273,7 +273,10 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	invocation := program.CacheTableInvocation(os.Args[1:])
 	table, err := program.ReadCacheTable(directory, identity, program.CacheTableSections{Runs: []string{invocation}}, anchor)
 	stored := table.Runs[invocation]
-	checked := stored.Check(key)
+	// Every input's stat is noted as it is checked, so a run that misses hands them to the content pack rather
+	// than statting each file again (#kdee854). See program.StatSnapshot.
+	runCacheCheckStats = program.NewStatSnapshot()
+	checked := stored.CheckNoting(key, runCacheCheckStats)
 	if checked == nil {
 		release()
 		replayRunCache(stored, anchor)

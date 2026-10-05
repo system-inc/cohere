@@ -16,3 +16,8 @@ func statIdentity(path string) (fileIdentity, bool) {
 func changeTimeAndInode(path string, information os.FileInfo) (changedNanoseconds int64, inode uint64) {
 	return 0, 0
 }
+
+// identityFromInfo reports nothing here, as statIdentity does.
+func identityFromInfo(information os.FileInfo) (fileIdentity, bool) {
+	return fileIdentity{}, false
+}

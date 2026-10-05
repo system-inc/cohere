@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/types/sourcename"
 )
 
 var messageNoExplicitAny = rule.Message{
@@ -149,14 +150,15 @@ var NoExplicitAny = rule.Rule{
 	},
 }
 
-// isTypeScriptSourceFile is oxc's `source_type().is_typescript()`, by file name.
+// isTypeScriptSourceFile is oxc's `source_type().is_typescript()`, by file name, with an Adamic `.a`
+// file read as the `.ts` it is (sourcename.TreatedAs, #kwt1htp).
 //
 // The `.d.ts` case needs no arm of its own: it ends in `.ts` and upstream treats a
 // `TypeScriptDefinition` as TypeScript for this predicate, so the suffix test already answers it.
 // Kept as a named function rather than inlined so the extension list has one home and the reasoning
 // above has something to point at.
 func isTypeScriptSourceFile(fileName string) bool {
-	return strings.HasSuffix(fileName, ".ts") ||
+	return strings.HasSuffix(sourcename.TreatedAs(fileName), ".ts") ||
 		strings.HasSuffix(fileName, ".tsx") ||
 		strings.HasSuffix(fileName, ".mts") ||
 		strings.HasSuffix(fileName, ".cts")

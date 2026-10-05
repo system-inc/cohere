@@ -71,6 +71,24 @@ const animalsOf: () => Animal[] = dogsOf;`, "dogsOf"},
 		"a mutable callback slot": {animals + `
 const handler: { onAnimal: (animal: Dog) => void } = { onAnimal: (dog) => { dog.bark(); } };
 const wide: { onAnimal: (animal: never) => void } = handler;`, "handler"},
+		// #53w68gt: a type parameter target is written through its constraint, and pack.push stores a
+		// Pack[number] where narrow holds only Narrow[number].
+		"a type parameter target": {animals + `
+function admit<Pack extends Animal[], Narrow extends Pack>(narrow: Narrow, extra: Pack[number]): void {
+	const pack: Pack = narrow;
+	pack.push(extra);
+}`, "narrow"},
+		"a type parameter target behind a readonly property": {animals + `
+function admit<Pack extends { readonly all: Animal[] }, Narrow extends Pack>(narrow: Narrow): Pack {
+	return narrow;
+}`, "narrow"},
+		// #53w68gt: an intersection's array member is a slot like any array.
+		"an intersection target": {animals + `
+declare const tagged: Dog[] & { tag: string };
+const wide: Animal[] & { tag: string } = tagged;`, "tagged"},
+		"an intersection source": {animals + `
+declare const tagged: Dog[] & { tag: string };
+const all: Animal[] = tagged;`, "tagged"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -109,6 +127,16 @@ func TestInvariantMutableStaysCleanWhereNothingCanBeWrittenThrough(t *testing.T)
 		"a new map":              animals + `const all: Map<string, Animal> = new Map<string, Dog>([['Rex', rex]]);`,
 		"Object.values":          animals + `declare const byName: { readonly [name: string]: Dog }; const all: Animal[] = Object.values(byName);`,
 		"a conditional literal":  `declare const flag: boolean; const maybe: { kind: string } | undefined = flag ? { kind: 'Circle' } : undefined;`,
+		// #53w68gt's near-misses: a constraint with no writable slot, the same parameter, an unconstrained one,
+		// and an intersection whose array member is the same and whose other member is read-only.
+		"a type parameter with a readonly constraint":      animals + `function admit<Pack extends readonly Animal[], Narrow extends Pack>(narrow: Narrow): Pack { const pack: Pack = narrow; return pack; }`,
+		"a type parameter constrained to a readonly shape": animals + `function admit<Pack extends Animal, Narrow extends Pack>(narrow: Narrow): Pack { return narrow; }`,
+		"an unconstrained type parameter":                  `function hold<Item, Other extends Item>(other: Other): Item { return other; }`,
+		// #53w68gt's measured false findings, each a pair that is no flow into the parameter.
+		"a generic method seen under two receivers": `class Entity { name = ''; clone<T extends this>(): T { return this as T; } } class Session extends Entity { token = ''; } declare const session: Readonly<Session & object>; const wide: Readonly<Session> = session;`,
+		"a union member the parameter is not":       `class Tracked { name = ''; } function insert<Entity extends Tracked>(entity: Readonly<Entity> | readonly Entity[]): readonly Entity[] { const entities: readonly Entity[] = Array.isArray(entity) ? entity : [entity]; return entities; }`,
+		"a parameter narrowed to non-null":          `function keep<Value extends { items: string[] } | null>(value: Value, set: (next: Value) => void): void { if(value !== null) { set(value); } }`,
+		"an intersection with the same array":       animals + `declare const tagged: Animal[] & { readonly tag: 'kennel' }; const wide: Animal[] & { readonly tag: string } = tagged;`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

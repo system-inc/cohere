@@ -82,10 +82,51 @@ type addedContent struct {
 	contents string
 }
 
+// StatSnapshot holds the identity of every file the run cache's check statted, by path. A run the check could
+// not replay has just statted every input it recorded, and the content pack validates against those stats
+// rather than taking each again: about 18ms of a graph phase's 32ms of serving on ahra, at 12 workers (#kdee854).
+//
+// It is sound because nothing the run reads can be newer than its clock. The run-cache clock starts before the
+// check (startRunCacheClock), so a file changed after its stat here has a modification or change time past the
+// run's readSince, and RecordRunCache refuses to record that run: the next run reads the file afresh. Every
+// other cache keys on the bytes the pack actually served, so served bytes older than the disk are recorded as
+// exactly that. The run reports the tree as it stood at the check, and nothing replays it past a later change.
+type StatSnapshot struct {
+	identities sync.Map
+}
+
+// NewStatSnapshot returns an empty snapshot for a check to fill.
+func NewStatSnapshot() *StatSnapshot {
+	return &StatSnapshot{}
+}
+
+// note keeps a file's identity from a stat already taken, when this platform can read one from it.
+func (s *StatSnapshot) note(path string, information os.FileInfo) {
+	if identity, ok := identityFromInfo(information); ok {
+		s.identities.Store(path, identity)
+	}
+}
+
+// identityOf is the identity noted for path, if the check statted it.
+func (s *StatSnapshot) identityOf(path string) (fileIdentity, bool) {
+	if s == nil {
+		return fileIdentity{}, false
+	}
+	identity, found := s.identities.Load(path)
+	if !found {
+		return fileIdentity{}, false
+	}
+	return identity.(fileIdentity), true
+}
+
 // ContentPack serves file bytes recorded by earlier runs and collects what this run read from disk, for
 // Save to keep. Safe for the program loader's concurrent reads.
 type ContentPack struct {
 	directory string
+
+	// known is the run-cache check's stats, trusted in place of a stat of each file served. Nil when the run had
+	// no check, or the check ran before the pack was handed its snapshot. See StatSnapshot.
+	known *StatSnapshot
 
 	// dataName, mapped and entries are what was on disk when the pack was opened, read-only afterward.
 	dataName string
@@ -131,6 +172,12 @@ func OpenContentPack(directory string) (*ContentPack, error) {
 	return pack, nil
 }
 
+// TrustStats has the pack validate entries against snapshot's stats where it holds one, rather than statting
+// each file served again. See StatSnapshot for why that is sound.
+func (p *ContentPack) TrustStats(snapshot *StatSnapshot) {
+	p.known = snapshot
+}
+
 // Counts reports how many files this run was served from the pack, read from disk, and found damaged.
 func (p *ContentPack) Counts() (hits int, misses int, damaged int) {
 	p.mutex.Lock()
@@ -167,7 +214,10 @@ func (p *ContentPack) serve(path string) (string, bool) {
 	if !found {
 		return "", false
 	}
-	identity, statted := statIdentity(path)
+	identity, statted := p.known.identityOf(path)
+	if !statted {
+		identity, statted = statIdentity(path)
+	}
 	if !statted || identity != entry.identity {
 		return "", false
 	}

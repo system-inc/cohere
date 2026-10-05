@@ -45,7 +45,7 @@ func TestANoFixFormatRunReplaysUntilWhatItsWalkReadMoves(t *testing.T) {
 		command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME=")
 		output, err := command.CombinedOutput()
 		if exitError, isExit := err.(*exec.ExitError); isExit {
-			return string(output), exitError.ExitCode()
+			return string(output), childExitCode(t, exitError)
 		}
 		if err != nil {
 			t.Fatalf("running cohere: %v\n%s", err, output)
@@ -126,7 +126,7 @@ func TestAnIgnoreFileTheWalkReadBreaksTheFormatReplay(t *testing.T) {
 		command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME=")
 		output, err := command.CombinedOutput()
 		if exitError, isExit := err.(*exec.ExitError); isExit {
-			return string(output), exitError.ExitCode()
+			return string(output), childExitCode(t, exitError)
 		}
 		if err != nil {
 			t.Fatalf("running cohere: %v\n%s", err, output)

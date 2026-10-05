@@ -168,6 +168,29 @@ func ExpectClean(t *testing.T, result Result) {
 	recordCase(t, result, capture.OutcomeClean, "")
 }
 
+// ExpectSameFindings asserts that two runs of a rule reported the same findings: the same message
+// ids, in the same order, over the same spans. It is how a fixture shows an Adamic `.a` file is
+// linted exactly as the same source named `.ts` (#kwt1htp), so the control run must report at least
+// one finding, or the comparison would pass with the rule silent on both.
+func ExpectSameFindings(t *testing.T, control Result, treatment Result) {
+	t.Helper()
+
+	if len(control.Diagnostics) == 0 {
+		t.Fatal("the control run reported nothing, so agreeing with it proves nothing")
+	}
+	if len(control.Diagnostics) != len(treatment.Diagnostics) {
+		t.Fatalf("expected %d findings %v, got %d %v",
+			len(control.Diagnostics), control.MessageIds(), len(treatment.Diagnostics), treatment.MessageIds())
+	}
+	for index, want := range control.Diagnostics {
+		got := treatment.Diagnostics[index]
+		if got.Message.Id != want.Message.Id || got.Range != want.Range {
+			t.Fatalf("finding %d: expected %q at %v, got %q at %v",
+				index, want.Message.Id, want.Range, got.Message.Id, got.Range)
+		}
+	}
+}
+
 // ExpectFixedSource applies every fix the rule proposed and asserts the resulting source text.
 //
 // A fix is the one part of a rule that rewrites source, and a fixture checking only message ids
