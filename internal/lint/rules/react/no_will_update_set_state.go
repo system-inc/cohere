@@ -15,27 +15,6 @@ var messageNoSetStateInComponentWillUpdate = rule.Message{
 		"comparison of the previous props so it cannot run on its own output.",
 }
 
-// NoWillUpdateSetStateOptions is the decoded option object.
-//
-// One field holding the single positional string both upstreams take. ESLint's `meta.schema` is
-// `[{enum: ["disallow-in-func"]}]`, so upstream accepts exactly one value and treats its absence as
-// the permissive default it spells `allow-in-func` internally. oxc deserializes the same position
-// into `AllowedOrDisallowInFunc`, which also names the default explicitly as `allowed`, and this
-// rule's corpus writes an empty array in that position on one pass case. Both spellings are
-// accepted here and only `disallow-in-func` changes an answer.
-//
-// Our inventory records this rule as taking no options, which is wrong. That column has now been
-// wrong on every rule in this three-rule family.
-type NoWillUpdateSetStateOptions struct {
-	// Mode is the positional option string, empty when the rule is configured with a bare severity.
-	//
-	// An unrecognized value reads as the default rather than as a second disallowing mode. Neither
-	// upstream has to decide this, because ESLint's schema rejects an unlisted string before the
-	// rule runs and oxc's serde fails the config; we do have to, and the permissive reading is the
-	// one that cannot start reporting on a typo in somebody's settings file.
-	Mode string `json:"mode"`
-}
-
 // The two names this rule latches on.
 //
 // React 16.3 renamed the three unsafe lifecycle methods with an `UNSAFE_` prefix and kept the old
@@ -151,8 +130,8 @@ var NoWillUpdateSetState = rule.Rule{
 		// An unconfigured rule gets the zero value, which is upstream's permissive default. The
 		// comma-ok form matters: the plain harness and a bare severity in the config both hand this
 		// a nil, and an unchecked assertion would panic on every real file.
-		settings, _ := rule.OptionsAs[NoWillUpdateSetStateOptions](options)
-		reportInsideNestedFunctions := settings.Mode == "disallow-in-func"
+		settings, _ := rule.OptionsAs[NoMethodSetStateOptions](options)
+		reportInsideNestedFunctions := settings.DisallowInFunc
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

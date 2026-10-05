@@ -22,6 +22,10 @@ const didUpdateSetStateFile = "/repository/source/DidUpdate.tsx"
 // stating because one fail case carries two `setState` calls and reports only once, which is the
 // nesting judgment rather than a counting accident.
 //
+// Four of those 34 were written under oxc's `allowed` spelling of the default, two passing and two
+// failing, each byte-identical to a default-mode case kept here. No ESLint version accepts
+// `allowed`, so the decoder refuses it and those four rows were dropped (#d21war2).
+//
 // The strings were decoded from the extractor's `-dump` output and then checked byte against byte
 // into the Rust source by a script before any Go was written. All 34 matched, and none of them
 // carries a backslash or a quote, so the cooking hazard that has bitten three previous porters
@@ -53,15 +57,13 @@ func TestNoDidUpdateSetStateFires(t *testing.T) {
 		{"a function-expression callback in a class component under disallow-in-func", "\n            class Hello extends React.Component {\n              componentDidUpdate() {\n                someClass.onSomeEvent(function(data) {\n                  this.setState({\n                    data: data\n                  });\n                })\n              }\n            }\n            ", "disallow-in-func"},
 		{"a concise-body arrow callback under disallow-in-func", "\n            var Hello = createReactClass({\n              componentDidUpdate: function() {\n                someClass.onSomeEvent((data) => this.setState({data: data}));\n              }\n            });\n            ", "disallow-in-func"},
 		{"a concise-body arrow callback in a class component under disallow-in-func", "\n            class Hello extends React.Component {\n              componentDidUpdate() {\n                someClass.onSomeEvent((data) => this.setState({data: data}));\n              }\n            }\n            ", "disallow-in-func"},
-		{"a direct setState under the explicit allowed spelling", "\n            var Hello = createReactClass({\n              componentDidUpdate: function() {\n                this.setState({\n                  name: this.props.name.toUpperCase()\n                });\n              }\n            });\n            ", "allowed"},
-		{"a direct setState in a class component under the explicit allowed spelling", "\n            class Hello extends React.Component {\n              componentDidUpdate() {\n                this.setState({\n                  name: this.props.name.toUpperCase()\n                });\n              }\n            }\n            ", "allowed"},
 	}
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
-				testCase.sourceText, NoDidUpdateSetStateOptions{Mode: testCase.option})
+				testCase.sourceText, noMethodSetStateOptions(t, testCase.option))
 			rule_testing.ExpectFindings(t, result, "noSetStateInComponentDidUpdate")
 		})
 	}
@@ -69,10 +71,10 @@ func TestNoDidUpdateSetStateFires(t *testing.T) {
 
 // The clean cases carry the whole rule, and they decline for four different reasons.
 //
-// Six of them are the nesting judgment in default mode: a callback, a function declared inside the
-// lifecycle and passed out, an arrow handler, a `setTimeout`, a promise continuation, and the same
-// two written again under the explicit `allowed` spelling. Those are the cases the option exists to
-// change, and every one of them reports once `disallow-in-func` is passed.
+// Five of them are the nesting judgment in default mode: a callback, a function declared inside the
+// lifecycle and passed out, an arrow handler, a `setTimeout` and a promise continuation. Those are
+// the cases the option exists to change, and every one of them reports once `disallow-in-func` is
+// passed.
 //
 // Three are the lifecycle name: `componentDidMount` and `componentWillUpdate` hold a `setState`
 // that a neighbouring rule reports and this one must not. Those two matter more here than anywhere
@@ -105,8 +107,6 @@ func TestNoDidUpdateSetStateStaysSilent(t *testing.T) {
 		{"setState inside a promise-then arrow", "\n            class Hello extends React.Component {\n              componentDidUpdate() {\n                Promise.resolve().then(() => {\n                  this.setState({ data: 123 });\n                });\n              }\n            }\n            ", ""},
 		{"an empty componentDidUpdate under disallow-in-func", "\n            var Hello = createReactClass({\n              componentDidUpdate: function() {}\n            });\n            ", "disallow-in-func"},
 		{"a render method with no lifecycle under disallow-in-func", "\n            var Hello = createReactClass({\n              render: function() {\n                return <div>Hello {this.props.name}</div>;\n              }\n            });\n            ", "disallow-in-func"},
-		{"a function-expression callback under the explicit allowed spelling", "\n            var Hello = createReactClass({\n              componentDidUpdate: function() {\n                someClass.onSomeEvent(function(data) {\n                  this.setState({\n                    data: data\n                  });\n                })\n              }\n            });\n            ", "allowed"},
-		{"an arrow callback in a class component under the explicit allowed spelling", "\n            class Hello extends React.Component {\n              componentDidUpdate() {\n                this.handleEvent(() => {\n                  this.setState({ data: 123 });\n                });\n              }\n            }\n            ", "allowed"},
 
 		// Everything below is ours rather than upstream's, and every one of them was measured on
 		// the release oxlint binary rather than reasoned about. They cover the discriminations our
@@ -189,7 +189,7 @@ func TestNoDidUpdateSetStateStaysSilent(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
-				testCase.sourceText, NoDidUpdateSetStateOptions{Mode: testCase.option})
+				testCase.sourceText, noMethodSetStateOptions(t, testCase.option))
 			rule_testing.ExpectClean(t, result)
 		})
 	}
@@ -272,7 +272,7 @@ func TestNoDidUpdateSetStateFiresOnShapesUpstreamDoesNotWrite(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
-				testCase.sourceText, NoDidUpdateSetStateOptions{Mode: testCase.option})
+				testCase.sourceText, noMethodSetStateOptions(t, testCase.option))
 			rule_testing.ExpectFindings(t, result, "noSetStateInComponentDidUpdate")
 		})
 	}
@@ -291,17 +291,7 @@ func TestNoDidUpdateSetStateOptionChangesTheAnswer(t *testing.T) {
 	t.Run("silent by default", func(t *testing.T) {
 		t.Parallel()
 		result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
-			nestedCallback, NoDidUpdateSetStateOptions{Mode: ""})
-		rule_testing.ExpectClean(t, result)
-	})
-
-	// The oxc spelling of the default. Its serde enum carries an `allowed` variant that ESLint's
-	// `meta.schema` does not list, and upstream's own corpus passes it, so it is accepted here and
-	// means exactly the default.
-	t.Run("silent under the explicit allowed spelling", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
-			nestedCallback, NoDidUpdateSetStateOptions{Mode: "allowed"})
+			nestedCallback, noMethodSetStateOptions(t, ""))
 		rule_testing.ExpectClean(t, result)
 	})
 
@@ -311,26 +301,15 @@ func TestNoDidUpdateSetStateOptionChangesTheAnswer(t *testing.T) {
 		t.Parallel()
 		result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
 			"\nclass Hello extends React.Component {\n  get componentDidUpdate() {\n    someClass.on(function() {\n      this.setState({ data: 123 });\n    });\n    return 1;\n  }\n}\n",
-			NoDidUpdateSetStateOptions{Mode: "disallow-in-func"})
+			noMethodSetStateOptions(t, "disallow-in-func"))
 		rule_testing.ExpectFindings(t, result, "noSetStateInComponentDidUpdate")
 	})
 
 	t.Run("reports under disallow-in-func", func(t *testing.T) {
 		t.Parallel()
 		result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
-			nestedCallback, NoDidUpdateSetStateOptions{Mode: "disallow-in-func"})
+			nestedCallback, noMethodSetStateOptions(t, "disallow-in-func"))
 		rule_testing.ExpectFindings(t, result, "noSetStateInComponentDidUpdate")
-	})
-
-	// An unrecognized value is the default rather than a second disallowing mode. ESLint's schema
-	// rejects it before the rule runs and oxc's serde would fail the config, so neither upstream
-	// has to decide; we do, and falling back to the permissive reading is the choice that cannot
-	// start reporting on a typo.
-	t.Run("an unrecognized mode reads as the default", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
-			nestedCallback, NoDidUpdateSetStateOptions{Mode: "disallowInFunc"})
-		rule_testing.ExpectClean(t, result)
 	})
 
 	// A rule offered no options at all gets the zero value through the registry, which is the
@@ -379,7 +358,7 @@ func TestNoDidUpdateSetStatePointsAtTheCallee(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
-				testCase.sourceText, NoDidUpdateSetStateOptions{Mode: ""})
+				testCase.sourceText, noMethodSetStateOptions(t, ""))
 			rule_testing.ExpectFindings(t, result, "noSetStateInComponentDidUpdate")
 			diagnostic := result.Diagnostics[0]
 			reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
@@ -400,7 +379,7 @@ func TestNoDidUpdateSetStateMessageText(t *testing.T) {
 
 	result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
 		"\nclass Hello extends React.Component {\n  componentDidUpdate() {\n    this.setState({ data: 123 });\n  }\n}\n",
-		NoDidUpdateSetStateOptions{Mode: ""})
+		noMethodSetStateOptions(t, ""))
 	rule_testing.ExpectFindings(t, result, "noSetStateInComponentDidUpdate")
 
 	description := result.Diagnostics[0].Message.Description

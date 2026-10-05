@@ -1,6 +1,7 @@
 package react
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -27,9 +28,8 @@ const preferEs6ClassFile = "/repository/source/PreferEs6Class.tsx"
 // class expression, no parenthesized anything and no JSDoc. Those all live in the measured tables
 // below, each row driven against the installed build rather than reasoned from the source.
 //
-// The option is spelled as our named key rather than upstream's bare positional string, and every
-// option fixture routes through the exported decoder so the default and the serde name are under
-// test rather than bypassed.
+// The option is upstream's bare string, and every option fixture routes through the exported
+// decoder in upstream's spelling, so the decoder is under test rather than bypassed.
 
 // TestPreferEs6ClassFires runs the three failing cases from upstream, one finding each.
 func TestPreferEs6ClassFires(t *testing.T) {
@@ -131,11 +131,11 @@ func TestPreferEs6ClassStaysSilent(t *testing.T) {
 // runPreferEs6Class drives the rule through its own exported decoder.
 //
 // Routing through DecodePreferEs6ClassOptions rather than building the options struct directly is
-// what puts the default and the JSON key under test. Both are lines with no upstream counterpart,
-// since upstream's option is a bare positional string and ours is a named key.
+// what puts the decoder under test: each mode reaches the rule as upstream writes it, `"always"` or
+// `"never"`.
 func runPreferEs6Class(t *testing.T, mode PreferEs6ClassMode, sourceText string) rule_testing.Result {
 	t.Helper()
-	decoded, err := DecodePreferEs6ClassOptions([]byte(`{"mode":"` + string(mode) + `"}`))
+	decoded, err := DecodePreferEs6ClassOptions([]byte(`"` + strings.ToLower(string(mode)) + `"`))
 	if err != nil {
 		t.Fatalf("decoding mode %q: %v", mode, err)
 	}
@@ -468,56 +468,53 @@ func TestPreferEs6ClassMessages(t *testing.T) {
 	}
 }
 
-// TestDecodePreferEs6ClassOptions pins the decoder, which has no upstream counterpart.
+// TestDecodePreferEs6ClassOptions pins the decoder against upstream's schema,
+// `[{ enum: ["always", "never"] }]`.
 func TestDecodePreferEs6ClassOptions(t *testing.T) {
 	t.Parallel()
 
-	t.Run("no options at all means Always", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodePreferEs6ClassOptions(nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if decoded.(PreferEs6ClassOptions).Mode != PreferEs6ClassAlways {
-			t.Errorf("mode = %q, wanted Always", decoded.(PreferEs6ClassOptions).Mode)
-		}
-	})
+	accepted := []struct {
+		name string
+		raw  string
+		want PreferEs6ClassMode
+	}{
+		{"no options at all means Always", ``, PreferEs6ClassAlways},
+		{"upstream's always", `"always"`, PreferEs6ClassAlways},
+		{"upstream's never", `"never"`, PreferEs6ClassNever},
+	}
+	for _, testCase := range accepted {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			decoded, err := DecodePreferEs6ClassOptions([]byte(testCase.raw))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if decoded.(PreferEs6ClassOptions).Mode != testCase.want {
+				t.Errorf("mode = %q, wanted %q", decoded.(PreferEs6ClassOptions).Mode, testCase.want)
+			}
+		})
+	}
 
-	t.Run("an empty object means Always", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodePreferEs6ClassOptions([]byte(`{}`))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if decoded.(PreferEs6ClassOptions).Mode != PreferEs6ClassAlways {
-			t.Errorf("mode = %q, wanted Always", decoded.(PreferEs6ClassOptions).Mode)
-		}
-	})
-
-	t.Run("an explicit Never is kept", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodePreferEs6ClassOptions([]byte(`{"mode":"Never"}`))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if decoded.(PreferEs6ClassOptions).Mode != PreferEs6ClassNever {
-			t.Errorf("mode = %q, wanted Never", decoded.(PreferEs6ClassOptions).Mode)
-		}
-	})
-
-	t.Run("an unknown mode is refused", func(t *testing.T) {
-		t.Parallel()
-		if _, err := DecodePreferEs6ClassOptions([]byte(`{"mode":"sometimes"}`)); err == nil {
-			t.Error("wanted an error naming the unknown mode")
-		}
-	})
-
-	t.Run("upstream's own spelling is refused rather than silently ignored", func(t *testing.T) {
-		t.Parallel()
-		// Guarding the migration: someone copying ESLint's config would write the lowercase
-		// spelling, and reading that as Always would enforce the opposite of what they asked for.
-		if _, err := DecodePreferEs6ClassOptions([]byte(`{"mode":"never"}`)); err == nil {
-			t.Error("wanted an error on upstream's lowercase spelling")
-		}
-	})
+	// The object form is the shape cohere invented before #d21war2 and no ESLint version accepts,
+	// so it is refused in both of its old spellings. The rest are values upstream's enum refuses.
+	refused := []struct {
+		name string
+		raw  string
+	}{
+		{"the old invented object", `{"mode":"Never"}`},
+		{"the old invented object in upstream's casing", `{"mode":"never"}`},
+		{"an empty object", `{}`},
+		{"the old PascalCase spelling", `"Never"`},
+		{"an unknown mode", `"sometimes"`},
+		{"an empty string", `""`},
+		{"null", `null`},
+	}
+	for _, testCase := range refused {
+		t.Run(testCase.name+" is refused", func(t *testing.T) {
+			t.Parallel()
+			if _, err := DecodePreferEs6ClassOptions([]byte(testCase.raw)); err == nil {
+				t.Errorf("%s decoded; upstream's schema refuses it", testCase.raw)
+			}
+		})
+	}
 }

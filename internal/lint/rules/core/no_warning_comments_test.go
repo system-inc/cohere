@@ -394,19 +394,41 @@ func TestDecodeNoWarningCommentsOptions(t *testing.T) {
 		}
 	})
 
-	t.Run("upstream's lowercase location is rejected", func(t *testing.T) {
-		t.Parallel()
-		if _, err := DecodeNoWarningCommentsOptions([]byte(`{"location":"anywhere"}`)); err == nil {
-			t.Error("the lowercase spelling decoded; our locations are PascalCase")
-		}
-	})
+	for _, testCase := range []struct {
+		raw  string
+		want NoWarningCommentsLocation
+	}{
+		{`{"location":"start"}`, NoWarningCommentsStart},
+		{`{"location":"anywhere"}`, NoWarningCommentsAnywhere},
+	} {
+		t.Run("upstream's "+testCase.raw+" is read", func(t *testing.T) {
+			t.Parallel()
+			decoded, err := DecodeNoWarningCommentsOptions([]byte(testCase.raw))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if decoded.(NoWarningCommentsOptions).Location != testCase.want {
+				t.Errorf("location = %q, wanted %q", decoded.(NoWarningCommentsOptions).Location, testCase.want)
+			}
+		})
+	}
 
-	t.Run("an unknown location is rejected", func(t *testing.T) {
-		t.Parallel()
-		if _, err := DecodeNoWarningCommentsOptions([]byte(`{"location":"Middle"}`)); err == nil {
-			t.Error("an unrecognized location decoded")
-		}
-	})
+	// "Start" and "Anywhere" are the spellings cohere invented before #d21war2, which no ESLint
+	// version accepts.
+	for _, raw := range []string{
+		`{"location":"Start"}`,
+		`{"location":"Anywhere"}`,
+		`{"location":"middle"}`,
+		`{"location":""}`,
+		`{"location":null}`,
+	} {
+		t.Run(raw+" is refused", func(t *testing.T) {
+			t.Parallel()
+			if _, err := DecodeNoWarningCommentsOptions([]byte(raw)); err == nil {
+				t.Errorf("%s decoded; upstream's schema refuses it", raw)
+			}
+		})
+	}
 
 	t.Run("a multi-character decoration is rejected", func(t *testing.T) {
 		t.Parallel()

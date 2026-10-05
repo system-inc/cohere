@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -23,16 +24,45 @@ const (
 	NoWarningCommentsAnywhere NoWarningCommentsLocation = "Anywhere"
 )
 
+// UnmarshalJSON reads upstream's spelling, `"start"` or `"anywhere"`, and refuses anything else.
+//
+// The config used to want `"Start"` and `"Anywhere"`, which refused upstream's own spelling while
+// no ESLint version accepted ours; the PascalCase form is now refused instead (#d21war2). An
+// unrecognized value is an error rather than a fallback, because every arm is selected by string
+// equality and an unknown value would silently pick a third behaviour of matching nothing.
+func (location *NoWarningCommentsLocation) UnmarshalJSON(raw []byte) error {
+	var spelling string
+	if err := json.Unmarshal(raw, &spelling); err != nil {
+		return err
+	}
+	switch spelling {
+	case "start":
+		*location = NoWarningCommentsStart
+	case "anywhere":
+		*location = NoWarningCommentsAnywhere
+	default:
+		return fmt.Errorf(`location is %q, which is neither "start" nor "anywhere"`, spelling)
+	}
+	return nil
+}
+
+// MarshalJSON writes the spelling UnmarshalJSON reads, so an options value round-trips.
+func (location NoWarningCommentsLocation) MarshalJSON() ([]byte, error) {
+	return json.Marshal(strings.ToLower(string(location)))
+}
+
 // NoWarningCommentsOptions configures the rule.
 //
-// Upstream's option is a single object, so the shape carries over directly. Only the `location`
-// enum is respelled into our casing.
+// Upstream's option is a single object, and the config takes it in exactly that form.
 type NoWarningCommentsOptions struct {
 	// Terms are the words that make a comment a warning. Absent means upstream's default set.
 	Terms []string `json:"terms"`
 
 	// Location is where the term has to appear. Absent means Start.
-	Location NoWarningCommentsLocation `json:"location"`
+	//
+	// Omitted when empty, because the empty location is the absent one and upstream's enum has no
+	// spelling for it: written out, it would be refused on the way back in.
+	Location NoWarningCommentsLocation `json:"location,omitempty"`
 
 	// Decoration are single characters allowed to precede the term under Start, so a banner
 	// comment still matches. Each entry must be exactly one non-whitespace character.
@@ -51,10 +81,9 @@ const noWarningCommentsCharacterLimit = 40
 
 // DecodeNoWarningCommentsOptions reads this rule's configuration from the config layer.
 //
-// Hand-rolled for two reasons the generic helper cannot cover. An unrecognized location must fail
-// loudly, because every arm is selected by string equality and an unknown value would silently pick
-// a third behaviour of matching nothing. And a decoration entry has to be exactly one non-whitespace
-// character, which upstream expresses as a schema `pattern` and we have no schema layer for.
+// Hand-rolled because a decoration entry has to be exactly one non-whitespace character, which
+// upstream expresses as a schema `pattern` and we have no schema layer for. The location is checked
+// by its own UnmarshalJSON.
 func DecodeNoWarningCommentsOptions(raw []byte) (any, error) {
 	options := NoWarningCommentsOptions{}
 	if len(raw) == 0 {
@@ -62,12 +91,6 @@ func DecodeNoWarningCommentsOptions(raw []byte) (any, error) {
 	}
 	if err := rule.UnmarshalOptions(raw, &options); err != nil {
 		return options, err
-	}
-	switch options.Location {
-	case "", NoWarningCommentsStart, NoWarningCommentsAnywhere:
-	default:
-		return options, fmt.Errorf(
-			"no-warning-comments: unknown location %q, wanted Start or Anywhere", options.Location)
 	}
 	for index, decoration := range options.Decoration {
 		if len([]rune(decoration)) != 1 || strings.TrimSpace(decoration) == "" {

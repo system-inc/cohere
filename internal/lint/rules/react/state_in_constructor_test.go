@@ -1,6 +1,7 @@
 package react
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -25,9 +26,8 @@ const stateInConstructorFile = "/repository/source/StateInConstructor.tsx"
 // Upstream's "features: ['class fields']" markers carry no meaning for us; class fields are
 // ordinary syntax to this parser, so the marker is dropped rather than modelled.
 //
-// The option is spelled as our named key rather than upstream's bare positional string, and every
-// option fixture routes through the exported decoder so the default and the serde name are under
-// test rather than bypassed.
+// The option is upstream's bare string, and every option fixture routes through the exported
+// decoder in upstream's spelling, so the decoder is under test rather than bypassed.
 
 // TestStateInConstructorFires runs the eight failing cases from upstream, one finding each.
 //
@@ -337,12 +337,11 @@ func TestStateInConstructorStaysSilent(t *testing.T) {
 // runStateInConstructor drives the rule through its own exported decoder.
 //
 // Routing through DecodeStateInConstructorOptions rather than building the options struct directly
-// is what puts the default and the JSON key under test. A fixture handing RunWithOptions a struct
-// would leave both untested, and both are lines with no upstream counterpart: upstream's option is
-// a bare positional string and ours is a named key.
+// is what puts the decoder under test: each mode reaches the rule as upstream writes it, `"always"`
+// or `"never"`. A fixture handing RunWithOptions a struct would leave the decoder untested.
 func runStateInConstructor(t *testing.T, mode StateInConstructorMode, sourceText string) rule_testing.Result {
 	t.Helper()
-	decoded, err := DecodeStateInConstructorOptions([]byte(`{"mode":"` + string(mode) + `"}`))
+	decoded, err := DecodeStateInConstructorOptions([]byte(`"` + strings.ToLower(string(mode)) + `"`))
 	if err != nil {
 		t.Fatalf("decoding mode %q: %v", mode, err)
 	}
@@ -748,62 +747,55 @@ func TestStateInConstructorMessages(t *testing.T) {
 	}
 }
 
-// TestDecodeStateInConstructorOptions pins the decoder, which has no upstream counterpart.
-//
-// Upstream's option is a bare positional string; ours is a named key with PascalCase values. The
-// default, the empty input, the empty string and the rejection of an unknown mode are all lines
-// this tree wrote, so they are all tested here rather than inferred from a rule fixture.
+// TestDecodeStateInConstructorOptions pins the decoder against upstream's schema,
+// `[{ enum: ["always", "never"] }]`.
 func TestDecodeStateInConstructorOptions(t *testing.T) {
 	t.Parallel()
 
-	t.Run("no options at all means Always", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeStateInConstructorOptions(nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if decoded.(StateInConstructorOptions).Mode != StateInConstructorAlways {
-			t.Errorf("mode = %q, wanted Always", decoded.(StateInConstructorOptions).Mode)
-		}
-	})
+	accepted := []struct {
+		name string
+		raw  string
+		want StateInConstructorMode
+	}{
+		{"no options at all means Always", ``, StateInConstructorAlways},
+		{"upstream's always", `"always"`, StateInConstructorAlways},
+		{"upstream's never", `"never"`, StateInConstructorNever},
+	}
+	for _, testCase := range accepted {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			decoded, err := DecodeStateInConstructorOptions([]byte(testCase.raw))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if decoded.(StateInConstructorOptions).Mode != testCase.want {
+				t.Errorf("mode = %q, wanted %q", decoded.(StateInConstructorOptions).Mode, testCase.want)
+			}
+		})
+	}
 
-	t.Run("an empty object means Always", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeStateInConstructorOptions([]byte(`{}`))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if decoded.(StateInConstructorOptions).Mode != StateInConstructorAlways {
-			t.Errorf("mode = %q, wanted Always", decoded.(StateInConstructorOptions).Mode)
-		}
-	})
-
-	t.Run("an explicit Never is kept", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeStateInConstructorOptions([]byte(`{"mode":"Never"}`))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if decoded.(StateInConstructorOptions).Mode != StateInConstructorNever {
-			t.Errorf("mode = %q, wanted Never", decoded.(StateInConstructorOptions).Mode)
-		}
-	})
-
-	t.Run("an unknown mode is refused", func(t *testing.T) {
-		t.Parallel()
-		if _, err := DecodeStateInConstructorOptions([]byte(`{"mode":"sometimes"}`)); err == nil {
-			t.Error("wanted an error naming the unknown mode")
-		}
-	})
-
-	t.Run("upstream's own spelling is refused rather than silently ignored", func(t *testing.T) {
-		t.Parallel()
-		// Guarding the migration: someone copying ESLint's config would write the kebab spelling,
-		// and silently reading that as Always would enforce the opposite of what they asked for.
-		if _, err := DecodeStateInConstructorOptions([]byte(`{"mode":"never"}`)); err == nil {
-			t.Error("wanted an error on upstream's lowercase spelling")
-		}
-	})
+	// The object form is the shape cohere invented before #d21war2 and no ESLint version accepts,
+	// so it is refused in both of its old spellings. The rest are values upstream's enum refuses.
+	refused := []struct {
+		name string
+		raw  string
+	}{
+		{"the old invented object", `{"mode":"Never"}`},
+		{"the old invented object in upstream's casing", `{"mode":"never"}`},
+		{"an empty object", `{}`},
+		{"the old PascalCase spelling", `"Never"`},
+		{"an unknown mode", `"sometimes"`},
+		{"an empty string", `""`},
+		{"null", `null`},
+	}
+	for _, testCase := range refused {
+		t.Run(testCase.name+" is refused", func(t *testing.T) {
+			t.Parallel()
+			if _, err := DecodeStateInConstructorOptions([]byte(testCase.raw)); err == nil {
+				t.Errorf("%s decoded; upstream's schema refuses it", testCase.raw)
+			}
+		})
+	}
 }
 
 // TestStateInConstructorWalkCrossesAClassBoundary pins that the constructor walk does not stop at a

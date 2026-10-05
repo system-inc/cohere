@@ -29,8 +29,8 @@ const didMountFile = "/repository/source/DidMount.tsx"
 // fail inputs and exactly one finding each. Recovered by counting the location headers in both
 // files rather than by assuming the totals lined up.
 //
-// The second block is the same rule under `["disallow-in-func"]`, spelled here as
-// `disallowInFunc: true`. Three of its four failing cases are byte-identical to cases that PASS in
+// The second block is the same rule under `["disallow-in-func"]`, which decodes to
+// `DisallowInFunc: true`. Three of its four failing cases are byte-identical to cases that PASS in
 // the first block, which is the single most useful thing the corpus says about this rule: the
 // option is not an edge refinement, it is the switch that moves half the passing set into the
 // failing one.
@@ -159,7 +159,7 @@ func TestNoDidMountSetStateFires(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, testCase.sourceText,
-				NoDidMountSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
+				NoMethodSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
 			rule_testing.ExpectFindings(t, result, "noDidMountSetState")
 		})
 	}
@@ -294,7 +294,7 @@ func TestNoDidMountSetStateStaysSilent(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, testCase.sourceText,
-				NoDidMountSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
+				NoMethodSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
 			rule_testing.ExpectClean(t, result)
 		})
 	}
@@ -712,7 +712,7 @@ class Hello extends React.Component {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoDidMountSetState, testCase.fileName, testCase.sourceText,
-				NoDidMountSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
+				NoMethodSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
 			if len(testCase.findings) == 0 {
 				rule_testing.ExpectClean(t, result)
 				return
@@ -745,7 +745,7 @@ class Hello extends React.Component {
 }
 `
 	result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, sourceText,
-		NoDidMountSetStateOptions{})
+		NoMethodSetStateOptions{})
 	rule_testing.ExpectFindings(t, result, "noDidMountSetState")
 
 	diagnostic := result.Diagnostics[0]
@@ -776,7 +776,7 @@ class Hello extends React.Component {
 }
 `
 	result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, sourceText,
-		NoDidMountSetStateOptions{})
+		NoMethodSetStateOptions{})
 	rule_testing.ExpectFindings(t, result, "noDidMountSetState")
 
 	diagnostic := result.Diagnostics[0]

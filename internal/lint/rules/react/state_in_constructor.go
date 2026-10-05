@@ -1,6 +1,9 @@
 package react
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -21,13 +24,12 @@ const (
 
 // StateInConstructorOptions configures the rule.
 //
-// Upstream's option surface is a bare string enum, a one-element positional array holding either
-// `always` or `never`. Our config layer reads named keys, so the same choice is spelled as one
-// field whose values are the string-literal union our conventions want. The decision each spelling
-// selects is identical; only the spelling moved.
+// Upstream's option is a bare string, `"always"` or `"never"`, and the config takes it in exactly
+// that form. It used to take `{"mode": "Always"}`, a shape no ESLint version accepts, which refused
+// upstream's own spelling; that form is now refused instead (#d21war2).
 type StateInConstructorOptions struct {
 	// Mode is which style the rule enforces. Absent means Always, which is upstream's default.
-	Mode StateInConstructorMode `json:"mode"`
+	Mode StateInConstructorMode
 }
 
 // DefaultStateInConstructorOptions is the unconfigured answer.
@@ -41,10 +43,10 @@ func DefaultStateInConstructorOptions() StateInConstructorOptions {
 
 // DecodeStateInConstructorOptions reads this rule's configuration from the config layer.
 //
-// Hand-rolled rather than `rule.DecodeOptionsInto` so an unrecognized mode fails loudly. The
-// generic helper would leave an unknown string in the field, and the two modes disagree about every
-// input this rule can see, so a typo would silently select a third behaviour of reporting nothing
-// at all. That is the failure the brief describes as a rule that is wired and inert.
+// The option is a bare enum string rather than an object, so the generic helper, which unmarshals
+// into a struct, cannot read it. Upstream's schema is `[{ enum: ["always", "never"] }]`, so anything
+// else is refused, naming the value: the two modes disagree about every input this rule can see, and
+// a value read as neither would silently select a third behaviour of reporting nothing at all.
 //
 // A rule configured as bare `"error"` is handed no options at all, and the empty case has to return
 // the default rather than the zero value for the same reason: an empty Mode matches neither arm.
@@ -53,25 +55,18 @@ func DecodeStateInConstructorOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	var mode string
+	if err := json.Unmarshal(raw, &mode); err != nil {
+		return options, fmt.Errorf(`expected a mode string, "always" or "never", got %s`, raw)
 	}
-	if options.Mode == "" {
-		options.Mode = StateInConstructorAlways
+	switch mode {
+	case "always":
+		return options, nil
+	case "never":
+		options.Mode = StateInConstructorNever
+		return options, nil
 	}
-	switch options.Mode {
-	case StateInConstructorAlways, StateInConstructorNever:
-	default:
-		return options, &stateInConstructorModeError{mode: string(options.Mode)}
-	}
-	return options, nil
-}
-
-// stateInConstructorModeError names an unrecognized mode and the two that are recognized.
-type stateInConstructorModeError struct{ mode string }
-
-func (e *stateInConstructorModeError) Error() string {
-	return "state-in-constructor: unknown mode " + e.mode + ", wanted one of Always, Never"
+	return options, fmt.Errorf(`mode %q is not "always" or "never"`, mode)
 }
 
 var messageStateInConstructorInConstructor = rule.Message{

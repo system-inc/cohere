@@ -16,29 +16,6 @@ var messageNoDidMountSetState = rule.Message{
 		"the first render is already correct.",
 }
 
-// NoDidMountSetStateOptions is the decoded option object.
-//
-// oxc's config is the bare enum `AllowedOrDisallowInFunc`, deserialized from the string
-// `"disallow-in-func"` sitting alone in the options array rather than from an object with a key.
-// There is no `meta.schema` to consult because this rule has no ESLint source in this tree; the
-// authority is oxc's `utils/configuration.rs:41`, which declares exactly two variants, `Allowed` (the
-// default) and `DisallowInFunc`, with `rename_all = "kebab-case"`.
-//
-// Our option decoding is object-shaped, so the enum is spelled as the boolean it actually is. One
-// variant is the zero value and the other is the flag being set, which loses nothing: the enum
-// never had a third state.
-type NoDidMountSetStateOptions struct {
-	// DisallowInFunc also reports a `setState` written inside a function nested in the lifecycle
-	// method, rather than only one written directly in its body.
-	//
-	// Off by default, and the default is the entire subject of upstream's corpus. Five of the
-	// twelve default-mode passing cases are a `setState` inside a callback, and three of those five
-	// reappear byte-identically in the second tester block as *failures* under this flag. So the
-	// flag is not a refinement at the edges: it is the only thing separating half the passing
-	// corpus from half the failing one.
-	DisallowInFunc bool `json:"disallowInFunc"`
-}
-
 // NoDidMountSetState flags `this.setState(...)` inside a component's `componentDidMount`.
 //
 //	valid:   class H extends React.Component { componentDidUpdate() { this.setState({}); } }
@@ -48,7 +25,7 @@ type NoDidMountSetStateOptions struct {
 //	invalid: class H extends React.Component { componentDidMount() { this.setState({}); } }
 //	invalid: createReactClass({ componentDidMount: function() { this.setState({}); } })
 //	invalid: createReactClass({ componentDidMount: function() { setTimeout(() => this.setState({})); } })
-//	                                                                   (disallowInFunc: true)
+//	                                                                   (under "disallow-in-func")
 //
 // Ported from `react/no-did-mount-set-state`, read against oxc's `no_did_mount_set_state.rs` and
 // the shared walk it delegates to at `oxc/crates/oxc_linter/src/utils/react.rs:606`,
@@ -139,8 +116,8 @@ var NoDidMountSetState = rule.Rule{
 		// legal, and the gate made the rule silent on 3,359 of them against 2,118 it could see.
 		// Measured before removal: the same class reported in `.tsx` and produced nothing in `.ts`.
 
-		// An unconfigured rule gets the zero value, which is upstream's `Allowed` default.
-		settings, _ := rule.OptionsAs[NoDidMountSetStateOptions](options)
+		// An unconfigured rule gets the zero value, which is upstream's `allow-in-func` default.
+		settings, _ := rule.OptionsAs[NoMethodSetStateOptions](options)
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

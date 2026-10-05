@@ -15,27 +15,6 @@ var messageNoSetStateInComponentDidUpdate = rule.Message{
 		"cannot run on its own output.",
 }
 
-// NoDidUpdateSetStateOptions is the decoded option object.
-//
-// One field holding the single positional string both upstreams take. ESLint's `meta.schema` is
-// `[{enum: ["disallow-in-func"]}]`, so upstream accepts exactly one value and treats its absence as
-// the permissive default it spells `allow-in-func` internally. oxc deserializes the same position
-// into an enum carrying `allowed` and `disallow-in-func`, so `allowed` is an oxc extension that
-// names the default explicitly, and upstream's own corpus passes it on four cases. Both spellings
-// are accepted here for that reason and only `disallow-in-func` changes an answer.
-//
-// Our inventory records this rule as taking no options, which is wrong, and this is the second
-// react rule in this package where that column has been wrong.
-type NoDidUpdateSetStateOptions struct {
-	// Mode is the positional option string, empty when the rule is configured with a bare severity.
-	//
-	// An unrecognized value reads as the default rather than as a second disallowing mode. Neither
-	// upstream has to decide this, because ESLint's schema rejects an unlisted string before the
-	// rule runs and oxc's serde fails the config; we do have to, and the permissive reading is the
-	// one that cannot start reporting on a typo in somebody's settings file.
-	Mode string `json:"mode"`
-}
-
 // NoDidUpdateSetState reports `this.setState` called from `componentDidUpdate`.
 //
 //	valid:   class H extends React.Component { componentDidMount() { this.setState({}); } }
@@ -107,8 +86,8 @@ var NoDidUpdateSetState = rule.Rule{
 	Name: "react/no-did-update-set-state",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's permissive default.
-		settings, _ := rule.OptionsAs[NoDidUpdateSetStateOptions](options)
-		reportInsideNestedFunctions := settings.Mode == "disallow-in-func"
+		settings, _ := rule.OptionsAs[NoMethodSetStateOptions](options)
+		reportInsideNestedFunctions := settings.DisallowInFunc
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

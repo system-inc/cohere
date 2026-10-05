@@ -138,7 +138,7 @@ func TestNoWillUpdateSetStateFires(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoWillUpdateSetState, willUpdateSetStateFile,
-				testCase.sourceText, NoWillUpdateSetStateOptions{Mode: testCase.option})
+				testCase.sourceText, noMethodSetStateOptions(t, testCase.option))
 			rule_testing.ExpectFindings(t, result, "noSetStateInComponentWillUpdate")
 		})
 	}
@@ -245,7 +245,7 @@ func TestNoWillUpdateSetStateStaysSilent(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			result := rule_testing.RunWithOptions(t, NoWillUpdateSetState, willUpdateSetStateFile,
-				testCase.sourceText, NoWillUpdateSetStateOptions{Mode: testCase.option})
+				testCase.sourceText, noMethodSetStateOptions(t, testCase.option))
 			rule_testing.ExpectClean(t, result)
 		})
 	}
@@ -324,16 +324,8 @@ func TestNoWillUpdateSetStateDefaultsToAllowingNestedFunctions(t *testing.T) {
 
 	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoWillUpdateSetState,
 		willUpdateSetStateFile, callbackSource,
-		NoWillUpdateSetStateOptions{Mode: "disallow-in-func"}),
+		noMethodSetStateOptions(t, "disallow-in-func")),
 		"noSetStateInComponentWillUpdate")
-
-	// An unrecognized value reads as the default rather than as a second disallowing mode. Neither
-	// upstream has to decide this, because ESLint's schema rejects an unlisted string before the
-	// rule runs and oxc's serde fails the configuration. The permissive reading is the one that cannot
-	// start reporting on a typo in somebody's settings file.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoWillUpdateSetState,
-		willUpdateSetStateFile, callbackSource,
-		NoWillUpdateSetStateOptions{Mode: "disallow_in_func"}))
 }
 
 // Two calls in one lifecycle method body report once each.

@@ -1,6 +1,9 @@
 package react
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -19,12 +22,12 @@ const (
 
 // PreferEs6ClassOptions configures the rule.
 //
-// Upstream's option surface is a bare string enum, a one-element positional array holding either
-// `always` or `never`. Our config layer reads named keys, so the same choice is spelled as one
-// field whose values are the string-literal union our conventions want.
+// Upstream's option is a bare string, `"always"` or `"never"`, and the config takes it in exactly
+// that form. It used to take `{"mode": "Always"}`, a shape no ESLint version accepts, which refused
+// upstream's own spelling; that form is now refused instead (#d21war2).
 type PreferEs6ClassOptions struct {
 	// Mode is which style the rule enforces. Absent means Always, which is upstream's default.
-	Mode PreferEs6ClassMode `json:"mode"`
+	Mode PreferEs6ClassMode
 }
 
 // DefaultPreferEs6ClassOptions is the unconfigured answer.
@@ -38,33 +41,27 @@ func DefaultPreferEs6ClassOptions() PreferEs6ClassOptions {
 
 // DecodePreferEs6ClassOptions reads this rule's configuration from the config layer.
 //
-// Hand-rolled rather than `rule.DecodeOptionsInto` so an unrecognized mode fails loudly. The
-// generic helper would leave an unknown string in the field, and the two modes report on disjoint
-// inputs, so a typo would silently select a third behaviour of reporting nothing at all.
+// The option is a bare enum string rather than an object, so the generic helper, which unmarshals
+// into a struct, cannot read it. Upstream's schema is `[{ enum: ["always", "never"] }]`, so anything
+// else is refused, naming the value: the two modes report on disjoint inputs, and a value read as
+// neither would silently select a third behaviour of reporting nothing at all.
 func DecodePreferEs6ClassOptions(raw []byte) (any, error) {
 	options := DefaultPreferEs6ClassOptions()
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	var mode string
+	if err := json.Unmarshal(raw, &mode); err != nil {
+		return options, fmt.Errorf(`expected a mode string, "always" or "never", got %s`, raw)
 	}
-	if options.Mode == "" {
-		options.Mode = PreferEs6ClassAlways
+	switch mode {
+	case "always":
+		return options, nil
+	case "never":
+		options.Mode = PreferEs6ClassNever
+		return options, nil
 	}
-	switch options.Mode {
-	case PreferEs6ClassAlways, PreferEs6ClassNever:
-	default:
-		return options, &preferEs6ClassModeError{mode: string(options.Mode)}
-	}
-	return options, nil
-}
-
-// preferEs6ClassModeError names an unrecognized mode and the two that are recognized.
-type preferEs6ClassModeError struct{ mode string }
-
-func (e *preferEs6ClassModeError) Error() string {
-	return "prefer-es6-class: unknown mode " + e.mode + ", wanted one of Always, Never"
+	return options, fmt.Errorf(`mode %q is not "always" or "never"`, mode)
 }
 
 var messagePreferEs6ClassShouldUseEs6Class = rule.Message{
