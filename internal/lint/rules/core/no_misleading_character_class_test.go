@@ -13,12 +13,12 @@ const misleadingCharacterClassFile = "/repository/source/Pattern.ts"
 // than as a wall of repeated identifiers. The rule reports six distinct ids and one input commonly
 // produces several, which is the whole reason the counts below are not all one.
 const (
-	withoutFlag = "surrogatePairWithoutUnicodeFlagInCharacterClass"
-	escapedPair = "surrogatePairInCharacterClass"
-	combining   = "combiningClassInCharacterClass"
-	emoji       = "emojiModifierInCharacterClass"
-	regional    = "regionalIndicatorInCharacterClass"
-	joiner      = "zeroWidthJoinerInCharacterClass"
+	withoutFlag = "surrogatePairWithoutUFlag"
+	escapedPair = "surrogatePair"
+	combining   = "combiningClass"
+	emoji       = "emojiModifier"
+	regional    = "regionalIndicatorSymbol"
+	joiner      = "zwj"
 )
 
 // The corpus is oxc's, copied rather than rewritten.

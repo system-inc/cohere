@@ -21,16 +21,6 @@ import (
  * it, a pattern held in a name or built by concatenation, a regex bound to a constant, regex literals
  * handed over with and without flags, and flags that are constant, written, or unknowable.
  */
-// misleadingIdsFromESLint maps each of ESLint's ids to this port's name for the same finding.
-var misleadingIdsFromESLint = map[string]string{
-	"surrogatePair":             "surrogatePairInCharacterClass",
-	"surrogatePairWithoutUFlag": "surrogatePairWithoutUnicodeFlagInCharacterClass",
-	"combiningClass":            "combiningClassInCharacterClass",
-	"emojiModifier":             "emojiModifierInCharacterClass",
-	"regionalIndicatorSymbol":   "regionalIndicatorInCharacterClass",
-	"zwj":                       "zeroWidthJoinerInCharacterClass",
-}
-
 func TestNoMisleadingCharacterClassAgreesWithESLint(t *testing.T) {
 	t.Parallel()
 
@@ -185,6 +175,8 @@ func TestNoMisleadingCharacterClassAgreesWithESLint(t *testing.T) {
 		{"corpus", "/[\\u{d83d}\\udc4d]/u", []string{"surrogatePair \\u{d83d}\\udc4d@2"}},
 		{"corpus", "/[\\u{d83d}\\u{dc4d}]/u", []string{"surrogatePair \\u{d83d}\\u{dc4d}@2"}},
 		{"corpus", "/[\\uD83D\\u{DC4d}]/u", []string{"surrogatePair \\uD83D\\u{DC4d}@2"}},
+		{"corpus", "new RegExp(`${\"[👍🇯🇵]\"}[😊]`);", []string{"surrogatePairWithoutUFlag `${\"[👍🇯🇵]\"}[😊]`@11"}},
+		{"corpus", "const pattern = \"[👍]\"; new RegExp(pattern);", []string{"surrogatePairWithoutUFlag pattern@37"}},
 		{"corpus", "RegExp(/[a👍z]/u, '');", []string{"surrogatePairWithoutUFlag 👍@10"}},
 		{"corpus", "RegExp(/[👍]/)", []string{"surrogatePairWithoutUFlag 👍@9"}},
 		{"corpus", "RegExp(/[👍]/, 'i');", []string{"surrogatePairWithoutUFlag 👍@9"}},
@@ -217,10 +209,6 @@ func TestNoMisleadingCharacterClassAgreesWithESLint(t *testing.T) {
 	}
 
 	for index, testCase := range cases {
-		for position, want := range testCase.want {
-			id, rest, _ := strings.Cut(want, " ")
-			testCase.want[position] = misleadingIdsFromESLint[id] + " " + rest
-		}
 		result := rule_testing.RunTypedVerbatimWithOptions(t, NoMisleadingCharacterClass, "input.ts", testCase.code, nil)
 		source := result.SourceFile.Text()
 		got := []string{}

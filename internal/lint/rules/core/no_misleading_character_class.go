@@ -16,7 +16,7 @@ import (
 // literal; one who sees "surrogate pair" without the flag knows to add the flag. Collapsing them
 // into a single id would make the count assertable and the advice useless.
 var messageMisleadingSurrogatePair = rule.Message{
-	Id: "surrogatePairInCharacterClass",
+	Id: "surrogatePair",
 	Description: "This character class holds a surrogate pair spelled partly as a code point escape, " +
 		"so what looks like one astral character is two independent class members. The class matches " +
 		"either half on its own and never the character the author wrote, which is a match that " +
@@ -24,7 +24,7 @@ var messageMisleadingSurrogatePair = rule.Message{
 }
 
 var messageMisleadingSurrogatePairWithoutUnicodeFlag = rule.Message{
-	Id: "surrogatePairWithoutUnicodeFlagInCharacterClass",
+	Id: "surrogatePairWithoutUFlag",
 	Description: "This character class holds an astral character while the pattern has neither the " +
 		"u nor the v flag, so the engine reads it as its two UTF-16 halves and the class matches " +
 		"either half alone. `/[👍]/` matches the two lone surrogates that spell it and never the " +
@@ -32,7 +32,7 @@ var messageMisleadingSurrogatePairWithoutUnicodeFlag = rule.Message{
 }
 
 var messageMisleadingCombiningClass = rule.Message{
-	Id: "combiningClassInCharacterClass",
+	Id: "combiningClass",
 	Description: "This character class holds a base character followed by a combining mark, which " +
 		"renders as one glyph and is two code points. The class matches the base or the mark " +
 		"separately, so `/[Á]/` accepts a bare `A` and accepts a stray accent, and rejects the " +
@@ -40,21 +40,21 @@ var messageMisleadingCombiningClass = rule.Message{
 }
 
 var messageMisleadingEmojiModifier = rule.Message{
-	Id: "emojiModifierInCharacterClass",
+	Id: "emojiModifier",
 	Description: "This character class holds an emoji followed by a skin tone modifier, which is one " +
 		"glyph made of two code points. The class matches the unmodified emoji or the bare modifier, " +
 		"so it accepts inputs nobody meant to accept and rejects the modified emoji itself.",
 }
 
 var messageMisleadingRegionalIndicator = rule.Message{
-	Id: "regionalIndicatorInCharacterClass",
+	Id: "regionalIndicatorSymbol",
 	Description: "This character class holds a pair of regional indicator symbols, which render as " +
 		"one flag and are two code points. The class matches either letter alone, so a flag class " +
 		"built this way accepts every other flag that shares a letter with it.",
 }
 
 var messageMisleadingZeroWidthJoiner = rule.Message{
-	Id: "zeroWidthJoinerInCharacterClass",
+	Id: "zwj",
 	Description: "This character class holds characters spliced by a zero width joiner, which renders " +
 		"as one glyph and is three or more code points. The class matches each piece on its own, so " +
 		"a family emoji written this way matches the individual people in it and never the family.",
@@ -625,7 +625,7 @@ func unicodeFlagSuggestionForLiteral(node *ast.Node, text string, flags string) 
 	}
 	return []rule.Suggestion{{
 		Message: rule.Message{
-			Id: "addUnicodeFlag",
+			Id: "suggestUnicodeFlag",
 			Description: "Add the u flag so the class matches the character rather than its parts. " +
 				"The flag changes how the whole pattern parses, so this is offered rather than applied.",
 		},

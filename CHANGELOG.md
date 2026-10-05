@@ -103,4 +103,6 @@ chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
   `const` or never-written binding, or built by concatenation, is read. A pattern that reached the call
   that way reports once per kind at the argument, and a string or template still reports at the
   characters. A pattern whose value is a RegExp object is not read, and flags that cannot be read still
-  decline the call.
+  decline the call. Its message ids are ESLint's: `surrogatePair`, `surrogatePairWithoutUFlag`,
+  `combiningClass`, `emojiModifier`, `regionalIndicatorSymbol` and `zwj`, and the suggestion's is
+  `suggestUnicodeFlag`.

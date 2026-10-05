@@ -9738,12 +9738,12 @@
             "upstreamName": "no-misleading-character-class",
             "typeAware": true,
             "messageIds": [
-                "combiningClassInCharacterClass",
-                "emojiModifierInCharacterClass",
-                "regionalIndicatorInCharacterClass",
-                "surrogatePairInCharacterClass",
-                "surrogatePairWithoutUnicodeFlagInCharacterClass",
-                "zeroWidthJoinerInCharacterClass"
+                "combiningClass",
+                "emojiModifier",
+                "regionalIndicatorSymbol",
+                "surrogatePair",
+                "surrogatePairWithoutUFlag",
+                "zwj"
             ],
             "fixKind": "suggestion",
             "sets": [
