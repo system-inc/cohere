@@ -50,6 +50,20 @@ func messageAmbiguousEnglishSibling(first string, second string) rule.Message {
 	}
 }
 
+// localizationNoUntranslatedValueMissingEnglishSiblingText is the rule's `missingEnglishSibling`
+// message, whose wording lives in `policy/messages/localization-no-untranslated-value.json`.
+var localizationNoUntranslatedValueMissingEnglishSiblingText = policy.MessageOf("nexus/localization-no-untranslated-value", "missingEnglishSibling")
+
+func messageMissingEnglishSibling(expected string, alternative string) rule.Message {
+	return rule.Message{
+		Id: "missingEnglishSibling",
+		Description: localizationNoUntranslatedValueMissingEnglishSiblingText.Render(map[string]string{
+			"expected":    expected,
+			"alternative": alternative,
+		}),
+	}
+}
+
 // localizationNoUntranslatedValueIdenticalToSourceText is the rule's `identicalToSource` message,
 // whose wording lives in `policy/messages/localization-no-untranslated-value.json`.
 var localizationNoUntranslatedValueIdenticalToSourceText = policy.MessageOf("nexus/localization-no-untranslated-value", "identicalToSource")
@@ -92,10 +106,11 @@ func messageIdenticalToSource(key string, locale string, value string) rule.Mess
 // so the sibling is looked up with the file's own extension first, then the other; both present is
 // reported, since which is English would be a guess (#kwt1htp).
 //
-// A file whose en.ts is not in the program is declined rather than reported on. That is the
-// conservative direction on purpose: the alternative is reporting every key in a locale file as
-// untranslatable because the comparison basis was missing, which is a wall of findings that says
-// nothing about the translations.
+// A file with neither English sibling in the program gets one finding at its start, naming the
+// siblings it looked for, and no per-key comparison. Declining it silently made a set whose en.ts
+// was missing or misnamed read as clean, which is the one result this rule exists to rule out
+// (#techtr1); reporting every key instead would be a wall of findings that says nothing about the
+// translations, since the comparison basis is what is missing.
 //
 // No fix. The repair is a translation, which a rule cannot write.
 var LocalizationNoUntranslatedValue = rule.Rule{
@@ -119,14 +134,14 @@ var LocalizationNoUntranslatedValue = rule.Rule{
 			return nil
 		}
 		englishSourceFile, both := englishSibling(ctx.Program, translationsDirectory, ctx.SourceFile.FileName())
+		fileStart := ctx.SourceFile.AsNode().Loc.WithEnd(ctx.SourceFile.AsNode().Loc.Pos())
 		if both != nil {
-			fileStart := ctx.SourceFile.AsNode().Loc.WithEnd(ctx.SourceFile.AsNode().Loc.Pos())
 			ctx.ReportRange(fileStart, messageAmbiguousEnglishSibling(both[0], both[1]))
 			return nil
 		}
 		if englishSourceFile == nil {
-			// Declined silently, as the Nexus twin declines (#techtr1 makes a missing English sibling
-			// report in both engines, once the consumers are measured).
+			lookedFor := englishSiblingBaseNames(ctx.SourceFile.FileName())
+			ctx.ReportRange(fileStart, messageMissingEnglishSibling(lookedFor[0], lookedFor[1]))
 			return nil
 		}
 		englishValues := map[string]string{}
@@ -427,14 +442,10 @@ func translationFileInformation(sourceFile *ast.SourceFile) (string, string, boo
 // (#kwt1htp). When both en.ts and en.a are in the program, which is English is a guess, so both names
 // come back for the rule to report and the file is not compared at all. Neither found returns nil.
 func englishSibling(program rule.Program, directory string, fileName string) (*ast.SourceFile, []string) {
-	extensions := []string{".ts", sourcename.AdamicExtension}
-	if sourcename.IsAdamic(fileName) {
-		extensions = []string{sourcename.AdamicExtension, ".ts"}
-	}
 	var found *ast.SourceFile
 	var names []string
-	for _, extension := range extensions {
-		name := directory + "/en" + extension
+	for _, baseName := range englishSiblingBaseNames(fileName) {
+		name := directory + "/" + baseName
 		if sourceFile := program.GetSourceFile(name); sourceFile != nil {
 			if found == nil {
 				found = sourceFile
@@ -446,4 +457,13 @@ func englishSibling(program rule.Program, directory string, fileName string) (*a
 		return nil, names
 	}
 	return found, nil
+}
+
+// englishSiblingBaseNames is the English table's base names in the order they are looked up: the
+// linted file's own extension first, then the other (#kwt1htp).
+func englishSiblingBaseNames(fileName string) []string {
+	if sourcename.IsAdamic(fileName) {
+		return []string{"en" + sourcename.AdamicExtension, "en.ts"}
+	}
+	return []string{"en.ts", "en" + sourcename.AdamicExtension}
 }
